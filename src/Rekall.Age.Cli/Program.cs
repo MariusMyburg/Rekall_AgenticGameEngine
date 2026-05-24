@@ -46,6 +46,10 @@ internal static class RekallAgeCli
                     await BootstrapVulkanLogicalDeviceAsync(registry, context, null),
                 ["render", "vulkan", "device", "bootstrap", var preferredDeviceType] =>
                     await BootstrapVulkanLogicalDeviceAsync(registry, context, preferredDeviceType),
+                ["render", "vulkan", "command-buffer", "submit-empty"] =>
+                    await SubmitEmptyVulkanCommandBufferAsync(registry, context, null),
+                ["render", "vulkan", "command-buffer", "submit-empty", var preferredDeviceType] =>
+                    await SubmitEmptyVulkanCommandBufferAsync(registry, context, preferredDeviceType),
                 ["render", "plan", "create", var root, var backend, var name] =>
                     await CreateRenderPlanAsync(registry, context, root, backend, name),
                 ["render", "plan", "inspect", var root] => await InspectRenderPlanAsync(registry, context, root),
@@ -114,6 +118,7 @@ internal static class RekallAgeCli
         registry.Register(new ListRenderBackendsCommand());
         registry.Register(new ProbeVulkanBackendCommand());
         registry.Register(new BootstrapVulkanLogicalDeviceCommand());
+        registry.Register(new SubmitEmptyVulkanCommandBufferCommand());
         registry.Register(new CreateRenderPlanCommand());
         registry.Register(new AddRenderResourceCommand());
         registry.Register(new RecordRenderCommandBufferCommand());
@@ -209,6 +214,35 @@ internal static class RekallAgeCli
             Console.WriteLine($"Queue capabilities: {string.Join(", ", device.GraphicsQueueFamily.Capabilities)}");
         }
 
+        foreach (var error in result.Value.Errors)
+        {
+            Console.WriteLine($"Error: {error}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> SubmitEmptyVulkanCommandBufferAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string? preferredDeviceType)
+    {
+        var result = await registry.ExecuteAsync<SubmitEmptyVulkanCommandBufferRequest, SubmitEmptyVulkanCommandBufferResult>(
+            "rekall.render.vulkan.command_buffer.submit_empty",
+            new SubmitEmptyVulkanCommandBufferRequest(preferredDeviceType),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Submitted: {result.Value.Submitted}");
+        Console.WriteLine($"Loader: {result.Value.LoaderName ?? "<none>"}");
+        if (result.Value.SelectedDevice is { } device)
+        {
+            Console.WriteLine($"Selected device: {device.Name} [{device.DeviceType}] API {device.ApiVersion}");
+            Console.WriteLine($"Graphics queue family: {device.GraphicsQueueFamily.Index}");
+        }
+
+        Console.WriteLine($"Command pool created: {result.Value.CommandPoolCreated}");
+        Console.WriteLine($"Command buffer allocated: {result.Value.CommandBufferAllocated}");
+        Console.WriteLine($"Fence signaled: {result.Value.FenceSignaled}");
         foreach (var error in result.Value.Errors)
         {
             Console.WriteLine($"Error: {error}");

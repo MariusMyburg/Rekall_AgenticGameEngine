@@ -30,5 +30,6 @@ public sealed class RenderBackendCatalogTests
         Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "command-buffers");
         Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "render-pass-submit-clear");
         Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "render-pass-read-clear");
+        Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "render-pass-capture-clear");
     }
 }

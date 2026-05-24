@@ -25,6 +25,7 @@ public sealed class McpCatalogTests
         registry.Register(new BuildModulesCommand());
         registry.Register(new SubmitClearVulkanRenderPassCommand(new FakeVulkanRenderPassSubmission()));
         registry.Register(new ReadClearVulkanRenderPassCommand(new FakeVulkanRenderPassReadback()));
+        registry.Register(new CaptureClearVulkanRenderPassCommand(new FakeVulkanRenderPassCapture()));
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
@@ -37,6 +38,7 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.build.modules");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.vulkan.render_pass.submit_clear");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.vulkan.render_pass.read_clear");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.vulkan.render_pass.capture_clear");
     }
 
     private sealed class FakeVulkanRenderPassSubmission : IRekallAgeVulkanRenderPassSubmission
@@ -100,6 +102,36 @@ public sealed class McpCatalogTests
                 NonZeroBytes: 4,
                 FirstPixel: new RekallAgeVulkanReadbackPixel(20, 26, 36, 255),
                 ByteChecksum: 337,
+                Errors: []));
+        }
+    }
+
+    private sealed class FakeVulkanRenderPassCapture : IRekallAgeVulkanRenderPassCapture
+    {
+        public ValueTask<RekallAgeVulkanRenderPassCaptureResult> CaptureClearRenderPassAsync(
+            uint width,
+            uint height,
+            string format,
+            string? preferredDeviceType,
+            string outputDirectory,
+            CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult(new RekallAgeVulkanRenderPassCaptureResult(
+                Captured: true,
+                OutputPath: Path.Combine(outputDirectory, "vulkan-clear.png"),
+                LoaderName: "fake-vulkan",
+                SelectedDevice: new RekallAgeVulkanSelectedDevice(
+                    "Fake RTX",
+                    "discrete-gpu",
+                    "1.4.0",
+                    new RekallAgeVulkanQueueFamilyInfo(0, ["graphics"], 8)),
+                Width: width,
+                Height: height,
+                Format: format,
+                BytesRead: 4,
+                NonZeroBytes: 4,
+                FirstPixel: new RekallAgeVulkanReadbackPixel(20, 25, 36, 255),
+                ByteChecksum: 336,
                 Errors: []));
         }
     }

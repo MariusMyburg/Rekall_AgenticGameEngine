@@ -70,6 +70,10 @@ internal static class RekallAgeCli
                     await ReadClearVulkanRenderPassAsync(registry, context, "64", "64", "R8G8B8A8_UNorm", null),
                 ["render", "vulkan", "render-pass", "read-clear", var width, var height, var format, var preferredDeviceType] =>
                     await ReadClearVulkanRenderPassAsync(registry, context, width, height, format, preferredDeviceType),
+                ["render", "vulkan", "render-pass", "capture-clear", var outputDirectory] =>
+                    await CaptureClearVulkanRenderPassAsync(registry, context, "64", "64", "R8G8B8A8_UNorm", null, outputDirectory),
+                ["render", "vulkan", "render-pass", "capture-clear", var width, var height, var format, var preferredDeviceType, var outputDirectory] =>
+                    await CaptureClearVulkanRenderPassAsync(registry, context, width, height, format, preferredDeviceType, outputDirectory),
                 ["render", "plan", "create", var root, var backend, var name] =>
                     await CreateRenderPlanAsync(registry, context, root, backend, name),
                 ["render", "plan", "inspect", var root] => await InspectRenderPlanAsync(registry, context, root),
@@ -144,6 +148,7 @@ internal static class RekallAgeCli
         registry.Register(new CreateVulkanRenderTargetCommand());
         registry.Register(new SubmitClearVulkanRenderPassCommand());
         registry.Register(new ReadClearVulkanRenderPassCommand());
+        registry.Register(new CaptureClearVulkanRenderPassCommand());
         registry.Register(new CreateRenderPlanCommand());
         registry.Register(new AddRenderResourceCommand());
         registry.Register(new RecordRenderCommandBufferCommand());
@@ -455,6 +460,45 @@ internal static class RekallAgeCli
         Console.WriteLine($"Buffer created: {result.Value.BufferCreated}");
         Console.WriteLine($"Buffer bound: {result.Value.BufferBound}");
         Console.WriteLine($"Buffer mapped: {result.Value.BufferMapped}");
+        Console.WriteLine($"Bytes read: {result.Value.BytesRead}");
+        Console.WriteLine($"Non-zero bytes: {result.Value.NonZeroBytes}");
+        Console.WriteLine($"First pixel: {result.Value.FirstPixel.R},{result.Value.FirstPixel.G},{result.Value.FirstPixel.B},{result.Value.FirstPixel.A}");
+        Console.WriteLine($"Byte checksum: {result.Value.ByteChecksum}");
+        foreach (var error in result.Value.Errors)
+        {
+            Console.WriteLine($"Error: {error}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> CaptureClearVulkanRenderPassAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string width,
+        string height,
+        string format,
+        string? preferredDeviceType,
+        string outputDirectory)
+    {
+        var parsedWidth = uint.Parse(width, System.Globalization.CultureInfo.InvariantCulture);
+        var parsedHeight = uint.Parse(height, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<CaptureClearVulkanRenderPassRequest, CaptureClearVulkanRenderPassResult>(
+            "rekall.render.vulkan.render_pass.capture_clear",
+            new CaptureClearVulkanRenderPassRequest(parsedWidth, parsedHeight, format, preferredDeviceType, outputDirectory),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Captured: {result.Value.Captured}");
+        Console.WriteLine($"Output: {result.Value.OutputPath}");
+        Console.WriteLine($"Loader: {result.Value.LoaderName ?? "<none>"}");
+        if (result.Value.SelectedDevice is { } device)
+        {
+            Console.WriteLine($"Selected device: {device.Name} [{device.DeviceType}] API {device.ApiVersion}");
+            Console.WriteLine($"Graphics queue family: {device.GraphicsQueueFamily.Index}");
+        }
+
+        Console.WriteLine($"Extent: {result.Value.Width}x{result.Value.Height}");
+        Console.WriteLine($"Format: {result.Value.Format}");
         Console.WriteLine($"Bytes read: {result.Value.BytesRead}");
         Console.WriteLine($"Non-zero bytes: {result.Value.NonZeroBytes}");
         Console.WriteLine($"First pixel: {result.Value.FirstPixel.R},{result.Value.FirstPixel.G},{result.Value.FirstPixel.B},{result.Value.FirstPixel.A}");

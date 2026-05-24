@@ -15,6 +15,7 @@ The current MVP includes:
 - module-authored playable runtime execution; no engine-owned fallback games
 - Vulkan-first internal rendering backend catalog with Direct3D 12 extension point
 - native Vulkan loader probing for agent-readable backend diagnostics
+- native Vulkan logical-device bootstrap validation with physical-device and graphics-queue selection
 - low-level render plan authoring, validation, command-buffer recording, and deterministic execution artifacts
 - deterministic asset import and catalog listing commands
 - entity inspection and single-property component mutation commands
@@ -64,6 +65,7 @@ dotnet run --project src/Rekall.Age.Cli -- templates list
 dotnet run --project src/Rekall.Age.Cli -- mcp stdio
 dotnet run --project src/Rekall.Age.Cli -- render backends
 dotnet run --project src/Rekall.Age.Cli -- render vulkan probe
+dotnet run --project src/Rekall.Age.Cli -- render vulkan device bootstrap discrete-gpu
 dotnet run --project src/Rekall.Age.Cli -- render plan create .age-sandbox software Preview
 dotnet run --project src/Rekall.Age.Cli -- render resource add .age-sandbox preview-color image R8G8B8A8_UNorm color-attachment
 dotnet run --project src/Rekall.Age.Cli -- render command-buffer record .age-sandbox main graphics '[{"op":"begin-render-pass","label":"preview","arguments":{"target":"preview-color"}},{"op":"draw-rect","label":"agent-rect","arguments":{"x":"8","y":"8","width":"24","height":"16","color":"#ffcc33"}},{"op":"end-render-pass","label":"preview","arguments":{}}]'

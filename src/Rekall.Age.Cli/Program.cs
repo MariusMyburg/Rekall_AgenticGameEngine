@@ -42,6 +42,10 @@ internal static class RekallAgeCli
                 ["templates", "list"] => ListTemplates(),
                 ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
                 ["render", "vulkan", "probe"] => await ProbeVulkanBackendAsync(registry, context),
+                ["render", "vulkan", "device", "bootstrap"] =>
+                    await BootstrapVulkanLogicalDeviceAsync(registry, context, null),
+                ["render", "vulkan", "device", "bootstrap", var preferredDeviceType] =>
+                    await BootstrapVulkanLogicalDeviceAsync(registry, context, preferredDeviceType),
                 ["render", "plan", "create", var root, var backend, var name] =>
                     await CreateRenderPlanAsync(registry, context, root, backend, name),
                 ["render", "plan", "inspect", var root] => await InspectRenderPlanAsync(registry, context, root),
@@ -109,6 +113,7 @@ internal static class RekallAgeCli
         registry.Register(new ScaffoldPlayableModuleCommand());
         registry.Register(new ListRenderBackendsCommand());
         registry.Register(new ProbeVulkanBackendCommand());
+        registry.Register(new BootstrapVulkanLogicalDeviceCommand());
         registry.Register(new CreateRenderPlanCommand());
         registry.Register(new AddRenderResourceCommand());
         registry.Register(new RecordRenderCommandBufferCommand());
@@ -175,6 +180,33 @@ internal static class RekallAgeCli
         foreach (var extension in result.Value.InstanceExtensions.Take(12))
         {
             Console.WriteLine($"  {extension}");
+        }
+
+        foreach (var error in result.Value.Errors)
+        {
+            Console.WriteLine($"Error: {error}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> BootstrapVulkanLogicalDeviceAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string? preferredDeviceType)
+    {
+        var result = await registry.ExecuteAsync<BootstrapVulkanLogicalDeviceRequest, BootstrapVulkanLogicalDeviceResult>(
+            "rekall.render.vulkan.device.bootstrap",
+            new BootstrapVulkanLogicalDeviceRequest(preferredDeviceType),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Available: {result.Value.Available}");
+        Console.WriteLine($"Loader: {result.Value.LoaderName ?? "<none>"}");
+        if (result.Value.SelectedDevice is { } device)
+        {
+            Console.WriteLine($"Selected device: {device.Name} [{device.DeviceType}] API {device.ApiVersion}");
+            Console.WriteLine($"Graphics queue family: {device.GraphicsQueueFamily.Index}");
+            Console.WriteLine($"Queue capabilities: {string.Join(", ", device.GraphicsQueueFamily.Capabilities)}");
         }
 
         foreach (var error in result.Value.Errors)

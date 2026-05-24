@@ -268,5 +268,15 @@ public sealed class GameTemplateWorkflowTests
         Assert.Equal("pong", inspectArchive.Value.Manifest.SourceTemplateId);
         Assert.Contains(inspectArchive.Value.Manifest.DrawCommands, command => command.Id == "ball" && command.Kind == "circle");
         Assert.Contains(inspectArchive.Value.Manifest.DrawAssertions, assertion => assertion.Id == "ball" && assertion.Passed);
+
+        var runArchive = await new RunPlayablePackageCommand().ExecuteAsync(
+            new RunPlayablePackageRequest(package.Value.ArchivePath, Frames: 1),
+            context);
+
+        Assert.True(runArchive.Ok, runArchive.Summary);
+        Assert.True(runArchive.Value.Ready);
+        Assert.Equal(0, runArchive.Value.ExitCode);
+        Assert.Contains("FRAME 1", runArchive.Value.Output, StringComparison.Ordinal);
+        Assert.Contains("PONG", Assert.Single(runArchive.Value.Frames), StringComparison.Ordinal);
     }
 }

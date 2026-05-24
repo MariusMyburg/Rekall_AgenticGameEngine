@@ -102,6 +102,12 @@ public sealed class CliSmokeTests
         Assert.Contains("Ready: True", inspect.Output);
         Assert.Contains("Template: pong", inspect.Output);
         Assert.Contains("Draw commands:", inspect.Output);
+
+        var runPackage = await RunAsync(project, "game", "run-package", $"{packageDirectory}.zip", "1");
+        Assert.Equal(0, runPackage.ExitCode);
+        Assert.Contains("Ready: True", runPackage.Output);
+        Assert.Contains("FRAME 1", runPackage.Output);
+        Assert.Contains("PONG", runPackage.Output);
     }
 
     [Fact]

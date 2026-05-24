@@ -129,6 +129,8 @@ internal static class RekallAgeCli
                 ["game", "package-playable", var root, var scene, var outputDirectory, "--graphics"] =>
                     await PackagePlayableGameAsync(registry, context, root, scene, outputDirectory, graphics: true),
                 ["game", "inspect-package", var packagePath] => await InspectPlayablePackageAsync(registry, context, packagePath),
+                ["game", "run-package", var packagePath] => await RunPlayablePackageAsync(registry, context, packagePath, "2"),
+                ["game", "run-package", var packagePath, var frames] => await RunPlayablePackageAsync(registry, context, packagePath, frames),
                 ["project", "create", var root, var name, var capabilities] => await CreateProjectAsync(registry, context, root, name, capabilities),
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
                 ["scene", "create", var root, var name, var capabilities] => await CreateSceneAsync(registry, context, root, name, capabilities),
@@ -179,6 +181,7 @@ internal static class RekallAgeCli
         registry.Register(new VerifyPlayableGameCommand());
         registry.Register(new PackagePlayableGameCommand());
         registry.Register(new InspectPlayablePackageCommand());
+        registry.Register(new RunPlayablePackageCommand());
         registry.Register(new ListGameTemplatesCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
@@ -1182,6 +1185,31 @@ internal static class RekallAgeCli
         Console.WriteLine($"Launch: {result.Value.Manifest.LaunchPath}");
         Console.WriteLine($"Draw commands: {result.Value.Manifest.DrawCommands.Count}");
         Console.WriteLine($"Draw assertions: {result.Value.Manifest.DrawAssertions.Count}");
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.Ready ? 0 : 1;
+    }
+
+    private static async Task<int> RunPlayablePackageAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string packagePath,
+        string frames)
+    {
+        var frameCount = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<RunPlayablePackageRequest, RunPlayablePackageResult>(
+            "rekall.workflow.run_playable_package",
+            new RunPlayablePackageRequest(packagePath, frameCount),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Ready: {result.Value.Ready}");
+        Console.WriteLine($"Launch: {result.Value.LaunchPath}");
+        Console.WriteLine($"Game: {result.Value.GameRoot}");
+        Console.WriteLine($"Exit code: {result.Value.ExitCode}");
+        Console.Write(result.Value.Output);
         foreach (var error in result.Errors)
         {
             Console.WriteLine($"{error.Code}: {error.Message}");

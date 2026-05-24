@@ -7,5 +7,6 @@ public interface IRekallAgeVulkanRenderPassSubmission
         uint height,
         string format,
         string? preferredDeviceType,
+        RekallAgeVulkanClearColor clearColor,
         CancellationToken cancellationToken);
 }

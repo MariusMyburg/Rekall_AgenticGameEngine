@@ -154,7 +154,7 @@ public sealed class RekallAgeMcpJsonRpcServer
         foreach (var property in requestProperties)
         {
             var name = ToCamelCase(property.Name);
-            properties[name] = CreatePropertySchema(property.PropertyType);
+            properties[name] = CreatePropertySchema(property.PropertyType, []);
             if (requiredNames.Contains(name))
             {
                 required.Add(name);
@@ -187,7 +187,7 @@ public sealed class RekallAgeMcpJsonRpcServer
             .ToHashSet(StringComparer.Ordinal);
     }
 
-    private static JsonObject CreatePropertySchema(Type type)
+    private static JsonObject CreatePropertySchema(Type type, HashSet<Type> visited)
     {
         var underlying = Nullable.GetUnderlyingType(type) ?? type;
         if (typeof(JsonNode).IsAssignableFrom(underlying))
@@ -207,7 +207,10 @@ public sealed class RekallAgeMcpJsonRpcServer
 
         if (underlying == typeof(int)
             || underlying == typeof(long)
-            || underlying == typeof(short))
+            || underlying == typeof(short)
+            || underlying == typeof(uint)
+            || underlying == typeof(ulong)
+            || underlying == typeof(ushort))
         {
             return new JsonObject { ["type"] = "integer" };
         }
@@ -223,6 +226,34 @@ public sealed class RekallAgeMcpJsonRpcServer
             && typeof(System.Collections.IEnumerable).IsAssignableFrom(underlying))
         {
             return new JsonObject { ["type"] = "array" };
+        }
+
+        var objectProperties = underlying.GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Where(property => property.GetMethod is not null && property.GetIndexParameters().Length == 0)
+            .OrderBy(property => property.Name, StringComparer.Ordinal)
+            .ToArray();
+        if (objectProperties.Length > 0 && visited.Add(underlying))
+        {
+            var properties = new JsonObject();
+            var required = new JsonArray();
+            var requiredNames = GetRequiredPropertyNames(underlying, objectProperties);
+            foreach (var property in objectProperties)
+            {
+                var name = ToCamelCase(property.Name);
+                properties[name] = CreatePropertySchema(property.PropertyType, visited);
+                if (requiredNames.Contains(name))
+                {
+                    required.Add(name);
+                }
+            }
+
+            visited.Remove(underlying);
+            return new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = properties,
+                ["required"] = required
+            };
         }
 
         return new JsonObject { ["type"] = "object" };

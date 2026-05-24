@@ -9,6 +9,7 @@ public sealed record RekallAgeVulkanRenderPassReadbackResult(
     uint Width,
     uint Height,
     string Format,
+    RekallAgeVulkanClearColor ClearColor,
     bool Submitted,
     bool BufferCreated,
     bool BufferBound,

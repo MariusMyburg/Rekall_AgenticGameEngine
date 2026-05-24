@@ -31,6 +31,7 @@ public sealed class VulkanRenderPassSubmissionTests
             RenderPassBegan: true,
             RenderPassEnded: true,
             FenceSignaled: true,
+            ClearColor: RekallAgeVulkanClearColor.Default,
             Errors: []));
 
         var result = await new SubmitClearVulkanRenderPassCommand(submission).ExecuteAsync(
@@ -70,6 +71,7 @@ public sealed class VulkanRenderPassSubmissionTests
             RenderPassBegan: true,
             RenderPassEnded: false,
             FenceSignaled: false,
+            ClearColor: RekallAgeVulkanClearColor.Default,
             Errors: ["vkEndCommandBuffer failed with VkResult -2."]));
 
         var result = await new SubmitClearVulkanRenderPassCommand(submission).ExecuteAsync(
@@ -94,6 +96,7 @@ public sealed class VulkanRenderPassSubmissionTests
             uint height,
             string format,
             string? preferredDeviceType,
+            RekallAgeVulkanClearColor clearColor,
             CancellationToken cancellationToken)
         {
             return ValueTask.FromResult(_result);

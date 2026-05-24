@@ -22,6 +22,7 @@ public sealed class VulkanRenderPassReadbackTests
             Width: 64,
             Height: 64,
             Format: "R8G8B8A8_UNorm",
+            ClearColor: RekallAgeVulkanClearColor.Default,
             Submitted: true,
             BufferCreated: true,
             BufferBound: true,
@@ -59,6 +60,7 @@ public sealed class VulkanRenderPassReadbackTests
             Width: 64,
             Height: 64,
             Format: "R8G8B8A8_UNorm",
+            ClearColor: RekallAgeVulkanClearColor.Default,
             Submitted: false,
             BufferCreated: true,
             BufferBound: false,
@@ -91,6 +93,7 @@ public sealed class VulkanRenderPassReadbackTests
             uint height,
             string format,
             string? preferredDeviceType,
+            RekallAgeVulkanClearColor clearColor,
             CancellationToken cancellationToken)
         {
             return ValueTask.FromResult(_result);

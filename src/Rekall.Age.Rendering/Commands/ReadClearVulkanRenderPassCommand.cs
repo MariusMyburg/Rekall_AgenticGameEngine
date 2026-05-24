@@ -6,7 +6,8 @@ public sealed record ReadClearVulkanRenderPassRequest(
     uint Width = 64,
     uint Height = 64,
     string Format = "R8G8B8A8_UNorm",
-    string? PreferredDeviceType = "discrete-gpu");
+    string? PreferredDeviceType = "discrete-gpu",
+    RekallAgeVulkanClearColor? ClearColor = null);
 
 public sealed record ReadClearVulkanRenderPassResult(
     bool Readback,
@@ -15,6 +16,7 @@ public sealed record ReadClearVulkanRenderPassResult(
     uint Width,
     uint Height,
     string Format,
+    RekallAgeVulkanClearColor ClearColor,
     bool Submitted,
     bool BufferCreated,
     bool BufferBound,
@@ -57,6 +59,7 @@ public sealed class ReadClearVulkanRenderPassCommand
             request.Height,
             request.Format,
             request.PreferredDeviceType,
+            RekallAgeVulkanClearColor.Normalize(request.ClearColor),
             context.CancellationToken);
         var result = new ReadClearVulkanRenderPassResult(
             readback.Readback,
@@ -65,6 +68,7 @@ public sealed class ReadClearVulkanRenderPassCommand
             readback.Width,
             readback.Height,
             readback.Format,
+            readback.ClearColor,
             readback.Submitted,
             readback.BufferCreated,
             readback.BufferBound,

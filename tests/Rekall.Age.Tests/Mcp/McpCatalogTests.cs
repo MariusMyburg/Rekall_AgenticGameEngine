@@ -48,6 +48,7 @@ public sealed class McpCatalogTests
             uint height,
             string format,
             string? preferredDeviceType,
+            RekallAgeVulkanClearColor clearColor,
             CancellationToken cancellationToken)
         {
             return ValueTask.FromResult(new RekallAgeVulkanRenderPassSubmissionResult(
@@ -70,6 +71,7 @@ public sealed class McpCatalogTests
                 RenderPassBegan: true,
                 RenderPassEnded: true,
                 FenceSignaled: true,
+                ClearColor: clearColor,
                 Errors: []));
         }
     }
@@ -81,6 +83,7 @@ public sealed class McpCatalogTests
             uint height,
             string format,
             string? preferredDeviceType,
+            RekallAgeVulkanClearColor clearColor,
             CancellationToken cancellationToken)
         {
             return ValueTask.FromResult(new RekallAgeVulkanRenderPassReadbackResult(
@@ -94,6 +97,7 @@ public sealed class McpCatalogTests
                 Width: width,
                 Height: height,
                 Format: format,
+                ClearColor: clearColor,
                 Submitted: true,
                 BufferCreated: true,
                 BufferBound: true,
@@ -114,6 +118,7 @@ public sealed class McpCatalogTests
             string format,
             string? preferredDeviceType,
             string outputDirectory,
+            RekallAgeVulkanClearColor clearColor,
             CancellationToken cancellationToken)
         {
             return ValueTask.FromResult(new RekallAgeVulkanRenderPassCaptureResult(
@@ -128,6 +133,7 @@ public sealed class McpCatalogTests
                 Width: width,
                 Height: height,
                 Format: format,
+                ClearColor: clearColor,
                 BytesRead: 4,
                 NonZeroBytes: 4,
                 FirstPixel: new RekallAgeVulkanReadbackPixel(20, 25, 36, 255),

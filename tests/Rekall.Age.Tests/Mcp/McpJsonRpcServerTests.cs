@@ -2,6 +2,7 @@ using System.Text.Json;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Mcp;
+using Rekall.Age.Rendering;
 
 namespace Rekall.Age.Tests.Mcp;
 
@@ -60,6 +61,32 @@ public sealed class McpJsonRpcServerTests
         Assert.DoesNotContain("optional", required);
     }
 
+    [Fact]
+    public async Task ToolsListExposesNestedValueObjectProperties()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new ClearColorSchemaCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(
+            """{"jsonrpc":"2.0","id":2,"method":"tools/list"}""",
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var clearColor = document.RootElement
+            .GetProperty("result")
+            .GetProperty("tools")[0]
+            .GetProperty("inputSchema")
+            .GetProperty("properties")
+            .GetProperty("clearColor");
+        Assert.Equal("object", clearColor.GetProperty("type").GetString());
+        var properties = clearColor.GetProperty("properties");
+        Assert.Equal("number", properties.GetProperty("r").GetProperty("type").GetString());
+        Assert.Equal("number", properties.GetProperty("g").GetProperty("type").GetString());
+        Assert.Equal("number", properties.GetProperty("b").GetProperty("type").GetString());
+        Assert.Equal("number", properties.GetProperty("a").GetProperty("type").GetString());
+    }
+
 
     [Fact]
     public async Task JsonLinesCanStartWithUtf8Bom()
@@ -110,6 +137,10 @@ public sealed class McpJsonRpcServerTests
 
     private sealed record OptionalResult(string Value);
 
+    private sealed record ClearColorSchemaRequest(RekallAgeVulkanClearColor? ClearColor = null);
+
+    private sealed record ClearColorSchemaResult(RekallAgeVulkanClearColor? ClearColor);
+
     private sealed class EchoCommand : IRekallAgeCommand<EchoRequest, EchoResult>
     {
         public string Name => "rekall.test.echo";
@@ -145,6 +176,24 @@ public sealed class McpJsonRpcServerTests
             RekallAgeCommandContext context)
         {
             return ValueTask.FromResult(RekallAgeCommandResult<OptionalResult>.Success(new OptionalResult(request.Required)));
+        }
+    }
+
+    private sealed class ClearColorSchemaCommand : IRekallAgeCommand<ClearColorSchemaRequest, ClearColorSchemaResult>
+    {
+        public string Name => "rekall.test.clear_color_schema";
+
+        public RekallAgeCommandSchema Schema => new(
+            Name,
+            "Tests nested value object schema fields.",
+            typeof(ClearColorSchemaRequest).FullName!,
+            typeof(ClearColorSchemaResult).FullName!);
+
+        public ValueTask<RekallAgeCommandResult<ClearColorSchemaResult>> ExecuteAsync(
+            ClearColorSchemaRequest request,
+            RekallAgeCommandContext context)
+        {
+            return ValueTask.FromResult(RekallAgeCommandResult<ClearColorSchemaResult>.Success(new ClearColorSchemaResult(request.ClearColor)));
         }
     }
 }

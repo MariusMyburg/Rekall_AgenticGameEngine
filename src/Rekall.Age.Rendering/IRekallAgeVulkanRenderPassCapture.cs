@@ -8,5 +8,6 @@ public interface IRekallAgeVulkanRenderPassCapture
         string format,
         string? preferredDeviceType,
         string outputDirectory,
+        RekallAgeVulkanClearColor clearColor,
         CancellationToken cancellationToken);
 }

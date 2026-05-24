@@ -16,4 +16,5 @@ public sealed record RekallAgeVulkanRenderPassSubmissionResult(
     bool RenderPassBegan,
     bool RenderPassEnded,
     bool FenceSignaled,
+    RekallAgeVulkanClearColor ClearColor,
     IReadOnlyList<string> Errors);

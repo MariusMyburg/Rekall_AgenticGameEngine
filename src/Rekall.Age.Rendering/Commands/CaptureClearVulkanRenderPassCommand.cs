@@ -7,7 +7,8 @@ public sealed record CaptureClearVulkanRenderPassRequest(
     uint Height = 64,
     string Format = "R8G8B8A8_UNorm",
     string? PreferredDeviceType = "discrete-gpu",
-    string OutputDirectory = "Artifacts/Vulkan");
+    string OutputDirectory = "Artifacts/Vulkan",
+    RekallAgeVulkanClearColor? ClearColor = null);
 
 public sealed record CaptureClearVulkanRenderPassResult(
     bool Captured,
@@ -17,6 +18,7 @@ public sealed record CaptureClearVulkanRenderPassResult(
     uint Width,
     uint Height,
     string Format,
+    RekallAgeVulkanClearColor ClearColor,
     ulong BytesRead,
     ulong NonZeroBytes,
     RekallAgeVulkanReadbackPixel FirstPixel,
@@ -56,6 +58,7 @@ public sealed class CaptureClearVulkanRenderPassCommand
             request.Format,
             request.PreferredDeviceType,
             request.OutputDirectory,
+            RekallAgeVulkanClearColor.Normalize(request.ClearColor),
             context.CancellationToken);
         var result = new CaptureClearVulkanRenderPassResult(
             capture.Captured,
@@ -65,6 +68,7 @@ public sealed class CaptureClearVulkanRenderPassCommand
             capture.Width,
             capture.Height,
             capture.Format,
+            capture.ClearColor,
             capture.BytesRead,
             capture.NonZeroBytes,
             capture.FirstPixel,

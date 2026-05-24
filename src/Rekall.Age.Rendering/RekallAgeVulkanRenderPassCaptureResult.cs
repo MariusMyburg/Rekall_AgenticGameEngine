@@ -8,6 +8,7 @@ public sealed record RekallAgeVulkanRenderPassCaptureResult(
     uint Width,
     uint Height,
     string Format,
+    RekallAgeVulkanClearColor ClearColor,
     ulong BytesRead,
     ulong NonZeroBytes,
     RekallAgeVulkanReadbackPixel FirstPixel,

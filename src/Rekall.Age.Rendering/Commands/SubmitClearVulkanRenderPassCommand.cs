@@ -6,7 +6,8 @@ public sealed record SubmitClearVulkanRenderPassRequest(
     uint Width = 128,
     uint Height = 72,
     string Format = "R8G8B8A8_UNorm",
-    string? PreferredDeviceType = "discrete-gpu");
+    string? PreferredDeviceType = "discrete-gpu",
+    RekallAgeVulkanClearColor? ClearColor = null);
 
 public sealed record SubmitClearVulkanRenderPassResult(
     bool Submitted,
@@ -24,6 +25,7 @@ public sealed record SubmitClearVulkanRenderPassResult(
     bool RenderPassBegan,
     bool RenderPassEnded,
     bool FenceSignaled,
+    RekallAgeVulkanClearColor ClearColor,
     IReadOnlyList<string> Errors);
 
 public sealed class SubmitClearVulkanRenderPassCommand
@@ -58,6 +60,7 @@ public sealed class SubmitClearVulkanRenderPassCommand
             request.Height,
             request.Format,
             request.PreferredDeviceType,
+            RekallAgeVulkanClearColor.Normalize(request.ClearColor),
             context.CancellationToken);
         var result = new SubmitClearVulkanRenderPassResult(
             submission.Submitted,
@@ -75,6 +78,7 @@ public sealed class SubmitClearVulkanRenderPassCommand
             submission.RenderPassBegan,
             submission.RenderPassEnded,
             submission.FenceSignaled,
+            submission.ClearColor,
             submission.Errors);
 
         if (submission.Submitted)

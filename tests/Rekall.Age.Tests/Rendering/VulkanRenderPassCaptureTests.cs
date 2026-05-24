@@ -23,6 +23,7 @@ public sealed class VulkanRenderPassCaptureTests
             Width: 64,
             Height: 64,
             Format: "R8G8B8A8_UNorm",
+            ClearColor: RekallAgeVulkanClearColor.Default,
             BytesRead: 16384,
             NonZeroBytes: 16384,
             FirstPixel: new RekallAgeVulkanReadbackPixel(20, 25, 36, 255),
@@ -53,6 +54,7 @@ public sealed class VulkanRenderPassCaptureTests
             Width: 64,
             Height: 64,
             Format: "R8G8B8A8_UNorm",
+            ClearColor: RekallAgeVulkanClearColor.Default,
             BytesRead: 0,
             NonZeroBytes: 0,
             FirstPixel: new RekallAgeVulkanReadbackPixel(0, 0, 0, 0),
@@ -82,6 +84,7 @@ public sealed class VulkanRenderPassCaptureTests
             string format,
             string? preferredDeviceType,
             string outputDirectory,
+            RekallAgeVulkanClearColor clearColor,
             CancellationToken cancellationToken)
         {
             return ValueTask.FromResult(_result);

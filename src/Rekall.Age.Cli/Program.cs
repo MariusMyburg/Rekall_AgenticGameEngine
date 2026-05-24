@@ -63,17 +63,23 @@ internal static class RekallAgeCli
                 ["render", "vulkan", "render-target", "create", var width, var height, var format, var preferredDeviceType] =>
                     await CreateVulkanRenderTargetAsync(registry, context, width, height, format, preferredDeviceType),
                 ["render", "vulkan", "render-pass", "submit-clear"] =>
-                    await SubmitClearVulkanRenderPassAsync(registry, context, "128", "72", "R8G8B8A8_UNorm", null),
+                    await SubmitClearVulkanRenderPassAsync(registry, context, "128", "72", "R8G8B8A8_UNorm", null, null),
                 ["render", "vulkan", "render-pass", "submit-clear", var width, var height, var format, var preferredDeviceType] =>
-                    await SubmitClearVulkanRenderPassAsync(registry, context, width, height, format, preferredDeviceType),
+                    await SubmitClearVulkanRenderPassAsync(registry, context, width, height, format, preferredDeviceType, null),
+                ["render", "vulkan", "render-pass", "submit-clear", var width, var height, var format, var preferredDeviceType, var r, var g, var b, var a] =>
+                    await SubmitClearVulkanRenderPassAsync(registry, context, width, height, format, preferredDeviceType, ParseClearColor(r, g, b, a)),
                 ["render", "vulkan", "render-pass", "read-clear"] =>
-                    await ReadClearVulkanRenderPassAsync(registry, context, "64", "64", "R8G8B8A8_UNorm", null),
+                    await ReadClearVulkanRenderPassAsync(registry, context, "64", "64", "R8G8B8A8_UNorm", null, null),
                 ["render", "vulkan", "render-pass", "read-clear", var width, var height, var format, var preferredDeviceType] =>
-                    await ReadClearVulkanRenderPassAsync(registry, context, width, height, format, preferredDeviceType),
+                    await ReadClearVulkanRenderPassAsync(registry, context, width, height, format, preferredDeviceType, null),
+                ["render", "vulkan", "render-pass", "read-clear", var width, var height, var format, var preferredDeviceType, var r, var g, var b, var a] =>
+                    await ReadClearVulkanRenderPassAsync(registry, context, width, height, format, preferredDeviceType, ParseClearColor(r, g, b, a)),
                 ["render", "vulkan", "render-pass", "capture-clear", var outputDirectory] =>
-                    await CaptureClearVulkanRenderPassAsync(registry, context, "64", "64", "R8G8B8A8_UNorm", null, outputDirectory),
+                    await CaptureClearVulkanRenderPassAsync(registry, context, "64", "64", "R8G8B8A8_UNorm", null, outputDirectory, null),
                 ["render", "vulkan", "render-pass", "capture-clear", var width, var height, var format, var preferredDeviceType, var outputDirectory] =>
-                    await CaptureClearVulkanRenderPassAsync(registry, context, width, height, format, preferredDeviceType, outputDirectory),
+                    await CaptureClearVulkanRenderPassAsync(registry, context, width, height, format, preferredDeviceType, outputDirectory, null),
+                ["render", "vulkan", "render-pass", "capture-clear", var width, var height, var format, var preferredDeviceType, var outputDirectory, var r, var g, var b, var a] =>
+                    await CaptureClearVulkanRenderPassAsync(registry, context, width, height, format, preferredDeviceType, outputDirectory, ParseClearColor(r, g, b, a)),
                 ["render", "plan", "create", var root, var backend, var name] =>
                     await CreateRenderPlanAsync(registry, context, root, backend, name),
                 ["render", "plan", "inspect", var root] => await InspectRenderPlanAsync(registry, context, root),
@@ -395,13 +401,14 @@ internal static class RekallAgeCli
         string width,
         string height,
         string format,
-        string? preferredDeviceType)
+        string? preferredDeviceType,
+        RekallAgeVulkanClearColor? clearColor)
     {
         var parsedWidth = uint.Parse(width, System.Globalization.CultureInfo.InvariantCulture);
         var parsedHeight = uint.Parse(height, System.Globalization.CultureInfo.InvariantCulture);
         var result = await registry.ExecuteAsync<SubmitClearVulkanRenderPassRequest, SubmitClearVulkanRenderPassResult>(
             "rekall.render.vulkan.render_pass.submit_clear",
-            new SubmitClearVulkanRenderPassRequest(parsedWidth, parsedHeight, format, preferredDeviceType),
+            new SubmitClearVulkanRenderPassRequest(parsedWidth, parsedHeight, format, preferredDeviceType, clearColor),
             context);
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Submitted: {result.Value.Submitted}");
@@ -414,6 +421,7 @@ internal static class RekallAgeCli
 
         Console.WriteLine($"Extent: {result.Value.Width}x{result.Value.Height}");
         Console.WriteLine($"Format: {result.Value.Format}");
+        Console.WriteLine($"Clear color: {FormatClearColor(result.Value.ClearColor)}");
         Console.WriteLine($"Image created: {result.Value.ImageCreated}");
         Console.WriteLine($"Image view created: {result.Value.ImageViewCreated}");
         Console.WriteLine($"Render pass created: {result.Value.RenderPassCreated}");
@@ -437,13 +445,14 @@ internal static class RekallAgeCli
         string width,
         string height,
         string format,
-        string? preferredDeviceType)
+        string? preferredDeviceType,
+        RekallAgeVulkanClearColor? clearColor)
     {
         var parsedWidth = uint.Parse(width, System.Globalization.CultureInfo.InvariantCulture);
         var parsedHeight = uint.Parse(height, System.Globalization.CultureInfo.InvariantCulture);
         var result = await registry.ExecuteAsync<ReadClearVulkanRenderPassRequest, ReadClearVulkanRenderPassResult>(
             "rekall.render.vulkan.render_pass.read_clear",
-            new ReadClearVulkanRenderPassRequest(parsedWidth, parsedHeight, format, preferredDeviceType),
+            new ReadClearVulkanRenderPassRequest(parsedWidth, parsedHeight, format, preferredDeviceType, clearColor),
             context);
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Readback: {result.Value.Readback}");
@@ -457,6 +466,7 @@ internal static class RekallAgeCli
 
         Console.WriteLine($"Extent: {result.Value.Width}x{result.Value.Height}");
         Console.WriteLine($"Format: {result.Value.Format}");
+        Console.WriteLine($"Clear color: {FormatClearColor(result.Value.ClearColor)}");
         Console.WriteLine($"Buffer created: {result.Value.BufferCreated}");
         Console.WriteLine($"Buffer bound: {result.Value.BufferBound}");
         Console.WriteLine($"Buffer mapped: {result.Value.BufferMapped}");
@@ -479,13 +489,14 @@ internal static class RekallAgeCli
         string height,
         string format,
         string? preferredDeviceType,
-        string outputDirectory)
+        string outputDirectory,
+        RekallAgeVulkanClearColor? clearColor)
     {
         var parsedWidth = uint.Parse(width, System.Globalization.CultureInfo.InvariantCulture);
         var parsedHeight = uint.Parse(height, System.Globalization.CultureInfo.InvariantCulture);
         var result = await registry.ExecuteAsync<CaptureClearVulkanRenderPassRequest, CaptureClearVulkanRenderPassResult>(
             "rekall.render.vulkan.render_pass.capture_clear",
-            new CaptureClearVulkanRenderPassRequest(parsedWidth, parsedHeight, format, preferredDeviceType, outputDirectory),
+            new CaptureClearVulkanRenderPassRequest(parsedWidth, parsedHeight, format, preferredDeviceType, outputDirectory, clearColor),
             context);
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Captured: {result.Value.Captured}");
@@ -499,6 +510,7 @@ internal static class RekallAgeCli
 
         Console.WriteLine($"Extent: {result.Value.Width}x{result.Value.Height}");
         Console.WriteLine($"Format: {result.Value.Format}");
+        Console.WriteLine($"Clear color: {FormatClearColor(result.Value.ClearColor)}");
         Console.WriteLine($"Bytes read: {result.Value.BytesRead}");
         Console.WriteLine($"Non-zero bytes: {result.Value.NonZeroBytes}");
         Console.WriteLine($"First pixel: {result.Value.FirstPixel.R},{result.Value.FirstPixel.G},{result.Value.FirstPixel.B},{result.Value.FirstPixel.A}");
@@ -1014,5 +1026,24 @@ internal static class RekallAgeCli
         {
             return JsonValue.Create(value);
         }
+    }
+
+    private static RekallAgeVulkanClearColor ParseClearColor(string r, string g, string b, string a)
+    {
+        return new RekallAgeVulkanClearColor(
+            float.Parse(r, System.Globalization.CultureInfo.InvariantCulture),
+            float.Parse(g, System.Globalization.CultureInfo.InvariantCulture),
+            float.Parse(b, System.Globalization.CultureInfo.InvariantCulture),
+            float.Parse(a, System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    private static string FormatClearColor(RekallAgeVulkanClearColor color)
+    {
+        return string.Join(
+            ',',
+            color.R.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            color.G.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            color.B.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            color.A.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 }

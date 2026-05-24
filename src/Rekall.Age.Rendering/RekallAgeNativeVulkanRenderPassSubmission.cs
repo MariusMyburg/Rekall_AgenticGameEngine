@@ -66,6 +66,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         uint height,
         string format,
         string? preferredDeviceType,
+        RekallAgeVulkanClearColor clearColor,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -73,12 +74,12 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         if (width == 0 || height == 0)
         {
             errors.Add("Vulkan render target width and height must be greater than zero.");
-            return ValueTask.FromResult(Unavailable(null, null, width, height, format, false, false, false, false, errors));
+            return ValueTask.FromResult(Unavailable(null, null, width, height, format, clearColor, false, false, false, false, errors));
         }
 
         if (!TryLoadVulkan(errors, out var library, out var loaderName))
         {
-            return ValueTask.FromResult(Unavailable(null, null, width, height, format, false, false, false, false, errors));
+            return ValueTask.FromResult(Unavailable(null, null, width, height, format, clearColor, false, false, false, false, errors));
         }
 
         try
@@ -86,10 +87,10 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             var context = CreateContext(library, errors);
             if (context is null)
             {
-                return ValueTask.FromResult(Unavailable(loaderName, null, width, height, format, false, false, false, false, errors));
+                return ValueTask.FromResult(Unavailable(loaderName, null, width, height, format, clearColor, false, false, false, false, errors));
             }
 
-            return ValueTask.FromResult(SubmitClearRenderPass(context.Value, loaderName!, width, height, format, preferredDeviceType, errors));
+            return ValueTask.FromResult(SubmitClearRenderPass(context.Value, loaderName!, width, height, format, preferredDeviceType, clearColor, errors));
         }
         finally
         {
@@ -102,6 +103,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         uint height,
         string format,
         string? preferredDeviceType,
+        RekallAgeVulkanClearColor clearColor,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -109,19 +111,19 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         if (width == 0 || height == 0)
         {
             errors.Add("Vulkan readback width and height must be greater than zero.");
-            return ValueTask.FromResult(UnavailableReadback(null, null, width, height, format, false, false, false, false, 0, 0, default, 0, errors));
+            return ValueTask.FromResult(UnavailableReadback(null, null, width, height, format, clearColor, false, false, false, false, 0, 0, default, 0, errors));
         }
 
         var byteCount = checked((ulong)width * height * 4);
         if (byteCount > int.MaxValue)
         {
             errors.Add("Vulkan readback size exceeds the maximum host buffer size for this smoke tool.");
-            return ValueTask.FromResult(UnavailableReadback(null, null, width, height, format, false, false, false, false, 0, 0, default, 0, errors));
+            return ValueTask.FromResult(UnavailableReadback(null, null, width, height, format, clearColor, false, false, false, false, 0, 0, default, 0, errors));
         }
 
         if (!TryLoadVulkan(errors, out var library, out var loaderName))
         {
-            return ValueTask.FromResult(UnavailableReadback(null, null, width, height, format, false, false, false, false, 0, 0, default, 0, errors));
+            return ValueTask.FromResult(UnavailableReadback(null, null, width, height, format, clearColor, false, false, false, false, 0, 0, default, 0, errors));
         }
 
         try
@@ -129,10 +131,10 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             var context = CreateContext(library, errors);
             if (context is null)
             {
-                return ValueTask.FromResult(UnavailableReadback(loaderName, null, width, height, format, false, false, false, false, 0, 0, default, 0, errors));
+                return ValueTask.FromResult(UnavailableReadback(loaderName, null, width, height, format, clearColor, false, false, false, false, 0, 0, default, 0, errors));
             }
 
-            return ValueTask.FromResult(ReadClearRenderPassOperation(context.Value, loaderName!, width, height, format, preferredDeviceType, errors).Result);
+            return ValueTask.FromResult(ReadClearRenderPassOperation(context.Value, loaderName!, width, height, format, preferredDeviceType, clearColor, errors).Result);
         }
         finally
         {
@@ -146,6 +148,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         string format,
         string? preferredDeviceType,
         string outputDirectory,
+        RekallAgeVulkanClearColor clearColor,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -153,25 +156,25 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         if (string.IsNullOrWhiteSpace(outputDirectory))
         {
             errors.Add("Vulkan capture output directory is required.");
-            return ValueTask.FromResult(UnavailableCapture(string.Empty, null, null, width, height, format, 0, 0, default, 0, errors));
+            return ValueTask.FromResult(UnavailableCapture(string.Empty, null, null, width, height, format, clearColor, 0, 0, default, 0, errors));
         }
 
         if (width == 0 || height == 0)
         {
             errors.Add("Vulkan capture width and height must be greater than zero.");
-            return ValueTask.FromResult(UnavailableCapture(string.Empty, null, null, width, height, format, 0, 0, default, 0, errors));
+            return ValueTask.FromResult(UnavailableCapture(string.Empty, null, null, width, height, format, clearColor, 0, 0, default, 0, errors));
         }
 
         var byteCount = checked((ulong)width * height * 4);
         if (byteCount > int.MaxValue)
         {
             errors.Add("Vulkan capture size exceeds the maximum host buffer size for this smoke tool.");
-            return ValueTask.FromResult(UnavailableCapture(string.Empty, null, null, width, height, format, 0, 0, default, 0, errors));
+            return ValueTask.FromResult(UnavailableCapture(string.Empty, null, null, width, height, format, clearColor, 0, 0, default, 0, errors));
         }
 
         if (!TryLoadVulkan(errors, out var library, out var loaderName))
         {
-            return ValueTask.FromResult(UnavailableCapture(string.Empty, null, null, width, height, format, 0, 0, default, 0, errors));
+            return ValueTask.FromResult(UnavailableCapture(string.Empty, null, null, width, height, format, clearColor, 0, 0, default, 0, errors));
         }
 
         try
@@ -179,10 +182,10 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             var context = CreateContext(library, errors);
             if (context is null)
             {
-                return ValueTask.FromResult(UnavailableCapture(string.Empty, loaderName, null, width, height, format, 0, 0, default, 0, errors));
+                return ValueTask.FromResult(UnavailableCapture(string.Empty, loaderName, null, width, height, format, clearColor, 0, 0, default, 0, errors));
             }
 
-            var operation = ReadClearRenderPassOperation(context.Value, loaderName!, width, height, format, preferredDeviceType, errors);
+            var operation = ReadClearRenderPassOperation(context.Value, loaderName!, width, height, format, preferredDeviceType, clearColor, errors);
             if (!operation.Result.Readback)
             {
                 return ValueTask.FromResult(UnavailableCapture(
@@ -192,6 +195,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                     width,
                     height,
                     format,
+                    clearColor,
                     operation.Result.BytesRead,
                     operation.Result.NonZeroBytes,
                     operation.Result.FirstPixel,
@@ -218,6 +222,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         uint height,
         string format,
         string? preferredDeviceType,
+        RekallAgeVulkanClearColor clearColor,
         List<string> errors)
     {
         using (context)
@@ -227,14 +232,14 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             if (selection is null)
             {
                 errors.Add("No Vulkan physical device with a graphics queue was found.");
-                return Unavailable(loaderName, null, width, height, format, false, false, false, false, errors);
+                return Unavailable(loaderName, null, width, height, format, clearColor, false, false, false, false, errors);
             }
 
             var nativeDevice = nativeDevices.First(device => device.Device.Name.Equals(selection.Device.Name, StringComparison.Ordinal));
             var device = CreateLogicalDevice(context, nativeDevice.Handle, selection, errors);
             if (device == IntPtr.Zero)
             {
-                return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, false, false, false, false, errors);
+                return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, clearColor, false, false, false, false, errors);
             }
 
             try
@@ -242,7 +247,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                 var image = CreateImage(context, device, width, height, format, includeTransferSource: false, errors);
                 if (image == IntPtr.Zero)
                 {
-                    return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, false, false, false, false, errors);
+                    return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, clearColor, false, false, false, false, errors);
                 }
 
                 try
@@ -250,7 +255,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                     var memory = BindImageMemory(context, nativeDevice.Handle, device, image, errors, out _);
                     if (memory == IntPtr.Zero)
                     {
-                        return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, true, false, false, false, errors);
+                        return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, clearColor, true, false, false, false, errors);
                     }
 
                     try
@@ -258,7 +263,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                         var imageView = CreateImageView(context, device, image, format, errors);
                         if (imageView == IntPtr.Zero)
                         {
-                            return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, true, false, false, false, errors);
+                            return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, clearColor, true, false, false, false, errors);
                         }
 
                         try
@@ -266,7 +271,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                             var renderPass = CreateRenderPass(context, device, format, finalLayoutTransferSource: false, errors);
                             if (renderPass == IntPtr.Zero)
                             {
-                                return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, true, true, false, false, errors);
+                                return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, clearColor, true, true, false, false, errors);
                             }
 
                             try
@@ -274,7 +279,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                                 var framebuffer = CreateFramebuffer(context, device, renderPass, imageView, width, height, errors);
                                 if (framebuffer == IntPtr.Zero)
                                 {
-                                    return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, true, true, true, false, errors);
+                                    return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, clearColor, true, true, true, false, errors);
                                 }
 
                                 try
@@ -283,13 +288,13 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                                     if (queue == IntPtr.Zero)
                                     {
                                         errors.Add("vkGetDeviceQueue returned a null graphics queue.");
-                                        return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, true, true, true, true, errors);
+                                        return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, clearColor, true, true, true, true, errors);
                                     }
 
                                     var commandPool = CreateCommandPool(context, device, selection.QueueFamily.Index, errors);
                                     if (commandPool == IntPtr.Zero)
                                     {
-                                        return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, true, true, true, true, errors);
+                                        return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, clearColor, true, true, true, true, errors);
                                     }
 
                                     try
@@ -297,18 +302,18 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                                         var commandBuffer = AllocateCommandBuffer(context, device, commandPool, errors);
                                         if (commandBuffer == IntPtr.Zero)
                                         {
-                                            return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, true, true, true, true, errors, commandPoolCreated: true);
+                                            return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, clearColor, true, true, true, true, errors, commandPoolCreated: true);
                                         }
 
-                                        if (!RecordClearRenderPass(context, commandBuffer, renderPass, framebuffer, width, height, errors, out var renderPassBegan, out var renderPassEnded))
+                                        if (!RecordClearRenderPass(context, commandBuffer, renderPass, framebuffer, width, height, clearColor, errors, out var renderPassBegan, out var renderPassEnded))
                                         {
-                                            return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, true, true, true, true, errors, true, true, renderPassBegan, renderPassEnded);
+                                            return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, clearColor, true, true, true, true, errors, true, true, renderPassBegan, renderPassEnded);
                                         }
 
                                         var fence = CreateFence(context, device, errors);
                                         if (fence == IntPtr.Zero)
                                         {
-                                            return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, true, true, true, true, errors, true, true, true, true);
+                                            return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, clearColor, true, true, true, true, errors, true, true, true, true);
                                         }
 
                                         try
@@ -331,8 +336,9 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                                                     RenderPassBegan: true,
                                                     RenderPassEnded: true,
                                                     FenceSignaled: true,
+                                                    ClearColor: clearColor,
                                                     Errors: errors)
-                                                : Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, true, true, true, true, errors, true, true, true, true);
+                                                : Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, clearColor, true, true, true, true, errors, true, true, true, true);
                                         }
                                         finally
                                         {
@@ -383,6 +389,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         uint height,
         string format,
         string? preferredDeviceType,
+        RekallAgeVulkanClearColor clearColor,
         List<string> errors)
     {
         using (context)
@@ -392,7 +399,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             if (selection is null)
             {
                 errors.Add("No Vulkan physical device with a graphics queue was found.");
-                return UnavailableReadbackOperation(loaderName, null, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                return UnavailableReadbackOperation(loaderName, null, width, height, format, clearColor, false, false, false, false, 0, 0, default, 0, errors);
             }
 
             var selectedDevice = ToSelectedDevice(selection);
@@ -400,7 +407,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             var device = CreateLogicalDevice(context, nativeDevice.Handle, selection, errors);
             if (device == IntPtr.Zero)
             {
-                return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, false, false, false, 0, 0, default, 0, errors);
             }
 
             try
@@ -409,13 +416,13 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                 if (queue == IntPtr.Zero)
                 {
                     errors.Add("vkGetDeviceQueue returned a null graphics queue.");
-                    return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                    return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, false, false, false, 0, 0, default, 0, errors);
                 }
 
                 var image = CreateImage(context, device, width, height, format, includeTransferSource: true, errors);
                 if (image == IntPtr.Zero)
                 {
-                    return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                    return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, false, false, false, 0, 0, default, 0, errors);
                 }
 
                 try
@@ -423,7 +430,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                     var imageMemory = BindImageMemory(context, nativeDevice.Handle, device, image, errors, out _);
                     if (imageMemory == IntPtr.Zero)
                     {
-                        return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                        return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, false, false, false, 0, 0, default, 0, errors);
                     }
 
                     try
@@ -431,7 +438,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                         var imageView = CreateImageView(context, device, image, format, errors);
                         if (imageView == IntPtr.Zero)
                         {
-                            return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                            return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, false, false, false, 0, 0, default, 0, errors);
                         }
 
                         try
@@ -439,7 +446,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                             var renderPass = CreateRenderPass(context, device, format, finalLayoutTransferSource: true, errors);
                             if (renderPass == IntPtr.Zero)
                             {
-                                return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                                return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, false, false, false, 0, 0, default, 0, errors);
                             }
 
                             try
@@ -447,7 +454,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                                 var framebuffer = CreateFramebuffer(context, device, renderPass, imageView, width, height, errors);
                                 if (framebuffer == IntPtr.Zero)
                                 {
-                                    return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                                    return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, false, false, false, 0, 0, default, 0, errors);
                                 }
 
                                 try
@@ -456,7 +463,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                                     var readbackBuffer = CreateBuffer(context, device, byteCount, errors);
                                     if (readbackBuffer == IntPtr.Zero)
                                     {
-                                        return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, true, false, false, 0, 0, default, 0, errors);
+                                        return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, true, false, false, 0, 0, default, 0, errors);
                                     }
 
                                     try
@@ -464,7 +471,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                                         var readbackMemory = BindBufferMemory(context, nativeDevice.Handle, device, readbackBuffer, errors);
                                         if (readbackMemory == IntPtr.Zero)
                                         {
-                                            return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, true, false, false, 0, 0, default, 0, errors);
+                                            return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, true, false, false, 0, 0, default, 0, errors);
                                         }
 
                                         try
@@ -472,7 +479,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                                             var commandPool = CreateCommandPool(context, device, selection.QueueFamily.Index, errors);
                                             if (commandPool == IntPtr.Zero)
                                             {
-                                                return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, true, true, false, 0, 0, default, 0, errors);
+                                                return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, true, true, false, 0, 0, default, 0, errors);
                                             }
 
                                             try
@@ -480,18 +487,18 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                                                 var commandBuffer = AllocateCommandBuffer(context, device, commandPool, errors);
                                                 if (commandBuffer == IntPtr.Zero)
                                                 {
-                                                    return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, true, true, false, 0, 0, default, 0, errors);
+                                                    return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, true, true, false, 0, 0, default, 0, errors);
                                                 }
 
-                                                if (!RecordClearRenderPassAndCopy(context, commandBuffer, renderPass, framebuffer, image, readbackBuffer, width, height, errors))
+                                                if (!RecordClearRenderPassAndCopy(context, commandBuffer, renderPass, framebuffer, image, readbackBuffer, width, height, clearColor, errors))
                                                 {
-                                                    return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, true, true, false, 0, 0, default, 0, errors);
+                                                    return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, true, true, false, 0, 0, default, 0, errors);
                                                 }
 
                                                 var fence = CreateFence(context, device, errors);
                                                 if (fence == IntPtr.Zero)
                                                 {
-                                                    return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, true, true, false, 0, 0, default, 0, errors);
+                                                    return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, true, true, false, 0, 0, default, 0, errors);
                                                 }
 
                                                 try
@@ -499,7 +506,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                                                     var submitted = SubmitAndWait(context, device, queue, commandBuffer, fence, errors);
                                                     if (!submitted)
                                                     {
-                                                        return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, false, true, true, false, 0, 0, default, 0, errors);
+                                                        return UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, false, true, true, false, 0, 0, default, 0, errors);
                                                     }
 
                                                     var readback = MapReadbackBuffer(context, device, readbackMemory, byteCount, NormalizeFormat(format), errors);
@@ -512,6 +519,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                                                                 Width: width,
                                                                 Height: height,
                                                                 Format: NormalizeFormat(format),
+                                                                ClearColor: clearColor,
                                                                 Submitted: true,
                                                                 BufferCreated: true,
                                                                 BufferBound: true,
@@ -522,7 +530,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                                                                 ByteChecksum: readback.ByteChecksum,
                                                                 Errors: errors),
                                                             readback.RgbaBytes)
-                                                        : UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, true, true, true, false, 0, 0, default, 0, errors);
+                                                        : UnavailableReadbackOperation(loaderName, selectedDevice, width, height, format, clearColor, true, true, true, false, 0, 0, default, 0, errors);
                                                 }
                                                 finally
                                                 {
@@ -1308,6 +1316,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         IntPtr framebuffer,
         uint width,
         uint height,
+        RekallAgeVulkanClearColor clearColor,
         List<string> errors,
         out bool renderPassBegan,
         out bool renderPassEnded)
@@ -1329,7 +1338,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                 return false;
             }
 
-            var clearValue = new VkClearColorValue(0.08f, 0.10f, 0.14f, 1.0f);
+            var clearValue = new VkClearColorValue(clearColor.R, clearColor.G, clearColor.B, clearColor.A);
             clearValuePointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkClearColorValue>());
             Marshal.StructureToPtr(clearValue, clearValuePointer, false);
             var renderPassBeginInfo = new VkRenderPassBeginInfo(
@@ -1384,6 +1393,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         IntPtr readbackBuffer,
         uint width,
         uint height,
+        RekallAgeVulkanClearColor clearColor,
         List<string> errors)
     {
         var beginInfoPointer = IntPtr.Zero;
@@ -1402,7 +1412,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                 return false;
             }
 
-            var clearValue = new VkClearColorValue(0.08f, 0.10f, 0.14f, 1.0f);
+            var clearValue = new VkClearColorValue(clearColor.R, clearColor.G, clearColor.B, clearColor.A);
             clearValuePointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkClearColorValue>());
             Marshal.StructureToPtr(clearValue, clearValuePointer, false);
             var renderPassBeginInfo = new VkRenderPassBeginInfo(
@@ -1599,6 +1609,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         uint width,
         uint height,
         string format,
+        RekallAgeVulkanClearColor clearColor,
         bool imageCreated,
         bool imageViewCreated,
         bool renderPassCreated,
@@ -1617,6 +1628,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             Width: width,
             Height: height,
             Format: NormalizeFormat(format),
+            ClearColor: clearColor,
             ImageCreated: imageCreated,
             ImageViewCreated: imageViewCreated,
             RenderPassCreated: renderPassCreated,
@@ -1635,6 +1647,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         uint width,
         uint height,
         string format,
+        RekallAgeVulkanClearColor clearColor,
         bool submitted,
         bool bufferCreated,
         bool bufferBound,
@@ -1652,6 +1665,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             Width: width,
             Height: height,
             Format: NormalizeFormat(format),
+            ClearColor: clearColor,
             Submitted: submitted,
             BufferCreated: bufferCreated,
             BufferBound: bufferBound,
@@ -1669,6 +1683,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         uint width,
         uint height,
         string format,
+        RekallAgeVulkanClearColor clearColor,
         bool submitted,
         bool bufferCreated,
         bool bufferBound,
@@ -1686,6 +1701,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                 width,
                 height,
                 format,
+                clearColor,
                 submitted,
                 bufferCreated,
                 bufferBound,
@@ -1705,6 +1721,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         uint width,
         uint height,
         string format,
+        RekallAgeVulkanClearColor clearColor,
         ulong bytesRead,
         ulong nonZeroBytes,
         RekallAgeVulkanReadbackPixel firstPixel,
@@ -1719,6 +1736,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             Width: width,
             Height: height,
             Format: NormalizeFormat(format),
+            ClearColor: clearColor,
             BytesRead: bytesRead,
             NonZeroBytes: nonZeroBytes,
             FirstPixel: firstPixel,
@@ -1744,6 +1762,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             Width: width,
             Height: height,
             Format: NormalizeFormat(format),
+            ClearColor: readback.ClearColor,
             BytesRead: readback.BytesRead,
             NonZeroBytes: readback.NonZeroBytes,
             FirstPixel: readback.FirstPixel,
@@ -2094,5 +2113,3 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         }
     }
 }
-
-

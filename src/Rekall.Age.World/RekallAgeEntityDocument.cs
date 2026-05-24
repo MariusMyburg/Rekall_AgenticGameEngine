@@ -30,6 +30,33 @@ public sealed record RekallAgeEntityDocument(
         return this with { Components = components };
     }
 
+    public RekallAgeEntityDocument UpdateComponent(
+        string componentType,
+        Func<RekallAgeComponentDocument, RekallAgeComponentDocument> update)
+    {
+        var found = false;
+        var components = Components.Select(component =>
+        {
+            if (!component.Type.Equals(componentType, StringComparison.Ordinal))
+            {
+                return component;
+            }
+
+            found = true;
+            return update(component);
+        }).ToArray();
+
+        if (!found)
+        {
+            throw new InvalidOperationException($"Component '{componentType}' was not found on entity '{Name}'.");
+        }
+
+        return this with
+        {
+            Components = components.OrderBy(component => component.Type, StringComparer.Ordinal).ToArray()
+        };
+    }
+
     private static IReadOnlyList<string> NormalizeTags(IEnumerable<string> tags)
     {
         return tags

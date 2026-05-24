@@ -3,7 +3,7 @@ using Rekall.Age.Core.Commands;
 
 namespace Rekall.Age.Modules.Commands;
 
-public sealed record ListComponentSchemasRequest(string? ModuleId = null);
+public sealed record ListComponentSchemasRequest(string? ModuleId = null, string? ProjectRoot = null);
 
 public sealed record ListComponentSchemasResult(IReadOnlyList<RekallAgeComponentSchema> Components);
 
@@ -34,7 +34,10 @@ public sealed class ListComponentSchemasCommand
         ListComponentSchemasRequest request,
         RekallAgeCommandContext context)
     {
-        var index = RekallAgeModuleIndexer.IndexAssemblies(_assemblies);
+        var assemblies = request.ProjectRoot is null
+            ? _assemblies
+            : _assemblies.Concat(RekallAgeProjectModuleAssemblyLoader.LoadBuiltModuleAssemblies(request.ProjectRoot));
+        var index = RekallAgeModuleIndexer.IndexAssemblies(assemblies);
         var components = index.Modules
             .Where(module => request.ModuleId is null || module.Id.Equals(request.ModuleId, StringComparison.Ordinal))
             .SelectMany(module => module.Components)

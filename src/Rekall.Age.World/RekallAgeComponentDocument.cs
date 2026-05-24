@@ -13,4 +13,16 @@ public sealed record RekallAgeComponentDocument(string Type, JsonObject Properti
 
         return new RekallAgeComponentDocument(type.Trim(), properties?.DeepClone().AsObject() ?? []);
     }
+
+    public RekallAgeComponentDocument SetProperty(string name, JsonNode? value)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Property name is required.", nameof(name));
+        }
+
+        var properties = Properties.DeepClone().AsObject();
+        properties[name.Trim()] = value?.DeepClone();
+        return this with { Properties = properties };
+    }
 }

@@ -14,6 +14,7 @@ using Rekall.Age.Runtime.Commands;
 using Rekall.Age.Validation;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
+using System.Text.Json.Nodes;
 
 return await RekallAgeCli.RunAsync(args, CancellationToken.None);
 
@@ -23,7 +24,7 @@ internal static class RekallAgeCli
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|run|context|capture|module|templates> ...");
+            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|run|context|capture|module|build|templates> ...");
             return 2;
         }
 
@@ -38,6 +39,7 @@ internal static class RekallAgeCli
                 ["templates", "list"] => ListTemplates(),
                 ["module", "schemas"] => await ListSchemasAsync(registry, context, null),
                 ["module", "schemas", var moduleId] => await ListSchemasAsync(registry, context, moduleId),
+                ["module", "schemas", "project", var root] => await ListProjectSchemasAsync(registry, context, root),
                 ["module", "scaffold", var root, var moduleId, var displayName, var moduleName, var componentName] =>
                     await ScaffoldModuleAsync(registry, context, root, moduleId, displayName, moduleName, componentName),
                 ["build", "modules", var root] => await BuildModulesAsync(registry, context, root),
@@ -46,6 +48,9 @@ internal static class RekallAgeCli
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
                 ["scene", "create", var root, var name, var capabilities] => await CreateSceneAsync(registry, context, root, name, capabilities),
                 ["entity", "create", var root, var scene, var name, var tags] => await CreateEntityAsync(registry, context, root, scene, name, tags),
+                ["entity", "inspect", var root, var scene, var entityId] => await InspectEntityAsync(registry, context, root, scene, entityId),
+                ["component", "set", var root, var scene, var entityId, var componentType, var propertyName, var value] =>
+                    await SetComponentPropertyAsync(registry, context, root, scene, entityId, componentType, propertyName, value),
                 ["run", "scene", var root, var scene, var seconds] => await RunSceneAsync(registry, context, root, scene, seconds),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
@@ -68,6 +73,8 @@ internal static class RekallAgeCli
         registry.Register(new CreateSceneCommand());
         registry.Register(new CreateEntityCommand());
         registry.Register(new AddComponentCommand());
+        registry.Register(new SetComponentPropertyCommand());
+        registry.Register(new InspectEntityCommand());
         registry.Register(new CreateGameFromTemplateCommand());
         registry.Register(new ListGameTemplatesCommand());
         registry.Register(new GetProjectSummaryCommand());
@@ -108,6 +115,24 @@ internal static class RekallAgeCli
         return result.Ok ? 0 : 1;
     }
 
+    private static async Task<int> ListProjectSchemasAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root)
+    {
+        var result = await registry.ExecuteAsync<ListComponentSchemasRequest, ListComponentSchemasResult>(
+            "rekall.module.component_schemas",
+            new ListComponentSchemasRequest(ProjectRoot: root),
+            context);
+        Console.WriteLine(result.Summary);
+        foreach (var component in result.Value.Components)
+        {
+            Console.WriteLine($"{component.DisplayName}: {component.TypeName}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
     private static async Task<int> ScaffoldModuleAsync(
         RekallAgeCommandRegistry registry,
         RekallAgeCommandContext context,
@@ -122,6 +147,44 @@ internal static class RekallAgeCli
             new ScaffoldModuleRequest(root, moduleId, displayName, moduleName, componentName),
             context);
         Console.WriteLine(result.Value.SourcePath);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectEntityAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string entityId)
+    {
+        var result = await registry.ExecuteAsync<InspectEntityRequest, InspectEntityResult>(
+            "rekall.entity.inspect",
+            new InspectEntityRequest(root, scene, entityId),
+            context);
+        Console.WriteLine($"{result.Value.Entity.Id}: {result.Value.Entity.Name}");
+        foreach (var component in result.Value.Entity.Components)
+        {
+            Console.WriteLine($"{component.Type}: {component.Properties}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> SetComponentPropertyAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string entityId,
+        string componentType,
+        string propertyName,
+        string value)
+    {
+        var result = await registry.ExecuteAsync<SetComponentPropertyRequest, SetComponentPropertyResult>(
+            "rekall.component.set_property",
+            new SetComponentPropertyRequest(root, scene, entityId, componentType, propertyName, ParseJsonValue(value)),
+            context);
+        Console.WriteLine(result.Summary);
         return result.Ok ? 0 : 1;
     }
 
@@ -300,5 +363,17 @@ internal static class RekallAgeCli
     private static string[] SplitCsv(string value)
     {
         return value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    private static JsonNode? ParseJsonValue(string value)
+    {
+        try
+        {
+            return JsonNode.Parse(value);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return JsonValue.Create(value);
+        }
     }
 }

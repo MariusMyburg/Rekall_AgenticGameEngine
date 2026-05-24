@@ -1,13 +1,30 @@
+using System.Text.Json;
+
 namespace Rekall.Age.Core.Commands;
 
 public sealed class RekallAgeCommandRegistry
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     private readonly Dictionary<string, IRekallAgeCommandDescriptor> _commands = new(StringComparer.Ordinal);
 
     public IReadOnlyList<RekallAgeCommandSchema> Schemas =>
         _commands.Values
             .Select(command => command.Schema)
             .OrderBy(schema => schema.Name, StringComparer.Ordinal)
+            .ToArray();
+
+    public IReadOnlyList<RekallAgeRegisteredCommand> RegisteredCommands =>
+        _commands.Values
+            .Select(command => new RekallAgeRegisteredCommand(
+                command.Schema,
+                command.RequestType,
+                command.ResultType))
+            .OrderBy(command => command.Schema.Name, StringComparer.Ordinal)
             .ToArray();
 
     public void Register<TRequest, TResult>(IRekallAgeCommand<TRequest, TResult> command)
@@ -43,14 +60,64 @@ public sealed class RekallAgeCommandRegistry
         return await typed.Command.ExecuteAsync(request, context);
     }
 
+    public async ValueTask<RekallAgeDynamicCommandResult> ExecuteJsonAsync(
+        string name,
+        string argumentsJson,
+        RekallAgeCommandContext context)
+    {
+        if (!_commands.TryGetValue(name, out var command))
+        {
+            var error = new RekallAgeCommandError("REKALL_COMMAND_NOT_FOUND", $"Command '{name}' is not registered.");
+            return new RekallAgeDynamicCommandResult(false, error.Message, null, [error]);
+        }
+
+        context.CancellationToken.ThrowIfCancellationRequested();
+        return await command.ExecuteJsonAsync(argumentsJson, context);
+    }
+
     private interface IRekallAgeCommandDescriptor
     {
         RekallAgeCommandSchema Schema { get; }
+
+        Type RequestType { get; }
+
+        Type ResultType { get; }
+
+        ValueTask<RekallAgeDynamicCommandResult> ExecuteJsonAsync(
+            string argumentsJson,
+            RekallAgeCommandContext context);
     }
 
     private sealed record RekallAgeCommandDescriptor<TRequest, TResult>(
         IRekallAgeCommand<TRequest, TResult> Command) : IRekallAgeCommandDescriptor
     {
         public RekallAgeCommandSchema Schema => Command.Schema;
+
+        public Type RequestType => typeof(TRequest);
+
+        public Type ResultType => typeof(TResult);
+
+        public async ValueTask<RekallAgeDynamicCommandResult> ExecuteJsonAsync(
+            string argumentsJson,
+            RekallAgeCommandContext context)
+        {
+            TRequest request;
+            try
+            {
+                request = JsonSerializer.Deserialize<TRequest>(argumentsJson, JsonOptions)
+                    ?? throw new JsonException($"Arguments for command '{Command.Name}' were null.");
+            }
+            catch (JsonException ex)
+            {
+                var error = new RekallAgeCommandError(
+                    "REKALL_COMMAND_ARGUMENTS_INVALID",
+                    ex.Message,
+                    Command.Name);
+                return new RekallAgeDynamicCommandResult(false, error.Message, null, [error]);
+            }
+
+            var result = await Command.ExecuteAsync(request, context);
+            return new RekallAgeDynamicCommandResult(result.Ok, result.Summary, result.Value, result.Errors);
+        }
     }
 }

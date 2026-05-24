@@ -16,6 +16,7 @@ The current MVP includes:
 - structured validation
 - compact agent project summaries
 - MCP tool catalog skeleton
+- stdio MCP JSON-RPC adapter for `initialize`, `tools/list`, and `tools/call`
 - CLI adapter over the same command bus
 - headless runtime smoke execution with active gameplay-system observations
 - deterministic software screenshot capture through command bus
@@ -54,6 +55,7 @@ dotnet test Rekall.AGE.sln
 
 ```powershell
 dotnet run --project src/Rekall.Age.Cli -- templates list
+dotnet run --project src/Rekall.Age.Cli -- mcp stdio
 dotnet run --project src/Rekall.Age.Cli -- module schemas
 dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" puzzle
 dotnet run --project src/Rekall.Age.Cli -- module scaffold .age-sandbox crystal.mining "Crystal Mining" CrystalMining MiningController

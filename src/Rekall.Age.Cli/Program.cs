@@ -5,6 +5,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.GameTemplates;
 using Rekall.Age.GameTemplates.Commands;
+using Rekall.Age.Mcp;
 using Rekall.Age.Modules.Commands;
 using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
@@ -37,6 +38,7 @@ internal static class RekallAgeCli
             return args switch
             {
                 ["templates", "list"] => ListTemplates(),
+                ["mcp", "stdio"] => await RunMcpStdioAsync(registry, context),
                 ["module", "schemas"] => await ListSchemasAsync(registry, context, null),
                 ["module", "schemas", var moduleId] => await ListSchemasAsync(registry, context, moduleId),
                 ["module", "schemas", "project", var root] => await ListProjectSchemasAsync(registry, context, root),
@@ -94,6 +96,15 @@ internal static class RekallAgeCli
             Console.WriteLine($"{template.Id}: {template.DisplayName} - {template.Description}");
         }
 
+        return 0;
+    }
+
+    private static async Task<int> RunMcpStdioAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context)
+    {
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+        await server.RunStdioAsync(Console.In, Console.Out, context);
         return 0;
     }
 

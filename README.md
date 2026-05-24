@@ -51,6 +51,7 @@ dotnet test Rekall.AGE.sln
 dotnet run --project src/Rekall.Age.Cli -- templates list
 dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" puzzle
 dotnet run --project src/Rekall.Age.Cli -- context summary .age-sandbox
+dotnet run --project src/Rekall.Age.Cli -- context scene .age-sandbox Main
 dotnet run --project src/Rekall.Age.Cli -- run scene .age-sandbox Main 0.1
 dotnet run --project src/Rekall.Age.Cli -- capture screenshot .age-sandbox Main
 ```

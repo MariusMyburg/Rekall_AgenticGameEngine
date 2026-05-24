@@ -1,4 +1,5 @@
 using Rekall.Age.Agent;
+using Rekall.Age.Agent.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.GameTemplates;
@@ -39,7 +40,8 @@ internal static class RekallAgeCli
                 ["scene", "create", var root, var name, var capabilities] => await CreateSceneAsync(registry, context, root, name, capabilities),
                 ["entity", "create", var root, var scene, var name, var tags] => await CreateEntityAsync(registry, context, root, scene, name, tags),
                 ["run", "scene", var root, var scene, var seconds] => await RunSceneAsync(registry, context, root, scene, seconds),
-                ["context", "summary", var root] => await PrintSummaryAsync(root, cancellationToken),
+                ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
+                ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
                 ["capture", "screenshot", var root, var scene] => await CaptureAsync(registry, context, root, scene),
                 _ => PrintUnknown(args)
             };
@@ -60,6 +62,9 @@ internal static class RekallAgeCli
         registry.Register(new CreateEntityCommand());
         registry.Register(new AddComponentCommand());
         registry.Register(new CreateGameFromTemplateCommand());
+        registry.Register(new ListGameTemplatesCommand());
+        registry.Register(new GetProjectSummaryCommand());
+        registry.Register(new GetSceneSummaryCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
         return registry;
@@ -150,13 +155,16 @@ internal static class RekallAgeCli
         return result.Ok ? 0 : 1;
     }
 
-    private static async Task<int> PrintSummaryAsync(string root, CancellationToken cancellationToken)
+    private static async Task<int> PrintSummaryAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root)
     {
-        var sceneStore = new RekallAgeSceneStore();
-        var summary = await new RekallAgeContextBuilder(
-            new RekallAgeProjectStore(),
-            sceneStore,
-            new RekallAgeProjectValidator(sceneStore)).BuildProjectSummaryAsync(root, cancellationToken);
+        var result = await registry.ExecuteAsync<GetProjectSummaryRequest, GetProjectSummaryResult>(
+            "rekall.context.project_summary",
+            new GetProjectSummaryRequest(root),
+            context);
+        var summary = result.Value.Summary;
 
         Console.WriteLine($"{summary.Project}: {summary.Health.Status}");
         foreach (var issue in summary.Health.BlockingIssues)
@@ -164,7 +172,28 @@ internal static class RekallAgeCli
             Console.WriteLine($"- {issue}");
         }
 
-        return summary.Health.Status == "ok" ? 0 : 1;
+        return result.Ok && summary.Health.Status == "ok" ? 0 : 1;
+    }
+
+    private static async Task<int> PrintSceneSummaryAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene)
+    {
+        var result = await registry.ExecuteAsync<GetSceneSummaryRequest, GetSceneSummaryResult>(
+            "rekall.context.scene_summary",
+            new GetSceneSummaryRequest(root, scene),
+            context);
+        var summary = result.Value.Summary;
+        Console.WriteLine($"Scene {summary.Scene}: {summary.EntityCount} entities");
+        Console.WriteLine($"Components: {string.Join(", ", summary.ComponentTypes)}");
+        foreach (var entity in summary.Entities)
+        {
+            Console.WriteLine($"- {entity.Name}: {string.Join(", ", entity.Components)}");
+        }
+
+        return result.Ok ? 0 : 1;
     }
 
     private static async Task<int> RunSceneAsync(

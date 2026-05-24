@@ -46,4 +46,34 @@ public sealed class RekallAgeContextBuilder
             new RekallAgeProjectHealth(status, blocking),
             nextActions);
     }
+
+    public async ValueTask<RekallAgeSceneSummary> BuildSceneSummaryAsync(
+        string projectRoot,
+        string sceneName,
+        CancellationToken cancellationToken)
+    {
+        var scene = await _sceneStore.LoadAsync(projectRoot, sceneName, cancellationToken);
+        var entities = scene.Entities
+            .Select(entity => new RekallAgeEntitySummary(
+                entity.Id,
+                entity.Name,
+                entity.Tags,
+                entity.Components.Select(component => SimplifyComponentType(component.Type)).ToArray()))
+            .ToArray();
+        var componentTypes = entities
+            .SelectMany(entity => entity.Components)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(component => component, StringComparer.Ordinal)
+            .ToArray();
+
+        return new RekallAgeSceneSummary(scene.Name, scene.Capabilities, entities, componentTypes);
+    }
+
+    private static string SimplifyComponentType(string componentType)
+    {
+        const string prefix = "Rekall.";
+        return componentType.StartsWith(prefix, StringComparison.Ordinal)
+            ? componentType[prefix.Length..]
+            : componentType;
+    }
 }

@@ -28,5 +28,6 @@ public sealed class RenderBackendCatalogTests
         Assert.True(result.Ok, result.Summary);
         Assert.Equal("vulkan", result.Value.Backends[0].Id);
         Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "command-buffers");
+        Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "render-pass-submit-clear");
     }
 }

@@ -25,6 +25,7 @@ public sealed record RekallAgeRenderBackendCatalog(IReadOnlyList<RekallAgeRender
                     "shaders",
                     "command-pools",
                     "command-buffers",
+                    "render-pass-submit-clear",
                     "synchronization"
                 ]),
             new RekallAgeRenderBackendDescriptor(

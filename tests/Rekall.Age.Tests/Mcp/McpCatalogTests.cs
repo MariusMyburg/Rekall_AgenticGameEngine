@@ -4,6 +4,7 @@ using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.Mcp;
 using Rekall.Age.Modules.Commands;
 using Rekall.Age.Project.Commands;
+using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime.Commands;
 
@@ -22,6 +23,7 @@ public sealed class McpCatalogTests
         registry.Register(new ListComponentSchemasCommand(GetType().Assembly));
         registry.Register(new ScaffoldModuleCommand());
         registry.Register(new BuildModulesCommand());
+        registry.Register(new SubmitClearVulkanRenderPassCommand(new FakeVulkanRenderPassSubmission()));
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
@@ -32,5 +34,39 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.component_schemas");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.scaffold");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.build.modules");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.vulkan.render_pass.submit_clear");
+    }
+
+    private sealed class FakeVulkanRenderPassSubmission : IRekallAgeVulkanRenderPassSubmission
+    {
+        public ValueTask<RekallAgeVulkanRenderPassSubmissionResult> SubmitClearRenderPassAsync(
+            uint width,
+            uint height,
+            string format,
+            string? preferredDeviceType,
+            CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult(new RekallAgeVulkanRenderPassSubmissionResult(
+                Submitted: true,
+                LoaderName: "fake-vulkan",
+                SelectedDevice: new RekallAgeVulkanSelectedDevice(
+                    "Fake RTX",
+                    "discrete-gpu",
+                    "1.4.0",
+                    new RekallAgeVulkanQueueFamilyInfo(0, ["graphics"], 8)),
+                Width: width,
+                Height: height,
+                Format: format,
+                ImageCreated: true,
+                ImageViewCreated: true,
+                RenderPassCreated: true,
+                FramebufferCreated: true,
+                CommandPoolCreated: true,
+                CommandBufferAllocated: true,
+                RenderPassBegan: true,
+                RenderPassEnded: true,
+                FenceSignaled: true,
+                Errors: []));
+        }
     }
 }

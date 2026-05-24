@@ -62,6 +62,10 @@ internal static class RekallAgeCli
                     await CreateVulkanRenderTargetAsync(registry, context, "128", "72", "R8G8B8A8_UNorm", null),
                 ["render", "vulkan", "render-target", "create", var width, var height, var format, var preferredDeviceType] =>
                     await CreateVulkanRenderTargetAsync(registry, context, width, height, format, preferredDeviceType),
+                ["render", "vulkan", "render-pass", "submit-clear"] =>
+                    await SubmitClearVulkanRenderPassAsync(registry, context, "128", "72", "R8G8B8A8_UNorm", null),
+                ["render", "vulkan", "render-pass", "submit-clear", var width, var height, var format, var preferredDeviceType] =>
+                    await SubmitClearVulkanRenderPassAsync(registry, context, width, height, format, preferredDeviceType),
                 ["render", "plan", "create", var root, var backend, var name] =>
                     await CreateRenderPlanAsync(registry, context, root, backend, name),
                 ["render", "plan", "inspect", var root] => await InspectRenderPlanAsync(registry, context, root),
@@ -134,6 +138,7 @@ internal static class RekallAgeCli
         registry.Register(new CreateMappedVulkanBufferCommand());
         registry.Register(new CreateBoundVulkanImageCommand());
         registry.Register(new CreateVulkanRenderTargetCommand());
+        registry.Register(new SubmitClearVulkanRenderPassCommand());
         registry.Register(new CreateRenderPlanCommand());
         registry.Register(new AddRenderResourceCommand());
         registry.Register(new RecordRenderCommandBufferCommand());
@@ -366,6 +371,48 @@ internal static class RekallAgeCli
         Console.WriteLine($"Image view created: {result.Value.ImageViewCreated}");
         Console.WriteLine($"Render pass created: {result.Value.RenderPassCreated}");
         Console.WriteLine($"Framebuffer created: {result.Value.FramebufferCreated}");
+        foreach (var error in result.Value.Errors)
+        {
+            Console.WriteLine($"Error: {error}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> SubmitClearVulkanRenderPassAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string width,
+        string height,
+        string format,
+        string? preferredDeviceType)
+    {
+        var parsedWidth = uint.Parse(width, System.Globalization.CultureInfo.InvariantCulture);
+        var parsedHeight = uint.Parse(height, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<SubmitClearVulkanRenderPassRequest, SubmitClearVulkanRenderPassResult>(
+            "rekall.render.vulkan.render_pass.submit_clear",
+            new SubmitClearVulkanRenderPassRequest(parsedWidth, parsedHeight, format, preferredDeviceType),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Submitted: {result.Value.Submitted}");
+        Console.WriteLine($"Loader: {result.Value.LoaderName ?? "<none>"}");
+        if (result.Value.SelectedDevice is { } device)
+        {
+            Console.WriteLine($"Selected device: {device.Name} [{device.DeviceType}] API {device.ApiVersion}");
+            Console.WriteLine($"Graphics queue family: {device.GraphicsQueueFamily.Index}");
+        }
+
+        Console.WriteLine($"Extent: {result.Value.Width}x{result.Value.Height}");
+        Console.WriteLine($"Format: {result.Value.Format}");
+        Console.WriteLine($"Image created: {result.Value.ImageCreated}");
+        Console.WriteLine($"Image view created: {result.Value.ImageViewCreated}");
+        Console.WriteLine($"Render pass created: {result.Value.RenderPassCreated}");
+        Console.WriteLine($"Framebuffer created: {result.Value.FramebufferCreated}");
+        Console.WriteLine($"Command pool created: {result.Value.CommandPoolCreated}");
+        Console.WriteLine($"Command buffer allocated: {result.Value.CommandBufferAllocated}");
+        Console.WriteLine($"Render pass began: {result.Value.RenderPassBegan}");
+        Console.WriteLine($"Render pass ended: {result.Value.RenderPassEnded}");
+        Console.WriteLine($"Fence signaled: {result.Value.FenceSignaled}");
         foreach (var error in result.Value.Errors)
         {
             Console.WriteLine($"Error: {error}");

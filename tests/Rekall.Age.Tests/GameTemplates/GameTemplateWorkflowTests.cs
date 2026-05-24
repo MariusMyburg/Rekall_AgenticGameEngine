@@ -254,5 +254,19 @@ public sealed class GameTemplateWorkflowTests
         Assert.Contains(archive.Entries, entry => entry.FullName == "rekall.package.json");
         Assert.Contains(archive.Entries, entry => entry.FullName == "Game/rekall.project.json");
         Assert.Contains(archive.Entries, entry => entry.FullName.EndsWith("PongPlayable.dll", StringComparison.Ordinal));
+
+        var inspectManifest = await new InspectPlayablePackageCommand().ExecuteAsync(
+            new InspectPlayablePackageRequest(package.Value.ManifestPath),
+            context);
+        var inspectArchive = await new InspectPlayablePackageCommand().ExecuteAsync(
+            new InspectPlayablePackageRequest(package.Value.ArchivePath),
+            context);
+
+        Assert.True(inspectManifest.Ok, inspectManifest.Summary);
+        Assert.True(inspectArchive.Ok, inspectArchive.Summary);
+        Assert.True(inspectArchive.Value.Ready);
+        Assert.Equal("pong", inspectArchive.Value.Manifest.SourceTemplateId);
+        Assert.Contains(inspectArchive.Value.Manifest.DrawCommands, command => command.Id == "ball" && command.Kind == "circle");
+        Assert.Contains(inspectArchive.Value.Manifest.DrawAssertions, assertion => assertion.Id == "ball" && assertion.Passed);
     }
 }

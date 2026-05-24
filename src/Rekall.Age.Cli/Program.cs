@@ -128,6 +128,7 @@ internal static class RekallAgeCli
                     await PackagePlayableGameAsync(registry, context, root, scene, outputDirectory, graphics: false),
                 ["game", "package-playable", var root, var scene, var outputDirectory, "--graphics"] =>
                     await PackagePlayableGameAsync(registry, context, root, scene, outputDirectory, graphics: true),
+                ["game", "inspect-package", var packagePath] => await InspectPlayablePackageAsync(registry, context, packagePath),
                 ["project", "create", var root, var name, var capabilities] => await CreateProjectAsync(registry, context, root, name, capabilities),
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
                 ["scene", "create", var root, var name, var capabilities] => await CreateSceneAsync(registry, context, root, name, capabilities),
@@ -177,6 +178,7 @@ internal static class RekallAgeCli
         registry.Register(new CreatePlayableGameFromTemplateCommand());
         registry.Register(new VerifyPlayableGameCommand());
         registry.Register(new PackagePlayableGameCommand());
+        registry.Register(new InspectPlayablePackageCommand());
         registry.Register(new ListGameTemplatesCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
@@ -1162,6 +1164,30 @@ internal static class RekallAgeCli
         }
 
         return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectPlayablePackageAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string packagePath)
+    {
+        var result = await registry.ExecuteAsync<InspectPlayablePackageRequest, InspectPlayablePackageResult>(
+            "rekall.workflow.inspect_playable_package",
+            new InspectPlayablePackageRequest(packagePath),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Ready: {result.Value.Ready}");
+        Console.WriteLine($"Template: {result.Value.Manifest.SourceTemplateId ?? "<none>"}");
+        Console.WriteLine($"Scene: {result.Value.Manifest.SceneName}");
+        Console.WriteLine($"Launch: {result.Value.Manifest.LaunchPath}");
+        Console.WriteLine($"Draw commands: {result.Value.Manifest.DrawCommands.Count}");
+        Console.WriteLine($"Draw assertions: {result.Value.Manifest.DrawAssertions.Count}");
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.Ready ? 0 : 1;
     }
 
     private static async Task<int> CreateProjectAsync(

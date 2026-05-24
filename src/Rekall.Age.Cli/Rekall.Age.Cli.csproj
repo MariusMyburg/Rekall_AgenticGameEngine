@@ -10,6 +10,7 @@
     <ProjectReference Include="..\Rekall.Age.Runtime\Rekall.Age.Runtime.csproj" />
     <ProjectReference Include="..\Rekall.Age.GameTemplates\Rekall.Age.GameTemplates.csproj" />
     <ProjectReference Include="..\Rekall.Age.Modules\Rekall.Age.Modules.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Build\Rekall.Age.Build.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

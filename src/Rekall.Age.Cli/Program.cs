@@ -1,5 +1,6 @@
 using Rekall.Age.Agent;
 using Rekall.Age.Agent.Commands;
+using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.GameTemplates;
@@ -39,6 +40,7 @@ internal static class RekallAgeCli
                 ["module", "schemas", var moduleId] => await ListSchemasAsync(registry, context, moduleId),
                 ["module", "scaffold", var root, var moduleId, var displayName, var moduleName, var componentName] =>
                     await ScaffoldModuleAsync(registry, context, root, moduleId, displayName, moduleName, componentName),
+                ["build", "modules", var root] => await BuildModulesAsync(registry, context, root),
                 ["game", "create", var root, var name, var template] => await CreateGameAsync(registry, context, root, name, template),
                 ["project", "create", var root, var name, var capabilities] => await CreateProjectAsync(registry, context, root, name, capabilities),
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
@@ -72,6 +74,7 @@ internal static class RekallAgeCli
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new ListComponentSchemasCommand());
         registry.Register(new ScaffoldModuleCommand());
+        registry.Register(new BuildModulesCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
         return registry;
@@ -119,6 +122,24 @@ internal static class RekallAgeCli
             new ScaffoldModuleRequest(root, moduleId, displayName, moduleName, componentName),
             context);
         Console.WriteLine(result.Value.SourcePath);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> BuildModulesAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root)
+    {
+        var result = await registry.ExecuteAsync<BuildModulesRequest, BuildModulesResult>(
+            "rekall.build.modules",
+            new BuildModulesRequest(root),
+            context);
+        Console.WriteLine(result.Summary);
+        foreach (var module in result.Value.Modules)
+        {
+            Console.WriteLine($"{module.ModuleName}: {module.AssemblyPath}");
+        }
+
         return result.Ok ? 0 : 1;
     }
 

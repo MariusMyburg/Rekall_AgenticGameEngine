@@ -24,12 +24,18 @@ public sealed class ScaffoldModuleCommandTests
 
         Assert.True(result.Ok);
         Assert.True(File.Exists(result.Value.SourcePath));
+        Assert.True(File.Exists(result.Value.ProjectPath));
         Assert.Contains(result.Value.SourcePath, context.Transaction.ChangedResources);
+        Assert.Contains(result.Value.ProjectPath, context.Transaction.ChangedResources);
 
         var source = await File.ReadAllTextAsync(result.Value.SourcePath);
         Assert.Contains("[RekallAgeModule(\"crystal.mining\", \"Crystal Mining\")]", source);
         Assert.Contains("public sealed class CrystalMiningModule : RekallAgeModule", source);
         Assert.Contains("builder.RegisterComponent<MiningController>();", source);
         Assert.Contains("public sealed class MiningController : RekallAgeComponent", source);
+
+        var project = await File.ReadAllTextAsync(result.Value.ProjectPath);
+        Assert.Contains("<Project Sdk=\"Microsoft.NET.Sdk\">", project);
+        Assert.Contains("Rekall.Age.Modules.csproj", project);
     }
 }

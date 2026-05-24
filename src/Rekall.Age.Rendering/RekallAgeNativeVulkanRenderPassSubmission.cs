@@ -3,7 +3,7 @@ using System.Text;
 
 namespace Rekall.Age.Rendering;
 
-public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkanRenderPassSubmission
+public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkanRenderPassSubmission, IRekallAgeVulkanRenderPassReadback
 {
     private const int VkSuccess = 0;
     private const int VkStructureTypeApplicationInfo = 0;
@@ -13,6 +13,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
     private const int VkStructureTypeSubmitInfo = 4;
     private const int VkStructureTypeMemoryAllocateInfo = 5;
     private const int VkStructureTypeFenceCreateInfo = 8;
+    private const int VkStructureTypeBufferCreateInfo = 12;
     private const int VkStructureTypeFramebufferCreateInfo = 37;
     private const int VkStructureTypeRenderPassCreateInfo = 38;
     private const int VkStructureTypeCommandPoolCreateInfo = 39;
@@ -28,16 +29,24 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
     private const uint VkSharingModeExclusive = 0;
     private const uint VkImageLayoutUndefined = 0;
     private const uint VkImageLayoutColorAttachmentOptimal = 2;
+    private const uint VkImageLayoutTransferSrcOptimal = 6;
     private const uint VkSampleCount1Bit = 1;
     private const uint VkFormatR8G8B8A8Unorm = 37;
     private const uint VkFormatB8G8R8A8Unorm = 44;
     private const uint VkImageUsageColorAttachmentBit = 0x00000010;
+    private const uint VkImageUsageTransferSrcBit = 0x00000001;
+    private const uint VkBufferUsageTransferDstBit = 0x00000002;
     private const uint VkImageAspectColorBit = 0x00000001;
     private const uint VkAttachmentLoadOpClear = 1;
     private const uint VkAttachmentStoreOpStore = 0;
     private const uint VkAttachmentLoadOpDontCare = 2;
     private const uint VkAttachmentStoreOpDontCare = 1;
     private const uint VkPipelineBindPointGraphics = 0;
+    private const uint VkPipelineStageColorAttachmentOutputBit = 0x00000400;
+    private const uint VkPipelineStageTransferBit = 0x00001000;
+    private const uint VkAccessColorAttachmentWriteBit = 0x00000100;
+    private const uint VkAccessTransferReadBit = 0x00000800;
+    private const uint VkSubpassExternal = 0xFFFFFFFF;
     private const uint VkCommandBufferLevelPrimary = 0;
     private const uint VkSubpassContentsInline = 0;
     private const uint VkQueueGraphicsBit = 0x00000001;
@@ -88,6 +97,49 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         }
     }
 
+    public ValueTask<RekallAgeVulkanRenderPassReadbackResult> ReadClearRenderPassAsync(
+        uint width,
+        uint height,
+        string format,
+        string? preferredDeviceType,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var errors = new List<string>();
+        if (width == 0 || height == 0)
+        {
+            errors.Add("Vulkan readback width and height must be greater than zero.");
+            return ValueTask.FromResult(UnavailableReadback(null, null, width, height, format, false, false, false, false, 0, 0, default, 0, errors));
+        }
+
+        var byteCount = checked((ulong)width * height * 4);
+        if (byteCount > int.MaxValue)
+        {
+            errors.Add("Vulkan readback size exceeds the maximum host buffer size for this smoke tool.");
+            return ValueTask.FromResult(UnavailableReadback(null, null, width, height, format, false, false, false, false, 0, 0, default, 0, errors));
+        }
+
+        if (!TryLoadVulkan(errors, out var library, out var loaderName))
+        {
+            return ValueTask.FromResult(UnavailableReadback(null, null, width, height, format, false, false, false, false, 0, 0, default, 0, errors));
+        }
+
+        try
+        {
+            var context = CreateContext(library, errors);
+            if (context is null)
+            {
+                return ValueTask.FromResult(UnavailableReadback(loaderName, null, width, height, format, false, false, false, false, 0, 0, default, 0, errors));
+            }
+
+            return ValueTask.FromResult(ReadClearRenderPass(context.Value, loaderName!, width, height, format, preferredDeviceType, errors));
+        }
+        finally
+        {
+            NativeLibrary.Free(library);
+        }
+    }
+
     private static RekallAgeVulkanRenderPassSubmissionResult SubmitClearRenderPass(
         VulkanRenderPassSubmissionContext context,
         string loaderName,
@@ -116,7 +168,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
 
             try
             {
-                var image = CreateImage(context, device, width, height, format, errors);
+                var image = CreateImage(context, device, width, height, format, includeTransferSource: false, errors);
                 if (image == IntPtr.Zero)
                 {
                     return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, false, false, false, false, errors);
@@ -140,7 +192,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
 
                         try
                         {
-                            var renderPass = CreateRenderPass(context, device, format, errors);
+                            var renderPass = CreateRenderPass(context, device, format, finalLayoutTransferSource: false, errors);
                             if (renderPass == IntPtr.Zero)
                             {
                                 return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, true, true, false, false, errors);
@@ -253,6 +305,204 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         }
     }
 
+    private static RekallAgeVulkanRenderPassReadbackResult ReadClearRenderPass(
+        VulkanRenderPassSubmissionContext context,
+        string loaderName,
+        uint width,
+        uint height,
+        string format,
+        string? preferredDeviceType,
+        List<string> errors)
+    {
+        using (context)
+        {
+            var nativeDevices = EnumerateCandidateDevices(context, errors);
+            var selection = RekallAgeVulkanDeviceSelector.Select(nativeDevices.Select(device => device.Device), preferredDeviceType);
+            if (selection is null)
+            {
+                errors.Add("No Vulkan physical device with a graphics queue was found.");
+                return UnavailableReadback(loaderName, null, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+            }
+
+            var selectedDevice = ToSelectedDevice(selection);
+            var nativeDevice = nativeDevices.First(device => device.Device.Name.Equals(selection.Device.Name, StringComparison.Ordinal));
+            var device = CreateLogicalDevice(context, nativeDevice.Handle, selection, errors);
+            if (device == IntPtr.Zero)
+            {
+                return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+            }
+
+            try
+            {
+                context.GetDeviceQueue(device, selection.QueueFamily.Index, 0, out var queue);
+                if (queue == IntPtr.Zero)
+                {
+                    errors.Add("vkGetDeviceQueue returned a null graphics queue.");
+                    return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                }
+
+                var image = CreateImage(context, device, width, height, format, includeTransferSource: true, errors);
+                if (image == IntPtr.Zero)
+                {
+                    return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                }
+
+                try
+                {
+                    var imageMemory = BindImageMemory(context, nativeDevice.Handle, device, image, errors, out _);
+                    if (imageMemory == IntPtr.Zero)
+                    {
+                        return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                    }
+
+                    try
+                    {
+                        var imageView = CreateImageView(context, device, image, format, errors);
+                        if (imageView == IntPtr.Zero)
+                        {
+                            return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                        }
+
+                        try
+                        {
+                            var renderPass = CreateRenderPass(context, device, format, finalLayoutTransferSource: true, errors);
+                            if (renderPass == IntPtr.Zero)
+                            {
+                                return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                            }
+
+                            try
+                            {
+                                var framebuffer = CreateFramebuffer(context, device, renderPass, imageView, width, height, errors);
+                                if (framebuffer == IntPtr.Zero)
+                                {
+                                    return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, false, false, false, 0, 0, default, 0, errors);
+                                }
+
+                                try
+                                {
+                                    var byteCount = checked((ulong)width * height * 4);
+                                    var readbackBuffer = CreateBuffer(context, device, byteCount, errors);
+                                    if (readbackBuffer == IntPtr.Zero)
+                                    {
+                                        return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, true, false, false, 0, 0, default, 0, errors);
+                                    }
+
+                                    try
+                                    {
+                                        var readbackMemory = BindBufferMemory(context, nativeDevice.Handle, device, readbackBuffer, errors);
+                                        if (readbackMemory == IntPtr.Zero)
+                                        {
+                                            return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, true, false, false, 0, 0, default, 0, errors);
+                                        }
+
+                                        try
+                                        {
+                                            var commandPool = CreateCommandPool(context, device, selection.QueueFamily.Index, errors);
+                                            if (commandPool == IntPtr.Zero)
+                                            {
+                                                return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, true, true, false, 0, 0, default, 0, errors);
+                                            }
+
+                                            try
+                                            {
+                                                var commandBuffer = AllocateCommandBuffer(context, device, commandPool, errors);
+                                                if (commandBuffer == IntPtr.Zero)
+                                                {
+                                                    return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, true, true, false, 0, 0, default, 0, errors);
+                                                }
+
+                                                if (!RecordClearRenderPassAndCopy(context, commandBuffer, renderPass, framebuffer, image, readbackBuffer, width, height, errors))
+                                                {
+                                                    return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, true, true, false, 0, 0, default, 0, errors);
+                                                }
+
+                                                var fence = CreateFence(context, device, errors);
+                                                if (fence == IntPtr.Zero)
+                                                {
+                                                    return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, true, true, false, 0, 0, default, 0, errors);
+                                                }
+
+                                                try
+                                                {
+                                                    var submitted = SubmitAndWait(context, device, queue, commandBuffer, fence, errors);
+                                                    if (!submitted)
+                                                    {
+                                                        return UnavailableReadback(loaderName, selectedDevice, width, height, format, false, true, true, false, 0, 0, default, 0, errors);
+                                                    }
+
+                                                    var readback = MapReadbackBuffer(context, device, readbackMemory, byteCount, NormalizeFormat(format), errors);
+                                                    return readback.BufferMapped
+                                                        ? new RekallAgeVulkanRenderPassReadbackResult(
+                                                            Readback: true,
+                                                            LoaderName: loaderName,
+                                                            SelectedDevice: selectedDevice,
+                                                            Width: width,
+                                                            Height: height,
+                                                            Format: NormalizeFormat(format),
+                                                            Submitted: true,
+                                                            BufferCreated: true,
+                                                            BufferBound: true,
+                                                            BufferMapped: true,
+                                                            BytesRead: byteCount,
+                                                            NonZeroBytes: readback.NonZeroBytes,
+                                                            FirstPixel: readback.FirstPixel,
+                                                            ByteChecksum: readback.ByteChecksum,
+                                                            Errors: errors)
+                                                        : UnavailableReadback(loaderName, selectedDevice, width, height, format, true, true, true, false, 0, 0, default, 0, errors);
+                                                }
+                                                finally
+                                                {
+                                                    context.DestroyFence(device, fence, IntPtr.Zero);
+                                                }
+                                            }
+                                            finally
+                                            {
+                                                context.DestroyCommandPool(device, commandPool, IntPtr.Zero);
+                                            }
+                                        }
+                                        finally
+                                        {
+                                            context.FreeMemory(device, readbackMemory, IntPtr.Zero);
+                                        }
+                                    }
+                                    finally
+                                    {
+                                        context.DestroyBuffer(device, readbackBuffer, IntPtr.Zero);
+                                    }
+                                }
+                                finally
+                                {
+                                    context.DestroyFramebuffer(device, framebuffer, IntPtr.Zero);
+                                }
+                            }
+                            finally
+                            {
+                                context.DestroyRenderPass(device, renderPass, IntPtr.Zero);
+                            }
+                        }
+                        finally
+                        {
+                            context.DestroyImageView(device, imageView, IntPtr.Zero);
+                        }
+                    }
+                    finally
+                    {
+                        context.FreeMemory(device, imageMemory, IntPtr.Zero);
+                    }
+                }
+                finally
+                {
+                    context.DestroyImage(device, image, IntPtr.Zero);
+                }
+            }
+            finally
+            {
+                context.DestroyDevice(device, IntPtr.Zero);
+            }
+        }
+    }
+
     private static bool TryLoadVulkan(List<string> errors, out IntPtr library, out string? loaderName)
     {
         foreach (var candidate in RekallAgeVulkanLoaderCandidateNames.ForCurrentPlatform())
@@ -284,9 +534,15 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             || !TryGetVulkanExport(library, "vkCreateImage", errors, out VkCreateImage createImage)
             || !TryGetVulkanExport(library, "vkDestroyImage", errors, out VkDestroyImage destroyImage)
             || !TryGetVulkanExport(library, "vkGetImageMemoryRequirements", errors, out VkGetImageMemoryRequirements getImageMemoryRequirements)
+            || !TryGetVulkanExport(library, "vkCreateBuffer", errors, out VkCreateBuffer createBuffer)
+            || !TryGetVulkanExport(library, "vkDestroyBuffer", errors, out VkDestroyBuffer destroyBuffer)
+            || !TryGetVulkanExport(library, "vkGetBufferMemoryRequirements", errors, out VkGetBufferMemoryRequirements getBufferMemoryRequirements)
             || !TryGetVulkanExport(library, "vkAllocateMemory", errors, out VkAllocateMemory allocateMemory)
             || !TryGetVulkanExport(library, "vkFreeMemory", errors, out VkFreeMemory freeMemory)
             || !TryGetVulkanExport(library, "vkBindImageMemory", errors, out VkBindImageMemory bindImageMemory)
+            || !TryGetVulkanExport(library, "vkBindBufferMemory", errors, out VkBindBufferMemory bindBufferMemory)
+            || !TryGetVulkanExport(library, "vkMapMemory", errors, out VkMapMemory mapMemory)
+            || !TryGetVulkanExport(library, "vkUnmapMemory", errors, out VkUnmapMemory unmapMemory)
             || !TryGetVulkanExport(library, "vkCreateImageView", errors, out VkCreateImageView createImageView)
             || !TryGetVulkanExport(library, "vkDestroyImageView", errors, out VkDestroyImageView destroyImageView)
             || !TryGetVulkanExport(library, "vkCreateRenderPass", errors, out VkCreateRenderPass createRenderPass)
@@ -299,6 +555,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             || !TryGetVulkanExport(library, "vkBeginCommandBuffer", errors, out VkBeginCommandBuffer beginCommandBuffer)
             || !TryGetVulkanExport(library, "vkCmdBeginRenderPass", errors, out VkCmdBeginRenderPass cmdBeginRenderPass)
             || !TryGetVulkanExport(library, "vkCmdEndRenderPass", errors, out VkCmdEndRenderPass cmdEndRenderPass)
+            || !TryGetVulkanExport(library, "vkCmdCopyImageToBuffer", errors, out VkCmdCopyImageToBuffer cmdCopyImageToBuffer)
             || !TryGetVulkanExport(library, "vkEndCommandBuffer", errors, out VkEndCommandBuffer endCommandBuffer)
             || !TryGetVulkanExport(library, "vkCreateFence", errors, out VkCreateFence createFence)
             || !TryGetVulkanExport(library, "vkDestroyFence", errors, out VkDestroyFence destroyFence)
@@ -340,9 +597,15 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                 createImage,
                 destroyImage,
                 getImageMemoryRequirements,
+                createBuffer,
+                destroyBuffer,
+                getBufferMemoryRequirements,
                 allocateMemory,
                 freeMemory,
                 bindImageMemory,
+                bindBufferMemory,
+                mapMemory,
+                unmapMemory,
                 createImageView,
                 destroyImageView,
                 createRenderPass,
@@ -355,6 +618,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                 beginCommandBuffer,
                 cmdBeginRenderPass,
                 cmdEndRenderPass,
+                cmdCopyImageToBuffer,
                 endCommandBuffer,
                 createFence,
                 destroyFence,
@@ -512,8 +776,21 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         }
     }
 
-    private static IntPtr CreateImage(VulkanRenderPassSubmissionContext context, IntPtr device, uint width, uint height, string format, List<string> errors)
+    private static IntPtr CreateImage(
+        VulkanRenderPassSubmissionContext context,
+        IntPtr device,
+        uint width,
+        uint height,
+        string format,
+        bool includeTransferSource,
+        List<string> errors)
     {
+        var usage = VkImageUsageColorAttachmentBit;
+        if (includeTransferSource)
+        {
+            usage |= VkImageUsageTransferSrcBit;
+        }
+
         var createInfo = new VkImageCreateInfo(
             VkStructureTypeImageCreateInfo,
             IntPtr.Zero,
@@ -525,7 +802,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             1,
             VkSampleCount1Bit,
             VkImageTilingOptimal,
-            VkImageUsageColorAttachmentBit,
+            usage,
             VkSharingModeExclusive,
             0,
             IntPtr.Zero,
@@ -669,8 +946,16 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         }
     }
 
-    private static IntPtr CreateRenderPass(VulkanRenderPassSubmissionContext context, IntPtr device, string format, List<string> errors)
+    private static IntPtr CreateRenderPass(
+        VulkanRenderPassSubmissionContext context,
+        IntPtr device,
+        string format,
+        bool finalLayoutTransferSource,
+        List<string> errors)
     {
+        var finalLayout = finalLayoutTransferSource
+            ? VkImageLayoutTransferSrcOptimal
+            : VkImageLayoutColorAttachmentOptimal;
         var attachment = new VkAttachmentDescription(
             0,
             ParseFormat(format),
@@ -680,11 +965,12 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             VkAttachmentLoadOpDontCare,
             VkAttachmentStoreOpDontCare,
             VkImageLayoutUndefined,
-            VkImageLayoutColorAttachmentOptimal);
+            finalLayout);
         var attachmentPointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkAttachmentDescription>());
         var colorRef = new VkAttachmentReference(0, VkImageLayoutColorAttachmentOptimal);
         var colorRefPointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkAttachmentReference>());
         var subpassPointer = IntPtr.Zero;
+        var dependencyPointer = IntPtr.Zero;
         var createInfoPointer = IntPtr.Zero;
         try
         {
@@ -703,6 +989,20 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                 IntPtr.Zero);
             subpassPointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkSubpassDescription>());
             Marshal.StructureToPtr(subpass, subpassPointer, false);
+            if (finalLayoutTransferSource)
+            {
+                var dependency = new VkSubpassDependency(
+                    0,
+                    VkSubpassExternal,
+                    VkPipelineStageColorAttachmentOutputBit,
+                    VkPipelineStageTransferBit,
+                    VkAccessColorAttachmentWriteBit,
+                    VkAccessTransferReadBit,
+                    0);
+                dependencyPointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkSubpassDependency>());
+                Marshal.StructureToPtr(dependency, dependencyPointer, false);
+            }
+
             var createInfo = new VkRenderPassCreateInfo(
                 VkStructureTypeRenderPassCreateInfo,
                 IntPtr.Zero,
@@ -711,8 +1011,8 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
                 attachmentPointer,
                 1,
                 subpassPointer,
-                0,
-                IntPtr.Zero);
+                finalLayoutTransferSource ? 1u : 0u,
+                dependencyPointer);
             createInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkRenderPassCreateInfo>());
             Marshal.StructureToPtr(createInfo, createInfoPointer, false);
             var result = context.CreateRenderPass(device, createInfoPointer, IntPtr.Zero, out var renderPass);
@@ -734,6 +1034,11 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             if (subpassPointer != IntPtr.Zero)
             {
                 Marshal.FreeHGlobal(subpassPointer);
+            }
+
+            if (dependencyPointer != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(dependencyPointer);
             }
 
             Marshal.FreeHGlobal(colorRefPointer);
@@ -777,6 +1082,90 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             }
 
             Marshal.FreeHGlobal(attachmentsPointer);
+        }
+    }
+
+    private static IntPtr CreateBuffer(
+        VulkanRenderPassSubmissionContext context,
+        IntPtr device,
+        ulong sizeBytes,
+        List<string> errors)
+    {
+        var createInfo = new VkBufferCreateInfo(
+            VkStructureTypeBufferCreateInfo,
+            IntPtr.Zero,
+            0,
+            sizeBytes,
+            VkBufferUsageTransferDstBit,
+            VkSharingModeExclusive,
+            0,
+            IntPtr.Zero);
+        var pointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkBufferCreateInfo>());
+        try
+        {
+            Marshal.StructureToPtr(createInfo, pointer, false);
+            var result = context.CreateBuffer(device, pointer, IntPtr.Zero, out var buffer);
+            if (result != VkSuccess)
+            {
+                errors.Add($"vkCreateBuffer failed with VkResult {result}.");
+                return IntPtr.Zero;
+            }
+
+            return buffer;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(pointer);
+        }
+    }
+
+    private static IntPtr BindBufferMemory(
+        VulkanRenderPassSubmissionContext context,
+        IntPtr physicalDevice,
+        IntPtr device,
+        IntPtr buffer,
+        List<string> errors)
+    {
+        var requirements = GetBufferMemoryRequirements(context, device, buffer);
+        var memoryTypes = ReadMemoryTypes(context, physicalDevice);
+        var memoryTypeIndex = RekallAgeVulkanMemoryTypeSelector.Select(
+            memoryTypes,
+            requirements.MemoryTypeBits,
+            ["host-visible", "host-coherent"]);
+        if (memoryTypeIndex is null)
+        {
+            errors.Add("No host-visible, host-coherent Vulkan memory type was compatible with the readback buffer.");
+            return IntPtr.Zero;
+        }
+
+        var memory = AllocateMemory(context, device, requirements.Size, memoryTypeIndex.Value, errors);
+        if (memory == IntPtr.Zero)
+        {
+            return IntPtr.Zero;
+        }
+
+        var bindResult = context.BindBufferMemory(device, buffer, memory, 0);
+        if (bindResult != VkSuccess)
+        {
+            context.FreeMemory(device, memory, IntPtr.Zero);
+            errors.Add($"vkBindBufferMemory failed with VkResult {bindResult}.");
+            return IntPtr.Zero;
+        }
+
+        return memory;
+    }
+
+    private static VkMemoryRequirements GetBufferMemoryRequirements(VulkanRenderPassSubmissionContext context, IntPtr device, IntPtr buffer)
+    {
+        var pointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkMemoryRequirements>());
+        try
+        {
+            context.GetBufferMemoryRequirements(device, buffer, pointer);
+            return Marshal.PtrToStructure<VkMemoryRequirements>(pointer);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(pointer);
         }
     }
 
@@ -913,6 +1302,147 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         }
     }
 
+    private static bool RecordClearRenderPassAndCopy(
+        VulkanRenderPassSubmissionContext context,
+        IntPtr commandBuffer,
+        IntPtr renderPass,
+        IntPtr framebuffer,
+        IntPtr image,
+        IntPtr readbackBuffer,
+        uint width,
+        uint height,
+        List<string> errors)
+    {
+        var beginInfoPointer = IntPtr.Zero;
+        var clearValuePointer = IntPtr.Zero;
+        var renderPassBeginInfoPointer = IntPtr.Zero;
+        var copyRegionPointer = IntPtr.Zero;
+        try
+        {
+            var beginInfo = new VkCommandBufferBeginInfo(VkStructureTypeCommandBufferBeginInfo, IntPtr.Zero, 0, IntPtr.Zero);
+            beginInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkCommandBufferBeginInfo>());
+            Marshal.StructureToPtr(beginInfo, beginInfoPointer, false);
+            var result = context.BeginCommandBuffer(commandBuffer, beginInfoPointer);
+            if (result != VkSuccess)
+            {
+                errors.Add($"vkBeginCommandBuffer failed with VkResult {result}.");
+                return false;
+            }
+
+            var clearValue = new VkClearColorValue(0.08f, 0.10f, 0.14f, 1.0f);
+            clearValuePointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkClearColorValue>());
+            Marshal.StructureToPtr(clearValue, clearValuePointer, false);
+            var renderPassBeginInfo = new VkRenderPassBeginInfo(
+                VkStructureTypeRenderPassBeginInfo,
+                IntPtr.Zero,
+                renderPass,
+                framebuffer,
+                new VkRect2D(new VkOffset2D(0, 0), new VkExtent2D(width, height)),
+                1,
+                clearValuePointer);
+            renderPassBeginInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkRenderPassBeginInfo>());
+            Marshal.StructureToPtr(renderPassBeginInfo, renderPassBeginInfoPointer, false);
+            context.CmdBeginRenderPass(commandBuffer, renderPassBeginInfoPointer, VkSubpassContentsInline);
+            context.CmdEndRenderPass(commandBuffer);
+
+            var copyRegion = new VkBufferImageCopy(
+                0,
+                0,
+                0,
+                new VkImageSubresourceLayers(VkImageAspectColorBit, 0, 0, 1),
+                new VkOffset3D(0, 0, 0),
+                new VkExtent3D(width, height, 1));
+            copyRegionPointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkBufferImageCopy>());
+            Marshal.StructureToPtr(copyRegion, copyRegionPointer, false);
+            context.CmdCopyImageToBuffer(
+                commandBuffer,
+                image,
+                VkImageLayoutTransferSrcOptimal,
+                readbackBuffer,
+                1,
+                copyRegionPointer);
+
+            result = context.EndCommandBuffer(commandBuffer);
+            if (result != VkSuccess)
+            {
+                errors.Add($"vkEndCommandBuffer failed with VkResult {result}.");
+                return false;
+            }
+
+            return true;
+        }
+        finally
+        {
+            if (copyRegionPointer != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(copyRegionPointer);
+            }
+
+            if (renderPassBeginInfoPointer != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(renderPassBeginInfoPointer);
+            }
+
+            if (clearValuePointer != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(clearValuePointer);
+            }
+
+            if (beginInfoPointer != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(beginInfoPointer);
+            }
+        }
+    }
+
+    private static VulkanReadbackBytes MapReadbackBuffer(
+        VulkanRenderPassSubmissionContext context,
+        IntPtr device,
+        IntPtr memory,
+        ulong sizeBytes,
+        string format,
+        List<string> errors)
+    {
+        var result = context.MapMemory(device, memory, 0, sizeBytes, 0, out var mapped);
+        if (result != VkSuccess)
+        {
+            errors.Add($"vkMapMemory failed with VkResult {result}.");
+            return new VulkanReadbackBytes(false, 0, new RekallAgeVulkanReadbackPixel(0, 0, 0, 0), 0);
+        }
+
+        try
+        {
+            var bytes = new byte[(int)sizeBytes];
+            Marshal.Copy(mapped, bytes, 0, bytes.Length);
+            var nonZero = 0ul;
+            var checksum = 0ul;
+            foreach (var value in bytes)
+            {
+                checksum += value;
+                if (value != 0)
+                {
+                    nonZero++;
+                }
+            }
+
+            var firstPixel = bytes.Length >= 4
+                ? ToReadbackPixel(bytes[0], bytes[1], bytes[2], bytes[3], format)
+                : new RekallAgeVulkanReadbackPixel(0, 0, 0, 0);
+            return new VulkanReadbackBytes(true, nonZero, firstPixel, checksum);
+        }
+        finally
+        {
+            context.UnmapMemory(device, memory);
+        }
+    }
+
+    private static RekallAgeVulkanReadbackPixel ToReadbackPixel(byte first, byte second, byte third, byte fourth, string format)
+    {
+        return format.Equals("B8G8R8A8_UNorm", StringComparison.Ordinal)
+            ? new RekallAgeVulkanReadbackPixel(third, second, first, fourth)
+            : new RekallAgeVulkanReadbackPixel(first, second, third, fourth);
+    }
+
     private static IntPtr CreateFence(VulkanRenderPassSubmissionContext context, IntPtr device, List<string> errors)
     {
         var createInfo = new VkFenceCreateInfo(VkStructureTypeFenceCreateInfo, IntPtr.Zero, 0);
@@ -1026,6 +1556,40 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
             Errors: errors.ToArray());
     }
 
+    private static RekallAgeVulkanRenderPassReadbackResult UnavailableReadback(
+        string? loaderName,
+        RekallAgeVulkanSelectedDevice? selectedDevice,
+        uint width,
+        uint height,
+        string format,
+        bool submitted,
+        bool bufferCreated,
+        bool bufferBound,
+        bool bufferMapped,
+        ulong bytesRead,
+        ulong nonZeroBytes,
+        RekallAgeVulkanReadbackPixel firstPixel,
+        ulong byteChecksum,
+        IReadOnlyList<string> errors)
+    {
+        return new RekallAgeVulkanRenderPassReadbackResult(
+            Readback: false,
+            LoaderName: loaderName,
+            SelectedDevice: selectedDevice,
+            Width: width,
+            Height: height,
+            Format: NormalizeFormat(format),
+            Submitted: submitted,
+            BufferCreated: bufferCreated,
+            BufferBound: bufferBound,
+            BufferMapped: bufferMapped,
+            BytesRead: bytesRead,
+            NonZeroBytes: nonZeroBytes,
+            FirstPixel: firstPixel,
+            ByteChecksum: byteChecksum,
+            Errors: errors.ToArray());
+    }
+
     private static RekallAgeVulkanSelectedDevice ToSelectedDevice(RekallAgeVulkanDeviceSelection selection)
     {
         return new RekallAgeVulkanSelectedDevice(selection.Device.Name, selection.Device.DeviceType, selection.Device.ApiVersion, selection.QueueFamily);
@@ -1095,6 +1659,12 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
 
     private sealed record NativeVulkanCandidateDevice(IntPtr Handle, RekallAgeVulkanCandidateDevice Device);
 
+    private readonly record struct VulkanReadbackBytes(
+        bool BufferMapped,
+        ulong NonZeroBytes,
+        RekallAgeVulkanReadbackPixel FirstPixel,
+        ulong ByteChecksum);
+
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     private delegate int VkCreateInstance(IntPtr createInfo, IntPtr allocator, out IntPtr instance);
 
@@ -1132,6 +1702,15 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
     private delegate void VkGetImageMemoryRequirements(IntPtr device, IntPtr image, IntPtr memoryRequirements);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate int VkCreateBuffer(IntPtr device, IntPtr createInfo, IntPtr allocator, out IntPtr buffer);
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate void VkDestroyBuffer(IntPtr device, IntPtr buffer, IntPtr allocator);
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate void VkGetBufferMemoryRequirements(IntPtr device, IntPtr buffer, IntPtr memoryRequirements);
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     private delegate int VkAllocateMemory(IntPtr device, IntPtr allocateInfo, IntPtr allocator, out IntPtr memory);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
@@ -1139,6 +1718,15 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     private delegate int VkBindImageMemory(IntPtr device, IntPtr image, IntPtr memory, ulong memoryOffset);
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate int VkBindBufferMemory(IntPtr device, IntPtr buffer, IntPtr memory, ulong memoryOffset);
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate int VkMapMemory(IntPtr device, IntPtr memory, ulong offset, ulong size, uint flags, out IntPtr data);
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate void VkUnmapMemory(IntPtr device, IntPtr memory);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     private delegate int VkCreateImageView(IntPtr device, IntPtr createInfo, IntPtr allocator, out IntPtr imageView);
@@ -1177,6 +1765,9 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
     private delegate void VkCmdEndRenderPass(IntPtr commandBuffer);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate void VkCmdCopyImageToBuffer(IntPtr commandBuffer, IntPtr srcImage, uint srcImageLayout, IntPtr dstBuffer, uint regionCount, IntPtr regions);
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     private delegate int VkEndCommandBuffer(IntPtr commandBuffer);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
@@ -1213,6 +1804,9 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
     private readonly record struct VkImageCreateInfo(int SType, IntPtr PNext, uint Flags, uint ImageType, uint Format, VkExtent3D Extent, uint MipLevels, uint ArrayLayers, uint Samples, uint Tiling, uint Usage, uint SharingMode, uint QueueFamilyIndexCount, IntPtr QueueFamilyIndices, uint InitialLayout);
 
     [StructLayout(LayoutKind.Sequential)]
+    private readonly record struct VkBufferCreateInfo(int SType, IntPtr PNext, uint Flags, ulong Size, uint Usage, uint SharingMode, uint QueueFamilyIndexCount, IntPtr QueueFamilyIndices);
+
+    [StructLayout(LayoutKind.Sequential)]
     private readonly record struct VkMemoryRequirements(ulong Size, ulong Alignment, uint MemoryTypeBits);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -1237,6 +1831,9 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
     private readonly record struct VkSubpassDescription(uint Flags, uint PipelineBindPoint, uint InputAttachmentCount, IntPtr InputAttachments, uint ColorAttachmentCount, IntPtr ColorAttachments, IntPtr ResolveAttachments, IntPtr DepthStencilAttachment, uint PreserveAttachmentCount, IntPtr PreserveAttachments);
 
     [StructLayout(LayoutKind.Sequential)]
+    private readonly record struct VkSubpassDependency(uint SrcSubpass, uint DstSubpass, uint SrcStageMask, uint DstStageMask, uint SrcAccessMask, uint DstAccessMask, uint DependencyFlags);
+
+    [StructLayout(LayoutKind.Sequential)]
     private readonly record struct VkRenderPassCreateInfo(int SType, IntPtr PNext, uint Flags, uint AttachmentCount, IntPtr Attachments, uint SubpassCount, IntPtr Subpasses, uint DependencyCount, IntPtr Dependencies);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -1255,6 +1852,9 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
     private readonly record struct VkOffset2D(int X, int Y);
 
     [StructLayout(LayoutKind.Sequential)]
+    private readonly record struct VkOffset3D(int X, int Y, int Z);
+
+    [StructLayout(LayoutKind.Sequential)]
     private readonly record struct VkExtent2D(uint Width, uint Height);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -1265,6 +1865,12 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
 
     [StructLayout(LayoutKind.Sequential)]
     private readonly record struct VkRenderPassBeginInfo(int SType, IntPtr PNext, IntPtr RenderPass, IntPtr Framebuffer, VkRect2D RenderArea, uint ClearValueCount, IntPtr ClearValues);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly record struct VkImageSubresourceLayers(uint AspectMask, uint MipLevel, uint BaseArrayLayer, uint LayerCount);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly record struct VkBufferImageCopy(ulong BufferOffset, uint BufferRowLength, uint BufferImageHeight, VkImageSubresourceLayers ImageSubresource, VkOffset3D ImageOffset, VkExtent3D ImageExtent);
 
     [StructLayout(LayoutKind.Sequential)]
     private readonly record struct VkFenceCreateInfo(int SType, IntPtr PNext, uint Flags);
@@ -1285,9 +1891,15 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         VkCreateImage CreateImage,
         VkDestroyImage DestroyImage,
         VkGetImageMemoryRequirements GetImageMemoryRequirements,
+        VkCreateBuffer CreateBuffer,
+        VkDestroyBuffer DestroyBuffer,
+        VkGetBufferMemoryRequirements GetBufferMemoryRequirements,
         VkAllocateMemory AllocateMemory,
         VkFreeMemory FreeMemory,
         VkBindImageMemory BindImageMemory,
+        VkBindBufferMemory BindBufferMemory,
+        VkMapMemory MapMemory,
+        VkUnmapMemory UnmapMemory,
         VkCreateImageView CreateImageView,
         VkDestroyImageView DestroyImageView,
         VkCreateRenderPass CreateRenderPass,
@@ -1300,6 +1912,7 @@ public sealed class RekallAgeNativeVulkanRenderPassSubmission : IRekallAgeVulkan
         VkBeginCommandBuffer BeginCommandBuffer,
         VkCmdBeginRenderPass CmdBeginRenderPass,
         VkCmdEndRenderPass CmdEndRenderPass,
+        VkCmdCopyImageToBuffer CmdCopyImageToBuffer,
         VkEndCommandBuffer EndCommandBuffer,
         VkCreateFence CreateFence,
         VkDestroyFence DestroyFence,

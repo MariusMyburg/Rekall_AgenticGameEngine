@@ -24,6 +24,7 @@ public sealed class McpCatalogTests
         registry.Register(new ScaffoldModuleCommand());
         registry.Register(new BuildModulesCommand());
         registry.Register(new SubmitClearVulkanRenderPassCommand(new FakeVulkanRenderPassSubmission()));
+        registry.Register(new ReadClearVulkanRenderPassCommand(new FakeVulkanRenderPassReadback()));
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
@@ -35,6 +36,7 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.scaffold");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.build.modules");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.vulkan.render_pass.submit_clear");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.vulkan.render_pass.read_clear");
     }
 
     private sealed class FakeVulkanRenderPassSubmission : IRekallAgeVulkanRenderPassSubmission
@@ -66,6 +68,38 @@ public sealed class McpCatalogTests
                 RenderPassBegan: true,
                 RenderPassEnded: true,
                 FenceSignaled: true,
+                Errors: []));
+        }
+    }
+
+    private sealed class FakeVulkanRenderPassReadback : IRekallAgeVulkanRenderPassReadback
+    {
+        public ValueTask<RekallAgeVulkanRenderPassReadbackResult> ReadClearRenderPassAsync(
+            uint width,
+            uint height,
+            string format,
+            string? preferredDeviceType,
+            CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult(new RekallAgeVulkanRenderPassReadbackResult(
+                Readback: true,
+                LoaderName: "fake-vulkan",
+                SelectedDevice: new RekallAgeVulkanSelectedDevice(
+                    "Fake RTX",
+                    "discrete-gpu",
+                    "1.4.0",
+                    new RekallAgeVulkanQueueFamilyInfo(0, ["graphics"], 8)),
+                Width: width,
+                Height: height,
+                Format: format,
+                Submitted: true,
+                BufferCreated: true,
+                BufferBound: true,
+                BufferMapped: true,
+                BytesRead: 4,
+                NonZeroBytes: 4,
+                FirstPixel: new RekallAgeVulkanReadbackPixel(20, 26, 36, 255),
+                ByteChecksum: 337,
                 Errors: []));
         }
     }

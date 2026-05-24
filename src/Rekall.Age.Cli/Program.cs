@@ -4,6 +4,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.GameTemplates;
 using Rekall.Age.GameTemplates.Commands;
+using Rekall.Age.Modules.Commands;
 using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering;
@@ -21,7 +22,7 @@ internal static class RekallAgeCli
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|run|context|capture|templates> ...");
+            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|run|context|capture|module|templates> ...");
             return 2;
         }
 
@@ -34,6 +35,8 @@ internal static class RekallAgeCli
             return args switch
             {
                 ["templates", "list"] => ListTemplates(),
+                ["module", "schemas"] => await ListSchemasAsync(registry, context, null),
+                ["module", "schemas", var moduleId] => await ListSchemasAsync(registry, context, moduleId),
                 ["game", "create", var root, var name, var template] => await CreateGameAsync(registry, context, root, name, template),
                 ["project", "create", var root, var name, var capabilities] => await CreateProjectAsync(registry, context, root, name, capabilities),
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
@@ -65,6 +68,7 @@ internal static class RekallAgeCli
         registry.Register(new ListGameTemplatesCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
+        registry.Register(new ListComponentSchemasCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
         return registry;
@@ -78,6 +82,24 @@ internal static class RekallAgeCli
         }
 
         return 0;
+    }
+
+    private static async Task<int> ListSchemasAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string? moduleId)
+    {
+        var result = await registry.ExecuteAsync<ListComponentSchemasRequest, ListComponentSchemasResult>(
+            "rekall.module.component_schemas",
+            new ListComponentSchemasRequest(moduleId),
+            context);
+        Console.WriteLine(result.Summary);
+        foreach (var component in result.Value.Components)
+        {
+            Console.WriteLine($"{component.DisplayName}: {component.TypeName}");
+        }
+
+        return result.Ok ? 0 : 1;
     }
 
     private static async Task<int> CreateGameAsync(

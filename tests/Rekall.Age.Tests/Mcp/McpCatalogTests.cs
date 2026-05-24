@@ -1,6 +1,7 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.Mcp;
+using Rekall.Age.Modules.Commands;
 using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime.Commands;
@@ -17,6 +18,7 @@ public sealed class McpCatalogTests
         registry.Register(new CreateGameFromTemplateCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
+        registry.Register(new ListComponentSchemasCommand(GetType().Assembly));
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
@@ -24,5 +26,6 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_game_from_template");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.run.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.capture.screenshot");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.component_schemas");
     }
 }

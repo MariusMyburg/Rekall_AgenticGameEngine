@@ -8,6 +8,7 @@ The current MVP includes:
 - transaction tracking
 - project capability manifests
 - deterministic scene/entity/component files
+- C# module attributes and reflection-based component schema discovery
 - structured validation
 - compact agent project summaries
 - MCP tool catalog skeleton
@@ -49,6 +50,7 @@ dotnet test Rekall.AGE.sln
 
 ```powershell
 dotnet run --project src/Rekall.Age.Cli -- templates list
+dotnet run --project src/Rekall.Age.Cli -- module schemas
 dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" puzzle
 dotnet run --project src/Rekall.Age.Cli -- context summary .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- context scene .age-sandbox Main

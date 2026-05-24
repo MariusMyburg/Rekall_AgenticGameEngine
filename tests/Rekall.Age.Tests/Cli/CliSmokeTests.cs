@@ -28,6 +28,11 @@ public sealed class CliSmokeTests
         Assert.Contains("Scene Main", sceneSummary.Output);
         Assert.Contains("PuzzleGrid", sceneSummary.Output);
 
+        var schemas = await RunAsync(project, "module", "schemas");
+        Assert.Equal(0, schemas.ExitCode);
+        Assert.Contains("Loaded", schemas.Output);
+        Assert.Contains("Transform", schemas.Output);
+
         var capture = await RunAsync(project, "capture", "screenshot", root, "Main");
         Assert.Equal(0, capture.ExitCode);
         Assert.Contains("Main_preview.png", capture.Output);

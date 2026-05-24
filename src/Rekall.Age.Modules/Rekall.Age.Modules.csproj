@@ -2,9 +2,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Rekall.Age.Core\Rekall.Age.Core.csproj" />
-    <ProjectReference Include="..\Rekall.Age.Agent\Rekall.Age.Agent.csproj" />
-    <ProjectReference Include="..\Rekall.Age.GameTemplates\Rekall.Age.GameTemplates.csproj" />
-    <ProjectReference Include="..\Rekall.Age.Modules\Rekall.Age.Modules.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

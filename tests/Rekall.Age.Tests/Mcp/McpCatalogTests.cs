@@ -20,6 +20,7 @@ public sealed class McpCatalogTests
         registry.Register(new CreateProjectCommand());
         registry.Register(new CreateGameFromTemplateCommand());
         registry.Register(new CreatePlayableGameFromTemplateCommand());
+        registry.Register(new CreatePlayablePackageFromTemplateCommand());
         registry.Register(new VerifyPlayableGameCommand());
         registry.Register(new PackagePlayableGameCommand());
         registry.Register(new InspectPlayablePackageCommand());
@@ -44,6 +45,7 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.project.create");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_game_from_template");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_playable_game_from_template");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_playable_package_from_template");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.verify_playable_game");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.package_playable_game");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.inspect_playable_package");

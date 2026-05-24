@@ -520,6 +520,50 @@ public sealed class McpJsonRpcServerTests
     }
 
     [Fact]
+    public async Task ToolsCallCanCreatePlayablePackageWithSingleWorkflowTool()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var packageOutput = Path.Combine(root, "OneShotPackage");
+        var frameOutput = Path.Combine(root, "OneShotFrames");
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CreatePlayablePackageFromTemplateCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 35,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.workflow.create_playable_package_from_template",
+                arguments = new
+                {
+                    projectRoot = root,
+                    projectName = "MCP One Shot Pong",
+                    templateId = "pong",
+                    outputDirectory = packageOutput,
+                    captureOutputDirectory = frameOutput,
+                    frames = 1
+                }
+            }
+        }), CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var result = document.RootElement.GetProperty("result");
+        Assert.False(result.GetProperty("isError").GetBoolean());
+        var value = result.GetProperty("structuredContent").GetProperty("value");
+        Assert.True(value.GetProperty("ready").GetBoolean());
+        Assert.Equal("pong", value.GetProperty("templateId").GetString());
+        Assert.True(File.Exists(value.GetProperty("package").GetProperty("archivePath").GetString()));
+        Assert.True(File.Exists(value.GetProperty("capture").GetProperty("outputPath").GetString()));
+        Assert.Contains("PONG", value.GetProperty("run").GetProperty("frames")[0].GetString(), StringComparison.Ordinal);
+        Assert.Contains(value.GetProperty("run").GetProperty("renderFrames")[0].GetProperty("drawCommands").EnumerateArray(), command =>
+            command.GetProperty("id").GetString() == "ball" &&
+            command.GetProperty("kind").GetString() == "circle");
+    }
+
+    [Fact]
     public async Task ToolsCallCanAuthorBuildAndPlaytestCustomModuleGame()
     {
         var root = TestPaths.CreateTempDirectory();

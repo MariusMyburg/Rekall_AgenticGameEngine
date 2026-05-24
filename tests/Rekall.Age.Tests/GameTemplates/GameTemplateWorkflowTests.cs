@@ -293,4 +293,35 @@ public sealed class GameTemplateWorkflowTests
         Assert.Equal("pong", captureArchive.Value.Kind);
         Assert.Contains(captureArchive.Value.DrawCommandKinds, kind => kind == "circle");
     }
+
+    [Fact]
+    public async Task CreatePlayablePackageFromTemplateBuildsRunsAndCapturesProof()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var output = Path.Combine(root, "Builds", "OneShotPackage");
+        var frameOutput = Path.Combine(root, "Artifacts", "OneShotFrames");
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("one-shot playable package"), CancellationToken.None);
+
+        var result = await new CreatePlayablePackageFromTemplateCommand().ExecuteAsync(
+            new CreatePlayablePackageFromTemplateRequest(
+                root,
+                "One Shot Pong",
+                "pong",
+                OutputDirectory: output,
+                CaptureOutputDirectory: frameOutput,
+                Frames: 1),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.Ready);
+        Assert.Equal("pong", result.Value.TemplateId);
+        Assert.True(File.Exists(result.Value.Package.ArchivePath), result.Value.Package.ArchivePath);
+        Assert.True(result.Value.Inspection.Ready);
+        Assert.True(result.Value.Run.Ready);
+        Assert.Contains("PONG", Assert.Single(result.Value.Run.Frames), StringComparison.Ordinal);
+        Assert.True(result.Value.Capture.Captured);
+        Assert.True(result.Value.Capture.NonBlank);
+        Assert.True(File.Exists(result.Value.Capture.OutputPath), result.Value.Capture.OutputPath);
+        Assert.Contains(result.Value.Run.RenderFrames[0].DrawCommands, command => command.Id == "ball" && command.Kind == "circle");
+    }
 }

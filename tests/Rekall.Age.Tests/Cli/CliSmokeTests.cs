@@ -115,6 +115,25 @@ public sealed class CliSmokeTests
         Assert.Contains("Captured: True", capturePackageFrame.Output);
         Assert.Contains("Non-blank: True", capturePackageFrame.Output);
         Assert.True(File.Exists(Path.Combine(packageFrameDirectory, "package_play_frame_001.png")));
+
+        var oneShotRoot = TestPaths.CreateTempDirectory();
+        var oneShotOutput = Path.Combine(oneShotRoot, "Packaged");
+        var oneShotFrames = Path.Combine(oneShotRoot, "Frames");
+        var oneShot = await RunAsync(
+            project,
+            "game",
+            "create-package-playable",
+            oneShotRoot,
+            "CLI One Shot Pong",
+            "pong",
+            oneShotOutput,
+            oneShotFrames);
+        Assert.Equal(0, oneShot.ExitCode);
+        Assert.Contains("Ready: True", oneShot.Output);
+        Assert.Contains("Archive:", oneShot.Output);
+        Assert.Contains("Capture:", oneShot.Output);
+        Assert.True(File.Exists($"{oneShotOutput}.zip"));
+        Assert.True(File.Exists(Path.Combine(oneShotFrames, "package_play_frame_001.png")));
     }
 
     [Fact]

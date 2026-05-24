@@ -397,6 +397,7 @@ public sealed class McpJsonRpcServerTests
         registry.Register(new PackagePlayableGameCommand());
         registry.Register(new InspectPlayablePackageCommand());
         registry.Register(new RunPlayablePackageCommand());
+        registry.Register(new CapturePlayablePackageFrameCommand());
         var server = new RekallAgeMcpJsonRpcServer(registry);
 
         var createResponse = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
@@ -460,15 +461,33 @@ public sealed class McpJsonRpcServerTests
                 }
             }
         }), CreateContext());
+        var captureResponse = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 29,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.workflow.capture_playable_package_frame",
+                arguments = new
+                {
+                    packagePath = $"{outputDirectory}.zip",
+                    outputDirectory = Path.Combine(root, "McpPackageFrames"),
+                    frameIndex = 1
+                }
+            }
+        }), CreateContext());
 
         using var createDocument = JsonDocument.Parse(createResponse!);
         using var packageDocument = JsonDocument.Parse(packageResponse!);
         using var inspectDocument = JsonDocument.Parse(inspectResponse!);
         using var runDocument = JsonDocument.Parse(runResponse!);
+        using var captureDocument = JsonDocument.Parse(captureResponse!);
         Assert.False(createDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
         Assert.False(packageDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
         Assert.False(inspectDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
         Assert.False(runDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.False(captureDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
 
         var inspectValue = inspectDocument.RootElement
             .GetProperty("result")
@@ -490,6 +509,14 @@ public sealed class McpJsonRpcServerTests
         Assert.Contains(renderFrame.GetProperty("drawCommands").EnumerateArray(), command =>
             command.GetProperty("id").GetString() == "ball" &&
             command.GetProperty("kind").GetString() == "circle");
+
+        var captureValue = captureDocument.RootElement
+            .GetProperty("result")
+            .GetProperty("structuredContent")
+            .GetProperty("value");
+        Assert.True(captureValue.GetProperty("captured").GetBoolean());
+        Assert.True(captureValue.GetProperty("nonBlank").GetBoolean());
+        Assert.True(File.Exists(captureValue.GetProperty("outputPath").GetString()));
     }
 
     [Fact]

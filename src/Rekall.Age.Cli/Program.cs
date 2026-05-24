@@ -51,6 +51,7 @@ internal static class RekallAgeCli
                 ["module", "scaffold", var root, var moduleId, var displayName, var moduleName, var componentName] =>
                     await ScaffoldModuleAsync(registry, context, root, moduleId, displayName, moduleName, componentName),
                 ["build", "modules", var root] => await BuildModulesAsync(registry, context, root),
+                ["build", "player", var root, var scene] => await BuildPlayerAsync(registry, context, root, scene),
                 ["game", "create", var root, var name, var template] => await CreateGameAsync(registry, context, root, name, template),
                 ["project", "create", var root, var name, var capabilities] => await CreateProjectAsync(registry, context, root, name, capabilities),
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
@@ -91,6 +92,7 @@ internal static class RekallAgeCli
         registry.Register(new ListComponentSchemasCommand());
         registry.Register(new ScaffoldModuleCommand());
         registry.Register(new BuildModulesCommand());
+        registry.Register(new BuildPlayerCommand());
         registry.Register(new ImportAssetCommand());
         registry.Register(new ListAssetsCommand());
         registry.Register(new PlaySceneCommand());
@@ -122,6 +124,21 @@ internal static class RekallAgeCli
             new ImportAssetRequest(root, source, kind, displayName),
             context);
         Console.WriteLine($"{result.Value.Asset.Id}: {result.Value.Asset.ImportedPath}");
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> BuildPlayerAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene)
+    {
+        var result = await registry.ExecuteAsync<BuildPlayerRequest, BuildPlayerResult>(
+            "rekall.build.player",
+            new BuildPlayerRequest(root, scene),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"{result.Value.LaunchPath} {string.Join(' ', result.Value.Arguments)}");
         return result.Ok ? 0 : 1;
     }
 

@@ -25,6 +25,7 @@ public sealed class McpJsonRpcServerTests
         Assert.True(document.RootElement.GetProperty("result").GetProperty("capabilities").TryGetProperty("tools", out _));
         var instructions = document.RootElement.GetProperty("result").GetProperty("instructions").GetString();
         Assert.Contains("rekall.templates.inspect", instructions, StringComparison.Ordinal);
+        Assert.Contains("rekall.templates.verify_mvp", instructions, StringComparison.Ordinal);
         Assert.Contains("rekall.workflow.create_playable_package_from_template", instructions, StringComparison.Ordinal);
     }
 

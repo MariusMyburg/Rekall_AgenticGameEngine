@@ -73,7 +73,7 @@ public sealed class RekallAgeGameTemplateCatalog
             [
                 Entity("DialogueDirector", ["dialogue"], Component("Rekall.DialogueGraph", Props(("startNode", "intro")))),
                 Entity("ChoicePanel", ["ui"], Component("Rekall.ChoicePanel", Props(("maxChoices", 4)))),
-                Entity("Background", ["art"], Component("Rekall.SpriteRenderer", Props(("sprite", "background_placeholder")))),
+                Entity("Background", ["art"], Component("Rekall.SpriteRenderer", Props(("sprite", "visual_novel_intro_background")))),
                 Entity("Music", ["audio"], Component("Rekall.AudioEmitter", Props(("loop", true))))
             ]),
             Create3D("first-person-exploration", "First-person Exploration", "First-person controller, interactables, objective loop.", "exploration",

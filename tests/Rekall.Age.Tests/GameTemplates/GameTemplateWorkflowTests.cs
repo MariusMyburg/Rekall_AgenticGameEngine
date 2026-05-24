@@ -69,4 +69,13 @@ public sealed class GameTemplateWorkflowTests
         Assert.Contains(catalog.Templates, template => template.Id == "first-person-exploration" && template.Capabilities.Contains("rendering3d"));
         Assert.Contains(catalog.Templates, template => template.Id == "visual-novel" && template.Capabilities.Contains("ui"));
     }
+
+    [Fact]
+    public void TemplateCatalogDoesNotUsePlaceholderAssetIds()
+    {
+        var catalog = RekallAgeGameTemplateCatalog.CreateDefault();
+        var serialized = System.Text.Json.JsonSerializer.Serialize(catalog.Templates);
+
+        Assert.DoesNotContain("placeholder", serialized, StringComparison.OrdinalIgnoreCase);
+    }
 }

@@ -10,6 +10,7 @@ The current MVP includes:
 - deterministic scene/entity/component files
 - C# module attributes and reflection-based component schema discovery
 - C# module scaffolding for agent-authored or human-authored gameplay modules
+- C# module source writing through the command bus for MCP-first agents
 - C# module build command for compiling scaffolded gameplay modules
 - project module assembly loading for agent-readable schemas after build
 - module-authored playable runtime execution; no engine-owned fallback games
@@ -95,6 +96,7 @@ dotnet run --project src/Rekall.Age.Cli -- game create-playable .age-sandbox "Pl
 dotnet run --project src/Rekall.Age.Cli -- asset import .age-sandbox .\player.png sprite "Player Ship"
 dotnet run --project src/Rekall.Age.Cli -- asset list .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module scaffold-playable .age-sandbox crystal.playable "Crystal Playable" CrystalPlayable crystal
+dotnet run --project src/Rekall.Age.Cli -- module write-source .age-sandbox CrystalPlayable CrystalPlayableModule.cs .\CrystalPlayableModule.cs
 dotnet run --project src/Rekall.Age.Cli -- build modules .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module schemas project .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- context summary .age-sandbox

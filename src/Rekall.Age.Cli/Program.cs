@@ -103,6 +103,8 @@ internal static class RekallAgeCli
                     await ScaffoldModuleAsync(registry, context, root, moduleId, displayName, moduleName, componentName),
                 ["module", "scaffold-playable", var root, var moduleId, var displayName, var moduleName, var kind] =>
                     await ScaffoldPlayableModuleAsync(registry, context, root, moduleId, displayName, moduleName, kind),
+                ["module", "write-source", var root, var moduleName, var fileName, var sourceOrPath] =>
+                    await WriteModuleSourceAsync(registry, context, root, moduleName, fileName, sourceOrPath),
                 ["build", "modules", var root] => await BuildModulesAsync(registry, context, root),
                 ["build", "player", var root, var scene] => await BuildPlayerAsync(registry, context, root, scene, graphics: false),
                 ["build", "player", var root, var scene, "--graphics"] => await BuildPlayerAsync(registry, context, root, scene, graphics: true),
@@ -153,6 +155,7 @@ internal static class RekallAgeCli
         registry.Register(new ListComponentSchemasCommand());
         registry.Register(new ScaffoldModuleCommand());
         registry.Register(new ScaffoldPlayableModuleCommand());
+        registry.Register(new WriteModuleSourceCommand());
         registry.Register(new ListRenderBackendsCommand());
         registry.Register(new ProbeVulkanBackendCommand());
         registry.Register(new BootstrapVulkanLogicalDeviceCommand());
@@ -843,6 +846,37 @@ internal static class RekallAgeCli
             new ScaffoldPlayableModuleRequest(root, moduleId, displayName, moduleName, kind),
             context);
         Console.WriteLine(result.Value.SourcePath);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> WriteModuleSourceAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string moduleName,
+        string fileName,
+        string sourceOrPath)
+    {
+        var source = File.Exists(sourceOrPath)
+            ? await File.ReadAllTextAsync(sourceOrPath, context.CancellationToken)
+            : sourceOrPath;
+        var result = await registry.ExecuteAsync<WriteModuleSourceRequest, WriteModuleSourceResult>(
+            "rekall.module.write_source",
+            new WriteModuleSourceRequest(root, moduleName, fileName, source),
+            context);
+        Console.WriteLine(result.Summary);
+        if (result.Ok)
+        {
+            Console.WriteLine($"{result.Value.SourcePath} ({result.Value.BytesWritten} bytes)");
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+            {
+                Console.WriteLine($"{error.Code}: {error.Message}");
+            }
+        }
+
         return result.Ok ? 0 : 1;
     }
 

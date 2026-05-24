@@ -50,6 +50,10 @@ internal static class RekallAgeCli
                     await SubmitEmptyVulkanCommandBufferAsync(registry, context, null),
                 ["render", "vulkan", "command-buffer", "submit-empty", var preferredDeviceType] =>
                     await SubmitEmptyVulkanCommandBufferAsync(registry, context, preferredDeviceType),
+                ["render", "vulkan", "buffer", "create-mapped"] =>
+                    await CreateMappedVulkanBufferAsync(registry, context, "256", "vertex-buffer", null),
+                ["render", "vulkan", "buffer", "create-mapped", var sizeBytes, var usage, var preferredDeviceType] =>
+                    await CreateMappedVulkanBufferAsync(registry, context, sizeBytes, usage, preferredDeviceType),
                 ["render", "plan", "create", var root, var backend, var name] =>
                     await CreateRenderPlanAsync(registry, context, root, backend, name),
                 ["render", "plan", "inspect", var root] => await InspectRenderPlanAsync(registry, context, root),
@@ -119,6 +123,7 @@ internal static class RekallAgeCli
         registry.Register(new ProbeVulkanBackendCommand());
         registry.Register(new BootstrapVulkanLogicalDeviceCommand());
         registry.Register(new SubmitEmptyVulkanCommandBufferCommand());
+        registry.Register(new CreateMappedVulkanBufferCommand());
         registry.Register(new CreateRenderPlanCommand());
         registry.Register(new AddRenderResourceCommand());
         registry.Register(new RecordRenderCommandBufferCommand());
@@ -243,6 +248,41 @@ internal static class RekallAgeCli
         Console.WriteLine($"Command pool created: {result.Value.CommandPoolCreated}");
         Console.WriteLine($"Command buffer allocated: {result.Value.CommandBufferAllocated}");
         Console.WriteLine($"Fence signaled: {result.Value.FenceSignaled}");
+        foreach (var error in result.Value.Errors)
+        {
+            Console.WriteLine($"Error: {error}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> CreateMappedVulkanBufferAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string sizeBytes,
+        string usage,
+        string? preferredDeviceType)
+    {
+        var size = ulong.Parse(sizeBytes, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<CreateMappedVulkanBufferRequest, CreateMappedVulkanBufferResult>(
+            "rekall.render.vulkan.buffer.create_mapped",
+            new CreateMappedVulkanBufferRequest(size, usage, preferredDeviceType),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Created: {result.Value.Created}");
+        Console.WriteLine($"Loader: {result.Value.LoaderName ?? "<none>"}");
+        if (result.Value.SelectedDevice is { } device)
+        {
+            Console.WriteLine($"Selected device: {device.Name} [{device.DeviceType}] API {device.ApiVersion}");
+        }
+
+        Console.WriteLine($"Size bytes: {result.Value.SizeBytes}");
+        Console.WriteLine($"Usage: {result.Value.Usage}");
+        Console.WriteLine($"Memory type: {result.Value.MemoryTypeIndex?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "<none>"}");
+        Console.WriteLine($"Memory properties: {string.Join(", ", result.Value.MemoryProperties)}");
+        Console.WriteLine($"Bound: {result.Value.Bound}");
+        Console.WriteLine($"Mapped: {result.Value.Mapped}");
+        Console.WriteLine($"Bytes written: {result.Value.BytesWritten}");
         foreach (var error in result.Value.Errors)
         {
             Console.WriteLine($"Error: {error}");

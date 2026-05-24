@@ -19,6 +19,7 @@ public sealed class McpCatalogTests
         var registry = new RekallAgeCommandRegistry();
         registry.Register(new CreateProjectCommand());
         registry.Register(new InspectGameTemplateCommand());
+        registry.Register(new VerifyMvpTemplatesCommand());
         registry.Register(new CreateGameFromTemplateCommand());
         registry.Register(new CreatePlayableGameFromTemplateCommand());
         registry.Register(new CreatePlayablePackageFromTemplateCommand());
@@ -45,6 +46,7 @@ public sealed class McpCatalogTests
 
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.project.create");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.templates.inspect");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.templates.verify_mvp");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_game_from_template");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_playable_game_from_template");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_playable_package_from_template");

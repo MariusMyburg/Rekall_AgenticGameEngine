@@ -42,6 +42,8 @@ internal static class RekallAgeCli
             {
                 ["templates", "list"] => ListTemplates(),
                 ["templates", "inspect", var templateId] => await InspectTemplateAsync(registry, context, templateId),
+                ["templates", "verify-mvp"] => await VerifyMvpTemplatesAsync(registry, context, null, cleanup: true),
+                ["templates", "verify-mvp", var workRoot] => await VerifyMvpTemplatesAsync(registry, context, workRoot, cleanup: false),
                 ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
                 ["render", "vulkan", "probe"] => await ProbeVulkanBackendAsync(registry, context),
                 ["render", "vulkan", "device", "bootstrap"] =>
@@ -191,6 +193,7 @@ internal static class RekallAgeCli
         registry.Register(new CreatePlayableGameFromTemplateCommand());
         registry.Register(new CreatePlayablePackageFromTemplateCommand());
         registry.Register(new InspectGameTemplateCommand());
+        registry.Register(new VerifyMvpTemplatesCommand());
         registry.Register(new VerifyPlayableGameCommand());
         registry.Register(new PackagePlayableGameCommand());
         registry.Register(new InspectPlayablePackageCommand());
@@ -274,6 +277,32 @@ internal static class RekallAgeCli
         }
 
         return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> VerifyMvpTemplatesAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string? workRoot,
+        bool cleanup)
+    {
+        var result = await registry.ExecuteAsync<VerifyMvpTemplatesRequest, VerifyMvpTemplatesResult>(
+            "rekall.templates.verify_mvp",
+            new VerifyMvpTemplatesRequest(workRoot, Cleanup: cleanup),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Ready: {result.Value.Ready}");
+        foreach (var template in result.Value.Templates)
+        {
+            Console.WriteLine($"{template.TemplateId}: {template.Ready} - {template.Summary}");
+            Console.WriteLine($"  Frames: {template.FrameCount}; Draw commands: {template.DrawCommandCount}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.Ready ? 0 : 1;
     }
 
     private static async Task<int> ListRenderBackendsAsync(

@@ -17,8 +17,8 @@ namespace Rekall.Age.Tests.GameTemplates;
 
 public sealed class GameTemplateWorkflowTests
 {
-    public static TheoryData<string> RequiredTemplates => new()
-    {
+    private static readonly string[] RequiredTemplateIds =
+    [
         "pong",
         "breakout",
         "asteroids",
@@ -29,6 +29,20 @@ public sealed class GameTemplateWorkflowTests
         "first-person-exploration",
         "collectathon-3d",
         "puzzle"
+    ];
+
+    public static TheoryData<string> RequiredTemplates => new()
+    {
+        RequiredTemplateIds[0],
+        RequiredTemplateIds[1],
+        RequiredTemplateIds[2],
+        RequiredTemplateIds[3],
+        RequiredTemplateIds[4],
+        RequiredTemplateIds[5],
+        RequiredTemplateIds[6],
+        RequiredTemplateIds[7],
+        RequiredTemplateIds[8],
+        RequiredTemplateIds[9]
     };
 
     [Theory]
@@ -341,5 +355,27 @@ public sealed class GameTemplateWorkflowTests
         Assert.True(result.Value.Capture.NonBlank);
         Assert.True(File.Exists(result.Value.Capture.OutputPath), result.Value.Capture.OutputPath);
         Assert.Contains(result.Value.Run.RenderFrames[0].DrawCommands, command => command.Id == "ball" && command.Kind == "circle");
+    }
+
+    [Fact]
+    public async Task VerifyMvpTemplatesReportsEveryRequiredTemplateReady()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("verify mvp templates"), CancellationToken.None);
+
+        var result = await new VerifyMvpTemplatesCommand().ExecuteAsync(
+            new VerifyMvpTemplatesRequest(root, Frames: 1, Cleanup: false),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.Ready);
+        Assert.Equal(RequiredTemplateIds.Order(StringComparer.Ordinal), result.Value.Templates.Select(item => item.TemplateId).Order(StringComparer.Ordinal));
+        Assert.All(result.Value.Templates, template =>
+        {
+            Assert.True(template.Ready, template.Summary);
+            Assert.True(File.Exists(template.ModuleAssemblyPath), template.ModuleAssemblyPath);
+            Assert.Equal(1, template.FrameCount);
+            Assert.True(template.DrawCommandCount > 0);
+        });
     }
 }

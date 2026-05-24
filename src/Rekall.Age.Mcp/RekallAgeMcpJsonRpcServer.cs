@@ -123,7 +123,7 @@ public sealed class RekallAgeMcpJsonRpcServer
                 title = "Rekall AGE",
                 version = "0.1.0"
             },
-            instructions = "Use Rekall AGE tools to create, inspect, validate, run, and capture agent-authored games."
+            instructions = "Use Rekall AGE tools to create, inspect, validate, run, and capture agent-authored games. Start with rekall.templates.inspect to choose a built-in game contract; for the fastest complete playable artifact use rekall.workflow.create_playable_package_from_template, which creates the project, builds the module, packages the player, runs the package, and captures a proof frame."
         };
     }
 

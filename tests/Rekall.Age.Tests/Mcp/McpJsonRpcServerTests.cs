@@ -23,6 +23,9 @@ public sealed class McpJsonRpcServerTests
         using var document = JsonDocument.Parse(response!);
         Assert.Equal("2025-06-18", document.RootElement.GetProperty("result").GetProperty("protocolVersion").GetString());
         Assert.True(document.RootElement.GetProperty("result").GetProperty("capabilities").TryGetProperty("tools", out _));
+        var instructions = document.RootElement.GetProperty("result").GetProperty("instructions").GetString();
+        Assert.Contains("rekall.templates.inspect", instructions, StringComparison.Ordinal);
+        Assert.Contains("rekall.workflow.create_playable_package_from_template", instructions, StringComparison.Ordinal);
     }
 
     [Fact]

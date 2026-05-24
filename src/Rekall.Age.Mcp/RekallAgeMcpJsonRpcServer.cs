@@ -130,6 +130,8 @@ public sealed class RekallAgeMcpJsonRpcServer
     private IReadOnlyList<object> CreateTools()
     {
         return _registry.RegisteredCommands
+            .OrderBy(command => RekallAgeMcpToolClassifier.GetAgentPriority(command.Schema.Name))
+            .ThenBy(command => command.Schema.Name, StringComparer.Ordinal)
             .Select(command => new
             {
                 name = command.Schema.Name,

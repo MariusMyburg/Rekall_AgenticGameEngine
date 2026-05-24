@@ -15,7 +15,8 @@ public sealed record RekallAgeMcpCatalog(IReadOnlyList<RekallAgeMcpTool> Tools)
                 RekallAgeMcpToolClassifier.GetCategory(schema.Name),
                 RekallAgeMcpToolClassifier.IsRecommended(schema.Name),
                 RekallAgeMcpToolClassifier.GetAgentPriority(schema.Name)))
-            .OrderBy(tool => tool.Name, StringComparer.Ordinal)
+            .OrderBy(tool => tool.AgentPriority)
+            .ThenBy(tool => tool.Name, StringComparer.Ordinal)
             .ToArray();
 
         return new RekallAgeMcpCatalog(tools);

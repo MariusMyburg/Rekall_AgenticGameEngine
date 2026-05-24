@@ -81,6 +81,8 @@ public sealed class McpCatalogTests
         Assert.Equal("rendering", renderTool.Category);
         Assert.False(renderTool.Recommended);
         Assert.True(renderTool.AgentPriority > oneShot.AgentPriority);
+        Assert.Equal("rekall.context.engine_status", catalog.Tools[0].Name);
+        Assert.True(catalog.Tools.Index().All(item => item.Index == 0 || catalog.Tools[item.Index - 1].AgentPriority <= item.Item.AgentPriority));
     }
 
     private sealed class FakeVulkanRenderPassSubmission : IRekallAgeVulkanRenderPassSubmission

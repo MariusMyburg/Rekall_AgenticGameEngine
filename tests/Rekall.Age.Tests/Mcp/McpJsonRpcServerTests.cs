@@ -67,6 +67,7 @@ public sealed class McpJsonRpcServerTests
         var engineStatus = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.context.engine_status");
         var oneShot = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.workflow.create_playable_package_from_template");
         var render = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.render.plan.create");
+        Assert.Equal("rekall.context.engine_status", tools[0].GetProperty("name").GetString());
         Assert.Equal("context", engineStatus.GetProperty("rekallCategory").GetString());
         Assert.True(engineStatus.GetProperty("rekallRecommended").GetBoolean());
         Assert.Equal(5, engineStatus.GetProperty("rekallAgentPriority").GetInt32());

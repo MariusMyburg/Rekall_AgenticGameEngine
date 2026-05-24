@@ -14,6 +14,7 @@ The current MVP includes:
 - project module assembly loading for agent-readable schemas after build
 - module-authored playable runtime execution; no engine-owned fallback games
 - Vulkan-first internal rendering backend catalog with Direct3D 12 extension point
+- low-level render plan authoring, validation, command-buffer recording, and deterministic execution artifacts
 - deterministic asset import and catalog listing commands
 - entity inspection and single-property component mutation commands
 - MVP terminal player for module-authored projects, including deterministic playtest frames
@@ -61,6 +62,11 @@ dotnet test Rekall.AGE.sln
 dotnet run --project src/Rekall.Age.Cli -- templates list
 dotnet run --project src/Rekall.Age.Cli -- mcp stdio
 dotnet run --project src/Rekall.Age.Cli -- render backends
+dotnet run --project src/Rekall.Age.Cli -- render plan create .age-sandbox software Preview
+dotnet run --project src/Rekall.Age.Cli -- render resource add .age-sandbox preview-color image R8G8B8A8_UNorm color-attachment
+dotnet run --project src/Rekall.Age.Cli -- render command-buffer record .age-sandbox main graphics '[{"op":"begin-render-pass","label":"preview","arguments":{"target":"preview-color"}},{"op":"draw-rect","label":"agent-rect","arguments":{"x":"8","y":"8","width":"24","height":"16","color":"#ffcc33"}},{"op":"end-render-pass","label":"preview","arguments":{}}]'
+dotnet run --project src/Rekall.Age.Cli -- render plan validate .age-sandbox
+dotnet run --project src/Rekall.Age.Cli -- render plan execute .age-sandbox .age-sandbox/Artifacts/Render
 dotnet run --project src/Rekall.Age.Cli -- module schemas
 dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" pong
 dotnet run --project src/Rekall.Age.Cli -- asset import .age-sandbox .\player.png sprite "Player Ship"

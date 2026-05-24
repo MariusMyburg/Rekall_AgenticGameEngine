@@ -27,7 +27,7 @@ internal static class RekallAgeCli
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|run|context|capture|module|build|templates|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|run|context|capture|render|module|build|templates|mcp> ...");
             return 2;
         }
 
@@ -45,8 +45,12 @@ internal static class RekallAgeCli
                     await CreateRenderPlanAsync(registry, context, root, backend, name),
                 ["render", "plan", "inspect", var root] => await InspectRenderPlanAsync(registry, context, root),
                 ["render", "plan", "validate", var root] => await ValidateRenderPlanAsync(registry, context, root),
+                ["render", "plan", "execute", var root, var outputDirectory] =>
+                    await ExecuteRenderPlanAsync(registry, context, root, outputDirectory),
                 ["render", "resource", "add", var root, var id, var kind, var format, var usage] =>
                     await AddRenderResourceAsync(registry, context, root, id, kind, format, usage),
+                ["render", "command-buffer", "record", var root, var id, var queue, var commandsJson] =>
+                    await RecordRenderCommandBufferAsync(registry, context, root, id, queue, commandsJson),
                 ["mcp", "stdio"] => await RunMcpStdioAsync(registry, context),
                 ["asset", "import", var root, var source, var kind, var displayName] =>
                     await ImportAssetAsync(registry, context, root, source, kind, displayName),
@@ -108,6 +112,7 @@ internal static class RekallAgeCli
         registry.Register(new RecordRenderCommandBufferCommand());
         registry.Register(new InspectRenderPlanCommand());
         registry.Register(new ValidateRenderPlanCommand());
+        registry.Register(new ExecuteRenderPlanCommand());
         registry.Register(new BuildModulesCommand());
         registry.Register(new BuildPlayerCommand());
         registry.Register(new ImportAssetCommand());
@@ -210,6 +215,65 @@ internal static class RekallAgeCli
         Console.WriteLine($"Resources: {plan.Resources.Count}");
         Console.WriteLine($"Pipelines: {plan.Pipelines.Count}");
         Console.WriteLine($"Command buffers: {plan.CommandBuffers.Count}");
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ExecuteRenderPlanAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string outputDirectory)
+    {
+        var result = await registry.ExecuteAsync<ExecuteRenderPlanRequest, ExecuteRenderPlanResult>(
+            "rekall.render.plan.execute",
+            new ExecuteRenderPlanRequest(root, outputDirectory),
+            context);
+        Console.WriteLine(result.Summary);
+        if (result.Ok)
+        {
+            Console.WriteLine($"{result.Value.OutputPath} ({result.Value.Width}x{result.Value.Height}, nonblank={result.Value.NonBlank})");
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+            {
+                Console.WriteLine($"{error.Code}: {error.Message}");
+            }
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> RecordRenderCommandBufferAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string id,
+        string queue,
+        string commandsJson)
+    {
+        var payload = File.Exists(commandsJson)
+            ? await File.ReadAllTextAsync(commandsJson, context.CancellationToken)
+            : commandsJson;
+        RekallAgeRenderCommand[] commands;
+        try
+        {
+            commands = System.Text.Json.JsonSerializer.Deserialize<RekallAgeRenderCommand[]>(
+                payload,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? [];
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            Console.Error.WriteLine($"Render commands JSON is invalid: {ex.Message}");
+            return 1;
+        }
+
+        var result = await registry.ExecuteAsync<RecordRenderCommandBufferRequest, RecordRenderCommandBufferResult>(
+            "rekall.render.command_buffer.record",
+            new RecordRenderCommandBufferRequest(root, id, queue, commands),
+            context);
+        Console.WriteLine(result.Summary);
         return result.Ok ? 0 : 1;
     }
 

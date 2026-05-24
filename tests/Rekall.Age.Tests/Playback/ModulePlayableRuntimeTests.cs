@@ -18,7 +18,7 @@ public sealed class ModulePlayableRuntimeTests
             new CreateGameFromTemplateRequest(root, "Module Pong", "pong"),
             context);
         await new ScaffoldPlayableModuleCommand().ExecuteAsync(
-            new ScaffoldPlayableModuleRequest(root, "module.pong", "Module Pong", "ModulePong", "module-pong"),
+            new ScaffoldPlayableModuleRequest(root, "module.pong", "Module Pong", "ModulePong", "pong"),
             context);
         var buildResult = await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
         Assert.True(buildResult.Ok, buildResult.Summary);
@@ -26,7 +26,8 @@ public sealed class ModulePlayableRuntimeTests
         var playResult = await new PlaySceneCommand().ExecuteAsync(new PlaySceneRequest(root, "Main", 2), context);
 
         Assert.True(playResult.Ok, playResult.Summary);
-        Assert.Equal("module-pong", playResult.Value.Kind);
-        Assert.All(playResult.Value.Frames, frame => Assert.Contains("Module-authored module-pong", frame, StringComparison.Ordinal));
+        Assert.Equal("pong", playResult.Value.Kind);
+        Assert.All(playResult.Value.Frames, frame => Assert.Contains("PONG", frame, StringComparison.Ordinal));
+        Assert.All(playResult.Value.Frames, frame => Assert.Contains("Ball", frame, StringComparison.Ordinal));
     }
 }

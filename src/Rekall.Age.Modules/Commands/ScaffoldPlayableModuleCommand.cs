@@ -81,6 +81,10 @@ public sealed class ScaffoldPlayableModuleCommand
         source.AppendLine("    {");
         source.AppendLine("        var state = new RekallAgePlayableModuleState();");
         source.AppendLine("        state.Numbers[\"frame\"] = 0;");
+        source.AppendLine("        state.Numbers[\"lane\"] = 0;");
+        source.AppendLine("        state.Numbers[\"phase\"] = 0;");
+        source.AppendLine("        state.Numbers[\"score\"] = 0;");
+        source.AppendLine("        state.Numbers[\"action\"] = 0;");
         source.AppendLine("        state.Text[\"scene\"] = context.SceneName;");
         source.AppendLine("        return state;");
         source.AppendLine("    }");
@@ -88,15 +92,66 @@ public sealed class ScaffoldPlayableModuleCommand
         source.AppendLine("    public void Tick(RekallAgePlayableModuleState state, RekallAgePlayableModuleInput input)");
         source.AppendLine("    {");
         source.AppendLine("        state.Numbers[\"frame\"] += 1;");
+        source.AppendLine("        state.Numbers[\"lane\"] = Math.Clamp(state.Numbers[\"lane\"] + input.VerticalAxis, -4, 4);");
+        source.AppendLine("        state.Numbers[\"phase\"] = (state.Numbers[\"phase\"] + 1) % 16;");
+        source.AppendLine("        if (input.PrimaryAction)");
+        source.AppendLine("        {");
+        source.AppendLine("            state.Numbers[\"action\"] += 1;");
+        source.AppendLine("            state.Numbers[\"score\"] += 10;");
+        source.AppendLine("        }");
         source.AppendLine("    }");
         source.AppendLine();
         source.AppendLine("    public RekallAgePlayableModuleFrame Render(RekallAgePlayableModuleState state)");
         source.AppendLine("    {");
         source.AppendLine("        var frame = (int)state.Numbers[\"frame\"];");
-        source.AppendLine("        return new RekallAgePlayableModuleFrame($\"Module-authored {Kind} in {state.Text[\"scene\"]} frame {frame}\");");
+        source.AppendLine("        var lane = (int)state.Numbers[\"lane\"];");
+        source.AppendLine("        var phase = (int)state.Numbers[\"phase\"];");
+        source.AppendLine("        var score = (int)state.Numbers[\"score\"];");
+        source.AppendLine("        var action = (int)state.Numbers[\"action\"];");
+        AppendRenderReturn(source, kind);
         source.AppendLine("    }");
         source.AppendLine("}");
         return source.ToString();
+    }
+
+    private static void AppendRenderReturn(StringBuilder source, string kind)
+    {
+        switch (kind.Trim().ToLowerInvariant())
+        {
+            case "pong":
+                source.AppendLine("        return new RekallAgePlayableModuleFrame($\"PONG\\nFrame {frame}  Score {score}\\nLeft paddle lane {lane}\\nBall phase {phase}\");");
+                break;
+            case "breakout":
+                source.AppendLine("        return new RekallAgePlayableModuleFrame($\"BREAKOUT\\nFrame {frame}  Score {score}\\nPaddle lane {lane}\\nBricks remaining {Math.Max(0, 50 - action)}\");");
+                break;
+            case "asteroids":
+                source.AppendLine("        return new RekallAgePlayableModuleFrame($\"ASTEROIDS\\nFrame {frame}  Score {score}\\nShip heading phase {phase}\\nAsteroids active {Math.Max(1, 12 - action)}\");");
+                break;
+            case "top-down-shooter":
+                source.AppendLine("        return new RekallAgePlayableModuleFrame($\"TOP-DOWN SHOOTER\\nFrame {frame}  Score {score}\\nPlayer lane {lane}\\nWave pressure {phase}\");");
+                break;
+            case "platformer-2d":
+                source.AppendLine("        return new RekallAgePlayableModuleFrame($\"PLATFORMER\\nFrame {frame}  Score {score}\\nRunner lane {lane}\\nJump charges {action}\");");
+                break;
+            case "tower-defense":
+                source.AppendLine("        return new RekallAgePlayableModuleFrame($\"TOWER DEFENSE\\nFrame {frame}  Score {score}\\nBuild cursor {lane}\\nWave timer {phase}\");");
+                break;
+            case "visual-novel":
+                source.AppendLine("        return new RekallAgePlayableModuleFrame($\"VISUAL NOVEL\\nFrame {frame}\\nScene {state.Text[\"scene\"]}\\nChoice cursor {lane}\\nChoices made {action}\");");
+                break;
+            case "first-person-exploration":
+                source.AppendLine("        return new RekallAgePlayableModuleFrame($\"FIRST-PERSON EXPLORATION\\nFrame {frame}\\nLook sweep {lane}\\nRoom clue phase {phase}\\nInteractions {action}\");");
+                break;
+            case "collectathon-3d":
+                source.AppendLine("        return new RekallAgePlayableModuleFrame($\"COLLECTATHON\\nFrame {frame}  Score {score}\\nCamera orbit {lane}\\nCollected {action}/30\");");
+                break;
+            case "puzzle":
+                source.AppendLine("        return new RekallAgePlayableModuleFrame($\"PUZZLE\\nFrame {frame}  Score {score}\\nCursor lane {lane}\\nMoves {action}\");");
+                break;
+            default:
+                source.AppendLine("        return new RekallAgePlayableModuleFrame($\"PLAYABLE MODULE\\nKind {Kind}\\nScene {state.Text[\"scene\"]}\\nFrame {frame}\");");
+                break;
+        }
     }
 
     private static string CreateProjectFile()

@@ -388,6 +388,106 @@ public sealed class McpJsonRpcServerTests
     }
 
     [Fact]
+    public async Task ToolsCallCanCreatePackageInspectAndRunPlayableTemplateGame()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var outputDirectory = Path.Combine(root, "Packaged");
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CreatePlayableGameFromTemplateCommand());
+        registry.Register(new PackagePlayableGameCommand());
+        registry.Register(new InspectPlayablePackageCommand());
+        registry.Register(new RunPlayablePackageCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var createResponse = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 25,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.workflow.create_playable_game_from_template",
+                arguments = new
+                {
+                    projectRoot = root,
+                    projectName = "MCP Packaged Pong",
+                    templateId = "pong"
+                }
+            }
+        }), CreateContext());
+        var packageResponse = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 26,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.workflow.package_playable_game",
+                arguments = new
+                {
+                    projectRoot = root,
+                    sceneName = "Main",
+                    outputDirectory
+                }
+            }
+        }), CreateContext());
+        var inspectResponse = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 27,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.workflow.inspect_playable_package",
+                arguments = new
+                {
+                    packagePath = $"{outputDirectory}.zip"
+                }
+            }
+        }), CreateContext());
+        var runResponse = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 28,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.workflow.run_playable_package",
+                arguments = new
+                {
+                    packagePath = $"{outputDirectory}.zip",
+                    frames = 1
+                }
+            }
+        }), CreateContext());
+
+        using var createDocument = JsonDocument.Parse(createResponse!);
+        using var packageDocument = JsonDocument.Parse(packageResponse!);
+        using var inspectDocument = JsonDocument.Parse(inspectResponse!);
+        using var runDocument = JsonDocument.Parse(runResponse!);
+        Assert.False(createDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.False(packageDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.False(inspectDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.False(runDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+
+        var inspectValue = inspectDocument.RootElement
+            .GetProperty("result")
+            .GetProperty("structuredContent")
+            .GetProperty("value");
+        Assert.True(inspectValue.GetProperty("ready").GetBoolean());
+        Assert.Equal("pong", inspectValue.GetProperty("manifest").GetProperty("sourceTemplateId").GetString());
+
+        var runValue = runDocument.RootElement
+            .GetProperty("result")
+            .GetProperty("structuredContent")
+            .GetProperty("value");
+        Assert.True(runValue.GetProperty("ready").GetBoolean());
+        Assert.Equal(0, runValue.GetProperty("exitCode").GetInt32());
+        Assert.Contains("FRAME 1", runValue.GetProperty("output").GetString(), StringComparison.Ordinal);
+        Assert.Contains("PONG", runValue.GetProperty("frames")[0].GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ToolsCallCanAuthorBuildAndPlaytestCustomModuleGame()
     {
         var root = TestPaths.CreateTempDirectory();

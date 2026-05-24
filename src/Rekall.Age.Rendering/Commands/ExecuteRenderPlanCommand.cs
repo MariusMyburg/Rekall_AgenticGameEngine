@@ -18,6 +18,22 @@ public sealed class ExecuteRenderPlanCommand
     private readonly RekallAgeRenderPlanStore _store = new();
     private readonly RekallAgeRenderPlanValidator _validator = new();
     private readonly RekallAgeSoftwareRenderPlanExecutor _softwareExecutor = new();
+    private readonly RekallAgeVulkanRenderPlanExecutor _vulkanExecutor;
+
+    public ExecuteRenderPlanCommand()
+        : this(new RekallAgeVulkanRenderPlanExecutor())
+    {
+    }
+
+    public ExecuteRenderPlanCommand(IRekallAgeVulkanRenderPassCapture vulkanCapture)
+        : this(new RekallAgeVulkanRenderPlanExecutor(vulkanCapture))
+    {
+    }
+
+    private ExecuteRenderPlanCommand(RekallAgeVulkanRenderPlanExecutor vulkanExecutor)
+    {
+        _vulkanExecutor = vulkanExecutor;
+    }
 
     public string Name => "rekall.render.plan.execute";
 
@@ -43,7 +59,8 @@ public sealed class ExecuteRenderPlanCommand
                     issue.Target)).ToArray());
         }
 
-        if (!plan.BackendId.Equals("software", StringComparison.Ordinal))
+        if (!plan.BackendId.Equals("software", StringComparison.Ordinal)
+            && !plan.BackendId.Equals("vulkan", StringComparison.Ordinal))
         {
             return Failure(
                 $"Render backend '{plan.BackendId}' is not executable in this build.",
@@ -55,10 +72,25 @@ public sealed class ExecuteRenderPlanCommand
                 ]);
         }
 
-        var execution = await _softwareExecutor.ExecuteAsync(
-            plan,
-            request.OutputDirectory,
-            context.CancellationToken);
+        RekallAgeRenderPlanExecutionResult execution;
+        try
+        {
+            execution = plan.BackendId.Equals("vulkan", StringComparison.Ordinal)
+                ? await _vulkanExecutor.ExecuteAsync(plan, request.OutputDirectory, context.CancellationToken)
+                : await _softwareExecutor.ExecuteAsync(plan, request.OutputDirectory, context.CancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Failure(
+                ex.Message,
+                [
+                    new RekallAgeCommandError(
+                        "REKALL_RENDER_PLAN_EXECUTION_FAILED",
+                        ex.Message,
+                        plan.BackendId)
+                ]);
+        }
+
         context.Transaction.RecordChangedResource(execution.OutputPath);
         return RekallAgeCommandResult<ExecuteRenderPlanResult>.Success(
             new ExecuteRenderPlanResult(

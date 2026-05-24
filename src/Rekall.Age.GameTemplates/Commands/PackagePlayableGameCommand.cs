@@ -113,6 +113,7 @@ public sealed class PackagePlayableGameCommand
             verification.Value.Checks,
             sourceTemplateId,
             drawCommands,
+            verification.Value.DrawAssertions,
             context.CancellationToken);
         CreatePackageArchive(outputDirectory, archivePath);
         context.Transaction.RecordChangedResource(bundledGameRoot);
@@ -217,6 +218,7 @@ public sealed class PackagePlayableGameCommand
         IReadOnlyList<RekallAgePlayableGameCheck> checks,
         string? sourceTemplateId,
         IReadOnlyList<RekallAgeTemplateDrawCommand> drawCommands,
+        IReadOnlyList<RekallAgeDrawCommandAssertionResult> drawAssertions,
         CancellationToken cancellationToken)
     {
         var manifest = new RekallAgePlayablePackageManifest(
@@ -227,7 +229,8 @@ public sealed class PackagePlayableGameCommand
             arguments,
             checks,
             sourceTemplateId,
-            drawCommands);
+            drawCommands,
+            drawAssertions);
         Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
         await File.WriteAllTextAsync(
             manifestPath,
@@ -258,4 +261,5 @@ public sealed record RekallAgePlayablePackageManifest(
     IReadOnlyList<string> Arguments,
     IReadOnlyList<RekallAgePlayableGameCheck> Checks,
     string? SourceTemplateId,
-    IReadOnlyList<RekallAgeTemplateDrawCommand> DrawCommands);
+    IReadOnlyList<RekallAgeTemplateDrawCommand> DrawCommands,
+    IReadOnlyList<RekallAgeDrawCommandAssertionResult> DrawAssertions);

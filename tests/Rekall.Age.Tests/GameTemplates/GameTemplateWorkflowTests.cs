@@ -244,6 +244,11 @@ public sealed class GameTemplateWorkflowTests
         Assert.Contains(drawCommands.EnumerateArray(), command =>
             command.GetProperty("id").GetString() == "ball" &&
             command.GetProperty("kind").GetString() == "circle");
+        var drawAssertions = manifest.RootElement.GetProperty("drawAssertions");
+        Assert.Contains(drawAssertions.EnumerateArray(), assertion =>
+            assertion.GetProperty("id").GetString() == "ball" &&
+            assertion.GetProperty("kind").GetString() == "circle" &&
+            assertion.GetProperty("passed").GetBoolean());
 
         using var archive = ZipFile.OpenRead(package.Value.ArchivePath);
         Assert.Contains(archive.Entries, entry => entry.FullName == "rekall.package.json");

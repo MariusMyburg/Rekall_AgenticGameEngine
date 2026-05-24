@@ -12,6 +12,11 @@ public static class RekallAgePlayableGameFactory
             .Select(component => component.Properties.TryGetPropertyValue("kind", out var value) ? value?.GetValue<string>() : null)
             .FirstOrDefault(kind => kind is not null);
 
+        if (loopKind == "arcade" && HasComponent(scene, "Rekall.BrickGrid"))
+        {
+            return RekallAgeBreakoutGame.FromEntities(scene.Entities.Select(entity => entity.Name).ToArray());
+        }
+
         if (loopKind == "arcade" && HasComponent(scene, "Rekall.PaddleController") && HasComponent(scene, "Rekall.Ball2D"))
         {
             return RekallAgePongGame.FromEntities(scene.Entities.Select(entity => entity.Name).ToArray());

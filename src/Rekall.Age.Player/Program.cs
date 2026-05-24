@@ -132,6 +132,12 @@ static RekallAgePongInput ReadRaylibInput()
 
 static void DrawGame(IRekallAgePlayableGame game, int width, int height)
 {
+    if (game is RekallAgeBreakoutGame breakout)
+    {
+        DrawTerminalTextFrame(breakout.RenderAscii(), width, height);
+        return;
+    }
+
     if (game is not RekallAgePongGame pong)
     {
         Raylib.DrawText($"Unsupported playable game: {game.Kind}", 32, 32, 24, Color.White);
@@ -161,4 +167,14 @@ static void DrawGame(IRekallAgePlayableGame game, int width, int height)
         frame.ScoreText.FontSize,
         Color.White);
     Raylib.DrawText("W/S or arrows move. Esc closes.", 24, frame.Height - 40, 20, new Color(140, 180, 190, 255));
+}
+
+static void DrawTerminalTextFrame(string text, int width, int height)
+{
+    var lines = text.Split(Environment.NewLine, StringSplitOptions.None);
+    var fontSize = Math.Max(12, Math.Min(width / 60, height / 28));
+    for (var y = 0; y < lines.Length; y++)
+    {
+        Raylib.DrawText(lines[y], 24, 24 + y * (fontSize + 2), fontSize, Color.White);
+    }
 }

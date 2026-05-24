@@ -175,6 +175,25 @@ public sealed class McpJsonRpcServerTests
     }
 
     [Fact]
+    public async Task ToolsCallReturnsStructuredErrorWhenCommandThrowsExpectedException()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new InspectGameTemplateCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(
+            """{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"rekall.templates.inspect","arguments":{"templateId":"missing-template"}}}""",
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var result = document.RootElement.GetProperty("result");
+        Assert.True(result.GetProperty("isError").GetBoolean());
+        var error = result.GetProperty("structuredContent").GetProperty("errors")[0];
+        Assert.Equal("REKALL_COMMAND_EXECUTION_FAILED", error.GetProperty("code").GetString());
+        Assert.Contains("missing-template", error.GetProperty("message").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ToolsCallListsTemplateDrawContractsForAgents()
     {
         var registry = new RekallAgeCommandRegistry();

@@ -116,8 +116,19 @@ public sealed class RekallAgeCommandRegistry
                 return new RekallAgeDynamicCommandResult(false, error.Message, null, [error]);
             }
 
-            var result = await Command.ExecuteAsync(request, context);
-            return new RekallAgeDynamicCommandResult(result.Ok, result.Summary, result.Value, result.Errors);
+            try
+            {
+                var result = await Command.ExecuteAsync(request, context);
+                return new RekallAgeDynamicCommandResult(result.Ok, result.Summary, result.Value, result.Errors);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException)
+            {
+                var error = new RekallAgeCommandError(
+                    "REKALL_COMMAND_EXECUTION_FAILED",
+                    ex.Message,
+                    Command.Name);
+                return new RekallAgeDynamicCommandResult(false, ex.Message, null, [error]);
+            }
         }
     }
 }

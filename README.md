@@ -12,6 +12,7 @@ The current MVP includes:
 - C# module scaffolding for agent-authored or human-authored gameplay modules
 - C# module build command for compiling scaffolded gameplay modules
 - project module assembly loading for agent-readable schemas after build
+- deterministic asset import and catalog listing commands
 - entity inspection and single-property component mutation commands
 - structured validation
 - compact agent project summaries
@@ -58,6 +59,8 @@ dotnet run --project src/Rekall.Age.Cli -- templates list
 dotnet run --project src/Rekall.Age.Cli -- mcp stdio
 dotnet run --project src/Rekall.Age.Cli -- module schemas
 dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" puzzle
+dotnet run --project src/Rekall.Age.Cli -- asset import .age-sandbox .\player.png sprite "Player Ship"
+dotnet run --project src/Rekall.Age.Cli -- asset list .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module scaffold .age-sandbox crystal.mining "Crystal Mining" CrystalMining MiningController
 dotnet run --project src/Rekall.Age.Cli -- build modules .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module schemas project .age-sandbox

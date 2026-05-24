@@ -1,5 +1,6 @@
 using Rekall.Age.Agent;
 using Rekall.Age.Agent.Commands;
+using Rekall.Age.Assets.Commands;
 using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
@@ -25,7 +26,7 @@ internal static class RekallAgeCli
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|run|context|capture|module|build|templates> ...");
+            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|run|context|capture|module|build|templates|mcp> ...");
             return 2;
         }
 
@@ -39,6 +40,10 @@ internal static class RekallAgeCli
             {
                 ["templates", "list"] => ListTemplates(),
                 ["mcp", "stdio"] => await RunMcpStdioAsync(registry, context),
+                ["asset", "import", var root, var source, var kind, var displayName] =>
+                    await ImportAssetAsync(registry, context, root, source, kind, displayName),
+                ["asset", "list", var root] => await ListAssetsAsync(registry, context, root, null),
+                ["asset", "list", var root, var kind] => await ListAssetsAsync(registry, context, root, kind),
                 ["module", "schemas"] => await ListSchemasAsync(registry, context, null),
                 ["module", "schemas", var moduleId] => await ListSchemasAsync(registry, context, moduleId),
                 ["module", "schemas", "project", var root] => await ListProjectSchemasAsync(registry, context, root),
@@ -84,6 +89,8 @@ internal static class RekallAgeCli
         registry.Register(new ListComponentSchemasCommand());
         registry.Register(new ScaffoldModuleCommand());
         registry.Register(new BuildModulesCommand());
+        registry.Register(new ImportAssetCommand());
+        registry.Register(new ListAssetsCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
         return registry;
@@ -97,6 +104,41 @@ internal static class RekallAgeCli
         }
 
         return 0;
+    }
+
+    private static async Task<int> ImportAssetAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string source,
+        string kind,
+        string displayName)
+    {
+        var result = await registry.ExecuteAsync<ImportAssetRequest, ImportAssetResult>(
+            "rekall.asset.import",
+            new ImportAssetRequest(root, source, kind, displayName),
+            context);
+        Console.WriteLine($"{result.Value.Asset.Id}: {result.Value.Asset.ImportedPath}");
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ListAssetsAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string? kind)
+    {
+        var result = await registry.ExecuteAsync<ListAssetsRequest, ListAssetsResult>(
+            "rekall.asset.list",
+            new ListAssetsRequest(root, kind),
+            context);
+        Console.WriteLine(result.Summary);
+        foreach (var asset in result.Value.Assets)
+        {
+            Console.WriteLine($"{asset.Id}: {asset.Kind}/{asset.Name} -> {asset.ImportedPath}");
+        }
+
+        return result.Ok ? 0 : 1;
     }
 
     private static async Task<int> RunMcpStdioAsync(

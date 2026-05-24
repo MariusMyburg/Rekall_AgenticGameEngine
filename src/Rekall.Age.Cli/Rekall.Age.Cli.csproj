@@ -6,6 +6,7 @@
     <ProjectReference Include="..\Rekall.Age.World\Rekall.Age.World.csproj" />
     <ProjectReference Include="..\Rekall.Age.Validation\Rekall.Age.Validation.csproj" />
     <ProjectReference Include="..\Rekall.Age.Agent\Rekall.Age.Agent.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Assets\Rekall.Age.Assets.csproj" />
     <ProjectReference Include="..\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj" />
     <ProjectReference Include="..\Rekall.Age.Runtime\Rekall.Age.Runtime.csproj" />
     <ProjectReference Include="..\Rekall.Age.GameTemplates\Rekall.Age.GameTemplates.csproj" />

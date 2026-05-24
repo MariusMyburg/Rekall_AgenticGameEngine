@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\src\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.GameTemplates\Rekall.Age.GameTemplates.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.Mcp\Rekall.Age.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\Rekall.Age.Assets\Rekall.Age.Assets.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.Modules\Rekall.Age.Modules.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.Build\Rekall.Age.Build.csproj" />
   </ItemGroup>

@@ -41,6 +41,7 @@ internal static class RekallAgeCli
             {
                 ["templates", "list"] => ListTemplates(),
                 ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
+                ["render", "vulkan", "probe"] => await ProbeVulkanBackendAsync(registry, context),
                 ["render", "plan", "create", var root, var backend, var name] =>
                     await CreateRenderPlanAsync(registry, context, root, backend, name),
                 ["render", "plan", "inspect", var root] => await InspectRenderPlanAsync(registry, context, root),
@@ -107,6 +108,7 @@ internal static class RekallAgeCli
         registry.Register(new ScaffoldModuleCommand());
         registry.Register(new ScaffoldPlayableModuleCommand());
         registry.Register(new ListRenderBackendsCommand());
+        registry.Register(new ProbeVulkanBackendCommand());
         registry.Register(new CreateRenderPlanCommand());
         registry.Register(new AddRenderResourceCommand());
         registry.Register(new RecordRenderCommandBufferCommand());
@@ -146,6 +148,38 @@ internal static class RekallAgeCli
         {
             Console.WriteLine($"{backend.Id}: {backend.DisplayName} [{backend.Status}]");
             Console.WriteLine($"  {string.Join(", ", backend.AgentExposedCapabilities)}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ProbeVulkanBackendAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context)
+    {
+        var result = await registry.ExecuteAsync<ProbeVulkanBackendRequest, ProbeVulkanBackendResult>(
+            "rekall.render.vulkan.probe",
+            new ProbeVulkanBackendRequest(),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Available: {result.Value.Available}");
+        Console.WriteLine($"Loader: {result.Value.LoaderName ?? "<none>"}");
+        Console.WriteLine($"API: {result.Value.ApiVersion ?? "<unknown>"}");
+        Console.WriteLine($"Physical devices: {result.Value.PhysicalDevices.Count}");
+        foreach (var device in result.Value.PhysicalDevices)
+        {
+            Console.WriteLine($"  {device.Name} [{device.DeviceType}] API {device.ApiVersion}");
+        }
+
+        Console.WriteLine($"Instance extensions: {result.Value.InstanceExtensions.Count}");
+        foreach (var extension in result.Value.InstanceExtensions.Take(12))
+        {
+            Console.WriteLine($"  {extension}");
+        }
+
+        foreach (var error in result.Value.Errors)
+        {
+            Console.WriteLine($"Error: {error}");
         }
 
         return result.Ok ? 0 : 1;

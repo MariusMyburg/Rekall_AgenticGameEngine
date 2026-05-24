@@ -49,6 +49,9 @@ public sealed class GameTemplateWorkflowTests
         Assert.Equal(templateId, result.Value.Template.Id);
         Assert.True(File.Exists(Path.Combine(root, "rekall.project.json")));
         Assert.True(File.Exists(Path.Combine(root, "Scenes", "Main.age.scene.json")));
+        Assert.Equal(templateId, result.Value.Manifest.SourceTemplateId);
+        var manifestJson = await File.ReadAllTextAsync(Path.Combine(root, "rekall.project.json"));
+        Assert.Contains($$""""sourceTemplateId": "{{templateId}}"""", manifestJson, StringComparison.Ordinal);
 
         var sceneStore = new RekallAgeSceneStore();
         var validator = new RekallAgeProjectValidator(sceneStore);

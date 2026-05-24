@@ -44,7 +44,11 @@ public sealed class CreateGameFromTemplateCommand
         RekallAgeCommandContext context)
     {
         var template = _catalog.GetRequired(request.TemplateId);
-        var manifest = RekallAgeProjectManifest.Create(request.ProjectName, template.Capabilities);
+        var manifest = RekallAgeProjectManifest.Create(request.ProjectName, template.Capabilities)
+            with
+            {
+                SourceTemplateId = template.Id
+            };
         var scene = RekallAgeSceneDocument.Create("Main", template.Capabilities);
         foreach (var entity in template.Entities)
         {

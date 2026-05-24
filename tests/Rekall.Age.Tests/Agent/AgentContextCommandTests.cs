@@ -23,6 +23,7 @@ public sealed class AgentContextCommandTests
 
         Assert.True(project.Ok);
         Assert.Equal("ok", project.Value.Summary.Health.Status);
+        Assert.Equal("puzzle", project.Value.Summary.SourceTemplateId);
         Assert.True(scene.Ok);
         Assert.Equal("Main", scene.Value.Summary.Scene);
         Assert.Contains(scene.Value.Summary.Entities, entity => entity.Name == "PuzzleGrid");

@@ -5,6 +5,8 @@ public sealed record RekallAgeProjectManifest(
     int SchemaVersion,
     IReadOnlyList<string> Capabilities)
 {
+    public string? SourceTemplateId { get; init; }
+
     public static RekallAgeProjectManifest Create(string name, IEnumerable<string> capabilities)
     {
         if (string.IsNullOrWhiteSpace(name))

@@ -34,6 +34,7 @@ The current MVP includes:
 - headless runtime smoke execution with active gameplay-system observations
 - deterministic software screenshot capture through command bus
 - built-in starter game workflows
+- one-shot playable game workflow that creates, scaffolds, and builds genre-aware C# module code
 
 ## Starter Game Workflows
 
@@ -89,6 +90,7 @@ dotnet run --project src/Rekall.Age.Cli -- render command-buffer record .age-san
 dotnet run --project src/Rekall.Age.Cli -- render plan execute .age-sandbox .age-sandbox/Artifacts/Render
 dotnet run --project src/Rekall.Age.Cli -- module schemas
 dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" pong
+dotnet run --project src/Rekall.Age.Cli -- game create-playable .age-sandbox "Playable Pong" pong
 dotnet run --project src/Rekall.Age.Cli -- asset import .age-sandbox .\player.png sprite "Player Ship"
 dotnet run --project src/Rekall.Age.Cli -- asset list .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module scaffold-playable .age-sandbox crystal.playable "Crystal Playable" CrystalPlayable crystal

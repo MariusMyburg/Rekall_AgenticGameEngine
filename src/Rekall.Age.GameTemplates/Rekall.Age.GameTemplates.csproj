@@ -1,7 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\Rekall.Age.Build\Rekall.Age.Build.csproj" />
     <ProjectReference Include="..\Rekall.Age.Core\Rekall.Age.Core.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Modules\Rekall.Age.Modules.csproj" />
     <ProjectReference Include="..\Rekall.Age.Project\Rekall.Age.Project.csproj" />
     <ProjectReference Include="..\Rekall.Age.World\Rekall.Age.World.csproj" />
     <ProjectReference Include="..\Rekall.Age.Validation\Rekall.Age.Validation.csproj" />

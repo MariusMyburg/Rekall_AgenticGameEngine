@@ -18,6 +18,7 @@ public sealed class McpCatalogTests
         var registry = new RekallAgeCommandRegistry();
         registry.Register(new CreateProjectCommand());
         registry.Register(new CreateGameFromTemplateCommand());
+        registry.Register(new CreatePlayableGameFromTemplateCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
         registry.Register(new ListComponentSchemasCommand(GetType().Assembly));
@@ -31,6 +32,7 @@ public sealed class McpCatalogTests
 
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.project.create");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_game_from_template");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_playable_game_from_template");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.run.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.capture.screenshot");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.component_schemas");

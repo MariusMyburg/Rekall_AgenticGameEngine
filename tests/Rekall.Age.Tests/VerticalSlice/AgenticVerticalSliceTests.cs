@@ -3,6 +3,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.Mcp;
+using Rekall.Age.Playback.Commands;
 using Rekall.Age.Project;
 using Rekall.Age.Rendering;
 using Rekall.Age.Runtime;
@@ -48,5 +49,33 @@ public sealed class AgenticVerticalSliceTests
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_game_from_template");
+    }
+
+    [Fact]
+    public async Task AgentCanCreateBuiltPlayableGameFromTemplateInOneWorkflow()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CreatePlayableGameFromTemplateCommand());
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("playable vertical slice"), CancellationToken.None);
+
+        var game = await registry.ExecuteAsync<CreatePlayableGameFromTemplateRequest, CreatePlayableGameFromTemplateResult>(
+            "rekall.workflow.create_playable_game_from_template",
+            new CreatePlayableGameFromTemplateRequest(root, "Playable Pong", "pong"),
+            context);
+
+        Assert.True(game.Ok, game.Summary);
+        Assert.Equal("pong", game.Value.Template.Id);
+        Assert.True(File.Exists(game.Value.ModuleSourcePath));
+        Assert.True(File.Exists(game.Value.ModuleAssemblyPath));
+
+        var play = await new PlaySceneCommand().ExecuteAsync(new PlaySceneRequest(root, "Main", 2), context);
+
+        Assert.True(play.Ok, play.Summary);
+        Assert.Equal("pong", play.Value.Kind);
+        Assert.All(play.Value.Frames, frame => Assert.Contains("PONG", frame, StringComparison.Ordinal));
+
+        var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_playable_game_from_template");
     }
 }

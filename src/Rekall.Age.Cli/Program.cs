@@ -106,6 +106,7 @@ internal static class RekallAgeCli
                 ["build", "player", var root, var scene] => await BuildPlayerAsync(registry, context, root, scene, graphics: false),
                 ["build", "player", var root, var scene, "--graphics"] => await BuildPlayerAsync(registry, context, root, scene, graphics: true),
                 ["game", "create", var root, var name, var template] => await CreateGameAsync(registry, context, root, name, template),
+                ["game", "create-playable", var root, var name, var template] => await CreatePlayableGameAsync(registry, context, root, name, template),
                 ["project", "create", var root, var name, var capabilities] => await CreateProjectAsync(registry, context, root, name, capabilities),
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
                 ["scene", "create", var root, var name, var capabilities] => await CreateSceneAsync(registry, context, root, name, capabilities),
@@ -139,6 +140,7 @@ internal static class RekallAgeCli
         registry.Register(new SetComponentPropertyCommand());
         registry.Register(new InspectEntityCommand());
         registry.Register(new CreateGameFromTemplateCommand());
+        registry.Register(new CreatePlayableGameFromTemplateCommand());
         registry.Register(new ListGameTemplatesCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
@@ -869,6 +871,34 @@ internal static class RekallAgeCli
             new CreateGameFromTemplateRequest(root, name, template),
             context);
         Console.WriteLine(result.Summary);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> CreatePlayableGameAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string name,
+        string template)
+    {
+        var result = await registry.ExecuteAsync<CreatePlayableGameFromTemplateRequest, CreatePlayableGameFromTemplateResult>(
+            "rekall.workflow.create_playable_game_from_template",
+            new CreatePlayableGameFromTemplateRequest(root, name, template),
+            context);
+        Console.WriteLine(result.Summary);
+        if (result.Ok)
+        {
+            Console.WriteLine($"Module source: {result.Value.ModuleSourcePath}");
+            Console.WriteLine($"Module assembly: {result.Value.ModuleAssemblyPath}");
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+            {
+                Console.WriteLine($"{error.Code}: {error.Message}");
+            }
+        }
+
         return result.Ok ? 0 : 1;
     }
 

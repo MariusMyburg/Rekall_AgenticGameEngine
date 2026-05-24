@@ -120,6 +120,12 @@ internal static class RekallAgeCli
                     await VerifyPlayableGameAsync(registry, context, root, scene, frames, null, assertionsJson),
                 ["game", "verify-playable", var root, var scene, var frames, var inputsJson, var assertionsJson] =>
                     await VerifyPlayableGameAsync(registry, context, root, scene, frames, inputsJson, assertionsJson),
+                ["game", "package-playable", var root] => await PackagePlayableGameAsync(registry, context, root, "Main", null, graphics: false),
+                ["game", "package-playable", var root, var scene] => await PackagePlayableGameAsync(registry, context, root, scene, null, graphics: false),
+                ["game", "package-playable", var root, var scene, var outputDirectory] =>
+                    await PackagePlayableGameAsync(registry, context, root, scene, outputDirectory, graphics: false),
+                ["game", "package-playable", var root, var scene, var outputDirectory, "--graphics"] =>
+                    await PackagePlayableGameAsync(registry, context, root, scene, outputDirectory, graphics: true),
                 ["project", "create", var root, var name, var capabilities] => await CreateProjectAsync(registry, context, root, name, capabilities),
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
                 ["scene", "create", var root, var name, var capabilities] => await CreateSceneAsync(registry, context, root, name, capabilities),
@@ -160,6 +166,7 @@ internal static class RekallAgeCli
         registry.Register(new CreateGameFromTemplateCommand());
         registry.Register(new CreatePlayableGameFromTemplateCommand());
         registry.Register(new VerifyPlayableGameCommand());
+        registry.Register(new PackagePlayableGameCommand());
         registry.Register(new ListGameTemplatesCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
@@ -1063,6 +1070,36 @@ internal static class RekallAgeCli
         foreach (var error in result.Errors)
         {
             Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> PackagePlayableGameAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string? outputDirectory,
+        bool graphics)
+    {
+        var result = await registry.ExecuteAsync<PackagePlayableGameRequest, PackagePlayableGameResult>(
+            "rekall.workflow.package_playable_game",
+            new PackagePlayableGameRequest(root, scene, outputDirectory, Graphics: graphics),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Ready: {result.Value.Ready}");
+        if (result.Ok)
+        {
+            Console.WriteLine($"Launch: {result.Value.LaunchPath}");
+            Console.WriteLine($"Arguments: {string.Join(' ', result.Value.Arguments)}");
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+            {
+                Console.WriteLine($"{error.Code}: {error.Message}");
+            }
         }
 
         return result.Ok ? 0 : 1;

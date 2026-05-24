@@ -132,4 +132,32 @@ public sealed class GameTemplateWorkflowTests
         Assert.Contains(result.Value.Checks, check => check.Name == "module-build" && !check.Passed);
         Assert.Contains(result.Errors, error => error.Code == "REKALL_PLAYABLE_GAME_NOT_READY");
     }
+
+    [Fact]
+    public async Task PackagePlayableGameVerifiesAndPublishesPlayer()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var output = Path.Combine(root, "Builds", "PackagedPlayer");
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("package playable"), CancellationToken.None);
+        var create = await new CreatePlayableGameFromTemplateCommand().ExecuteAsync(
+            new CreatePlayableGameFromTemplateRequest(root, "Packaged Pong", "pong"),
+            context);
+        Assert.True(create.Ok, create.Summary);
+
+        var package = await new PackagePlayableGameCommand().ExecuteAsync(
+            new PackagePlayableGameRequest(
+                root,
+                "Main",
+                output,
+                Frames: 1,
+                Assertions: [new RekallAgeFrameAssertion(0, "PONG")]),
+            context);
+
+        Assert.True(package.Ok, package.Summary);
+        Assert.True(package.Value.Ready);
+        Assert.True(File.Exists(package.Value.LaunchPath), package.Value.LaunchPath);
+        Assert.Equal(output, package.Value.OutputDirectory);
+        Assert.Contains(root, package.Value.Arguments);
+        Assert.Contains("Main", package.Value.Arguments);
+    }
 }

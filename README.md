@@ -13,6 +13,7 @@ The current MVP includes:
 - C# module source writing through the command bus for MCP-first agents
 - C# module build command for compiling scaffolded gameplay modules
 - playable game readiness verification workflow for validation, build, and playtest checks
+- playable game packaging workflow that verifies and publishes launch artifacts
 - project module assembly loading for agent-readable schemas after build
 - module-authored playable runtime execution; no engine-owned fallback games
 - Vulkan-first internal rendering backend catalog with Direct3D 12 extension point
@@ -95,6 +96,7 @@ dotnet run --project src/Rekall.Age.Cli -- module schemas
 dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" pong
 dotnet run --project src/Rekall.Age.Cli -- game create-playable .age-sandbox "Playable Pong" pong
 dotnet run --project src/Rekall.Age.Cli -- game verify-playable .age-sandbox Main 2 '[{"frameIndex":0,"contains":"PONG"}]'
+dotnet run --project src/Rekall.Age.Cli -- game package-playable .age-sandbox Main .age-sandbox/Builds/RekallAgePlayer
 dotnet run --project src/Rekall.Age.Cli -- asset import .age-sandbox .\player.png sprite "Player Ship"
 dotnet run --project src/Rekall.Age.Cli -- asset list .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module scaffold-playable .age-sandbox crystal.playable "Crystal Playable" CrystalPlayable crystal

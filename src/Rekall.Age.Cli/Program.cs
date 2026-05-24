@@ -51,7 +51,8 @@ internal static class RekallAgeCli
                 ["module", "scaffold", var root, var moduleId, var displayName, var moduleName, var componentName] =>
                     await ScaffoldModuleAsync(registry, context, root, moduleId, displayName, moduleName, componentName),
                 ["build", "modules", var root] => await BuildModulesAsync(registry, context, root),
-                ["build", "player", var root, var scene] => await BuildPlayerAsync(registry, context, root, scene),
+                ["build", "player", var root, var scene] => await BuildPlayerAsync(registry, context, root, scene, graphics: false),
+                ["build", "player", var root, var scene, "--graphics"] => await BuildPlayerAsync(registry, context, root, scene, graphics: true),
                 ["game", "create", var root, var name, var template] => await CreateGameAsync(registry, context, root, name, template),
                 ["project", "create", var root, var name, var capabilities] => await CreateProjectAsync(registry, context, root, name, capabilities),
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
@@ -131,11 +132,12 @@ internal static class RekallAgeCli
         RekallAgeCommandRegistry registry,
         RekallAgeCommandContext context,
         string root,
-        string scene)
+        string scene,
+        bool graphics)
     {
         var result = await registry.ExecuteAsync<BuildPlayerRequest, BuildPlayerResult>(
             "rekall.build.player",
-            new BuildPlayerRequest(root, scene),
+            new BuildPlayerRequest(root, scene, Graphics: graphics),
             context);
         Console.WriteLine(result.Summary);
         Console.WriteLine($"{result.Value.LaunchPath} {string.Join(' ', result.Value.Arguments)}");

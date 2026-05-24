@@ -6,7 +6,8 @@ namespace Rekall.Age.Build.Commands;
 public sealed record BuildPlayerRequest(
     string ProjectRoot,
     string SceneName,
-    string? OutputDirectory = null);
+    string? OutputDirectory = null,
+    bool Graphics = false);
 
 public sealed record BuildPlayerResult(
     string OutputDirectory,
@@ -57,7 +58,9 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
         var result = new BuildPlayerResult(
             outputDirectory,
             launchPath,
-            [request.ProjectRoot, request.SceneName],
+            request.Graphics
+                ? [request.ProjectRoot, request.SceneName, "--graphics"]
+                : [request.ProjectRoot, request.SceneName],
             output);
         if (process.ExitCode != 0 || !File.Exists(launchPath))
         {

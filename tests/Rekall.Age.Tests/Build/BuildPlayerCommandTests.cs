@@ -24,4 +24,20 @@ public sealed class BuildPlayerCommandTests
         Assert.Contains(root, result.Value.Arguments);
         Assert.Contains("Main", result.Value.Arguments);
     }
+
+    [Fact]
+    public async Task BuildPlayerCanReturnGraphicsLaunchArguments()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("build graphics player"), CancellationToken.None);
+        await new CreateGameFromTemplateCommand().ExecuteAsync(
+            new CreateGameFromTemplateRequest(root, "Graphical Pong", "pong"),
+            context);
+        var command = new BuildPlayerCommand();
+
+        var result = await command.ExecuteAsync(new BuildPlayerRequest(root, "Main", Graphics: true), context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains("--graphics", result.Value.Arguments);
+    }
 }

@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+TestResults/
+Artifacts/
+.age-sandbox/
+*.agecache
+.worktrees/
+worktrees/

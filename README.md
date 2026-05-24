@@ -106,6 +106,7 @@ dotnet run --project src/Rekall.Age.Cli -- play scene .age-sandbox Main 2 '[{"ve
 dotnet run --project src/Rekall.Age.Cli -- playtest scene .age-sandbox Main 2 '[{"verticalAxis":1,"primaryAction":true},{"verticalAxis":-1}]' '[{"frameIndex":0,"contains":"Score 10"},{"frameIndex":1,"contains":"Left paddle lane 0"}]'
 dotnet run --project src/Rekall.Age.Cli -- build player .age-sandbox Main
 dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main
+dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main --frames 2 --inputs '[{"verticalAxis":1,"primaryAction":true},{"verticalAxis":-1}]'
 dotnet run --project src/Rekall.Age.Cli -- run scene .age-sandbox Main 0.1
 dotnet run --project src/Rekall.Age.Cli -- capture screenshot .age-sandbox Main
 ```

@@ -3,13 +3,14 @@ using Rekall.Age.World;
 
 if (args.Length < 2)
 {
-    Console.Error.WriteLine("Usage: rekall-age-player <project-root> <scene-name> [--frames <count>] [--graphics]");
+    Console.Error.WriteLine("Usage: rekall-age-player <project-root> <scene-name> [--frames <count>] [--inputs <json-or-file>] [--graphics]");
     return 2;
 }
 
 var projectRoot = args[0];
 var sceneName = args[1];
 var frames = TryReadFrameCount(args);
+var inputs = await TryReadInputsAsync(args, CancellationToken.None);
 var useGraphics = args.Any(arg => arg.Equals("--graphics", StringComparison.Ordinal));
 var scene = await new RekallAgeSceneStore().LoadAsync(projectRoot, sceneName, CancellationToken.None);
 var game = RekallAgePlayableGameFactory.Create(projectRoot, scene);
@@ -18,7 +19,10 @@ if (frames is not null)
 {
     for (var i = 0; i < frames.Value; i++)
     {
-        game.Tick(RekallAgePlaybackInput.None);
+        var input = inputs is { Count: > 0 } && i < inputs.Count
+            ? inputs[i]
+            : RekallAgePlaybackInput.None;
+        game.Tick(input);
         Console.WriteLine($"FRAME {i + 1}");
         Console.Write(game.RenderAscii());
     }
@@ -64,6 +68,36 @@ static int? TryReadFrameCount(string[] args)
         if (args[i].Equals("--frames", StringComparison.Ordinal) && int.TryParse(args[i + 1], out var frames))
         {
             return Math.Max(1, frames);
+        }
+    }
+
+    return null;
+}
+
+static async ValueTask<IReadOnlyList<RekallAgePlaybackInput>?> TryReadInputsAsync(
+    string[] args,
+    CancellationToken cancellationToken)
+{
+    for (var i = 2; i < args.Length - 1; i++)
+    {
+        if (!args[i].Equals("--inputs", StringComparison.Ordinal))
+        {
+            continue;
+        }
+
+        var source = args[i + 1];
+        var payload = File.Exists(source)
+            ? await File.ReadAllTextAsync(source, cancellationToken)
+            : source;
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<RekallAgePlaybackInput[]>(
+                payload,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new ArgumentException($"Playback inputs JSON is invalid: {ex.Message}", ex);
         }
     }
 

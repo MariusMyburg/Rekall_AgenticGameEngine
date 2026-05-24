@@ -48,6 +48,46 @@ public sealed class CliSmokeTests
         Assert.Contains("Main_preview.png", capture.Output);
     }
 
+    [Fact]
+    public async Task CliPlaytestsPlayableTemplateWithJsonAssertions()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var project = Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Cli", "Rekall.Age.Cli.csproj");
+
+        var create = await RunAsync(project, "game", "create-playable", root, "CLI Pong", "pong");
+        Assert.Equal(0, create.ExitCode);
+
+        var playtest = await RunAsync(
+            project,
+            "playtest",
+            "scene",
+            root,
+            "Main",
+            "2",
+            """[{"verticalAxis":1,"primaryAction":true},{"verticalAxis":-1,"primaryAction":false}]""",
+            """[{"frameIndex":0,"contains":"Score 10"},{"frameIndex":1,"contains":"Left paddle lane 0"}]""");
+
+        Assert.Equal(0, playtest.ExitCode);
+        Assert.Contains("Passed: True", playtest.Output);
+        Assert.Contains("Assertion frame 0 contains \"Score 10\": True", playtest.Output);
+    }
+
+    [Fact]
+    public async Task CliReportsInvalidPlaytestJsonWithoutUnhandledException()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var project = Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Cli", "Rekall.Age.Cli.csproj");
+
+        var create = await RunAsync(project, "game", "create-playable", root, "CLI Pong", "pong");
+        Assert.Equal(0, create.ExitCode);
+
+        var playtest = await RunAsync(project, "playtest", "scene", root, "Main", "1", "[{verticalAxis:1}]", "[]");
+
+        Assert.Equal(1, playtest.ExitCode);
+        Assert.Contains("JSON is invalid", playtest.Output);
+        Assert.DoesNotContain("Unhandled exception", playtest.Output);
+    }
+
     private static async Task<(int ExitCode, string Output)> RunAsync(string project, params string[] args)
     {
         var startInfo = new ProcessStartInfo("dotnet")

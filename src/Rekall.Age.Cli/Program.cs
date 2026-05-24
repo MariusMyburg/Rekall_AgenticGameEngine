@@ -28,7 +28,7 @@ internal static class RekallAgeCli
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|run|context|capture|render|module|build|templates|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|play|playtest|run|context|capture|render|module|build|templates|mcp> ...");
             return 2;
         }
 
@@ -117,6 +117,10 @@ internal static class RekallAgeCli
                     await SetComponentPropertyAsync(registry, context, root, scene, entityId, componentType, propertyName, value),
                 ["play", "scene", var root, var scene, var frames] => await PlaySceneAsync(registry, context, root, scene, frames, null),
                 ["play", "scene", var root, var scene, var frames, var inputsJson] => await PlaySceneAsync(registry, context, root, scene, frames, inputsJson),
+                ["playtest", "scene", var root, var scene, var frames, var assertionsJson] =>
+                    await PlaytestSceneAsync(registry, context, root, scene, frames, null, assertionsJson),
+                ["playtest", "scene", var root, var scene, var frames, var inputsJson, var assertionsJson] =>
+                    await PlaytestSceneAsync(registry, context, root, scene, frames, inputsJson, assertionsJson),
                 ["run", "scene", var root, var scene, var seconds] => await RunSceneAsync(registry, context, root, scene, seconds),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
@@ -170,6 +174,7 @@ internal static class RekallAgeCli
         registry.Register(new ImportAssetCommand());
         registry.Register(new ListAssetsCommand());
         registry.Register(new PlaySceneCommand());
+        registry.Register(new PlaytestSceneCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
         return registry;
@@ -709,6 +714,40 @@ internal static class RekallAgeCli
         return result.Ok ? 0 : 1;
     }
 
+    private static async Task<int> PlaytestSceneAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string frames,
+        string? inputsJson,
+        string assertionsJson)
+    {
+        var count = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
+        var inputs = await ParsePlaybackInputsAsync(inputsJson, context.CancellationToken);
+        var assertions = await ParseFrameAssertionsAsync(assertionsJson, context.CancellationToken);
+        var result = await registry.ExecuteAsync<PlaytestSceneRequest, PlaytestSceneResult>(
+            "rekall.playtest.scene",
+            new PlaytestSceneRequest(root, scene, count, inputs, assertions),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Passed: {result.Value.Passed}");
+        Console.WriteLine($"Kind: {result.Value.Kind}");
+        Console.WriteLine($"Frames: {result.Value.Frames.Count}");
+        foreach (var assertion in result.Value.Assertions)
+        {
+            var expected = assertion.MustContain ? "contains" : "does not contain";
+            Console.WriteLine($"Assertion frame {assertion.FrameIndex} {expected} \"{assertion.Contains}\": {assertion.Passed}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
     private static async Task<int> ListAssetsAsync(
         RekallAgeCommandRegistry registry,
         RekallAgeCommandContext context,
@@ -1093,8 +1132,39 @@ internal static class RekallAgeCli
         var payload = File.Exists(inputsJson)
             ? await File.ReadAllTextAsync(inputsJson, cancellationToken)
             : inputsJson;
-        return System.Text.Json.JsonSerializer.Deserialize<RekallAgePlaybackInput[]>(
-            payload,
-            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<RekallAgePlaybackInput[]>(
+                payload,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new ArgumentException($"Playback inputs JSON is invalid: {ex.Message}", ex);
+        }
+    }
+
+    private static async ValueTask<IReadOnlyList<RekallAgeFrameAssertion>?> ParseFrameAssertionsAsync(
+        string? assertionsJson,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(assertionsJson))
+        {
+            return null;
+        }
+
+        var payload = File.Exists(assertionsJson)
+            ? await File.ReadAllTextAsync(assertionsJson, cancellationToken)
+            : assertionsJson;
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<RekallAgeFrameAssertion[]>(
+                payload,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new ArgumentException($"Frame assertions JSON is invalid: {ex.Message}", ex);
+        }
     }
 }

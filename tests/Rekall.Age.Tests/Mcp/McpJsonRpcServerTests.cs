@@ -212,6 +212,90 @@ public sealed class McpJsonRpcServerTests
         Assert.Contains("Score 10", frame, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ToolsCallCanCreateBuildAndPlaytestTemplateGame()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CreatePlayableGameFromTemplateCommand());
+        registry.Register(new PlaytestSceneCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var createResponse = await server.HandleJsonLineAsync(
+            JsonSerializer.Serialize(new
+            {
+                jsonrpc = "2.0",
+                id = 20,
+                method = "tools/call",
+                @params = new
+                {
+                    name = "rekall.workflow.create_playable_game_from_template",
+                    arguments = new
+                    {
+                        projectRoot = root,
+                        projectName = "MCP Playtest Pong",
+                        templateId = "pong"
+                    }
+                }
+            }),
+            CreateContext());
+        var playtestResponse = await server.HandleJsonLineAsync(
+            JsonSerializer.Serialize(new
+            {
+                jsonrpc = "2.0",
+                id = 21,
+                method = "tools/call",
+                @params = new
+                {
+                    name = "rekall.playtest.scene",
+                    arguments = new
+                    {
+                        projectRoot = root,
+                        sceneName = "Main",
+                        frames = 2,
+                        inputs = new[]
+                        {
+                            new
+                            {
+                                verticalAxis = 1,
+                                primaryAction = true
+                            },
+                            new
+                            {
+                                verticalAxis = -1,
+                                primaryAction = false
+                            }
+                        },
+                        assertions = new[]
+                        {
+                            new
+                            {
+                                frameIndex = 0,
+                                contains = "Score 10"
+                            },
+                            new
+                            {
+                                frameIndex = 1,
+                                contains = "Left paddle lane 0"
+                            }
+                        }
+                    }
+                }
+            }),
+            CreateContext());
+
+        using var createDocument = JsonDocument.Parse(createResponse!);
+        using var playtestDocument = JsonDocument.Parse(playtestResponse!);
+        Assert.False(createDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.False(playtestDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.True(playtestDocument.RootElement
+            .GetProperty("result")
+            .GetProperty("structuredContent")
+            .GetProperty("value")
+            .GetProperty("passed")
+            .GetBoolean());
+    }
+
     private static RekallAgeMcpJsonRpcServer CreateServer()
     {
         var registry = new RekallAgeCommandRegistry();

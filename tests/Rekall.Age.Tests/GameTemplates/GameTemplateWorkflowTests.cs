@@ -157,7 +157,18 @@ public sealed class GameTemplateWorkflowTests
         Assert.True(package.Value.Ready);
         Assert.True(File.Exists(package.Value.LaunchPath), package.Value.LaunchPath);
         Assert.Equal(output, package.Value.OutputDirectory);
-        Assert.Contains(root, package.Value.Arguments);
+        var bundledGameRoot = Path.Combine(output, "Game");
+        Assert.True(File.Exists(Path.Combine(bundledGameRoot, "rekall.project.json")));
+        Assert.True(File.Exists(Path.Combine(bundledGameRoot, "Scenes", "Main.age.scene.json")));
+        Assert.True(File.Exists(Path.Combine(bundledGameRoot, "Modules", "PongPlayable", "bin", "Debug", "net10.0", "PongPlayable.dll")));
+        Assert.Contains(bundledGameRoot, package.Value.Arguments);
+        Assert.DoesNotContain(root, package.Value.Arguments);
         Assert.Contains("Main", package.Value.Arguments);
+
+        var packagedPlay = await new PlaySceneCommand().ExecuteAsync(
+            new PlaySceneRequest(bundledGameRoot, "Main", 1),
+            context);
+        Assert.True(packagedPlay.Ok, packagedPlay.Summary);
+        Assert.Contains("PONG", packagedPlay.Value.Frames[0], StringComparison.Ordinal);
     }
 }

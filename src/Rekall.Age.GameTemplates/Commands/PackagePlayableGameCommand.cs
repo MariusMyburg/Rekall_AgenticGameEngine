@@ -62,14 +62,19 @@ public sealed class PackagePlayableGameCommand
                 verification.Errors);
         }
 
+        var outputDirectory = request.OutputDirectory
+            ?? Path.Combine(request.ProjectRoot, "Builds", "RekallAgePlayer");
         var player = await _buildPlayer.ExecuteAsync(
-            new BuildPlayerRequest(request.ProjectRoot, request.SceneName, request.OutputDirectory, request.Graphics),
+            new BuildPlayerRequest(request.ProjectRoot, request.SceneName, outputDirectory, request.Graphics),
             context);
+        var bundledGameRoot = Path.Combine(outputDirectory, "Game");
         var result = new PackagePlayableGameResult(
             Ready: player.Ok,
             OutputDirectory: player.Value.OutputDirectory,
             LaunchPath: player.Value.LaunchPath,
-            Arguments: player.Value.Arguments,
+            Arguments: player.Ok
+                ? CreateLaunchArguments(bundledGameRoot, request.SceneName, request.Graphics)
+                : player.Value.Arguments,
             Checks: verification.Value.Checks,
             BuildOutput: player.Value.Output);
         if (!player.Ok)
@@ -80,8 +85,84 @@ public sealed class PackagePlayableGameCommand
                 player.Errors);
         }
 
+        CopyProjectToPackage(request.ProjectRoot, bundledGameRoot, outputDirectory);
+        context.Transaction.RecordChangedResource(bundledGameRoot);
+
         return RekallAgeCommandResult<PackagePlayableGameResult>.Success(
             result,
             $"Packaged playable game '{request.SceneName}' at '{player.Value.OutputDirectory}'.");
+    }
+
+    private static IReadOnlyList<string> CreateLaunchArguments(string bundledGameRoot, string sceneName, bool graphics)
+    {
+        return graphics
+            ? [bundledGameRoot, sceneName, "--graphics"]
+            : [bundledGameRoot, sceneName];
+    }
+
+    private static void CopyProjectToPackage(string projectRoot, string bundledGameRoot, string outputDirectory)
+    {
+        var sourceRoot = Path.GetFullPath(projectRoot);
+        var destinationRoot = Path.GetFullPath(bundledGameRoot);
+        var packageRoot = Path.GetFullPath(outputDirectory);
+        if (Directory.Exists(destinationRoot))
+        {
+            Directory.Delete(destinationRoot, recursive: true);
+        }
+
+        Directory.CreateDirectory(destinationRoot);
+        foreach (var directory in Directory.EnumerateDirectories(sourceRoot, "*", SearchOption.AllDirectories))
+        {
+            var fullDirectory = Path.GetFullPath(directory);
+            if (ShouldSkipPath(sourceRoot, fullDirectory, packageRoot))
+            {
+                continue;
+            }
+
+            Directory.CreateDirectory(ToDestinationPath(sourceRoot, destinationRoot, fullDirectory));
+        }
+
+        foreach (var file in Directory.EnumerateFiles(sourceRoot, "*", SearchOption.AllDirectories))
+        {
+            var fullFile = Path.GetFullPath(file);
+            if (ShouldSkipPath(sourceRoot, fullFile, packageRoot))
+            {
+                continue;
+            }
+
+            var destination = ToDestinationPath(sourceRoot, destinationRoot, fullFile);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(fullFile, destination, overwrite: true);
+        }
+    }
+
+    private static string ToDestinationPath(string sourceRoot, string destinationRoot, string path)
+    {
+        return Path.Combine(destinationRoot, Path.GetRelativePath(sourceRoot, path));
+    }
+
+    private static bool ShouldSkipPath(string sourceRoot, string path, string packageRoot)
+    {
+        if (IsSameOrInside(path, packageRoot))
+        {
+            return true;
+        }
+
+        var relative = Path.GetRelativePath(sourceRoot, path);
+        var segments = relative.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries);
+        return segments.Any(segment =>
+            segment.Equals("Builds", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("obj", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsSameOrInside(string path, string directory)
+    {
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        var normalizedPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var normalizedDirectory = Path.GetFullPath(directory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return normalizedPath.Equals(normalizedDirectory, comparison) ||
+            normalizedPath.StartsWith(normalizedDirectory + Path.DirectorySeparatorChar, comparison);
     }
 }

@@ -99,6 +99,9 @@ internal static class RekallAgeCli
                 ["module", "schemas"] => await ListSchemasAsync(registry, context, null),
                 ["module", "schemas", var moduleId] => await ListSchemasAsync(registry, context, moduleId),
                 ["module", "schemas", "project", var root] => await ListProjectSchemasAsync(registry, context, root),
+                ["module", "sources", var root] => await ListModuleSourcesAsync(registry, context, root),
+                ["module", "read-source", var root, var moduleName, var fileName] =>
+                    await ReadModuleSourceAsync(registry, context, root, moduleName, fileName),
                 ["module", "scaffold", var root, var moduleId, var displayName, var moduleName, var componentName] =>
                     await ScaffoldModuleAsync(registry, context, root, moduleId, displayName, moduleName, componentName),
                 ["module", "scaffold-playable", var root, var moduleId, var displayName, var moduleName, var kind] =>
@@ -161,6 +164,8 @@ internal static class RekallAgeCli
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new ListComponentSchemasCommand());
+        registry.Register(new ListModuleSourcesCommand());
+        registry.Register(new ReadModuleSourceCommand());
         registry.Register(new ScaffoldModuleCommand());
         registry.Register(new ScaffoldPlayableModuleCommand());
         registry.Register(new WriteModuleSourceCommand());
@@ -818,6 +823,51 @@ internal static class RekallAgeCli
         foreach (var component in result.Value.Components)
         {
             Console.WriteLine($"{component.DisplayName}: {component.TypeName}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ListModuleSourcesAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root)
+    {
+        var result = await registry.ExecuteAsync<ListModuleSourcesRequest, ListModuleSourcesResult>(
+            "rekall.module.list_sources",
+            new ListModuleSourcesRequest(root),
+            context);
+        Console.WriteLine(result.Summary);
+        foreach (var source in result.Value.Sources)
+        {
+            Console.WriteLine($"{source.ModuleName}/{source.FileName}: {source.SourcePath} ({source.Bytes} bytes)");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ReadModuleSourceAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string moduleName,
+        string fileName)
+    {
+        var result = await registry.ExecuteAsync<ReadModuleSourceRequest, ReadModuleSourceResult>(
+            "rekall.module.read_source",
+            new ReadModuleSourceRequest(root, moduleName, fileName),
+            context);
+        Console.WriteLine(result.Summary);
+        if (result.Ok)
+        {
+            Console.Write(result.Value.Source);
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+            {
+                Console.WriteLine($"{error.Code}: {error.Message}");
+            }
         }
 
         return result.Ok ? 0 : 1;

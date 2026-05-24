@@ -28,13 +28,10 @@ public sealed class WriteModuleSourceCommand
         WriteModuleSourceRequest request,
         RekallAgeCommandContext context)
     {
-        var modulesRoot = Path.GetFullPath(Path.Combine(request.ProjectRoot, "Modules"));
-        var sourcePath = Path.GetFullPath(Path.Combine(modulesRoot, request.ModuleName, request.FileName));
+        var sourcePath = RekallAgeModuleSourcePaths.GetSourcePath(request.ProjectRoot, request.ModuleName, request.FileName);
         var emptyResult = new WriteModuleSourceResult(sourcePath, 0);
 
-        if (!IsSimplePathSegment(request.ModuleName) ||
-            !IsSimplePathSegment(request.FileName) ||
-            !IsInsideDirectory(sourcePath, modulesRoot))
+        if (!RekallAgeModuleSourcePaths.IsSafeDirectModuleSourcePath(request.ProjectRoot, request.ModuleName, request.FileName, sourcePath))
         {
             var error = new RekallAgeCommandError(
                 "REKALL_MODULE_SOURCE_PATH_OUTSIDE_PROJECT",
@@ -59,23 +56,5 @@ public sealed class WriteModuleSourceCommand
         return RekallAgeCommandResult<WriteModuleSourceResult>.Success(
             new WriteModuleSourceResult(sourcePath, Encoding.UTF8.GetByteCount(request.Source)),
             $"Wrote module source '{sourcePath}'.");
-    }
-
-    private static bool IsInsideDirectory(string path, string directory)
-    {
-        var comparison = OperatingSystem.IsWindows()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
-        var root = directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        return path.StartsWith(root, comparison);
-    }
-
-    private static bool IsSimplePathSegment(string value)
-    {
-        return !string.IsNullOrWhiteSpace(value) &&
-            !Path.IsPathRooted(value) &&
-            value.IndexOfAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]) < 0 &&
-            !value.Equals(".", StringComparison.Ordinal) &&
-            !value.Equals("..", StringComparison.Ordinal);
     }
 }

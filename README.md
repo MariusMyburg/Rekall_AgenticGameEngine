@@ -98,6 +98,8 @@ dotnet run --project src/Rekall.Age.Cli -- game verify-playable .age-sandbox Mai
 dotnet run --project src/Rekall.Age.Cli -- asset import .age-sandbox .\player.png sprite "Player Ship"
 dotnet run --project src/Rekall.Age.Cli -- asset list .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module scaffold-playable .age-sandbox crystal.playable "Crystal Playable" CrystalPlayable crystal
+dotnet run --project src/Rekall.Age.Cli -- module sources .age-sandbox
+dotnet run --project src/Rekall.Age.Cli -- module read-source .age-sandbox CrystalPlayable CrystalPlayableModule.cs
 dotnet run --project src/Rekall.Age.Cli -- module write-source .age-sandbox CrystalPlayable CrystalPlayableModule.cs .\CrystalPlayableModule.cs
 dotnet run --project src/Rekall.Age.Cli -- build modules .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module schemas project .age-sandbox

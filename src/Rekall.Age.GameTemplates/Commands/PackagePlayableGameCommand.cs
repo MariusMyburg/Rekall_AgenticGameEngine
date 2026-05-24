@@ -2,6 +2,7 @@ using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
 using Rekall.Age.Playback.Commands;
+using Rekall.Age.Project;
 using System.IO.Compression;
 using System.Text.Json;
 
@@ -31,6 +32,8 @@ public sealed class PackagePlayableGameCommand
 {
     private readonly VerifyPlayableGameCommand _verifyPlayableGame = new();
     private readonly BuildPlayerCommand _buildPlayer = new();
+    private readonly RekallAgeProjectStore _projectStore = new();
+    private readonly RekallAgeGameTemplateCatalog _templateCatalog = RekallAgeGameTemplateCatalog.CreateDefault();
 
     public string Name => "rekall.workflow.package_playable_game";
 
@@ -97,6 +100,10 @@ public sealed class PackagePlayableGameCommand
         }
 
         CopyProjectToPackage(request.ProjectRoot, bundledGameRoot, outputDirectory);
+        var sourceTemplateId = await ReadSourceTemplateIdAsync(request.ProjectRoot, context.CancellationToken);
+        var drawCommands = sourceTemplateId is null
+            ? []
+            : _templateCatalog.GetRequired(sourceTemplateId).DrawCommands;
         await WriteManifestAsync(
             manifestPath,
             request.SceneName,
@@ -104,6 +111,8 @@ public sealed class PackagePlayableGameCommand
             player.Value.LaunchPath,
             arguments,
             verification.Value.Checks,
+            sourceTemplateId,
+            drawCommands,
             context.CancellationToken);
         CreatePackageArchive(outputDirectory, archivePath);
         context.Transaction.RecordChangedResource(bundledGameRoot);
@@ -206,6 +215,8 @@ public sealed class PackagePlayableGameCommand
         string launchPath,
         IReadOnlyList<string> arguments,
         IReadOnlyList<RekallAgePlayableGameCheck> checks,
+        string? sourceTemplateId,
+        IReadOnlyList<RekallAgeTemplateDrawCommand> drawCommands,
         CancellationToken cancellationToken)
     {
         var manifest = new RekallAgePlayablePackageManifest(
@@ -214,7 +225,9 @@ public sealed class PackagePlayableGameCommand
             bundledGameRoot,
             launchPath,
             arguments,
-            checks);
+            checks,
+            sourceTemplateId,
+            drawCommands);
         Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
         await File.WriteAllTextAsync(
             manifestPath,
@@ -227,6 +240,14 @@ public sealed class PackagePlayableGameCommand
                 }),
             cancellationToken);
     }
+
+    private async ValueTask<string?> ReadSourceTemplateIdAsync(
+        string projectRoot,
+        CancellationToken cancellationToken)
+    {
+        var manifest = await _projectStore.LoadAsync(projectRoot, cancellationToken);
+        return manifest.SourceTemplateId;
+    }
 }
 
 public sealed record RekallAgePlayablePackageManifest(
@@ -235,4 +256,6 @@ public sealed record RekallAgePlayablePackageManifest(
     string GameRoot,
     string LaunchPath,
     IReadOnlyList<string> Arguments,
-    IReadOnlyList<RekallAgePlayableGameCheck> Checks);
+    IReadOnlyList<RekallAgePlayableGameCheck> Checks,
+    string? SourceTemplateId,
+    IReadOnlyList<RekallAgeTemplateDrawCommand> DrawCommands);

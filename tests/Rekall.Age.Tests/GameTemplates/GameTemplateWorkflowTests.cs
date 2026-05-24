@@ -236,9 +236,14 @@ public sealed class GameTemplateWorkflowTests
         using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(package.Value.ManifestPath));
         Assert.Equal("rekall.age.playable.package", manifest.RootElement.GetProperty("kind").GetString());
         Assert.Equal("Main", manifest.RootElement.GetProperty("sceneName").GetString());
+        Assert.Equal("pong", manifest.RootElement.GetProperty("sourceTemplateId").GetString());
         Assert.Equal(package.Value.LaunchPath, manifest.RootElement.GetProperty("launchPath").GetString());
         Assert.Equal(bundledGameRoot, manifest.RootElement.GetProperty("gameRoot").GetString());
         Assert.True(manifest.RootElement.GetProperty("checks").GetArrayLength() > 0);
+        var drawCommands = manifest.RootElement.GetProperty("drawCommands");
+        Assert.Contains(drawCommands.EnumerateArray(), command =>
+            command.GetProperty("id").GetString() == "ball" &&
+            command.GetProperty("kind").GetString() == "circle");
 
         using var archive = ZipFile.OpenRead(package.Value.ArchivePath);
         Assert.Contains(archive.Entries, entry => entry.FullName == "rekall.package.json");

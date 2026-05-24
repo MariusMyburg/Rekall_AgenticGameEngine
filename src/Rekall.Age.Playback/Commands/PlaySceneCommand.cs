@@ -24,13 +24,40 @@ public sealed class PlaySceneCommand : IRekallAgeCommand<PlaySceneRequest, PlayS
         RekallAgeCommandContext context)
     {
         var scene = await _sceneStore.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
-        var game = RekallAgePlayableGameFactory.Create(scene);
+        IRekallAgePlayableGame game;
+        try
+        {
+            game = RekallAgePlayableGameFactory.Create(request.ProjectRoot, scene);
+        }
+        catch (RekallAgePlayableModuleMissingException ex)
+        {
+            var error = new RekallAgeCommandError(
+                "REKALL_PLAYABLE_MODULE_MISSING",
+                ex.Message,
+                ex.SceneName,
+                [
+                    new RekallAgeSuggestedCommand(
+                        "rekall.module.scaffold_playable",
+                        new Dictionary<string, object?>
+                        {
+                            ["projectRoot"] = request.ProjectRoot,
+                            ["moduleId"] = "game.playable",
+                            ["displayName"] = "Game Playable",
+                            ["moduleName"] = "GamePlayable",
+                            ["kind"] = "game"
+                        })
+                ]);
+            return RekallAgeCommandResult<PlaySceneResult>.Failure(
+                new PlaySceneResult("missing-module", Array.Empty<string>()),
+                error.Message,
+                [error]);
+        }
         var frames = new List<string>();
         var frameCount = Math.Clamp(request.Frames, 1, 600);
         for (var i = 0; i < frameCount; i++)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            game.Tick(RekallAgePongInput.None);
+            game.Tick(RekallAgePlaybackInput.None);
             frames.Add(game.RenderAscii());
         }
 

@@ -40,6 +40,7 @@ internal static class RekallAgeCli
             return args switch
             {
                 ["templates", "list"] => ListTemplates(),
+                ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
                 ["mcp", "stdio"] => await RunMcpStdioAsync(registry, context),
                 ["asset", "import", var root, var source, var kind, var displayName] =>
                     await ImportAssetAsync(registry, context, root, source, kind, displayName),
@@ -50,6 +51,8 @@ internal static class RekallAgeCli
                 ["module", "schemas", "project", var root] => await ListProjectSchemasAsync(registry, context, root),
                 ["module", "scaffold", var root, var moduleId, var displayName, var moduleName, var componentName] =>
                     await ScaffoldModuleAsync(registry, context, root, moduleId, displayName, moduleName, componentName),
+                ["module", "scaffold-playable", var root, var moduleId, var displayName, var moduleName, var kind] =>
+                    await ScaffoldPlayableModuleAsync(registry, context, root, moduleId, displayName, moduleName, kind),
                 ["build", "modules", var root] => await BuildModulesAsync(registry, context, root),
                 ["build", "player", var root, var scene] => await BuildPlayerAsync(registry, context, root, scene, graphics: false),
                 ["build", "player", var root, var scene, "--graphics"] => await BuildPlayerAsync(registry, context, root, scene, graphics: true),
@@ -92,6 +95,8 @@ internal static class RekallAgeCli
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new ListComponentSchemasCommand());
         registry.Register(new ScaffoldModuleCommand());
+        registry.Register(new ScaffoldPlayableModuleCommand());
+        registry.Register(new ListRenderBackendsCommand());
         registry.Register(new BuildModulesCommand());
         registry.Register(new BuildPlayerCommand());
         registry.Register(new ImportAssetCommand());
@@ -110,6 +115,24 @@ internal static class RekallAgeCli
         }
 
         return 0;
+    }
+
+    private static async Task<int> ListRenderBackendsAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context)
+    {
+        var result = await registry.ExecuteAsync<ListRenderBackendsRequest, ListRenderBackendsResult>(
+            "rekall.render.backends",
+            new ListRenderBackendsRequest(),
+            context);
+        Console.WriteLine(result.Summary);
+        foreach (var backend in result.Value.Backends)
+        {
+            Console.WriteLine($"{backend.Id}: {backend.DisplayName} [{backend.Status}]");
+            Console.WriteLine($"  {string.Join(", ", backend.AgentExposedCapabilities)}");
+        }
+
+        return result.Ok ? 0 : 1;
     }
 
     private static async Task<int> ImportAssetAsync(
@@ -242,6 +265,23 @@ internal static class RekallAgeCli
         var result = await registry.ExecuteAsync<ScaffoldModuleRequest, ScaffoldModuleResult>(
             "rekall.module.scaffold",
             new ScaffoldModuleRequest(root, moduleId, displayName, moduleName, componentName),
+            context);
+        Console.WriteLine(result.Value.SourcePath);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ScaffoldPlayableModuleAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string moduleId,
+        string displayName,
+        string moduleName,
+        string kind)
+    {
+        var result = await registry.ExecuteAsync<ScaffoldPlayableModuleRequest, ScaffoldPlayableModuleResult>(
+            "rekall.module.scaffold_playable",
+            new ScaffoldPlayableModuleRequest(root, moduleId, displayName, moduleName, kind),
             context);
         Console.WriteLine(result.Value.SourcePath);
         return result.Ok ? 0 : 1;

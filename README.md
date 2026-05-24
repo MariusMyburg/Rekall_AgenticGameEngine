@@ -12,9 +12,11 @@ The current MVP includes:
 - C# module scaffolding for agent-authored or human-authored gameplay modules
 - C# module build command for compiling scaffolded gameplay modules
 - project module assembly loading for agent-readable schemas after build
+- module-authored playable runtime execution; no engine-owned fallback games
+- Vulkan-first internal rendering backend catalog with Direct3D 12 extension point
 - deterministic asset import and catalog listing commands
 - entity inspection and single-property component mutation commands
-- MVP terminal player for Pong-style projects, including deterministic playtest frames
+- MVP terminal player for module-authored projects, including deterministic playtest frames
 - structured validation
 - compact agent project summaries
 - MCP tool catalog skeleton
@@ -58,11 +60,12 @@ dotnet test Rekall.AGE.sln
 ```powershell
 dotnet run --project src/Rekall.Age.Cli -- templates list
 dotnet run --project src/Rekall.Age.Cli -- mcp stdio
+dotnet run --project src/Rekall.Age.Cli -- render backends
 dotnet run --project src/Rekall.Age.Cli -- module schemas
-dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" puzzle
+dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" pong
 dotnet run --project src/Rekall.Age.Cli -- asset import .age-sandbox .\player.png sprite "Player Ship"
 dotnet run --project src/Rekall.Age.Cli -- asset list .age-sandbox
-dotnet run --project src/Rekall.Age.Cli -- module scaffold .age-sandbox crystal.mining "Crystal Mining" CrystalMining MiningController
+dotnet run --project src/Rekall.Age.Cli -- module scaffold-playable .age-sandbox crystal.playable "Crystal Playable" CrystalPlayable crystal
 dotnet run --project src/Rekall.Age.Cli -- build modules .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module schemas project .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- context summary .age-sandbox
@@ -70,8 +73,8 @@ dotnet run --project src/Rekall.Age.Cli -- context scene .age-sandbox Main
 dotnet run --project src/Rekall.Age.Cli -- entity inspect .age-sandbox Main <entity-id>
 dotnet run --project src/Rekall.Age.Cli -- component set .age-sandbox Main <entity-id> Rekall.Transform x 42
 dotnet run --project src/Rekall.Age.Cli -- play scene .age-sandbox Main 4
-dotnet run --project src/Rekall.Age.Cli -- build player .age-sandbox Main --graphics
-dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main --graphics
+dotnet run --project src/Rekall.Age.Cli -- build player .age-sandbox Main
+dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main
 dotnet run --project src/Rekall.Age.Cli -- run scene .age-sandbox Main 0.1
 dotnet run --project src/Rekall.Age.Cli -- capture screenshot .age-sandbox Main
 ```

@@ -6,7 +6,7 @@ public interface IRekallAgePlayableGame
 
     IReadOnlyList<string> EntityNames { get; }
 
-    void Tick(RekallAgePongInput input);
+    void Tick(RekallAgePlaybackInput input);
 
     string RenderAscii();
 }

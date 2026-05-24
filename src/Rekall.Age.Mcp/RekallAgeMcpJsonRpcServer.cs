@@ -225,7 +225,12 @@ public sealed class RekallAgeMcpJsonRpcServer
         if (underlying != typeof(string)
             && typeof(System.Collections.IEnumerable).IsAssignableFrom(underlying))
         {
-            return new JsonObject { ["type"] = "array" };
+            var itemType = GetEnumerableItemType(underlying);
+            return new JsonObject
+            {
+                ["type"] = "array",
+                ["items"] = itemType is null ? new JsonObject() : CreatePropertySchema(itemType, visited)
+            };
         }
 
         var objectProperties = underlying.GetProperties(BindingFlags.Instance | BindingFlags.Public)
@@ -257,6 +262,21 @@ public sealed class RekallAgeMcpJsonRpcServer
         }
 
         return new JsonObject { ["type"] = "object" };
+    }
+
+    private static Type? GetEnumerableItemType(Type type)
+    {
+        if (type.IsArray)
+        {
+            return type.GetElementType();
+        }
+
+        return type.GetInterfaces()
+            .Prepend(type)
+            .FirstOrDefault(candidate =>
+                candidate.IsGenericType
+                && candidate.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            ?.GetGenericArguments()[0];
     }
 
     private static string SerializeResponse(JsonElement id, object result)

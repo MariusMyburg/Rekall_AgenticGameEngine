@@ -8,6 +8,7 @@ using Rekall.Age.GameTemplates;
 using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.Mcp;
 using Rekall.Age.Modules.Commands;
+using Rekall.Age.Playback;
 using Rekall.Age.Playback.Commands;
 using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
@@ -114,7 +115,8 @@ internal static class RekallAgeCli
                 ["entity", "inspect", var root, var scene, var entityId] => await InspectEntityAsync(registry, context, root, scene, entityId),
                 ["component", "set", var root, var scene, var entityId, var componentType, var propertyName, var value] =>
                     await SetComponentPropertyAsync(registry, context, root, scene, entityId, componentType, propertyName, value),
-                ["play", "scene", var root, var scene, var frames] => await PlaySceneAsync(registry, context, root, scene, frames),
+                ["play", "scene", var root, var scene, var frames] => await PlaySceneAsync(registry, context, root, scene, frames, null),
+                ["play", "scene", var root, var scene, var frames, var inputsJson] => await PlaySceneAsync(registry, context, root, scene, frames, inputsJson),
                 ["run", "scene", var root, var scene, var seconds] => await RunSceneAsync(registry, context, root, scene, seconds),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
@@ -688,12 +690,14 @@ internal static class RekallAgeCli
         RekallAgeCommandContext context,
         string root,
         string scene,
-        string frames)
+        string frames,
+        string? inputsJson)
     {
         var count = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
+        var inputs = await ParsePlaybackInputsAsync(inputsJson, context.CancellationToken);
         var result = await registry.ExecuteAsync<PlaySceneRequest, PlaySceneResult>(
             "rekall.play.scene",
-            new PlaySceneRequest(root, scene, count),
+            new PlaySceneRequest(root, scene, count, inputs),
             context);
         Console.WriteLine(result.Summary);
         foreach (var frame in result.Value.Frames)
@@ -1075,5 +1079,22 @@ internal static class RekallAgeCli
             color.G.ToString(System.Globalization.CultureInfo.InvariantCulture),
             color.B.ToString(System.Globalization.CultureInfo.InvariantCulture),
             color.A.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    private static async ValueTask<IReadOnlyList<RekallAgePlaybackInput>?> ParsePlaybackInputsAsync(
+        string? inputsJson,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(inputsJson))
+        {
+            return null;
+        }
+
+        var payload = File.Exists(inputsJson)
+            ? await File.ReadAllTextAsync(inputsJson, cancellationToken)
+            : inputsJson;
+        return System.Text.Json.JsonSerializer.Deserialize<RekallAgePlaybackInput[]>(
+            payload,
+            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     }
 }

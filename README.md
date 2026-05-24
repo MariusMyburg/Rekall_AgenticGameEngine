@@ -101,6 +101,7 @@ dotnet run --project src/Rekall.Age.Cli -- context scene .age-sandbox Main
 dotnet run --project src/Rekall.Age.Cli -- entity inspect .age-sandbox Main <entity-id>
 dotnet run --project src/Rekall.Age.Cli -- component set .age-sandbox Main <entity-id> Rekall.Transform x 42
 dotnet run --project src/Rekall.Age.Cli -- play scene .age-sandbox Main 4
+dotnet run --project src/Rekall.Age.Cli -- play scene .age-sandbox Main 2 '[{"verticalAxis":1,"primaryAction":true},{"verticalAxis":-1}]'
 dotnet run --project src/Rekall.Age.Cli -- build player .age-sandbox Main
 dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main
 dotnet run --project src/Rekall.Age.Cli -- run scene .age-sandbox Main 0.1

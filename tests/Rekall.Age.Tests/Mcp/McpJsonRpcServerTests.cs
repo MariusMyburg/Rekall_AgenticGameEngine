@@ -89,6 +89,31 @@ public sealed class McpJsonRpcServerTests
         Assert.Equal("number", properties.GetProperty("a").GetProperty("type").GetString());
     }
 
+    [Fact]
+    public async Task ToolsListExposesArrayItemProperties()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new PlaySceneCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(
+            """{"jsonrpc":"2.0","id":2,"method":"tools/list"}""",
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var inputItem = document.RootElement
+            .GetProperty("result")
+            .GetProperty("tools")[0]
+            .GetProperty("inputSchema")
+            .GetProperty("properties")
+            .GetProperty("inputs")
+            .GetProperty("items");
+        Assert.Equal("object", inputItem.GetProperty("type").GetString());
+        var properties = inputItem.GetProperty("properties");
+        Assert.Equal("boolean", properties.GetProperty("primaryAction").GetProperty("type").GetString());
+        Assert.Equal("integer", properties.GetProperty("verticalAxis").GetProperty("type").GetString());
+    }
+
 
     [Fact]
     public async Task JsonLinesCanStartWithUtf8Bom()
@@ -159,7 +184,15 @@ public sealed class McpJsonRpcServerTests
                     {
                         projectRoot = root,
                         sceneName = "Main",
-                        frames = 1
+                        frames = 1,
+                        inputs = new[]
+                        {
+                            new
+                            {
+                                verticalAxis = 1,
+                                primaryAction = true
+                            }
+                        }
                     }
                 }
             }),
@@ -176,6 +209,7 @@ public sealed class McpJsonRpcServerTests
             .GetProperty("frames")[0]
             .GetString();
         Assert.Contains("PONG", frame, StringComparison.Ordinal);
+        Assert.Contains("Score 10", frame, StringComparison.Ordinal);
     }
 
     private static RekallAgeMcpJsonRpcServer CreateServer()

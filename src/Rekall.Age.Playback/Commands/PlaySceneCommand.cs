@@ -3,7 +3,11 @@ using Rekall.Age.World;
 
 namespace Rekall.Age.Playback.Commands;
 
-public sealed record PlaySceneRequest(string ProjectRoot, string SceneName, int Frames = 10);
+public sealed record PlaySceneRequest(
+    string ProjectRoot,
+    string SceneName,
+    int Frames = 10,
+    IReadOnlyList<RekallAgePlaybackInput>? Inputs = null);
 
 public sealed record PlaySceneResult(string Kind, IReadOnlyList<string> Frames);
 
@@ -57,7 +61,10 @@ public sealed class PlaySceneCommand : IRekallAgeCommand<PlaySceneRequest, PlayS
         for (var i = 0; i < frameCount; i++)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            game.Tick(RekallAgePlaybackInput.None);
+            var input = request.Inputs is { Count: > 0 } inputs && i < inputs.Count
+                ? inputs[i]
+                : RekallAgePlaybackInput.None;
+            game.Tick(input);
             frames.Add(game.RenderAscii());
         }
 

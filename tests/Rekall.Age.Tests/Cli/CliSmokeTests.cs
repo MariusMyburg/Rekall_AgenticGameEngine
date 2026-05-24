@@ -33,6 +33,11 @@ public sealed class CliSmokeTests
         Assert.Contains("Loaded", schemas.Output);
         Assert.Contains("Transform", schemas.Output);
 
+        var scaffold = await RunAsync(project, "module", "scaffold", root, "crystal.mining", "Crystal Mining", "CrystalMining", "MiningController");
+        Assert.Equal(0, scaffold.ExitCode);
+        Assert.Contains("CrystalMiningModule.cs", scaffold.Output);
+        Assert.True(File.Exists(Path.Combine(root, "Modules", "CrystalMining", "CrystalMiningModule.cs")));
+
         var capture = await RunAsync(project, "capture", "screenshot", root, "Main");
         Assert.Equal(0, capture.ExitCode);
         Assert.Contains("Main_preview.png", capture.Output);

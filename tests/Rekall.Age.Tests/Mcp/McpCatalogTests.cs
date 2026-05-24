@@ -19,6 +19,7 @@ public sealed class McpCatalogTests
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
         registry.Register(new ListComponentSchemasCommand(GetType().Assembly));
+        registry.Register(new ScaffoldModuleCommand());
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
@@ -27,5 +28,6 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.run.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.capture.screenshot");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.component_schemas");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.scaffold");
     }
 }

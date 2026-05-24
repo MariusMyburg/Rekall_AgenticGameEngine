@@ -37,6 +37,8 @@ internal static class RekallAgeCli
                 ["templates", "list"] => ListTemplates(),
                 ["module", "schemas"] => await ListSchemasAsync(registry, context, null),
                 ["module", "schemas", var moduleId] => await ListSchemasAsync(registry, context, moduleId),
+                ["module", "scaffold", var root, var moduleId, var displayName, var moduleName, var componentName] =>
+                    await ScaffoldModuleAsync(registry, context, root, moduleId, displayName, moduleName, componentName),
                 ["game", "create", var root, var name, var template] => await CreateGameAsync(registry, context, root, name, template),
                 ["project", "create", var root, var name, var capabilities] => await CreateProjectAsync(registry, context, root, name, capabilities),
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
@@ -69,6 +71,7 @@ internal static class RekallAgeCli
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new ListComponentSchemasCommand());
+        registry.Register(new ScaffoldModuleCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
         return registry;
@@ -99,6 +102,23 @@ internal static class RekallAgeCli
             Console.WriteLine($"{component.DisplayName}: {component.TypeName}");
         }
 
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ScaffoldModuleAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string moduleId,
+        string displayName,
+        string moduleName,
+        string componentName)
+    {
+        var result = await registry.ExecuteAsync<ScaffoldModuleRequest, ScaffoldModuleResult>(
+            "rekall.module.scaffold",
+            new ScaffoldModuleRequest(root, moduleId, displayName, moduleName, componentName),
+            context);
+        Console.WriteLine(result.Value.SourcePath);
         return result.Ok ? 0 : 1;
     }
 

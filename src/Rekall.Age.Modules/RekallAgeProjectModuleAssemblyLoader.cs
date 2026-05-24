@@ -22,7 +22,8 @@ public static class RekallAgeProjectModuleAssemblyLoader
                 continue;
             }
 
-            assemblies.Add(AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.GetFullPath(assemblyPath)));
+            assemblies.Add(new RekallAgeProjectModuleLoadContext(assemblyPath)
+                .LoadFromAssemblyPath(Path.GetFullPath(assemblyPath)));
         }
 
         return assemblies;
@@ -33,5 +34,29 @@ public static class RekallAgeProjectModuleAssemblyLoader
         var projectDirectory = Path.GetDirectoryName(projectPath)!;
         var moduleName = Path.GetFileNameWithoutExtension(projectPath);
         return Path.Combine(projectDirectory, "bin", "Debug", "net10.0", $"{moduleName}.dll");
+    }
+
+    private sealed class RekallAgeProjectModuleLoadContext : AssemblyLoadContext
+    {
+        private readonly AssemblyDependencyResolver _resolver;
+
+        public RekallAgeProjectModuleLoadContext(string mainAssemblyPath)
+            : base(isCollectible: false)
+        {
+            _resolver = new AssemblyDependencyResolver(Path.GetFullPath(mainAssemblyPath));
+        }
+
+        protected override Assembly? Load(AssemblyName assemblyName)
+        {
+            if (assemblyName.Name is not null
+                && assemblyName.Name.StartsWith("Rekall.Age.", StringComparison.Ordinal))
+            {
+                return AssemblyLoadContext.Default.Assemblies
+                    .FirstOrDefault(assembly => assembly.GetName().Name == assemblyName.Name);
+            }
+
+            var resolvedPath = _resolver.ResolveAssemblyToPath(assemblyName);
+            return resolvedPath is null ? null : LoadFromAssemblyPath(resolvedPath);
+        }
     }
 }

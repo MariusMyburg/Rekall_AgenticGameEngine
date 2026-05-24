@@ -1,6 +1,7 @@
 using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
+using Rekall.Age.Modules;
 using Rekall.Age.Modules.Commands;
 
 namespace Rekall.Age.Tests.Modules;
@@ -53,5 +54,30 @@ public sealed class ScaffoldPlayableModuleCommandTests
         var source = await File.ReadAllTextAsync(scaffold.Value.SourcePath);
         Assert.Contains(marker, source, StringComparison.Ordinal);
         Assert.DoesNotContain("Module-authored", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProjectModuleLoaderCanLoadSameModuleNameFromDifferentProjects()
+    {
+        var firstRoot = TestPaths.CreateTempDirectory();
+        var secondRoot = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("duplicate module names"), CancellationToken.None);
+
+        foreach (var root in new[] { firstRoot, secondRoot })
+        {
+            await new ScaffoldPlayableModuleCommand().ExecuteAsync(
+                new ScaffoldPlayableModuleRequest(root, "module.pong", "Module Pong", "PongPlayable", "pong"),
+                context);
+            var build = await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
+            Assert.True(build.Ok, build.Summary);
+        }
+
+        var firstAssemblies = RekallAgeProjectModuleAssemblyLoader.LoadBuiltModuleAssemblies(firstRoot);
+        var secondAssemblies = RekallAgeProjectModuleAssemblyLoader.LoadBuiltModuleAssemblies(secondRoot);
+
+        Assert.Single(firstAssemblies);
+        Assert.Single(secondAssemblies);
+        Assert.Contains(firstAssemblies[0].GetTypes(), type => typeof(IRekallAgePlayableModule).IsAssignableFrom(type));
+        Assert.Contains(secondAssemblies[0].GetTypes(), type => typeof(IRekallAgePlayableModule).IsAssignableFrom(type));
     }
 }

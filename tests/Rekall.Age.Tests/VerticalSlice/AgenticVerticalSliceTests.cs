@@ -14,6 +14,20 @@ namespace Rekall.Age.Tests.VerticalSlice;
 
 public sealed class AgenticVerticalSliceTests
 {
+    public static TheoryData<string, string> PlayableTemplates => new()
+    {
+        { "pong", "PONG" },
+        { "breakout", "BREAKOUT" },
+        { "asteroids", "ASTEROIDS" },
+        { "top-down-shooter", "TOP-DOWN SHOOTER" },
+        { "platformer-2d", "PLATFORMER" },
+        { "tower-defense", "TOWER DEFENSE" },
+        { "visual-novel", "VISUAL NOVEL" },
+        { "first-person-exploration", "FIRST-PERSON EXPLORATION" },
+        { "collectathon-3d", "COLLECTATHON" },
+        { "puzzle", "PUZZLE" }
+    };
+
     [Fact]
     public async Task AgentCanCreateInspectRunCaptureAndAdvertiseToolsForStarterGame()
     {
@@ -77,5 +91,25 @@ public sealed class AgenticVerticalSliceTests
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_playable_game_from_template");
+    }
+
+    [Theory]
+    [MemberData(nameof(PlayableTemplates))]
+    public async Task OneShotPlayableWorkflowBuildsAndPlaysEveryMvpTemplate(string templateId, string frameMarker)
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin($"playable {templateId}"), CancellationToken.None);
+
+        var game = await new CreatePlayableGameFromTemplateCommand().ExecuteAsync(
+            new CreatePlayableGameFromTemplateRequest(root, $"Playable {templateId}", templateId),
+            context);
+        var play = await new PlaySceneCommand().ExecuteAsync(new PlaySceneRequest(root, "Main", 1), context);
+
+        Assert.True(game.Ok, game.Summary);
+        Assert.True(File.Exists(game.Value.ModuleAssemblyPath), game.Value.ModuleAssemblyPath);
+        Assert.True(play.Ok, play.Summary);
+        Assert.Equal(templateId, play.Value.Kind);
+        Assert.Single(play.Value.Frames);
+        Assert.Contains(frameMarker, play.Value.Frames[0], StringComparison.Ordinal);
     }
 }

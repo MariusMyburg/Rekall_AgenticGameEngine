@@ -41,6 +41,12 @@ internal static class RekallAgeCli
             {
                 ["templates", "list"] => ListTemplates(),
                 ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
+                ["render", "plan", "create", var root, var backend, var name] =>
+                    await CreateRenderPlanAsync(registry, context, root, backend, name),
+                ["render", "plan", "inspect", var root] => await InspectRenderPlanAsync(registry, context, root),
+                ["render", "plan", "validate", var root] => await ValidateRenderPlanAsync(registry, context, root),
+                ["render", "resource", "add", var root, var id, var kind, var format, var usage] =>
+                    await AddRenderResourceAsync(registry, context, root, id, kind, format, usage),
                 ["mcp", "stdio"] => await RunMcpStdioAsync(registry, context),
                 ["asset", "import", var root, var source, var kind, var displayName] =>
                     await ImportAssetAsync(registry, context, root, source, kind, displayName),
@@ -97,6 +103,11 @@ internal static class RekallAgeCli
         registry.Register(new ScaffoldModuleCommand());
         registry.Register(new ScaffoldPlayableModuleCommand());
         registry.Register(new ListRenderBackendsCommand());
+        registry.Register(new CreateRenderPlanCommand());
+        registry.Register(new AddRenderResourceCommand());
+        registry.Register(new RecordRenderCommandBufferCommand());
+        registry.Register(new InspectRenderPlanCommand());
+        registry.Register(new ValidateRenderPlanCommand());
         registry.Register(new BuildModulesCommand());
         registry.Register(new BuildPlayerCommand());
         registry.Register(new ImportAssetCommand());
@@ -132,6 +143,73 @@ internal static class RekallAgeCli
             Console.WriteLine($"  {string.Join(", ", backend.AgentExposedCapabilities)}");
         }
 
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ValidateRenderPlanAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root)
+    {
+        var result = await registry.ExecuteAsync<ValidateRenderPlanRequest, ValidateRenderPlanResult>(
+            "rekall.render.plan.validate",
+            new ValidateRenderPlanRequest(root),
+            context);
+        Console.WriteLine(result.Summary);
+        foreach (var issue in result.Value.Issues)
+        {
+            Console.WriteLine($"{issue.Code}: {issue.Message}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> CreateRenderPlanAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string backend,
+        string name)
+    {
+        var result = await registry.ExecuteAsync<CreateRenderPlanRequest, CreateRenderPlanResult>(
+            "rekall.render.plan.create",
+            new CreateRenderPlanRequest(root, backend, name),
+            context);
+        Console.WriteLine(result.Summary);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> AddRenderResourceAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string id,
+        string kind,
+        string format,
+        string usage)
+    {
+        var result = await registry.ExecuteAsync<AddRenderResourceRequest, AddRenderResourceResult>(
+            "rekall.render.resource.add",
+            new AddRenderResourceRequest(root, id, kind, format, SplitCsv(usage)),
+            context);
+        Console.WriteLine(result.Summary);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectRenderPlanAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root)
+    {
+        var result = await registry.ExecuteAsync<InspectRenderPlanRequest, InspectRenderPlanResult>(
+            "rekall.render.plan.inspect",
+            new InspectRenderPlanRequest(root),
+            context);
+        var plan = result.Value.Plan;
+        Console.WriteLine($"{plan.Name}: {plan.BackendId}");
+        Console.WriteLine($"Resources: {plan.Resources.Count}");
+        Console.WriteLine($"Pipelines: {plan.Pipelines.Count}");
+        Console.WriteLine($"Command buffers: {plan.CommandBuffers.Count}");
         return result.Ok ? 0 : 1;
     }
 

@@ -70,6 +70,12 @@ public sealed class CliSmokeTests
         Assert.Equal(0, playtest.ExitCode);
         Assert.Contains("Passed: True", playtest.Output);
         Assert.Contains("Assertion frame 0 contains \"Score 10\": True", playtest.Output);
+
+        var captureDirectory = Path.Combine(root, "PlayCaptures");
+        var capture = await RunAsync(project, "play", "capture-frame", root, "Main", captureDirectory, "1");
+        Assert.Equal(0, capture.ExitCode);
+        Assert.Contains("Main_play_frame_001.png", capture.Output);
+        Assert.True(File.Exists(Path.Combine(captureDirectory, "Main_play_frame_001.png")));
     }
 
     [Fact]

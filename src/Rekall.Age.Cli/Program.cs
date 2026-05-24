@@ -135,6 +135,12 @@ internal static class RekallAgeCli
                     await SetComponentPropertyAsync(registry, context, root, scene, entityId, componentType, propertyName, value),
                 ["play", "scene", var root, var scene, var frames] => await PlaySceneAsync(registry, context, root, scene, frames, null),
                 ["play", "scene", var root, var scene, var frames, var inputsJson] => await PlaySceneAsync(registry, context, root, scene, frames, inputsJson),
+                ["play", "capture-frame", var root, var scene, var outputDirectory] =>
+                    await CapturePlayableFrameAsync(registry, context, root, scene, outputDirectory, "1", null),
+                ["play", "capture-frame", var root, var scene, var outputDirectory, var frameIndex] =>
+                    await CapturePlayableFrameAsync(registry, context, root, scene, outputDirectory, frameIndex, null),
+                ["play", "capture-frame", var root, var scene, var outputDirectory, var frameIndex, var inputsJson] =>
+                    await CapturePlayableFrameAsync(registry, context, root, scene, outputDirectory, frameIndex, inputsJson),
                 ["playtest", "scene", var root, var scene, var frames, var assertionsJson] =>
                     await PlaytestSceneAsync(registry, context, root, scene, frames, null, assertionsJson),
                 ["playtest", "scene", var root, var scene, var frames, var inputsJson, var assertionsJson] =>
@@ -200,6 +206,7 @@ internal static class RekallAgeCli
         registry.Register(new PlaytestSceneCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
+        registry.Register(new CapturePlayableFrameCommand());
         return registry;
     }
 
@@ -769,6 +776,32 @@ internal static class RekallAgeCli
         }
 
         return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> CapturePlayableFrameAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string outputDirectory,
+        string frameIndex,
+        string? inputsJson)
+    {
+        var parsedFrameIndex = int.Parse(frameIndex, System.Globalization.CultureInfo.InvariantCulture);
+        var inputs = await ParsePlaybackInputsAsync(inputsJson, context.CancellationToken);
+        var result = await registry.ExecuteAsync<CapturePlayableFrameRequest, CapturePlayableFrameResult>(
+            "rekall.play.capture_frame",
+            new CapturePlayableFrameRequest(root, scene, outputDirectory, parsedFrameIndex, Inputs: inputs),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"{result.Value.OutputPath} ({result.Value.Width}x{result.Value.Height}, nonblank={result.Value.NonBlank})");
+        Console.WriteLine($"Draw commands: {result.Value.DrawCommandCount} [{string.Join(", ", result.Value.DrawCommandKinds)}]");
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.Captured && result.Value.NonBlank ? 0 : 1;
     }
 
     private static async Task<int> ListAssetsAsync(

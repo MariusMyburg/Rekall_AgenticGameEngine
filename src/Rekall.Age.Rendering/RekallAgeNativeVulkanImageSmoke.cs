@@ -3,7 +3,7 @@ using System.Text;
 
 namespace Rekall.Age.Rendering;
 
-public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmoke
+public sealed class RekallAgeNativeVulkanImageSmoke : IRekallAgeVulkanImageSmoke
 {
     private const int VkSuccess = 0;
     private const int VkStructureTypeApplicationInfo = 0;
@@ -11,19 +11,26 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
     private const int VkStructureTypeDeviceQueueCreateInfo = 2;
     private const int VkStructureTypeDeviceCreateInfo = 3;
     private const int VkStructureTypeMemoryAllocateInfo = 5;
-    private const int VkStructureTypeBufferCreateInfo = 12;
+    private const int VkStructureTypeImageCreateInfo = 14;
     private const uint VkApiVersion10 = 4194304;
+    private const uint VkImageType2D = 1;
+    private const uint VkImageTilingOptimal = 0;
     private const uint VkSharingModeExclusive = 0;
+    private const uint VkImageLayoutUndefined = 0;
+    private const uint VkSampleCount1Bit = 1;
+    private const uint VkFormatR8G8B8A8Unorm = 37;
+    private const uint VkFormatB8G8R8A8Unorm = 44;
+    private const uint VkFormatD32Sfloat = 126;
+    private const uint VkImageUsageTransferSrcBit = 0x00000001;
+    private const uint VkImageUsageTransferDstBit = 0x00000002;
+    private const uint VkImageUsageSampledBit = 0x00000004;
+    private const uint VkImageUsageStorageBit = 0x00000008;
+    private const uint VkImageUsageColorAttachmentBit = 0x00000010;
+    private const uint VkImageUsageDepthStencilAttachmentBit = 0x00000020;
     private const uint VkQueueGraphicsBit = 0x00000001;
     private const uint VkQueueComputeBit = 0x00000002;
     private const uint VkQueueTransferBit = 0x00000004;
     private const uint VkQueueSparseBindingBit = 0x00000008;
-    private const uint VkBufferUsageTransferSrcBit = 0x00000001;
-    private const uint VkBufferUsageTransferDstBit = 0x00000002;
-    private const uint VkBufferUsageUniformBufferBit = 0x00000010;
-    private const uint VkBufferUsageStorageBufferBit = 0x00000020;
-    private const uint VkBufferUsageIndexBufferBit = 0x00000040;
-    private const uint VkBufferUsageVertexBufferBit = 0x00000080;
     private const int PhysicalDevicePropertiesBufferSize = 2048;
     private const int PhysicalDeviceMemoryPropertiesBufferSize = 4096;
     private const int PhysicalDeviceNameOffset = 20;
@@ -31,23 +38,25 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
     private const int MemoryTypesOffset = 4;
     private const int MemoryTypeSize = 8;
 
-    public ValueTask<RekallAgeVulkanBufferSmokeResult> CreateMappedBufferAsync(
-        ulong sizeBytes,
+    public ValueTask<RekallAgeVulkanImageSmokeResult> CreateBoundImageAsync(
+        uint width,
+        uint height,
+        string format,
         string usage,
         string? preferredDeviceType,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var errors = new List<string>();
-        if (sizeBytes == 0)
+        if (width == 0 || height == 0)
         {
-            errors.Add("Vulkan buffer size must be greater than zero.");
-            return ValueTask.FromResult(Unavailable(null, null, sizeBytes, usage, null, [], false, false, 0, errors));
+            errors.Add("Vulkan image width and height must be greater than zero.");
+            return ValueTask.FromResult(Unavailable(null, null, width, height, format, usage, null, [], false, errors));
         }
 
         if (!TryLoadVulkan(errors, out var library, out var loaderName))
         {
-            return ValueTask.FromResult(Unavailable(null, null, sizeBytes, usage, null, [], false, false, 0, errors));
+            return ValueTask.FromResult(Unavailable(null, null, width, height, format, usage, null, [], false, errors));
         }
 
         try
@@ -55,10 +64,10 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
             var context = CreateContext(library, errors);
             if (context is null)
             {
-                return ValueTask.FromResult(Unavailable(loaderName, null, sizeBytes, usage, null, [], false, false, 0, errors));
+                return ValueTask.FromResult(Unavailable(loaderName, null, width, height, format, usage, null, [], false, errors));
             }
 
-            return ValueTask.FromResult(CreateMappedBuffer(context.Value, loaderName!, sizeBytes, usage, preferredDeviceType, errors));
+            return ValueTask.FromResult(CreateBoundImage(context.Value, loaderName!, width, height, format, usage, preferredDeviceType, errors));
         }
         finally
         {
@@ -66,10 +75,12 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
         }
     }
 
-    private static RekallAgeVulkanBufferSmokeResult CreateMappedBuffer(
-        VulkanBufferContext context,
+    private static RekallAgeVulkanImageSmokeResult CreateBoundImage(
+        VulkanImageContext context,
         string loaderName,
-        ulong sizeBytes,
+        uint width,
+        uint height,
+        string format,
         string usage,
         string? preferredDeviceType,
         List<string> errors)
@@ -81,71 +92,65 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
             if (selection is null)
             {
                 errors.Add("No Vulkan physical device with a graphics queue was found.");
-                return Unavailable(loaderName, null, sizeBytes, usage, null, [], false, false, 0, errors);
+                return Unavailable(loaderName, null, width, height, format, usage, null, [], false, errors);
             }
 
             var nativeDevice = nativeDevices.First(device => device.Device.Name.Equals(selection.Device.Name, StringComparison.Ordinal));
             var logicalDevice = CreateLogicalDevice(context, nativeDevice.Handle, selection, errors);
             if (logicalDevice == IntPtr.Zero)
             {
-                return Unavailable(loaderName, ToSelectedDevice(selection), sizeBytes, usage, null, [], false, false, 0, errors);
+                return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, usage, null, [], false, errors);
             }
 
             try
             {
-                var buffer = CreateBuffer(context, logicalDevice, sizeBytes, usage, errors);
-                if (buffer == IntPtr.Zero)
+                var image = CreateImage(context, logicalDevice, width, height, format, usage, errors);
+                if (image == IntPtr.Zero)
                 {
-                    return Unavailable(loaderName, ToSelectedDevice(selection), sizeBytes, usage, null, [], false, false, 0, errors);
+                    return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, usage, null, [], false, errors);
                 }
 
                 try
                 {
-                    var requirements = GetMemoryRequirements(context, logicalDevice, buffer);
+                    var requirements = GetMemoryRequirements(context, logicalDevice, image);
                     var memoryTypes = ReadMemoryTypes(context, nativeDevice.Handle);
                     var memoryTypeIndex = RekallAgeVulkanMemoryTypeSelector.Select(
                         memoryTypes,
                         requirements.MemoryTypeBits,
-                        ["host-visible", "host-coherent"]);
+                        ["device-local"]);
                     if (memoryTypeIndex is null)
                     {
-                        errors.Add("No compatible Vulkan memory type was found.");
-                        return Unavailable(loaderName, ToSelectedDevice(selection), sizeBytes, usage, null, [], false, false, 0, errors);
+                        errors.Add("No compatible Vulkan image memory type was found.");
+                        return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, usage, null, [], false, errors);
                     }
 
                     var memoryProperties = memoryTypes.First(item => item.Index == memoryTypeIndex.Value).Properties;
                     var memory = AllocateMemory(context, logicalDevice, requirements.Size, memoryTypeIndex.Value, errors);
                     if (memory == IntPtr.Zero)
                     {
-                        return Unavailable(loaderName, ToSelectedDevice(selection), sizeBytes, usage, memoryTypeIndex, memoryProperties, false, false, 0, errors);
+                        return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, usage, memoryTypeIndex, memoryProperties, false, errors);
                     }
 
                     try
                     {
-                        var bindResult = context.BindBufferMemory(logicalDevice, buffer, memory, 0);
+                        var bindResult = context.BindImageMemory(logicalDevice, image, memory, 0);
                         if (bindResult != VkSuccess)
                         {
-                            errors.Add($"vkBindBufferMemory failed with VkResult {bindResult}.");
-                            return Unavailable(loaderName, ToSelectedDevice(selection), sizeBytes, usage, memoryTypeIndex, memoryProperties, false, false, 0, errors);
+                            errors.Add($"vkBindImageMemory failed with VkResult {bindResult}.");
+                            return Unavailable(loaderName, ToSelectedDevice(selection), width, height, format, usage, memoryTypeIndex, memoryProperties, false, errors);
                         }
 
-                        var bytesWritten = MapAndWrite(context, logicalDevice, memory, Math.Min(sizeBytes, 16), errors);
-                        if (bytesWritten == 0)
-                        {
-                            return Unavailable(loaderName, ToSelectedDevice(selection), sizeBytes, usage, memoryTypeIndex, memoryProperties, true, false, 0, errors);
-                        }
-
-                        return new RekallAgeVulkanBufferSmokeResult(
+                        return new RekallAgeVulkanImageSmokeResult(
                             Created: true,
                             LoaderName: loaderName,
                             SelectedDevice: ToSelectedDevice(selection),
-                            SizeBytes: sizeBytes,
+                            Width: width,
+                            Height: height,
+                            Format: NormalizeFormat(format),
                             Usage: NormalizeUsage(usage),
                             MemoryTypeIndex: memoryTypeIndex,
                             MemoryProperties: memoryProperties,
                             Bound: true,
-                            Mapped: true,
-                            BytesWritten: bytesWritten,
                             Errors: errors);
                     }
                     finally
@@ -155,7 +160,7 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
                 }
                 finally
                 {
-                    context.DestroyBuffer(logicalDevice, buffer, IntPtr.Zero);
+                    context.DestroyImage(logicalDevice, image, IntPtr.Zero);
                 }
             }
             finally
@@ -182,7 +187,7 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
         return false;
     }
 
-    private static VulkanBufferContext? CreateContext(IntPtr library, List<string> errors)
+    private static VulkanImageContext? CreateContext(IntPtr library, List<string> errors)
     {
         if (!TryGetVulkanExport(library, "vkCreateInstance", errors, out VkCreateInstance createInstance)
             || !TryGetVulkanExport(library, "vkDestroyInstance", errors, out VkDestroyInstance destroyInstance)
@@ -192,14 +197,12 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
             || !TryGetVulkanExport(library, "vkGetPhysicalDeviceMemoryProperties", errors, out VkGetPhysicalDeviceMemoryProperties getMemoryProperties)
             || !TryGetVulkanExport(library, "vkCreateDevice", errors, out VkCreateDevice createDevice)
             || !TryGetVulkanExport(library, "vkDestroyDevice", errors, out VkDestroyDevice destroyDevice)
-            || !TryGetVulkanExport(library, "vkCreateBuffer", errors, out VkCreateBuffer createBuffer)
-            || !TryGetVulkanExport(library, "vkDestroyBuffer", errors, out VkDestroyBuffer destroyBuffer)
-            || !TryGetVulkanExport(library, "vkGetBufferMemoryRequirements", errors, out VkGetBufferMemoryRequirements getBufferMemoryRequirements)
+            || !TryGetVulkanExport(library, "vkCreateImage", errors, out VkCreateImage createImage)
+            || !TryGetVulkanExport(library, "vkDestroyImage", errors, out VkDestroyImage destroyImage)
+            || !TryGetVulkanExport(library, "vkGetImageMemoryRequirements", errors, out VkGetImageMemoryRequirements getImageMemoryRequirements)
             || !TryGetVulkanExport(library, "vkAllocateMemory", errors, out VkAllocateMemory allocateMemory)
             || !TryGetVulkanExport(library, "vkFreeMemory", errors, out VkFreeMemory freeMemory)
-            || !TryGetVulkanExport(library, "vkBindBufferMemory", errors, out VkBindBufferMemory bindBufferMemory)
-            || !TryGetVulkanExport(library, "vkMapMemory", errors, out VkMapMemory mapMemory)
-            || !TryGetVulkanExport(library, "vkUnmapMemory", errors, out VkUnmapMemory unmapMemory))
+            || !TryGetVulkanExport(library, "vkBindImageMemory", errors, out VkBindImageMemory bindImageMemory))
         {
             return null;
         }
@@ -223,7 +226,7 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
                 return null;
             }
 
-            return new VulkanBufferContext(
+            return new VulkanImageContext(
                 instance,
                 destroyInstance,
                 enumerateDevices,
@@ -232,14 +235,12 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
                 getMemoryProperties,
                 createDevice,
                 destroyDevice,
-                createBuffer,
-                destroyBuffer,
-                getBufferMemoryRequirements,
+                createImage,
+                destroyImage,
+                getImageMemoryRequirements,
                 allocateMemory,
                 freeMemory,
-                bindBufferMemory,
-                mapMemory,
-                unmapMemory);
+                bindImageMemory);
         }
         finally
         {
@@ -258,7 +259,7 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
         }
     }
 
-    private static IReadOnlyList<NativeVulkanCandidateDevice> EnumerateCandidateDevices(VulkanBufferContext context, List<string> errors)
+    private static IReadOnlyList<NativeVulkanCandidateDevice> EnumerateCandidateDevices(VulkanImageContext context, List<string> errors)
     {
         var deviceCount = 0u;
         var result = context.EnumeratePhysicalDevices(context.Instance, ref deviceCount, IntPtr.Zero);
@@ -298,7 +299,7 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
         }
     }
 
-    private static RekallAgeVulkanCandidateDevice ReadCandidateDevice(VulkanBufferContext context, IntPtr physicalDevice)
+    private static RekallAgeVulkanCandidateDevice ReadCandidateDevice(VulkanImageContext context, IntPtr physicalDevice)
     {
         var properties = Marshal.AllocHGlobal(PhysicalDevicePropertiesBufferSize);
         try
@@ -324,7 +325,7 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
         }
     }
 
-    private static IReadOnlyList<RekallAgeVulkanQueueFamilyInfo> ReadQueueFamilies(VulkanBufferContext context, IntPtr physicalDevice)
+    private static IReadOnlyList<RekallAgeVulkanQueueFamilyInfo> ReadQueueFamilies(VulkanImageContext context, IntPtr physicalDevice)
     {
         var queueFamilyCount = 0u;
         context.GetPhysicalDeviceQueueFamilyProperties(physicalDevice, ref queueFamilyCount, IntPtr.Zero);
@@ -353,11 +354,7 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
         }
     }
 
-    private static IntPtr CreateLogicalDevice(
-        VulkanBufferContext context,
-        IntPtr physicalDevice,
-        RekallAgeVulkanDeviceSelection selection,
-        List<string> errors)
+    private static IntPtr CreateLogicalDevice(VulkanImageContext context, IntPtr physicalDevice, RekallAgeVulkanDeviceSelection selection, List<string> errors)
     {
         var priorityPointer = Marshal.AllocHGlobal(sizeof(float));
         var queueCreateInfoPointer = IntPtr.Zero;
@@ -396,34 +393,43 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
         }
     }
 
-    private static IntPtr CreateBuffer(
-        VulkanBufferContext context,
+    private static IntPtr CreateImage(
+        VulkanImageContext context,
         IntPtr device,
-        ulong sizeBytes,
+        uint width,
+        uint height,
+        string format,
         string usage,
         List<string> errors)
     {
-        var createInfo = new VkBufferCreateInfo(
-            VkStructureTypeBufferCreateInfo,
+        var createInfo = new VkImageCreateInfo(
+            VkStructureTypeImageCreateInfo,
             IntPtr.Zero,
             0,
-            sizeBytes,
+            VkImageType2D,
+            ParseFormat(format),
+            new VkExtent3D(width, height, 1),
+            1,
+            1,
+            VkSampleCount1Bit,
+            VkImageTilingOptimal,
             ParseUsage(usage),
             VkSharingModeExclusive,
             0,
-            IntPtr.Zero);
-        var createInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkBufferCreateInfo>());
+            IntPtr.Zero,
+            VkImageLayoutUndefined);
+        var createInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkImageCreateInfo>());
         try
         {
             Marshal.StructureToPtr(createInfo, createInfoPointer, false);
-            var result = context.CreateBuffer(device, createInfoPointer, IntPtr.Zero, out var buffer);
+            var result = context.CreateImage(device, createInfoPointer, IntPtr.Zero, out var image);
             if (result != VkSuccess)
             {
-                errors.Add($"vkCreateBuffer failed with VkResult {result}.");
+                errors.Add($"vkCreateImage failed with VkResult {result}.");
                 return IntPtr.Zero;
             }
 
-            return buffer;
+            return image;
         }
         finally
         {
@@ -431,12 +437,12 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
         }
     }
 
-    private static VkMemoryRequirements GetMemoryRequirements(VulkanBufferContext context, IntPtr device, IntPtr buffer)
+    private static VkMemoryRequirements GetMemoryRequirements(VulkanImageContext context, IntPtr device, IntPtr image)
     {
         var pointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkMemoryRequirements>());
         try
         {
-            context.GetBufferMemoryRequirements(device, buffer, pointer);
+            context.GetImageMemoryRequirements(device, image, pointer);
             return Marshal.PtrToStructure<VkMemoryRequirements>(pointer);
         }
         finally
@@ -445,7 +451,7 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
         }
     }
 
-    private static IReadOnlyList<RekallAgeVulkanMemoryTypeInfo> ReadMemoryTypes(VulkanBufferContext context, IntPtr physicalDevice)
+    private static IReadOnlyList<RekallAgeVulkanMemoryTypeInfo> ReadMemoryTypes(VulkanImageContext context, IntPtr physicalDevice)
     {
         var buffer = Marshal.AllocHGlobal(PhysicalDeviceMemoryPropertiesBufferSize);
         try
@@ -471,18 +477,9 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
         }
     }
 
-    private static IntPtr AllocateMemory(
-        VulkanBufferContext context,
-        IntPtr device,
-        ulong allocationSize,
-        uint memoryTypeIndex,
-        List<string> errors)
+    private static IntPtr AllocateMemory(VulkanImageContext context, IntPtr device, ulong allocationSize, uint memoryTypeIndex, List<string> errors)
     {
-        var allocateInfo = new VkMemoryAllocateInfo(
-            VkStructureTypeMemoryAllocateInfo,
-            IntPtr.Zero,
-            allocationSize,
-            memoryTypeIndex);
+        var allocateInfo = new VkMemoryAllocateInfo(VkStructureTypeMemoryAllocateInfo, IntPtr.Zero, allocationSize, memoryTypeIndex);
         var allocateInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf<VkMemoryAllocateInfo>());
         try
         {
@@ -502,79 +499,68 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
         }
     }
 
-    private static int MapAndWrite(
-        VulkanBufferContext context,
-        IntPtr device,
-        IntPtr memory,
-        ulong writeSize,
-        List<string> errors)
-    {
-        var result = context.MapMemory(device, memory, 0, writeSize, 0, out var data);
-        if (result != VkSuccess)
-        {
-            errors.Add($"vkMapMemory failed with VkResult {result}.");
-            return 0;
-        }
-
-        try
-        {
-            var bytes = Enumerable.Range(0, checked((int)writeSize)).Select(item => (byte)(item + 1)).ToArray();
-            Marshal.Copy(bytes, 0, data, bytes.Length);
-            return bytes.Length;
-        }
-        finally
-        {
-            context.UnmapMemory(device, memory);
-        }
-    }
-
     private static RekallAgeVulkanSelectedDevice ToSelectedDevice(RekallAgeVulkanDeviceSelection selection)
     {
         return new RekallAgeVulkanSelectedDevice(selection.Device.Name, selection.Device.DeviceType, selection.Device.ApiVersion, selection.QueueFamily);
     }
 
-    private static RekallAgeVulkanBufferSmokeResult Unavailable(
+    private static RekallAgeVulkanImageSmokeResult Unavailable(
         string? loaderName,
         RekallAgeVulkanSelectedDevice? selectedDevice,
-        ulong sizeBytes,
+        uint width,
+        uint height,
+        string format,
         string usage,
         uint? memoryTypeIndex,
         IReadOnlyList<string> memoryProperties,
         bool bound,
-        bool mapped,
-        int bytesWritten,
         IReadOnlyList<string> errors)
     {
-        return new RekallAgeVulkanBufferSmokeResult(
+        return new RekallAgeVulkanImageSmokeResult(
             Created: false,
             LoaderName: loaderName,
             SelectedDevice: selectedDevice,
-            SizeBytes: sizeBytes,
+            Width: width,
+            Height: height,
+            Format: NormalizeFormat(format),
             Usage: NormalizeUsage(usage),
             MemoryTypeIndex: memoryTypeIndex,
             MemoryProperties: memoryProperties,
             Bound: bound,
-            Mapped: mapped,
-            BytesWritten: bytesWritten,
             Errors: errors.ToArray());
+    }
+
+    private static uint ParseFormat(string format)
+    {
+        return NormalizeFormat(format) switch
+        {
+            "B8G8R8A8_UNorm" => VkFormatB8G8R8A8Unorm,
+            "D32_SFloat" => VkFormatD32Sfloat,
+            _ => VkFormatR8G8B8A8Unorm
+        };
+    }
+
+    private static string NormalizeFormat(string format)
+    {
+        return string.IsNullOrWhiteSpace(format) ? "R8G8B8A8_UNorm" : format.Trim();
     }
 
     private static uint ParseUsage(string usage)
     {
         return NormalizeUsage(usage) switch
         {
-            "transfer-src" => VkBufferUsageTransferSrcBit,
-            "transfer-dst" => VkBufferUsageTransferDstBit,
-            "uniform-buffer" => VkBufferUsageUniformBufferBit,
-            "storage-buffer" => VkBufferUsageStorageBufferBit,
-            "index-buffer" => VkBufferUsageIndexBufferBit,
-            _ => VkBufferUsageVertexBufferBit
+            "transfer-src" => VkImageUsageTransferSrcBit,
+            "transfer-dst" => VkImageUsageTransferDstBit,
+            "sampled" => VkImageUsageSampledBit,
+            "storage" => VkImageUsageStorageBit,
+            "depth-stencil-attachment" => VkImageUsageDepthStencilAttachmentBit,
+            _ => VkImageUsageColorAttachmentBit
         };
     }
 
     private static string NormalizeUsage(string usage)
     {
-        return string.IsNullOrWhiteSpace(usage) ? "vertex-buffer" : usage.Trim().ToLowerInvariant();
+        return string.IsNullOrWhiteSpace(usage) ? "color-attachment" : usage.Trim().ToLowerInvariant();
     }
 
     private static IReadOnlyList<string> DecodeQueueCapabilities(uint queueFlags)
@@ -652,13 +638,13 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
     private delegate void VkDestroyDevice(IntPtr device, IntPtr allocator);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-    private delegate int VkCreateBuffer(IntPtr device, IntPtr createInfo, IntPtr allocator, out IntPtr buffer);
+    private delegate int VkCreateImage(IntPtr device, IntPtr createInfo, IntPtr allocator, out IntPtr image);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-    private delegate void VkDestroyBuffer(IntPtr device, IntPtr buffer, IntPtr allocator);
+    private delegate void VkDestroyImage(IntPtr device, IntPtr image, IntPtr allocator);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-    private delegate void VkGetBufferMemoryRequirements(IntPtr device, IntPtr buffer, IntPtr memoryRequirements);
+    private delegate void VkGetImageMemoryRequirements(IntPtr device, IntPtr image, IntPtr memoryRequirements);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     private delegate int VkAllocateMemory(IntPtr device, IntPtr allocateInfo, IntPtr allocator, out IntPtr memory);
@@ -667,13 +653,7 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
     private delegate void VkFreeMemory(IntPtr device, IntPtr memory, IntPtr allocator);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-    private delegate int VkBindBufferMemory(IntPtr device, IntPtr buffer, IntPtr memory, ulong memoryOffset);
-
-    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-    private delegate int VkMapMemory(IntPtr device, IntPtr memory, ulong offset, ulong size, uint flags, out IntPtr data);
-
-    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-    private delegate void VkUnmapMemory(IntPtr device, IntPtr memory);
+    private delegate int VkBindImageMemory(IntPtr device, IntPtr image, IntPtr memory, ulong memoryOffset);
 
     [StructLayout(LayoutKind.Sequential)]
     private readonly record struct VkApplicationInfo(int SType, IntPtr PNext, IntPtr ApplicationName, uint ApplicationVersion, IntPtr EngineName, uint EngineVersion, uint ApiVersion);
@@ -691,7 +671,10 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
     private readonly record struct VkDeviceCreateInfo(int SType, IntPtr PNext, uint Flags, uint QueueCreateInfoCount, IntPtr QueueCreateInfos, uint EnabledLayerCount, IntPtr EnabledLayerNames, uint EnabledExtensionCount, IntPtr EnabledExtensionNames, IntPtr EnabledFeatures);
 
     [StructLayout(LayoutKind.Sequential)]
-    private readonly record struct VkBufferCreateInfo(int SType, IntPtr PNext, uint Flags, ulong Size, uint Usage, uint SharingMode, uint QueueFamilyIndexCount, IntPtr QueueFamilyIndices);
+    private readonly record struct VkExtent3D(uint Width, uint Height, uint Depth);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly record struct VkImageCreateInfo(int SType, IntPtr PNext, uint Flags, uint ImageType, uint Format, VkExtent3D Extent, uint MipLevels, uint ArrayLayers, uint Samples, uint Tiling, uint Usage, uint SharingMode, uint QueueFamilyIndexCount, IntPtr QueueFamilyIndices, uint InitialLayout);
 
     [StructLayout(LayoutKind.Sequential)]
     private readonly record struct VkMemoryRequirements(ulong Size, ulong Alignment, uint MemoryTypeBits);
@@ -699,7 +682,7 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
     [StructLayout(LayoutKind.Sequential)]
     private readonly record struct VkMemoryAllocateInfo(int SType, IntPtr PNext, ulong AllocationSize, uint MemoryTypeIndex);
 
-    private readonly record struct VulkanBufferContext(
+    private readonly record struct VulkanImageContext(
         IntPtr Instance,
         VkDestroyInstance DestroyInstance,
         VkEnumeratePhysicalDevices EnumeratePhysicalDevices,
@@ -708,14 +691,12 @@ public sealed class RekallAgeNativeVulkanBufferSmoke : IRekallAgeVulkanBufferSmo
         VkGetPhysicalDeviceMemoryProperties GetPhysicalDeviceMemoryProperties,
         VkCreateDevice CreateDevice,
         VkDestroyDevice DestroyDevice,
-        VkCreateBuffer CreateBuffer,
-        VkDestroyBuffer DestroyBuffer,
-        VkGetBufferMemoryRequirements GetBufferMemoryRequirements,
+        VkCreateImage CreateImage,
+        VkDestroyImage DestroyImage,
+        VkGetImageMemoryRequirements GetImageMemoryRequirements,
         VkAllocateMemory AllocateMemory,
         VkFreeMemory FreeMemory,
-        VkBindBufferMemory BindBufferMemory,
-        VkMapMemory MapMemory,
-        VkUnmapMemory UnmapMemory) : IDisposable
+        VkBindImageMemory BindImageMemory) : IDisposable
     {
         public void Dispose()
         {

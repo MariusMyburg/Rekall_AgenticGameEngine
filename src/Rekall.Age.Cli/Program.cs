@@ -54,6 +54,10 @@ internal static class RekallAgeCli
                     await CreateMappedVulkanBufferAsync(registry, context, "256", "vertex-buffer", null),
                 ["render", "vulkan", "buffer", "create-mapped", var sizeBytes, var usage, var preferredDeviceType] =>
                     await CreateMappedVulkanBufferAsync(registry, context, sizeBytes, usage, preferredDeviceType),
+                ["render", "vulkan", "image", "create-bound"] =>
+                    await CreateBoundVulkanImageAsync(registry, context, "64", "64", "R8G8B8A8_UNorm", "color-attachment", null),
+                ["render", "vulkan", "image", "create-bound", var width, var height, var format, var usage, var preferredDeviceType] =>
+                    await CreateBoundVulkanImageAsync(registry, context, width, height, format, usage, preferredDeviceType),
                 ["render", "plan", "create", var root, var backend, var name] =>
                     await CreateRenderPlanAsync(registry, context, root, backend, name),
                 ["render", "plan", "inspect", var root] => await InspectRenderPlanAsync(registry, context, root),
@@ -124,6 +128,7 @@ internal static class RekallAgeCli
         registry.Register(new BootstrapVulkanLogicalDeviceCommand());
         registry.Register(new SubmitEmptyVulkanCommandBufferCommand());
         registry.Register(new CreateMappedVulkanBufferCommand());
+        registry.Register(new CreateBoundVulkanImageCommand());
         registry.Register(new CreateRenderPlanCommand());
         registry.Register(new AddRenderResourceCommand());
         registry.Register(new RecordRenderCommandBufferCommand());
@@ -283,6 +288,43 @@ internal static class RekallAgeCli
         Console.WriteLine($"Bound: {result.Value.Bound}");
         Console.WriteLine($"Mapped: {result.Value.Mapped}");
         Console.WriteLine($"Bytes written: {result.Value.BytesWritten}");
+        foreach (var error in result.Value.Errors)
+        {
+            Console.WriteLine($"Error: {error}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> CreateBoundVulkanImageAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string width,
+        string height,
+        string format,
+        string usage,
+        string? preferredDeviceType)
+    {
+        var parsedWidth = uint.Parse(width, System.Globalization.CultureInfo.InvariantCulture);
+        var parsedHeight = uint.Parse(height, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<CreateBoundVulkanImageRequest, CreateBoundVulkanImageResult>(
+            "rekall.render.vulkan.image.create_bound",
+            new CreateBoundVulkanImageRequest(parsedWidth, parsedHeight, format, usage, preferredDeviceType),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Created: {result.Value.Created}");
+        Console.WriteLine($"Loader: {result.Value.LoaderName ?? "<none>"}");
+        if (result.Value.SelectedDevice is { } device)
+        {
+            Console.WriteLine($"Selected device: {device.Name} [{device.DeviceType}] API {device.ApiVersion}");
+        }
+
+        Console.WriteLine($"Extent: {result.Value.Width}x{result.Value.Height}");
+        Console.WriteLine($"Format: {result.Value.Format}");
+        Console.WriteLine($"Usage: {result.Value.Usage}");
+        Console.WriteLine($"Memory type: {result.Value.MemoryTypeIndex?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "<none>"}");
+        Console.WriteLine($"Memory properties: {string.Join(", ", result.Value.MemoryProperties)}");
+        Console.WriteLine($"Bound: {result.Value.Bound}");
         foreach (var error in result.Value.Errors)
         {
             Console.WriteLine($"Error: {error}");

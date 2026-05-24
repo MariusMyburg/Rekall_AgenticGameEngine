@@ -28,3 +28,37 @@ public static class RekallAgeVulkanMemoryTypeSelector
         return null;
     }
 }
+
+public static class RekallAgeVulkanMemoryPropertyNames
+{
+    private const uint VkMemoryPropertyDeviceLocalBit = 0x00000001;
+    private const uint VkMemoryPropertyHostVisibleBit = 0x00000002;
+    private const uint VkMemoryPropertyHostCoherentBit = 0x00000004;
+    private const uint VkMemoryPropertyHostCachedBit = 0x00000008;
+
+    public static IReadOnlyList<string> FromVulkanFlags(uint flags)
+    {
+        var properties = new List<string>();
+        if ((flags & VkMemoryPropertyDeviceLocalBit) != 0)
+        {
+            properties.Add("device-local");
+        }
+
+        if ((flags & VkMemoryPropertyHostVisibleBit) != 0)
+        {
+            properties.Add("host-visible");
+        }
+
+        if ((flags & VkMemoryPropertyHostCoherentBit) != 0)
+        {
+            properties.Add("host-coherent");
+        }
+
+        if ((flags & VkMemoryPropertyHostCachedBit) != 0)
+        {
+            properties.Add("host-cached");
+        }
+
+        return properties;
+    }
+}

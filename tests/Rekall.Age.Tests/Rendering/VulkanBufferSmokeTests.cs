@@ -26,6 +26,14 @@ public sealed class VulkanBufferSmokeTests
     }
 
     [Fact]
+    public void MemoryPropertyNamesFollowVulkanMemoryPropertyFlags()
+    {
+        Assert.Equal(["device-local"], RekallAgeVulkanMemoryPropertyNames.FromVulkanFlags(0x00000001));
+        Assert.Equal(["host-visible", "host-coherent"], RekallAgeVulkanMemoryPropertyNames.FromVulkanFlags(0x00000006));
+        Assert.Equal(["host-visible", "host-cached"], RekallAgeVulkanMemoryPropertyNames.FromVulkanFlags(0x0000000a));
+    }
+
+    [Fact]
     public async Task BufferSmokeCommandReturnsMappedBufferDetails()
     {
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("vulkan buffer"), CancellationToken.None);

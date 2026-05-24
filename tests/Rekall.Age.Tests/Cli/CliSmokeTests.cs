@@ -15,6 +15,12 @@ public sealed class CliSmokeTests
         Assert.Contains("puzzle: Puzzle Game", template.Output);
         Assert.Contains("rekall.workflow.create_playable_package_from_template", template.Output);
 
+        var engine = await RunAsync(project, "context", "engine");
+        Assert.Equal(0, engine.ExitCode);
+        Assert.Contains("Rekall AGE", engine.Output);
+        Assert.Contains("Agent-first: True", engine.Output);
+        Assert.Contains("rekall.workflow.create_playable_package_from_template", engine.Output);
+
         var create = await RunAsync(project, "game", "create", root, "Crystal Mines", "puzzle");
         Assert.Equal(0, create.ExitCode);
         Assert.Contains("Created puzzle game", create.Output);

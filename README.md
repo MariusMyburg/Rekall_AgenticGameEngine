@@ -111,6 +111,7 @@ dotnet run --project src/Rekall.Age.Cli -- module read-source .age-sandbox Cryst
 dotnet run --project src/Rekall.Age.Cli -- module write-source .age-sandbox CrystalPlayable CrystalPlayableModule.cs .\CrystalPlayableModule.cs
 dotnet run --project src/Rekall.Age.Cli -- build modules .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module schemas project .age-sandbox
+dotnet run --project src/Rekall.Age.Cli -- context engine
 dotnet run --project src/Rekall.Age.Cli -- context summary .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- context scene .age-sandbox Main
 dotnet run --project src/Rekall.Age.Cli -- entity inspect .age-sandbox Main <entity-id>

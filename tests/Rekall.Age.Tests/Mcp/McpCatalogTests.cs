@@ -1,3 +1,4 @@
+using Rekall.Age.Agent.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Build.Commands;
 using Rekall.Age.GameTemplates.Commands;
@@ -17,6 +18,7 @@ public sealed class McpCatalogTests
     public void CatalogExposesRegisteredCommandSchemasAsTools()
     {
         var registry = new RekallAgeCommandRegistry();
+        registry.Register(new GetEngineStatusCommand());
         registry.Register(new CreateProjectCommand());
         registry.Register(new InspectGameTemplateCommand());
         registry.Register(new VerifyMvpTemplatesCommand());
@@ -44,6 +46,7 @@ public sealed class McpCatalogTests
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.engine_status");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.project.create");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.templates.inspect");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.templates.verify_mvp");

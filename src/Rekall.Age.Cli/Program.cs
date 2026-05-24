@@ -166,6 +166,7 @@ internal static class RekallAgeCli
                 ["playtest", "scene", var root, var scene, var frames, var inputsJson, var assertionsJson, var drawAssertionsJson] =>
                     await PlaytestSceneAsync(registry, context, root, scene, frames, inputsJson, assertionsJson, drawAssertionsJson),
                 ["run", "scene", var root, var scene, var seconds] => await RunSceneAsync(registry, context, root, scene, seconds),
+                ["context", "engine"] => await PrintEngineStatusAsync(registry, context),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
                 ["capture", "screenshot", var root, var scene] => await CaptureAsync(registry, context, root, scene),
@@ -202,6 +203,7 @@ internal static class RekallAgeCli
         registry.Register(new ListGameTemplatesCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
+        registry.Register(new GetEngineStatusCommand());
         registry.Register(new ListComponentSchemasCommand());
         registry.Register(new ListModuleSourcesCommand());
         registry.Register(new ReadModuleSourceCommand());
@@ -1432,6 +1434,34 @@ internal static class RekallAgeCli
         }
 
         return result.Ok && summary.Health.Status == "ok" ? 0 : 1;
+    }
+
+    private static async Task<int> PrintEngineStatusAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context)
+    {
+        var result = await registry.ExecuteAsync<GetEngineStatusRequest, GetEngineStatusResult>(
+            "rekall.context.engine_status",
+            new GetEngineStatusRequest(),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine(result.Value.EngineName);
+        Console.WriteLine($"Agent-first: {result.Value.AgentFirst}");
+        Console.WriteLine($"Rendering: {result.Value.RenderingPosture}");
+        Console.WriteLine($"MVP templates: {string.Join(", ", result.Value.MvpTemplateIds)}");
+        Console.WriteLine("Workflow tools:");
+        foreach (var workflow in result.Value.WorkflowTools)
+        {
+            var marker = workflow.Recommended ? "recommended" : "available";
+            Console.WriteLine($"  {workflow.Tool} [{marker}] - {workflow.Purpose}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok ? 0 : 1;
     }
 
     private static async Task<int> PrintSceneSummaryAsync(

@@ -34,14 +34,34 @@ public sealed class AgentContextCommandTests
     public void ContextCommandsAreVisibleToMcpCatalog()
     {
         var registry = new RekallAgeCommandRegistry();
+        registry.Register(new GetEngineStatusCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new ListGameTemplatesCommand());
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.engine_status");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.project_summary");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.scene_summary");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.templates.list");
+    }
+
+    [Fact]
+    public async Task EngineStatusReturnsAgentFirstMvpWorkflowMap()
+    {
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("engine status"), CancellationToken.None);
+
+        var result = await new GetEngineStatusCommand().ExecuteAsync(new GetEngineStatusRequest(), context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal("Rekall AGE", result.Value.EngineName);
+        Assert.True(result.Value.AgentFirst);
+        Assert.Contains("pong", result.Value.MvpTemplateIds);
+        Assert.Contains("first-person-exploration", result.Value.MvpTemplateIds);
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.templates.inspect" && workflow.Recommended);
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.workflow.create_playable_package_from_template" && workflow.Recommended);
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.templates.verify_mvp");
+        Assert.Contains("vulkan", result.Value.RenderingPosture, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -52,6 +52,23 @@ public sealed class RekallAgeModulePlayableGame : IRekallAgePlayableGame
 
     public string RenderAscii()
     {
-        return _module.Render(_state).Text + Environment.NewLine;
+        return RenderFrame(0).Text;
+    }
+
+    public RekallAgePlaybackRenderFrame RenderFrame(int frameIndex)
+    {
+        var moduleFrame = _module.Render(_state);
+        var drawCommands = (moduleFrame.DrawCommands ?? Array.Empty<RekallAgePlayableDrawCommand>())
+            .Select(command => new RekallAgePlaybackDrawCommand(
+                command.Kind,
+                command.Id,
+                command.X,
+                command.Y,
+                command.Width,
+                command.Height,
+                command.Fill,
+                command.Text))
+            .ToArray();
+        return new RekallAgePlaybackRenderFrame(frameIndex, Kind, moduleFrame.Text + Environment.NewLine, drawCommands);
     }
 }

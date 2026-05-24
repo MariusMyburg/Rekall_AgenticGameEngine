@@ -5,6 +5,7 @@ using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.Modules.Commands;
 using Rekall.Age.Playback;
 using Rekall.Age.Playback.Commands;
+using Rekall.Age.World;
 
 namespace Rekall.Age.Tests.Playback;
 
@@ -30,6 +31,52 @@ public sealed class ModulePlayableRuntimeTests
         Assert.Equal("pong", playResult.Value.Kind);
         Assert.All(playResult.Value.Frames, frame => Assert.Contains("PONG", frame, StringComparison.Ordinal));
         Assert.All(playResult.Value.Frames, frame => Assert.Contains("Ball", frame, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PlaySceneReturnsStructuredRenderFramesFromPlayableModule()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("module render frame"), CancellationToken.None);
+        await new CreatePlayableGameFromTemplateCommand().ExecuteAsync(
+            new CreatePlayableGameFromTemplateRequest(root, "Renderable Pong", "pong"),
+            context);
+
+        var playResult = await new PlaySceneCommand().ExecuteAsync(
+            new PlaySceneRequest(
+                root,
+                "Main",
+                1,
+                [
+                    new RekallAgePlaybackInput(1, PrimaryAction: true)
+                ]),
+            context);
+
+        Assert.True(playResult.Ok, playResult.Summary);
+        var renderFrame = Assert.Single(playResult.Value.RenderFrames);
+        Assert.Equal("pong", renderFrame.Kind);
+        Assert.Equal(1, renderFrame.FrameIndex);
+        Assert.Contains(renderFrame.DrawCommands, command => command.Kind == "clear" && command.Fill == "#101820");
+        Assert.Contains(renderFrame.DrawCommands, command => command.Kind == "rect" && command.Id == "left-paddle");
+        Assert.Contains(renderFrame.DrawCommands, command => command.Kind == "circle" && command.Id == "ball");
+        Assert.Contains(renderFrame.DrawCommands, command => command.Kind == "text" && command.Text.Contains("Score 10", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RenderAsciiPreservesSingleTrailingNewLine()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("module ascii render"), CancellationToken.None);
+        await new CreatePlayableGameFromTemplateCommand().ExecuteAsync(
+            new CreatePlayableGameFromTemplateRequest(root, "Ascii Pong", "pong"),
+            context);
+        var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        var game = RekallAgePlayableGameFactory.Create(root, scene);
+
+        var frame = game.RenderAscii();
+
+        Assert.EndsWith(Environment.NewLine, frame, StringComparison.Ordinal);
+        Assert.False(frame.EndsWith(Environment.NewLine + Environment.NewLine, StringComparison.Ordinal), frame);
     }
 
     [Fact]

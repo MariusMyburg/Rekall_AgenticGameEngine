@@ -212,6 +212,18 @@ public sealed class McpJsonRpcServerTests
             .GetString();
         Assert.Contains("PONG", frame, StringComparison.Ordinal);
         Assert.Contains("Score 10", frame, StringComparison.Ordinal);
+        var renderFrame = playDocument.RootElement
+            .GetProperty("result")
+            .GetProperty("structuredContent")
+            .GetProperty("value")
+            .GetProperty("renderFrames")[0];
+        Assert.Equal("pong", renderFrame.GetProperty("kind").GetString());
+        Assert.Equal(1, renderFrame.GetProperty("frameIndex").GetInt32());
+        var drawCommands = renderFrame.GetProperty("drawCommands");
+        Assert.Contains(drawCommands.EnumerateArray(), command => command.GetProperty("kind").GetString() == "clear");
+        Assert.Contains(drawCommands.EnumerateArray(), command => command.GetProperty("id").GetString() == "left-paddle");
+        Assert.Contains(drawCommands.EnumerateArray(), command => command.GetProperty("id").GetString() == "ball");
+        Assert.Contains(drawCommands.EnumerateArray(), command => command.GetProperty("text").GetString()?.Contains("Score 10", StringComparison.Ordinal) == true);
     }
 
     [Fact]

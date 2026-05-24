@@ -9,7 +9,10 @@ public sealed record PlaySceneRequest(
     int Frames = 10,
     IReadOnlyList<RekallAgePlaybackInput>? Inputs = null);
 
-public sealed record PlaySceneResult(string Kind, IReadOnlyList<string> Frames);
+public sealed record PlaySceneResult(
+    string Kind,
+    IReadOnlyList<string> Frames,
+    IReadOnlyList<RekallAgePlaybackRenderFrame> RenderFrames);
 
 public sealed class PlaySceneCommand : IRekallAgeCommand<PlaySceneRequest, PlaySceneResult>
 {
@@ -52,11 +55,12 @@ public sealed class PlaySceneCommand : IRekallAgeCommand<PlaySceneRequest, PlayS
                         })
                 ]);
             return RekallAgeCommandResult<PlaySceneResult>.Failure(
-                new PlaySceneResult("missing-module", Array.Empty<string>()),
+                new PlaySceneResult("missing-module", Array.Empty<string>(), Array.Empty<RekallAgePlaybackRenderFrame>()),
                 error.Message,
                 [error]);
         }
         var frames = new List<string>();
+        var renderFrames = new List<RekallAgePlaybackRenderFrame>();
         var frameCount = Math.Clamp(request.Frames, 1, 600);
         for (var i = 0; i < frameCount; i++)
         {
@@ -65,11 +69,13 @@ public sealed class PlaySceneCommand : IRekallAgeCommand<PlaySceneRequest, PlayS
                 ? inputs[i]
                 : RekallAgePlaybackInput.None;
             game.Tick(input);
-            frames.Add(game.RenderAscii());
+            var renderFrame = game.RenderFrame(i + 1);
+            renderFrames.Add(renderFrame);
+            frames.Add(renderFrame.Text);
         }
 
         return RekallAgeCommandResult<PlaySceneResult>.Success(
-            new PlaySceneResult(game.Kind, frames),
+            new PlaySceneResult(game.Kind, frames, renderFrames),
             $"Played {frameCount} frame(s) of {game.Kind}.");
     }
 }

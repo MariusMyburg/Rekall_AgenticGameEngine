@@ -22,6 +22,20 @@ public sealed class ScaffoldPlayableModuleCommandTests
         { "puzzle", "PUZZLE" }
     };
 
+    public static TheoryData<string, string[]> GenreDrawCommandIds => new()
+    {
+        { "pong", ["left-paddle", "right-paddle", "ball", "hud"] },
+        { "breakout", ["paddle", "ball", "brick-field", "hud"] },
+        { "asteroids", ["ship", "asteroid-alpha", "projectile", "hud"] },
+        { "top-down-shooter", ["player", "enemy-wave", "projectile", "hud"] },
+        { "platformer-2d", ["runner", "platform-ground", "collectible", "hud"] },
+        { "tower-defense", ["enemy-path", "tower", "enemy-wave", "base-health"] },
+        { "visual-novel", ["background-panel", "portrait-left", "dialogue-box", "choice-cursor"] },
+        { "first-person-exploration", ["corridor", "reticle", "interaction-hotspot", "objective"] },
+        { "collectathon-3d", ["avatar", "collectible", "camera-orbit", "goal-gate"] },
+        { "puzzle", ["grid", "tile-active", "cursor", "objective"] }
+    };
+
     [Fact]
     public async Task ScaffoldPlayableModuleCreatesBuildableGameplayModule()
     {
@@ -54,6 +68,25 @@ public sealed class ScaffoldPlayableModuleCommandTests
         var source = await File.ReadAllTextAsync(scaffold.Value.SourcePath);
         Assert.Contains(marker, source, StringComparison.Ordinal);
         Assert.DoesNotContain("Module-authored", source, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [MemberData(nameof(GenreDrawCommandIds))]
+    public async Task ScaffoldPlayableModuleCreatesGenreSpecificDrawCommandIds(string kind, string[] expectedIds)
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin($"playable scaffold draws {kind}"), CancellationToken.None);
+
+        var scaffold = await new ScaffoldPlayableModuleCommand().ExecuteAsync(
+            new ScaffoldPlayableModuleRequest(root, $"module.{kind}", $"Module {kind}", $"{kind}Module", kind),
+            context);
+
+        Assert.True(scaffold.Ok, scaffold.Summary);
+        var source = await File.ReadAllTextAsync(scaffold.Value.SourcePath);
+        foreach (var expectedId in expectedIds)
+        {
+            Assert.Contains($"\"{expectedId}\"", source, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

@@ -73,6 +73,20 @@ public sealed class CliSmokeTests
         Assert.Contains("Assertion frame 0 contains \"Score 10\": True", playtest.Output);
         Assert.Contains("Draw assertion frame 0 id=ball kind=circle text=<any>: True", playtest.Output);
 
+        var verify = await RunAsync(
+            project,
+            "game",
+            "verify-playable",
+            root,
+            "Main",
+            "1",
+            """[{"verticalAxis":1,"primaryAction":true}]""",
+            """[{"frameIndex":0,"contains":"Score 10"}]""",
+            """[{"frameIndex":0,"id":"ball","kind":"circle"}]""");
+        Assert.Equal(0, verify.ExitCode);
+        Assert.Contains("Ready: True", verify.Output);
+        Assert.Contains("Draw assertion frame 0 id=ball kind=circle text=<any>: True", verify.Output);
+
         var captureDirectory = Path.Combine(root, "PlayCaptures");
         var capture = await RunAsync(project, "play", "capture-frame", root, "Main", captureDirectory, "1");
         Assert.Equal(0, capture.ExitCode);

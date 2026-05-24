@@ -7,4 +7,12 @@ public sealed record RekallAgeGameTemplate(
     string DisplayName,
     string Description,
     IReadOnlyList<string> Capabilities,
-    IReadOnlyList<RekallAgeEntityDocument> Entities);
+    IReadOnlyList<RekallAgeEntityDocument> Entities)
+{
+    public IReadOnlyList<RekallAgeTemplateDrawCommand> DrawCommands { get; init; } = [];
+}
+
+public sealed record RekallAgeTemplateDrawCommand(
+    string Id,
+    string Kind,
+    string Purpose);

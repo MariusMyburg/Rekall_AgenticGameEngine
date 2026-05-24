@@ -175,6 +175,31 @@ public sealed class McpJsonRpcServerTests
     }
 
     [Fact]
+    public async Task ToolsCallListsTemplateDrawContractsForAgents()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new ListGameTemplatesCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(
+            """{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"rekall.templates.list","arguments":{}}}""",
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var result = document.RootElement.GetProperty("result");
+        Assert.False(result.GetProperty("isError").GetBoolean());
+        var templates = result.GetProperty("structuredContent").GetProperty("value").GetProperty("templates");
+        var puzzle = templates.EnumerateArray().Single(template => template.GetProperty("id").GetString() == "puzzle");
+        var drawCommands = puzzle.GetProperty("drawCommands");
+        Assert.Contains(drawCommands.EnumerateArray(), command =>
+            command.GetProperty("id").GetString() == "grid" &&
+            command.GetProperty("kind").GetString() == "rect");
+        Assert.Contains(drawCommands.EnumerateArray(), command =>
+            command.GetProperty("id").GetString() == "objective" &&
+            command.GetProperty("kind").GetString() == "text");
+    }
+
+    [Fact]
     public async Task ToolsCallCanCreateBuildAndPlayTemplateGame()
     {
         var root = TestPaths.CreateTempDirectory();

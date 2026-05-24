@@ -113,13 +113,15 @@ internal static class RekallAgeCli
                 ["build", "player", var root, var scene, "--graphics"] => await BuildPlayerAsync(registry, context, root, scene, graphics: true),
                 ["game", "create", var root, var name, var template] => await CreateGameAsync(registry, context, root, name, template),
                 ["game", "create-playable", var root, var name, var template] => await CreatePlayableGameAsync(registry, context, root, name, template),
-                ["game", "verify-playable", var root] => await VerifyPlayableGameAsync(registry, context, root, "Main", "2", null, null),
-                ["game", "verify-playable", var root, var scene] => await VerifyPlayableGameAsync(registry, context, root, scene, "2", null, null),
-                ["game", "verify-playable", var root, var scene, var frames] => await VerifyPlayableGameAsync(registry, context, root, scene, frames, null, null),
+                ["game", "verify-playable", var root] => await VerifyPlayableGameAsync(registry, context, root, "Main", "2", null, null, null),
+                ["game", "verify-playable", var root, var scene] => await VerifyPlayableGameAsync(registry, context, root, scene, "2", null, null, null),
+                ["game", "verify-playable", var root, var scene, var frames] => await VerifyPlayableGameAsync(registry, context, root, scene, frames, null, null, null),
                 ["game", "verify-playable", var root, var scene, var frames, var assertionsJson] =>
-                    await VerifyPlayableGameAsync(registry, context, root, scene, frames, null, assertionsJson),
+                    await VerifyPlayableGameAsync(registry, context, root, scene, frames, null, assertionsJson, null),
                 ["game", "verify-playable", var root, var scene, var frames, var inputsJson, var assertionsJson] =>
-                    await VerifyPlayableGameAsync(registry, context, root, scene, frames, inputsJson, assertionsJson),
+                    await VerifyPlayableGameAsync(registry, context, root, scene, frames, inputsJson, assertionsJson, null),
+                ["game", "verify-playable", var root, var scene, var frames, var inputsJson, var assertionsJson, var drawAssertionsJson] =>
+                    await VerifyPlayableGameAsync(registry, context, root, scene, frames, inputsJson, assertionsJson, drawAssertionsJson),
                 ["game", "package-playable", var root] => await PackagePlayableGameAsync(registry, context, root, "Main", null, graphics: false),
                 ["game", "package-playable", var root, var scene] => await PackagePlayableGameAsync(registry, context, root, scene, null, graphics: false),
                 ["game", "package-playable", var root, var scene, var outputDirectory] =>
@@ -1096,20 +1098,30 @@ internal static class RekallAgeCli
         string scene,
         string frames,
         string? inputsJson,
-        string? assertionsJson)
+        string? assertionsJson,
+        string? drawAssertionsJson)
     {
         var count = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
         var inputs = await ParsePlaybackInputsAsync(inputsJson, context.CancellationToken);
         var assertions = await ParseFrameAssertionsAsync(assertionsJson, context.CancellationToken);
+        var drawAssertions = await ParseDrawAssertionsAsync(drawAssertionsJson, context.CancellationToken);
         var result = await registry.ExecuteAsync<VerifyPlayableGameRequest, VerifyPlayableGameResult>(
             "rekall.workflow.verify_playable_game",
-            new VerifyPlayableGameRequest(root, scene, count, inputs, assertions),
+            new VerifyPlayableGameRequest(root, scene, count, inputs, assertions, drawAssertions),
             context);
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Ready: {result.Value.Ready}");
         foreach (var check in result.Value.Checks)
         {
             Console.WriteLine($"{check.Name}: {check.Passed} - {check.Summary}");
+        }
+
+        foreach (var assertion in result.Value.DrawAssertions)
+        {
+            var id = assertion.Id ?? "<any>";
+            var kind = assertion.Kind ?? "<any>";
+            var text = assertion.TextContains ?? "<any>";
+            Console.WriteLine($"Draw assertion frame {assertion.FrameIndex} id={id} kind={kind} text={text}: {assertion.Passed}");
         }
 
         foreach (var error in result.Errors)

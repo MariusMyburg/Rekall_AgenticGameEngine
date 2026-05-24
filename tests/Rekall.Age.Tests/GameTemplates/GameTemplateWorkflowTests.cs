@@ -84,6 +84,24 @@ public sealed class GameTemplateWorkflowTests
     }
 
     [Fact]
+    public void TemplateCatalogExposesAgentRenderableDrawContracts()
+    {
+        var catalog = RekallAgeGameTemplateCatalog.CreateDefault();
+
+        var breakout = catalog.GetRequired("breakout");
+        Assert.Contains(breakout.DrawCommands, command => command.Id == "brick-field" && command.Kind == "rect");
+        Assert.Contains(breakout.DrawCommands, command => command.Id == "ball" && command.Kind == "circle");
+
+        var visualNovel = catalog.GetRequired("visual-novel");
+        Assert.Contains(visualNovel.DrawCommands, command => command.Id == "dialogue-box" && command.Kind == "rect");
+        Assert.Contains(visualNovel.DrawCommands, command => command.Id == "choice-cursor" && command.Kind == "text");
+
+        var collectathon = catalog.GetRequired("collectathon-3d");
+        Assert.Contains(collectathon.DrawCommands, command => command.Id == "camera-orbit" && command.Kind == "rect");
+        Assert.Contains(collectathon.DrawCommands, command => command.Id == "goal-gate" && command.Kind == "text");
+    }
+
+    [Fact]
     public async Task VerifyPlayableGamePassesForBuiltPlayableTemplate()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -113,6 +131,39 @@ public sealed class GameTemplateWorkflowTests
         Assert.All(result.Value.Checks, check => Assert.True(check.Passed, check.Summary));
         Assert.True(result.Value.BuildSucceeded);
         Assert.True(result.Value.PlaytestPassed);
+    }
+
+    [Fact]
+    public async Task VerifyPlayableGamePassesStructuredDrawAssertionsThroughReadinessCheck()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("verify playable draws"), CancellationToken.None);
+        var create = await new CreatePlayableGameFromTemplateCommand().ExecuteAsync(
+            new CreatePlayableGameFromTemplateRequest(root, "Verified Draw Pong", "pong"),
+            context);
+        Assert.True(create.Ok, create.Summary);
+
+        var result = await new VerifyPlayableGameCommand().ExecuteAsync(
+            new VerifyPlayableGameRequest(
+                root,
+                "Main",
+                1,
+                [
+                    new RekallAgePlaybackInput(1, PrimaryAction: true)
+                ],
+                [
+                    new RekallAgeFrameAssertion(0, "Score 10")
+                ],
+                [
+                    new RekallAgeDrawCommandAssertion(0, Id: "ball", Kind: "circle"),
+                    new RekallAgeDrawCommandAssertion(0, Kind: "text", TextContains: "Score 10")
+                ]),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.Ready);
+        Assert.All(result.Value.DrawAssertions, assertion => Assert.True(assertion.Passed));
+        Assert.Contains(result.Value.RenderFrames[0].DrawCommands, command => command.Id == "ball" && command.Kind == "circle");
     }
 
     [Fact]

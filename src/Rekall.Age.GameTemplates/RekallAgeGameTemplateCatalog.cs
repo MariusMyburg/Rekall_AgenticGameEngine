@@ -128,7 +128,10 @@ public sealed class RekallAgeGameTemplateCatalog
             displayName,
             description,
             capabilities,
-            Base2D(loopKind).Concat(entities).ToArray());
+            Base2D(loopKind).Concat(entities).ToArray())
+        {
+            DrawCommands = DrawCommandsFor(id)
+        };
     }
 
     private static RekallAgeGameTemplate Create3D(
@@ -143,7 +146,103 @@ public sealed class RekallAgeGameTemplateCatalog
             displayName,
             description,
             ["input", "rendering3d", "ui", "world"],
-            Base3D(loopKind).Concat(entities).ToArray());
+            Base3D(loopKind).Concat(entities).ToArray())
+        {
+            DrawCommands = DrawCommandsFor(id)
+        };
+    }
+
+    private static IReadOnlyList<RekallAgeTemplateDrawCommand> DrawCommandsFor(string id)
+    {
+        return id switch
+        {
+            "pong" =>
+            [
+                Draw("background", "clear", "frame clear color"),
+                Draw("left-paddle", "rect", "player paddle"),
+                Draw("right-paddle", "rect", "opponent paddle"),
+                Draw("ball", "circle", "active ball"),
+                Draw("hud", "text", "score display")
+            ],
+            "breakout" =>
+            [
+                Draw("background", "clear", "frame clear color"),
+                Draw("brick-field", "rect", "remaining brick field"),
+                Draw("paddle", "rect", "player paddle"),
+                Draw("ball", "circle", "active ball"),
+                Draw("hud", "text", "score display")
+            ],
+            "asteroids" =>
+            [
+                Draw("background", "clear", "frame clear color"),
+                Draw("ship", "rect", "player ship"),
+                Draw("asteroid-alpha", "circle", "representative asteroid"),
+                Draw("projectile", "rect", "fired projectile"),
+                Draw("hud", "text", "score display")
+            ],
+            "top-down-shooter" =>
+            [
+                Draw("background", "clear", "frame clear color"),
+                Draw("player", "rect", "player avatar"),
+                Draw("enemy-wave", "rect", "enemy wave band"),
+                Draw("projectile", "rect", "player projectile"),
+                Draw("hud", "text", "score display")
+            ],
+            "platformer-2d" =>
+            [
+                Draw("background", "clear", "frame clear color"),
+                Draw("platform-ground", "rect", "ground platform"),
+                Draw("runner", "rect", "player runner"),
+                Draw("collectible", "circle", "collectible marker"),
+                Draw("hud", "text", "score display")
+            ],
+            "tower-defense" =>
+            [
+                Draw("background", "clear", "frame clear color"),
+                Draw("enemy-path", "rect", "enemy travel path"),
+                Draw("tower", "rect", "placed tower"),
+                Draw("enemy-wave", "circle", "incoming enemy"),
+                Draw("base-health", "text", "base health display")
+            ],
+            "visual-novel" =>
+            [
+                Draw("background", "clear", "frame clear color"),
+                Draw("background-panel", "rect", "scene background"),
+                Draw("portrait-left", "rect", "speaker portrait"),
+                Draw("dialogue-box", "rect", "dialogue container"),
+                Draw("choice-cursor", "text", "choice selector")
+            ],
+            "first-person-exploration" =>
+            [
+                Draw("background", "clear", "frame clear color"),
+                Draw("corridor", "rect", "first-person corridor view"),
+                Draw("reticle", "rect", "look reticle"),
+                Draw("interaction-hotspot", "circle", "interactable marker"),
+                Draw("objective", "text", "objective tracker")
+            ],
+            "collectathon-3d" =>
+            [
+                Draw("background", "clear", "frame clear color"),
+                Draw("camera-orbit", "rect", "camera framing volume"),
+                Draw("avatar", "rect", "player avatar"),
+                Draw("collectible", "circle", "collectible marker"),
+                Draw("goal-gate", "text", "collection progress")
+            ],
+            "puzzle" =>
+            [
+                Draw("background", "clear", "frame clear color"),
+                Draw("grid", "rect", "puzzle board"),
+                Draw("tile-active", "rect", "active puzzle tile"),
+                Draw("cursor", "rect", "board cursor"),
+                Draw("objective", "text", "move counter")
+            ],
+            _ => []
+        };
+    }
+
+    private static RekallAgeTemplateDrawCommand Draw(string id, string kind, string purpose)
+    {
+        return new RekallAgeTemplateDrawCommand(id, kind, purpose);
     }
 
     private static IReadOnlyList<RekallAgeEntityDocument> Base2D(string loopKind)

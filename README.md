@@ -13,7 +13,7 @@ The current MVP includes:
 - C# module source writing through the command bus for MCP-first agents
 - C# module build command for compiling scaffolded gameplay modules
 - playable game readiness verification workflow for validation, build, and playtest checks
-- playable game packaging workflow that verifies, bundles game content, writes a package manifest, and publishes launch artifacts
+- playable game packaging workflow that verifies, bundles game content, writes a package manifest, creates a zip archive, and publishes launch artifacts
 - project module assembly loading for agent-readable schemas after build
 - module-authored playable runtime execution; no engine-owned fallback games
 - Vulkan-first internal rendering backend catalog with Direct3D 12 extension point

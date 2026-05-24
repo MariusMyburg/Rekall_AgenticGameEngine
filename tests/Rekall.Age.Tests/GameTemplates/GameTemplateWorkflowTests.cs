@@ -10,6 +10,7 @@ using Rekall.Age.Rendering;
 using Rekall.Age.Runtime;
 using Rekall.Age.Validation;
 using Rekall.Age.World;
+using System.IO.Compression;
 using System.Text.Json;
 
 namespace Rekall.Age.Tests.GameTemplates;
@@ -159,6 +160,7 @@ public sealed class GameTemplateWorkflowTests
         Assert.True(File.Exists(package.Value.LaunchPath), package.Value.LaunchPath);
         Assert.Equal(output, package.Value.OutputDirectory);
         Assert.True(File.Exists(package.Value.ManifestPath), package.Value.ManifestPath);
+        Assert.True(File.Exists(package.Value.ArchivePath), package.Value.ArchivePath);
         var bundledGameRoot = Path.Combine(output, "Game");
         Assert.True(File.Exists(Path.Combine(bundledGameRoot, "rekall.project.json")));
         Assert.True(File.Exists(Path.Combine(bundledGameRoot, "Scenes", "Main.age.scene.json")));
@@ -179,5 +181,10 @@ public sealed class GameTemplateWorkflowTests
         Assert.Equal(package.Value.LaunchPath, manifest.RootElement.GetProperty("launchPath").GetString());
         Assert.Equal(bundledGameRoot, manifest.RootElement.GetProperty("gameRoot").GetString());
         Assert.True(manifest.RootElement.GetProperty("checks").GetArrayLength() > 0);
+
+        using var archive = ZipFile.OpenRead(package.Value.ArchivePath);
+        Assert.Contains(archive.Entries, entry => entry.FullName == "rekall.package.json");
+        Assert.Contains(archive.Entries, entry => entry.FullName == "Game/rekall.project.json");
+        Assert.Contains(archive.Entries, entry => entry.FullName.EndsWith("PongPlayable.dll", StringComparison.Ordinal));
     }
 }

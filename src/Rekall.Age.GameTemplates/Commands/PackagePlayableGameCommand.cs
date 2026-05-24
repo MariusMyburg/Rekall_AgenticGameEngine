@@ -2,6 +2,7 @@ using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
 using Rekall.Age.Playback.Commands;
+using System.IO.Compression;
 using System.Text.Json;
 
 namespace Rekall.Age.GameTemplates.Commands;
@@ -20,6 +21,7 @@ public sealed record PackagePlayableGameResult(
     string OutputDirectory,
     string LaunchPath,
     string ManifestPath,
+    string ArchivePath,
     IReadOnlyList<string> Arguments,
     IReadOnlyList<RekallAgePlayableGameCheck> Checks,
     string BuildOutput);
@@ -58,6 +60,7 @@ public sealed class PackagePlayableGameCommand
                     OutputDirectory: request.OutputDirectory ?? string.Empty,
                     LaunchPath: string.Empty,
                     ManifestPath: string.Empty,
+                    ArchivePath: string.Empty,
                     Arguments: [],
                     Checks: verification.Value.Checks,
                     BuildOutput: string.Empty),
@@ -72,6 +75,7 @@ public sealed class PackagePlayableGameCommand
             context);
         var bundledGameRoot = Path.Combine(outputDirectory, "Game");
         var manifestPath = Path.Combine(outputDirectory, "rekall.package.json");
+        var archivePath = $"{Path.GetFullPath(outputDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)}.zip";
         var arguments = player.Ok
             ? CreateLaunchArguments(bundledGameRoot, request.SceneName, request.Graphics)
             : player.Value.Arguments;
@@ -80,6 +84,7 @@ public sealed class PackagePlayableGameCommand
             OutputDirectory: player.Value.OutputDirectory,
             LaunchPath: player.Value.LaunchPath,
             ManifestPath: manifestPath,
+            ArchivePath: archivePath,
             Arguments: arguments,
             Checks: verification.Value.Checks,
             BuildOutput: player.Value.Output);
@@ -100,8 +105,10 @@ public sealed class PackagePlayableGameCommand
             arguments,
             verification.Value.Checks,
             context.CancellationToken);
+        CreatePackageArchive(outputDirectory, archivePath);
         context.Transaction.RecordChangedResource(bundledGameRoot);
         context.Transaction.RecordChangedResource(manifestPath);
+        context.Transaction.RecordChangedResource(archivePath);
 
         return RekallAgeCommandResult<PackagePlayableGameResult>.Success(
             result,
@@ -179,6 +186,17 @@ public sealed class PackagePlayableGameCommand
         var normalizedDirectory = Path.GetFullPath(directory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         return normalizedPath.Equals(normalizedDirectory, comparison) ||
             normalizedPath.StartsWith(normalizedDirectory + Path.DirectorySeparatorChar, comparison);
+    }
+
+    private static void CreatePackageArchive(string outputDirectory, string archivePath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(archivePath)!);
+        if (File.Exists(archivePath))
+        {
+            File.Delete(archivePath);
+        }
+
+        ZipFile.CreateFromDirectory(outputDirectory, archivePath, CompressionLevel.Optimal, includeBaseDirectory: false);
     }
 
     private static async Task WriteManifestAsync(

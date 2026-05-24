@@ -281,5 +281,16 @@ public sealed class GameTemplateWorkflowTests
         var renderFrame = Assert.Single(runArchive.Value.RenderFrames);
         Assert.Equal("pong", renderFrame.Kind);
         Assert.Contains(renderFrame.DrawCommands, command => command.Id == "ball" && command.Kind == "circle");
+
+        var captureArchive = await new CapturePlayablePackageFrameCommand().ExecuteAsync(
+            new CapturePlayablePackageFrameRequest(package.Value.ArchivePath, Path.Combine(root, "PackageFrames"), FrameIndex: 1),
+            context);
+
+        Assert.True(captureArchive.Ok, captureArchive.Summary);
+        Assert.True(captureArchive.Value.Captured);
+        Assert.True(captureArchive.Value.NonBlank);
+        Assert.True(File.Exists(captureArchive.Value.OutputPath), captureArchive.Value.OutputPath);
+        Assert.Equal("pong", captureArchive.Value.Kind);
+        Assert.Contains(captureArchive.Value.DrawCommandKinds, kind => kind == "circle");
     }
 }

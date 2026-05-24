@@ -131,6 +131,10 @@ internal static class RekallAgeCli
                 ["game", "inspect-package", var packagePath] => await InspectPlayablePackageAsync(registry, context, packagePath),
                 ["game", "run-package", var packagePath] => await RunPlayablePackageAsync(registry, context, packagePath, "2"),
                 ["game", "run-package", var packagePath, var frames] => await RunPlayablePackageAsync(registry, context, packagePath, frames),
+                ["game", "capture-package-frame", var packagePath, var outputDirectory] =>
+                    await CapturePlayablePackageFrameAsync(registry, context, packagePath, outputDirectory, "1"),
+                ["game", "capture-package-frame", var packagePath, var outputDirectory, var frameIndex] =>
+                    await CapturePlayablePackageFrameAsync(registry, context, packagePath, outputDirectory, frameIndex),
                 ["project", "create", var root, var name, var capabilities] => await CreateProjectAsync(registry, context, root, name, capabilities),
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
                 ["scene", "create", var root, var name, var capabilities] => await CreateSceneAsync(registry, context, root, name, capabilities),
@@ -182,6 +186,7 @@ internal static class RekallAgeCli
         registry.Register(new PackagePlayableGameCommand());
         registry.Register(new InspectPlayablePackageCommand());
         registry.Register(new RunPlayablePackageCommand());
+        registry.Register(new CapturePlayablePackageFrameCommand());
         registry.Register(new ListGameTemplatesCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
@@ -1216,6 +1221,33 @@ internal static class RekallAgeCli
         }
 
         return result.Ok && result.Value.Ready ? 0 : 1;
+    }
+
+    private static async Task<int> CapturePlayablePackageFrameAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string packagePath,
+        string outputDirectory,
+        string frameIndex)
+    {
+        var frame = int.Parse(frameIndex, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<CapturePlayablePackageFrameRequest, CapturePlayablePackageFrameResult>(
+            "rekall.workflow.capture_playable_package_frame",
+            new CapturePlayablePackageFrameRequest(packagePath, outputDirectory, frame),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Captured: {result.Value.Captured}");
+        Console.WriteLine($"Output: {result.Value.OutputPath}");
+        Console.WriteLine($"Kind: {result.Value.Kind}");
+        Console.WriteLine($"Frame: {result.Value.FrameIndex}");
+        Console.WriteLine($"Non-blank: {result.Value.NonBlank}");
+        Console.WriteLine($"Draw commands: {result.Value.DrawCommandCount}");
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.Captured && result.Value.NonBlank ? 0 : 1;
     }
 
     private static async Task<int> CreateProjectAsync(

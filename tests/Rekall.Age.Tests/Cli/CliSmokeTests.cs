@@ -108,6 +108,13 @@ public sealed class CliSmokeTests
         Assert.Contains("Ready: True", runPackage.Output);
         Assert.Contains("FRAME 1", runPackage.Output);
         Assert.Contains("PONG", runPackage.Output);
+
+        var packageFrameDirectory = Path.Combine(root, "PackageFrames");
+        var capturePackageFrame = await RunAsync(project, "game", "capture-package-frame", $"{packageDirectory}.zip", packageFrameDirectory, "1");
+        Assert.Equal(0, capturePackageFrame.ExitCode);
+        Assert.Contains("Captured: True", capturePackageFrame.Output);
+        Assert.Contains("Non-blank: True", capturePackageFrame.Output);
+        Assert.True(File.Exists(Path.Combine(packageFrameDirectory, "package_play_frame_001.png")));
     }
 
     [Fact]

@@ -134,6 +134,10 @@ public sealed class GameTemplateWorkflowTests
         Assert.All(result.Value.Checks, check => Assert.True(check.Passed, check.Summary));
         Assert.True(result.Value.BuildSucceeded);
         Assert.True(result.Value.PlaytestPassed);
+        Assert.Contains(result.Value.DrawAssertions, assertion =>
+            assertion.Id == "ball" &&
+            assertion.Kind == "circle" &&
+            assertion.Passed);
     }
 
     [Fact]

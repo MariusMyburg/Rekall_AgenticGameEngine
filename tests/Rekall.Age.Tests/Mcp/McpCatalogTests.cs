@@ -71,6 +71,16 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.vulkan.render_pass.submit_clear");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.vulkan.render_pass.read_clear");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.vulkan.render_pass.capture_clear");
+
+        var oneShot = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.create_playable_package_from_template");
+        Assert.Equal("workflow", oneShot.Category);
+        Assert.True(oneShot.Recommended);
+        Assert.Equal(10, oneShot.AgentPriority);
+
+        var renderTool = catalog.Tools.Single(tool => tool.Name == "rekall.render.vulkan.render_pass.capture_clear");
+        Assert.Equal("rendering", renderTool.Category);
+        Assert.False(renderTool.Recommended);
+        Assert.True(renderTool.AgentPriority > oneShot.AgentPriority);
     }
 
     private sealed class FakeVulkanRenderPassSubmission : IRekallAgeVulkanRenderPassSubmission

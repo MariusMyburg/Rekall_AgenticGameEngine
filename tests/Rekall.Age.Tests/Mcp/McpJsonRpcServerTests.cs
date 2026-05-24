@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Rekall.Age.Agent.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Build.Commands;
@@ -7,6 +8,7 @@ using Rekall.Age.Mcp;
 using Rekall.Age.Modules.Commands;
 using Rekall.Age.Playback.Commands;
 using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Commands;
 
 namespace Rekall.Age.Tests.Mcp;
 
@@ -43,6 +45,34 @@ public sealed class McpJsonRpcServerTests
         Assert.Equal("rekall.test.echo", tool.GetProperty("name").GetString());
         Assert.Equal("object", tool.GetProperty("inputSchema").GetProperty("type").GetString());
         Assert.True(tool.GetProperty("inputSchema").GetProperty("properties").TryGetProperty("message", out _));
+        Assert.Equal("unknown", tool.GetProperty("rekallCategory").GetString());
+        Assert.False(tool.GetProperty("rekallRecommended").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ToolsListExposesAgentToolMetadata()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new GetEngineStatusCommand());
+        registry.Register(new CreatePlayablePackageFromTemplateCommand());
+        registry.Register(new CreateRenderPlanCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(
+            """{"jsonrpc":"2.0","id":20,"method":"tools/list"}""",
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var tools = document.RootElement.GetProperty("result").GetProperty("tools").EnumerateArray().ToArray();
+        var engineStatus = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.context.engine_status");
+        var oneShot = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.workflow.create_playable_package_from_template");
+        var render = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.render.plan.create");
+        Assert.Equal("context", engineStatus.GetProperty("rekallCategory").GetString());
+        Assert.True(engineStatus.GetProperty("rekallRecommended").GetBoolean());
+        Assert.Equal(5, engineStatus.GetProperty("rekallAgentPriority").GetInt32());
+        Assert.Equal("workflow", oneShot.GetProperty("rekallCategory").GetString());
+        Assert.True(oneShot.GetProperty("rekallRecommended").GetBoolean());
+        Assert.True(render.GetProperty("rekallAgentPriority").GetInt32() > oneShot.GetProperty("rekallAgentPriority").GetInt32());
     }
 
     [Fact]

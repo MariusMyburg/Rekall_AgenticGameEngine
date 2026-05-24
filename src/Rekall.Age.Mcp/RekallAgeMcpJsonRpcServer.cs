@@ -135,6 +135,9 @@ public sealed class RekallAgeMcpJsonRpcServer
                 name = command.Schema.Name,
                 title = ToTitle(command.Schema.Name),
                 description = command.Schema.Description,
+                rekallCategory = RekallAgeMcpToolClassifier.GetCategory(command.Schema.Name),
+                rekallRecommended = RekallAgeMcpToolClassifier.IsRecommended(command.Schema.Name),
+                rekallAgentPriority = RekallAgeMcpToolClassifier.GetAgentPriority(command.Schema.Name),
                 inputSchema = CreateInputSchema(command.RequestType)
             })
             .ToArray();

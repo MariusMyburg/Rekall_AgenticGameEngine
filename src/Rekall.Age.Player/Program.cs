@@ -3,7 +3,7 @@ using Rekall.Age.World;
 
 if (args.Length < 2)
 {
-    Console.Error.WriteLine("Usage: rekall-age-player <project-root> <scene-name> [--frames <count>] [--inputs <json-or-file>] [--graphics]");
+    Console.Error.WriteLine("Usage: rekall-age-player <project-root> <scene-name> [--frames <count>] [--inputs <json-or-file>] [--render-json <path>] [--graphics]");
     return 2;
 }
 
@@ -11,20 +11,38 @@ var projectRoot = args[0];
 var sceneName = args[1];
 var frames = TryReadFrameCount(args);
 var inputs = await TryReadInputsAsync(args, CancellationToken.None);
+var renderJsonPath = TryReadRenderJsonPath(args);
 var useGraphics = args.Any(arg => arg.Equals("--graphics", StringComparison.Ordinal));
 var scene = await new RekallAgeSceneStore().LoadAsync(projectRoot, sceneName, CancellationToken.None);
 var game = RekallAgePlayableGameFactory.Create(projectRoot, scene);
 
 if (frames is not null)
 {
+    var renderFrames = new List<RekallAgePlaybackRenderFrame>();
     for (var i = 0; i < frames.Value; i++)
     {
         var input = inputs is { Count: > 0 } && i < inputs.Count
             ? inputs[i]
             : RekallAgePlaybackInput.None;
         game.Tick(input);
+        var renderFrame = game.RenderFrame(i + 1);
+        renderFrames.Add(renderFrame);
         Console.WriteLine($"FRAME {i + 1}");
-        Console.Write(game.RenderAscii());
+        Console.Write(renderFrame.Text);
+    }
+
+    if (renderJsonPath is not null)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(renderJsonPath)!);
+        await File.WriteAllTextAsync(
+            renderJsonPath,
+            System.Text.Json.JsonSerializer.Serialize(
+                renderFrames,
+                new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                    WriteIndented = true
+                }));
     }
 
     return 0;
@@ -98,6 +116,19 @@ static async ValueTask<IReadOnlyList<RekallAgePlaybackInput>?> TryReadInputsAsyn
         catch (System.Text.Json.JsonException ex)
         {
             throw new ArgumentException($"Playback inputs JSON is invalid: {ex.Message}", ex);
+        }
+    }
+
+    return null;
+}
+
+static string? TryReadRenderJsonPath(string[] args)
+{
+    for (var i = 2; i < args.Length - 1; i++)
+    {
+        if (args[i].Equals("--render-json", StringComparison.Ordinal))
+        {
+            return Path.GetFullPath(args[i + 1]);
         }
     }
 

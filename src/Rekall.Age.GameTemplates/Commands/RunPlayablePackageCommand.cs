@@ -19,6 +19,7 @@ public sealed record RunPlayablePackageResult(
     string GameRoot,
     int ExitCode,
     IReadOnlyList<string> Frames,
+    IReadOnlyList<RekallAgePlaybackRenderFrame> RenderFrames,
     string Output);
 
 public sealed class RunPlayablePackageCommand
@@ -68,6 +69,7 @@ public sealed class RunPlayablePackageCommand
                 gameRoot,
                 run.ExitCode,
                 ParseFrames(run.Output),
+                run.RenderFrames,
                 run.Output);
             if (!ready)
             {
@@ -141,7 +143,7 @@ public sealed class RunPlayablePackageCommand
         return gameRoot;
     }
 
-    private static async Task<(int ExitCode, string Output)> RunPlayerAsync(
+    private static async Task<(int ExitCode, string Output, IReadOnlyList<RekallAgePlaybackRenderFrame> RenderFrames)> RunPlayerAsync(
         string launchPath,
         string gameRoot,
         string sceneName,
@@ -149,6 +151,10 @@ public sealed class RunPlayablePackageCommand
         IReadOnlyList<RekallAgePlaybackInput>? inputs,
         CancellationToken cancellationToken)
     {
+        var renderJsonPath = Path.Combine(
+            Path.GetTempPath(),
+            "RekallAgePackageRuns",
+            $"{Guid.NewGuid():N}.renderframes.json");
         var startInfo = Path.GetExtension(launchPath).Equals(".dll", StringComparison.OrdinalIgnoreCase)
             ? new ProcessStartInfo("dotnet")
             : new ProcessStartInfo(launchPath);
@@ -164,19 +170,36 @@ public sealed class RunPlayablePackageCommand
         startInfo.ArgumentList.Add(sceneName);
         startInfo.ArgumentList.Add("--frames");
         startInfo.ArgumentList.Add(frames.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        startInfo.ArgumentList.Add("--render-json");
+        startInfo.ArgumentList.Add(renderJsonPath);
         if (inputs is { Count: > 0 })
         {
             startInfo.ArgumentList.Add("--inputs");
             startInfo.ArgumentList.Add(JsonSerializer.Serialize(inputs, JsonOptions));
         }
 
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Could not start packaged Rekall AGE player.");
-        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        var output = await outputTask + await errorTask;
-        return (process.ExitCode, output);
+        try
+        {
+            using var process = Process.Start(startInfo)
+                ?? throw new InvalidOperationException("Could not start packaged Rekall AGE player.");
+            var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+            var output = await outputTask + await errorTask;
+            var renderFrames = File.Exists(renderJsonPath)
+                ? JsonSerializer.Deserialize<RekallAgePlaybackRenderFrame[]>(
+                    await File.ReadAllTextAsync(renderJsonPath, cancellationToken),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? []
+                : [];
+            return (process.ExitCode, output, renderFrames);
+        }
+        finally
+        {
+            if (File.Exists(renderJsonPath))
+            {
+                File.Delete(renderJsonPath);
+            }
+        }
     }
 
     private static IReadOnlyList<string> ParseFrames(string output)

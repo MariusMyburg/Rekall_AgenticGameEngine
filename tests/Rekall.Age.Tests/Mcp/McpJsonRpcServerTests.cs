@@ -485,6 +485,11 @@ public sealed class McpJsonRpcServerTests
         Assert.Equal(0, runValue.GetProperty("exitCode").GetInt32());
         Assert.Contains("FRAME 1", runValue.GetProperty("output").GetString(), StringComparison.Ordinal);
         Assert.Contains("PONG", runValue.GetProperty("frames")[0].GetString(), StringComparison.Ordinal);
+        var renderFrame = runValue.GetProperty("renderFrames")[0];
+        Assert.Equal("pong", renderFrame.GetProperty("kind").GetString());
+        Assert.Contains(renderFrame.GetProperty("drawCommands").EnumerateArray(), command =>
+            command.GetProperty("id").GetString() == "ball" &&
+            command.GetProperty("kind").GetString() == "circle");
     }
 
     [Fact]

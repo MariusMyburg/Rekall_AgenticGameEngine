@@ -278,5 +278,8 @@ public sealed class GameTemplateWorkflowTests
         Assert.Equal(0, runArchive.Value.ExitCode);
         Assert.Contains("FRAME 1", runArchive.Value.Output, StringComparison.Ordinal);
         Assert.Contains("PONG", Assert.Single(runArchive.Value.Frames), StringComparison.Ordinal);
+        var renderFrame = Assert.Single(runArchive.Value.RenderFrames);
+        Assert.Equal("pong", renderFrame.Kind);
+        Assert.Contains(renderFrame.DrawCommands, command => command.Id == "ball" && command.Kind == "circle");
     }
 }

@@ -18,6 +18,11 @@ public sealed class CliSmokeTests
         Assert.Equal(0, summary.ExitCode);
         Assert.Contains("Crystal Mines: ok", summary.Output);
 
+        var run = await RunAsync(project, "run", "scene", root, "Main", "0.1");
+        Assert.Equal(0, run.ExitCode);
+        Assert.Contains("Simulated Main", run.Output);
+        Assert.Contains("GridBoard", run.Output);
+
         var capture = await RunAsync(project, "capture", "screenshot", root, "Main");
         Assert.Equal(0, capture.ExitCode);
         Assert.Contains("Main_preview.png", capture.Output);

@@ -6,6 +6,8 @@ using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Commands;
+using Rekall.Age.Runtime.Commands;
 using Rekall.Age.Validation;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
@@ -18,7 +20,7 @@ internal static class RekallAgeCli
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|context|capture|templates> ...");
+            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|run|context|capture|templates> ...");
             return 2;
         }
 
@@ -36,8 +38,9 @@ internal static class RekallAgeCli
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
                 ["scene", "create", var root, var name, var capabilities] => await CreateSceneAsync(registry, context, root, name, capabilities),
                 ["entity", "create", var root, var scene, var name, var tags] => await CreateEntityAsync(registry, context, root, scene, name, tags),
+                ["run", "scene", var root, var scene, var seconds] => await RunSceneAsync(registry, context, root, scene, seconds),
                 ["context", "summary", var root] => await PrintSummaryAsync(root, cancellationToken),
-                ["capture", "screenshot", var root, var scene] => await CaptureAsync(root, scene, cancellationToken),
+                ["capture", "screenshot", var root, var scene] => await CaptureAsync(registry, context, root, scene),
                 _ => PrintUnknown(args)
             };
         }
@@ -57,6 +60,8 @@ internal static class RekallAgeCli
         registry.Register(new CreateEntityCommand());
         registry.Register(new AddComponentCommand());
         registry.Register(new CreateGameFromTemplateCommand());
+        registry.Register(new RunSceneCommand());
+        registry.Register(new CaptureScreenshotCommand());
         return registry;
     }
 
@@ -162,15 +167,36 @@ internal static class RekallAgeCli
         return summary.Health.Status == "ok" ? 0 : 1;
     }
 
-    private static async Task<int> CaptureAsync(
+    private static async Task<int> RunSceneAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
         string root,
         string scene,
-        CancellationToken cancellationToken)
+        string seconds)
     {
-        var result = await new RekallAgeSoftwarePreview(new RekallAgeSceneStore())
-            .CaptureAsync(root, scene, Path.Combine(root, "Artifacts", "Screenshots"), cancellationToken);
-        Console.WriteLine(result.ScreenshotPath);
-        return result.NonBlank ? 0 : 1;
+        var duration = double.Parse(seconds, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<RunSceneRequest, RunSceneResult>(
+            "rekall.run.scene",
+            new RunSceneRequest(root, scene, duration),
+            context);
+
+        Console.WriteLine($"Simulated {scene}: {result.Value.FramesSimulated} frames");
+        Console.WriteLine($"Systems: {string.Join(", ", result.Value.ActiveSystems)}");
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> CaptureAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene)
+    {
+        var result = await registry.ExecuteAsync<CaptureScreenshotRequest, CaptureScreenshotResult>(
+            "rekall.capture.screenshot",
+            new CaptureScreenshotRequest(root, scene, Path.Combine(root, "Artifacts", "Screenshots")),
+            context);
+        Console.WriteLine(result.Value.ScreenshotPath);
+        return result.Ok && result.Value.NonBlank ? 0 : 1;
     }
 
     private static int PrintUnknown(string[] args)

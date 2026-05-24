@@ -7,6 +7,7 @@ public sealed class RekallAgeHeadlessRuntime
 {
     private readonly RekallAgeSceneStore _sceneStore;
     private readonly RekallAgeProjectValidator? _validator;
+    private readonly RekallAgeGameplayInterpreter _interpreter = new();
 
     public RekallAgeHeadlessRuntime(RekallAgeSceneStore sceneStore, RekallAgeProjectValidator? validator = null)
     {
@@ -20,14 +21,14 @@ public sealed class RekallAgeHeadlessRuntime
         TimeSpan duration,
         CancellationToken cancellationToken)
     {
-        await _sceneStore.LoadAsync(projectRoot, sceneName, cancellationToken);
+        var scene = await _sceneStore.LoadAsync(projectRoot, sceneName, cancellationToken);
 
         if (_validator is not null)
         {
             var report = await _validator.ValidateSceneAsync(projectRoot, sceneName, cancellationToken);
             if (report.Status == "blocked")
             {
-                return new RekallAgeRuntimeResult(false, 0, TimeSpan.Zero, report.BlockingMessages);
+                return new RekallAgeRuntimeResult(false, 0, TimeSpan.Zero, report.BlockingMessages, Array.Empty<RekallAgeRuntimeObservation>());
             }
         }
 
@@ -40,6 +41,7 @@ public sealed class RekallAgeHeadlessRuntime
             await Task.Yield();
         }
 
-        return new RekallAgeRuntimeResult(true, frames, duration, Array.Empty<string>());
+        var observations = _interpreter.Observe(scene, frames);
+        return new RekallAgeRuntimeResult(true, frames, duration, Array.Empty<string>(), observations);
     }
 }

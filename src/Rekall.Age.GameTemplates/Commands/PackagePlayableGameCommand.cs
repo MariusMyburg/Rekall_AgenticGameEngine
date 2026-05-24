@@ -2,6 +2,7 @@ using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
 using Rekall.Age.Playback.Commands;
+using System.Text.Json;
 
 namespace Rekall.Age.GameTemplates.Commands;
 
@@ -18,6 +19,7 @@ public sealed record PackagePlayableGameResult(
     bool Ready,
     string OutputDirectory,
     string LaunchPath,
+    string ManifestPath,
     IReadOnlyList<string> Arguments,
     IReadOnlyList<RekallAgePlayableGameCheck> Checks,
     string BuildOutput);
@@ -55,6 +57,7 @@ public sealed class PackagePlayableGameCommand
                     Ready: false,
                     OutputDirectory: request.OutputDirectory ?? string.Empty,
                     LaunchPath: string.Empty,
+                    ManifestPath: string.Empty,
                     Arguments: [],
                     Checks: verification.Value.Checks,
                     BuildOutput: string.Empty),
@@ -68,13 +71,16 @@ public sealed class PackagePlayableGameCommand
             new BuildPlayerRequest(request.ProjectRoot, request.SceneName, outputDirectory, request.Graphics),
             context);
         var bundledGameRoot = Path.Combine(outputDirectory, "Game");
+        var manifestPath = Path.Combine(outputDirectory, "rekall.package.json");
+        var arguments = player.Ok
+            ? CreateLaunchArguments(bundledGameRoot, request.SceneName, request.Graphics)
+            : player.Value.Arguments;
         var result = new PackagePlayableGameResult(
             Ready: player.Ok,
             OutputDirectory: player.Value.OutputDirectory,
             LaunchPath: player.Value.LaunchPath,
-            Arguments: player.Ok
-                ? CreateLaunchArguments(bundledGameRoot, request.SceneName, request.Graphics)
-                : player.Value.Arguments,
+            ManifestPath: manifestPath,
+            Arguments: arguments,
             Checks: verification.Value.Checks,
             BuildOutput: player.Value.Output);
         if (!player.Ok)
@@ -86,7 +92,16 @@ public sealed class PackagePlayableGameCommand
         }
 
         CopyProjectToPackage(request.ProjectRoot, bundledGameRoot, outputDirectory);
+        await WriteManifestAsync(
+            manifestPath,
+            request.SceneName,
+            bundledGameRoot,
+            player.Value.LaunchPath,
+            arguments,
+            verification.Value.Checks,
+            context.CancellationToken);
         context.Transaction.RecordChangedResource(bundledGameRoot);
+        context.Transaction.RecordChangedResource(manifestPath);
 
         return RekallAgeCommandResult<PackagePlayableGameResult>.Success(
             result,
@@ -165,4 +180,41 @@ public sealed class PackagePlayableGameCommand
         return normalizedPath.Equals(normalizedDirectory, comparison) ||
             normalizedPath.StartsWith(normalizedDirectory + Path.DirectorySeparatorChar, comparison);
     }
+
+    private static async Task WriteManifestAsync(
+        string manifestPath,
+        string sceneName,
+        string bundledGameRoot,
+        string launchPath,
+        IReadOnlyList<string> arguments,
+        IReadOnlyList<RekallAgePlayableGameCheck> checks,
+        CancellationToken cancellationToken)
+    {
+        var manifest = new RekallAgePlayablePackageManifest(
+            "rekall.age.playable.package",
+            sceneName,
+            bundledGameRoot,
+            launchPath,
+            arguments,
+            checks);
+        Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
+        await File.WriteAllTextAsync(
+            manifestPath,
+            JsonSerializer.Serialize(
+                manifest,
+                new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true
+                }),
+            cancellationToken);
+    }
 }
+
+public sealed record RekallAgePlayablePackageManifest(
+    string Kind,
+    string SceneName,
+    string GameRoot,
+    string LaunchPath,
+    IReadOnlyList<string> Arguments,
+    IReadOnlyList<RekallAgePlayableGameCheck> Checks);

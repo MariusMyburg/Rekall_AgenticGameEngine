@@ -1092,6 +1092,7 @@ internal static class RekallAgeCli
         if (result.Ok)
         {
             Console.WriteLine($"Launch: {result.Value.LaunchPath}");
+            Console.WriteLine($"Manifest: {result.Value.ManifestPath}");
             Console.WriteLine($"Arguments: {string.Join(' ', result.Value.Arguments)}");
         }
         else

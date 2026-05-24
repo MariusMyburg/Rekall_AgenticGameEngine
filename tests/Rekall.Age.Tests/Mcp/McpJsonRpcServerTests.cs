@@ -179,13 +179,18 @@ public sealed class McpJsonRpcServerTests
     {
         var registry = new RekallAgeCommandRegistry();
         registry.Register(new ListGameTemplatesCommand());
+        registry.Register(new InspectGameTemplateCommand());
         var server = new RekallAgeMcpJsonRpcServer(registry);
 
         var response = await server.HandleJsonLineAsync(
             """{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"rekall.templates.list","arguments":{}}}""",
             CreateContext());
+        var inspectResponse = await server.HandleJsonLineAsync(
+            """{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"rekall.templates.inspect","arguments":{"templateId":"puzzle"}}}""",
+            CreateContext());
 
         using var document = JsonDocument.Parse(response!);
+        using var inspectDocument = JsonDocument.Parse(inspectResponse!);
         var result = document.RootElement.GetProperty("result");
         Assert.False(result.GetProperty("isError").GetBoolean());
         var templates = result.GetProperty("structuredContent").GetProperty("value").GetProperty("templates");
@@ -197,6 +202,12 @@ public sealed class McpJsonRpcServerTests
         Assert.Contains(drawCommands.EnumerateArray(), command =>
             command.GetProperty("id").GetString() == "objective" &&
             command.GetProperty("kind").GetString() == "text");
+        var inspect = inspectDocument.RootElement.GetProperty("result");
+        Assert.False(inspect.GetProperty("isError").GetBoolean());
+        var inspectValue = inspect.GetProperty("structuredContent").GetProperty("value");
+        Assert.Equal("puzzle", inspectValue.GetProperty("template").GetProperty("id").GetString());
+        Assert.Contains(inspectValue.GetProperty("suggestedCommands").EnumerateArray(), command =>
+            command.GetProperty("tool").GetString() == "rekall.workflow.create_playable_package_from_template");
     }
 
     [Fact]

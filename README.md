@@ -93,6 +93,7 @@ dotnet run --project src/Rekall.Age.Cli -- render resource add .age-sandbox fram
 dotnet run --project src/Rekall.Age.Cli -- render command-buffer record .age-sandbox main graphics '[{"op":"begin-render-pass","label":"frame","arguments":{"target":"frame-color","width":"32","height":"16","preferredDeviceType":"discrete-gpu"}},{"op":"clear","label":"sky","arguments":{"r":"0.25","g":"0.5","b":"0.75","a":"1"}},{"op":"end-render-pass","label":"frame","arguments":{}}]'
 dotnet run --project src/Rekall.Age.Cli -- render plan execute .age-sandbox .age-sandbox/Artifacts/Render
 dotnet run --project src/Rekall.Age.Cli -- module schemas
+dotnet run --project src/Rekall.Age.Cli -- templates inspect pong
 dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" pong
 dotnet run --project src/Rekall.Age.Cli -- game create-playable .age-sandbox "Playable Pong" pong
 dotnet run --project src/Rekall.Age.Cli -- game create-package-playable .age-sandbox "Packaged Pong" pong .age-sandbox/Builds/RekallAgePlayer .age-sandbox/Artifacts/PackageFrames

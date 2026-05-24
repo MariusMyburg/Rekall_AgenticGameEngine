@@ -10,6 +10,11 @@ public sealed class CliSmokeTests
         var root = TestPaths.CreateTempDirectory();
         var project = Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Cli", "Rekall.Age.Cli.csproj");
 
+        var template = await RunAsync(project, "templates", "inspect", "puzzle");
+        Assert.Equal(0, template.ExitCode);
+        Assert.Contains("puzzle: Puzzle Game", template.Output);
+        Assert.Contains("rekall.workflow.create_playable_package_from_template", template.Output);
+
         var create = await RunAsync(project, "game", "create", root, "Crystal Mines", "puzzle");
         Assert.Equal(0, create.ExitCode);
         Assert.Contains("Created puzzle game", create.Output);

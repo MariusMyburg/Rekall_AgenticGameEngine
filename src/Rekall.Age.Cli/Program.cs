@@ -41,6 +41,7 @@ internal static class RekallAgeCli
             return args switch
             {
                 ["templates", "list"] => ListTemplates(),
+                ["templates", "inspect", var templateId] => await InspectTemplateAsync(registry, context, templateId),
                 ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
                 ["render", "vulkan", "probe"] => await ProbeVulkanBackendAsync(registry, context),
                 ["render", "vulkan", "device", "bootstrap"] =>
@@ -189,6 +190,7 @@ internal static class RekallAgeCli
         registry.Register(new CreateGameFromTemplateCommand());
         registry.Register(new CreatePlayableGameFromTemplateCommand());
         registry.Register(new CreatePlayablePackageFromTemplateCommand());
+        registry.Register(new InspectGameTemplateCommand());
         registry.Register(new VerifyPlayableGameCommand());
         registry.Register(new PackagePlayableGameCommand());
         registry.Register(new InspectPlayablePackageCommand());
@@ -239,6 +241,39 @@ internal static class RekallAgeCli
         }
 
         return 0;
+    }
+
+    private static async Task<int> InspectTemplateAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string templateId)
+    {
+        var result = await registry.ExecuteAsync<InspectGameTemplateRequest, InspectGameTemplateResult>(
+            "rekall.templates.inspect",
+            new InspectGameTemplateRequest(templateId),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"{result.Value.Template.Id}: {result.Value.Template.DisplayName}");
+        Console.WriteLine(result.Value.Template.Description);
+        Console.WriteLine($"Capabilities: {string.Join(", ", result.Value.Template.Capabilities)}");
+        Console.WriteLine("Draw commands:");
+        foreach (var command in result.Value.Template.DrawCommands)
+        {
+            Console.WriteLine($"  {command.Id}: {command.Kind} - {command.Purpose}");
+        }
+
+        Console.WriteLine("Suggested tools:");
+        foreach (var command in result.Value.SuggestedCommands)
+        {
+            Console.WriteLine($"  {command.Tool}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok ? 0 : 1;
     }
 
     private static async Task<int> ListRenderBackendsAsync(

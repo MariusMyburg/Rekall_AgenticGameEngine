@@ -105,6 +105,24 @@ public sealed class GameTemplateWorkflowTests
     }
 
     [Fact]
+    public async Task InspectTemplateReturnsAgentWorkflowGuidance()
+    {
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("inspect template"), CancellationToken.None);
+
+        var result = await new InspectGameTemplateCommand().ExecuteAsync(
+            new InspectGameTemplateRequest("pong"),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal("pong", result.Value.Template.Id);
+        Assert.Contains(result.Value.Template.DrawCommands, command => command.Id == "ball" && command.Kind == "circle");
+        Assert.Contains(result.Value.SuggestedCommands, command => command.Tool == "rekall.workflow.create_playable_package_from_template");
+        var packageCommand = result.Value.SuggestedCommands.Single(command => command.Tool == "rekall.workflow.create_playable_package_from_template");
+        Assert.Equal("pong", packageCommand.Arguments["templateId"]);
+        Assert.Equal("Main", packageCommand.Arguments["sceneName"]);
+    }
+
+    [Fact]
     public async Task VerifyPlayableGamePassesForBuiltPlayableTemplate()
     {
         var root = TestPaths.CreateTempDirectory();

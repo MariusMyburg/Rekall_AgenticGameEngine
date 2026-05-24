@@ -8,6 +8,7 @@ using Rekall.Age.GameTemplates;
 using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.Mcp;
 using Rekall.Age.Modules.Commands;
+using Rekall.Age.Playback.Commands;
 using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering;
@@ -58,6 +59,7 @@ internal static class RekallAgeCli
                 ["entity", "inspect", var root, var scene, var entityId] => await InspectEntityAsync(registry, context, root, scene, entityId),
                 ["component", "set", var root, var scene, var entityId, var componentType, var propertyName, var value] =>
                     await SetComponentPropertyAsync(registry, context, root, scene, entityId, componentType, propertyName, value),
+                ["play", "scene", var root, var scene, var frames] => await PlaySceneAsync(registry, context, root, scene, frames),
                 ["run", "scene", var root, var scene, var seconds] => await RunSceneAsync(registry, context, root, scene, seconds),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
@@ -91,6 +93,7 @@ internal static class RekallAgeCli
         registry.Register(new BuildModulesCommand());
         registry.Register(new ImportAssetCommand());
         registry.Register(new ListAssetsCommand());
+        registry.Register(new PlaySceneCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
         return registry;
@@ -119,6 +122,28 @@ internal static class RekallAgeCli
             new ImportAssetRequest(root, source, kind, displayName),
             context);
         Console.WriteLine($"{result.Value.Asset.Id}: {result.Value.Asset.ImportedPath}");
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> PlaySceneAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string frames)
+    {
+        var count = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<PlaySceneRequest, PlaySceneResult>(
+            "rekall.play.scene",
+            new PlaySceneRequest(root, scene, count),
+            context);
+        Console.WriteLine(result.Summary);
+        foreach (var frame in result.Value.Frames)
+        {
+            Console.WriteLine("FRAME");
+            Console.Write(frame);
+        }
+
         return result.Ok ? 0 : 1;
     }
 

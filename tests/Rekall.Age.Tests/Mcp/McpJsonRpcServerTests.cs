@@ -1,8 +1,10 @@
 using System.Text.Json;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
+using Rekall.Age.Build.Commands;
 using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.Mcp;
+using Rekall.Age.Modules.Commands;
 using Rekall.Age.Playback.Commands;
 using Rekall.Age.Rendering;
 
@@ -296,6 +298,139 @@ public sealed class McpJsonRpcServerTests
             .GetBoolean());
     }
 
+    [Fact]
+    public async Task ToolsCallCanAuthorBuildAndPlaytestCustomModuleGame()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CreateGameFromTemplateCommand());
+        registry.Register(new ScaffoldPlayableModuleCommand());
+        registry.Register(new WriteModuleSourceCommand());
+        registry.Register(new BuildModulesCommand());
+        registry.Register(new PlaytestSceneCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var createResponse = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 30,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.workflow.create_game_from_template",
+                arguments = new
+                {
+                    projectRoot = root,
+                    projectName = "MCP Authored Pong",
+                    templateId = "pong"
+                }
+            }
+        }), CreateContext());
+        var scaffoldResponse = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 31,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.module.scaffold_playable",
+                arguments = new
+                {
+                    projectRoot = root,
+                    moduleId = "mcp.authored",
+                    displayName = "MCP Authored",
+                    moduleName = "McpAuthored",
+                    kind = "pong"
+                }
+            }
+        }), CreateContext());
+        var writeResponse = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 32,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.module.write_source",
+                arguments = new
+                {
+                    projectRoot = root,
+                    moduleName = "McpAuthored",
+                    fileName = "McpAuthoredModule.cs",
+                    source = CreateMcpAuthoredPlayableSource()
+                }
+            }
+        }), CreateContext());
+        var buildResponse = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 33,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.build.modules",
+                arguments = new
+                {
+                    projectRoot = root
+                }
+            }
+        }), CreateContext());
+        var playtestResponse = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 34,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.playtest.scene",
+                arguments = new
+                {
+                    projectRoot = root,
+                    sceneName = "Main",
+                    frames = 1,
+                    inputs = new[]
+                    {
+                        new
+                        {
+                            verticalAxis = 1,
+                            primaryAction = true
+                        }
+                    },
+                    assertions = new[]
+                    {
+                        new
+                        {
+                            frameIndex = 0,
+                            contains = "MCP AUTHORED PONG"
+                        },
+                        new
+                        {
+                            frameIndex = 0,
+                            contains = "Score 77"
+                        }
+                    }
+                }
+            }
+        }), CreateContext());
+
+        using var createDocument = JsonDocument.Parse(createResponse!);
+        using var scaffoldDocument = JsonDocument.Parse(scaffoldResponse!);
+        using var writeDocument = JsonDocument.Parse(writeResponse!);
+        using var buildDocument = JsonDocument.Parse(buildResponse!);
+        using var playtestDocument = JsonDocument.Parse(playtestResponse!);
+        Assert.False(createDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.False(scaffoldDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.False(writeDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.False(buildDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.False(playtestDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.True(playtestDocument.RootElement
+            .GetProperty("result")
+            .GetProperty("structuredContent")
+            .GetProperty("value")
+            .GetProperty("passed")
+            .GetBoolean());
+    }
+
     private static RekallAgeMcpJsonRpcServer CreateServer()
     {
         var registry = new RekallAgeCommandRegistry();
@@ -306,6 +441,48 @@ public sealed class McpJsonRpcServerTests
     private static RekallAgeCommandContext CreateContext()
     {
         return new RekallAgeCommandContext("mcp-test", RekallAgeTransaction.Begin("mcp"), CancellationToken.None);
+    }
+
+    private static string CreateMcpAuthoredPlayableSource()
+    {
+        return """
+using Rekall.Age.Modules;
+
+namespace Game.Modules.McpAuthored;
+
+[RekallAgeModule("mcp.authored", "MCP Authored")]
+[RekallAgeRequiresCapability("world")]
+public sealed class McpAuthoredModule : RekallAgeModule, IRekallAgePlayableModule
+{
+    public string Kind => "pong";
+
+    public override void Configure(RekallAgeModuleBuilder builder)
+    {
+    }
+
+    public RekallAgePlayableModuleState CreateInitialState(RekallAgePlayableModuleContext context)
+    {
+        var state = new RekallAgePlayableModuleState();
+        state.Numbers["score"] = 0;
+        state.Numbers["frame"] = 0;
+        return state;
+    }
+
+    public void Tick(RekallAgePlayableModuleState state, RekallAgePlayableModuleInput input)
+    {
+        state.Numbers["frame"] += 1;
+        if (input.PrimaryAction)
+        {
+            state.Numbers["score"] += 77;
+        }
+    }
+
+    public RekallAgePlayableModuleFrame Render(RekallAgePlayableModuleState state)
+    {
+        return new RekallAgePlayableModuleFrame($"MCP AUTHORED PONG\nFrame {(int)state.Numbers["frame"]}\nScore {(int)state.Numbers["score"]}");
+    }
+}
+""";
     }
 
     private sealed record EchoRequest(string Message);

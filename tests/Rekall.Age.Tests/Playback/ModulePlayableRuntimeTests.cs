@@ -138,6 +138,40 @@ public sealed class ModulePlayableRuntimeTests
     }
 
     [Fact]
+    public async Task PlaytestScenePassesWhenDrawCommandAssertionsMatchRenderedFrame()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("module draw playtest"), CancellationToken.None);
+        await new CreatePlayableGameFromTemplateCommand().ExecuteAsync(
+            new CreatePlayableGameFromTemplateRequest(root, "Draw Playtest Pong", "pong"),
+            context);
+
+        var playtestResult = await new PlaytestSceneCommand().ExecuteAsync(
+            new PlaytestSceneRequest(
+                root,
+                "Main",
+                1,
+                [
+                    new RekallAgePlaybackInput(1, PrimaryAction: true)
+                ],
+                [
+                    new RekallAgeFrameAssertion(0, "Score 10")
+                ],
+                [
+                    new RekallAgeDrawCommandAssertion(0, Kind: "clear"),
+                    new RekallAgeDrawCommandAssertion(0, Id: "left-paddle", Kind: "rect"),
+                    new RekallAgeDrawCommandAssertion(0, Id: "ball", Kind: "circle"),
+                    new RekallAgeDrawCommandAssertion(0, Kind: "text", TextContains: "Score 10")
+                ]),
+            context);
+
+        Assert.True(playtestResult.Ok, playtestResult.Summary);
+        Assert.True(playtestResult.Value.Passed);
+        Assert.All(playtestResult.Value.DrawAssertions, assertion => Assert.True(assertion.Passed));
+        Assert.Contains(playtestResult.Value.RenderFrames[0].DrawCommands, command => command.Id == "ball");
+    }
+
+    [Fact]
     public async Task PlaytestSceneFailsWithStructuredAssertionDetailsWhenFrameDoesNotMatch()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -165,5 +199,37 @@ public sealed class ModulePlayableRuntimeTests
         Assert.Equal(0, failedAssertion.FrameIndex);
         Assert.Equal("Score 999", failedAssertion.Contains);
         Assert.Contains("PONG", failedAssertion.Frame, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PlaytestSceneFailsWithStructuredDrawAssertionDetailsWhenCommandDoesNotMatch()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("module draw playtest failure"), CancellationToken.None);
+        await new CreatePlayableGameFromTemplateCommand().ExecuteAsync(
+            new CreatePlayableGameFromTemplateRequest(root, "Draw Failure Pong", "pong"),
+            context);
+
+        var playtestResult = await new PlaytestSceneCommand().ExecuteAsync(
+            new PlaytestSceneRequest(
+                root,
+                "Main",
+                1,
+                null,
+                null,
+                [
+                    new RekallAgeDrawCommandAssertion(0, Id: "boss-health-bar", Kind: "rect")
+                ]),
+            context);
+
+        Assert.False(playtestResult.Ok);
+        Assert.False(playtestResult.Value.Passed);
+        Assert.Contains(playtestResult.Errors, error => error.Code == "REKALL_PLAYTEST_FAILED");
+        var failedAssertion = Assert.Single(playtestResult.Value.DrawAssertions);
+        Assert.False(failedAssertion.Passed);
+        Assert.Equal(0, failedAssertion.FrameIndex);
+        Assert.Equal("boss-health-bar", failedAssertion.Id);
+        Assert.Equal("rect", failedAssertion.Kind);
+        Assert.Empty(failedAssertion.MatchingCommands);
     }
 }

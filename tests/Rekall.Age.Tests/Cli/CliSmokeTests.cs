@@ -65,11 +65,13 @@ public sealed class CliSmokeTests
             "Main",
             "2",
             """[{"verticalAxis":1,"primaryAction":true},{"verticalAxis":-1,"primaryAction":false}]""",
-            """[{"frameIndex":0,"contains":"Score 10"},{"frameIndex":1,"contains":"Left paddle lane 0"}]""");
+            """[{"frameIndex":0,"contains":"Score 10"},{"frameIndex":1,"contains":"Left paddle lane 0"}]""",
+            """[{"frameIndex":0,"id":"ball","kind":"circle"},{"frameIndex":0,"kind":"text","textContains":"Score 10"}]""");
 
         Assert.Equal(0, playtest.ExitCode);
         Assert.Contains("Passed: True", playtest.Output);
         Assert.Contains("Assertion frame 0 contains \"Score 10\": True", playtest.Output);
+        Assert.Contains("Draw assertion frame 0 id=ball kind=circle text=<any>: True", playtest.Output);
 
         var captureDirectory = Path.Combine(root, "PlayCaptures");
         var capture = await RunAsync(project, "play", "capture-frame", root, "Main", captureDirectory, "1");

@@ -116,6 +116,34 @@ public sealed class McpJsonRpcServerTests
         Assert.Equal("integer", properties.GetProperty("verticalAxis").GetProperty("type").GetString());
     }
 
+    [Fact]
+    public async Task ToolsListExposesDrawAssertionArrayItemProperties()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new PlaytestSceneCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(
+            """{"jsonrpc":"2.0","id":2,"method":"tools/list"}""",
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var inputItem = document.RootElement
+            .GetProperty("result")
+            .GetProperty("tools")[0]
+            .GetProperty("inputSchema")
+            .GetProperty("properties")
+            .GetProperty("drawAssertions")
+            .GetProperty("items");
+        Assert.Equal("object", inputItem.GetProperty("type").GetString());
+        var properties = inputItem.GetProperty("properties");
+        Assert.Equal("integer", properties.GetProperty("frameIndex").GetProperty("type").GetString());
+        Assert.Equal("string", properties.GetProperty("kind").GetProperty("type").GetString());
+        Assert.Equal("string", properties.GetProperty("id").GetProperty("type").GetString());
+        Assert.Equal("string", properties.GetProperty("textContains").GetProperty("type").GetString());
+        Assert.Equal("boolean", properties.GetProperty("mustExist").GetProperty("type").GetString());
+    }
+
 
     [Fact]
     public async Task JsonLinesCanStartWithUtf8Bom()
@@ -292,6 +320,23 @@ public sealed class McpJsonRpcServerTests
                                 frameIndex = 1,
                                 contains = "Left paddle lane 0"
                             }
+                        },
+                        drawAssertions = new[]
+                        {
+                            new
+                            {
+                                frameIndex = 0,
+                                id = (string?)"ball",
+                                kind = "circle",
+                                textContains = (string?)null
+                            },
+                            new
+                            {
+                                frameIndex = 0,
+                                id = (string?)null,
+                                kind = "text",
+                                textContains = (string?)"Score 10"
+                            }
                         }
                     }
                 }
@@ -308,6 +353,13 @@ public sealed class McpJsonRpcServerTests
             .GetProperty("value")
             .GetProperty("passed")
             .GetBoolean());
+        var playtestValue = playtestDocument.RootElement
+            .GetProperty("result")
+            .GetProperty("structuredContent")
+            .GetProperty("value");
+        Assert.True(playtestValue.GetProperty("drawAssertions")[0].GetProperty("passed").GetBoolean());
+        Assert.Equal("ball", playtestValue.GetProperty("drawAssertions")[0].GetProperty("matchingCommands")[0].GetProperty("id").GetString());
+        Assert.Equal("circle", playtestValue.GetProperty("drawAssertions")[0].GetProperty("matchingCommands")[0].GetProperty("kind").GetString());
     }
 
     [Fact]

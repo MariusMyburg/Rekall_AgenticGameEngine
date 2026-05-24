@@ -142,9 +142,11 @@ internal static class RekallAgeCli
                 ["play", "capture-frame", var root, var scene, var outputDirectory, var frameIndex, var inputsJson] =>
                     await CapturePlayableFrameAsync(registry, context, root, scene, outputDirectory, frameIndex, inputsJson),
                 ["playtest", "scene", var root, var scene, var frames, var assertionsJson] =>
-                    await PlaytestSceneAsync(registry, context, root, scene, frames, null, assertionsJson),
+                    await PlaytestSceneAsync(registry, context, root, scene, frames, null, assertionsJson, null),
                 ["playtest", "scene", var root, var scene, var frames, var inputsJson, var assertionsJson] =>
-                    await PlaytestSceneAsync(registry, context, root, scene, frames, inputsJson, assertionsJson),
+                    await PlaytestSceneAsync(registry, context, root, scene, frames, inputsJson, assertionsJson, null),
+                ["playtest", "scene", var root, var scene, var frames, var inputsJson, var assertionsJson, var drawAssertionsJson] =>
+                    await PlaytestSceneAsync(registry, context, root, scene, frames, inputsJson, assertionsJson, drawAssertionsJson),
                 ["run", "scene", var root, var scene, var seconds] => await RunSceneAsync(registry, context, root, scene, seconds),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
@@ -751,14 +753,16 @@ internal static class RekallAgeCli
         string scene,
         string frames,
         string? inputsJson,
-        string assertionsJson)
+        string assertionsJson,
+        string? drawAssertionsJson)
     {
         var count = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
         var inputs = await ParsePlaybackInputsAsync(inputsJson, context.CancellationToken);
         var assertions = await ParseFrameAssertionsAsync(assertionsJson, context.CancellationToken);
+        var drawAssertions = await ParseDrawAssertionsAsync(drawAssertionsJson, context.CancellationToken);
         var result = await registry.ExecuteAsync<PlaytestSceneRequest, PlaytestSceneResult>(
             "rekall.playtest.scene",
-            new PlaytestSceneRequest(root, scene, count, inputs, assertions),
+            new PlaytestSceneRequest(root, scene, count, inputs, assertions, drawAssertions),
             context);
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Passed: {result.Value.Passed}");
@@ -768,6 +772,14 @@ internal static class RekallAgeCli
         {
             var expected = assertion.MustContain ? "contains" : "does not contain";
             Console.WriteLine($"Assertion frame {assertion.FrameIndex} {expected} \"{assertion.Contains}\": {assertion.Passed}");
+        }
+
+        foreach (var assertion in result.Value.DrawAssertions)
+        {
+            var id = assertion.Id ?? "<any>";
+            var kind = assertion.Kind ?? "<any>";
+            var text = assertion.TextContains ?? "<any>";
+            Console.WriteLine($"Draw assertion frame {assertion.FrameIndex} id={id} kind={kind} text={text}: {assertion.Passed}");
         }
 
         foreach (var error in result.Errors)
@@ -1360,6 +1372,30 @@ internal static class RekallAgeCli
         catch (System.Text.Json.JsonException ex)
         {
             throw new ArgumentException($"Frame assertions JSON is invalid: {ex.Message}", ex);
+        }
+    }
+
+    private static async ValueTask<IReadOnlyList<RekallAgeDrawCommandAssertion>?> ParseDrawAssertionsAsync(
+        string? assertionsJson,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(assertionsJson))
+        {
+            return null;
+        }
+
+        var payload = File.Exists(assertionsJson)
+            ? await File.ReadAllTextAsync(assertionsJson, cancellationToken)
+            : assertionsJson;
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<RekallAgeDrawCommandAssertion[]>(
+                payload,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new ArgumentException($"Draw assertions JSON is invalid: {ex.Message}", ex);
         }
     }
 }

@@ -3,6 +3,8 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.GameTemplates;
 using Rekall.Age.GameTemplates.Commands;
+using Rekall.Age.Playback;
+using Rekall.Age.Playback.Commands;
 using Rekall.Age.Project;
 using Rekall.Age.Rendering;
 using Rekall.Age.Runtime;
@@ -77,5 +79,57 @@ public sealed class GameTemplateWorkflowTests
         var serialized = System.Text.Json.JsonSerializer.Serialize(catalog.Templates);
 
         Assert.DoesNotContain("placeholder", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task VerifyPlayableGamePassesForBuiltPlayableTemplate()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("verify playable"), CancellationToken.None);
+        var create = await new CreatePlayableGameFromTemplateCommand().ExecuteAsync(
+            new CreatePlayableGameFromTemplateRequest(root, "Verified Pong", "pong"),
+            context);
+        Assert.True(create.Ok, create.Summary);
+
+        var result = await new VerifyPlayableGameCommand().ExecuteAsync(
+            new VerifyPlayableGameRequest(
+                root,
+                "Main",
+                2,
+                [
+                    new RekallAgePlaybackInput(1, PrimaryAction: true),
+                    new RekallAgePlaybackInput(-1)
+                ],
+                [
+                    new RekallAgeFrameAssertion(0, "Score 10"),
+                    new RekallAgeFrameAssertion(1, "Left paddle lane 0")
+                ]),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.Ready);
+        Assert.All(result.Value.Checks, check => Assert.True(check.Passed, check.Summary));
+        Assert.True(result.Value.BuildSucceeded);
+        Assert.True(result.Value.PlaytestPassed);
+    }
+
+    [Fact]
+    public async Task VerifyPlayableGameFailsWithStructuredChecksWhenPlayableModuleIsMissing()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("verify missing playable"), CancellationToken.None);
+        var create = await new CreateGameFromTemplateCommand().ExecuteAsync(
+            new CreateGameFromTemplateRequest(root, "Unbuilt Pong", "pong"),
+            context);
+        Assert.True(create.Ok, create.Summary);
+
+        var result = await new VerifyPlayableGameCommand().ExecuteAsync(
+            new VerifyPlayableGameRequest(root, "Main", 1),
+            context);
+
+        Assert.False(result.Ok);
+        Assert.False(result.Value.Ready);
+        Assert.Contains(result.Value.Checks, check => check.Name == "module-build" && !check.Passed);
+        Assert.Contains(result.Errors, error => error.Code == "REKALL_PLAYABLE_GAME_NOT_READY");
     }
 }

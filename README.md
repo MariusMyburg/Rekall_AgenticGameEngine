@@ -2,4 +2,54 @@
 
 Rekall AGE is a greenfield, agent-native C# game engine.
 
-The first MVP focuses on the command bus, project capabilities, deterministic world files, validation, agent context, CLI/MCP adapters, headless runtime, deterministic screenshot capture, and built-in starter game workflows.
+The current MVP includes:
+
+- typed command bus through `IRekallAgeCommand`
+- transaction tracking
+- project capability manifests
+- deterministic scene/entity/component files
+- structured validation
+- compact agent project summaries
+- MCP tool catalog skeleton
+- CLI adapter over the same command bus
+- headless runtime smoke execution
+- deterministic software screenshot capture
+- built-in starter game workflows
+
+## Starter Game Workflows
+
+Agents can create these game foundations through the command bus or CLI:
+
+- `pong`
+- `breakout`
+- `asteroids`
+- `top-down-shooter`
+- `platformer-2d`
+- `tower-defense`
+- `visual-novel`
+- `first-person-exploration`
+- `collectathon-3d`
+- `puzzle`
+
+Each template creates a project manifest, `Main` scene, active camera, playable loop marker, and starter entities/components appropriate to the genre.
+
+## Build
+
+```powershell
+dotnet build Rekall.AGE.sln
+```
+
+## Test
+
+```powershell
+dotnet test Rekall.AGE.sln
+```
+
+## CLI Example
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- templates list
+dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" puzzle
+dotnet run --project src/Rekall.Age.Cli -- context summary .age-sandbox
+dotnet run --project src/Rekall.Age.Cli -- capture screenshot .age-sandbox Main
+```

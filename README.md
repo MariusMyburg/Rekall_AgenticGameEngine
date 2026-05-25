@@ -38,6 +38,8 @@ The current MVP includes:
 - stdio MCP JSON-RPC adapter for `initialize`, `tools/list`, and `tools/call`
 - CLI adapter over the same command bus
 - headless runtime smoke execution with active gameplay-system observations
+- canonical runtime scene snapshots with render, physics, audio, animation, and UI projections
+- runtime scene inspection through command bus, CLI, MCP catalog, and Studio read models
 - deterministic software screenshot capture through command bus
 - built-in starter game workflows
 - one-shot playable game workflow that creates, scaffolds, and builds genre-aware C# module code
@@ -126,6 +128,7 @@ dotnet run --project src/Rekall.Age.Cli -- build player .age-sandbox Main
 dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main
 dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main --frames 2 --inputs '[{"verticalAxis":1,"primaryAction":true},{"verticalAxis":-1}]'
 dotnet run --project src/Rekall.Age.Cli -- run scene .age-sandbox Main 0.1
+dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
 dotnet run --project src/Rekall.Age.Cli -- capture screenshot .age-sandbox Main
 ```
 
@@ -142,3 +145,13 @@ dotnet run --project src/Rekall.Age.Cli -- level prefab instantiate .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- level entity snap .age-sandbox Main <entity-id> 1
 dotnet run --project src/Rekall.Age.Studio -- --project .age-sandbox --scene Main
 ```
+
+## Scene Runtime Foundation
+
+Inspect a deterministic runtime snapshot without mutating authoring files:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
+```
+
+The command reports entity counts, renderable counts, physics/audio/animation/UI readiness, and structured runtime observations for agents and Studio.

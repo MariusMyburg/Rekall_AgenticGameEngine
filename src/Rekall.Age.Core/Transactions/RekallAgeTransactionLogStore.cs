@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace Rekall.Age.Core.Transactions;
@@ -17,6 +18,9 @@ public sealed record RekallAgeTransactionLogEntry(
 {
     public IReadOnlyList<RekallAgeTransactionResourceChange> ResourceChanges { get; init; } =
         Array.Empty<RekallAgeTransactionResourceChange>();
+
+    public IReadOnlyList<RekallAgeTransactionResourcePreimageEntry> ResourcePreimages { get; init; } =
+        Array.Empty<RekallAgeTransactionResourcePreimageEntry>();
 }
 
 public sealed record RekallAgeTransactionResourceChange(
@@ -25,6 +29,14 @@ public sealed record RekallAgeTransactionResourceChange(
     string Kind,
     bool Exists,
     long? SizeBytes);
+
+public sealed record RekallAgeTransactionResourcePreimageEntry(
+    string Path,
+    string RelativePath,
+    bool ExistedBefore,
+    string? SnapshotPath,
+    long? SizeBytes,
+    string? Sha256);
 
 public sealed class RekallAgeTransactionLogStore
 {
@@ -63,6 +75,7 @@ public sealed class RekallAgeTransactionLogStore
         CancellationToken cancellationToken)
     {
         var existing = await LoadAsync(projectRoot, cancellationToken);
+        var resourcePreimages = await PersistPreimagesAsync(projectRoot, transaction, cancellationToken);
         var entry = new RekallAgeTransactionLogEntry(
             transaction.Id,
             transaction.Name,
@@ -72,7 +85,8 @@ public sealed class RekallAgeTransactionLogStore
         {
             ResourceChanges = transaction.ChangedResources
                 .Select(resource => RekallAgeTransactionResourceChangeSummarizer.Summarize(projectRoot, resource))
-                .ToArray()
+                .ToArray(),
+            ResourcePreimages = resourcePreimages
         };
         var document = new RekallAgeTransactionLogDocument(
             existing.Transactions
@@ -84,6 +98,66 @@ public sealed class RekallAgeTransactionLogStore
         Directory.CreateDirectory(Path.GetDirectoryName(GetPath(projectRoot))!);
         var json = JsonSerializer.Serialize(document, JsonOptions);
         await File.WriteAllTextAsync(GetPath(projectRoot), json + Environment.NewLine, cancellationToken);
+    }
+
+    private static async ValueTask<IReadOnlyList<RekallAgeTransactionResourcePreimageEntry>> PersistPreimagesAsync(
+        string projectRoot,
+        RekallAgeTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        if (transaction.ResourcePreimages.Count == 0)
+        {
+            return Array.Empty<RekallAgeTransactionResourcePreimageEntry>();
+        }
+
+        var snapshotsDirectory = Path.Combine(projectRoot, "Transactions", "Snapshots", transaction.Id);
+        Directory.CreateDirectory(snapshotsDirectory);
+        var entries = new List<RekallAgeTransactionResourcePreimageEntry>();
+        for (var index = 0; index < transaction.ResourcePreimages.Count; index++)
+        {
+            var preimage = transaction.ResourcePreimages[index];
+            var fullPath = Path.GetFullPath(preimage.Resource);
+            var relativePath = GetRelativePath(projectRoot, fullPath);
+            string? snapshotPath = null;
+            string? sha256 = null;
+            long? sizeBytes = null;
+            if (preimage.ExistedBefore)
+            {
+                sha256 = Convert.ToHexString(SHA256.HashData(preimage.Content)).ToLowerInvariant();
+                sizeBytes = preimage.Content.LongLength;
+                var snapshotFileName = $"{index:D4}-{SanitizeFileName(Path.GetFileName(preimage.Resource))}-{sha256[..12]}.preimage";
+                var snapshotFullPath = Path.Combine(snapshotsDirectory, snapshotFileName);
+                await File.WriteAllBytesAsync(snapshotFullPath, preimage.Content, cancellationToken);
+                snapshotPath = Path.GetRelativePath(projectRoot, snapshotFullPath);
+            }
+
+            entries.Add(new RekallAgeTransactionResourcePreimageEntry(
+                fullPath,
+                relativePath,
+                preimage.ExistedBefore,
+                snapshotPath,
+                sizeBytes,
+                sha256));
+        }
+
+        return entries;
+    }
+
+    private static string GetRelativePath(string projectRoot, string fullPath)
+    {
+        var projectFullPath = Path.GetFullPath(projectRoot);
+        var normalizedRoot = projectFullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        return fullPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase)
+            ? Path.GetRelativePath(projectFullPath, fullPath)
+            : fullPath;
+    }
+
+    private static string SanitizeFileName(string fileName)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var chars = fileName.Select(character => invalid.Contains(character) ? '_' : character).ToArray();
+        return new string(chars);
     }
 }
 

@@ -1751,6 +1751,12 @@ internal static class RekallAgeCli
                     : "missing";
                 Console.WriteLine($"  - {resource.RelativePath} {resource.Kind} {state}");
             }
+
+            foreach (var preimage in transaction.ResourcePreimages)
+            {
+                var snapshot = preimage.SnapshotPath is null ? "<none>" : preimage.SnapshotPath;
+                Console.WriteLine($"  preimage {preimage.RelativePath} existed={preimage.ExistedBefore} snapshot={snapshot}");
+            }
         }
 
         return result.Ok ? 0 : 1;

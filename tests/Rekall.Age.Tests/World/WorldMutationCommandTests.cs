@@ -37,6 +37,10 @@ public sealed class WorldMutationCommandTests
         var component = Assert.Single(updated.Entities.Single().Components);
         Assert.Equal(7, component.Properties["speed"]!.GetValue<int>());
         Assert.Equal(3, component.Properties["health"]!.GetValue<int>());
+        var preimage = Assert.Single(context.Transaction.ResourcePreimages);
+        Assert.EndsWith("Main.age.scene.json", preimage.Resource, StringComparison.Ordinal);
+        Assert.True(preimage.ExistedBefore);
+        Assert.Contains("\"speed\": 4", preimage.ReadUtf8Text(), StringComparison.Ordinal);
     }
 
     [Fact]

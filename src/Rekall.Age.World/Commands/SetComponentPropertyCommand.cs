@@ -36,8 +36,10 @@ public sealed class SetComponentPropertyCommand
             entity => entity.UpdateComponent(
                 request.ComponentType,
                 component => component.SetProperty(request.PropertyName, request.Value)));
+        var scenePath = _store.GetScenePath(request.ProjectRoot, request.SceneName);
+        context.Transaction.CaptureResourcePreimage(scenePath);
         await _store.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
-        context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
+        context.Transaction.RecordChangedResource(scenePath);
 
         return RekallAgeCommandResult<SetComponentPropertyResult>.Success(
             new SetComponentPropertyResult(updated),

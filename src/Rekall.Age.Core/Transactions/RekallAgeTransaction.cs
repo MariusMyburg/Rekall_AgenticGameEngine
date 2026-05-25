@@ -3,6 +3,7 @@ namespace Rekall.Age.Core.Transactions;
 public sealed class RekallAgeTransaction
 {
     private readonly List<string> _changedResources = [];
+    private readonly List<RekallAgeTransactionResourcePreimage> _resourcePreimages = [];
 
     private RekallAgeTransaction(string name)
     {
@@ -18,6 +19,8 @@ public sealed class RekallAgeTransaction
     public DateTimeOffset StartedAtUtc { get; }
 
     public IReadOnlyList<string> ChangedResources => _changedResources;
+
+    public IReadOnlyList<RekallAgeTransactionResourcePreimage> ResourcePreimages => _resourcePreimages;
 
     public static RekallAgeTransaction Begin(string name)
     {
@@ -40,5 +43,34 @@ public sealed class RekallAgeTransaction
         {
             _changedResources.Add(resource);
         }
+    }
+
+    public void CaptureResourcePreimage(string resource)
+    {
+        if (string.IsNullOrWhiteSpace(resource))
+        {
+            throw new ArgumentException("Resource preimage path is required.", nameof(resource));
+        }
+
+        if (_resourcePreimages.Any(preimage => preimage.Resource.Equals(resource, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        var content = File.Exists(resource)
+            ? File.ReadAllBytes(resource)
+            : Array.Empty<byte>();
+        _resourcePreimages.Add(new RekallAgeTransactionResourcePreimage(resource, File.Exists(resource), content));
+    }
+}
+
+public sealed record RekallAgeTransactionResourcePreimage(
+    string Resource,
+    bool ExistedBefore,
+    byte[] Content)
+{
+    public string ReadUtf8Text()
+    {
+        return System.Text.Encoding.UTF8.GetString(Content);
     }
 }

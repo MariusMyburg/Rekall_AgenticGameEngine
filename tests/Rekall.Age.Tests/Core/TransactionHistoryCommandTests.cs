@@ -1,5 +1,7 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
+using Rekall.Age.World;
+using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Tests.Core;
 
@@ -67,5 +69,48 @@ public sealed class TransactionHistoryCommandTests
         var transaction = Assert.Single(document.Transactions);
         Assert.Equal("txn_old", transaction.Id);
         Assert.Empty(transaction.ResourceChanges);
+        Assert.Empty(transaction.ResourcePreimages);
+    }
+
+    [Fact]
+    public async Task TransactionHistoryPersistsResourcePreimageSnapshots()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await File.WriteAllTextAsync(Path.Combine(root, "rekall.project.json"), "{}", CancellationToken.None);
+        var sceneStore = new RekallAgeSceneStore();
+        var entity = RekallAgeEntityDocument.Create("Player", ["player"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Game.PlayerController",
+                new System.Text.Json.Nodes.JsonObject
+                {
+                    ["speed"] = 4,
+                    ["health"] = 3
+                }));
+        await sceneStore.SaveAsync(root, RekallAgeSceneDocument.Create("Main", ["2d"]).AddEntity(entity), CancellationToken.None);
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("set speed"), CancellationToken.None);
+
+        var result = await new SetComponentPropertyCommand().ExecuteAsync(
+            new SetComponentPropertyRequest(
+                root,
+                "Main",
+                entity.Id,
+                "Game.PlayerController",
+                "speed",
+                System.Text.Json.Nodes.JsonValue.Create(7)!),
+            context);
+        await new RekallAgeTransactionLogStore().AppendAsync(root, context.Transaction, context.Actor, CancellationToken.None);
+
+        Assert.True(result.Ok, result.Summary);
+        var log = await new RekallAgeTransactionLogStore().LoadAsync(root, CancellationToken.None);
+        var transaction = Assert.Single(log.Transactions);
+        var preimage = Assert.Single(transaction.ResourcePreimages);
+        Assert.Equal(Path.Combine("Scenes", "Main.age.scene.json"), preimage.RelativePath);
+        Assert.True(preimage.ExistedBefore);
+        Assert.NotNull(preimage.SnapshotPath);
+        Assert.True(preimage.SizeBytes > 0);
+        Assert.False(string.IsNullOrWhiteSpace(preimage.Sha256));
+        var snapshot = await File.ReadAllTextAsync(Path.Combine(root, preimage.SnapshotPath!), CancellationToken.None);
+        Assert.Contains("\"speed\": 4", snapshot, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"speed\": 7", snapshot, StringComparison.Ordinal);
     }
 }

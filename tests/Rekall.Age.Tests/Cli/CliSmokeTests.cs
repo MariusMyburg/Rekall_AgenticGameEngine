@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Rekall.Age.Core.Transactions;
 
 namespace Rekall.Age.Tests.Cli;
 
@@ -172,6 +173,23 @@ public sealed class CliSmokeTests
         Assert.Equal(1, playtest.ExitCode);
         Assert.Contains("JSON is invalid", playtest.Output);
         Assert.DoesNotContain("Unhandled exception", playtest.Output);
+    }
+
+    [Fact]
+    public async Task CliPersistsSuccessfulProjectTransactions()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var cliAssembly = FindCliAssemblyPath();
+
+        var create = await RunAsync(cliAssembly, "project", "create", root, "Transaction CLI", "world");
+
+        Assert.Equal(0, create.ExitCode);
+        var log = await new RekallAgeTransactionLogStore().LoadAsync(root, CancellationToken.None);
+        var transaction = Assert.Single(log.Transactions);
+        Assert.Contains("project create", transaction.Name, StringComparison.Ordinal);
+        Assert.Contains(
+            transaction.ChangedResources,
+            resource => resource.EndsWith("rekall.project.json", StringComparison.Ordinal));
     }
 
     private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)

@@ -41,7 +41,7 @@ internal static class RekallAgeCli
 
         try
         {
-            return args switch
+            var exitCode = args switch
             {
                 ["templates", "list"] => ListTemplates(),
                 ["templates", "inspect", var templateId] => await InspectTemplateAsync(registry, context, templateId),
@@ -198,6 +198,12 @@ internal static class RekallAgeCli
                 ["capture", "screenshot", var root, var scene] => await CaptureAsync(registry, context, root, scene),
                 _ => PrintUnknown(args)
             };
+            if (exitCode == 0)
+            {
+                await PersistTransactionAsync(context);
+            }
+
+            return exitCode;
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
         {
@@ -272,6 +278,49 @@ internal static class RekallAgeCli
         registry.Register(new CaptureRuntimeViewportCommand());
         registry.Register(new CapturePlayableFrameCommand());
         return registry;
+    }
+
+    private static async ValueTask PersistTransactionAsync(RekallAgeCommandContext context)
+    {
+        if (context.Transaction.ChangedResources.Count == 0)
+        {
+            return;
+        }
+
+        var projectRoot = ResolveProjectRoot(context.Transaction.ChangedResources);
+        if (projectRoot is null)
+        {
+            return;
+        }
+
+        await new RekallAgeTransactionLogStore().AppendAsync(
+            projectRoot,
+            context.Transaction,
+            context.Actor,
+            context.CancellationToken);
+    }
+
+    private static string? ResolveProjectRoot(IReadOnlyList<string> changedResources)
+    {
+        foreach (var resource in changedResources)
+        {
+            var fullPath = Path.GetFullPath(resource);
+            var start = Directory.Exists(fullPath)
+                ? fullPath
+                : Path.GetDirectoryName(fullPath);
+            var directory = start is null ? null : new DirectoryInfo(start);
+            while (directory is not null)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, RekallAgeProjectStore.ManifestFileName)))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+        }
+
+        return null;
     }
 
     private static int ListTemplates()
@@ -834,6 +883,7 @@ internal static class RekallAgeCli
         Console.WriteLine($"Root entities: {model.Scene.RootEntities.Count}");
         Console.WriteLine($"Assets: {model.Assets.Assets.Count}");
         Console.WriteLine($"Diagnostics: {model.Diagnostics.Issues.Count}");
+        Console.WriteLine($"Transactions: {model.Transactions.Transactions.Count}");
         return 0;
     }
 

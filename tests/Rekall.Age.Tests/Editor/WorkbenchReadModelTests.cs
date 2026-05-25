@@ -1,8 +1,11 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Assets;
+using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor;
 using Rekall.Age.Project;
 using Rekall.Age.World;
+using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Tests.Editor;
 
@@ -92,5 +95,37 @@ public sealed class WorkbenchReadModelTests
         Assert.Equal("rekall.render.capture_runtime_viewport", model.Runtime.ViewportCaptureTool);
         Assert.Equal(2, model.Runtime.EntityCount);
         Assert.Equal(2, model.Runtime.RenderableCount);
+    }
+
+    [Fact]
+    public async Task WorkbenchModelLoadsPersistedTransactionHistory()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Transaction Project", ["world"]),
+            CancellationToken.None);
+
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("create scene through command"),
+            CancellationToken.None);
+        var createScene = await new CreateSceneCommand().ExecuteAsync(
+            new CreateSceneRequest(root, "Main", ["world"]),
+            context);
+        Assert.True(createScene.Ok, createScene.Summary);
+
+        await new RekallAgeTransactionLogStore().AppendAsync(
+            root,
+            context.Transaction,
+            context.Actor,
+            CancellationToken.None);
+
+        var model = await new RekallAgeWorkbenchModelBuilder().BuildAsync(root, "Main", CancellationToken.None);
+
+        var transaction = Assert.Single(model.Transactions.Transactions);
+        Assert.Equal(context.Transaction.Id, transaction.Id);
+        Assert.Equal("create scene through command", transaction.Name);
+        Assert.Contains(context.Transaction.ChangedResources.Single(), transaction.ChangedResources);
     }
 }

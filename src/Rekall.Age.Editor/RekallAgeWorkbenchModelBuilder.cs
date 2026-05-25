@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Assets;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor.Contracts;
 using Rekall.Age.Project;
 using Rekall.Age.Runtime;
@@ -15,20 +16,27 @@ public sealed class RekallAgeWorkbenchModelBuilder
     private readonly RekallAgeProjectStore _projectStore;
     private readonly RekallAgeSceneStore _sceneStore;
     private readonly RekallAgeAssetCatalogStore _assetStore;
+    private readonly RekallAgeTransactionLogStore _transactionLogStore;
 
     public RekallAgeWorkbenchModelBuilder()
-        : this(new RekallAgeProjectStore(), new RekallAgeSceneStore(), new RekallAgeAssetCatalogStore())
+        : this(
+            new RekallAgeProjectStore(),
+            new RekallAgeSceneStore(),
+            new RekallAgeAssetCatalogStore(),
+            new RekallAgeTransactionLogStore())
     {
     }
 
     public RekallAgeWorkbenchModelBuilder(
         RekallAgeProjectStore projectStore,
         RekallAgeSceneStore sceneStore,
-        RekallAgeAssetCatalogStore assetStore)
+        RekallAgeAssetCatalogStore assetStore,
+        RekallAgeTransactionLogStore transactionLogStore)
     {
         _projectStore = projectStore;
         _sceneStore = sceneStore;
         _assetStore = assetStore;
+        _transactionLogStore = transactionLogStore;
     }
 
     public async ValueTask<RekallAgeWorkbenchModel> BuildAsync(
@@ -39,6 +47,7 @@ public sealed class RekallAgeWorkbenchModelBuilder
         var manifest = await _projectStore.LoadAsync(projectRoot, cancellationToken);
         var scene = await _sceneStore.LoadAsync(projectRoot, activeSceneName, cancellationToken);
         var assets = await _assetStore.LoadAsync(projectRoot, cancellationToken);
+        var transactions = await _transactionLogStore.LoadAsync(projectRoot, cancellationToken);
         var validation = await new RekallAgeProjectValidator(_sceneStore)
             .ValidateSceneAsync(projectRoot, activeSceneName, cancellationToken);
         var runtimeWorld = await new RekallAgeRuntimeSnapshotService(
@@ -82,7 +91,13 @@ public sealed class RekallAgeWorkbenchModelBuilder
                             .Select(command => command.Tool)
                             .ToArray()))
                     .ToArray()),
-            new RekallAgeTransactionPanelModel(Array.Empty<RekallAgeTransactionPanelItem>()),
+            new RekallAgeTransactionPanelModel(
+                transactions.Transactions
+                    .Select(transaction => new RekallAgeTransactionPanelItem(
+                        transaction.Id,
+                        transaction.Name,
+                        transaction.ChangedResources))
+                    .ToArray()),
             new RekallAgeImportQueueModel(Array.Empty<RekallAgeImportQueueItem>()),
             BuildRuntimePanel(runtimeWorld));
     }

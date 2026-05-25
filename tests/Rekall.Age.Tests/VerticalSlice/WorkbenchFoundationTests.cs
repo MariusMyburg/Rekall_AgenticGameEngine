@@ -85,12 +85,14 @@ public sealed class WorkbenchFoundationTests
         Assert.True(runtime.Ok);
         Assert.True(runtime.Value.EntityCount >= 3);
         Assert.True(runtime.Value.RenderableCount >= 1);
+        await new RekallAgeTransactionLogStore().AppendAsync(root, context.Transaction, context.Actor, CancellationToken.None);
 
         var model = await new RekallAgeWorkbenchModelBuilder().BuildAsync(root, "Main", CancellationToken.None);
         Assert.Equal("Workbench Game", model.Project.Name);
         Assert.True(model.Scene.RootEntities.Count >= 3);
         Assert.Single(model.Assets.Assets);
         Assert.DoesNotContain(model.Diagnostics.Issues, issue => issue.Severity == "blocking");
+        Assert.Contains(model.Transactions.Transactions, transaction => transaction.Name == "workbench loop");
 
         var capture = await registry.ExecuteAsync<CaptureScreenshotRequest, CaptureScreenshotResult>(
             "rekall.capture.screenshot",

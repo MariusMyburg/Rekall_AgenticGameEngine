@@ -68,7 +68,7 @@ public sealed class RekallAgeCommandRegistry
         if (!_commands.TryGetValue(name, out var command))
         {
             var error = new RekallAgeCommandError("REKALL_COMMAND_NOT_FOUND", $"Command '{name}' is not registered.");
-            return new RekallAgeDynamicCommandResult(false, error.Message, null, [error]);
+            return new RekallAgeDynamicCommandResult(false, error.Message, null, [error], CreateTransactionSummary(context));
         }
 
         context.CancellationToken.ThrowIfCancellationRequested();
@@ -113,13 +113,18 @@ public sealed class RekallAgeCommandRegistry
                     "REKALL_COMMAND_ARGUMENTS_INVALID",
                     ex.Message,
                     Command.Name);
-                return new RekallAgeDynamicCommandResult(false, error.Message, null, [error]);
+                return new RekallAgeDynamicCommandResult(false, error.Message, null, [error], CreateTransactionSummary(context));
             }
 
             try
             {
                 var result = await Command.ExecuteAsync(request, context);
-                return new RekallAgeDynamicCommandResult(result.Ok, result.Summary, result.Value, result.Errors);
+                return new RekallAgeDynamicCommandResult(
+                    result.Ok,
+                    result.Summary,
+                    result.Value,
+                    result.Errors,
+                    CreateTransactionSummary(context));
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException)
             {
@@ -127,8 +132,18 @@ public sealed class RekallAgeCommandRegistry
                     "REKALL_COMMAND_EXECUTION_FAILED",
                     ex.Message,
                     Command.Name);
-                return new RekallAgeDynamicCommandResult(false, ex.Message, null, [error]);
+                return new RekallAgeDynamicCommandResult(false, ex.Message, null, [error], CreateTransactionSummary(context));
             }
         }
+    }
+
+    private static RekallAgeCommandTransactionSummary CreateTransactionSummary(RekallAgeCommandContext context)
+    {
+        return new RekallAgeCommandTransactionSummary(
+            context.Transaction.Id,
+            context.Transaction.Name,
+            context.Actor,
+            context.Transaction.StartedAtUtc,
+            context.Transaction.ChangedResources.ToArray());
     }
 }

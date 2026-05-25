@@ -237,7 +237,8 @@ public sealed class McpJsonRpcServerTests
         }), serverContext);
 
         using var document = JsonDocument.Parse(response!);
-        Assert.False(document.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        var result = document.RootElement.GetProperty("result");
+        Assert.False(result.GetProperty("isError").GetBoolean());
         Assert.Empty(serverContext.Transaction.ChangedResources);
 
         var log = await new RekallAgeTransactionLogStore().LoadAsync(root, CancellationToken.None);
@@ -247,6 +248,13 @@ public sealed class McpJsonRpcServerTests
         Assert.Contains(
             transaction.ChangedResources,
             resource => resource.EndsWith("rekall.project.json", StringComparison.Ordinal));
+
+        var responseTransaction = result.GetProperty("structuredContent").GetProperty("transaction");
+        Assert.Equal(transaction.Id, responseTransaction.GetProperty("id").GetString());
+        Assert.Equal("rekall.project.create", responseTransaction.GetProperty("name").GetString());
+        Assert.Equal("mcp-test", responseTransaction.GetProperty("actor").GetString());
+        Assert.Contains(responseTransaction.GetProperty("changedResources").EnumerateArray(), resource =>
+            resource.GetString()!.EndsWith("rekall.project.json", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -17,6 +17,10 @@ public sealed class DynamicCommandDispatchTests
         Assert.True(result.Ok, result.Summary);
         var value = Assert.IsType<EchoResult>(result.Value);
         Assert.Equal("hello from command", value.Message);
+        Assert.Equal(context.Transaction.Id, result.Transaction.Id);
+        Assert.Equal("dynamic", result.Transaction.Name);
+        Assert.Equal("mcp", result.Transaction.Actor);
+        Assert.Contains("echo:hello", result.Transaction.ChangedResources);
     }
 
     [Fact]
@@ -50,6 +54,7 @@ public sealed class DynamicCommandDispatchTests
             EchoRequest request,
             RekallAgeCommandContext context)
         {
+            context.Transaction.RecordChangedResource($"echo:{request.Message}");
             return ValueTask.FromResult(RekallAgeCommandResult<EchoResult>.Success(
                 new EchoResult($"{request.Message} from command"),
                 "Echoed message."));

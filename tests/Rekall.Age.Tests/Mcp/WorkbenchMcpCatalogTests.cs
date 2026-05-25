@@ -2,6 +2,7 @@ using Rekall.Age.AssetPipeline.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.LevelDesign.Commands;
 using Rekall.Age.Mcp;
+using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime.Commands;
 
 namespace Rekall.Age.Tests.Mcp;
@@ -19,6 +20,7 @@ public sealed class WorkbenchMcpCatalogTests
         registry.Register(new InstantiatePrefabCommand());
         registry.Register(new SnapEntityToGridCommand());
         registry.Register(new InspectSceneRuntimeCommand());
+        registry.Register(new CaptureRuntimeViewportCommand());
 
         var names = RekallAgeMcpCatalog.FromRegistry(registry).Tools.Select(tool => tool.Name).ToArray();
 
@@ -26,5 +28,6 @@ public sealed class WorkbenchMcpCatalogTests
         Assert.Contains("rekall.level.entity.duplicate", names);
         Assert.Contains("rekall.level.prefab.instantiate", names);
         Assert.Contains("rekall.runtime.inspect_scene", names);
+        Assert.Contains("rekall.render.capture_runtime_viewport", names);
     }
 }

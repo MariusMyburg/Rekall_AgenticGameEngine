@@ -34,6 +34,7 @@ public sealed class McpCatalogTests
         registry.Register(new PlaytestSceneCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
+        registry.Register(new CaptureRuntimeViewportCommand());
         registry.Register(new CapturePlayableFrameCommand());
         registry.Register(new ListComponentSchemasCommand(GetType().Assembly));
         registry.Register(new ListModuleSourcesCommand());
@@ -63,6 +64,7 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.playtest.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.run.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.capture.screenshot");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.capture_runtime_viewport");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.play.capture_frame");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.component_schemas");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.list_sources");

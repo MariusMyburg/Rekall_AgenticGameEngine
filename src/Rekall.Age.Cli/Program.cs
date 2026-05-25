@@ -97,6 +97,10 @@ internal static class RekallAgeCli
                     await AddRenderResourceAsync(registry, context, root, id, kind, format, usage),
                 ["render", "command-buffer", "record", var root, var id, var queue, var commandsJson] =>
                     await RecordRenderCommandBufferAsync(registry, context, root, id, queue, commandsJson),
+                ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory] =>
+                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, "320", "180"),
+                ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory, var width, var height] =>
+                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height),
                 ["mcp", "stdio"] => await RunMcpStdioAsync(registry, context),
                 ["studio", "open", var root, var scene] => await OpenStudioModelAsync(root, scene),
                 ["asset", "import", var root, var source, var kind, var displayName] =>
@@ -262,6 +266,7 @@ internal static class RekallAgeCli
         registry.Register(new RunSceneCommand());
         registry.Register(new InspectSceneRuntimeCommand());
         registry.Register(new CaptureScreenshotCommand());
+        registry.Register(new CaptureRuntimeViewportCommand());
         registry.Register(new CapturePlayableFrameCommand());
         return registry;
     }
@@ -1722,6 +1727,43 @@ internal static class RekallAgeCli
         }
 
         return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> CaptureRuntimeViewportAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string frames,
+        string outputDirectory,
+        string width,
+        string height)
+    {
+        var frameCount = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
+        var viewportWidth = int.Parse(width, System.Globalization.CultureInfo.InvariantCulture);
+        var viewportHeight = int.Parse(height, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<CaptureRuntimeViewportRequest, CaptureRuntimeViewportResult>(
+            "rekall.render.capture_runtime_viewport",
+            new CaptureRuntimeViewportRequest(root, scene, frameCount, outputDirectory, viewportWidth, viewportHeight, true),
+            context);
+
+        Console.WriteLine($"Runtime viewport {scene} frame {result.Value.FrameIndex}: {result.Value.Width}x{result.Value.Height}");
+        Console.WriteLine(result.Value.ScreenshotPath);
+        Console.WriteLine($"Active camera: {result.Value.ActiveCamera ?? "(none)"}");
+        Console.WriteLine($"Renderable: {result.Value.RenderableCount}");
+        Console.WriteLine($"Renderable kinds: {string.Join(", ", result.Value.RenderableKinds)}");
+        Console.WriteLine($"Observations: {result.Value.ObservationCount}");
+        foreach (var code in result.Value.ObservationCodes)
+        {
+            Console.WriteLine($"Observation: {code}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.Captured && result.Value.NonBlank ? 0 : 1;
     }
 
     private static async Task<int> CaptureAsync(

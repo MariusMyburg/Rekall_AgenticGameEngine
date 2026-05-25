@@ -128,3 +128,17 @@ dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main --frames 2 --inp
 dotnet run --project src/Rekall.Age.Cli -- run scene .age-sandbox Main 0.1
 dotnet run --project src/Rekall.Age.Cli -- capture screenshot .age-sandbox Main
 ```
+
+## Workbench Foundation
+
+The production workbench slice adds editor-facing read models, level-design workflows, asset pipeline reports, and a first Windows desktop Studio shell.
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- studio open .age-sandbox Main
+dotnet run --project src/Rekall.Age.Cli -- asset import-report .age-sandbox .\player.png sprite "Player"
+dotnet run --project src/Rekall.Age.Cli -- level entity duplicate .age-sandbox Main <entity-id> "Player Copy"
+dotnet run --project src/Rekall.Age.Cli -- level prefab create .age-sandbox Main <entity-id> PlayerPrefab
+dotnet run --project src/Rekall.Age.Cli -- level prefab instantiate .age-sandbox Main <prefab-id> "Prefab Player"
+dotnet run --project src/Rekall.Age.Cli -- level entity snap .age-sandbox Main <entity-id> 1
+dotnet run --project src/Rekall.Age.Studio -- --project .age-sandbox --scene Main
+```

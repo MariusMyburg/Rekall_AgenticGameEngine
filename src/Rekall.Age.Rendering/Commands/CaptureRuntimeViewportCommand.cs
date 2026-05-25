@@ -23,7 +23,12 @@ public sealed record CaptureRuntimeViewportResult(
     int RenderableCount,
     IReadOnlyList<string> RenderableKinds,
     int ObservationCount,
-    IReadOnlyList<string> ObservationCodes);
+    IReadOnlyList<string> ObservationCodes,
+    int AssetBackedRenderableCount,
+    int FallbackRenderableCount,
+    int MissingAssetCount,
+    int UnsupportedAssetCount,
+    IReadOnlyList<string> AssetIssueCodes);
 
 public sealed class CaptureRuntimeViewportCommand
     : IRekallAgeCommand<CaptureRuntimeViewportRequest, CaptureRuntimeViewportResult>
@@ -59,10 +64,15 @@ public sealed class CaptureRuntimeViewportCommand
             request.Width,
             request.Height,
             request.DebugOverlay);
+        var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(
+            request.ProjectRoot,
+            frame,
+            context.CancellationToken);
         var capture = await new RekallAgeRuntimeSoftwareRenderer().CaptureAsync(
             frame,
             request.OutputDirectory,
             $"{world.SceneName}_runtime_{world.FrameIndex:000}.png",
+            assets,
             context.CancellationToken);
         var result = new CaptureRuntimeViewportResult(
             capture.Captured,
@@ -83,7 +93,12 @@ public sealed class CaptureRuntimeViewportCommand
                 .Select(observation => observation.Code)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(code => code, StringComparer.Ordinal)
-                .ToArray());
+                .ToArray(),
+            capture.AssetBackedRenderableCount,
+            capture.FallbackRenderableCount,
+            capture.MissingAssetCount,
+            capture.UnsupportedAssetCount,
+            capture.AssetIssueCodes);
 
         context.Transaction.RecordChangedResource(capture.ScreenshotPath);
         return RekallAgeCommandResult<CaptureRuntimeViewportResult>.Success(
@@ -133,6 +148,11 @@ public sealed class CaptureRuntimeViewportCommand
             null,
             0,
             Array.Empty<string>(),
+            0,
+            Array.Empty<string>(),
+            0,
+            0,
+            0,
             0,
             Array.Empty<string>());
     }

@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
+using Rekall.Age.Assets.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
+using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.World;
 
@@ -53,5 +55,48 @@ public sealed class CaptureRuntimeViewportCommandTests
         Assert.False(result.Ok);
         Assert.False(result.Value.Captured);
         Assert.Contains(result.Errors, error => error.Code == "REKALL_RUNTIME_VIEWPORT_INVALID_REQUEST");
+    }
+
+    [Fact]
+    public async Task CaptureRuntimeViewportCommandResolvesImportedSpritePng()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var source = Path.Combine(root, "player.png");
+        await RekallAgePngWriter.WriteRgbaAsync(
+            source,
+            2,
+            2,
+            [
+                40, 220, 90, 255,
+                40, 220, 90, 255,
+                40, 220, 90, 255,
+                40, 220, 90, 255
+            ],
+            CancellationToken.None);
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("asset viewport"), CancellationToken.None);
+        var import = await new ImportAssetCommand().ExecuteAsync(
+            new ImportAssetRequest(root, source, "sprite", "Player"),
+            context);
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"])
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Player", ["player"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject { ["x"] = 1, ["y"] = 2 }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.SpriteRenderer", new JsonObject { ["sprite"] = import.Value.Asset.Id })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 1, Path.Combine(root, "Viewport"), 160, 90, false),
+            context);
+        var output = await RekallAgePngReader.ReadRgbaAsync(result.Value.ScreenshotPath, CancellationToken.None);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(1, result.Value.AssetBackedRenderableCount);
+        Assert.Equal(0, result.Value.FallbackRenderableCount);
+        Assert.Contains(Enumerable.Range(0, output.Rgba.Length / 4), pixel =>
+        {
+            var index = pixel * 4;
+            return output.Rgba[index] == 40 && output.Rgba[index + 1] == 220 && output.Rgba[index + 2] == 90;
+        });
     }
 }

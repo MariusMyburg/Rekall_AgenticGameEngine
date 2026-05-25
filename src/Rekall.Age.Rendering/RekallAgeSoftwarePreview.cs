@@ -28,10 +28,15 @@ public sealed class RekallAgeSoftwarePreview
                 RekallAgeRuntimeExecutionLoop.CreateDefault())
             .InspectSceneAsync(projectRoot, sceneName, 0, cancellationToken);
         var frame = _frameBuilder.Build(world, Width, Height, debugOverlay: true);
+        var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(
+            projectRoot,
+            frame,
+            cancellationToken);
         var capture = await _renderer.CaptureAsync(
             frame,
             outputDirectory,
             $"{world.SceneName}_preview.png",
+            assets,
             cancellationToken);
         var visibleRenderers = capture.RenderableCount > 0
             ? capture.RenderableCount

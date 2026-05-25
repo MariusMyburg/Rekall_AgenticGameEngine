@@ -2,6 +2,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Rekall.Age.Playback\Rekall.Age.Playback.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Rendering.Abstractions\Rekall.Age.Rendering.Abstractions.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Runtime\Rekall.Age.Runtime.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Runtime.Abstractions\Rekall.Age.Runtime.Abstractions.csproj" />
     <ProjectReference Include="..\Rekall.Age.World\Rekall.Age.World.csproj" />
   </ItemGroup>
 

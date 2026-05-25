@@ -1744,6 +1744,13 @@ internal static class RekallAgeCli
         foreach (var transaction in result.Value.Transactions)
         {
             Console.WriteLine($"{transaction.StartedAtUtc:u} {transaction.Name} [{transaction.Actor}] {transaction.ChangedResources.Count} change(s) {transaction.Id}");
+            foreach (var resource in transaction.ResourceChanges)
+            {
+                var state = resource.Exists
+                    ? resource.SizeBytes is { } size ? $"file {size} bytes" : "directory"
+                    : "missing";
+                Console.WriteLine($"  - {resource.RelativePath} {resource.Kind} {state}");
+            }
         }
 
         return result.Ok ? 0 : 1;

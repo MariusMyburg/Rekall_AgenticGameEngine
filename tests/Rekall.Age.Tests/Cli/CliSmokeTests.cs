@@ -195,6 +195,8 @@ public sealed class CliSmokeTests
         Assert.Equal(0, history.ExitCode);
         Assert.Contains("project create", history.Output);
         Assert.Contains("cli", history.Output);
+        Assert.Contains("rekall.project.json", history.Output);
+        Assert.Contains("project-manifest file", history.Output);
     }
 
     private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)

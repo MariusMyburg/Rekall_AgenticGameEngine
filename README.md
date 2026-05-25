@@ -7,6 +7,7 @@ The current MVP includes:
 - typed command bus through `IRekallAgeCommand`
 - transaction tracking
 - project-local transaction history for Studio and agent read models
+- transaction history resource-change summaries with path, kind, existence, and size metadata
 - project capability manifests
 - deterministic scene/entity/component files
 - C# module attributes and reflection-based component schema discovery
@@ -155,7 +156,7 @@ dotnet run --project src/Rekall.Age.Cli -- level entity snap .age-sandbox Main <
 dotnet run --project src/Rekall.Age.Studio -- --project .age-sandbox --scene Main
 ```
 
-Successful CLI and MCP mutations persist project-local transaction history in `Transactions/transactions.age.json`. Studio, workbench read models, and the `rekall.transaction.history` command load that log so agents and humans can inspect recent command effects after the original command context has ended.
+Successful CLI and MCP mutations persist project-local transaction history in `Transactions/transactions.age.json`. Studio, workbench read models, and the `rekall.transaction.history` command load that log so agents and humans can inspect recent command effects after the original command context has ended. Each persisted transaction includes structured resource-change summaries with relative paths, resource kinds, existence state, and file sizes when available.
 
 ## Scene Runtime Foundation
 

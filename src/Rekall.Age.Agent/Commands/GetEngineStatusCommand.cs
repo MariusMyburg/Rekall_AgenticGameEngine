@@ -50,6 +50,10 @@ public sealed class GetEngineStatusCommand
                     "Create, build, package, run, and capture a proof frame for a playable template game in one call.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
+                    "rekall.workflow.audit_playable_package",
+                    "Inspect a package, run deterministic frames, and capture a proof PNG for deliverable validation.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
                     "rekall.templates.verify_mvp",
                     "Build and playtest every MVP template, returning a readiness matrix.",
                     Recommended: false),

@@ -138,6 +138,9 @@ internal static class RekallAgeCli
                 ["game", "package-playable", var root, var scene, var outputDirectory, "--graphics"] =>
                     await PackagePlayableGameAsync(registry, context, root, scene, outputDirectory, graphics: true),
                 ["game", "inspect-package", var packagePath] => await InspectPlayablePackageAsync(registry, context, packagePath),
+                ["game", "audit-package", var packagePath] => await AuditPlayablePackageAsync(registry, context, packagePath, null),
+                ["game", "audit-package", var packagePath, var outputDirectory] =>
+                    await AuditPlayablePackageAsync(registry, context, packagePath, outputDirectory),
                 ["game", "run-package", var packagePath] => await RunPlayablePackageAsync(registry, context, packagePath, "2"),
                 ["game", "run-package", var packagePath, var frames] => await RunPlayablePackageAsync(registry, context, packagePath, frames),
                 ["game", "capture-package-frame", var packagePath, var outputDirectory] =>
@@ -200,6 +203,7 @@ internal static class RekallAgeCli
         registry.Register(new InspectPlayablePackageCommand());
         registry.Register(new RunPlayablePackageCommand());
         registry.Register(new CapturePlayablePackageFrameCommand());
+        registry.Register(new AuditPlayablePackageCommand());
         registry.Register(new ListGameTemplatesCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
@@ -1328,6 +1332,42 @@ internal static class RekallAgeCli
         Console.WriteLine($"Game: {result.Value.GameRoot}");
         Console.WriteLine($"Exit code: {result.Value.ExitCode}");
         Console.Write(result.Value.Output);
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.Ready ? 0 : 1;
+    }
+
+    private static async Task<int> AuditPlayablePackageAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string packagePath,
+        string? outputDirectory)
+    {
+        var result = await registry.ExecuteAsync<AuditPlayablePackageRequest, AuditPlayablePackageResult>(
+            "rekall.workflow.audit_playable_package",
+            new AuditPlayablePackageRequest(packagePath, outputDirectory),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Ready: {result.Value.Ready}");
+        Console.WriteLine($"Files: {result.Value.Inspection.FileCount}");
+        Console.WriteLine($"Missing key artifacts: {result.Value.MissingKeyArtifacts.Count}");
+        foreach (var missing in result.Value.MissingKeyArtifacts)
+        {
+            Console.WriteLine($"  {missing}");
+        }
+
+        Console.WriteLine($"Run exit code: {result.Value.Run.ExitCode}");
+        Console.WriteLine($"Captured: {result.Value.Capture.Captured}");
+        Console.WriteLine($"Capture: {result.Value.Capture.OutputPath}");
+        Console.WriteLine($"Non-blank: {result.Value.Capture.NonBlank}");
+        foreach (var check in result.Value.Checks)
+        {
+            Console.WriteLine($"{check.Name}: {check.Passed} - {check.Summary}");
+        }
+
         foreach (var error in result.Errors)
         {
             Console.WriteLine($"{error.Code}: {error.Message}");

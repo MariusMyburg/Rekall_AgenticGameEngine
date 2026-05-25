@@ -78,7 +78,8 @@ internal static class RekallAgeMcpToolClassifier
         return name is
             "rekall.context.engine_status" or
             "rekall.templates.inspect" or
-            "rekall.workflow.create_playable_package_from_template";
+            "rekall.workflow.create_playable_package_from_template" or
+            "rekall.workflow.audit_playable_package";
     }
 
     public static int GetAgentPriority(string name)
@@ -88,6 +89,7 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.context.engine_status" => 5,
             "rekall.templates.inspect" => 8,
             "rekall.workflow.create_playable_package_from_template" => 10,
+            "rekall.workflow.audit_playable_package" => 15,
             "rekall.templates.verify_mvp" => 20,
             _ when name.StartsWith("rekall.workflow.", StringComparison.Ordinal) => 30,
             _ when name.StartsWith("rekall.playtest.", StringComparison.Ordinal) => 40,

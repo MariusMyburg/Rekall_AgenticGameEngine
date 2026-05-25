@@ -329,6 +329,19 @@ public sealed class GameTemplateWorkflowTests
         Assert.True(File.Exists(captureArchive.Value.OutputPath), captureArchive.Value.OutputPath);
         Assert.Equal("pong", captureArchive.Value.Kind);
         Assert.Contains(captureArchive.Value.DrawCommandKinds, kind => kind == "circle");
+
+        var auditArchive = await new AuditPlayablePackageCommand().ExecuteAsync(
+            new AuditPlayablePackageRequest(package.Value.ArchivePath, Path.Combine(root, "PackageAudit"), Frames: 1),
+            context);
+
+        Assert.True(auditArchive.Ok, auditArchive.Summary);
+        Assert.True(auditArchive.Value.Ready);
+        Assert.Empty(auditArchive.Value.MissingKeyArtifacts);
+        Assert.True(auditArchive.Value.Inspection.Ready);
+        Assert.True(auditArchive.Value.Run.Ready);
+        Assert.True(auditArchive.Value.Capture.Captured);
+        Assert.True(auditArchive.Value.Capture.NonBlank);
+        Assert.True(File.Exists(auditArchive.Value.Capture.OutputPath), auditArchive.Value.Capture.OutputPath);
     }
 
     [Fact]

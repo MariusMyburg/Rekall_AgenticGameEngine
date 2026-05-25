@@ -463,6 +463,7 @@ public sealed class McpJsonRpcServerTests
         registry.Register(new InspectPlayablePackageCommand());
         registry.Register(new RunPlayablePackageCommand());
         registry.Register(new CapturePlayablePackageFrameCommand());
+        registry.Register(new AuditPlayablePackageCommand());
         var server = new RekallAgeMcpJsonRpcServer(registry);
 
         var createResponse = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
@@ -542,17 +543,35 @@ public sealed class McpJsonRpcServerTests
                 }
             }
         }), CreateContext());
+        var auditResponse = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 30,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.workflow.audit_playable_package",
+                arguments = new
+                {
+                    packagePath = $"{outputDirectory}.zip",
+                    outputDirectory = Path.Combine(root, "McpPackageAudit"),
+                    frames = 1
+                }
+            }
+        }), CreateContext());
 
         using var createDocument = JsonDocument.Parse(createResponse!);
         using var packageDocument = JsonDocument.Parse(packageResponse!);
         using var inspectDocument = JsonDocument.Parse(inspectResponse!);
         using var runDocument = JsonDocument.Parse(runResponse!);
         using var captureDocument = JsonDocument.Parse(captureResponse!);
+        using var auditDocument = JsonDocument.Parse(auditResponse!);
         Assert.False(createDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
         Assert.False(packageDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
         Assert.False(inspectDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
         Assert.False(runDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
         Assert.False(captureDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.False(auditDocument.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
 
         var inspectValue = inspectDocument.RootElement
             .GetProperty("result")
@@ -585,6 +604,14 @@ public sealed class McpJsonRpcServerTests
         Assert.True(captureValue.GetProperty("captured").GetBoolean());
         Assert.True(captureValue.GetProperty("nonBlank").GetBoolean());
         Assert.True(File.Exists(captureValue.GetProperty("outputPath").GetString()));
+
+        var auditValue = auditDocument.RootElement
+            .GetProperty("result")
+            .GetProperty("structuredContent")
+            .GetProperty("value");
+        Assert.True(auditValue.GetProperty("ready").GetBoolean());
+        Assert.Equal(0, auditValue.GetProperty("missingKeyArtifacts").GetArrayLength());
+        Assert.True(auditValue.GetProperty("capture").GetProperty("nonBlank").GetBoolean());
     }
 
     [Fact]

@@ -30,6 +30,7 @@ public sealed class McpCatalogTests
         registry.Register(new InspectPlayablePackageCommand());
         registry.Register(new RunPlayablePackageCommand());
         registry.Register(new CapturePlayablePackageFrameCommand());
+        registry.Register(new AuditPlayablePackageCommand());
         registry.Register(new PlaytestSceneCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
@@ -58,6 +59,7 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.inspect_playable_package");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.run_playable_package");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.capture_playable_package_frame");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.audit_playable_package");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.playtest.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.run.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.capture.screenshot");
@@ -76,6 +78,11 @@ public sealed class McpCatalogTests
         Assert.Equal("workflow", oneShot.Category);
         Assert.True(oneShot.Recommended);
         Assert.Equal(10, oneShot.AgentPriority);
+
+        var audit = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.audit_playable_package");
+        Assert.Equal("workflow", audit.Category);
+        Assert.True(audit.Recommended);
+        Assert.True(audit.AgentPriority > oneShot.AgentPriority);
 
         var renderTool = catalog.Tools.Single(tool => tool.Name == "rekall.render.vulkan.render_pass.capture_clear");
         Assert.Equal("rendering", renderTool.Category);

@@ -130,6 +130,14 @@ public sealed class CliSmokeTests
         Assert.Contains("Non-blank: True", capturePackageFrame.Output);
         Assert.True(File.Exists(Path.Combine(packageFrameDirectory, "package_play_frame_001.png")));
 
+        var auditDirectory = Path.Combine(root, "PackageAudit");
+        var audit = await RunAsync(cliAssembly, "game", "audit-package", $"{packageDirectory}.zip", auditDirectory);
+        Assert.Equal(0, audit.ExitCode);
+        Assert.Contains("Ready: True", audit.Output);
+        Assert.Contains("Missing key artifacts: 0", audit.Output);
+        Assert.Contains("Captured: True", audit.Output);
+        Assert.True(File.Exists(Path.Combine(auditDirectory, "package_play_frame_001.png")));
+
         var oneShotRoot = TestPaths.CreateTempDirectory();
         var oneShotOutput = Path.Combine(oneShotRoot, "Packaged");
         var oneShotFrames = Path.Combine(oneShotRoot, "Frames");

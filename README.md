@@ -12,6 +12,7 @@ The current MVP includes:
 - C# module scaffolding for agent-authored or human-authored gameplay modules
 - C# module source writing through the command bus for MCP-first agents
 - C# module build command for compiling scaffolded gameplay modules
+- generic C# runtime-system module scaffolding for agent-authored systems
 - project-authored C# runtime systems that participate in runtime snapshots and viewport captures
 - playable game readiness verification workflow for validation, build, and playtest checks
 - playable game packaging workflow that verifies, bundles game content, writes a package manifest, creates a zip archive, and publishes launch artifacts
@@ -115,6 +116,7 @@ dotnet run --project src/Rekall.Age.Cli -- game audit-package .age-sandbox/Build
 dotnet run --project src/Rekall.Age.Cli -- asset import .age-sandbox .\player.png sprite "Player Ship"
 dotnet run --project src/Rekall.Age.Cli -- asset list .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module scaffold-playable .age-sandbox crystal.playable "Crystal Playable" CrystalPlayable crystal
+dotnet run --project src/Rekall.Age.Cli -- module scaffold-runtime-system .age-sandbox game.motion "Game Motion" GameMotion OrbitMotion OrbitMotionSystem
 dotnet run --project src/Rekall.Age.Cli -- module sources .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module read-source .age-sandbox CrystalPlayable CrystalPlayableModule.cs
 dotnet run --project src/Rekall.Age.Cli -- module write-source .age-sandbox CrystalPlayable CrystalPlayableModule.cs .\CrystalPlayableModule.cs

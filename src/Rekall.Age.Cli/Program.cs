@@ -119,6 +119,8 @@ internal static class RekallAgeCli
                     await ScaffoldModuleAsync(registry, context, root, moduleId, displayName, moduleName, componentName),
                 ["module", "scaffold-playable", var root, var moduleId, var displayName, var moduleName, var kind] =>
                     await ScaffoldPlayableModuleAsync(registry, context, root, moduleId, displayName, moduleName, kind),
+                ["module", "scaffold-runtime-system", var root, var moduleId, var displayName, var moduleName, var componentName, var systemName] =>
+                    await ScaffoldRuntimeSystemModuleAsync(registry, context, root, moduleId, displayName, moduleName, componentName, systemName),
                 ["module", "write-source", var root, var moduleName, var fileName, var sourceOrPath] =>
                     await WriteModuleSourceAsync(registry, context, root, moduleName, fileName, sourceOrPath),
                 ["build", "modules", var root] => await BuildModulesAsync(registry, context, root),
@@ -234,6 +236,7 @@ internal static class RekallAgeCli
         registry.Register(new ReadModuleSourceCommand());
         registry.Register(new ScaffoldModuleCommand());
         registry.Register(new ScaffoldPlayableModuleCommand());
+        registry.Register(new ScaffoldRuntimeSystemModuleCommand());
         registry.Register(new WriteModuleSourceCommand());
         registry.Register(new ListRenderBackendsCommand());
         registry.Register(new ProbeVulkanBackendCommand());
@@ -1188,6 +1191,24 @@ internal static class RekallAgeCli
         var result = await registry.ExecuteAsync<ScaffoldPlayableModuleRequest, ScaffoldPlayableModuleResult>(
             "rekall.module.scaffold_playable",
             new ScaffoldPlayableModuleRequest(root, moduleId, displayName, moduleName, kind),
+            context);
+        Console.WriteLine(result.Value.SourcePath);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ScaffoldRuntimeSystemModuleAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string moduleId,
+        string displayName,
+        string moduleName,
+        string componentName,
+        string systemName)
+    {
+        var result = await registry.ExecuteAsync<ScaffoldRuntimeSystemModuleRequest, ScaffoldRuntimeSystemModuleResult>(
+            "rekall.module.scaffold_runtime_system",
+            new ScaffoldRuntimeSystemModuleRequest(root, moduleId, displayName, moduleName, componentName, systemName),
             context);
         Console.WriteLine(result.Value.SourcePath);
         return result.Ok ? 0 : 1;

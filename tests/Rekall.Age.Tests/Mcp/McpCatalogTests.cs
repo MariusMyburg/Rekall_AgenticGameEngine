@@ -40,6 +40,7 @@ public sealed class McpCatalogTests
         registry.Register(new ListModuleSourcesCommand());
         registry.Register(new ReadModuleSourceCommand());
         registry.Register(new ScaffoldModuleCommand());
+        registry.Register(new ScaffoldRuntimeSystemModuleCommand());
         registry.Register(new WriteModuleSourceCommand());
         registry.Register(new BuildModulesCommand());
         registry.Register(new SubmitClearVulkanRenderPassCommand(new FakeVulkanRenderPassSubmission()));
@@ -70,6 +71,7 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.list_sources");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.read_source");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.scaffold");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.scaffold_runtime_system");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.write_source");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.build.modules");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.vulkan.render_pass.submit_clear");

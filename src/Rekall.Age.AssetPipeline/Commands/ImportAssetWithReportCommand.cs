@@ -54,7 +54,10 @@ public sealed class ImportAssetWithReportCommand
             asset.Kind,
             asset.SourcePath,
             asset.ImportedPath,
-            Array.Empty<string>());
+            Array.Empty<string>())
+        {
+            GlbMetadata = asset.GlbMetadata
+        };
         return RekallAgeCommandResult<ImportAssetWithReportResult>.Success(
             new ImportAssetWithReportResult(report, updatedPipeline),
             $"Imported asset '{asset.Id}' with pipeline report.");

@@ -36,6 +36,7 @@ The current MVP includes:
 - low-level render plan authoring, validation, command-buffer recording, and deterministic execution artifacts
 - Vulkan render-plan execution for clear render passes
 - deterministic asset import and catalog listing commands
+- GLB asset import metadata inspection for scenes, nodes, meshes, materials, images, and animations
 - entity inspection and single-property component mutation commands
 - MVP terminal player for module-authored projects, including deterministic playtest frames
 - structured scene playtest assertions for MCP/headless agent loops
@@ -119,6 +120,7 @@ dotnet run --project src/Rekall.Age.Cli -- game run-package .age-sandbox/Builds/
 dotnet run --project src/Rekall.Age.Cli -- game capture-package-frame .age-sandbox/Builds/RekallAgePlayer.zip .age-sandbox/Artifacts/PackageFrames 1
 dotnet run --project src/Rekall.Age.Cli -- game audit-package .age-sandbox/Builds/RekallAgePlayer.zip .age-sandbox/Artifacts/PackageAudit
 dotnet run --project src/Rekall.Age.Cli -- asset import .age-sandbox .\player.png sprite "Player Ship"
+dotnet run --project src/Rekall.Age.Cli -- asset import-report .age-sandbox .\robot.glb model "Robot"
 dotnet run --project src/Rekall.Age.Cli -- asset list .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module scaffold-playable .age-sandbox crystal.playable "Crystal Playable" CrystalPlayable crystal
 dotnet run --project src/Rekall.Age.Cli -- module scaffold-runtime-system .age-sandbox game.motion "Game Motion" GameMotion OrbitMotion OrbitMotionSystem

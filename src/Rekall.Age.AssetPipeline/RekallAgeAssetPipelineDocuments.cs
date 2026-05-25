@@ -20,13 +20,30 @@ public sealed record RekallAgeAssetPipelineDocument(
         string kind)
     {
         var source = new RekallAgeAssetSourceRecord(asset.Id, sourcePath, kind, asset.ContentHash);
-        var imported = new RekallAgeImportedAssetRecord(asset.Id, asset.ImportedPath, kind, asset.ContentHash);
+        var imported = new RekallAgeImportedAssetRecord(asset.Id, asset.ImportedPath, kind, asset.ContentHash)
+        {
+            MimeType = GetMimeType(asset.ImportedPath),
+            GlbMetadata = asset.GlbMetadata
+        };
         var cooked = new RekallAgeCookedAssetRecord(asset.Id, asset.ImportedPath, "raw-copy", asset.ContentHash);
         return this with
         {
             Sources = Replace(Sources, source, item => item.AssetId),
             Imported = Replace(Imported, imported, item => item.AssetId),
             CookedArtifacts = Replace(CookedArtifacts, cooked, item => item.AssetId)
+        };
+    }
+
+    private static string GetMimeType(string path)
+    {
+        return Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".glb" => "model/gltf-binary",
+            ".gltf" => "model/gltf+json",
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".wav" => "audio/wav",
+            _ => "application/octet-stream"
         };
     }
 
@@ -54,7 +71,12 @@ public sealed record RekallAgeImportedAssetRecord(
     string AssetId,
     string ImportedPath,
     string Kind,
-    string ContentHash);
+    string ContentHash)
+{
+    public string? MimeType { get; init; }
+
+    public RekallAgeGlbMetadata? GlbMetadata { get; init; }
+}
 
 public sealed record RekallAgeCookedAssetRecord(
     string AssetId,
@@ -73,4 +95,7 @@ public sealed record RekallAgeAssetImportReport(
     string Kind,
     string SourcePath,
     string ImportedPath,
-    IReadOnlyList<string> Diagnostics);
+    IReadOnlyList<string> Diagnostics)
+{
+    public RekallAgeGlbMetadata? GlbMetadata { get; init; }
+}

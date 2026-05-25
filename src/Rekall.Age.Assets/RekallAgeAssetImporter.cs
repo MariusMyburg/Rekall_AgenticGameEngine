@@ -33,6 +33,7 @@ public static class RekallAgeAssetImporter
             await source.CopyToAsync(destination, cancellationToken);
         }
 
+        var glbMetadata = await RekallAgeGlbMetadataReader.ReadAsync(importedPath, cancellationToken);
         return new RekallAgeAssetDocument(
             id,
             normalizedName,
@@ -40,7 +41,10 @@ public static class RekallAgeAssetImporter
             normalizedKind,
             Path.GetFullPath(sourcePath),
             Path.GetFullPath(importedPath),
-            hash);
+            hash)
+        {
+            GlbMetadata = glbMetadata
+        };
     }
 
     private static async ValueTask<string> HashFileAsync(string path, CancellationToken cancellationToken)

@@ -34,6 +34,12 @@
     <ProjectReference Include="..\..\src\Rekall.Age.Build\Rekall.Age.Build.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.Cli\Rekall.Age.Cli.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\src\Rekall.Age.Player\Rekall.Age.Player.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\Rekall.Age.Editor.Contracts\Rekall.Age.Editor.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Rekall.Age.Editor\Rekall.Age.Editor.csproj" />
+    <ProjectReference Include="..\..\src\Rekall.Age.AssetPipeline\Rekall.Age.AssetPipeline.csproj" />
+    <ProjectReference Include="..\..\src\Rekall.Age.Runtime.Abstractions\Rekall.Age.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Rekall.Age.Rendering.Abstractions\Rekall.Age.Rendering.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Rekall.Age.LevelDesign\Rekall.Age.LevelDesign.csproj" />
   </ItemGroup>
 
 </Project>

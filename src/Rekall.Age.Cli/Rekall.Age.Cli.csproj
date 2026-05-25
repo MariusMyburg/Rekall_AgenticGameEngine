@@ -14,6 +14,9 @@
     <ProjectReference Include="..\Rekall.Age.Modules\Rekall.Age.Modules.csproj" />
     <ProjectReference Include="..\Rekall.Age.Playback\Rekall.Age.Playback.csproj" />
     <ProjectReference Include="..\Rekall.Age.Build\Rekall.Age.Build.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Editor\Rekall.Age.Editor.csproj" />
+    <ProjectReference Include="..\Rekall.Age.AssetPipeline\Rekall.Age.AssetPipeline.csproj" />
+    <ProjectReference Include="..\Rekall.Age.LevelDesign\Rekall.Age.LevelDesign.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

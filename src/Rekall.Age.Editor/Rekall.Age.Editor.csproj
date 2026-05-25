@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Rekall.Age.Editor.Contracts\Rekall.Age.Editor.Contracts.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Project\Rekall.Age.Project.csproj" />
+    <ProjectReference Include="..\Rekall.Age.World\Rekall.Age.World.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Assets\Rekall.Age.Assets.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Validation\Rekall.Age.Validation.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Modules\Rekall.Age.Modules.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Core\Rekall.Age.Core.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -31,7 +31,7 @@ internal static class RekallAgeCli
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|level|studio|play|playtest|run|context|capture|render|module|build|templates|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|level|studio|play|playtest|run|runtime|context|capture|render|module|build|templates|mcp> ...");
             return 2;
         }
 
@@ -185,6 +185,7 @@ internal static class RekallAgeCli
                 ["playtest", "scene", var root, var scene, var frames, var inputsJson, var assertionsJson, var drawAssertionsJson] =>
                     await PlaytestSceneAsync(registry, context, root, scene, frames, inputsJson, assertionsJson, drawAssertionsJson),
                 ["run", "scene", var root, var scene, var seconds] => await RunSceneAsync(registry, context, root, scene, seconds),
+                ["runtime", "inspect", var root, var scene, var frames] => await InspectRuntimeAsync(registry, context, root, scene, frames),
                 ["context", "engine"] => await PrintEngineStatusAsync(registry, context),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
@@ -259,6 +260,7 @@ internal static class RekallAgeCli
         registry.Register(new PlaySceneCommand());
         registry.Register(new PlaytestSceneCommand());
         registry.Register(new RunSceneCommand());
+        registry.Register(new InspectSceneRuntimeCommand());
         registry.Register(new CaptureScreenshotCommand());
         registry.Register(new CapturePlayableFrameCommand());
         return registry;
@@ -1685,6 +1687,40 @@ internal static class RekallAgeCli
 
         Console.WriteLine($"Simulated {scene}: {result.Value.FramesSimulated} frames");
         Console.WriteLine($"Systems: {string.Join(", ", result.Value.ActiveSystems)}");
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectRuntimeAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string frames)
+    {
+        var frameCount = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<InspectSceneRuntimeRequest, InspectSceneRuntimeResult>(
+            "rekall.runtime.inspect_scene",
+            new InspectSceneRuntimeRequest(root, scene, frameCount),
+            context);
+
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Entities: {result.Value.EntityCount}");
+        Console.WriteLine($"Renderable: {result.Value.RenderableCount}");
+        Console.WriteLine($"Physics bodies: {result.Value.PhysicsBodyCount}");
+        Console.WriteLine($"Physics colliders: {result.Value.PhysicsColliderCount}");
+        Console.WriteLine($"Audio: {result.Value.AudioListenerCount} listeners, {result.Value.AudioEmitterCount} emitters");
+        Console.WriteLine($"Animation players: {result.Value.AnimationPlayerCount}");
+        Console.WriteLine($"UI elements: {result.Value.UiElementCount}");
+        foreach (var observation in result.Value.Observations)
+        {
+            Console.WriteLine($"{observation.Severity} {observation.Code} {observation.Subsystem} {observation.TargetId}: {observation.Message}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
         return result.Ok ? 0 : 1;
     }
 

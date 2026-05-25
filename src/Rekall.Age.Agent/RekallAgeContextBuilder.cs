@@ -34,16 +34,20 @@ public sealed class RekallAgeContextBuilder
             blocking.AddRange(report.BlockingMessages);
         }
 
+        var artifacts = FindArtifacts(projectRoot);
         var status = blocking.Count == 0 ? "ok" : "blocked";
-        IReadOnlyList<string> nextActions = blocking.Count == 0
-            ? new[] { "rekall.capture.screenshot" }
-            : new[] { "rekall.workflow.fix_validation_errors" };
+        IReadOnlyList<string> nextActions = blocking.Count != 0
+            ? ["rekall.workflow.fix_validation_errors"]
+            : artifacts.Any(artifact => artifact.Kind == "playable-package-archive")
+                ? ["rekall.workflow.audit_playable_package", "rekall.workflow.run_playable_package"]
+                : ["rekall.workflow.package_playable_game", "rekall.capture.screenshot"];
 
         return new RekallAgeProjectSummary(
             manifest.Name,
             manifest.SourceTemplateId,
             manifest.Capabilities,
             sceneNames,
+            artifacts,
             new RekallAgeProjectHealth(status, blocking),
             nextActions);
     }
@@ -76,5 +80,52 @@ public sealed class RekallAgeContextBuilder
         return componentType.StartsWith(prefix, StringComparison.Ordinal)
             ? componentType[prefix.Length..]
             : componentType;
+    }
+
+    private static IReadOnlyList<RekallAgeProjectArtifact> FindArtifacts(string projectRoot)
+    {
+        var fullRoot = Path.GetFullPath(projectRoot);
+        if (!Directory.Exists(fullRoot))
+        {
+            return [];
+        }
+
+        var artifacts = new List<RekallAgeProjectArtifact>();
+        AddArtifacts(
+            artifacts,
+            fullRoot,
+            Directory.EnumerateFiles(fullRoot, "*.zip", SearchOption.AllDirectories),
+            "playable-package-archive");
+        AddArtifacts(
+            artifacts,
+            fullRoot,
+            Directory.EnumerateFiles(fullRoot, "rekall.package.json", SearchOption.AllDirectories),
+            "playable-package-manifest");
+
+        return artifacts
+            .OrderBy(artifact => artifact.Kind, StringComparer.Ordinal)
+            .ThenBy(artifact => artifact.Path, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static void AddArtifacts(
+        List<RekallAgeProjectArtifact> artifacts,
+        string fullRoot,
+        IEnumerable<string> files,
+        string kind)
+    {
+        foreach (var file in files)
+        {
+            var fullPath = Path.GetFullPath(file);
+            artifacts.Add(new RekallAgeProjectArtifact(
+                kind,
+                NormalizePath(Path.GetRelativePath(fullRoot, fullPath)),
+                new FileInfo(fullPath).Length));
+        }
+    }
+
+    private static string NormalizePath(string path)
+    {
+        return path.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
     }
 }

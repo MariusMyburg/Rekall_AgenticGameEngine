@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Rekall.Age.Core.Transactions;
 
 namespace Rekall.Age.Core.Commands;
 
@@ -139,11 +140,19 @@ public sealed class RekallAgeCommandRegistry
 
     private static RekallAgeCommandTransactionSummary CreateTransactionSummary(RekallAgeCommandContext context)
     {
+        var projectRoot = RekallAgeTransactionProjectRootResolver.Resolve(context.Transaction.ChangedResources);
+        var resourceChanges = projectRoot is null
+            ? Array.Empty<RekallAgeTransactionResourceChange>()
+            : RekallAgeTransactionResourceChangeSummarizer.Summarize(
+                projectRoot,
+                context.Transaction.ChangedResources);
+
         return new RekallAgeCommandTransactionSummary(
             context.Transaction.Id,
             context.Transaction.Name,
             context.Actor,
             context.Transaction.StartedAtUtc,
-            context.Transaction.ChangedResources.ToArray());
+            context.Transaction.ChangedResources.ToArray(),
+            resourceChanges);
     }
 }

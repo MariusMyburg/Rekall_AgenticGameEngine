@@ -255,6 +255,11 @@ public sealed class McpJsonRpcServerTests
         Assert.Equal("mcp-test", responseTransaction.GetProperty("actor").GetString());
         Assert.Contains(responseTransaction.GetProperty("changedResources").EnumerateArray(), resource =>
             resource.GetString()!.EndsWith("rekall.project.json", StringComparison.Ordinal));
+        var responseResourceChange = Assert.Single(responseTransaction.GetProperty("resourceChanges").EnumerateArray());
+        Assert.Equal("rekall.project.json", responseResourceChange.GetProperty("relativePath").GetString());
+        Assert.Equal("project-manifest", responseResourceChange.GetProperty("kind").GetString());
+        Assert.True(responseResourceChange.GetProperty("exists").GetBoolean());
+        Assert.True(responseResourceChange.GetProperty("sizeBytes").GetInt64() > 0);
     }
 
     [Fact]

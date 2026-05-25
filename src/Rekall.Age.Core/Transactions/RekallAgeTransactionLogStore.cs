@@ -71,7 +71,7 @@ public sealed class RekallAgeTransactionLogStore
             transaction.ChangedResources.ToArray())
         {
             ResourceChanges = transaction.ChangedResources
-                .Select(resource => CreateResourceChange(projectRoot, resource))
+                .Select(resource => RekallAgeTransactionResourceChangeSummarizer.Summarize(projectRoot, resource))
                 .ToArray()
         };
         var document = new RekallAgeTransactionLogDocument(
@@ -85,8 +85,18 @@ public sealed class RekallAgeTransactionLogStore
         var json = JsonSerializer.Serialize(document, JsonOptions);
         await File.WriteAllTextAsync(GetPath(projectRoot), json + Environment.NewLine, cancellationToken);
     }
+}
 
-    private static RekallAgeTransactionResourceChange CreateResourceChange(string projectRoot, string resource)
+public static class RekallAgeTransactionResourceChangeSummarizer
+{
+    public static IReadOnlyList<RekallAgeTransactionResourceChange> Summarize(
+        string projectRoot,
+        IReadOnlyList<string> resources)
+    {
+        return resources.Select(resource => Summarize(projectRoot, resource)).ToArray();
+    }
+
+    public static RekallAgeTransactionResourceChange Summarize(string projectRoot, string resource)
     {
         try
         {

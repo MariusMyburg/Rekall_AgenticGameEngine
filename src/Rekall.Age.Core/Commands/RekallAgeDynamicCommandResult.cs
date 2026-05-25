@@ -1,3 +1,5 @@
+using Rekall.Age.Core.Transactions;
+
 namespace Rekall.Age.Core.Commands;
 
 public sealed record RekallAgeDynamicCommandResult(
@@ -12,4 +14,5 @@ public sealed record RekallAgeCommandTransactionSummary(
     string Name,
     string Actor,
     DateTimeOffset StartedAtUtc,
-    IReadOnlyList<string> ChangedResources);
+    IReadOnlyList<string> ChangedResources,
+    IReadOnlyList<RekallAgeTransactionResourceChange> ResourceChanges);

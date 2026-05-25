@@ -40,6 +40,7 @@ The current MVP includes:
 - headless runtime smoke execution with active gameplay-system observations
 - canonical runtime scene snapshots with render, physics, audio, animation, and UI projections
 - runtime scene inspection through command bus, CLI, MCP catalog, and Studio read models
+- runtime-backed viewport frame capture through command bus, CLI, MCP catalog, and Studio metadata
 - deterministic software screenshot capture through command bus
 - built-in starter game workflows
 - one-shot playable game workflow that creates, scaffolds, and builds genre-aware C# module code
@@ -129,6 +130,7 @@ dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main
 dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main --frames 2 --inputs '[{"verticalAxis":1,"primaryAction":true},{"verticalAxis":-1}]'
 dotnet run --project src/Rekall.Age.Cli -- run scene .age-sandbox Main 0.1
 dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
+dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport
 dotnet run --project src/Rekall.Age.Cli -- capture screenshot .age-sandbox Main
 ```
 
@@ -155,3 +157,13 @@ dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
 ```
 
 The command reports entity counts, renderable counts, physics/audio/animation/UI readiness, and structured runtime observations for agents and Studio.
+
+## Runtime Viewport Capture
+
+Capture a deterministic viewport PNG from the same runtime snapshot used by inspection and Studio metadata:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport
+```
+
+The command writes `Main_runtime_003.png` and reports the active camera, frame index, renderable kinds, and runtime observation count.

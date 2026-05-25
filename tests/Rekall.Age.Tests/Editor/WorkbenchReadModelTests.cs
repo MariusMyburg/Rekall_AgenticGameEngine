@@ -25,7 +25,10 @@ public sealed class WorkbenchReadModelTests
                 {
                     ["x"] = 4,
                     ["y"] = 8
-                }));
+                }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.SpriteRenderer",
+                new JsonObject { ["sprite"] = "asset_player_12345678" }));
         await sceneStore.SaveAsync(
             root,
             RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"]).AddEntity(player),
@@ -51,9 +54,14 @@ public sealed class WorkbenchReadModelTests
         var node = Assert.Single(model.Scene.RootEntities);
         Assert.Equal(player.Id, node.EntityId);
         Assert.Equal("Player", node.Name);
-        Assert.Equal("Rekall.Transform2D", Assert.Single(model.Inspector.Components).Type);
-        Assert.Contains(model.Inspector.Components[0].Properties, property => property.Name == "x" && property.Value == "4");
+        var transform = model.Inspector.Components.Single(component => component.Type == "Rekall.Transform2D");
+        Assert.Contains(transform.Properties, property => property.Name == "x" && property.Value == "4");
         Assert.Equal("asset_player_12345678", Assert.Single(model.Assets.Assets).AssetId);
         Assert.Contains(model.Diagnostics.Issues, issue => issue.Code == "REKALL_CAMERA_MISSING");
+        Assert.Equal("Main", model.Runtime.SceneName);
+        Assert.Equal(0, model.Runtime.FrameIndex);
+        Assert.Equal(1, model.Runtime.EntityCount);
+        Assert.Equal(1, model.Runtime.RenderableCount);
+        Assert.DoesNotContain(model.Runtime.Observations, observation => observation.Severity == "blocking");
     }
 }

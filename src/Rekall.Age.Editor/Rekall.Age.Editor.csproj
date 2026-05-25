@@ -9,6 +9,7 @@
     <ProjectReference Include="..\Rekall.Age.Modules\Rekall.Age.Modules.csproj" />
     <ProjectReference Include="..\Rekall.Age.Core\Rekall.Age.Core.csproj" />
     <ProjectReference Include="..\Rekall.Age.Rendering.Abstractions\Rekall.Age.Rendering.Abstractions.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Runtime\Rekall.Age.Runtime.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

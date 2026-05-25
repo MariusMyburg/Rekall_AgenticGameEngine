@@ -7,6 +7,7 @@ using Rekall.Age.LevelDesign.Commands;
 using Rekall.Age.Playback.Commands;
 using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering.Commands;
+using Rekall.Age.Runtime.Commands;
 using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Tests.VerticalSlice;
@@ -29,6 +30,7 @@ public sealed class WorkbenchFoundationTests
         registry.Register(new CreatePrefabFromEntityCommand());
         registry.Register(new InstantiatePrefabCommand());
         registry.Register(new PlaySceneCommand());
+        registry.Register(new InspectSceneRuntimeCommand());
         registry.Register(new CaptureScreenshotCommand());
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("workbench loop"), CancellationToken.None);
 
@@ -76,6 +78,13 @@ public sealed class WorkbenchFoundationTests
             "rekall.level.prefab.instantiate",
             new InstantiatePrefabRequest(root, "Main", prefab.Value.PrefabId, "Prefab Player"),
             context)).Ok);
+        var runtime = await registry.ExecuteAsync<InspectSceneRuntimeRequest, InspectSceneRuntimeResult>(
+            "rekall.runtime.inspect_scene",
+            new InspectSceneRuntimeRequest(root, "Main", 1),
+            context);
+        Assert.True(runtime.Ok);
+        Assert.True(runtime.Value.EntityCount >= 3);
+        Assert.True(runtime.Value.RenderableCount >= 1);
 
         var model = await new RekallAgeWorkbenchModelBuilder().BuildAsync(root, "Main", CancellationToken.None);
         Assert.Equal("Workbench Game", model.Project.Name);

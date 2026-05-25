@@ -3,6 +3,8 @@ using Rekall.Age.Assets;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Editor.Contracts;
 using Rekall.Age.Project;
+using Rekall.Age.Runtime;
+using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.Validation;
 using Rekall.Age.World;
 
@@ -39,6 +41,11 @@ public sealed class RekallAgeWorkbenchModelBuilder
         var assets = await _assetStore.LoadAsync(projectRoot, cancellationToken);
         var validation = await new RekallAgeProjectValidator(_sceneStore)
             .ValidateSceneAsync(projectRoot, activeSceneName, cancellationToken);
+        var runtimeWorld = await new RekallAgeRuntimeSnapshotService(
+                _sceneStore,
+                new RekallAgeRuntimeWorldBuilder(),
+                RekallAgeRuntimeExecutionLoop.CreateDefault())
+            .InspectSceneAsync(projectRoot, activeSceneName, 0, cancellationToken);
 
         return new RekallAgeWorkbenchModel(
             new RekallAgeProjectTreeModel(
@@ -76,7 +83,8 @@ public sealed class RekallAgeWorkbenchModelBuilder
                             .ToArray()))
                     .ToArray()),
             new RekallAgeTransactionPanelModel(Array.Empty<RekallAgeTransactionPanelItem>()),
-            new RekallAgeImportQueueModel(Array.Empty<RekallAgeImportQueueItem>()));
+            new RekallAgeImportQueueModel(Array.Empty<RekallAgeImportQueueItem>()),
+            BuildRuntimePanel(runtimeWorld));
     }
 
     private static RekallAgeSceneGraphModel BuildSceneGraph(RekallAgeSceneDocument scene)
@@ -147,5 +155,32 @@ public sealed class RekallAgeWorkbenchModelBuilder
         return value is JsonValue jsonValue
             ? jsonValue.ToJsonString().Trim('"')
             : value.ToJsonString();
+    }
+
+    private static RekallAgeRuntimePanelModel BuildRuntimePanel(RekallAgeRuntimeWorld world)
+    {
+        var rendering = world.Subsystems.Rendering;
+        var physics = world.Subsystems.Physics;
+        var audio = world.Subsystems.Audio;
+        var animation = world.Subsystems.Animation;
+        var ui = world.Subsystems.Ui;
+
+        return new RekallAgeRuntimePanelModel(
+            world.SceneName,
+            world.FrameIndex,
+            world.Entities.Count,
+            rendering.Cameras.Count + rendering.Sprites.Count + rendering.Meshes.Count + rendering.Lights.Count + rendering.UiLayers.Count,
+            physics.RigidBodies.Count,
+            audio.Emitters.Count,
+            animation.Players.Count,
+            ui.Elements.Count,
+            world.Observations
+                .Select(observation => new RekallAgeRuntimePanelObservation(
+                    observation.Code,
+                    observation.Severity,
+                    observation.Subsystem,
+                    observation.TargetName.Length > 0 ? observation.TargetName : observation.TargetId,
+                    observation.Message))
+                .ToArray());
     }
 }

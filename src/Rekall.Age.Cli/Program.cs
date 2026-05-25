@@ -197,6 +197,8 @@ internal static class RekallAgeCli
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
                 ["transaction", "history", var root] => await PrintTransactionHistoryAsync(registry, context, root, "20"),
                 ["transaction", "history", var root, var limit] => await PrintTransactionHistoryAsync(registry, context, root, limit),
+                ["transaction", "restore-preimage", var root, var transactionId, var relativePath] =>
+                    await RestoreTransactionPreimageAsync(registry, context, root, transactionId, relativePath),
                 ["capture", "screenshot", var root, var scene] => await CaptureAsync(registry, context, root, scene),
                 _ => PrintUnknown(args)
             };
@@ -240,6 +242,7 @@ internal static class RekallAgeCli
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new GetEngineStatusCommand());
         registry.Register(new ListTransactionHistoryCommand());
+        registry.Register(new RestoreTransactionPreimageCommand());
         registry.Register(new ListComponentSchemasCommand());
         registry.Register(new ListModuleSourcesCommand());
         registry.Register(new ReadModuleSourceCommand());
@@ -1759,6 +1762,23 @@ internal static class RekallAgeCli
             }
         }
 
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> RestoreTransactionPreimageAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string transactionId,
+        string relativePath)
+    {
+        var result = await registry.ExecuteAsync<RestoreTransactionPreimageRequest, RestoreTransactionPreimageResult>(
+            "rekall.transaction.restore_preimage",
+            new RestoreTransactionPreimageRequest(root, transactionId, relativePath),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Restored: {result.Value.RelativePath}");
+        Console.WriteLine($"Bytes: {result.Value.BytesRestored}");
         return result.Ok ? 0 : 1;
     }
 

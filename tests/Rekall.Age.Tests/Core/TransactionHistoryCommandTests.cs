@@ -113,4 +113,51 @@ public sealed class TransactionHistoryCommandTests
         Assert.Contains("\"speed\": 4", snapshot, StringComparison.Ordinal);
         Assert.DoesNotContain("\"speed\": 7", snapshot, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task RestoreTransactionPreimageRestoresChangedResourceAndCapturesCurrentPreimage()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await File.WriteAllTextAsync(Path.Combine(root, "rekall.project.json"), "{}", CancellationToken.None);
+        var sceneStore = new RekallAgeSceneStore();
+        var entity = RekallAgeEntityDocument.Create("Player", ["player"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Game.PlayerController",
+                new System.Text.Json.Nodes.JsonObject
+                {
+                    ["speed"] = 4,
+                    ["health"] = 3
+                }));
+        await sceneStore.SaveAsync(root, RekallAgeSceneDocument.Create("Main", ["2d"]).AddEntity(entity), CancellationToken.None);
+        var mutateContext = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("set speed"), CancellationToken.None);
+        await new SetComponentPropertyCommand().ExecuteAsync(
+            new SetComponentPropertyRequest(
+                root,
+                "Main",
+                entity.Id,
+                "Game.PlayerController",
+                "speed",
+                System.Text.Json.Nodes.JsonValue.Create(7)!),
+            mutateContext);
+        await new RekallAgeTransactionLogStore().AppendAsync(root, mutateContext.Transaction, mutateContext.Actor, CancellationToken.None);
+        var restoreContext = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("restore speed"), CancellationToken.None);
+
+        var result = await new RestoreTransactionPreimageCommand().ExecuteAsync(
+            new RestoreTransactionPreimageRequest(
+                root,
+                mutateContext.Transaction.Id,
+                Path.Combine("Scenes", "Main.age.scene.json")),
+            restoreContext);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(Path.Combine("Scenes", "Main.age.scene.json"), result.Value.RelativePath);
+        Assert.True(result.Value.BytesRestored > 0);
+        var restoredScene = await sceneStore.LoadAsync(root, "Main", CancellationToken.None);
+        var component = Assert.Single(restoredScene.Entities.Single().Components);
+        Assert.Equal(4, component.Properties["speed"]!.GetValue<int>());
+        var restorePreimage = Assert.Single(restoreContext.Transaction.ResourcePreimages);
+        Assert.Contains("\"speed\": 7", restorePreimage.ReadUtf8Text(), StringComparison.Ordinal);
+        Assert.Contains(restoreContext.Transaction.ChangedResources, resource =>
+            resource.EndsWith("Main.age.scene.json", StringComparison.Ordinal));
+    }
 }

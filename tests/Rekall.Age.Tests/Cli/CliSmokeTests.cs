@@ -1,5 +1,9 @@
 using System.Diagnostics;
+using System.Text.Json.Nodes;
+using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
+using Rekall.Age.World;
+using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Tests.Cli;
 
@@ -197,6 +201,49 @@ public sealed class CliSmokeTests
         Assert.Contains("cli", history.Output);
         Assert.Contains("rekall.project.json", history.Output);
         Assert.Contains("project-manifest file", history.Output);
+    }
+
+    [Fact]
+    public async Task CliRestoresTransactionPreimage()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await File.WriteAllTextAsync(Path.Combine(root, "rekall.project.json"), "{}", CancellationToken.None);
+        var cliAssembly = FindCliAssemblyPath();
+        var sceneStore = new RekallAgeSceneStore();
+        var entity = RekallAgeEntityDocument.Create("Player", ["player"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Game.PlayerController",
+                new JsonObject
+                {
+                    ["speed"] = 4,
+                    ["health"] = 3
+                }));
+        await sceneStore.SaveAsync(root, RekallAgeSceneDocument.Create("Main", ["2d"]).AddEntity(entity), CancellationToken.None);
+        var mutateContext = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("set speed"), CancellationToken.None);
+        await new SetComponentPropertyCommand().ExecuteAsync(
+            new SetComponentPropertyRequest(
+                root,
+                "Main",
+                entity.Id,
+                "Game.PlayerController",
+                "speed",
+                JsonValue.Create(7)!),
+            mutateContext);
+        await new RekallAgeTransactionLogStore().AppendAsync(root, mutateContext.Transaction, mutateContext.Actor, CancellationToken.None);
+
+        var restore = await RunAsync(
+            cliAssembly,
+            "transaction",
+            "restore-preimage",
+            root,
+            mutateContext.Transaction.Id,
+            Path.Combine("Scenes", "Main.age.scene.json"));
+
+        Assert.Equal(0, restore.ExitCode);
+        Assert.Contains("Restored", restore.Output);
+        var restored = await sceneStore.LoadAsync(root, "Main", CancellationToken.None);
+        var component = Assert.Single(restored.Entities.Single().Components);
+        Assert.Equal(4, component.Properties["speed"]!.GetValue<int>());
     }
 
     private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)

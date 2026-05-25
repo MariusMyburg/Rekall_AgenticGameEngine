@@ -21,6 +21,7 @@ public sealed class McpCatalogTests
         var registry = new RekallAgeCommandRegistry();
         registry.Register(new GetEngineStatusCommand());
         registry.Register(new ListTransactionHistoryCommand());
+        registry.Register(new RestoreTransactionPreimageCommand());
         registry.Register(new CreateProjectCommand());
         registry.Register(new InspectGameTemplateCommand());
         registry.Register(new VerifyMvpTemplatesCommand());
@@ -53,6 +54,7 @@ public sealed class McpCatalogTests
 
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.engine_status");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.transaction.history");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.transaction.restore_preimage");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.project.create");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.templates.inspect");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.templates.verify_mvp");

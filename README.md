@@ -10,6 +10,7 @@ The current MVP includes:
 - transaction history resource-change summaries with path, kind, existence, and size metadata
 - immediate MCP/dynamic command transaction metadata with structured resource-change summaries
 - transaction resource preimage snapshots for pre-mutation restore groundwork
+- transaction preimage restore command for reverting a changed resource from a persisted snapshot
 - project capability manifests
 - deterministic scene/entity/component files
 - C# module attributes and reflection-based component schema discovery
@@ -130,6 +131,7 @@ dotnet run --project src/Rekall.Age.Cli -- context engine
 dotnet run --project src/Rekall.Age.Cli -- context summary .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- context scene .age-sandbox Main
 dotnet run --project src/Rekall.Age.Cli -- transaction history .age-sandbox
+dotnet run --project src/Rekall.Age.Cli -- transaction restore-preimage .age-sandbox <transaction-id> Scenes/Main.age.scene.json
 dotnet run --project src/Rekall.Age.Cli -- entity inspect .age-sandbox Main <entity-id>
 dotnet run --project src/Rekall.Age.Cli -- component set .age-sandbox Main <entity-id> Rekall.Transform x 42
 dotnet run --project src/Rekall.Age.Cli -- play scene .age-sandbox Main 4
@@ -158,7 +160,7 @@ dotnet run --project src/Rekall.Age.Cli -- level entity snap .age-sandbox Main <
 dotnet run --project src/Rekall.Age.Studio -- --project .age-sandbox --scene Main
 ```
 
-Successful CLI and MCP mutations persist project-local transaction history in `Transactions/transactions.age.json`. Studio, workbench read models, and the `rekall.transaction.history` command load that log so agents and humans can inspect recent command effects after the original command context has ended. Each persisted transaction includes structured resource-change summaries with relative paths, resource kinds, existence state, and file sizes when available. Dynamic command and MCP tool-call results include the same transaction and resource-change metadata immediately in `structuredContent.transaction`. Mutations that capture preimages write before-change snapshots under `Transactions/Snapshots/<transaction-id>/`, creating the foundation for explicit undo and restore commands.
+Successful CLI and MCP mutations persist project-local transaction history in `Transactions/transactions.age.json`. Studio, workbench read models, and the `rekall.transaction.history` command load that log so agents and humans can inspect recent command effects after the original command context has ended. Each persisted transaction includes structured resource-change summaries with relative paths, resource kinds, existence state, and file sizes when available. Dynamic command and MCP tool-call results include the same transaction and resource-change metadata immediately in `structuredContent.transaction`. Mutations that capture preimages write before-change snapshots under `Transactions/Snapshots/<transaction-id>/`; `rekall.transaction.restore_preimage` restores a selected resource from one of those snapshots while capturing the current file as the new transaction preimage.
 
 ## Scene Runtime Foundation
 

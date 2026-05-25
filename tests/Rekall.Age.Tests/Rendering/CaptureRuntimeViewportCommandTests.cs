@@ -122,4 +122,50 @@ public sealed class CaptureRuntimeViewportCommandTests
         Assert.Equal(1, result.Value.MissingAssetCount);
         Assert.Contains("REKALL_RENDER_ASSET_MISSING", result.Value.AssetIssueCodes);
     }
+
+    [Fact]
+    public async Task CaptureRuntimeViewportCommandRendersAnimatedPrimitiveCubeWithDirectionalLight()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "animation"])
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("SlowSpinningCube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["scaleX"] = 2, ["scaleY"] = 2, ["scaleZ"] = 2 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.TransformAnimation",
+                    new JsonObject { ["yawDegreesPerSecond"] = 45 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.MeshRenderer",
+                    new JsonObject { ["mesh"] = "rekall.primitive.cube" })))
+            .AddEntity(RekallAgeEntityDocument.Create("KeyDirectionalLight", ["light"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["pitch"] = -35, ["yaw"] = -45 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.DirectionalLight",
+                    new JsonObject { ["intensity"] = 1.0 })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 60, Path.Combine(root, "Viewport"), 180, 120, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("animated cube viewport"), CancellationToken.None));
+        var output = await RekallAgePngReader.ReadRgbaAsync(result.Value.ScreenshotPath, CancellationToken.None);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.NonBlank);
+        Assert.Equal(60, result.Value.FrameIndex);
+        Assert.Equal(2, result.Value.RenderableCount);
+        Assert.Equal(["light", "mesh"], result.Value.RenderableKinds);
+        Assert.Equal(0, result.Value.FallbackRenderableCount);
+        Assert.Contains(Enumerable.Range(0, output.Rgba.Length / 4), pixel =>
+        {
+            var index = pixel * 4;
+            return output.Rgba[index] >= 45
+                && output.Rgba[index + 1] >= 70
+                && output.Rgba[index + 2] >= 100;
+        });
+    }
 }

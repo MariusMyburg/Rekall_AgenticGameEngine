@@ -95,7 +95,8 @@ public sealed record RekallAgeRuntimeRenderMesh(
 public sealed record RekallAgeRuntimeRenderLight(
     string EntityId,
     string EntityName,
-    string Kind);
+    string Kind,
+    double Intensity);
 
 public sealed record RekallAgeRuntimeRenderUiLayer(
     string EntityId,

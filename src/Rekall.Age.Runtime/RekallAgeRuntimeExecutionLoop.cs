@@ -29,7 +29,7 @@ public sealed class RekallAgeRuntimeExecutionLoop
     {
         var loop = new RekallAgeRuntimeExecutionLoop(
             [
-                new NoOpRuntimeWorldSystem("runtime.animation"),
+                new RekallAgeTransformAnimationSystem(),
                 new NoOpRuntimeWorldSystem("runtime.audio"),
                 new NoOpRuntimeWorldSystem("runtime.physics"),
                 new NoOpRuntimeWorldSystem("runtime.rendering"),

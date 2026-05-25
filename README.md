@@ -39,9 +39,11 @@ The current MVP includes:
 - CLI adapter over the same command bus
 - headless runtime smoke execution with active gameplay-system observations
 - canonical runtime scene snapshots with render, physics, audio, animation, and UI projections
+- deterministic transform animation for runtime pitch/yaw/roll rates
 - runtime scene inspection through command bus, CLI, MCP catalog, and Studio read models
 - runtime-backed viewport frame capture through command bus, CLI, MCP catalog, and Studio metadata
 - deterministic software screenshot capture through command bus
+- software viewport rasterization for primitive cube meshes with directional-light shading
 - built-in starter game workflows
 - one-shot playable game workflow that creates, scaffolds, and builds genre-aware C# module code
 
@@ -169,3 +171,5 @@ dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox 
 The command writes `Main_runtime_003.png` and reports the active camera, frame index, renderable kinds, asset-backed renderable count, fallback renderable count, and runtime observation count.
 
 If a sprite renderable references an imported PNG asset, the software viewport draws that PNG into the frame. Missing or unsupported sprite assets fall back to deterministic markers and are reported in the command output.
+
+Primitive mesh renderables, including `rekall.primitive.cube`, are projected into the software viewport as shaded cube geometry. `Rekall.DirectionalLight` entities contribute deterministic directional lighting from their `Rekall.Transform3D` rotation and `intensity` value. `Rekall.TransformAnimation` can apply `pitchDegreesPerSecond`, `yawDegreesPerSecond`, and `rollDegreesPerSecond` during runtime frame simulation before capture.

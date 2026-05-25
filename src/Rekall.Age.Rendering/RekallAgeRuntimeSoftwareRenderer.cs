@@ -37,6 +37,10 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
             {
                 assetBackedCount++;
             }
+            else if (TryDrawEngineRenderable(frame, renderable, pixels))
+            {
+                continue;
+            }
             else
             {
                 DrawRenderableMarker(frame, renderable, pixels);
@@ -106,6 +110,213 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
 
         DrawImage(frame, renderable, image, pixels);
         return true;
+    }
+
+    private static bool TryDrawEngineRenderable(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable,
+        byte[] pixels)
+    {
+        if (renderable.Kind.Equals("mesh", StringComparison.Ordinal) && IsPrimitiveCube(renderable))
+        {
+            DrawPrimitiveCube(frame, renderable, pixels);
+            return true;
+        }
+
+        if (renderable.Kind.Equals("light", StringComparison.Ordinal))
+        {
+            return renderable.Variant?.Contains("DirectionalLight", StringComparison.Ordinal) == true;
+        }
+
+        return false;
+    }
+
+    private static bool IsPrimitiveCube(RekallAgeRuntimeViewportRenderable renderable)
+    {
+        return renderable.Variant is not null
+            && (renderable.Variant.Equals("cube", StringComparison.OrdinalIgnoreCase)
+                || renderable.Variant.Equals("rekall.primitive.cube", StringComparison.OrdinalIgnoreCase)
+                || renderable.Variant.EndsWith(".cube", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static void DrawPrimitiveCube(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable,
+        byte[] pixels)
+    {
+        var (centerX, centerY) = ResolveRenderableCenter(frame, renderable);
+        var scale = Math.Max(0.1, Math.Max(renderable.ScaleX, Math.Max(renderable.ScaleY, renderable.ScaleZ)));
+        var size = Math.Max(14, Math.Min(frame.Width, frame.Height) * 0.18 * scale);
+        var light = ResolveDirectionalLight(frame);
+        var vertices = CubeVertices
+            .Select(vertex => Rotate(
+                new SoftwareVec3(
+                    vertex.X * Math.Max(0.1, renderable.ScaleX),
+                    vertex.Y * Math.Max(0.1, renderable.ScaleY),
+                    vertex.Z * Math.Max(0.1, renderable.ScaleZ)),
+                renderable.RotationX,
+                renderable.RotationY,
+                renderable.RotationZ))
+            .ToArray();
+
+        var faces = CubeFaces
+            .Select(face =>
+            {
+                var normal = Normalize(Rotate(face.Normal, renderable.RotationX, renderable.RotationY, renderable.RotationZ));
+                var projected = face.VertexIndexes
+                    .Select(index => Project(vertices[index], centerX, centerY, size))
+                    .ToArray();
+                return new SoftwareCubeFace(projected, normal, face.VertexIndexes.Average(index => vertices[index].Z));
+            })
+            .OrderBy(face => face.AverageZ)
+            .ToArray();
+
+        foreach (var face in faces)
+        {
+            var diffuse = Math.Max(0, Dot(face.Normal, light.Direction));
+            var shade = Math.Clamp(0.36 + diffuse * 0.64 * light.Intensity, 0.24, 1.0);
+            var r = (byte)Math.Clamp((int)Math.Round(88 * shade + Math.Abs(face.Normal.X) * 18), 45, 190);
+            var g = (byte)Math.Clamp((int)Math.Round(148 * shade + Math.Abs(face.Normal.Y) * 18), 70, 220);
+            var b = (byte)Math.Clamp((int)Math.Round(218 * shade + Math.Abs(face.Normal.Z) * 18), 100, 255);
+            FillQuad(frame, pixels, face.Points, r, g, b);
+        }
+    }
+
+    private static SoftwareDirectionalLight ResolveDirectionalLight(RekallAgeRuntimeViewportFrame frame)
+    {
+        var light = frame.Renderables
+            .Where(renderable => renderable.Kind.Equals("light", StringComparison.Ordinal))
+            .Where(renderable => renderable.Variant?.Contains("DirectionalLight", StringComparison.Ordinal) == true)
+            .OrderByDescending(renderable => renderable.Intensity)
+            .ThenBy(renderable => renderable.EntityName, StringComparer.Ordinal)
+            .FirstOrDefault();
+
+        if (light is null)
+        {
+            return new SoftwareDirectionalLight(Normalize(new SoftwareVec3(0.35, 0.55, 0.75)), 1);
+        }
+
+        return new SoftwareDirectionalLight(
+            DirectionFromEuler(light.RotationX, light.RotationY),
+            Math.Clamp(light.Intensity, 0, 4));
+    }
+
+    private static SoftwareVec3 DirectionFromEuler(double pitchDegrees, double yawDegrees)
+    {
+        var pitch = DegreesToRadians(pitchDegrees);
+        var yaw = DegreesToRadians(yawDegrees);
+        return Normalize(new SoftwareVec3(
+            Math.Sin(yaw) * Math.Cos(pitch),
+            -Math.Sin(pitch),
+            Math.Cos(yaw) * Math.Cos(pitch)));
+    }
+
+    private static SoftwarePoint Project(SoftwareVec3 vertex, int centerX, int centerY, double size)
+    {
+        var x = centerX + (vertex.X - vertex.Z * 0.42) * size;
+        var y = centerY - (vertex.Y + vertex.Z * 0.28) * size;
+        return new SoftwarePoint(x, y);
+    }
+
+    private static void FillQuad(
+        RekallAgeRuntimeViewportFrame frame,
+        byte[] pixels,
+        IReadOnlyList<SoftwarePoint> points,
+        byte r,
+        byte g,
+        byte b)
+    {
+        FillTriangle(frame, pixels, points[0], points[1], points[2], r, g, b);
+        FillTriangle(frame, pixels, points[0], points[2], points[3], r, g, b);
+    }
+
+    private static void FillTriangle(
+        RekallAgeRuntimeViewportFrame frame,
+        byte[] pixels,
+        SoftwarePoint a,
+        SoftwarePoint b,
+        SoftwarePoint c,
+        byte r,
+        byte g,
+        byte blue)
+    {
+        var minX = Math.Max(0, (int)Math.Floor(Math.Min(a.X, Math.Min(b.X, c.X))));
+        var maxX = Math.Min(frame.Width - 1, (int)Math.Ceiling(Math.Max(a.X, Math.Max(b.X, c.X))));
+        var minY = Math.Max(0, (int)Math.Floor(Math.Min(a.Y, Math.Min(b.Y, c.Y))));
+        var maxY = Math.Min(frame.Height - 1, (int)Math.Ceiling(Math.Max(a.Y, Math.Max(b.Y, c.Y))));
+        var area = Edge(a, b, c);
+
+        if (Math.Abs(area) < 0.000001)
+        {
+            return;
+        }
+
+        for (var y = minY; y <= maxY; y++)
+        {
+            for (var x = minX; x <= maxX; x++)
+            {
+                var point = new SoftwarePoint(x + 0.5, y + 0.5);
+                var w0 = Edge(b, c, point);
+                var w1 = Edge(c, a, point);
+                var w2 = Edge(a, b, point);
+                if ((w0 >= 0 && w1 >= 0 && w2 >= 0 && area > 0)
+                    || (w0 <= 0 && w1 <= 0 && w2 <= 0 && area < 0))
+                {
+                    var index = ToIndex(frame, x, y);
+                    pixels[index + 0] = r;
+                    pixels[index + 1] = g;
+                    pixels[index + 2] = blue;
+                    pixels[index + 3] = 255;
+                }
+            }
+        }
+    }
+
+    private static double Edge(SoftwarePoint a, SoftwarePoint b, SoftwarePoint c)
+    {
+        return (c.X - a.X) * (b.Y - a.Y) - (c.Y - a.Y) * (b.X - a.X);
+    }
+
+    private static SoftwareVec3 Rotate(
+        SoftwareVec3 point,
+        double pitchDegrees,
+        double yawDegrees,
+        double rollDegrees)
+    {
+        var pitch = DegreesToRadians(pitchDegrees);
+        var yaw = DegreesToRadians(yawDegrees);
+        var roll = DegreesToRadians(rollDegrees);
+
+        var x1 = point.X;
+        var y1 = point.Y * Math.Cos(pitch) - point.Z * Math.Sin(pitch);
+        var z1 = point.Y * Math.Sin(pitch) + point.Z * Math.Cos(pitch);
+
+        var x2 = x1 * Math.Cos(yaw) + z1 * Math.Sin(yaw);
+        var y2 = y1;
+        var z2 = -x1 * Math.Sin(yaw) + z1 * Math.Cos(yaw);
+
+        return new SoftwareVec3(
+            x2 * Math.Cos(roll) - y2 * Math.Sin(roll),
+            x2 * Math.Sin(roll) + y2 * Math.Cos(roll),
+            z2);
+    }
+
+    private static double Dot(SoftwareVec3 left, SoftwareVec3 right)
+    {
+        return left.X * right.X + left.Y * right.Y + left.Z * right.Z;
+    }
+
+    private static SoftwareVec3 Normalize(SoftwareVec3 value)
+    {
+        var length = Math.Sqrt(value.X * value.X + value.Y * value.Y + value.Z * value.Z);
+        return length <= 0.000001
+            ? new SoftwareVec3(0, 0, 1)
+            : new SoftwareVec3(value.X / length, value.Y / length, value.Z / length);
+    }
+
+    private static double DegreesToRadians(double degrees)
+    {
+        return degrees * Math.PI / 180.0;
     }
 
     private static void DrawImage(
@@ -227,6 +438,15 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeRuntimeViewportRenderable renderable)
     {
+        if (renderable.Kind.Equals("mesh", StringComparison.Ordinal))
+        {
+            var meshX = (int)Math.Round(frame.Width / 2.0 + renderable.X * 18);
+            var meshY = (int)Math.Round(frame.Height / 2.0 - renderable.Y * 18);
+            return (
+                Math.Clamp(meshX, 16, Math.Max(16, frame.Width - 17)),
+                Math.Clamp(meshY, 16, Math.Max(16, frame.Height - 17)));
+        }
+
         var seed = Math.Abs(renderable.EntityId.GetHashCode(StringComparison.Ordinal));
         var x = 12 + (seed + (int)Math.Round(renderable.X * 7)) % Math.Max(1, frame.Width - 24);
         var y = 16 + (seed / 17 + (int)Math.Round(renderable.Y * 7)) % Math.Max(1, frame.Height - 28);
@@ -267,4 +487,43 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
     {
         return (y * frame.Width + x) * 4;
     }
+
+    private static readonly SoftwareVec3[] CubeVertices =
+    [
+        new(-0.5, -0.5, -0.5),
+        new(0.5, -0.5, -0.5),
+        new(0.5, 0.5, -0.5),
+        new(-0.5, 0.5, -0.5),
+        new(-0.5, -0.5, 0.5),
+        new(0.5, -0.5, 0.5),
+        new(0.5, 0.5, 0.5),
+        new(-0.5, 0.5, 0.5)
+    ];
+
+    private static readonly SoftwareCubeFaceDefinition[] CubeFaces =
+    [
+        new([0, 3, 2, 1], new SoftwareVec3(0, 0, -1)),
+        new([4, 5, 6, 7], new SoftwareVec3(0, 0, 1)),
+        new([0, 4, 7, 3], new SoftwareVec3(-1, 0, 0)),
+        new([1, 2, 6, 5], new SoftwareVec3(1, 0, 0)),
+        new([0, 1, 5, 4], new SoftwareVec3(0, -1, 0)),
+        new([3, 7, 6, 2], new SoftwareVec3(0, 1, 0))
+    ];
+
+    private readonly record struct SoftwareVec3(double X, double Y, double Z);
+
+    private readonly record struct SoftwarePoint(double X, double Y);
+
+    private sealed record SoftwareCubeFace(
+        IReadOnlyList<SoftwarePoint> Points,
+        SoftwareVec3 Normal,
+        double AverageZ);
+
+    private sealed record SoftwareCubeFaceDefinition(
+        IReadOnlyList<int> VertexIndexes,
+        SoftwareVec3 Normal);
+
+    private sealed record SoftwareDirectionalLight(
+        SoftwareVec3 Direction,
+        double Intensity);
 }

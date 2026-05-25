@@ -72,7 +72,10 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 transform.Position2D.X,
                 transform.Position2D.Y,
                 transform.Position3D.Z,
-                100);
+                100,
+                RotationZ: transform.Rotation2D,
+                ScaleX: transform.Scale2D.X,
+                ScaleY: transform.Scale2D.Y);
         }
 
         foreach (var mesh in world.Subsystems.Rendering.Meshes)
@@ -86,7 +89,14 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 transform.Position3D.X,
                 transform.Position3D.Y,
                 transform.Position3D.Z,
-                200);
+                200,
+                Variant: mesh.AssetId,
+                RotationX: transform.Rotation3D.X,
+                RotationY: transform.Rotation3D.Y,
+                RotationZ: transform.Rotation3D.Z,
+                ScaleX: transform.Scale3D.X,
+                ScaleY: transform.Scale3D.Y,
+                ScaleZ: transform.Scale3D.Z);
         }
 
         foreach (var light in world.Subsystems.Rendering.Lights)
@@ -100,7 +110,12 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 transform.Position3D.X,
                 transform.Position3D.Y,
                 transform.Position3D.Z,
-                300);
+                300,
+                Variant: light.Kind,
+                RotationX: transform.Rotation3D.X,
+                RotationY: transform.Rotation3D.Y,
+                RotationZ: transform.Rotation3D.Z,
+                Intensity: light.Intensity);
         }
 
         foreach (var uiLayer in world.Subsystems.Rendering.UiLayers)

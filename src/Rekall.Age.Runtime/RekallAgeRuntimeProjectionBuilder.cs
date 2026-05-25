@@ -122,6 +122,13 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                         }
 
                         break;
+                    case "Rekall.TransformAnimation":
+                        animationPlayers.Add(new RekallAgeRuntimeAnimationPlayer(
+                            entity.Id,
+                            entity.Name,
+                            component.Type["Rekall.".Length..],
+                            null));
+                        break;
                     case "Rekall.UiCanvas":
                         var layer = ReadInt32(component.Properties, "layer", 0);
                         canvases.Add(new RekallAgeRuntimeUiCanvas(entity.Id, entity.Name, layer));
@@ -143,7 +150,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             lights.Add(new RekallAgeRuntimeRenderLight(
                                 entity.Id,
                                 entity.Name,
-                                component.Type["Rekall.".Length..]));
+                                component.Type["Rekall.".Length..],
+                                ReadNumber(component.Properties, "intensity", 1)));
                         }
 
                         break;
@@ -278,6 +286,26 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         if (value.TryGetValue<double>(out var number))
         {
             return (int)number;
+        }
+
+        return fallback;
+    }
+
+    private static double ReadNumber(JsonObject properties, string name, double fallback)
+    {
+        if (!properties.TryGetPropertyValue(name, out var node) || node is not JsonValue value)
+        {
+            return fallback;
+        }
+
+        if (value.TryGetValue<double>(out var doubleValue))
+        {
+            return doubleValue;
+        }
+
+        if (value.TryGetValue<int>(out var intValue))
+        {
+            return intValue;
         }
 
         return fallback;

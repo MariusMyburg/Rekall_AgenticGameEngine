@@ -59,7 +59,15 @@ public sealed record RekallAgeRuntimeViewportRenderable(
     double X,
     double Y,
     double Z,
-    int SortKey);
+    int SortKey,
+    string? Variant = null,
+    double RotationX = 0,
+    double RotationY = 0,
+    double RotationZ = 0,
+    double ScaleX = 1,
+    double ScaleY = 1,
+    double ScaleZ = 1,
+    double Intensity = 1);
 
 public sealed record RekallAgeRuntimeViewportOverlay(
     bool Enabled,

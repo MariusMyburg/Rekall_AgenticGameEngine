@@ -154,6 +154,28 @@ public sealed class SceneRuntimeFoundationTests
     }
 
     [Fact]
+    public async Task ExecutionLoopAppliesTransformAnimationYawOverTime()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "animation", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("SlowSpinningCube", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["yaw"] = 10, ["scaleX"] = 2, ["scaleY"] = 2, ["scaleZ"] = 2 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.TransformAnimation",
+                    new JsonObject { ["yawDegreesPerSecond"] = 90 })));
+        var initial = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(initial, frames: 60, CancellationToken.None);
+
+        var cube = Assert.Single(result.World.Entities);
+        Assert.Equal(60, result.World.FrameIndex);
+        Assert.Equal(100, cube.Transform.Rotation3D.Y, precision: 3);
+        Assert.Equal("TransformAnimation", Assert.Single(result.World.Subsystems.Animation.Players).Kind);
+    }
+
+    [Fact]
     public async Task InspectSceneRuntimeCommandReturnsCompactSubsystemCounts()
     {
         var root = TestPaths.CreateTempDirectory();

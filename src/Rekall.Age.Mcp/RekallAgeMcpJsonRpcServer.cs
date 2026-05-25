@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Transactions;
 
 namespace Rekall.Age.Mcp;
 
@@ -87,7 +88,14 @@ public sealed class RekallAgeMcpJsonRpcServer
         var argumentsJson = parameters.TryGetProperty("arguments", out var arguments)
             ? arguments.GetRawText()
             : "{}";
-        var commandResult = await _registry.ExecuteJsonAsync(name, argumentsJson, context);
+        var toolTransaction = RekallAgeTransaction.Begin(name);
+        var toolContext = new RekallAgeCommandContext(context.Actor, toolTransaction, context.CancellationToken);
+        var commandResult = await _registry.ExecuteJsonAsync(name, argumentsJson, toolContext);
+        if (commandResult.Ok)
+        {
+            await PersistTransactionAsync(toolContext);
+        }
+
         var result = new
         {
             content = new[]
@@ -103,6 +111,26 @@ public sealed class RekallAgeMcpJsonRpcServer
         };
 
         return SerializeResponse(id, result);
+    }
+
+    private static async ValueTask PersistTransactionAsync(RekallAgeCommandContext context)
+    {
+        if (context.Transaction.ChangedResources.Count == 0)
+        {
+            return;
+        }
+
+        var projectRoot = RekallAgeTransactionProjectRootResolver.Resolve(context.Transaction.ChangedResources);
+        if (projectRoot is null)
+        {
+            return;
+        }
+
+        await new RekallAgeTransactionLogStore().AppendAsync(
+            projectRoot,
+            context.Transaction,
+            context.Actor,
+            context.CancellationToken);
     }
 
     private object CreateInitializeResult()

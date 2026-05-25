@@ -154,7 +154,7 @@ dotnet run --project src/Rekall.Age.Cli -- level entity snap .age-sandbox Main <
 dotnet run --project src/Rekall.Age.Studio -- --project .age-sandbox --scene Main
 ```
 
-Successful CLI mutations persist project-local transaction history in `Transactions/transactions.age.json`. Studio and workbench read models load that log into the Transactions panel so agents and humans can inspect recent command effects after the original command context has ended.
+Successful CLI and MCP mutations persist project-local transaction history in `Transactions/transactions.age.json`. Studio and workbench read models load that log into the Transactions panel so agents and humans can inspect recent command effects after the original command context has ended.
 
 ## Scene Runtime Foundation
 

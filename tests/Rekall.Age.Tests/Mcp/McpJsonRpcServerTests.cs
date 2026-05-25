@@ -7,6 +7,7 @@ using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.Mcp;
 using Rekall.Age.Modules.Commands;
 using Rekall.Age.Playback.Commands;
+using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
 
@@ -207,6 +208,45 @@ public sealed class McpJsonRpcServerTests
         Assert.False(result.GetProperty("isError").GetBoolean());
         Assert.Contains("Echoed message.", result.GetProperty("content")[0].GetProperty("text").GetString());
         Assert.Equal("ping from command", result.GetProperty("structuredContent").GetProperty("value").GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public async Task ToolsCallPersistsSuccessfulMutationAsIndependentTransaction()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CreateProjectCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+        var serverContext = CreateContext();
+
+        var response = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 31,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.project.create",
+                arguments = new
+                {
+                    projectRoot = root,
+                    name = "MCP Transactions",
+                    capabilities = new[] { "world" }
+                }
+            }
+        }), serverContext);
+
+        using var document = JsonDocument.Parse(response!);
+        Assert.False(document.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.Empty(serverContext.Transaction.ChangedResources);
+
+        var log = await new RekallAgeTransactionLogStore().LoadAsync(root, CancellationToken.None);
+        var transaction = Assert.Single(log.Transactions);
+        Assert.Equal("rekall.project.create", transaction.Name);
+        Assert.Equal("mcp-test", transaction.Actor);
+        Assert.Contains(
+            transaction.ChangedResources,
+            resource => resource.EndsWith("rekall.project.json", StringComparison.Ordinal));
     }
 
     [Fact]

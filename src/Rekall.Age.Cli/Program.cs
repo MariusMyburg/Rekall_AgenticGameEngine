@@ -287,7 +287,7 @@ internal static class RekallAgeCli
             return;
         }
 
-        var projectRoot = ResolveProjectRoot(context.Transaction.ChangedResources);
+        var projectRoot = RekallAgeTransactionProjectRootResolver.Resolve(context.Transaction.ChangedResources);
         if (projectRoot is null)
         {
             return;
@@ -298,29 +298,6 @@ internal static class RekallAgeCli
             context.Transaction,
             context.Actor,
             context.CancellationToken);
-    }
-
-    private static string? ResolveProjectRoot(IReadOnlyList<string> changedResources)
-    {
-        foreach (var resource in changedResources)
-        {
-            var fullPath = Path.GetFullPath(resource);
-            var start = Directory.Exists(fullPath)
-                ? fullPath
-                : Path.GetDirectoryName(fullPath);
-            var directory = start is null ? null : new DirectoryInfo(start);
-            while (directory is not null)
-            {
-                if (File.Exists(Path.Combine(directory.FullName, RekallAgeProjectStore.ManifestFileName)))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
-            }
-        }
-
-        return null;
     }
 
     private static int ListTemplates()

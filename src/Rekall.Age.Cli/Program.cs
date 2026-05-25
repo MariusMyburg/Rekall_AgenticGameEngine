@@ -1,11 +1,14 @@
 using Rekall.Age.Agent;
 using Rekall.Age.Agent.Commands;
+using Rekall.Age.AssetPipeline.Commands;
 using Rekall.Age.Assets.Commands;
 using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
+using Rekall.Age.Editor;
 using Rekall.Age.GameTemplates;
 using Rekall.Age.GameTemplates.Commands;
+using Rekall.Age.LevelDesign.Commands;
 using Rekall.Age.Mcp;
 using Rekall.Age.Modules.Commands;
 using Rekall.Age.Playback;
@@ -28,7 +31,7 @@ internal static class RekallAgeCli
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|play|playtest|run|context|capture|render|module|build|templates|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|level|studio|play|playtest|run|context|capture|render|module|build|templates|mcp> ...");
             return 2;
         }
 
@@ -95,8 +98,11 @@ internal static class RekallAgeCli
                 ["render", "command-buffer", "record", var root, var id, var queue, var commandsJson] =>
                     await RecordRenderCommandBufferAsync(registry, context, root, id, queue, commandsJson),
                 ["mcp", "stdio"] => await RunMcpStdioAsync(registry, context),
+                ["studio", "open", var root, var scene] => await OpenStudioModelAsync(root, scene),
                 ["asset", "import", var root, var source, var kind, var displayName] =>
                     await ImportAssetAsync(registry, context, root, source, kind, displayName),
+                ["asset", "import-report", var root, var source, var kind, var displayName] =>
+                    await ImportAssetReportAsync(registry, context, root, source, kind, displayName),
                 ["asset", "list", var root] => await ListAssetsAsync(registry, context, root, null),
                 ["asset", "list", var root, var kind] => await ListAssetsAsync(registry, context, root, kind),
                 ["module", "schemas"] => await ListSchemasAsync(registry, context, null),
@@ -154,6 +160,16 @@ internal static class RekallAgeCli
                 ["entity", "inspect", var root, var scene, var entityId] => await InspectEntityAsync(registry, context, root, scene, entityId),
                 ["component", "set", var root, var scene, var entityId, var componentType, var propertyName, var value] =>
                     await SetComponentPropertyAsync(registry, context, root, scene, entityId, componentType, propertyName, value),
+                ["level", "entity", "duplicate", var root, var scene, var entityId, var name] =>
+                    await DuplicateEntityAsync(registry, context, root, scene, entityId, name),
+                ["level", "entity", "parent", var root, var scene, var entityId, var parentId] =>
+                    await ParentEntityAsync(registry, context, root, scene, entityId, parentId),
+                ["level", "prefab", "create", var root, var scene, var entityId, var prefabName] =>
+                    await CreatePrefabAsync(registry, context, root, scene, entityId, prefabName),
+                ["level", "prefab", "instantiate", var root, var scene, var prefabId, var name] =>
+                    await InstantiatePrefabAsync(registry, context, root, scene, prefabId, name),
+                ["level", "entity", "snap", var root, var scene, var entityId, var gridSize] =>
+                    await SnapEntityAsync(registry, context, root, scene, entityId, gridSize),
                 ["play", "scene", var root, var scene, var frames] => await PlaySceneAsync(registry, context, root, scene, frames, null),
                 ["play", "scene", var root, var scene, var frames, var inputsJson] => await PlaySceneAsync(registry, context, root, scene, frames, inputsJson),
                 ["play", "capture-frame", var root, var scene, var outputDirectory] =>
@@ -233,7 +249,13 @@ internal static class RekallAgeCli
         registry.Register(new BuildModulesCommand());
         registry.Register(new BuildPlayerCommand());
         registry.Register(new ImportAssetCommand());
+        registry.Register(new ImportAssetWithReportCommand());
         registry.Register(new ListAssetsCommand());
+        registry.Register(new DuplicateEntityCommand());
+        registry.Register(new ParentEntityCommand());
+        registry.Register(new CreatePrefabFromEntityCommand());
+        registry.Register(new InstantiatePrefabCommand());
+        registry.Register(new SnapEntityToGridCommand());
         registry.Register(new PlaySceneCommand());
         registry.Register(new PlaytestSceneCommand());
         registry.Register(new RunSceneCommand());
@@ -792,6 +814,122 @@ internal static class RekallAgeCli
             new ImportAssetRequest(root, source, kind, displayName),
             context);
         Console.WriteLine($"{result.Value.Asset.Id}: {result.Value.Asset.ImportedPath}");
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> OpenStudioModelAsync(string root, string scene)
+    {
+        var model = await new RekallAgeWorkbenchModelBuilder().BuildAsync(root, scene, CancellationToken.None);
+        Console.WriteLine($"{model.Project.Name}: {model.Scene.Name}");
+        Console.WriteLine($"Root entities: {model.Scene.RootEntities.Count}");
+        Console.WriteLine($"Assets: {model.Assets.Assets.Count}");
+        Console.WriteLine($"Diagnostics: {model.Diagnostics.Issues.Count}");
+        return 0;
+    }
+
+    private static async Task<int> ImportAssetReportAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string source,
+        string kind,
+        string displayName)
+    {
+        var result = await registry.ExecuteAsync<ImportAssetWithReportRequest, ImportAssetWithReportResult>(
+            "rekall.asset.import_report",
+            new ImportAssetWithReportRequest(root, source, kind, displayName),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Imported: {result.Value.Report.Imported}");
+        Console.WriteLine($"Asset: {result.Value.Report.AssetId}");
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> DuplicateEntityAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string entityId,
+        string name)
+    {
+        var result = await registry.ExecuteAsync<DuplicateEntityRequest, DuplicateEntityResult>(
+            "rekall.level.entity.duplicate",
+            new DuplicateEntityRequest(root, scene, entityId, name),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine(result.Value.EntityId);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ParentEntityAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string entityId,
+        string parentId)
+    {
+        var normalizedParent = parentId.Equals("null", StringComparison.OrdinalIgnoreCase) ? null : parentId;
+        var result = await registry.ExecuteAsync<ParentEntityRequest, ParentEntityResult>(
+            "rekall.level.entity.parent",
+            new ParentEntityRequest(root, scene, entityId, normalizedParent),
+            context);
+        Console.WriteLine(result.Summary);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> CreatePrefabAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string entityId,
+        string prefabName)
+    {
+        var result = await registry.ExecuteAsync<CreatePrefabFromEntityRequest, CreatePrefabFromEntityResult>(
+            "rekall.level.prefab.create_from_entity",
+            new CreatePrefabFromEntityRequest(root, scene, entityId, prefabName),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine(result.Value.PrefabId);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InstantiatePrefabAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string prefabId,
+        string name)
+    {
+        var result = await registry.ExecuteAsync<InstantiatePrefabRequest, InstantiatePrefabResult>(
+            "rekall.level.prefab.instantiate",
+            new InstantiatePrefabRequest(root, scene, prefabId, name),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine(result.Value.EntityId);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> SnapEntityAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string entityId,
+        string gridSize)
+    {
+        var result = await registry.ExecuteAsync<SnapEntityToGridRequest, SnapEntityToGridResult>(
+            "rekall.level.entity.snap_to_grid",
+            new SnapEntityToGridRequest(
+                root,
+                scene,
+                entityId,
+                double.Parse(gridSize, System.Globalization.CultureInfo.InvariantCulture)),
+            context);
+        Console.WriteLine(result.Summary);
         return result.Ok ? 0 : 1;
     }
 

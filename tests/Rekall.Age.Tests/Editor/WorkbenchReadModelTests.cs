@@ -62,6 +62,35 @@ public sealed class WorkbenchReadModelTests
         Assert.Equal(0, model.Runtime.FrameIndex);
         Assert.Equal(1, model.Runtime.EntityCount);
         Assert.Equal(1, model.Runtime.RenderableCount);
+        Assert.Null(model.Runtime.ActiveCameraName);
+        Assert.Equal("rekall.render.capture_runtime_viewport", model.Runtime.ViewportCaptureTool);
         Assert.DoesNotContain(model.Runtime.Observations, observation => observation.Severity == "blocking");
+    }
+
+    [Fact]
+    public async Task WorkbenchRuntimePanelReportsActiveCameraAndViewportCaptureTool()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Viewport Project", ["world", "rendering2d"]),
+            CancellationToken.None);
+
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"])
+                .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject { ["active"] = true })))
+                .AddEntity(RekallAgeEntityDocument.Create("Player", ["player"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject { ["x"] = 2, ["y"] = 3 }))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.SpriteRenderer", new JsonObject { ["sprite"] = "asset_player" }))),
+            CancellationToken.None);
+
+        var model = await new RekallAgeWorkbenchModelBuilder().BuildAsync(root, "Main", CancellationToken.None);
+
+        Assert.Equal("MainCamera", model.Runtime.ActiveCameraName);
+        Assert.Equal("rekall.render.capture_runtime_viewport", model.Runtime.ViewportCaptureTool);
+        Assert.Equal(2, model.Runtime.EntityCount);
+        Assert.Equal(2, model.Runtime.RenderableCount);
     }
 }

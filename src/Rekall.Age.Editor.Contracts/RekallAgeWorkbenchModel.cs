@@ -13,6 +13,8 @@ public sealed record RekallAgeWorkbenchModel(
 public sealed record RekallAgeRuntimePanelModel(
     string SceneName,
     int FrameIndex,
+    string? ActiveCameraName,
+    string ViewportCaptureTool,
     int EntityCount,
     int RenderableCount,
     int PhysicsBodyCount,

@@ -24,7 +24,8 @@ public sealed class RekallAgeStudioViewModel
         ViewportTitle = model is null ? "Viewport" : $"{model.Scene.Name} Viewport";
         ViewportSummary = model is null
             ? "Open a Rekall AGE project to begin."
-            : $"{model.Scene.RootEntities.Count} root entities, {model.Assets.Assets.Count} assets, {model.Diagnostics.Issues.Count} diagnostics";
+            : $"Frame {model.Runtime.FrameIndex}, camera {model.Runtime.ActiveCameraName ?? "none"}, {model.Runtime.RenderableCount} renderables, {model.Runtime.Observations.Count} observations";
+        ViewportCaptureTool = model?.Runtime.ViewportCaptureTool ?? string.Empty;
     }
 
     public ObservableCollection<string> EntityNodes { get; }
@@ -42,6 +43,8 @@ public sealed class RekallAgeStudioViewModel
     public string ViewportTitle { get; }
 
     public string ViewportSummary { get; }
+
+    public string ViewportCaptureTool { get; }
 
     private static string FormatEntity(RekallAgeSceneEntityNode node)
     {

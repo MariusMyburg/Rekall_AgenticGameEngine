@@ -164,10 +164,14 @@ public sealed class RekallAgeWorkbenchModelBuilder
         var audio = world.Subsystems.Audio;
         var animation = world.Subsystems.Animation;
         var ui = world.Subsystems.Ui;
+        var activeCamera = rendering.Cameras.FirstOrDefault(camera => camera.Active)
+            ?? rendering.Cameras.FirstOrDefault();
 
         return new RekallAgeRuntimePanelModel(
             world.SceneName,
             world.FrameIndex,
+            activeCamera?.EntityName,
+            "rekall.render.capture_runtime_viewport",
             world.Entities.Count,
             rendering.Cameras.Count + rendering.Sprites.Count + rendering.Meshes.Count + rendering.Lights.Count + rendering.UiLayers.Count,
             physics.RigidBodies.Count,

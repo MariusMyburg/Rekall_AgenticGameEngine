@@ -15,7 +15,7 @@
             <Button Content="Pause" Padding="12,4" />
             <Button Content="Stop" Padding="12,4" />
             <Separator />
-            <Button Content="Capture" Padding="12,4" />
+            <Button Content="Capture" Padding="12,4" ToolTip="{Binding ViewportCaptureTool}" />
             <Button Content="Validate" Padding="12,4" />
         </ToolBar>
 

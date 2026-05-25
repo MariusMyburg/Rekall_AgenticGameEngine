@@ -56,7 +56,8 @@ public sealed class ImportAssetWithReportCommand
             asset.ImportedPath,
             Array.Empty<string>())
         {
-            GlbMetadata = asset.GlbMetadata
+            GlbMetadata = asset.GlbMetadata,
+            TextureMetadata = asset.TextureMetadata
         };
         return RekallAgeCommandResult<ImportAssetWithReportResult>.Success(
             new ImportAssetWithReportResult(report, updatedPipeline),

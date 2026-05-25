@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
+using Serilog;
 
 namespace Rekall.Age.Mcp;
 
@@ -14,6 +15,8 @@ public sealed class RekallAgeMcpJsonRpcServer
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
+
+    private static ILogger Logger => Log.ForContext<RekallAgeMcpJsonRpcServer>();
 
     private readonly RekallAgeCommandRegistry _registry;
 
@@ -59,12 +62,32 @@ public sealed class RekallAgeMcpJsonRpcServer
                 continue;
             }
 
-            var response = await HandleJsonLineAsync(line, context);
+            var response = await HandleJsonLineSafelyAsync(line, context);
             if (response is not null)
             {
                 await output.WriteLineAsync(response);
                 await output.FlushAsync();
             }
+        }
+    }
+
+    private async ValueTask<string?> HandleJsonLineSafelyAsync(
+        string line,
+        RekallAgeCommandContext context)
+    {
+        try
+        {
+            return await HandleJsonLineAsync(line, context);
+        }
+        catch (JsonException exception)
+        {
+            Logger.Warning(exception, "Invalid MCP JSON-RPC line.");
+            return SerializeErrorWithoutId(-32700, "Parse error: invalid JSON-RPC payload.");
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException)
+        {
+            Logger.Warning(exception, "Invalid MCP JSON-RPC request.");
+            return SerializeErrorWithoutId(-32600, "Invalid Request: malformed JSON-RPC payload.");
         }
     }
 
@@ -90,10 +113,35 @@ public sealed class RekallAgeMcpJsonRpcServer
             : "{}";
         var toolTransaction = RekallAgeTransaction.Begin(name);
         var toolContext = new RekallAgeCommandContext(context.Actor, toolTransaction, context.CancellationToken);
-        var commandResult = await _registry.ExecuteJsonAsync(name, argumentsJson, toolContext);
+        Logger.Information("Executing MCP tool. Tool={Tool} Actor={Actor}", name, context.Actor);
+        RekallAgeDynamicCommandResult commandResult;
+        try
+        {
+            commandResult = await _registry.ExecuteJsonAsync(name, argumentsJson, toolContext);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "MCP tool failed unexpectedly. Tool={Tool} Actor={Actor}", name, context.Actor);
+            return SerializeError(id, -32603, "Internal error. See MCP log for details.");
+        }
+
         if (commandResult.Ok)
         {
-            await PersistTransactionAsync(toolContext);
+            try
+            {
+                await PersistTransactionAsync(toolContext);
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, "MCP transaction persistence failed. Tool={Tool} Actor={Actor}", name, context.Actor);
+                return SerializeError(id, -32603, "Internal error. See MCP log for details.");
+            }
+
+            Logger.Information("MCP tool completed. Tool={Tool} Actor={Actor}", name, context.Actor);
+        }
+        else
+        {
+            Logger.Warning("MCP tool returned errors. Tool={Tool} Actor={Actor} ErrorCount={ErrorCount}", name, context.Actor, commandResult.Errors.Count);
         }
 
         var result = new
@@ -151,7 +199,7 @@ public sealed class RekallAgeMcpJsonRpcServer
                 title = "Rekall AGE",
                 version = "0.1.0"
             },
-            instructions = "Use Rekall AGE tools to create, inspect, validate, run, and capture agent-authored games. Start with rekall.templates.inspect to choose a built-in game contract; use rekall.templates.verify_mvp to self-check every MVP template. For the fastest complete playable artifact use rekall.workflow.create_playable_package_from_template, which creates the project, builds the module, packages the player, runs the package, and captures a proof frame."
+            instructions = "Use Rekall AGE tools to create, inspect, validate, run, and capture agent-authored games. Start with rekall.context.engine_status to discover workflow tools and authoring contracts. Use rekall.templates.inspect for built-in game contracts and rekall.templates.verify_mvp to self-check every MVP template. For custom components, behavior, or render vocabulary, use rekall.module.scaffold_runtime_system, rekall.module.read_source, rekall.module.write_source, and rekall.build.modules; runtime systems can project arbitrary renderables with RekallAgeRuntimeRenderMesh. For the fastest complete playable artifact use rekall.workflow.create_playable_package_from_template, which creates the project, builds the module, packages the player, runs the package, and captures a proof frame."
         };
     }
 
@@ -320,6 +368,11 @@ public sealed class RekallAgeMcpJsonRpcServer
     private static string SerializeError(JsonElement id, int code, string message)
     {
         return JsonSerializer.Serialize(new { jsonrpc = "2.0", id, error = new { code, message } }, JsonOptions);
+    }
+
+    private static string SerializeErrorWithoutId(int code, string message)
+    {
+        return JsonSerializer.Serialize(new { jsonrpc = "2.0", id = (object?)null, error = new { code, message } }, JsonOptions);
     }
 
     private static string ToCamelCase(string value)

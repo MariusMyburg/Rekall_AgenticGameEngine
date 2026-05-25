@@ -7,11 +7,11 @@ public sealed class RekallAgeRuntimeProjectionBuilder
 {
     public RekallAgeRuntimeWorld Project(RekallAgeRuntimeWorld world)
     {
-        var cameras = new List<RekallAgeRuntimeRenderCamera>();
-        var sprites = new List<RekallAgeRuntimeRenderSprite>();
-        var meshes = new List<RekallAgeRuntimeRenderMesh>();
-        var lights = new List<RekallAgeRuntimeRenderLight>();
-        var uiLayers = new List<RekallAgeRuntimeRenderUiLayer>();
+        var cameras = PreserveAuthored(world.Subsystems.Rendering.Cameras);
+        var sprites = PreserveAuthored(world.Subsystems.Rendering.Sprites);
+        var meshes = PreserveAuthored(world.Subsystems.Rendering.Meshes);
+        var lights = PreserveAuthored(world.Subsystems.Rendering.Lights);
+        var uiLayers = PreserveAuthored(world.Subsystems.Rendering.UiLayers);
         var bodies = new List<RekallAgeRuntimePhysicsBody>();
         var colliders = new List<RekallAgeRuntimePhysicsCollider>();
         var triggers = new List<RekallAgeRuntimePhysicsCollider>();
@@ -37,20 +37,64 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             entity.Id,
                             entity.Name,
                             component.Type["Rekall.".Length..],
-                            ReadBoolean(component.Properties, "active", true)));
+                            ReadBoolean(component.Properties, "active", true),
+                            RekallAgeRuntimeProjectionSources.BuiltIn,
+                            NormalizeProjectionMode(
+                                ReadString(component.Properties, "projectionMode")
+                                    ?? (component.Type == "Rekall.Camera2D" ? "orthographic" : "perspective")),
+                            Clamp(ReadNumber(component.Properties, "fieldOfView", 65), 1, 179),
+                            Math.Max(0.001, ReadNumber(component.Properties, "orthographicSize", 10)),
+                            ReadNumber(component.Properties, "nearClip", component.Type == "Rekall.Camera2D" ? -1000 : 0.05),
+                            ReadNumber(component.Properties, "farClip", component.Type == "Rekall.Camera2D" ? 1000 : 1000),
+                            ReadString(component.Properties, "clearColor")
+                                ?? (component.Type == "Rekall.Camera2D" ? "#102030" : "#101820")));
                         break;
                     case "Rekall.SpriteRenderer":
                         sprites.Add(new RekallAgeRuntimeRenderSprite(
                             entity.Id,
                             entity.Name,
-                            ReadString(component.Properties, "sprite") ?? ReadString(component.Properties, "assetId")));
+                            ReadString(component.Properties, "sprite") ?? ReadString(component.Properties, "assetId"),
+                            RekallAgeRuntimeProjectionSources.BuiltIn));
                         break;
                     case "Rekall.MeshRenderer":
                     case "Rekall.MeshSet":
                         meshes.Add(new RekallAgeRuntimeRenderMesh(
                             entity.Id,
                             entity.Name,
-                            ReadString(component.Properties, "mesh") ?? ReadString(component.Properties, "assetId")));
+                            ReadString(component.Properties, "mesh") ?? ReadString(component.Properties, "assetId"),
+                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
+                        break;
+                    case "Rekall.GeometryPrimitive":
+                        if (!HasMeshRenderer(entity))
+                        {
+                            var primitive = ReadString(component.Properties, "primitive");
+                            meshes.Add(new RekallAgeRuntimeRenderMesh(
+                                entity.Id,
+                                entity.Name,
+                                string.IsNullOrWhiteSpace(primitive)
+                                    ? "rekall.geometry.cube"
+                                    : $"rekall.geometry.{primitive.Trim().ToLowerInvariant()}",
+                                ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
+                        }
+
+                        break;
+                    case "Rekall.GeometryMesh":
+                        if (!HasMeshRenderer(entity))
+                        {
+                            meshes.Add(new RekallAgeRuntimeRenderMesh(
+                                entity.Id,
+                                entity.Name,
+                                "rekall.geometry.mesh",
+                                ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
+                        }
+
+                        break;
+                    case "Rekall.PlanetRenderer":
+                        meshes.Add(new RekallAgeRuntimeRenderMesh(
+                            entity.Id,
+                            entity.Name,
+                            "rekall.planet.surface",
+                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
                         break;
                     case "Rekall.Rigidbody2D":
                     case "Rekall.Rigidbody3D":
@@ -74,6 +118,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                     case "Rekall.BoxCollider2D":
                     case "Rekall.CircleCollider2D":
                     case "Rekall.BoxCollider3D":
+                    case "Rekall.SphereCollider3D":
+                    case "Rekall.CapsuleCollider3D":
                     case "Rekall.MeshCollider":
                         colliders.Add(new RekallAgeRuntimePhysicsCollider(
                             entity.Id,
@@ -132,7 +178,11 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                     case "Rekall.UiCanvas":
                         var layer = ReadInt32(component.Properties, "layer", 0);
                         canvases.Add(new RekallAgeRuntimeUiCanvas(entity.Id, entity.Name, layer));
-                        uiLayers.Add(new RekallAgeRuntimeRenderUiLayer(entity.Id, entity.Name, layer));
+                        uiLayers.Add(new RekallAgeRuntimeRenderUiLayer(
+                            entity.Id,
+                            entity.Name,
+                            layer,
+                            RekallAgeRuntimeProjectionSources.BuiltIn));
                         break;
                     case "Rekall.UiElement":
                     case "Rekall.Button":
@@ -151,7 +201,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                                 entity.Id,
                                 entity.Name,
                                 component.Type["Rekall.".Length..],
-                                ReadNumber(component.Properties, "intensity", 1)));
+                                ReadNumber(component.Properties, "intensity", 1),
+                                RekallAgeRuntimeProjectionSources.BuiltIn));
                         }
 
                         break;
@@ -217,6 +268,26 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         };
     }
 
+    private static List<T> PreserveAuthored<T>(IEnumerable<T> renderItems)
+    {
+        return renderItems
+            .Where(IsAuthored)
+            .ToList();
+    }
+
+    private static bool IsAuthored<T>(T item)
+    {
+        return item switch
+        {
+            RekallAgeRuntimeRenderCamera value => value.ProjectionSource != RekallAgeRuntimeProjectionSources.BuiltIn,
+            RekallAgeRuntimeRenderSprite value => value.ProjectionSource != RekallAgeRuntimeProjectionSources.BuiltIn,
+            RekallAgeRuntimeRenderMesh value => value.ProjectionSource != RekallAgeRuntimeProjectionSources.BuiltIn,
+            RekallAgeRuntimeRenderLight value => value.ProjectionSource != RekallAgeRuntimeProjectionSources.BuiltIn,
+            RekallAgeRuntimeRenderUiLayer value => value.ProjectionSource != RekallAgeRuntimeProjectionSources.BuiltIn,
+            _ => true
+        };
+    }
+
     private static RekallAgeRuntimeObservation CreateObservation(
         int frame,
         string code,
@@ -244,16 +315,22 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             && type.Contains("Light", StringComparison.Ordinal);
     }
 
+    private static bool HasMeshRenderer(RekallAgeRuntimeEntity entity)
+    {
+        return entity.Components.Any(component =>
+            component.Type is "Rekall.MeshRenderer" or "Rekall.MeshSet");
+    }
+
     private static string? ReadString(JsonObject properties, string name)
     {
-        return properties.TryGetPropertyValue(name, out var node) && node is JsonValue value
+        return TryGetPropertyValue(properties, name, out var node) && node is JsonValue value
             ? value.TryGetValue<string>(out var text) ? text : null
             : null;
     }
 
     private static bool ReadBoolean(JsonObject properties, string name, bool fallback)
     {
-        if (!properties.TryGetPropertyValue(name, out var node) || node is not JsonValue value)
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
         {
             return fallback;
         }
@@ -273,7 +350,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
 
     private static int ReadInt32(JsonObject properties, string name, int fallback)
     {
-        if (!properties.TryGetPropertyValue(name, out var node) || node is not JsonValue value)
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
         {
             return fallback;
         }
@@ -293,7 +370,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
 
     private static double ReadNumber(JsonObject properties, string name, double fallback)
     {
-        if (!properties.TryGetPropertyValue(name, out var node) || node is not JsonValue value)
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
         {
             return fallback;
         }
@@ -309,6 +386,37 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         }
 
         return fallback;
+    }
+
+    private static bool TryGetPropertyValue(JsonObject properties, string name, out JsonNode? node)
+    {
+        if (properties.TryGetPropertyValue(name, out node))
+        {
+            return true;
+        }
+
+        if (name.Length > 0)
+        {
+            var pascalName = char.ToUpperInvariant(name[0]) + name[1..];
+            if (properties.TryGetPropertyValue(pascalName, out node))
+            {
+                return true;
+            }
+        }
+
+        node = null;
+        return false;
+    }
+
+    private static string NormalizeProjectionMode(string value)
+    {
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized is "orthographic" or "ortho" ? "orthographic" : "perspective";
+    }
+
+    private static double Clamp(double value, double min, double max)
+    {
+        return Math.Min(max, Math.Max(min, value));
     }
 
     private static IReadOnlyList<T> Sort<T>(IEnumerable<T> items)

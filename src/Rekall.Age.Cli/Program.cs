@@ -21,7 +21,10 @@ using Rekall.Age.Runtime.Commands;
 using Rekall.Age.Validation;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
+using System.Globalization;
 using System.Text.Json.Nodes;
+using Serilog;
+using Serilog.Events;
 
 return await RekallAgeCli.RunAsync(args, CancellationToken.None);
 
@@ -29,18 +32,21 @@ internal static class RekallAgeCli
 {
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken)
     {
+        var logDirectory = ConfigureLogging(args);
+        Log.Information("Rekall AGE command starting. Args={Args}", string.Join(' ', args));
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|level|studio|play|playtest|run|runtime|context|transaction|capture|render|module|build|templates|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|context|transaction|capture|render|module|build|templates|mcp> ...");
+            Log.Information("Rekall AGE command finished with usage error. LogDirectory={LogDirectory}", logDirectory);
+            Log.CloseAndFlush();
             return 2;
         }
 
-        var registry = BuildRegistry();
-        var transaction = RekallAgeTransaction.Begin(string.Join(' ', args));
-        var context = new RekallAgeCommandContext("cli", transaction, cancellationToken);
-
         try
         {
+            var registry = BuildRegistry();
+            var transaction = RekallAgeTransaction.Begin(string.Join(' ', args));
+            var context = new RekallAgeCommandContext(IsMcpStdio(args) ? "mcp" : "cli", transaction, cancellationToken);
             var exitCode = args switch
             {
                 ["templates", "list"] => ListTemplates(),
@@ -98,9 +104,15 @@ internal static class RekallAgeCli
                 ["render", "command-buffer", "record", var root, var id, var queue, var commandsJson] =>
                     await RecordRenderCommandBufferAsync(registry, context, root, id, queue, commandsJson),
                 ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory] =>
-                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, "320", "180"),
+                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, "320", "180", "software"),
                 ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory, var width, var height] =>
-                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height),
+                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height, "software"),
+                ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory, var width, var height, var backend] =>
+                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height, backend),
+                ["render", "glb", "export", var root, var scene, var outputPath] =>
+                    await ExportSceneGlbAsync(registry, context, root, scene, outputPath, "0"),
+                ["render", "glb", "export", var root, var scene, var outputPath, var frames] =>
+                    await ExportSceneGlbAsync(registry, context, root, scene, outputPath, frames),
                 ["mcp", "stdio"] => await RunMcpStdioAsync(registry, context),
                 ["studio", "open", var root, var scene] => await OpenStudioModelAsync(root, scene),
                 ["asset", "import", var root, var source, var kind, var displayName] =>
@@ -176,6 +188,36 @@ internal static class RekallAgeCli
                     await InstantiatePrefabAsync(registry, context, root, scene, prefabId, name),
                 ["level", "entity", "snap", var root, var scene, var entityId, var gridSize] =>
                     await SnapEntityAsync(registry, context, root, scene, entityId, gridSize),
+                ["geometry", "primitive", "create", var root, var scene, var name, var primitive] =>
+                    await CreateGeometryPrimitiveAsync(registry, context, root, scene, name, primitive, "0", "0", "0", "#8ab4f8"),
+                ["geometry", "primitive", "create", var root, var scene, var name, var primitive, var x, var y, var z] =>
+                    await CreateGeometryPrimitiveAsync(registry, context, root, scene, name, primitive, x, y, z, "#8ab4f8"),
+                ["geometry", "primitive", "create", var root, var scene, var name, var primitive, var x, var y, var z, var color] =>
+                    await CreateGeometryPrimitiveAsync(registry, context, root, scene, name, primitive, x, y, z, color),
+                ["geometry", "mesh", "create", var root, var scene, var name, var verticesJson, var indicesJson] =>
+                    await CreateGeometryMeshAsync(registry, context, root, scene, name, verticesJson, indicesJson, "0", "0", "0", "#8ab4f8"),
+                ["geometry", "mesh", "create", var root, var scene, var name, var verticesJson, var indicesJson, var x, var y, var z] =>
+                    await CreateGeometryMeshAsync(registry, context, root, scene, name, verticesJson, indicesJson, x, y, z, "#8ab4f8"),
+                ["geometry", "mesh", "create", var root, var scene, var name, var verticesJson, var indicesJson, var x, var y, var z, var color] =>
+                    await CreateGeometryMeshAsync(registry, context, root, scene, name, verticesJson, indicesJson, x, y, z, color, null),
+                ["geometry", "mesh", "create", var root, var scene, var name, var verticesJson, var indicesJson, var x, var y, var z, var color, var textureAssetId] =>
+                    await CreateGeometryMeshAsync(registry, context, root, scene, name, verticesJson, indicesJson, x, y, z, color, textureAssetId),
+                ["geometry", "recipe", "create", var root, var scene, var name, var partsJson] =>
+                    await CreateGeometryRecipeAsync(registry, context, root, scene, name, partsJson, "0", "0", "0", "#8ab4f8"),
+                ["geometry", "recipe", "create", var root, var scene, var name, var partsJson, var x, var y, var z] =>
+                    await CreateGeometryRecipeAsync(registry, context, root, scene, name, partsJson, x, y, z, "#8ab4f8"),
+                ["geometry", "recipe", "create", var root, var scene, var name, var partsJson, var x, var y, var z, var color] =>
+                    await CreateGeometryRecipeAsync(registry, context, root, scene, name, partsJson, x, y, z, color),
+                ["geometry", "extrusion", "create", var root, var scene, var name, var profileJson, var depth] =>
+                    await CreateGeometryExtrusionAsync(registry, context, root, scene, name, profileJson, depth, "0", "0", "0", "#8ab4f8"),
+                ["geometry", "extrusion", "create", var root, var scene, var name, var profileJson, var depth, var x, var y, var z] =>
+                    await CreateGeometryExtrusionAsync(registry, context, root, scene, name, profileJson, depth, x, y, z, "#8ab4f8"),
+                ["geometry", "extrusion", "create", var root, var scene, var name, var profileJson, var depth, var x, var y, var z, var color] =>
+                    await CreateGeometryExtrusionAsync(registry, context, root, scene, name, profileJson, depth, x, y, z, color),
+                ["planet", "import-ksa", var root, var scene, var ksaRoot, var bodyId] =>
+                    await ImportKsaPlanetAsync(registry, context, root, scene, ksaRoot, bodyId, null),
+                ["planet", "import-ksa", var root, var scene, var ksaRoot, var bodyId, var entityName] =>
+                    await ImportKsaPlanetAsync(registry, context, root, scene, ksaRoot, bodyId, entityName),
                 ["play", "scene", var root, var scene, var frames] => await PlaySceneAsync(registry, context, root, scene, frames, null),
                 ["play", "scene", var root, var scene, var frames, var inputsJson] => await PlaySceneAsync(registry, context, root, scene, frames, inputsJson),
                 ["play", "capture-frame", var root, var scene, var outputDirectory] =>
@@ -206,14 +248,71 @@ internal static class RekallAgeCli
             {
                 await PersistTransactionAsync(context);
             }
+            else
+            {
+                Log.Warning("Rekall AGE command returned non-zero exit code. ExitCode={ExitCode} Args={Args}", exitCode, string.Join(' ', args));
+            }
 
+            Log.Information("Rekall AGE command finished. ExitCode={ExitCode} LogDirectory={LogDirectory}", exitCode, logDirectory);
             return exitCode;
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
         {
+            Log.Error(ex, "CLI command failed. Args={Args} LogDirectory={LogDirectory}", string.Join(' ', args), logDirectory);
             Console.Error.WriteLine(ex.Message);
             return 1;
         }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "Unhandled CLI command exception. Args={Args} LogDirectory={LogDirectory}", string.Join(' ', args), logDirectory);
+            Console.Error.WriteLine($"Unexpected error. See log: {logDirectory}");
+            return 1;
+        }
+        finally
+        {
+            Log.CloseAndFlush();
+        }
+    }
+
+    private static string ConfigureLogging(string[] args)
+    {
+        var applicationName = IsMcpStdio(args) ? "Mcp" : "Cli";
+        var envName = applicationName.Equals("Mcp", StringComparison.Ordinal)
+            ? "REKALL_AGE_MCP_LOG_DIR"
+            : "REKALL_AGE_CLI_LOG_DIR";
+        var logDirectory = Environment.GetEnvironmentVariable(envName);
+        if (string.IsNullOrWhiteSpace(logDirectory))
+        {
+            logDirectory = Environment.GetEnvironmentVariable("REKALL_AGE_LOG_DIR");
+        }
+
+        if (string.IsNullOrWhiteSpace(logDirectory))
+        {
+            logDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Rekall AGE",
+                applicationName,
+                "Logs");
+        }
+
+        Directory.CreateDirectory(logDirectory);
+        var filePrefix = applicationName.ToLowerInvariant();
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+            .Enrich.FromLogContext()
+            .WriteTo.File(
+                Path.Combine(logDirectory, $"{filePrefix}-.log"),
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 14,
+                outputTemplate: "{Timestamp:O} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}")
+            .CreateLogger();
+        return logDirectory;
+    }
+
+    private static bool IsMcpStdio(string[] args)
+    {
+        return args is ["mcp", "stdio", ..];
     }
 
     private static RekallAgeCommandRegistry BuildRegistry()
@@ -222,7 +321,9 @@ internal static class RekallAgeCli
         registry.Register(new CreateProjectCommand());
         registry.Register(new AddCapabilityCommand());
         registry.Register(new CreateSceneCommand());
+        registry.Register(new ApplySceneBlueprintCommand());
         registry.Register(new CreateEntityCommand());
+        registry.Register(new DeleteEntityCommand());
         registry.Register(new AddComponentCommand());
         registry.Register(new SetComponentPropertyCommand());
         registry.Register(new InspectEntityCommand());
@@ -266,12 +367,22 @@ internal static class RekallAgeCli
         registry.Register(new InspectRenderPlanCommand());
         registry.Register(new ValidateRenderPlanCommand());
         registry.Register(new ExecuteRenderPlanCommand());
+        registry.Register(new ListShaderSourcesCommand());
+        registry.Register(new ReadShaderSourceCommand());
+        registry.Register(new WriteShaderSourceCommand());
+        registry.Register(new ValidateShaderSourceCommand());
+        registry.Register(new AssignShaderPipelineCommand());
         registry.Register(new BuildModulesCommand());
         registry.Register(new BuildPlayerCommand());
         registry.Register(new ImportAssetCommand());
         registry.Register(new ImportAssetWithReportCommand());
         registry.Register(new ListAssetsCommand());
         registry.Register(new DuplicateEntityCommand());
+        registry.Register(new CreateGeometryPrimitiveCommand());
+        registry.Register(new CreateGeometryMeshCommand());
+        registry.Register(new CreateGeometryRecipeCommand());
+        registry.Register(new CreateGeometryExtrusionCommand());
+        registry.Register(new ImportKsaPlanetCommand());
         registry.Register(new ParentEntityCommand());
         registry.Register(new CreatePrefabFromEntityCommand());
         registry.Register(new InstantiatePrefabCommand());
@@ -282,6 +393,7 @@ internal static class RekallAgeCli
         registry.Register(new InspectSceneRuntimeCommand());
         registry.Register(new CaptureScreenshotCommand());
         registry.Register(new CaptureRuntimeViewportCommand());
+        registry.Register(new ExportSceneGlbCommand());
         registry.Register(new CapturePlayableFrameCommand());
         return registry;
     }
@@ -974,6 +1086,347 @@ internal static class RekallAgeCli
             context);
         Console.WriteLine(result.Summary);
         return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> CreateGeometryPrimitiveAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string name,
+        string primitive,
+        string x,
+        string y,
+        string z,
+        string color)
+    {
+        var result = await registry.ExecuteAsync<CreateGeometryPrimitiveRequest, CreateGeometryPrimitiveResult>(
+            "rekall.geometry.create_primitive",
+            new CreateGeometryPrimitiveRequest(
+                root,
+                scene,
+                name,
+                primitive,
+                double.Parse(x, System.Globalization.CultureInfo.InvariantCulture),
+                double.Parse(y, System.Globalization.CultureInfo.InvariantCulture),
+                double.Parse(z, System.Globalization.CultureInfo.InvariantCulture),
+                Color: color),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine(result.Value.EntityId);
+        Console.WriteLine(result.Value.Primitive);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> CreateGeometryMeshAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string name,
+        string verticesJson,
+        string indicesJson,
+        string x,
+        string y,
+        string z,
+        string color,
+        string? textureAssetId = null)
+    {
+        var result = await registry.ExecuteAsync<CreateGeometryMeshRequest, CreateGeometryMeshResult>(
+            "rekall.geometry.create_mesh",
+            new CreateGeometryMeshRequest(
+                root,
+                scene,
+                name,
+                ParseGeometryMeshVertices(verticesJson),
+                ParseGeometryMeshIndices(indicesJson),
+                double.Parse(x, CultureInfo.InvariantCulture),
+                double.Parse(y, CultureInfo.InvariantCulture),
+                double.Parse(z, CultureInfo.InvariantCulture),
+                Color: color,
+                TextureAssetId: textureAssetId),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine(result.Value.EntityId);
+        Console.WriteLine(result.Value.VertexCount);
+        Console.WriteLine(result.Value.IndexCount);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static IReadOnlyList<CreateGeometryMeshVertex> ParseGeometryMeshVertices(string json)
+    {
+        var node = JsonNode.Parse(ReadJsonArgument(json)) as JsonArray
+            ?? throw new ArgumentException("Geometry mesh vertices must be a JSON array.");
+        var vertices = new List<CreateGeometryMeshVertex>(node.Count);
+        for (var i = 0; i < node.Count; i++)
+        {
+            var item = node[i] as JsonObject
+                ?? throw new ArgumentException("Geometry mesh vertices must be JSON objects.");
+            vertices.Add(new CreateGeometryMeshVertex(
+                ReadRequiredNumber(item, "x"),
+                ReadRequiredNumber(item, "y"),
+                ReadRequiredNumber(item, "z"),
+                ReadOptionalNumber(item, "nx") ?? ReadOptionalNumber(item, "normalX"),
+                ReadOptionalNumber(item, "ny") ?? ReadOptionalNumber(item, "normalY"),
+                ReadOptionalNumber(item, "nz") ?? ReadOptionalNumber(item, "normalZ"),
+                ReadOptionalNumber(item, "r"),
+                ReadOptionalNumber(item, "g"),
+                ReadOptionalNumber(item, "b"),
+                ReadOptionalNumber(item, "a"),
+                ReadNumber(item, "u", 0),
+                ReadNumber(item, "v", 0)));
+        }
+
+        return vertices;
+    }
+
+    private static IReadOnlyList<ushort> ParseGeometryMeshIndices(string json)
+    {
+        var node = JsonNode.Parse(ReadJsonArgument(json)) as JsonArray
+            ?? throw new ArgumentException("Geometry mesh indices must be a JSON array.");
+        var indices = new List<ushort>(node.Count);
+        foreach (var item in node)
+        {
+            if (item is not JsonValue value || !value.TryGetValue<int>(out var integer) || integer < 0 || integer > ushort.MaxValue)
+            {
+                throw new ArgumentException("Geometry mesh indices must be unsigned 16-bit integers.");
+            }
+
+            indices.Add((ushort)integer);
+        }
+
+        return indices;
+    }
+
+    private static async Task<int> CreateGeometryRecipeAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string name,
+        string partsJson,
+        string x,
+        string y,
+        string z,
+        string color)
+    {
+        var result = await registry.ExecuteAsync<CreateGeometryRecipeRequest, CreateGeometryRecipeResult>(
+            "rekall.geometry.create_recipe",
+            new CreateGeometryRecipeRequest(
+                root,
+                scene,
+                name,
+                ParseGeometryRecipeParts(partsJson),
+                double.Parse(x, CultureInfo.InvariantCulture),
+                double.Parse(y, CultureInfo.InvariantCulture),
+                double.Parse(z, CultureInfo.InvariantCulture),
+                Color: color),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine(result.Value.EntityId);
+        Console.WriteLine(result.Value.PartCount);
+        Console.WriteLine(result.Value.VertexCount);
+        Console.WriteLine(result.Value.IndexCount);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static IReadOnlyList<CreateGeometryRecipePart> ParseGeometryRecipeParts(string json)
+    {
+        var node = JsonNode.Parse(ReadJsonArgument(json)) as JsonArray
+            ?? throw new ArgumentException("Geometry recipe parts must be a JSON array.");
+        var parts = new List<CreateGeometryRecipePart>(node.Count);
+        foreach (var itemNode in node)
+        {
+            var item = itemNode as JsonObject
+                ?? throw new ArgumentException("Geometry recipe parts must be JSON objects.");
+            parts.Add(new CreateGeometryRecipePart(
+                ReadRequiredString(item, "kind"),
+                ReadNumber(item, "x", 0),
+                ReadNumber(item, "y", 0),
+                ReadNumber(item, "z", 0),
+                ReadNumber(item, "pitch", 0),
+                ReadNumber(item, "yaw", 0),
+                ReadNumber(item, "roll", 0),
+                ReadNumber(item, "scaleX", 1),
+                ReadNumber(item, "scaleY", 1),
+                ReadNumber(item, "scaleZ", 1),
+                ReadOptionalString(item, "color"),
+                ReadInt(item, "segments", 24),
+                ReadInt(item, "rings", 12)));
+        }
+
+        return parts;
+    }
+
+    private static async Task<int> CreateGeometryExtrusionAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string name,
+        string profileJson,
+        string depth,
+        string x,
+        string y,
+        string z,
+        string color)
+    {
+        var result = await registry.ExecuteAsync<CreateGeometryExtrusionRequest, CreateGeometryExtrusionResult>(
+            "rekall.geometry.create_extrusion",
+            new CreateGeometryExtrusionRequest(
+                root,
+                scene,
+                name,
+                ParseGeometryExtrusionProfile(profileJson),
+                double.Parse(depth, CultureInfo.InvariantCulture),
+                double.Parse(x, CultureInfo.InvariantCulture),
+                double.Parse(y, CultureInfo.InvariantCulture),
+                double.Parse(z, CultureInfo.InvariantCulture),
+                Color: color),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine(result.Value.EntityId);
+        Console.WriteLine(result.Value.VertexCount);
+        Console.WriteLine(result.Value.IndexCount);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ImportKsaPlanetAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string ksaRoot,
+        string bodyId,
+        string? entityName)
+    {
+        var result = await registry.ExecuteAsync<ImportKsaPlanetRequest, ImportKsaPlanetResult>(
+            "rekall.planet.import_ksa",
+            new ImportKsaPlanetRequest(root, scene, ksaRoot, bodyId, entityName),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine(result.Value.EntityId);
+        Console.WriteLine(result.Value.ImportedAssetCount);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static IReadOnlyList<CreateGeometryExtrusionPoint> ParseGeometryExtrusionProfile(string json)
+    {
+        var node = JsonNode.Parse(ReadJsonArgument(json)) as JsonArray
+            ?? throw new ArgumentException("Geometry extrusion profile must be a JSON array.");
+        var profile = new List<CreateGeometryExtrusionPoint>(node.Count);
+        foreach (var itemNode in node)
+        {
+            var item = itemNode as JsonObject
+                ?? throw new ArgumentException("Geometry extrusion profile points must be JSON objects.");
+            profile.Add(new CreateGeometryExtrusionPoint(
+                ReadRequiredNumber(item, "x"),
+                ReadRequiredNumber(item, "y")));
+        }
+
+        return profile;
+    }
+
+    private static string ReadJsonArgument(string value)
+    {
+        if (value.Length > 1 && value[0] == '@')
+        {
+            return File.ReadAllText(value[1..]);
+        }
+
+        return value;
+    }
+
+    private static double ReadRequiredNumber(JsonObject item, string name)
+    {
+        if (!item.TryGetPropertyValue(name, out var node) || node is not JsonValue value)
+        {
+            throw new ArgumentException($"Geometry mesh vertex is missing required '{name}' coordinate.");
+        }
+
+        return ReadNumber(value, name);
+    }
+
+    private static string ReadRequiredString(JsonObject item, string name)
+    {
+        return ReadOptionalString(item, name)
+            ?? throw new ArgumentException($"JSON object is missing required '{name}' string property.");
+    }
+
+    private static string? ReadOptionalString(JsonObject item, string name)
+    {
+        if (!item.TryGetPropertyValue(name, out var node) || node is not JsonValue value)
+        {
+            return null;
+        }
+
+        if (value.TryGetValue<string>(out var text))
+        {
+            return text;
+        }
+
+        throw new ArgumentException($"JSON object property '{name}' must be a string.");
+    }
+
+    private static double ReadNumber(JsonObject item, string name, double fallback)
+    {
+        return item.TryGetPropertyValue(name, out var node) && node is JsonValue value
+            ? ReadNumber(value, name)
+            : fallback;
+    }
+
+    private static double? ReadOptionalNumber(JsonObject item, string name)
+    {
+        return item.TryGetPropertyValue(name, out var node) && node is JsonValue value
+            ? ReadNumber(value, name)
+            : null;
+    }
+
+    private static double ReadNumber(JsonValue value, string name)
+    {
+        if (value.TryGetValue<double>(out var number))
+        {
+            return number;
+        }
+
+        if (value.TryGetValue<int>(out var integer))
+        {
+            return integer;
+        }
+
+        if (value.TryGetValue<string>(out var text)
+            && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+        {
+            return parsed;
+        }
+
+        throw new ArgumentException($"Geometry mesh vertex property '{name}' must be numeric.");
+    }
+
+    private static int ReadInt(JsonObject item, string name, int fallback)
+    {
+        if (!item.TryGetPropertyValue(name, out var node) || node is not JsonValue value)
+        {
+            return fallback;
+        }
+
+        if (value.TryGetValue<int>(out var integer))
+        {
+            return integer;
+        }
+
+        if (value.TryGetValue<double>(out var number))
+        {
+            return (int)number;
+        }
+
+        if (value.TryGetValue<string>(out var text)
+            && int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+        {
+            return parsed;
+        }
+
+        throw new ArgumentException($"JSON object property '{name}' must be an integer.");
     }
 
     private static async Task<int> BuildPlayerAsync(
@@ -1702,6 +2155,15 @@ internal static class RekallAgeCli
             Console.WriteLine($"  {workflow.Tool} [{marker}] - {workflow.Purpose}");
         }
 
+        Console.WriteLine("Authoring contracts:");
+        foreach (var contract in result.Value.AuthoringContracts)
+        {
+            Console.WriteLine($"  {contract.Name}: {contract.PrimaryType}");
+            Console.WriteLine($"    {contract.Purpose}");
+            Console.WriteLine($"    Capabilities: {string.Join(", ", contract.Capabilities)}");
+            Console.WriteLine($"    Tools: {string.Join(", ", contract.RelatedTools)}");
+        }
+
         foreach (var error in result.Errors)
         {
             Console.WriteLine($"{error.Code}: {error.Message}");
@@ -1843,18 +2305,23 @@ internal static class RekallAgeCli
         string frames,
         string outputDirectory,
         string width,
-        string height)
+        string height,
+        string backend)
     {
         var frameCount = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
         var viewportWidth = int.Parse(width, System.Globalization.CultureInfo.InvariantCulture);
         var viewportHeight = int.Parse(height, System.Globalization.CultureInfo.InvariantCulture);
         var result = await registry.ExecuteAsync<CaptureRuntimeViewportRequest, CaptureRuntimeViewportResult>(
             "rekall.render.capture_runtime_viewport",
-            new CaptureRuntimeViewportRequest(root, scene, frameCount, outputDirectory, viewportWidth, viewportHeight, true),
+            new CaptureRuntimeViewportRequest(root, scene, frameCount, outputDirectory, viewportWidth, viewportHeight, true, backend),
             context);
 
         Console.WriteLine($"Runtime viewport {scene} frame {result.Value.FrameIndex}: {result.Value.Width}x{result.Value.Height}");
         Console.WriteLine(result.Value.ScreenshotPath);
+        Console.WriteLine($"Backend: {result.Value.BackendId}");
+        Console.WriteLine($"Hardware accelerated: {result.Value.HardwareAccelerated}");
+        Console.WriteLine($"Acceleration: {result.Value.AccelerationStatus}");
+        Console.WriteLine($"Selected device: {result.Value.SelectedDeviceName ?? "(none)"}");
         Console.WriteLine($"Active camera: {result.Value.ActiveCamera ?? "(none)"}");
         Console.WriteLine($"Renderable: {result.Value.RenderableCount}");
         Console.WriteLine($"Renderable kinds: {string.Join(", ", result.Value.RenderableKinds)}");
@@ -1879,6 +2346,41 @@ internal static class RekallAgeCli
         }
 
         return result.Ok && result.Value.Captured && result.Value.NonBlank ? 0 : 1;
+    }
+
+    private static async Task<int> ExportSceneGlbAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string outputPath,
+        string frames)
+    {
+        var frameCount = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<ExportSceneGlbRequest, ExportSceneGlbResult>(
+            "rekall.render.export_scene_glb",
+            new ExportSceneGlbRequest(root, scene, outputPath, frameCount),
+            context);
+
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Output: {result.Value.OutputPath}");
+        Console.WriteLine($"Frame: {result.Value.FrameIndex}");
+        Console.WriteLine($"Nodes: {result.Value.NodeCount}");
+        Console.WriteLine($"Meshes: {result.Value.MeshCount}");
+        Console.WriteLine($"Materials: {result.Value.MaterialCount}");
+        Console.WriteLine($"Images: {result.Value.ImageCount}");
+        Console.WriteLine($"Bytes: {result.Value.BytesWritten}");
+        foreach (var warning in result.Value.Warnings)
+        {
+            Console.WriteLine($"Warning: {warning}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.Exported ? 0 : 1;
     }
 
     private static async Task<int> CaptureAsync(

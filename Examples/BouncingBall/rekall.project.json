@@ -1,0 +1,11 @@
+{
+  "name": "Bouncing Ball Test Scene",
+  "schemaVersion": 1,
+  "capabilities": [
+    "world",
+    "rendering3d",
+    "physics3d",
+    "animation"
+  ],
+  "sourceTemplateId": null
+}

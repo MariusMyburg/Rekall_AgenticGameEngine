@@ -1,0 +1,80 @@
+{
+  "transactions": [
+    {
+      "id": "txn_2a1ba0d0db5d4f01b7506fb70782080c",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\VulkanCubeProbe Main 0 F:\\Dev\\Rekall_AGE\\Examples\\VulkanCubeProbe\\Artifacts\\Vulkan 512 512 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:33:46.9813942+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\VulkanCubeProbe\\Artifacts\\Vulkan\\vulkan-scene-512x512-20260525143347344.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\VulkanCubeProbe\\Artifacts\\Vulkan\\vulkan-scene-512x512-20260525143347344.png",
+          "relativePath": "Artifacts\\Vulkan\\vulkan-scene-512x512-20260525143347344.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 1820
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_7753ef61783c4167a46602a23d19cede",
+      "name": "geometry primitive create F:\\Dev\\Rekall_AGE\\Examples\\VulkanCubeProbe Main Cube cube 0 0 0 #33ff66",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:33:46.800635+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\VulkanCubeProbe\\Scenes\\Main.age.scene.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\VulkanCubeProbe\\Scenes\\Main.age.scene.json",
+          "relativePath": "Scenes\\Main.age.scene.json",
+          "kind": "scene",
+          "exists": true,
+          "sizeBytes": 1110
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_ddd1e97d4ce742df834618eea42110f2",
+      "name": "scene create F:\\Dev\\Rekall_AGE\\Examples\\VulkanCubeProbe Main world,rendering3d",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:33:46.6150765+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\VulkanCubeProbe\\Scenes\\Main.age.scene.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\VulkanCubeProbe\\Scenes\\Main.age.scene.json",
+          "relativePath": "Scenes\\Main.age.scene.json",
+          "kind": "scene",
+          "exists": true,
+          "sizeBytes": 154
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_a6339bcda3a543e39803ddd9a534363c",
+      "name": "project create F:\\Dev\\Rekall_AGE\\Examples\\VulkanCubeProbe Vulkan Cube Probe world,rendering3d",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:33:46.4294924+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\VulkanCubeProbe\\rekall.project.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\VulkanCubeProbe\\rekall.project.json",
+          "relativePath": "rekall.project.json",
+          "kind": "project-manifest",
+          "exists": true,
+          "sizeBytes": 149
+        }
+      ],
+      "resourcePreimages": []
+    }
+  ]
+}

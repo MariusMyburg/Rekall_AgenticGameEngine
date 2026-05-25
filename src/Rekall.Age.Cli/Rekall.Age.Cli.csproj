@@ -19,6 +19,10 @@
     <ProjectReference Include="..\Rekall.Age.LevelDesign\Rekall.Age.LevelDesign.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>

@@ -34,6 +34,7 @@ public static class RekallAgeAssetImporter
         }
 
         var glbMetadata = await RekallAgeGlbMetadataReader.ReadAsync(importedPath, cancellationToken);
+        var textureMetadata = await RekallAgeTextureMetadataReader.ReadAsync(importedPath, cancellationToken);
         return new RekallAgeAssetDocument(
             id,
             normalizedName,
@@ -43,7 +44,8 @@ public static class RekallAgeAssetImporter
             Path.GetFullPath(importedPath),
             hash)
         {
-            GlbMetadata = glbMetadata
+            GlbMetadata = glbMetadata,
+            TextureMetadata = textureMetadata
         };
     }
 

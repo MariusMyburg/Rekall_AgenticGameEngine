@@ -10,7 +10,18 @@ public sealed record RekallAgeAssetDocument(
     string ContentHash)
 {
     public RekallAgeGlbMetadata? GlbMetadata { get; init; }
+
+    public RekallAgeTextureMetadata? TextureMetadata { get; init; }
 }
+
+public sealed record RekallAgeTextureMetadata(
+    string Container,
+    int Width,
+    int Height,
+    int MipLevelCount,
+    string? Format,
+    string? Supercompression,
+    bool GpuCompressed);
 
 public sealed record RekallAgeGlbMetadata(
     int SceneCount,

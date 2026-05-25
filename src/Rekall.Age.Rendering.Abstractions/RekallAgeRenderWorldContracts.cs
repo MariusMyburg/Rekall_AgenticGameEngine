@@ -49,7 +49,19 @@ public sealed record RekallAgeRuntimeViewportCamera(
     string EntityId,
     string EntityName,
     string Kind,
-    bool Active);
+    bool Active,
+    double X = 0,
+    double Y = 0,
+    double Z = 0,
+    double RotationX = 0,
+    double RotationY = 0,
+    double RotationZ = 0,
+    string ProjectionMode = "perspective",
+    double FieldOfViewDegrees = 65,
+    double OrthographicSize = 10,
+    double NearClip = 0.05,
+    double FarClip = 1000,
+    string ClearColor = "#101820");
 
 public sealed record RekallAgeRuntimeViewportRenderable(
     string EntityId,
@@ -67,7 +79,33 @@ public sealed record RekallAgeRuntimeViewportRenderable(
     double ScaleX = 1,
     double ScaleY = 1,
     double ScaleZ = 1,
-    double Intensity = 1);
+    double Intensity = 1,
+    string? MaterialColor = null,
+    RekallAgeRuntimeViewportGeometryMesh? GeometryMesh = null,
+    string? TextureAssetId = null,
+    RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null);
+
+public sealed record RekallAgeRuntimeViewportShaderPipeline(
+    string VertexShader,
+    string FragmentShader);
+
+public sealed record RekallAgeRuntimeViewportGeometryMesh(
+    IReadOnlyList<RekallAgeRuntimeViewportGeometryVertex> Vertices,
+    IReadOnlyList<ushort> Indices);
+
+public sealed record RekallAgeRuntimeViewportGeometryVertex(
+    double X,
+    double Y,
+    double Z,
+    double NormalX = 0,
+    double NormalY = 1,
+    double NormalZ = 0,
+    double R = double.NaN,
+    double G = double.NaN,
+    double B = double.NaN,
+    double A = double.NaN,
+    double U = 0,
+    double V = 0);
 
 public sealed record RekallAgeRuntimeViewportOverlay(
     bool Enabled,

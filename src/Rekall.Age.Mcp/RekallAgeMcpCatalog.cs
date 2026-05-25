@@ -52,6 +52,11 @@ internal static class RekallAgeMcpToolClassifier
             return "rendering";
         }
 
+        if (name.StartsWith("rekall.shader.", StringComparison.Ordinal))
+        {
+            return "shaders";
+        }
+
         if (name.StartsWith("rekall.module.", StringComparison.Ordinal))
         {
             return "modules";
@@ -70,6 +75,7 @@ internal static class RekallAgeMcpToolClassifier
         if (name.StartsWith("rekall.project.", StringComparison.Ordinal) ||
             name.StartsWith("rekall.scene.", StringComparison.Ordinal) ||
             name.StartsWith("rekall.entity.", StringComparison.Ordinal) ||
+            name.StartsWith("rekall.geometry.", StringComparison.Ordinal) ||
             name.StartsWith("rekall.component.", StringComparison.Ordinal))
         {
             return "world";
@@ -96,10 +102,13 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.workflow.create_playable_package_from_template" => 10,
             "rekall.workflow.audit_playable_package" => 15,
             "rekall.templates.verify_mvp" => 20,
+            "rekall.scene.apply_blueprint" => 42,
             _ when name.StartsWith("rekall.workflow.", StringComparison.Ordinal) => 30,
             _ when name.StartsWith("rekall.transaction.", StringComparison.Ordinal) => 35,
             _ when name.StartsWith("rekall.playtest.", StringComparison.Ordinal) => 40,
+            _ when name.StartsWith("rekall.geometry.", StringComparison.Ordinal) => 45,
             _ when name.StartsWith("rekall.module.", StringComparison.Ordinal) => 50,
+            _ when name.StartsWith("rekall.shader.", StringComparison.Ordinal) => 60,
             _ when name.StartsWith("rekall.render.", StringComparison.Ordinal) => 70,
             _ => 100
         };

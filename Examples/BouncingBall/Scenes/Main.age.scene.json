@@ -1,0 +1,201 @@
+{
+  "id": "scene_bouncing_ball_main",
+  "name": "Main",
+  "capabilities": [
+    "world",
+    "rendering3d",
+    "physics3d",
+    "animation"
+  ],
+  "entities": [
+    {
+      "id": "ent_bouncing_ball_camera",
+      "name": "MainCamera",
+      "tags": [
+        "camera"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 4.2,
+            "z": 9,
+            "pitch": -18,
+            "yaw": 0,
+            "roll": 0
+          }
+        },
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "active": true
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_bouncing_ball_light",
+      "name": "KeyLight",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "pitch": -45,
+            "yaw": -35,
+            "roll": 0
+          }
+        },
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": {
+            "intensity": 1.25
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_bouncing_ball_floor",
+      "name": "Matte Floor",
+      "tags": [
+        "floor",
+        "geometry",
+        "primitive"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": -0.08,
+            "z": 0,
+            "scaleX": 8,
+            "scaleY": 0.16,
+            "scaleZ": 5
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#4d5563"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cube"
+          }
+        },
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 8,
+            "height": 0.16,
+            "depth": 5
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 0.45,
+            "restitution": 0.9,
+            "maximumRecoveryVelocity": 8,
+            "springFrequency": 45,
+            "dampingRatio": 0.8
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_bouncing_ball_actor",
+      "name": "Bouncing Ball",
+      "tags": [
+        "ball",
+        "geometry",
+        "primitive",
+        "animated"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 4,
+            "z": 0,
+            "scaleX": 1.8,
+            "scaleY": 1.8,
+            "scaleZ": 1.8
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "sphere",
+            "color": "#ff3b30"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.sphere"
+          }
+        },
+        {
+          "type": "Rekall.Rigidbody3D",
+          "properties": {
+            "mass": 1
+          }
+        },
+        {
+          "type": "Rekall.SphereCollider3D",
+          "properties": {
+            "radius": 0.9
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 0.2,
+            "restitution": 0.9,
+            "minimumBounceSpeed": 0.4,
+            "maximumRecoveryVelocity": 8,
+            "springFrequency": 45,
+            "dampingRatio": 0.8
+          }
+        },
+        {
+          "type": "Game.Modules.BouncingBall.BouncingBallMotion",
+          "properties": {
+            "enabled": false,
+            "radius": 0.9,
+            "floorY": 0,
+            "bounceHeight": 4.1,
+            "bouncesPerSecond": 0.85,
+            "driftRadius": 1.35,
+            "spinDegreesPerSecond": 230
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

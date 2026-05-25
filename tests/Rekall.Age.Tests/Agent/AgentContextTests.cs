@@ -28,16 +28,14 @@ public sealed class AgentContextTests
     }
 
     [Fact]
-    public async Task ProjectSummaryIsOkWhenSceneHasCameraAndPlayableLoop()
+    public async Task ProjectSummaryIsOkWhenSceneHasCoreCamera()
     {
         var root = TestPaths.CreateTempDirectory();
         var projectStore = new RekallAgeProjectStore();
         var sceneStore = new RekallAgeSceneStore();
         var camera = RekallAgeEntityDocument.Create("MainCamera", ["camera"])
             .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject { ["active"] = true }));
-        var gameRules = RekallAgeEntityDocument.Create("GameRules", ["game_rules"])
-            .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlayableLoop", new JsonObject { ["kind"] = "puzzle" }));
-        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"]).AddEntity(camera).AddEntity(gameRules);
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"]).AddEntity(camera);
 
         await projectStore.SaveAsync(root, RekallAgeProjectManifest.Create("Puzzle Box", ["world", "rendering2d"]), CancellationToken.None);
         await sceneStore.SaveAsync(root, scene, CancellationToken.None);
@@ -63,9 +61,7 @@ public sealed class AgentContextTests
         var sceneStore = new RekallAgeSceneStore();
         var camera = RekallAgeEntityDocument.Create("MainCamera", ["camera"])
             .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject { ["active"] = true }));
-        var gameRules = RekallAgeEntityDocument.Create("GameRules", ["game_rules"])
-            .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlayableLoop", new JsonObject { ["kind"] = "puzzle" }));
-        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"]).AddEntity(camera).AddEntity(gameRules);
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"]).AddEntity(camera);
 
         await projectStore.SaveAsync(root, RekallAgeProjectManifest.Create("Packaged Puzzle", ["world", "rendering2d"]), CancellationToken.None);
         await sceneStore.SaveAsync(root, scene, CancellationToken.None);

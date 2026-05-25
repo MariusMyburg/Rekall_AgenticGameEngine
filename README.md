@@ -37,6 +37,7 @@ The current MVP includes:
 - Vulkan render-plan execution for clear render passes
 - deterministic asset import and catalog listing commands
 - GLB asset import metadata inspection for scenes, nodes, meshes, materials, images, and animations
+- runtime scene GLB export for engine-authored primitives, custom meshes, and extrusions with transforms, normals, UVs, vertex colors, and PBR base-color materials
 - entity inspection and single-property component mutation commands
 - MVP terminal player for module-authored projects, including deterministic playtest frames
 - structured scene playtest assertions for MCP/headless agent loops
@@ -50,8 +51,16 @@ The current MVP includes:
 - deterministic transform animation for runtime pitch/yaw/roll rates
 - runtime scene inspection through command bus, CLI, MCP catalog, and Studio read models
 - runtime-backed viewport frame capture through command bus, CLI, MCP catalog, and Studio metadata
+- runtime viewport backend reporting with explicit software/Vulkan acceleration status
+- Serilog-backed CLI, MCP stdio, and Studio startup/exception logging with daily rolling files
 - deterministic software screenshot capture through command bus
-- software viewport rasterization for primitive cube meshes with directional-light shading
+- software viewport rasterization for cube, sphere, cylinder, cone, and plane geometry primitives plus authored triangle meshes with material colors and directional-light shading
+- Vulkan runtime viewport clear-pass capture for empty frames, plus native offscreen Vulkan scene rendering for generated primitive meshes and authored triangle meshes
+- Vulkan scene-rendering contracts, camera/view-projection propagation, primitive/custom mesh preparation, bundled GLSL shader deployment and compilation, uniform descriptors, model push constants, depth targets, indexed draw submission, readback, and runtime viewport scene-capture routing
+- agent-authored 3D geometry primitive creation through command bus, CLI, and MCP catalog
+- agent-authored custom 3D triangle mesh payloads through `Rekall.GeometryMesh`
+- agent-authored procedural extrusions from 2D profiles through `rekall.geometry.create_extrusion`
+- agent-accessible GLB export through `rekall.render.export_scene_glb` / `render glb export`
 - built-in starter game workflows
 - one-shot playable game workflow that creates, scaffolds, and builds genre-aware C# module code
 
@@ -70,7 +79,7 @@ Agents can create these game foundations through the command bus or CLI:
 - `collectathon-3d`
 - `puzzle`
 
-Each template creates a project manifest, `Main` scene, active camera, playable loop marker, and starter entities/components appropriate to the genre.
+Each template creates a project manifest, `Main` scene, active camera, core render primitives, and starter game-owned entities/components under `Game.Templates.*`; game behavior belongs in project-authored modules, not engine built-ins.
 
 ## Build
 
@@ -159,8 +168,15 @@ dotnet run --project src/Rekall.Age.Cli -- level entity duplicate .age-sandbox M
 dotnet run --project src/Rekall.Age.Cli -- level prefab create .age-sandbox Main <entity-id> PlayerPrefab
 dotnet run --project src/Rekall.Age.Cli -- level prefab instantiate .age-sandbox Main <prefab-id> "Prefab Player"
 dotnet run --project src/Rekall.Age.Cli -- level entity snap .age-sandbox Main <entity-id> 1
+dotnet run --project src/Rekall.Age.Cli -- geometry primitive create .age-sandbox Main "Crystal Orb" sphere -2 1 0 "#33ff66"
+dotnet run --project src/Rekall.Age.Cli -- geometry mesh create .age-sandbox Main "Agent Triangle" '[{"x":0,"y":0,"z":0},{"x":1,"y":0,"z":0},{"x":0,"y":1,"z":0,"r":0,"g":1,"b":0}]' '[0,1,2]' 0 0 0 "#ff6633"
+dotnet run --project src/Rekall.Age.Cli -- geometry extrusion create .age-sandbox Main "Agent Block" '[{"x":-0.5,"y":-0.5},{"x":0.5,"y":-0.5},{"x":0.5,"y":0.5},{"x":-0.5,"y":0.5}]' 1 0 0 0 "#44ccff"
 dotnet run --project src/Rekall.Age.Studio -- --project .age-sandbox --scene Main
 ```
+
+Studio writes Serilog diagnostics and unhandled exception details to daily rolling files under `%LOCALAPPDATA%\Rekall AGE\Studio\Logs`. Startup project-load failures are logged there and shown in the workbench as a validation status instead of a raw WPF exception dialog.
+
+The CLI writes handled command failures and unexpected exceptions under `%LOCALAPPDATA%\Rekall AGE\Cli\Logs`; `mcp stdio` writes protocol and tool-call diagnostics under `%LOCALAPPDATA%\Rekall AGE\Mcp\Logs` without polluting JSON-RPC stdout. Set `REKALL_AGE_CLI_LOG_DIR`, `REKALL_AGE_MCP_LOG_DIR`, or the shared `REKALL_AGE_LOG_DIR` to redirect those logs during tests or automation.
 
 Successful CLI and MCP mutations persist project-local transaction history in `Transactions/transactions.age.json`. Studio, workbench read models, and the `rekall.transaction.history` command load that log so agents and humans can inspect recent command effects after the original command context has ended. Each persisted transaction includes structured resource-change summaries with relative paths, resource kinds, existence state, and file sizes when available. Dynamic command and MCP tool-call results include the same transaction and resource-change metadata immediately in `structuredContent.transaction`. Mutations that capture preimages write before-change snapshots under `Transactions/Snapshots/<transaction-id>/`; `rekall.transaction.restore_preimage` restores a selected resource from one of those snapshots while capturing the current file as the new transaction preimage.
 
@@ -180,12 +196,43 @@ Capture a deterministic viewport PNG from the same runtime snapshot used by insp
 
 ```powershell
 dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport
+dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport 320 180 vulkan
 ```
 
 The command writes `Main_runtime_003.png` and reports the active camera, frame index, renderable kinds, asset-backed renderable count, fallback renderable count, and runtime observation count.
 
+`Rekall.Camera2D` and `Rekall.Camera3D` are core configurable camera components. They remain plain entity components so project modules can drive them like any other authored data. Runtime rendering carries active state, projection mode, field of view, orthographic size, near/far clip distances, clear color, and transform into the viewport frame; Vulkan scene capture consumes those camera settings for view/projection, while software and Vulkan clear captures honor the active camera clear color.
+
+The default viewport backend is `software`, which is CPU rasterized. Passing `vulkan` requests native Vulkan capture. Empty runtime frames use the native clear-pass/readback path and report the selected device. Generated primitive mesh scenes and authored `Rekall.GeometryMesh` triangle meshes use native offscreen Vulkan scene rendering: Rekall AGE ships the bundled GLSL shaders beside the rendering assembly, compiles them with Shaderc, creates color and depth targets, uploads local-space vertex/index/uniform buffers, propagates active camera transforms into the view-projection uniform, binds per-mesh model matrices through push constants, submits indexed draw calls, copies the color image to a host buffer, and writes the captured PNG. Unsupported renderable kinds, such as sprites and imported mesh assets, fail with structured diagnostics instead of falling back silently.
+
 If a sprite renderable references an imported PNG asset, the software viewport draws that PNG into the frame. Missing or unsupported sprite assets fall back to deterministic markers and are reported in the command output.
 
-Primitive mesh renderables, including `rekall.primitive.cube`, are projected into the software viewport as shaded cube geometry. `Rekall.DirectionalLight` entities contribute deterministic directional lighting from their `Rekall.Transform3D` rotation and `intensity` value. `Rekall.TransformAnimation` can apply `pitchDegreesPerSecond`, `yawDegreesPerSecond`, and `rollDegreesPerSecond` during runtime frame simulation before capture.
+Primitive mesh renderables, including `rekall.primitive.cube`, and authored `Rekall.GeometryMesh` triangle lists are projected into the software viewport as shaded geometry. `Rekall.DirectionalLight` entities contribute deterministic directional lighting from their `Rekall.Transform3D` rotation and `intensity` value. `Rekall.TransformAnimation` can apply `pitchDegreesPerSecond`, `yawDegreesPerSecond`, and `rollDegreesPerSecond` during runtime frame simulation before capture.
+
+Agents can author renderable 3D geometry through `rekall.geometry.create_primitive` / `geometry primitive create`. Supported primitives are `cube`, `sphere`, `cylinder`, `cone`, and `plane`; the command writes `Rekall.Transform3D`, `Rekall.GeometryPrimitive`, and `Rekall.MeshRenderer` components so the same runtime viewport capture path can render the object immediately.
+
+For high-throughput world creation over MCP, agents can use `rekall.scene.apply_blueprint` to apply many generic entities and components to a scene in one transaction, optionally clearing existing scene entities first. `rekall.entity.delete` removes one authored entity during iteration without requiring a full scene rewrite.
+
+Agents can also author arbitrary triangle meshes through `rekall.geometry.create_mesh` / `geometry mesh create`, or directly with a `Rekall.GeometryMesh` component. The runtime frame contract carries the parsed vertex/index payload into the Vulkan scene renderer. Vertices support `x`, `y`, `z`, optional normals through `nx`, `ny`, `nz`, optional vertex color through `r`, `g`, `b`, `a`, and optional `u`, `v` texture coordinates. Indices are 16-bit triangle-list indices. If normals are omitted, Rekall AGE infers averaged per-vertex normals from the triangle winding so simple generated meshes still light correctly.
+
+For higher-level modeling, agents can use `rekall.geometry.create_extrusion` / `geometry extrusion create` with a 2D profile and depth. The command generates a closed hard-edged mesh with front/back caps and side faces, writes editable `Rekall.GeometryExtrusion` source metadata, and emits the renderable `Rekall.GeometryMesh` payload used by both software and Vulkan viewport capture.
+
+Runtime-renderable 3D scenes can be exported as binary glTF through `rekall.render.export_scene_glb` / `render glb export <projectRoot> <sceneName> <output.glb> [frames]`. The exporter resolves the same runtime snapshot used by viewport capture, converts supported engine-authored mesh renderables through the engine mesh builder, and writes a GLB 2.0 file with embedded binary buffers, node transforms, mesh accessors for `POSITION`, `NORMAL`, `TEXCOORD_0`, and `COLOR_0`, triangle indices, PBR base-color materials, and embedded PNG/JPEG base-color textures when a mesh or primitive component references an imported image asset through `textureAssetId` or `texture`. Mesh renderables that reference imported `.glb` model assets are merged into the exported scene with their source nodes, meshes, materials, material-extension texture references, images, textures, samplers, cameras, skins, animations, and extension declarations reindexed into the output, then wrapped by the engine entity transform.
+
+```json
+{
+  "type": "Rekall.GeometryMesh",
+  "properties": {
+    "color": "#ff6633",
+    "textureAssetId": "asset_paint_0123abcd",
+    "vertices": [
+      { "x": 0, "y": 0, "z": 0, "nx": 0, "ny": 0, "nz": 1 },
+      { "x": 1, "y": 0, "z": 0 },
+      { "x": 0, "y": 1, "z": 0, "r": 0, "g": 1, "b": 0, "a": 1 }
+    ],
+    "indices": [0, 1, 2]
+  }
+}
+```
 
 Compiled project modules can also register `IRekallAgeRuntimeModuleSystem` implementations through `RekallAgeModuleBuilder.RegisterRuntimeSystem<T>()`. Runtime inspection and viewport capture load built project modules, run those systems during fixed-frame simulation, and expose the executed system IDs in runtime inspection output.

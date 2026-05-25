@@ -1,0 +1,346 @@
+{
+  "transactions": [
+    {
+      "id": "txn_12f5fee9b58942b08c11837da2451c1f",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 180 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures 640 360 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T19:02:12.4819549+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-640x360-20260525190212995.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-640x360-20260525190212995.png",
+          "relativePath": "Captures\\vulkan-scene-640x360-20260525190212995.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 9694
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_c9526a2eaecc4a068a78b8ce0758ac23",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 900 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:59:12.3435509+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525185913689.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525185913689.png",
+          "relativePath": "Captures\\vulkan-scene-960x540-20260525185913689.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 15603
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_84cda86de44746a0a66b363230d36985",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 900 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:56:06.617144+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525185607373.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525185607373.png",
+          "relativePath": "Captures\\vulkan-scene-960x540-20260525185607373.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 15603
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_bc9ee453aa1749ce991d6c3acc21c2c6",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 5400 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures 640 360 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:53:29.5185779+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-640x360-20260525185331073.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-640x360-20260525185331073.png",
+          "relativePath": "Captures\\vulkan-scene-640x360-20260525185331073.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 9502
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_9dfba8a02da04e0f9cd3285e3a2eb5bf",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 3600 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures 640 360 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:53:23.9102939+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-640x360-20260525185325394.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-640x360-20260525185325394.png",
+          "relativePath": "Captures\\vulkan-scene-640x360-20260525185325394.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 9502
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_83c66680ad52441fb8cd0c31327dd357",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 1800 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures 640 360 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:53:18.6295284+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-640x360-20260525185319713.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-640x360-20260525185319713.png",
+          "relativePath": "Captures\\vulkan-scene-640x360-20260525185319713.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 9502
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_94ccb49f360241deb31a8b6bc91ad8fc",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 900 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures 640 360 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:53:13.4644612+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-640x360-20260525185314383.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-640x360-20260525185314383.png",
+          "relativePath": "Captures\\vulkan-scene-640x360-20260525185314383.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 9502
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_29b71f585b7d437fb91e2ffc7413eb90",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 900 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:51:11.601317+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525185112371.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525185112371.png",
+          "relativePath": "Captures\\vulkan-scene-960x540-20260525185112371.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 15603
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_fb4ef0d807494d4aa900b9339a0d19bd",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 360 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:51:07.4825932+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525185108075.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525185108075.png",
+          "relativePath": "Captures\\vulkan-scene-960x540-20260525185108075.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 15623
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_390e959d2ba74e66aaf5cd07fe0e0657",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 70 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:49:03.0175287+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525184903536.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525184903536.png",
+          "relativePath": "Captures\\vulkan-scene-960x540-20260525184903536.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 16009
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_12208bdec24249b0b9c2765457e91cfb",
+      "name": "build modules F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:49:02.7854186+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Modules\\BouncingBall\\bin\\Debug\\net10.0\\BouncingBall.dll"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Modules\\BouncingBall\\bin\\Debug\\net10.0\\BouncingBall.dll",
+          "relativePath": "Modules\\BouncingBall\\bin\\Debug\\net10.0\\BouncingBall.dll",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 9728
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_b06b3937e43e465e99a5c0a54d7a8296",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 240 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:45:37.1391677+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525184537753.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525184537753.png",
+          "relativePath": "Captures\\vulkan-scene-960x540-20260525184537753.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 11269
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_a3323b5c0d744059a151c101b06facbc",
+      "name": "build modules F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:40:11.8129931+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Modules\\BouncingBall\\bin\\Debug\\net10.0\\BouncingBall.dll"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Modules\\BouncingBall\\bin\\Debug\\net10.0\\BouncingBall.dll",
+          "relativePath": "Modules\\BouncingBall\\bin\\Debug\\net10.0\\BouncingBall.dll",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 9728
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_3eb6090fb0c046a4aecbc823d97b1be7",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 70 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:38:13.7787012+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525183814274.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525183814274.png",
+          "relativePath": "Captures\\vulkan-scene-960x540-20260525183814274.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 11470
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_0690722aee1849c7a7cc70d89141c900",
+      "name": "build modules F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:38:01.9467774+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Modules\\BouncingBall\\bin\\Debug\\net10.0\\BouncingBall.dll"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Modules\\BouncingBall\\bin\\Debug\\net10.0\\BouncingBall.dll",
+          "relativePath": "Modules\\BouncingBall\\bin\\Debug\\net10.0\\BouncingBall.dll",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 9728
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_1718f8ee202e45d286e636186f5e4dcd",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 90 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\CapturesSoftware 320 180 software",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:29:47.46189+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\CapturesSoftware\\Main_runtime_090.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\CapturesSoftware\\Main_runtime_090.png",
+          "relativePath": "CapturesSoftware\\Main_runtime_090.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 563
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_a17381a376fe491d899bfd3c43340e8a",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall Main 90 F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:28:05.3885622+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525182805922.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Captures\\vulkan-scene-960x540-20260525182805922.png",
+          "relativePath": "Captures\\vulkan-scene-960x540-20260525182805922.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 11208
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_4e50afaa82d34dce87092faec1b8d70c",
+      "name": "build modules F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T18:27:19.3241488+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Modules\\BouncingBall\\bin\\Debug\\net10.0\\BouncingBall.dll"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\BouncingBall\\Modules\\BouncingBall\\bin\\Debug\\net10.0\\BouncingBall.dll",
+          "relativePath": "Modules\\BouncingBall\\bin\\Debug\\net10.0\\BouncingBall.dll",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 9728
+        }
+      ],
+      "resourcePreimages": []
+    }
+  ]
+}

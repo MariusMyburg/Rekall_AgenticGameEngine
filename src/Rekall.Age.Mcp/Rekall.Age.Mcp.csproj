@@ -8,6 +8,10 @@
     <ProjectReference Include="..\Rekall.Age.Build\Rekall.Age.Build.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Serilog" Version="4.3.1" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

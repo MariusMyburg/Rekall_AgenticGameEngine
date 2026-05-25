@@ -1,0 +1,70 @@
+{
+  "id": "scene_a5a33dc8c6354c42bfc42a258313bf36",
+  "name": "Main",
+  "capabilities": [
+    "rendering3d"
+  ],
+  "entities": [
+    {
+      "id": "ent_56fcbf611161480f9eeac06b69147564",
+      "name": "Space Station Megastructure",
+      "tags": [
+        "model",
+        "station"
+      ],
+      "components": [
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "asset_space-station-megastructure_9533247a"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "pitch": -12,
+            "yaw": 28,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_station_key_light",
+      "name": "Station Key Light",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "pitch": -38,
+            "yaw": -48,
+            "roll": 0
+          }
+        },
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": {
+            "intensity": 1.35
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

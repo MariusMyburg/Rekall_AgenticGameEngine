@@ -89,6 +89,8 @@ public sealed class SceneRuntimeFoundationTests
             .AddEntity(RekallAgeEntityDocument.Create("Mesh", ["prop"])
                 .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer", new JsonObject { ["mesh"] = "asset_mesh" }))
                 .AddComponent(RekallAgeComponentDocument.Create("Rekall.PointLight", new JsonObject { ["intensity"] = 1 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Planet", ["planet"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject { ["Radius"] = 2 })))
             .AddEntity(RekallAgeEntityDocument.Create("HudCanvas", ["ui"])
                 .AddComponent(RekallAgeComponentDocument.Create("Rekall.UiCanvas", new JsonObject { ["layer"] = 10 })))
             .AddEntity(RekallAgeEntityDocument.Create("HudButton", ["ui"])
@@ -98,7 +100,7 @@ public sealed class SceneRuntimeFoundationTests
 
         Assert.Single(world.Subsystems.Rendering.Cameras);
         Assert.Single(world.Subsystems.Rendering.Sprites);
-        Assert.Single(world.Subsystems.Rendering.Meshes);
+        Assert.Equal(2, world.Subsystems.Rendering.Meshes.Count);
         Assert.Single(world.Subsystems.Rendering.Lights);
         Assert.Single(world.Subsystems.Rendering.UiLayers);
         Assert.Single(world.Subsystems.Physics.RigidBodies);
@@ -117,16 +119,18 @@ public sealed class SceneRuntimeFoundationTests
     {
         var scene = RekallAgeSceneDocument.Create("Main", ["world"])
             .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
-                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject { ["active"] = true })));
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Project Game Marker", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create("Game.Tests.CustomController", new JsonObject { ["speed"] = 8 })));
 
-        var observation = new RekallAgeGameplayInterpreter()
-            .Observe(scene, 3)
-            .Single(item => item.System == "Camera2D");
+        var observations = new RekallAgeGameplayInterpreter().Observe(scene, 3);
+        var observation = Assert.Single(observations, item => item.System == "Camera2D");
 
         Assert.Equal(3, observation.Frame);
         Assert.Equal("rendering", observation.Subsystem);
         Assert.Equal("info", observation.Severity);
         Assert.Equal("REKALL_RUNTIME_SYSTEM_EVALUATED", observation.Code);
+        Assert.DoesNotContain(observations, item => item.System == "CustomController");
     }
 
     [Fact]
@@ -145,7 +149,7 @@ public sealed class SceneRuntimeFoundationTests
             [
                 "runtime.animation",
                 "runtime.audio",
-                "runtime.physics",
+                "runtime.physics.bepu",
                 "runtime.rendering",
                 "runtime.transform",
                 "runtime.ui"
@@ -173,6 +177,266 @@ public sealed class SceneRuntimeFoundationTests
         Assert.Equal(60, result.World.FrameIndex);
         Assert.Equal(100, cube.Transform.Rotation3D.Y, precision: 3);
         Assert.Equal("TransformAnimation", Assert.Single(result.World.Subsystems.Animation.Players).Kind);
+    }
+
+    [Fact]
+    public async Task ExecutionLoopUsesBepuPhysicsForDynamic3DBodies()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Falling Box", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = 0, ["y"] = 4, ["z"] = 0 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Rigidbody3D",
+                    new JsonObject { ["mass"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.BoxCollider3D",
+                    new JsonObject { ["width"] = 1, ["height"] = 1, ["depth"] = 1 })));
+        var initial = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(initial, frames: 60, CancellationToken.None);
+
+        var body = Assert.Single(result.World.Entities);
+        Assert.Contains("runtime.physics.bepu", result.SystemsRun);
+        Assert.True(body.Transform.Position3D.Y < 4);
+        Assert.True(body.Transform.Position3D.Y > -2);
+        Assert.Contains(body.Components, component =>
+            component.Type == "Rekall.PhysicsState3D"
+            && component.Properties["backend"]!.GetValue<string>() == "bepu");
+    }
+
+    [Fact]
+    public async Task BepuPhysicsBodiesCollideWithStaticBoxColliders()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Ground", ["level"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = 0, ["y"] = -0.5, ["z"] = 0 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.BoxCollider3D",
+                    new JsonObject { ["width"] = 20, ["height"] = 1, ["depth"] = 20 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Falling Box", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = 0, ["y"] = 3, ["z"] = 0 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Rigidbody3D",
+                    new JsonObject { ["mass"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.BoxCollider3D",
+                    new JsonObject { ["width"] = 1, ["height"] = 1, ["depth"] = 1 })));
+        var initial = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(initial, frames: 180, CancellationToken.None);
+
+        var body = result.World.Entities.Single(entity => entity.Name == "Falling Box");
+        Assert.InRange(body.Transform.Position3D.Y, 0.45, 0.65);
+    }
+
+    [Fact]
+    public async Task BepuPhysicsAppliesAuthorableRestitutionForBouncyBodies()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Ground", ["level"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["y"] = -0.5 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.BoxCollider3D",
+                    new JsonObject { ["Width"] = 20, ["Height"] = 1, ["Depth"] = 20 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsMaterial3D",
+                    new JsonObject { ["Friction"] = 0.35, ["Restitution"] = 0.9 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Bouncy Sphere", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["y"] = 3 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Rigidbody3D",
+                    new JsonObject { ["Mass"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.SphereCollider3D",
+                    new JsonObject { ["Radius"] = 0.5 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsMaterial3D",
+                    new JsonObject
+                    {
+                        ["Friction"] = 0.25,
+                        ["Restitution"] = 0.9,
+                        ["MinimumBounceSpeed"] = 0.4,
+                        ["MaximumRecoveryVelocity"] = 8
+                    })));
+        var initial = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(initial, frames: 70, CancellationToken.None);
+
+        var sphere = result.World.Entities.Single(entity => entity.Name == "Bouncy Sphere");
+        var velocity = sphere.Components.Single(component => component.Type == "Rekall.PhysicsState3D")
+            .Properties["linearVelocity"]!.AsObject();
+        Assert.True(sphere.Transform.Position3D.Y > 0.62);
+        Assert.True(velocity["y"]!.GetValue<float>() > 0);
+    }
+
+    [Fact]
+    public async Task BepuPhysicsReadsPascalCaseAuthoringSchemaProperties()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Physics Settings", ["settings"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsWorld3D",
+                    new JsonObject { ["GravityY"] = 0 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Floating Box", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = 0, ["y"] = 4, ["z"] = 0 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Rigidbody3D",
+                    new JsonObject { ["Mass"] = 2 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.BoxCollider3D",
+                    new JsonObject { ["Width"] = 2, ["Height"] = 2, ["Depth"] = 2 })));
+        var initial = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(initial, frames: 60, CancellationToken.None);
+
+        var body = result.World.Entities.Single(entity => entity.Name == "Floating Box");
+        Assert.Equal(4, body.Transform.Position3D.Y, precision: 3);
+    }
+
+    [Fact]
+    public async Task BepuPhysicsSupportsSphereAndCapsuleColliders()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Ground", ["level"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["y"] = -0.5 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.BoxCollider3D",
+                    new JsonObject { ["Width"] = 20, ["Height"] = 1, ["Depth"] = 20 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Sphere", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = -2, ["y"] = 3 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Rigidbody3D",
+                    new JsonObject { ["Mass"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.SphereCollider3D",
+                    new JsonObject { ["Radius"] = 0.5 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Capsule", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = 2, ["y"] = 3 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Rigidbody3D",
+                    new JsonObject { ["Mass"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.CapsuleCollider3D",
+                    new JsonObject { ["Radius"] = 0.5, ["Length"] = 1 })));
+        var initial = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(initial, frames: 180, CancellationToken.None);
+
+        var sphere = result.World.Entities.Single(entity => entity.Name == "Sphere");
+        var capsule = result.World.Entities.Single(entity => entity.Name == "Capsule");
+        Assert.InRange(sphere.Transform.Position3D.Y, 0.45, 0.65);
+        Assert.InRange(capsule.Transform.Position3D.Y, 0.95, 1.15);
+    }
+
+    [Fact]
+    public async Task BepuPhysicsSupportsStaticMeshCollidersFromGeometryMesh()
+    {
+        var groundVertices = new JsonArray
+        {
+            new JsonObject { ["x"] = -10, ["y"] = 0, ["z"] = -10 },
+            new JsonObject { ["x"] = -10, ["y"] = 0, ["z"] = 10 },
+            new JsonObject { ["x"] = 10, ["y"] = 0, ["z"] = 10 },
+            new JsonObject { ["x"] = 10, ["y"] = 0, ["z"] = -10 }
+        };
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Mesh Ground", ["level"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject()))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.GeometryMesh",
+                    new JsonObject
+                    {
+                        ["vertices"] = groundVertices,
+                        ["indices"] = new JsonArray { 0, 1, 2, 0, 2, 3 }
+                    }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.MeshCollider",
+                    new JsonObject())))
+            .AddEntity(RekallAgeEntityDocument.Create("Falling Sphere", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = 0, ["y"] = 3, ["z"] = 0 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Rigidbody3D",
+                    new JsonObject { ["Mass"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.SphereCollider3D",
+                    new JsonObject { ["Radius"] = 0.5 })));
+        var initial = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(initial, frames: 180, CancellationToken.None);
+
+        var sphere = result.World.Entities.Single(entity => entity.Name == "Falling Sphere");
+        Assert.InRange(sphere.Transform.Position3D.Y, 0.45, 0.65);
+    }
+
+    [Fact]
+    public async Task BepuPhysicsSupportsDynamicConvexMeshCollidersFromGeometryMesh()
+    {
+        var cubeVertices = new JsonArray
+        {
+            new JsonObject { ["x"] = -0.5, ["y"] = -0.5, ["z"] = -0.5 },
+            new JsonObject { ["x"] = -0.5, ["y"] = -0.5, ["z"] = 0.5 },
+            new JsonObject { ["x"] = -0.5, ["y"] = 0.5, ["z"] = -0.5 },
+            new JsonObject { ["x"] = -0.5, ["y"] = 0.5, ["z"] = 0.5 },
+            new JsonObject { ["x"] = 0.5, ["y"] = -0.5, ["z"] = -0.5 },
+            new JsonObject { ["x"] = 0.5, ["y"] = -0.5, ["z"] = 0.5 },
+            new JsonObject { ["x"] = 0.5, ["y"] = 0.5, ["z"] = -0.5 },
+            new JsonObject { ["x"] = 0.5, ["y"] = 0.5, ["z"] = 0.5 }
+        };
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Ground", ["level"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["y"] = -0.5 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.BoxCollider3D",
+                    new JsonObject { ["Width"] = 20, ["Height"] = 1, ["Depth"] = 20 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Convex Mesh", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["y"] = 3 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.GeometryMesh",
+                    new JsonObject { ["vertices"] = cubeVertices, ["indices"] = new JsonArray() }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Rigidbody3D",
+                    new JsonObject { ["Mass"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.MeshCollider",
+                    new JsonObject { ["Convex"] = true })));
+        var initial = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(initial, frames: 180, CancellationToken.None);
+
+        var mesh = result.World.Entities.Single(entity => entity.Name == "Convex Mesh");
+        Assert.InRange(mesh.Transform.Position3D.Y, 0.45, 0.65);
     }
 
     [Fact]

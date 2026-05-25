@@ -80,16 +80,15 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
 
     private static void FillBackground(RekallAgeRuntimeViewportFrame frame, byte[] pixels)
     {
-        var hash = Math.Abs(HashCode.Combine(frame.SceneName.GetHashCode(StringComparison.Ordinal), frame.FrameIndex));
+        var color = ParseHexColor(frame.ActiveCamera?.ClearColor, new SoftwareColor(18, 46, 86));
         for (var y = 0; y < frame.Height; y++)
         {
             for (var x = 0; x < frame.Width; x++)
             {
                 var index = ToIndex(frame, x, y);
-                var stripe = (x / 16 + y / 16 + hash) % 2 == 0;
-                pixels[index + 0] = stripe ? (byte)18 : (byte)8;
-                pixels[index + 1] = stripe ? (byte)46 : (byte)24;
-                pixels[index + 2] = stripe ? (byte)86 : (byte)54;
+                pixels[index + 0] = color.R;
+                pixels[index + 1] = color.G;
+                pixels[index + 2] = color.B;
                 pixels[index + 3] = 255;
             }
         }
@@ -117,9 +116,17 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         RekallAgeRuntimeViewportRenderable renderable,
         byte[] pixels)
     {
-        if (renderable.Kind.Equals("mesh", StringComparison.Ordinal) && IsPrimitiveCube(renderable))
+        if (renderable.Kind.Equals("mesh", StringComparison.Ordinal)
+            && renderable.GeometryMesh is not null)
         {
-            DrawPrimitiveCube(frame, renderable, pixels);
+            DrawAuthoredGeometryMesh(frame, renderable, pixels);
+            return true;
+        }
+
+        var primitive = TryGetPrimitiveKind(renderable);
+        if (primitive is not null)
+        {
+            DrawGeometryPrimitive(frame, renderable, primitive, pixels);
             return true;
         }
 
@@ -131,22 +138,134 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         return false;
     }
 
-    private static bool IsPrimitiveCube(RekallAgeRuntimeViewportRenderable renderable)
+    private static string? TryGetPrimitiveKind(RekallAgeRuntimeViewportRenderable renderable)
     {
-        return renderable.Variant is not null
-            && (renderable.Variant.Equals("cube", StringComparison.OrdinalIgnoreCase)
-                || renderable.Variant.Equals("rekall.primitive.cube", StringComparison.OrdinalIgnoreCase)
-                || renderable.Variant.EndsWith(".cube", StringComparison.OrdinalIgnoreCase));
+        if (!renderable.Kind.Equals("mesh", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var variant = renderable.Variant ?? renderable.AssetId;
+        if (string.IsNullOrWhiteSpace(variant))
+        {
+            return null;
+        }
+
+        var normalized = variant.Trim().ToLowerInvariant();
+        if (normalized.StartsWith("rekall.geometry.", StringComparison.Ordinal))
+        {
+            normalized = normalized["rekall.geometry.".Length..];
+        }
+        else if (normalized.StartsWith("rekall.planet.", StringComparison.Ordinal))
+        {
+            normalized = normalized["rekall.planet.".Length..];
+        }
+        else if (normalized.StartsWith("rekall.primitive.", StringComparison.Ordinal))
+        {
+            normalized = normalized["rekall.primitive.".Length..];
+        }
+
+        return normalized is "cube" or "sphere" or "cylinder" or "cone" or "plane" or "surface"
+            ? normalized
+            : null;
+    }
+
+    private static void DrawGeometryPrimitive(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable,
+        string primitive,
+        byte[] pixels)
+    {
+        var material = ResolveMaterialColor(renderable, new SoftwareColor(88, 148, 218));
+        switch (primitive)
+        {
+            case "cube":
+                DrawPrimitiveCube(frame, renderable, pixels, material);
+                break;
+            case "sphere":
+            case "surface":
+                DrawPrimitiveSphere(frame, renderable, pixels, material);
+                break;
+            case "cylinder":
+                DrawPrimitiveCylinder(frame, renderable, pixels, material);
+                break;
+            case "cone":
+                DrawPrimitiveCone(frame, renderable, pixels, material);
+                break;
+            case "plane":
+                DrawPrimitivePlane(frame, renderable, pixels, material);
+                break;
+        }
+    }
+
+    private static void DrawAuthoredGeometryMesh(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable,
+        byte[] pixels)
+    {
+        var geometry = renderable.GeometryMesh;
+        if (geometry is null || geometry.Vertices.Count == 0 || geometry.Indices.Count < 3)
+        {
+            return;
+        }
+
+        var material = ResolveMaterialColor(renderable, new SoftwareColor(88, 148, 218));
+        var (centerX, centerY) = ResolveRenderableCenter(frame, renderable);
+        var size = ResolveAuthoredMeshSize(frame, renderable, geometry);
+        var transformed = geometry.Vertices
+            .Select(vertex => Rotate(
+                new SoftwareVec3(
+                    vertex.X * Math.Max(0.1, renderable.ScaleX),
+                    vertex.Y * Math.Max(0.1, renderable.ScaleY),
+                    vertex.Z * Math.Max(0.1, renderable.ScaleZ)),
+                renderable.RotationX,
+                renderable.RotationY,
+                renderable.RotationZ))
+            .ToArray();
+        var light = ResolveDirectionalLight(frame);
+        var triangles = new List<SoftwareMeshTriangle>();
+
+        for (var i = 0; i + 2 < geometry.Indices.Count; i += 3)
+        {
+            var aIndex = geometry.Indices[i];
+            var bIndex = geometry.Indices[i + 1];
+            var cIndex = geometry.Indices[i + 2];
+            if (aIndex >= transformed.Length || bIndex >= transformed.Length || cIndex >= transformed.Length)
+            {
+                continue;
+            }
+
+            var a = transformed[aIndex];
+            var b = transformed[bIndex];
+            var c = transformed[cIndex];
+            var normal = ResolveTriangleNormal(a, b, c, geometry.Vertices[aIndex], geometry.Vertices[bIndex], geometry.Vertices[cIndex], renderable);
+            var color = ResolveTriangleColor(material, geometry.Vertices[aIndex], geometry.Vertices[bIndex], geometry.Vertices[cIndex]);
+            triangles.Add(new SoftwareMeshTriangle(
+                Project(a, centerX, centerY, size),
+                Project(b, centerX, centerY, size),
+                Project(c, centerX, centerY, size),
+                normal,
+                (a.Z + b.Z + c.Z) / 3.0,
+                color));
+        }
+
+        foreach (var triangle in triangles.OrderBy(triangle => triangle.AverageZ))
+        {
+            var diffuse = Math.Max(0, Dot(triangle.Normal, light.Direction));
+            var shade = Math.Clamp(0.6 + diffuse * 0.4 * light.Intensity, 0.5, 1.1);
+            var (r, g, b) = Shade(triangle.Color, shade);
+            FillTriangle(frame, pixels, triangle.A, triangle.B, triangle.C, r, g, b);
+        }
     }
 
     private static void DrawPrimitiveCube(
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeRuntimeViewportRenderable renderable,
-        byte[] pixels)
+        byte[] pixels,
+        SoftwareColor material)
     {
         var (centerX, centerY) = ResolveRenderableCenter(frame, renderable);
-        var scale = Math.Max(0.1, Math.Max(renderable.ScaleX, Math.Max(renderable.ScaleY, renderable.ScaleZ)));
-        var size = Math.Max(14, Math.Min(frame.Width, frame.Height) * 0.18 * scale);
+        var size = ResolvePrimitiveSize(frame, renderable);
         var light = ResolveDirectionalLight(frame);
         var vertices = CubeVertices
             .Select(vertex => Rotate(
@@ -174,12 +293,281 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         foreach (var face in faces)
         {
             var diffuse = Math.Max(0, Dot(face.Normal, light.Direction));
-            var shade = Math.Clamp(0.36 + diffuse * 0.64 * light.Intensity, 0.24, 1.0);
-            var r = (byte)Math.Clamp((int)Math.Round(88 * shade + Math.Abs(face.Normal.X) * 18), 45, 190);
-            var g = (byte)Math.Clamp((int)Math.Round(148 * shade + Math.Abs(face.Normal.Y) * 18), 70, 220);
-            var b = (byte)Math.Clamp((int)Math.Round(218 * shade + Math.Abs(face.Normal.Z) * 18), 100, 255);
+            var shade = Math.Clamp(0.55 + diffuse * 0.45 * light.Intensity, 0.55, 1.05);
+            var r = (byte)Math.Clamp(
+                (int)Math.Round(material.R * shade + Math.Abs(face.Normal.X) * 18),
+                0,
+                255);
+            var g = (byte)Math.Clamp(
+                (int)Math.Round(material.G * shade + Math.Abs(face.Normal.Y) * 18),
+                0,
+                255);
+            var b = (byte)Math.Clamp(
+                (int)Math.Round(material.B * shade + Math.Abs(face.Normal.Z) * 18),
+                0,
+                255);
             FillQuad(frame, pixels, face.Points, r, g, b);
         }
+    }
+
+    private static void DrawPrimitiveSphere(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable,
+        byte[] pixels,
+        SoftwareColor material)
+    {
+        var (centerX, centerY) = ResolveRenderableCenter(frame, renderable);
+        var size = ResolvePrimitiveSize(frame, renderable);
+        var radiusX = Math.Max(7, size * 0.48);
+        var radiusY = Math.Max(7, size * 0.48);
+        var minX = Math.Max(0, (int)Math.Floor(centerX - radiusX));
+        var maxX = Math.Min(frame.Width - 1, (int)Math.Ceiling(centerX + radiusX));
+        var minY = Math.Max(0, (int)Math.Floor(centerY - radiusY));
+        var maxY = Math.Min(frame.Height - 1, (int)Math.Ceiling(centerY + radiusY));
+
+        for (var y = minY; y <= maxY; y++)
+        {
+            for (var x = minX; x <= maxX; x++)
+            {
+                var nx = (x + 0.5 - centerX) / radiusX;
+                var ny = (y + 0.5 - centerY) / radiusY;
+                var distance = nx * nx + ny * ny;
+                if (distance > 1)
+                {
+                    continue;
+                }
+
+                var highlight = Math.Max(0, 1 - distance);
+                var directional = Math.Max(0, (-nx * 0.35) + (-ny * 0.45));
+                SetPixel(frame, pixels, x, y, material, Math.Clamp(0.54 + highlight * 0.32 + directional * 0.16, 0.42, 1.08));
+            }
+        }
+    }
+
+    private static void DrawPrimitiveCylinder(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable,
+        byte[] pixels,
+        SoftwareColor material)
+    {
+        var (centerX, centerY) = ResolveRenderableCenter(frame, renderable);
+        var size = ResolvePrimitiveSize(frame, renderable);
+        var radiusX = Math.Max(7, size * 0.38);
+        var radiusY = Math.Max(4, size * 0.13);
+        var halfHeight = Math.Max(10, size * 0.44);
+        var topY = (int)Math.Round(centerY - halfHeight);
+        var bottomY = (int)Math.Round(centerY + halfHeight);
+        var left = Math.Max(0, (int)Math.Floor(centerX - radiusX));
+        var right = Math.Min(frame.Width - 1, (int)Math.Ceiling(centerX + radiusX));
+
+        for (var y = Math.Max(0, topY); y <= Math.Min(frame.Height - 1, bottomY); y++)
+        {
+            for (var x = left; x <= right; x++)
+            {
+                var nx = Math.Abs((x + 0.5 - centerX) / radiusX);
+                if (nx > 1)
+                {
+                    continue;
+                }
+
+                SetPixel(frame, pixels, x, y, material, 0.52 + (1 - nx) * 0.3);
+            }
+        }
+
+        FillEllipse(frame, pixels, centerX, topY, radiusX, radiusY, material, 1.02);
+        FillEllipse(frame, pixels, centerX, bottomY, radiusX, radiusY, material, 0.48);
+    }
+
+    private static void DrawPrimitiveCone(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable,
+        byte[] pixels,
+        SoftwareColor material)
+    {
+        var (centerX, centerY) = ResolveRenderableCenter(frame, renderable);
+        var size = ResolvePrimitiveSize(frame, renderable);
+        var radiusX = Math.Max(8, size * 0.42);
+        var radiusY = Math.Max(4, size * 0.13);
+        var apex = new SoftwarePoint(centerX, centerY - size * 0.58);
+        var left = new SoftwarePoint(centerX - radiusX, centerY + size * 0.38);
+        var right = new SoftwarePoint(centerX + radiusX, centerY + size * 0.38);
+        var (r, g, b) = Shade(material, 0.8);
+        FillTriangle(frame, pixels, apex, left, right, r, g, b);
+        FillEllipse(frame, pixels, centerX, (int)Math.Round(centerY + size * 0.38), radiusX, radiusY, material, 0.58);
+    }
+
+    private static void DrawPrimitivePlane(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable,
+        byte[] pixels,
+        SoftwareColor material)
+    {
+        var (centerX, centerY) = ResolveRenderableCenter(frame, renderable);
+        var size = ResolvePrimitiveSize(frame, renderable);
+        var points = new[]
+        {
+            new SoftwarePoint(centerX - size * 0.62, centerY + size * 0.16),
+            new SoftwarePoint(centerX - size * 0.12, centerY - size * 0.26),
+            new SoftwarePoint(centerX + size * 0.62, centerY - size * 0.08),
+            new SoftwarePoint(centerX + size * 0.08, centerY + size * 0.34)
+        };
+        var (r, g, b) = Shade(material, 0.82);
+        FillQuad(frame, pixels, points, r, g, b);
+    }
+
+    private static double ResolvePrimitiveSize(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable)
+    {
+        var scale = Math.Max(0.1, Math.Max(renderable.ScaleX, Math.Max(renderable.ScaleY, renderable.ScaleZ)));
+        return Math.Max(14, Math.Min(frame.Width, frame.Height) * 0.18 * scale);
+    }
+
+    private static double ResolveAuthoredMeshSize(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable,
+        RekallAgeRuntimeViewportGeometryMesh geometry)
+    {
+        var minX = geometry.Vertices.Min(vertex => vertex.X);
+        var maxX = geometry.Vertices.Max(vertex => vertex.X);
+        var minY = geometry.Vertices.Min(vertex => vertex.Y);
+        var maxY = geometry.Vertices.Max(vertex => vertex.Y);
+        var minZ = geometry.Vertices.Min(vertex => vertex.Z);
+        var maxZ = geometry.Vertices.Max(vertex => vertex.Z);
+        var extent = Math.Max(0.1, Math.Max(maxX - minX, Math.Max(maxY - minY, maxZ - minZ)));
+        var scale = Math.Max(0.1, Math.Max(renderable.ScaleX, Math.Max(renderable.ScaleY, renderable.ScaleZ)));
+        return Math.Max(14, Math.Min(frame.Width, frame.Height) * 0.22 * scale / extent);
+    }
+
+    private static SoftwareColor ResolveMaterialColor(
+        RekallAgeRuntimeViewportRenderable renderable,
+        SoftwareColor fallback)
+    {
+        return ParseHexColor(renderable.MaterialColor, fallback);
+    }
+
+    private static SoftwareColor ParseHexColor(
+        string? color,
+        SoftwareColor fallback)
+    {
+        if (string.IsNullOrWhiteSpace(color)
+            || color.Length != 7
+            || color[0] != '#')
+        {
+            return fallback;
+        }
+
+        try
+        {
+            return new SoftwareColor(
+                Convert.ToByte(color.Substring(1, 2), 16),
+                Convert.ToByte(color.Substring(3, 2), 16),
+                Convert.ToByte(color.Substring(5, 2), 16));
+        }
+        catch (FormatException)
+        {
+            return fallback;
+        }
+    }
+
+    private static void FillEllipse(
+        RekallAgeRuntimeViewportFrame frame,
+        byte[] pixels,
+        int centerX,
+        int centerY,
+        double radiusX,
+        double radiusY,
+        SoftwareColor material,
+        double shade)
+    {
+        var minX = Math.Max(0, (int)Math.Floor(centerX - radiusX));
+        var maxX = Math.Min(frame.Width - 1, (int)Math.Ceiling(centerX + radiusX));
+        var minY = Math.Max(0, (int)Math.Floor(centerY - radiusY));
+        var maxY = Math.Min(frame.Height - 1, (int)Math.Ceiling(centerY + radiusY));
+
+        for (var y = minY; y <= maxY; y++)
+        {
+            for (var x = minX; x <= maxX; x++)
+            {
+                var nx = (x + 0.5 - centerX) / radiusX;
+                var ny = (y + 0.5 - centerY) / radiusY;
+                if (nx * nx + ny * ny <= 1)
+                {
+                    SetPixel(frame, pixels, x, y, material, shade);
+                }
+            }
+        }
+    }
+
+    private static void SetPixel(
+        RekallAgeRuntimeViewportFrame frame,
+        byte[] pixels,
+        int x,
+        int y,
+        SoftwareColor material,
+        double shade)
+    {
+        if (x < 0 || y < 0 || x >= frame.Width || y >= frame.Height)
+        {
+            return;
+        }
+
+        var (r, g, b) = Shade(material, shade);
+        var index = ToIndex(frame, x, y);
+        pixels[index + 0] = r;
+        pixels[index + 1] = g;
+        pixels[index + 2] = b;
+        pixels[index + 3] = 255;
+    }
+
+    private static (byte R, byte G, byte B) Shade(SoftwareColor material, double shade)
+    {
+        return (
+            (byte)Math.Clamp((int)Math.Round(material.R * shade), 0, 255),
+            (byte)Math.Clamp((int)Math.Round(material.G * shade), 0, 255),
+            (byte)Math.Clamp((int)Math.Round(material.B * shade), 0, 255));
+    }
+
+    private static SoftwareVec3 ResolveTriangleNormal(
+        SoftwareVec3 a,
+        SoftwareVec3 b,
+        SoftwareVec3 c,
+        RekallAgeRuntimeViewportGeometryVertex vertexA,
+        RekallAgeRuntimeViewportGeometryVertex vertexB,
+        RekallAgeRuntimeViewportGeometryVertex vertexC,
+        RekallAgeRuntimeViewportRenderable renderable)
+    {
+        var authored = new SoftwareVec3(
+            (vertexA.NormalX + vertexB.NormalX + vertexC.NormalX) / 3.0,
+            (vertexA.NormalY + vertexB.NormalY + vertexC.NormalY) / 3.0,
+            (vertexA.NormalZ + vertexB.NormalZ + vertexC.NormalZ) / 3.0);
+        if (Math.Abs(authored.X) + Math.Abs(authored.Y) + Math.Abs(authored.Z) > 0.000001)
+        {
+            return Normalize(Rotate(authored, renderable.RotationX, renderable.RotationY, renderable.RotationZ));
+        }
+
+        return Normalize(Cross(
+            new SoftwareVec3(b.X - a.X, b.Y - a.Y, b.Z - a.Z),
+            new SoftwareVec3(c.X - a.X, c.Y - a.Y, c.Z - a.Z)));
+    }
+
+    private static SoftwareColor ResolveTriangleColor(
+        SoftwareColor fallback,
+        RekallAgeRuntimeViewportGeometryVertex a,
+        RekallAgeRuntimeViewportGeometryVertex b,
+        RekallAgeRuntimeViewportGeometryVertex c)
+    {
+        return new SoftwareColor(
+            (byte)Math.Clamp((int)Math.Round((ResolveUnit(a.R, fallback.R) + ResolveUnit(b.R, fallback.R) + ResolveUnit(c.R, fallback.R)) / 3.0), 0, 255),
+            (byte)Math.Clamp((int)Math.Round((ResolveUnit(a.G, fallback.G) + ResolveUnit(b.G, fallback.G) + ResolveUnit(c.G, fallback.G)) / 3.0), 0, 255),
+            (byte)Math.Clamp((int)Math.Round((ResolveUnit(a.B, fallback.B) + ResolveUnit(b.B, fallback.B) + ResolveUnit(c.B, fallback.B)) / 3.0), 0, 255));
+    }
+
+    private static double ResolveUnit(double value, byte fallback)
+    {
+        return double.IsNaN(value)
+            ? fallback
+            : Math.Clamp(value, 0, 1) * 255;
     }
 
     private static SoftwareDirectionalLight ResolveDirectionalLight(RekallAgeRuntimeViewportFrame frame)
@@ -304,6 +692,14 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
     private static double Dot(SoftwareVec3 left, SoftwareVec3 right)
     {
         return left.X * right.X + left.Y * right.Y + left.Z * right.Z;
+    }
+
+    private static SoftwareVec3 Cross(SoftwareVec3 left, SoftwareVec3 right)
+    {
+        return new SoftwareVec3(
+            left.Y * right.Z - left.Z * right.Y,
+            left.Z * right.X - left.X * right.Z,
+            left.X * right.Y - left.Y * right.X);
     }
 
     private static SoftwareVec3 Normalize(SoftwareVec3 value)
@@ -472,9 +868,9 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
 
     private static bool IsNonBlank(byte[] pixels)
     {
-        for (var i = 4; i < pixels.Length; i += 4)
+        for (var i = 0; i < pixels.Length; i += 4)
         {
-            if (pixels[i] != pixels[0] || pixels[i + 1] != pixels[1] || pixels[i + 2] != pixels[2])
+            if (pixels[i] != 0 || pixels[i + 1] != 0 || pixels[i + 2] != 0 || pixels[i + 3] != 0)
             {
                 return true;
             }
@@ -510,6 +906,8 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         new([3, 7, 6, 2], new SoftwareVec3(0, 1, 0))
     ];
 
+    private readonly record struct SoftwareColor(byte R, byte G, byte B);
+
     private readonly record struct SoftwareVec3(double X, double Y, double Z);
 
     private readonly record struct SoftwarePoint(double X, double Y);
@@ -522,6 +920,14 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
     private sealed record SoftwareCubeFaceDefinition(
         IReadOnlyList<int> VertexIndexes,
         SoftwareVec3 Normal);
+
+    private sealed record SoftwareMeshTriangle(
+        SoftwarePoint A,
+        SoftwarePoint B,
+        SoftwarePoint C,
+        SoftwareVec3 Normal,
+        double AverageZ,
+        SoftwareColor Color);
 
     private sealed record SoftwareDirectionalLight(
         SoftwareVec3 Direction,

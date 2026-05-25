@@ -53,6 +53,9 @@ public sealed class RuntimeInspectCliTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Runtime viewport Main frame 3", result.Output);
+        Assert.Contains("Backend: software", result.Output);
+        Assert.Contains("Hardware accelerated: False", result.Output);
+        Assert.Contains("Acceleration: software-rasterized", result.Output);
         Assert.Contains("Active camera: MainCamera", result.Output);
         Assert.Contains("Renderable: 1", result.Output);
         Assert.Contains("Asset-backed: 0", result.Output);

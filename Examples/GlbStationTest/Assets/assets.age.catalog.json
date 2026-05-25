@@ -1,0 +1,62 @@
+{
+  "assets": [
+    {
+      "id": "asset_space-station-megastructure_9533247a",
+      "name": "space-station-megastructure",
+      "displayName": "Space Station Megastructure",
+      "kind": "model",
+      "sourcePath": "C:\\Users\\Marius\\Downloads\\space station megastructure 3d model.glb",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Assets\\model\\asset_space-station-megastructure_9533247a.glb",
+      "contentHash": "9533247a130fae02efb124e1ed83001d51062effd4c4a06d7625a0793671638a",
+      "glbMetadata": {
+        "sceneCount": 1,
+        "nodeCount": 1,
+        "meshCount": 1,
+        "materialCount": 1,
+        "imageCount": 3,
+        "animationCount": 0,
+        "scenes": [
+          {
+            "name": null,
+            "nodeCount": 1
+          }
+        ],
+        "nodes": [
+          {
+            "name": "tripo_node_11445d2a-1c86-4b94-92fc-03a4621ea891",
+            "meshIndex": 0
+          }
+        ],
+        "meshes": [
+          {
+            "name": "meshes[0]",
+            "primitiveCount": 1
+          }
+        ],
+        "materials": [
+          {
+            "name": "tripo_material_11445d2a-1c86-4b94-92fc-03a4621ea891"
+          }
+        ],
+        "images": [
+          {
+            "name": "space\u002Bstation\u002Bmegastructure\u002B3d\u002Bmodel_basecolor.jpg",
+            "mimeType": "image/jpeg",
+            "uri": null
+          },
+          {
+            "name": "space\u002Bstation\u002Bmegastructure\u002B3d\u002Bmodel_rm.jpg",
+            "mimeType": "image/jpeg",
+            "uri": null
+          },
+          {
+            "name": "space\u002Bstation\u002Bmegastructure\u002B3d\u002Bmodel_normal.jpg",
+            "mimeType": "image/jpeg",
+            "uri": null
+          }
+        ],
+        "animations": []
+      }
+    }
+  ]
+}

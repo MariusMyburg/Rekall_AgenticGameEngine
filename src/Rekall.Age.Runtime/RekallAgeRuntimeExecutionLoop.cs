@@ -37,7 +37,7 @@ public sealed class RekallAgeRuntimeExecutionLoop
         [
             new RekallAgeTransformAnimationSystem(),
             new NoOpRuntimeWorldSystem("runtime.audio"),
-            new NoOpRuntimeWorldSystem("runtime.physics"),
+            new RekallAgeBepuPhysicsSystem(),
             new NoOpRuntimeWorldSystem("runtime.rendering"),
             new NoOpRuntimeWorldSystem("runtime.transform"),
             new NoOpRuntimeWorldSystem("runtime.ui")

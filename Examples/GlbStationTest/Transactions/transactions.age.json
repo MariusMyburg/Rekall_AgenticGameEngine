@@ -1,0 +1,240 @@
+{
+  "transactions": [
+    {
+      "id": "txn_4858373e507b45f5b9e9a77cc29c9a46",
+      "name": "render viewport capture Examples\\GlbStationTest Main 1 Examples\\GlbStationTest\\Artifacts\\ViewportVulkanPbr 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T16:19:31.1277141+00:00",
+      "changedResources": [
+        "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanPbr\\vulkan-scene-960x540-20260525161935329.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Examples\\GlbStationTest\\Artifacts\\ViewportVulkanPbr\\vulkan-scene-960x540-20260525161935329.png",
+          "relativePath": "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanPbr\\vulkan-scene-960x540-20260525161935329.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_f78b182adba9401da0cc0667eb7d23d8",
+      "name": "render viewport capture Examples\\GlbStationTest Main 1 Examples\\GlbStationTest\\Artifacts\\ViewportVulkanDirectionalLight 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T16:01:03.9218321+00:00",
+      "changedResources": [
+        "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanDirectionalLight\\vulkan-scene-960x540-20260525160105442.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Examples\\GlbStationTest\\Artifacts\\ViewportVulkanDirectionalLight\\vulkan-scene-960x540-20260525160105442.png",
+          "relativePath": "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanDirectionalLight\\vulkan-scene-960x540-20260525160105442.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_fec0a1b70513441996142828ff222a33",
+      "name": "render viewport capture Examples\\GlbStationTest Main 1 Examples\\GlbStationTest\\Artifacts\\ViewportVulkanUltraOptimized 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T15:57:45.5106656+00:00",
+      "changedResources": [
+        "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanUltraOptimized\\vulkan-scene-960x540-20260525155747130.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Examples\\GlbStationTest\\Artifacts\\ViewportVulkanUltraOptimized\\vulkan-scene-960x540-20260525155747130.png",
+          "relativePath": "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanUltraOptimized\\vulkan-scene-960x540-20260525155747130.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_5a955a6ad280449ba6c60062e8468f00",
+      "name": "render viewport capture Examples\\GlbStationTest Main 1 Examples\\GlbStationTest\\Artifacts\\ViewportVulkanOptimized 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T15:48:57.393687+00:00",
+      "changedResources": [
+        "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanOptimized\\vulkan-scene-960x540-20260525154859111.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Examples\\GlbStationTest\\Artifacts\\ViewportVulkanOptimized\\vulkan-scene-960x540-20260525154859111.png",
+          "relativePath": "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanOptimized\\vulkan-scene-960x540-20260525154859111.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_7be202b1c2654ee0abe7b108ce6296cf",
+      "name": "render viewport capture Examples\\GlbStationTest Main 1 Examples\\GlbStationTest\\Artifacts\\ViewportVulkanSampler 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T15:32:03.3560449+00:00",
+      "changedResources": [
+        "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanSampler\\vulkan-scene-960x540-20260525153205777.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Examples\\GlbStationTest\\Artifacts\\ViewportVulkanSampler\\vulkan-scene-960x540-20260525153205777.png",
+          "relativePath": "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanSampler\\vulkan-scene-960x540-20260525153205777.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_575b89be83194abcb8607439fde8f892",
+      "name": "render viewport capture Examples\\GlbStationTest Main 1 Examples\\GlbStationTest\\Artifacts\\ViewportVulkanTexturedBright 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T15:20:49.7490576+00:00",
+      "changedResources": [
+        "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanTexturedBright\\vulkan-scene-960x540-20260525152052094.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Examples\\GlbStationTest\\Artifacts\\ViewportVulkanTexturedBright\\vulkan-scene-960x540-20260525152052094.png",
+          "relativePath": "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanTexturedBright\\vulkan-scene-960x540-20260525152052094.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_b83d2a6e91734f9dad8c3083432fddfb",
+      "name": "render viewport capture Examples\\GlbStationTest Main 1 Examples\\GlbStationTest\\Artifacts\\ViewportVulkanTextured 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T15:19:41.2132201+00:00",
+      "changedResources": [
+        "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanTextured\\vulkan-scene-960x540-20260525151943937.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Examples\\GlbStationTest\\Artifacts\\ViewportVulkanTextured\\vulkan-scene-960x540-20260525151943937.png",
+          "relativePath": "Examples\\GlbStationTest\\Artifacts\\ViewportVulkanTextured\\vulkan-scene-960x540-20260525151943937.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_b784d6e4573f48a9a351514011d45506",
+      "name": "render viewport capture Examples\\GlbStationTest Main 1 Examples\\GlbStationTest\\Artifacts\\ViewportVulkan 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T15:14:20.8623027+00:00",
+      "changedResources": [
+        "Examples\\GlbStationTest\\Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525151422359.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Examples\\GlbStationTest\\Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525151422359.png",
+          "relativePath": "Examples\\GlbStationTest\\Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525151422359.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_555bd2577c4546299ead097271e61d68",
+      "name": "entity create Examples\\GlbStationTest Main Space Station Megastructure model,station",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T15:12:55.4470983+00:00",
+      "changedResources": [
+        "Examples\\GlbStationTest\\Scenes\\Main.age.scene.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Examples\\GlbStationTest\\Scenes\\Main.age.scene.json",
+          "relativePath": "Examples\\GlbStationTest\\Scenes\\Main.age.scene.json",
+          "kind": "scene",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_db64d9eb9bae4c1cbc998ef2d51e2c82",
+      "name": "asset import Examples\\GlbStationTest C:\\Users\\Marius\\Downloads\\space station megastructure 3d model.glb model Space Station Megastructure",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T15:12:50.3306298+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Assets\\model\\asset_space-station-megastructure_9533247a.glb",
+        "Examples\\GlbStationTest\\Assets\\assets.age.catalog.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Assets\\model\\asset_space-station-megastructure_9533247a.glb",
+          "relativePath": "Assets\\model\\asset_space-station-megastructure_9533247a.glb",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 60807152
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Examples\\GlbStationTest\\Assets\\assets.age.catalog.json",
+          "relativePath": "Examples\\GlbStationTest\\Assets\\assets.age.catalog.json",
+          "kind": "asset-catalog",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_dddeb0bfddb44fb5b49abf662ee555d3",
+      "name": "scene create Examples\\GlbStationTest Main rendering3d",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T15:12:50.1477986+00:00",
+      "changedResources": [
+        "Examples\\GlbStationTest\\Scenes\\Main.age.scene.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Examples\\GlbStationTest\\Scenes\\Main.age.scene.json",
+          "relativePath": "Examples\\GlbStationTest\\Scenes\\Main.age.scene.json",
+          "kind": "scene",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_368503b28c26498082364ad65d676209",
+      "name": "project create Examples\\GlbStationTest GLB Station Test rendering3d",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T15:12:49.9576561+00:00",
+      "changedResources": [
+        "Examples\\GlbStationTest\\rekall.project.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\GlbStationTest\\Examples\\GlbStationTest\\rekall.project.json",
+          "relativePath": "Examples\\GlbStationTest\\rekall.project.json",
+          "kind": "project-manifest",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    }
+  ]
+}

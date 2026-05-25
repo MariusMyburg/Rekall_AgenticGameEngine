@@ -1,0 +1,251 @@
+{
+  "transactions": [
+    {
+      "id": "txn_c1f1c1d66f70458f8527fecb09524ab1",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D Main 2 F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportVulkan 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:47:35.3990145+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525144735759.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525144735759.png",
+          "relativePath": "Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525144735759.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 15304
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_c00dc2f789e14703bd082fd2151ba402",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D Main 2 F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportVulkan 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:32:32.2297944+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525143232579.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525143232579.png",
+          "relativePath": "Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525143232579.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 2850
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_b0513a542b8c492cbec256cb5b2fab64",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D Main 2 F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportVulkan 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:32:15.1619606+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525143215520.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525143215520.png",
+          "relativePath": "Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525143215520.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 2850
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_984eb01fe78a404fb8254e3fa07321ab",
+      "name": "render glb export F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D Main F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\Exports\\showcase-main.glb 2",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:31:23.5668248+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\Exports\\showcase-main.glb"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\Exports\\showcase-main.glb",
+          "relativePath": "Artifacts\\Exports\\showcase-main.glb",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 24792
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_11013e3cd24b4931bfabd4791003ce91",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D Main 2 F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportVulkan 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:31:22.5661992+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525143123348.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525143123348.png",
+          "relativePath": "Artifacts\\ViewportVulkan\\vulkan-scene-960x540-20260525143123348.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 2934
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_9c1e2398a635413b8f9dbea2b9c8f5be",
+      "name": "render viewport capture F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D Main 2 F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportSoftware 960 540 software",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:31:22.2439509+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportSoftware\\Main_runtime_002.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Artifacts\\ViewportSoftware\\Main_runtime_002.png",
+          "relativePath": "Artifacts\\ViewportSoftware\\Main_runtime_002.png",
+          "kind": "image",
+          "exists": true,
+          "sizeBytes": 10166
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_7852fe263443414e91e8e8054168cf29",
+      "name": "geometry primitive create F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D Main Ground Plane plane 0 -0.95 0 #335577",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:27:43.1440639+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Scenes\\Main.age.scene.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Scenes\\Main.age.scene.json",
+          "relativePath": "Scenes\\Main.age.scene.json",
+          "kind": "scene",
+          "exists": true,
+          "sizeBytes": 5014
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_733a6413cc9448c18fb7931564affe9f",
+      "name": "geometry primitive create F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D Main Signal Cone cone 2.35 0.55 0.15 #ff6b6b",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:27:42.9648376+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Scenes\\Main.age.scene.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Scenes\\Main.age.scene.json",
+          "relativePath": "Scenes\\Main.age.scene.json",
+          "kind": "scene",
+          "exists": true,
+          "sizeBytes": 4046
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_441c34578e6c41c983e949ead602cfa9",
+      "name": "geometry primitive create F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D Main Gold Column cylinder 1.45 0.15 -0.15 #ffcc33",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:27:42.7841591+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Scenes\\Main.age.scene.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Scenes\\Main.age.scene.json",
+          "relativePath": "Scenes\\Main.age.scene.json",
+          "kind": "scene",
+          "exists": true,
+          "sizeBytes": 3077
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_9436a36afa9d423aa0680d8842fdec70",
+      "name": "geometry primitive create F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D Main Teal Orb sphere -1.65 0.85 0 #33ffcc",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:27:42.5958947+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Scenes\\Main.age.scene.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Scenes\\Main.age.scene.json",
+          "relativePath": "Scenes\\Main.age.scene.json",
+          "kind": "scene",
+          "exists": true,
+          "sizeBytes": 2095
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_f06e964300814ae3ad3c15251299492e",
+      "name": "geometry primitive create F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D Main Obsidian Plinth cube 0 -0.35 0 #2f3440",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:27:42.416534+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Scenes\\Main.age.scene.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Scenes\\Main.age.scene.json",
+          "relativePath": "Scenes\\Main.age.scene.json",
+          "kind": "scene",
+          "exists": true,
+          "sizeBytes": 1125
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_517a1d60f3fc4a56ad5fef71a103001f",
+      "name": "scene create F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D Main world,rendering3d",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:27:42.2292205+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Scenes\\Main.age.scene.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\Scenes\\Main.age.scene.json",
+          "relativePath": "Scenes\\Main.age.scene.json",
+          "kind": "scene",
+          "exists": true,
+          "sizeBytes": 154
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_3df151ad1e894f02a1f4c212b4491e65",
+      "name": "project create F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D Rekall AGE 3D Showcase world,rendering3d",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T14:27:42.0427147+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\rekall.project.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\Examples\\Showcase3D\\rekall.project.json",
+          "relativePath": "rekall.project.json",
+          "kind": "project-manifest",
+          "exists": true,
+          "sizeBytes": 154
+        }
+      ],
+      "resourcePreimages": []
+    }
+  ]
+}

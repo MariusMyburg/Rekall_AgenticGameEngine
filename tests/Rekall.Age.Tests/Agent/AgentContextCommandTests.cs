@@ -27,7 +27,7 @@ public sealed class AgentContextCommandTests
         Assert.True(scene.Ok);
         Assert.Equal("Main", scene.Value.Summary.Scene);
         Assert.Contains(scene.Value.Summary.Entities, entity => entity.Name == "PuzzleGrid");
-        Assert.Contains("GridBoard", scene.Value.Summary.ComponentTypes);
+        Assert.Contains(scene.Value.Summary.ComponentTypes, component => component.EndsWith(".GridBoard", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -60,8 +60,31 @@ public sealed class AgentContextCommandTests
         Assert.Contains("pong", result.Value.MvpTemplateIds);
         Assert.Contains("first-person-exploration", result.Value.MvpTemplateIds);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.templates.inspect" && workflow.Recommended);
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.geometry.create_primitive");
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.scene.apply_blueprint" && workflow.Recommended);
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.entity.delete");
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.module.scaffold_runtime_system" && workflow.Recommended);
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.module.list_sources");
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.module.read_source");
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.build.modules" && workflow.Recommended);
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.shader.assign_pipeline");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.workflow.create_playable_package_from_template" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.templates.verify_mvp");
+        Assert.Contains(result.Value.AuthoringContracts, contract =>
+            contract.Name == "runtime-module-system"
+            && contract.PrimaryType == "IRekallAgeRuntimeModuleSystem"
+            && contract.Capabilities.Contains("own-game-rules"));
+        Assert.Contains(result.Value.AuthoringContracts, contract =>
+            contract.Name == "runtime-module-sdk"
+            && contract.PrimaryType == "RekallAgeRuntimeModuleSdk"
+            && contract.Capabilities.Contains("raycast3d")
+            && contract.Capabilities.Contains("write-components"));
+        Assert.Contains(result.Value.AuthoringContracts, contract =>
+            contract.Name == "runtime-render-mesh"
+            && contract.PrimaryType == "RekallAgeRuntimeRenderMesh"
+            && contract.Capabilities.Contains("custom-kind")
+            && contract.Capabilities.Contains("custom-variant")
+            && contract.Capabilities.Contains("shader-pipeline"));
         Assert.Contains("vulkan", result.Value.RenderingPosture, StringComparison.OrdinalIgnoreCase);
     }
 }

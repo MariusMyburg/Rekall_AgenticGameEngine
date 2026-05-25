@@ -1,0 +1,9 @@
+{
+  "name": "Rekall AGE 3D Showcase",
+  "schemaVersion": 1,
+  "capabilities": [
+    "rendering3d",
+    "world"
+  ],
+  "sourceTemplateId": null
+}

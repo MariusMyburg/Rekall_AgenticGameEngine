@@ -83,28 +83,55 @@ public sealed record RekallAgeRuntimeRenderCamera(
     string EntityId,
     string EntityName,
     string Kind,
-    bool Active);
+    bool Active,
+    string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored,
+    string ProjectionMode = "perspective",
+    double FieldOfViewDegrees = 65,
+    double OrthographicSize = 10,
+    double NearClip = 0.05,
+    double FarClip = 1000,
+    string ClearColor = "#101820");
 
 public sealed record RekallAgeRuntimeRenderSprite(
     string EntityId,
     string EntityName,
-    string? AssetId);
+    string? AssetId,
+    string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored);
 
 public sealed record RekallAgeRuntimeRenderMesh(
     string EntityId,
     string EntityName,
-    string? AssetId);
+    string? AssetId,
+    string? Variant = null,
+    string? TextureAssetId = null,
+    string? MaterialColor = null,
+    string Kind = "mesh",
+    int SortKey = 200,
+    RekallAgeRuntimeRenderShaderPipeline? ShaderPipeline = null,
+    string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored);
+
+public sealed record RekallAgeRuntimeRenderShaderPipeline(
+    string VertexShader,
+    string FragmentShader);
 
 public sealed record RekallAgeRuntimeRenderLight(
     string EntityId,
     string EntityName,
     string Kind,
-    double Intensity);
+    double Intensity,
+    string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored);
 
 public sealed record RekallAgeRuntimeRenderUiLayer(
     string EntityId,
     string EntityName,
-    int Layer);
+    int Layer,
+    string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored);
+
+public static class RekallAgeRuntimeProjectionSources
+{
+    public const string Authored = "authored";
+    public const string BuiltIn = "built-in";
+}
 
 public sealed record RekallAgeRuntimePhysicsView(
     IReadOnlyList<RekallAgeRuntimePhysicsBody> RigidBodies,

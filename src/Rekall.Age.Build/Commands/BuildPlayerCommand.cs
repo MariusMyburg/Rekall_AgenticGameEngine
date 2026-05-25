@@ -29,7 +29,7 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
         BuildPlayerRequest request,
         RekallAgeCommandContext context)
     {
-        var playerProject = FindPlayerProjectPath();
+        var playerProject = FindPlayerProjectPath(request.Graphics);
         var outputDirectory = request.OutputDirectory
             ?? Path.Combine(request.ProjectRoot, "Builds", "RekallAgePlayer");
         Directory.CreateDirectory(outputDirectory);
@@ -61,7 +61,7 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
             outputDirectory,
             launchPath,
             request.Graphics
-                ? [request.ProjectRoot, request.SceneName, "--graphics"]
+                ? [request.ProjectRoot, request.SceneName, "--graphics", "--backend", "vulkan"]
                 : [request.ProjectRoot, request.SceneName],
             output);
         if (process.ExitCode != 0 || !File.Exists(launchPath))
@@ -82,8 +82,10 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
             $"Built playable player at '{launchPath}'.");
     }
 
-    private static string FindPlayerProjectPath()
+    private static string FindPlayerProjectPath(bool graphics)
     {
+        var projectDirectoryName = graphics ? "Rekall.Age.Player.Windows" : "Rekall.Age.Player";
+        var projectFileName = $"{projectDirectoryName}.csproj";
         foreach (var start in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() })
         {
             var directory = new DirectoryInfo(start);
@@ -92,8 +94,8 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
                 var candidate = Path.Combine(
                     directory.FullName,
                     "src",
-                    "Rekall.Age.Player",
-                    "Rekall.Age.Player.csproj");
+                    projectDirectoryName,
+                    projectFileName);
                 if (File.Exists(candidate))
                 {
                     return candidate;
@@ -103,15 +105,24 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
             }
         }
 
-        throw new InvalidOperationException("Could not locate src/Rekall.Age.Player/Rekall.Age.Player.csproj.");
+        throw new InvalidOperationException($"Could not locate src/{projectDirectoryName}/{projectFileName}.");
     }
 
     private static string FindLaunchPath(string outputDirectory)
     {
-        var executable = Path.Combine(outputDirectory, OperatingSystem.IsWindows() ? "Rekall.Age.Player.exe" : "Rekall.Age.Player");
-        if (File.Exists(executable))
+        foreach (var baseName in new[] { "Rekall.Age.Player.Windows", "Rekall.Age.Player" })
         {
-            return executable;
+            var executable = Path.Combine(outputDirectory, OperatingSystem.IsWindows() ? $"{baseName}.exe" : baseName);
+            if (File.Exists(executable))
+            {
+                return executable;
+            }
+
+            var assembly = Path.Combine(outputDirectory, $"{baseName}.dll");
+            if (File.Exists(assembly))
+            {
+                return assembly;
+            }
         }
 
         return Path.Combine(outputDirectory, "Rekall.Age.Player.dll");

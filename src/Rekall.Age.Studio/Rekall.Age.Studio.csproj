@@ -12,4 +12,8 @@
     <ProjectReference Include="..\Rekall.Age.Editor\Rekall.Age.Editor.csproj" />
     <ProjectReference Include="..\Rekall.Age.Editor.Contracts\Rekall.Age.Editor.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
 </Project>

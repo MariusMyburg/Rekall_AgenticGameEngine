@@ -39,5 +39,7 @@ public sealed class BuildPlayerCommandTests
 
         Assert.True(result.Ok, result.Summary);
         Assert.Contains("--graphics", result.Value.Arguments);
+        Assert.Contains("--backend", result.Value.Arguments);
+        Assert.Contains("vulkan", result.Value.Arguments);
     }
 }

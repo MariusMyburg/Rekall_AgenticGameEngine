@@ -1,0 +1,8 @@
+{
+  "name": "GLB Station Test",
+  "schemaVersion": 1,
+  "capabilities": [
+    "rendering3d"
+  ],
+  "sourceTemplateId": null
+}

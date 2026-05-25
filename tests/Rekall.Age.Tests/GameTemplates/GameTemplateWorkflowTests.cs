@@ -101,6 +101,46 @@ public sealed class GameTemplateWorkflowTests
     }
 
     [Fact]
+    public void TemplateScenesDoNotInjectCoreGameplayComponents()
+    {
+        var catalog = RekallAgeGameTemplateCatalog.CreateDefault();
+        var allowedRekallTypes = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Rekall.Transform",
+            "Rekall.Transform2D",
+            "Rekall.Transform3D",
+            "Rekall.Camera2D",
+            "Rekall.Camera3D",
+            "Rekall.SpriteRenderer",
+            "Rekall.MeshRenderer",
+            "Rekall.MeshSet",
+            "Rekall.GeometryPrimitive",
+            "Rekall.GeometryMesh",
+            "Rekall.GeometryExtrusion",
+            "Rekall.DirectionalLight",
+            "Rekall.PointLight",
+            "Rekall.SpotLight",
+            "Rekall.Rigidbody3D",
+            "Rekall.BoxCollider3D",
+            "Rekall.SphereCollider3D",
+            "Rekall.CapsuleCollider3D",
+            "Rekall.MeshCollider",
+            "Rekall.AudioEmitter"
+        };
+
+        foreach (var template in catalog.Templates)
+        {
+            Assert.DoesNotContain(
+                template.Entities.SelectMany(entity => entity.Components),
+                component => component.Type.StartsWith("Rekall.", StringComparison.Ordinal)
+                    && !allowedRekallTypes.Contains(component.Type));
+            Assert.DoesNotContain(
+                template.Entities.SelectMany(entity => entity.Components),
+                component => component.Type.EndsWith(".GameRules", StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
     public void TemplateCatalogExposesAgentRenderableDrawContracts()
     {
         var catalog = RekallAgeGameTemplateCatalog.CreateDefault();

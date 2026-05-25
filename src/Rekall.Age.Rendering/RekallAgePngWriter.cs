@@ -19,11 +19,11 @@ public static class RekallAgePngWriter
             throw new ArgumentException("RGBA buffer length does not match image dimensions.", nameof(rgba));
         }
 
-        await using var stream = File.Create(path);
-        await stream.WriteAsync(Signature, cancellationToken);
-        await WriteChunkAsync(stream, "IHDR", CreateHeader(width, height), cancellationToken);
-        await WriteChunkAsync(stream, "IDAT", CompressRows(width, height, rgba), cancellationToken);
-        await WriteChunkAsync(stream, "IEND", Array.Empty<byte>(), cancellationToken);
+        using var stream = File.Create(path);
+        await stream.WriteAsync(Signature, cancellationToken).ConfigureAwait(false);
+        await WriteChunkAsync(stream, "IHDR", CreateHeader(width, height), cancellationToken).ConfigureAwait(false);
+        await WriteChunkAsync(stream, "IDAT", CompressRows(width, height, rgba), cancellationToken).ConfigureAwait(false);
+        await WriteChunkAsync(stream, "IEND", Array.Empty<byte>(), cancellationToken).ConfigureAwait(false);
     }
 
     private static byte[] CreateHeader(int width, int height)
@@ -66,18 +66,18 @@ public static class RekallAgePngWriter
     {
         var length = new byte[4];
         BinaryPrimitives.WriteInt32BigEndian(length, data.Length);
-        await stream.WriteAsync(length, cancellationToken);
+        await stream.WriteAsync(length, cancellationToken).ConfigureAwait(false);
 
         var typeBytes = System.Text.Encoding.ASCII.GetBytes(type);
-        await stream.WriteAsync(typeBytes, cancellationToken);
-        await stream.WriteAsync(data, cancellationToken);
+        await stream.WriteAsync(typeBytes, cancellationToken).ConfigureAwait(false);
+        await stream.WriteAsync(data, cancellationToken).ConfigureAwait(false);
 
         var crcInput = new byte[typeBytes.Length + data.Length];
         Buffer.BlockCopy(typeBytes, 0, crcInput, 0, typeBytes.Length);
         Buffer.BlockCopy(data, 0, crcInput, typeBytes.Length, data.Length);
         var crc = new byte[4];
         BinaryPrimitives.WriteUInt32BigEndian(crc, ComputeCrc32(crcInput));
-        await stream.WriteAsync(crc, cancellationToken);
+        await stream.WriteAsync(crc, cancellationToken).ConfigureAwait(false);
     }
 
     private static uint ComputeCrc32(byte[] bytes)

@@ -10,6 +10,9 @@ using Rekall.Age.Playback.Commands;
 using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
+using Serilog;
+using Serilog.Core;
+using Serilog.Events;
 
 namespace Rekall.Age.Tests.Mcp;
 
@@ -30,6 +33,9 @@ public sealed class McpJsonRpcServerTests
         Assert.Contains("rekall.templates.inspect", instructions, StringComparison.Ordinal);
         Assert.Contains("rekall.templates.verify_mvp", instructions, StringComparison.Ordinal);
         Assert.Contains("rekall.workflow.create_playable_package_from_template", instructions, StringComparison.Ordinal);
+        Assert.Contains("rekall.context.engine_status", instructions, StringComparison.Ordinal);
+        Assert.Contains("rekall.module.scaffold_runtime_system", instructions, StringComparison.Ordinal);
+        Assert.Contains("RekallAgeRuntimeRenderMesh", instructions, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -192,6 +198,39 @@ public sealed class McpJsonRpcServerTests
 
         using var document = JsonDocument.Parse(response!);
         Assert.Equal("rekall.test.echo", document.RootElement.GetProperty("result").GetProperty("tools")[0].GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task StdioLogsMalformedJsonAndContinuesProcessing()
+    {
+        var sink = new CollectingLogEventSink();
+        Log.Logger = new LoggerConfiguration().WriteTo.Sink(sink).CreateLogger();
+        try
+        {
+            var server = CreateServer();
+            using var input = new StringReader(
+                """
+                {bad json
+                {"jsonrpc":"2.0","id":2,"method":"ping"}
+                """);
+            using var output = new StringWriter();
+
+            await server.RunStdioAsync(input, output, CreateContext());
+
+            var lines = output.ToString()
+                .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+            Assert.Equal(2, lines.Length);
+            using var errorDocument = JsonDocument.Parse(lines[0]);
+            Assert.Equal(-32700, errorDocument.RootElement.GetProperty("error").GetProperty("code").GetInt32());
+            Assert.Contains("Parse error", errorDocument.RootElement.GetProperty("error").GetProperty("message").GetString(), StringComparison.Ordinal);
+            using var pingDocument = JsonDocument.Parse(lines[1]);
+            Assert.True(pingDocument.RootElement.TryGetProperty("result", out _));
+            Assert.Contains(sink.Events, item => item.MessageTemplate.Text.Contains("Invalid MCP JSON-RPC line", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Log.CloseAndFlush();
+        }
     }
 
     [Fact]
@@ -895,6 +934,7 @@ public sealed class McpAuthoredModule : RekallAgeModule, IRekallAgePlayableModul
         return new RekallAgePlayableModuleFrame($"MCP AUTHORED PONG\nFrame {(int)state.Numbers["frame"]}\nScore {(int)state.Numbers["score"]}");
     }
 }
+
 """;
     }
 
@@ -963,6 +1003,16 @@ public sealed class McpAuthoredModule : RekallAgeModule, IRekallAgePlayableModul
             RekallAgeCommandContext context)
         {
             return ValueTask.FromResult(RekallAgeCommandResult<ClearColorSchemaResult>.Success(new ClearColorSchemaResult(request.ClearColor)));
+        }
+    }
+
+    private sealed class CollectingLogEventSink : ILogEventSink
+    {
+        public List<LogEvent> Events { get; } = [];
+
+        public void Emit(LogEvent logEvent)
+        {
+            Events.Add(logEvent);
         }
     }
 }

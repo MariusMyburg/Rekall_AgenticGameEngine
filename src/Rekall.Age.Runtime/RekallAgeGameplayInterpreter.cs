@@ -49,24 +49,54 @@ public sealed class RekallAgeGameplayInterpreter
         }
 
         var system = componentType[prefix.Length..];
-        return system is "Transform" or "Transform2D" or "Transform3D"
-            ? null
-            : system;
+        return IsCoreEngineSystem(system) ? system : null;
+    }
+
+    private static bool IsCoreEngineSystem(string system)
+    {
+        return system is
+            "Camera2D" or
+            "Camera3D" or
+            "SpriteRenderer" or
+            "MeshRenderer" or
+            "MeshSet" or
+            "GeometryPrimitive" or
+            "GeometryMesh" or
+            "GeometryExtrusion" or
+            "PlanetRenderer" or
+            "AtmosphereRenderer" or
+            "DirectionalLight" or
+            "PointLight" or
+            "SpotLight" or
+            "Rigidbody2D" or
+            "Rigidbody3D" or
+            "BoxCollider2D" or
+            "CircleCollider2D" or
+            "BoxCollider3D" or
+            "SphereCollider3D" or
+            "CapsuleCollider3D" or
+            "MeshCollider" or
+            "Trigger" or
+            "PhysicsWorld3D" or
+            "PhysicsMaterial3D" or
+            "PhysicsState3D" or
+            "AudioListener" or
+            "AudioEmitter" or
+            "AnimationPlayer" or
+            "SpriteAnimator" or
+            "TransformAnimation" or
+            "UiCanvas" or
+            "UiElement" or
+            "Button" or
+            "Label" or
+            "Panel";
     }
 
     private static string CreateMessage(string system, string entityName)
     {
         return system switch
         {
-            "PlayableLoop" => "Playable loop advanced.",
             "Camera2D" or "Camera3D" => $"Camera '{entityName}' is available for capture.",
-            "DialogueGraph" => "Dialogue graph is ready for branching choices.",
-            "WaveSpawner" => "Wave spawning schedule advanced.",
-            "AsteroidSpawner" => "Asteroid field schedule advanced.",
-            "BrickGrid" => "Brick grid state evaluated.",
-            "GridBoard" => "Puzzle grid state evaluated.",
-            "FirstPersonController" or "ThirdPersonController" => "3D controller intent evaluated.",
-            "PlatformerController2D" => "Platformer movement intent evaluated.",
             _ => $"{system} evaluated."
         };
     }
@@ -75,8 +105,8 @@ public sealed class RekallAgeGameplayInterpreter
     {
         return system switch
         {
-            "Camera2D" or "Camera3D" or "SpriteRenderer" or "MeshRenderer" or "MeshSet" => "rendering",
-            "Rigidbody2D" or "Rigidbody3D" or "BoxCollider2D" or "CircleCollider2D" or "BoxCollider3D" or "MeshCollider" or "Trigger" => "physics",
+            "Camera2D" or "Camera3D" or "SpriteRenderer" or "MeshRenderer" or "MeshSet" or "PlanetRenderer" or "AtmosphereRenderer" => "rendering",
+            "Rigidbody2D" or "Rigidbody3D" or "BoxCollider2D" or "CircleCollider2D" or "BoxCollider3D" or "SphereCollider3D" or "CapsuleCollider3D" or "MeshCollider" or "Trigger" => "physics",
             "AudioListener" or "AudioEmitter" => "audio",
             "AnimationPlayer" or "SpriteAnimator" => "animation",
             "UiCanvas" or "UiElement" or "Button" or "Label" or "Panel" => "ui",

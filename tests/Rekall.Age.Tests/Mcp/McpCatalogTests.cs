@@ -10,6 +10,7 @@ using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime.Commands;
+using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Tests.Mcp;
 
@@ -49,6 +50,13 @@ public sealed class McpCatalogTests
         registry.Register(new SubmitClearVulkanRenderPassCommand(new FakeVulkanRenderPassSubmission()));
         registry.Register(new ReadClearVulkanRenderPassCommand(new FakeVulkanRenderPassReadback()));
         registry.Register(new CaptureClearVulkanRenderPassCommand(new FakeVulkanRenderPassCapture()));
+        registry.Register(new ListShaderSourcesCommand());
+        registry.Register(new ReadShaderSourceCommand());
+        registry.Register(new WriteShaderSourceCommand());
+        registry.Register(new ValidateShaderSourceCommand());
+        registry.Register(new AssignShaderPipelineCommand());
+        registry.Register(new ApplySceneBlueprintCommand());
+        registry.Register(new DeleteEntityCommand());
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
@@ -82,6 +90,13 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.vulkan.render_pass.submit_clear");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.vulkan.render_pass.read_clear");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.vulkan.render_pass.capture_clear");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.shader.list");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.shader.read");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.shader.write");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.shader.validate");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.shader.assign_pipeline");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.scene.apply_blueprint");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.entity.delete");
 
         var oneShot = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.create_playable_package_from_template");
         Assert.Equal("workflow", oneShot.Category);
@@ -97,9 +112,16 @@ public sealed class McpCatalogTests
         Assert.Equal("rendering", renderTool.Category);
         Assert.False(renderTool.Recommended);
         Assert.True(renderTool.AgentPriority > oneShot.AgentPriority);
+        var shaderTool = catalog.Tools.Single(tool => tool.Name == "rekall.shader.write");
+        Assert.Equal("shaders", shaderTool.Category);
+        Assert.True(shaderTool.AgentPriority < renderTool.AgentPriority);
         var transactionTool = catalog.Tools.Single(tool => tool.Name == "rekall.transaction.history");
         Assert.Equal("transactions", transactionTool.Category);
         Assert.True(transactionTool.AgentPriority < renderTool.AgentPriority);
+        var blueprintTool = catalog.Tools.Single(tool => tool.Name == "rekall.scene.apply_blueprint");
+        Assert.Equal("world", blueprintTool.Category);
+        var deleteTool = catalog.Tools.Single(tool => tool.Name == "rekall.entity.delete");
+        Assert.Equal("world", deleteTool.Category);
         Assert.Equal("rekall.context.engine_status", catalog.Tools[0].Name);
         Assert.True(catalog.Tools.Index().All(item => item.Index == 0 || catalog.Tools[item.Index - 1].AgentPriority <= item.Item.AgentPriority));
     }

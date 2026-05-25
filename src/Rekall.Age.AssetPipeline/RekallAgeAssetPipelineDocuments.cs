@@ -23,7 +23,8 @@ public sealed record RekallAgeAssetPipelineDocument(
         var imported = new RekallAgeImportedAssetRecord(asset.Id, asset.ImportedPath, kind, asset.ContentHash)
         {
             MimeType = GetMimeType(asset.ImportedPath),
-            GlbMetadata = asset.GlbMetadata
+            GlbMetadata = asset.GlbMetadata,
+            TextureMetadata = asset.TextureMetadata
         };
         var cooked = new RekallAgeCookedAssetRecord(asset.Id, asset.ImportedPath, "raw-copy", asset.ContentHash);
         return this with
@@ -40,6 +41,8 @@ public sealed record RekallAgeAssetPipelineDocument(
         {
             ".glb" => "model/gltf-binary",
             ".gltf" => "model/gltf+json",
+            ".ktx2" => "image/ktx2",
+            ".dds" => "image/vnd-ms.dds",
             ".png" => "image/png",
             ".jpg" or ".jpeg" => "image/jpeg",
             ".wav" => "audio/wav",
@@ -76,6 +79,8 @@ public sealed record RekallAgeImportedAssetRecord(
     public string? MimeType { get; init; }
 
     public RekallAgeGlbMetadata? GlbMetadata { get; init; }
+
+    public RekallAgeTextureMetadata? TextureMetadata { get; init; }
 }
 
 public sealed record RekallAgeCookedAssetRecord(
@@ -98,4 +103,6 @@ public sealed record RekallAgeAssetImportReport(
     IReadOnlyList<string> Diagnostics)
 {
     public RekallAgeGlbMetadata? GlbMetadata { get; init; }
+
+    public RekallAgeTextureMetadata? TextureMetadata { get; init; }
 }

@@ -63,6 +63,80 @@ public sealed class ProjectRuntimeSystemTests
         Assert.True(cubePixelXs.Average() > output.Width / 2.0 + 18);
     }
 
+    [Fact]
+    public async Task AgentAuthoredModuleCanProjectCustomPlanetComponentIntoRenderablePlanet()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("agent planet module"), CancellationToken.None);
+        var scaffold = await new ScaffoldModuleCommand().ExecuteAsync(
+            new ScaffoldModuleRequest(root, "agent.planets", "Agent Planets", "AgentPlanets", "PlanetSurface"),
+            context);
+        var write = await new WriteModuleSourceCommand().ExecuteAsync(
+            new WriteModuleSourceRequest(root, "AgentPlanets", "AgentPlanetsModule.cs", CreateAgentPlanetModuleSource()),
+            context);
+        var build = await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
+        await SaveAgentPlanetSceneAsync(root);
+
+        Assert.True(scaffold.Ok, scaffold.Summary);
+        Assert.True(write.Ok, write.Summary);
+        Assert.True(build.Ok, build.Summary);
+
+        var world = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(root, "Main", 1, CancellationToken.None);
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        Assert.Contains("AgentPlanetProjectionSystem", world.SystemsRun);
+        var renderable = Assert.Single(frame.Renderables, item => item.EntityName == "Authored Gaia");
+        Assert.Equal("mesh", renderable.Kind);
+        Assert.Equal("rekall.planet.surface", renderable.Variant);
+        Assert.Equal("asset_agent_earth", renderable.TextureAssetId);
+        Assert.Equal("#2277cc", renderable.MaterialColor);
+        Assert.Equal(12.8, renderable.ScaleX);
+        Assert.Equal(12.8, renderable.ScaleY);
+        Assert.Equal(12.8, renderable.ScaleZ);
+    }
+
+    [Fact]
+    public async Task AgentAuthoredRuntimeSystemCanUseModuleSdkForGenericMovementAndSpatialEffects()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("agent-authored gameplay sdk"), CancellationToken.None);
+        var scaffold = await new ScaffoldRuntimeSystemModuleCommand().ExecuteAsync(
+            new ScaffoldRuntimeSystemModuleRequest(
+                root,
+                "agent.authored-gameplay",
+                "Agent Authored Gameplay",
+                "AgentAuthoredGameplay",
+                "AgentMotor",
+                "AgentAuthoredGameplaySystem"),
+            context);
+        var write = await new WriteModuleSourceCommand().ExecuteAsync(
+            new WriteModuleSourceRequest(
+                root,
+                "AgentAuthoredGameplay",
+                "AgentAuthoredGameplayModule.cs",
+                CreateAgentAuthoredGameplayModuleSource()),
+            context);
+        var build = await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
+        await SaveAgentAuthoredGameplaySceneAsync(root);
+
+        Assert.True(scaffold.Ok, scaffold.Summary);
+        Assert.True(write.Ok, write.Summary);
+        Assert.True(build.Ok, build.Summary);
+
+        var world = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(root, "Main", 60, CancellationToken.None);
+        var actor = world.Entities.Single(entity => entity.Name == "Agent Actor");
+        var target = world.Entities.Single(entity => entity.Name == "Target Dummy");
+        var resource = target.Components.Single(component =>
+            component.Type == "Game.Modules.AgentAuthoredGameplay.VitalResource");
+
+        Assert.Contains("AgentAuthoredGameplaySystem", world.SystemsRun);
+        Assert.True(actor.Transform.Position3D.Z > 4.9);
+        Assert.Equal(50, resource.Properties["current"]!.GetValue<double>());
+        Assert.Contains(target.Components, component =>
+            component.Type == "Game.Modules.AgentAuthoredGameplay.LastEffect"
+            && component.Properties["source"]!.GetValue<string>() == "Agent Actor");
+    }
+
     private static async Task CreateOrbitModuleAsync(string root, RekallAgeCommandContext context)
     {
         var scaffold = await new ScaffoldModuleCommand().ExecuteAsync(
@@ -106,6 +180,33 @@ public sealed class ProjectRuntimeSystemTests
                         new JsonObject { ["intensity"] = 1.0 })));
         }
 
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+    }
+
+    private static async Task SaveAgentPlanetSceneAsync(string root)
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Authored Gaia", ["planet"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Game.Modules.AgentPlanets.PlanetSurface",
+                    new JsonObject
+                    {
+                        ["radius"] = 6.4,
+                        ["surfaceTexture"] = "asset_agent_earth",
+                        ["color"] = "#2277cc"
+                    }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = 1, ["y"] = 2, ["z"] = 3 })))
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("KeyLight", ["light"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["pitch"] = -35, ["yaw"] = -45 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.DirectionalLight",
+                    new JsonObject { ["intensity"] = 1.0 })));
         await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
     }
 
@@ -179,6 +280,254 @@ public sealed class OrbitMotionSystem : IRekallAgeRuntimeModuleSystem
         }).ToArray();
 
         return ValueTask.FromResult(world with { Entities = entities });
+    }
+
+    private static double ReadNumber(JsonObject properties, string name, double fallback)
+    {
+        return properties.TryGetPropertyValue(name, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<double>(out var number)
+            ? number
+            : fallback;
+    }
+}
+""";
+    }
+
+    private static async Task SaveAgentAuthoredGameplaySceneAsync(string root)
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Agent Actor", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = 0, ["y"] = 1, ["z"] = 0, ["yaw"] = 0 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Game.Modules.AgentAuthoredGameplay.AgentMotor",
+                    new JsonObject { ["moveZPerSecond"] = 5, ["emitEffect"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Target Dummy", ["target"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = 0, ["y"] = 1, ["z"] = 8 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.SphereCollider3D",
+                    new JsonObject { ["radius"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Game.Modules.AgentAuthoredGameplay.VitalResource",
+                    new JsonObject { ["current"] = 100, ["max"] = 100 })))
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+    }
+
+    private static string CreateAgentAuthoredGameplayModuleSource()
+    {
+        return """
+using Rekall.Age.Modules;
+using Rekall.Age.Runtime.Abstractions;
+using System.Text.Json.Nodes;
+
+namespace Game.Modules.AgentAuthoredGameplay;
+
+[RekallAgeModule("agent.authored-gameplay", "Agent Authored Gameplay")]
+[RekallAgeRequiresCapability("world")]
+public sealed class AgentAuthoredGameplayModule : RekallAgeModule
+{
+    public override void Configure(RekallAgeModuleBuilder builder)
+    {
+        builder.RegisterComponent<AgentMotor>();
+        builder.RegisterComponent<VitalResource>();
+        builder.RegisterComponent<LastEffect>();
+        builder.RegisterRuntimeSystem<AgentAuthoredGameplaySystem>();
+    }
+}
+
+[RekallAgeComponent("Agent Motor")]
+public sealed class AgentMotor : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public double MoveZPerSecond { get; init; } = 5;
+
+    [RekallAgeProperty]
+    public bool EmitEffect { get; init; } = true;
+}
+
+[RekallAgeComponent("Vital Resource")]
+public sealed class VitalResource : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public double Current { get; init; } = 100;
+
+    [RekallAgeProperty]
+    public double Max { get; init; } = 100;
+}
+
+[RekallAgeComponent("Last Effect")]
+public sealed class LastEffect : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public string Source { get; init; } = "";
+}
+
+public sealed class AgentAuthoredGameplaySystem : IRekallAgeRuntimeModuleSystem
+{
+    private const string MotorType = "Game.Modules.AgentAuthoredGameplay.AgentMotor";
+    private const string ResourceType = "Game.Modules.AgentAuthoredGameplay.VitalResource";
+
+    public string Id => nameof(AgentAuthoredGameplaySystem);
+
+    public int Priority => -10;
+
+    public ValueTask<RekallAgeRuntimeWorld> UpdateAsync(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeModuleFrameContext context)
+    {
+        var seconds = context.DeltaTime.TotalSeconds;
+        var entities = world.Entities.ToArray();
+        for (var i = 0; i < entities.Length; i++)
+        {
+            var actor = entities[i];
+            var motor = actor.FindComponent(MotorType);
+            if (motor is null)
+            {
+                continue;
+            }
+
+            var move = motor.Properties.ReadNumber("moveZPerSecond", 0) * seconds;
+            actor = actor.WithPosition3D(actor.Transform.Position3D with { Z = actor.Transform.Position3D.Z + move });
+            entities[i] = actor;
+
+            if (!motor.Properties.ReadBoolean("emitEffect", false))
+            {
+                continue;
+            }
+
+            var hit = (world with { Entities = entities })
+                .Raycast3D(actor.Transform.Position3D, new RekallAgeRuntimeVector3(0, 0, 1), 20, tag: "target")
+                .FirstOrDefault();
+            if (hit is null)
+            {
+                continue;
+            }
+
+            var targetIndex = Array.FindIndex(entities, entity => entity.Id == hit.Entity.Id);
+            if (targetIndex < 0)
+            {
+                continue;
+            }
+
+            entities[targetIndex] = entities[targetIndex]
+                .UpdateComponent(ResourceType, properties =>
+                {
+                    properties["current"] = properties.ReadNumber("current", 0) - 50;
+                    return properties;
+                })
+                .UpsertComponent(
+                    "Game.Modules.AgentAuthoredGameplay.LastEffect",
+                    new JsonObject { ["source"] = actor.Name });
+            entities[i] = actor.UpdateComponent(MotorType, properties =>
+            {
+                properties["emitEffect"] = false;
+                return properties;
+            });
+        }
+
+        return ValueTask.FromResult(world with { Entities = entities });
+    }
+}
+""";
+    }
+
+    private static string CreateAgentPlanetModuleSource()
+    {
+        return """
+using Rekall.Age.Modules;
+using Rekall.Age.Runtime.Abstractions;
+using System.Text.Json.Nodes;
+
+namespace Game.Modules.AgentPlanets;
+
+[RekallAgeModule("agent.planets", "Agent Planets")]
+[RekallAgeRequiresCapability("world")]
+public sealed class AgentPlanetsModule : RekallAgeModule
+{
+    public override void Configure(RekallAgeModuleBuilder builder)
+    {
+        builder.RegisterComponent<PlanetSurface>();
+        builder.RegisterRuntimeSystem<AgentPlanetProjectionSystem>();
+    }
+}
+
+[RekallAgeComponent("Planet Surface")]
+public sealed class PlanetSurface : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Radius { get; init; } = 1;
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
+    public string? SurfaceTexture { get; init; }
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#4b86d8";
+}
+
+public sealed class AgentPlanetProjectionSystem : IRekallAgeRuntimeModuleSystem
+{
+    public string Id => nameof(AgentPlanetProjectionSystem);
+
+    public int Priority => -20;
+
+    public ValueTask<RekallAgeRuntimeWorld> UpdateAsync(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeModuleFrameContext context)
+    {
+        const string componentType = "Game.Modules.AgentPlanets.PlanetSurface";
+        var meshes = world.Subsystems.Rendering.Meshes.ToList();
+        var entities = world.Entities.Select(entity =>
+        {
+            var component = entity.Components.FirstOrDefault(item => item.Type == componentType);
+            if (component is null)
+            {
+                return entity;
+            }
+
+            var radius = Math.Max(0.0001, ReadNumber(component.Properties, "radius", 1));
+            meshes.Add(new RekallAgeRuntimeRenderMesh(
+                entity.Id,
+                entity.Name,
+                "rekall.planet.surface",
+                Variant: "rekall.planet.surface",
+                TextureAssetId: ReadString(component.Properties, "surfaceTexture"),
+                MaterialColor: ReadString(component.Properties, "color")));
+            var transform = entity.Transform;
+            return entity with
+            {
+                Transform = transform with
+                {
+                    Scale3D = new RekallAgeRuntimeVector3(radius * 2, radius * 2, radius * 2)
+                }
+            };
+        }).ToArray();
+
+        return ValueTask.FromResult(world with
+        {
+            Entities = entities,
+            Subsystems = world.Subsystems with
+            {
+                Rendering = world.Subsystems.Rendering with
+                {
+                    Meshes = meshes
+                }
+            }
+        });
+    }
+
+    private static string? ReadString(JsonObject properties, string name)
+    {
+        return properties.TryGetPropertyValue(name, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<string>(out var text)
+            ? text
+            : null;
     }
 
     private static double ReadNumber(JsonObject properties, string name, double fallback)

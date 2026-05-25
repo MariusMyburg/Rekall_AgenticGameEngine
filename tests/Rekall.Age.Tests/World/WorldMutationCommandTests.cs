@@ -64,4 +64,86 @@ public sealed class WorldMutationCommandTests
         Assert.Equal("Game.LockedDoor", component.Type);
         Assert.True(component.Properties["requiresKey"]!.GetValue<bool>());
     }
+
+    [Fact]
+    public async Task ApplySceneBlueprintReplacesSceneEntitiesInOneCommand()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        await store.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity(RekallAgeEntityDocument.Create("Old Marker", ["stale"])),
+            CancellationToken.None);
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("apply blueprint"), CancellationToken.None);
+        var command = new ApplySceneBlueprintCommand();
+
+        var result = await command.ExecuteAsync(
+            new ApplySceneBlueprintRequest(
+                root,
+                "Main",
+                [
+                    new RekallAgeSceneBlueprintEntity(
+                        "Camera",
+                        ["camera"],
+                        [
+                            new RekallAgeSceneBlueprintComponent(
+                                "Rekall.Camera3D",
+                                new JsonObject { ["active"] = true }),
+                            new RekallAgeSceneBlueprintComponent(
+                                "Rekall.Transform3D",
+                                new JsonObject { ["x"] = 1, ["y"] = 2, ["z"] = 3 })
+                        ]),
+                    new RekallAgeSceneBlueprintEntity(
+                        "Target",
+                        ["enemy", "target"],
+                        [
+                            new RekallAgeSceneBlueprintComponent(
+                                "Game.Agent.Target",
+                                new JsonObject { ["health"] = 100 })
+                        ],
+                        Visible: false)
+                ],
+                ClearExisting: true),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(2, result.Value.EntityCount);
+        Assert.Equal(2, result.Value.UpsertedCount);
+        Assert.Equal(1, result.Value.RemovedCount);
+        var saved = await store.LoadAsync(root, "Main", CancellationToken.None);
+        Assert.DoesNotContain(saved.Entities, entity => entity.Name == "Old Marker");
+        var camera = saved.Entities.Single(entity => entity.Name == "Camera");
+        Assert.Contains(camera.Components, component => component.Type == "Rekall.Camera3D");
+        var target = saved.Entities.Single(entity => entity.Name == "Target");
+        Assert.False(target.Visible);
+        Assert.Equal(["enemy", "target"], target.Tags);
+        Assert.Single(context.Transaction.ResourcePreimages);
+        Assert.Single(context.Transaction.ChangedResources);
+    }
+
+    [Fact]
+    public async Task DeleteEntityRemovesOneEntityAndCapturesPreimage()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        var keep = RekallAgeEntityDocument.Create("Keep", ["level"]);
+        var remove = RekallAgeEntityDocument.Create("Remove", ["duplicate"]);
+        await store.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"]).AddEntity(keep).AddEntity(remove),
+            CancellationToken.None);
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("delete entity"), CancellationToken.None);
+        var command = new DeleteEntityCommand();
+
+        var result = await command.ExecuteAsync(new DeleteEntityRequest(root, "Main", remove.Id), context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(remove.Id, result.Value.DeletedEntityId);
+        var saved = await store.LoadAsync(root, "Main", CancellationToken.None);
+        Assert.Single(saved.Entities);
+        Assert.Equal("Keep", saved.Entities.Single().Name);
+        Assert.Single(context.Transaction.ResourcePreimages);
+        Assert.Single(context.Transaction.ChangedResources);
+    }
 }

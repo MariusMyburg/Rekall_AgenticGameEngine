@@ -25,6 +25,9 @@ public sealed class CliSmokeTests
         Assert.Contains("Rekall AGE", engine.Output);
         Assert.Contains("Agent-first: True", engine.Output);
         Assert.Contains("rekall.workflow.create_playable_package_from_template", engine.Output);
+        Assert.Contains("Authoring contracts:", engine.Output);
+        Assert.Contains("IRekallAgeRuntimeModuleSystem", engine.Output);
+        Assert.Contains("RekallAgeRuntimeRenderMesh", engine.Output);
 
         var create = await RunAsync(cliAssembly, "game", "create", root, "Crystal Mines", "puzzle");
         Assert.Equal(0, create.ExitCode);
@@ -37,7 +40,7 @@ public sealed class CliSmokeTests
         var run = await RunAsync(cliAssembly, "run", "scene", root, "Main", "0.1");
         Assert.Equal(0, run.ExitCode);
         Assert.Contains("Simulated Main", run.Output);
-        Assert.Contains("GridBoard", run.Output);
+        Assert.Contains("Camera2D", run.Output);
 
         var sceneSummary = await RunAsync(cliAssembly, "context", "scene", root, "Main");
         Assert.Equal(0, sceneSummary.ExitCode);
@@ -180,6 +183,28 @@ public sealed class CliSmokeTests
     }
 
     [Fact]
+    public async Task CliLogsHandledCommandFailuresToSerilogFile()
+    {
+        var missingRoot = Path.Combine(TestPaths.CreateTempDirectory(), "missing");
+        var logDirectory = Path.Combine(TestPaths.CreateTempDirectory(), "cli-logs");
+        var cliAssembly = FindCliAssemblyPath();
+
+        var result = await RunAsync(
+            cliAssembly,
+            new Dictionary<string, string> { ["REKALL_AGE_CLI_LOG_DIR"] = logDirectory },
+            "context",
+            "summary",
+            missingRoot);
+
+        Assert.Equal(1, result.ExitCode);
+        var logFile = Assert.Single(Directory.GetFiles(logDirectory, "cli-*.log"));
+        var log = await File.ReadAllTextAsync(logFile);
+        Assert.Contains("CLI command failed.", log);
+        Assert.Contains("context summary", log);
+        Assert.Contains(missingRoot, log);
+    }
+
+    [Fact]
     public async Task CliPersistsSuccessfulProjectTransactions()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -248,12 +273,27 @@ public sealed class CliSmokeTests
 
     private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)
     {
+        return await RunAsync(cliAssembly, null, args);
+    }
+
+    private static async Task<(int ExitCode, string Output)> RunAsync(
+        string cliAssembly,
+        IReadOnlyDictionary<string, string>? environment,
+        params string[] args)
+    {
         var startInfo = new ProcessStartInfo("dotnet")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
         startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
+        if (environment is not null)
+        {
+            foreach (var item in environment)
+            {
+                startInfo.Environment[item.Key] = item.Value;
+            }
+        }
 
         startInfo.ArgumentList.Add(cliAssembly);
         foreach (var arg in args)

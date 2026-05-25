@@ -45,6 +45,9 @@ public sealed class ScaffoldRuntimeSystemModuleCommandTests
         Assert.Contains("public sealed class OrbitMotion : RekallAgeComponent", source);
         Assert.Contains("public sealed class OrbitMotionSystem : IRekallAgeRuntimeModuleSystem", source);
         Assert.Contains("ValueTask<RekallAgeRuntimeWorld> UpdateAsync", source);
+        Assert.Contains("entity.FindComponent(componentType)", source);
+        Assert.Contains("component.Properties.ReadNumber(\"valuePerSecond\", 1)", source);
+        Assert.Contains("entity.WithPosition3D", source);
 
         Assert.True(build.Ok, build.Summary);
         Assert.True(schemas.Ok, schemas.Summary);

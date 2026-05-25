@@ -1,12 +1,50 @@
+# Build outputs
 bin/
 obj/
+out/
+publish/
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+
+# IDE/editor state
 .vs/
+.vscode/
 .idea/
 *.user
 *.suo
-TestResults/
+*.userosscache
+*.sln.docstates
+
+# Rekall AGE generated/runtime artifacts
 Artifacts/
 .age-sandbox/
+.age-tmp/
+.agecache/
 *.agecache
 .worktrees/
 worktrees/
+
+# Local third-party engine checkouts used for comparison/research.
+Examples/Prowl/
+Examples/Stride/
+
+# Logs and diagnostics
+*.log
+logs/
+Logs/
+crashdumps/
+
+# Local assets and large ad-hoc captures
+*.tmp
+*.temp
+*.bak
+*.orig
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

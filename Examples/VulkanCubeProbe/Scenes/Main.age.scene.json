@@ -1,0 +1,52 @@
+{
+  "id": "scene_f66a1a7f34624761bebaf54f2b80f947",
+  "name": "Main",
+  "capabilities": [
+    "rendering3d",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "ent_7d4d256446ab48899fa1dae358996cce",
+      "name": "Cube",
+      "tags": [
+        "cube",
+        "geometry",
+        "primitive"
+      ],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#33ff66"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

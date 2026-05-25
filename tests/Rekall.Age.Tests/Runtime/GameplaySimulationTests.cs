@@ -10,23 +10,23 @@ namespace Rekall.Age.Tests.Runtime;
 
 public sealed class GameplaySimulationTests
 {
-    public static TheoryData<string, string> TemplateSystems => new()
+    public static TheoryData<string> Templates => new()
     {
-        { "pong", "PaddleController" },
-        { "breakout", "BrickGrid" },
-        { "asteroids", "AsteroidSpawner" },
-        { "top-down-shooter", "WaveSpawner" },
-        { "platformer-2d", "PlatformerController2D" },
-        { "tower-defense", "TowerBuildGrid" },
-        { "visual-novel", "DialogueGraph" },
-        { "first-person-exploration", "FirstPersonController" },
-        { "collectathon-3d", "ThirdPersonController" },
-        { "puzzle", "GridBoard" }
+        { "pong" },
+        { "breakout" },
+        { "asteroids" },
+        { "top-down-shooter" },
+        { "platformer-2d" },
+        { "tower-defense" },
+        { "visual-novel" },
+        { "first-person-exploration" },
+        { "collectathon-3d" },
+        { "puzzle" }
     };
 
     [Theory]
-    [MemberData(nameof(TemplateSystems))]
-    public async Task RunSceneReportsTemplateSpecificGameplaySystem(string templateId, string expectedSystem)
+    [MemberData(nameof(Templates))]
+    public async Task RunSceneReportsOnlyCoreRuntimeSystemsForTemplates(string templateId)
     {
         var root = TestPaths.CreateTempDirectory();
         var createGame = new CreateGameFromTemplateCommand();
@@ -40,8 +40,9 @@ public sealed class GameplaySimulationTests
 
         Assert.True(result.Ok);
         Assert.True(result.Value.FramesSimulated >= 6);
-        Assert.Contains(result.Value.Observations, observation => observation.System == "PlayableLoop");
-        Assert.Contains(result.Value.Observations, observation => observation.System == expectedSystem);
+        Assert.Contains(result.Value.Observations, observation => observation.System is "Camera2D" or "Camera3D");
+        Assert.DoesNotContain(result.Value.Observations, observation =>
+            observation.System is "PaddleController" or "BrickGrid" or "GridBoard" or "FirstPersonController" or "ThirdPersonController");
     }
 
     [Fact]

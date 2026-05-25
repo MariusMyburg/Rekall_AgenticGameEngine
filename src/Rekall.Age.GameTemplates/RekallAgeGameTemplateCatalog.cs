@@ -27,75 +27,75 @@ public sealed class RekallAgeGameTemplateCatalog
     {
         return new RekallAgeGameTemplateCatalog(
         [
-            Create2D("pong", "Pong", "Two paddles, ball, score loop.", "arcade",
+            Create2D("pong", "Pong", "Two paddles, ball, score loop.",
             [
-                Entity("LeftPaddle", ["player"], Component("Rekall.PaddleController", Props(("side", "left"), ("speed", 8)))),
-                Entity("RightPaddle", ["opponent"], Component("Rekall.AiPaddleController", Props(("side", "right"), ("speed", 7)))),
-                Entity("Ball", ["ball"], Component("Rekall.Ball2D", Props(("speed", 9), ("bounces", true)))),
-                Entity("Score", ["ui"], Component("Rekall.ScoreCounter", Props(("left", 0), ("right", 0))))
+                Entity("LeftPaddle", ["player"], TemplateComponent("pong", "PaddleController", Props(("side", "left"), ("speed", 8)))),
+                Entity("RightPaddle", ["opponent"], TemplateComponent("pong", "AiPaddleController", Props(("side", "right"), ("speed", 7)))),
+                Entity("Ball", ["ball"], TemplateComponent("pong", "Ball2D", Props(("speed", 9), ("bounces", true)))),
+                Entity("Score", ["ui"], TemplateComponent("pong", "ScoreCounter", Props(("left", 0), ("right", 0))))
             ]),
-            Create2D("breakout", "Breakout", "Paddle, ball, bricks, score loop.", "arcade",
+            Create2D("breakout", "Breakout", "Paddle, ball, bricks, score loop.",
             [
-                Entity("Paddle", ["player"], Component("Rekall.PaddleController", Props(("axis", "horizontal"), ("speed", 8)))),
-                Entity("Ball", ["ball"], Component("Rekall.Ball2D", Props(("speed", 7), ("bounces", true)))),
-                Entity("BrickField", ["level"], Component("Rekall.BrickGrid", Props(("columns", 10), ("rows", 5)))),
-                Entity("Score", ["ui"], Component("Rekall.ScoreCounter", Props(("score", 0))))
+                Entity("Paddle", ["player"], TemplateComponent("breakout", "PaddleController", Props(("axis", "horizontal"), ("speed", 8)))),
+                Entity("Ball", ["ball"], TemplateComponent("breakout", "Ball2D", Props(("speed", 7), ("bounces", true)))),
+                Entity("BrickField", ["level"], TemplateComponent("breakout", "BrickGrid", Props(("columns", 10), ("rows", 5)))),
+                Entity("Score", ["ui"], TemplateComponent("breakout", "ScoreCounter", Props(("score", 0))))
             ]),
-            Create2D("asteroids", "Asteroids", "Ship, asteroids, projectiles, survival loop.", "arcade",
+            Create2D("asteroids", "Asteroids", "Ship, asteroids, projectiles, survival loop.",
             [
-                Entity("Ship", ["player"], Component("Rekall.ThrustShipController", Props(("turnSpeed", 180), ("thrust", 12)))),
-                Entity("AsteroidSpawner", ["spawner"], Component("Rekall.AsteroidSpawner", Props(("count", 12), ("wrapWorld", true)))),
-                Entity("ProjectilePool", ["weapon"], Component("Rekall.ProjectilePool", Props(("capacity", 24)))),
-                Entity("Score", ["ui"], Component("Rekall.ScoreCounter", Props(("score", 0))))
+                Entity("Ship", ["player"], TemplateComponent("asteroids", "ThrustShipController", Props(("turnSpeed", 180), ("thrust", 12)))),
+                Entity("AsteroidSpawner", ["spawner"], TemplateComponent("asteroids", "AsteroidSpawner", Props(("count", 12), ("wrapWorld", true)))),
+                Entity("ProjectilePool", ["weapon"], TemplateComponent("asteroids", "ProjectilePool", Props(("capacity", 24)))),
+                Entity("Score", ["ui"], TemplateComponent("asteroids", "ScoreCounter", Props(("score", 0))))
             ]),
-            Create2D("top-down-shooter", "Top-down Shooter", "Player, enemies, bullets, wave loop.", "action",
+            Create2D("top-down-shooter", "Top-down Shooter", "Player, enemies, bullets, wave loop.",
             [
-                Entity("Player", ["player"], Component("Rekall.TopDownController", Props(("speed", 6))), Component("Rekall.Health", Props(("max", 100)))),
-                Entity("EnemySpawner", ["spawner"], Component("Rekall.WaveSpawner", Props(("enemyCount", 8), ("interval", 2.0)))),
-                Entity("Weapon", ["weapon"], Component("Rekall.ProjectileWeapon", Props(("fireRate", 6), ("damage", 10)))),
-                Entity("Hud", ["ui"], Component("Rekall.Hud", Props(("showsHealth", true), ("showsScore", true))))
+                Entity("Player", ["player"], TemplateComponent("top-down-shooter", "TopDownController", Props(("speed", 6))), TemplateComponent("top-down-shooter", "Health", Props(("max", 100)))),
+                Entity("EnemySpawner", ["spawner"], TemplateComponent("top-down-shooter", "WaveSpawner", Props(("enemyCount", 8), ("interval", 2.0)))),
+                Entity("Weapon", ["weapon"], TemplateComponent("top-down-shooter", "ProjectileWeapon", Props(("fireRate", 6), ("damage", 10)))),
+                Entity("Hud", ["ui"], TemplateComponent("top-down-shooter", "Hud", Props(("showsHealth", true), ("showsScore", true))))
             ]),
-            Create2D("platformer-2d", "2D Platformer", "Player movement, platforms, hazards, collectible loop.", "platformer",
+            Create2D("platformer-2d", "2D Platformer", "Player movement, platforms, hazards, collectible loop.",
             [
-                Entity("Player", ["player"], Component("Rekall.PlatformerController2D", Props(("speed", 7), ("jumpForce", 13))), Component("Rekall.Health", Props(("max", 3)))),
-                Entity("LevelGeometry", ["level"], Component("Rekall.Tilemap2D", Props(("width", 48), ("height", 18)))),
-                Entity("Collectibles", ["collectible"], Component("Rekall.CollectibleSet", Props(("count", 20)))),
-                Entity("Goal", ["goal"], Component("Rekall.LevelExit", Props(("requiresAllCollectibles", false))))
+                Entity("Player", ["player"], TemplateComponent("platformer-2d", "PlatformerController2D", Props(("speed", 7), ("jumpForce", 13))), TemplateComponent("platformer-2d", "Health", Props(("max", 3)))),
+                Entity("LevelGeometry", ["level"], TemplateComponent("platformer-2d", "Tilemap2D", Props(("width", 48), ("height", 18)))),
+                Entity("Collectibles", ["collectible"], TemplateComponent("platformer-2d", "CollectibleSet", Props(("count", 20)))),
+                Entity("Goal", ["goal"], TemplateComponent("platformer-2d", "LevelExit", Props(("requiresAllCollectibles", false))))
             ]),
-            Create2D("tower-defense", "Tower Defense", "Path, waves, towers, base health loop.", "strategy",
+            Create2D("tower-defense", "Tower Defense", "Path, waves, towers, base health loop.",
             [
-                Entity("EnemyPath", ["path"], Component("Rekall.Path2D", Props(("waypoints", 6)))),
-                Entity("WaveDirector", ["spawner"], Component("Rekall.WaveSpawner", Props(("enemyCount", 12), ("interval", 1.5)))),
-                Entity("TowerGrid", ["build"], Component("Rekall.TowerBuildGrid", Props(("columns", 12), ("rows", 8)))),
-                Entity("Base", ["base"], Component("Rekall.Health", Props(("max", 20))))
+                Entity("EnemyPath", ["path"], TemplateComponent("tower-defense", "Path2D", Props(("waypoints", 6)))),
+                Entity("WaveDirector", ["spawner"], TemplateComponent("tower-defense", "WaveSpawner", Props(("enemyCount", 12), ("interval", 1.5)))),
+                Entity("TowerGrid", ["build"], TemplateComponent("tower-defense", "TowerBuildGrid", Props(("columns", 12), ("rows", 8)))),
+                Entity("Base", ["base"], TemplateComponent("tower-defense", "Health", Props(("max", 20))))
             ]),
-            Create2D("visual-novel", "Visual Novel Adventure", "Dialogue, choices, backgrounds, scene loop.", "narrative", ["ui", "audio"],
+            Create2D("visual-novel", "Visual Novel Adventure", "Dialogue, choices, backgrounds, scene loop.", ["ui", "audio"],
             [
-                Entity("DialogueDirector", ["dialogue"], Component("Rekall.DialogueGraph", Props(("startNode", "intro")))),
-                Entity("ChoicePanel", ["ui"], Component("Rekall.ChoicePanel", Props(("maxChoices", 4)))),
+                Entity("DialogueDirector", ["dialogue"], TemplateComponent("visual-novel", "DialogueGraph", Props(("startNode", "intro")))),
+                Entity("ChoicePanel", ["ui"], TemplateComponent("visual-novel", "ChoicePanel", Props(("maxChoices", 4)))),
                 Entity("Background", ["art"], Component("Rekall.SpriteRenderer", Props(("sprite", "visual_novel_intro_background")))),
                 Entity("Music", ["audio"], Component("Rekall.AudioEmitter", Props(("loop", true))))
             ]),
-            Create3D("first-person-exploration", "First-person Exploration", "First-person controller, interactables, objective loop.", "exploration",
+            Create3D("first-person-exploration", "First-person Exploration", "First-person controller, interactables, objective loop.",
             [
-                Entity("Player", ["player"], Component("Rekall.FirstPersonController", Props(("walkSpeed", 5), ("lookSensitivity", 0.8)))),
+                Entity("Player", ["player"], TemplateComponent("first-person-exploration", "FirstPersonController", Props(("walkSpeed", 5), ("lookSensitivity", 0.8)))),
                 Entity("Environment", ["level"], Component("Rekall.MeshSet", Props(("mesh", "blockout_room")))),
-                Entity("Interactables", ["interactable"], Component("Rekall.InteractableSet", Props(("count", 5)))),
-                Entity("Objective", ["goal"], Component("Rekall.ObjectiveTracker", Props(("objective", "Explore the room"))))
+                Entity("Interactables", ["interactable"], TemplateComponent("first-person-exploration", "InteractableSet", Props(("count", 5)))),
+                Entity("Objective", ["goal"], TemplateComponent("first-person-exploration", "ObjectiveTracker", Props(("objective", "Explore the room"))))
             ]),
-            Create3D("collectathon-3d", "3D Collectathon", "Third-person player, collectibles, goals, camera loop.", "collectathon",
+            Create3D("collectathon-3d", "3D Collectathon", "Third-person player, collectibles, goals, camera loop.",
             [
-                Entity("Player", ["player"], Component("Rekall.ThirdPersonController", Props(("speed", 6), ("jumpForce", 8)))),
-                Entity("FollowCameraRig", ["camera_rig"], Component("Rekall.FollowCamera", Props(("target", "Player")))),
-                Entity("Collectibles", ["collectible"], Component("Rekall.CollectibleSet", Props(("count", 30)))),
-                Entity("GoalGate", ["goal"], Component("Rekall.LevelExit", Props(("requiredCollectibles", 20))))
+                Entity("Player", ["player"], TemplateComponent("collectathon-3d", "ThirdPersonController", Props(("speed", 6), ("jumpForce", 8)))),
+                Entity("FollowCameraRig", ["camera_rig"], TemplateComponent("collectathon-3d", "FollowCamera", Props(("target", "Player")))),
+                Entity("Collectibles", ["collectible"], TemplateComponent("collectathon-3d", "CollectibleSet", Props(("count", 30)))),
+                Entity("GoalGate", ["goal"], TemplateComponent("collectathon-3d", "LevelExit", Props(("requiredCollectibles", 20))))
             ]),
-            Create2D("puzzle", "Puzzle Game", "Grid, pieces, goals, move-count loop.", "puzzle",
+            Create2D("puzzle", "Puzzle Game", "Grid, pieces, goals, move-count loop.",
             [
-                Entity("PuzzleGrid", ["board"], Component("Rekall.GridBoard", Props(("columns", 8), ("rows", 8)))),
-                Entity("PuzzleRules", ["rules"], Component("Rekall.PuzzleRules", Props(("moveLimit", 40)))),
-                Entity("Cursor", ["player"], Component("Rekall.GridCursor", Props(("wrap", false)))),
-                Entity("GoalPanel", ["ui"], Component("Rekall.ObjectiveTracker", Props(("objective", "Solve the board"))))
+                Entity("PuzzleGrid", ["board"], TemplateComponent("puzzle", "GridBoard", Props(("columns", 8), ("rows", 8)))),
+                Entity("PuzzleRules", ["rules"], TemplateComponent("puzzle", "PuzzleRules", Props(("moveLimit", 40)))),
+                Entity("Cursor", ["player"], TemplateComponent("puzzle", "GridCursor", Props(("wrap", false)))),
+                Entity("GoalPanel", ["ui"], TemplateComponent("puzzle", "ObjectiveTracker", Props(("objective", "Solve the board"))))
             ])
         ]);
     }
@@ -104,17 +104,15 @@ public sealed class RekallAgeGameTemplateCatalog
         string id,
         string displayName,
         string description,
-        string loopKind,
         IReadOnlyList<RekallAgeEntityDocument> entities)
     {
-        return Create2D(id, displayName, description, loopKind, ["ui"], entities);
+        return Create2D(id, displayName, description, ["ui"], entities);
     }
 
     private static RekallAgeGameTemplate Create2D(
         string id,
         string displayName,
         string description,
-        string loopKind,
         IReadOnlyList<string> extraCapabilities,
         IReadOnlyList<RekallAgeEntityDocument> entities)
     {
@@ -128,7 +126,7 @@ public sealed class RekallAgeGameTemplateCatalog
             displayName,
             description,
             capabilities,
-            Base2D(loopKind).Concat(entities).ToArray())
+            Base2D().Concat(entities).ToArray())
         {
             DrawCommands = DrawCommandsFor(id)
         };
@@ -138,7 +136,6 @@ public sealed class RekallAgeGameTemplateCatalog
         string id,
         string displayName,
         string description,
-        string loopKind,
         IReadOnlyList<RekallAgeEntityDocument> entities)
     {
         return new RekallAgeGameTemplate(
@@ -146,7 +143,7 @@ public sealed class RekallAgeGameTemplateCatalog
             displayName,
             description,
             ["input", "rendering3d", "ui", "world"],
-            Base3D(loopKind).Concat(entities).ToArray())
+            Base3D().Concat(entities).ToArray())
         {
             DrawCommands = DrawCommandsFor(id)
         };
@@ -245,22 +242,20 @@ public sealed class RekallAgeGameTemplateCatalog
         return new RekallAgeTemplateDrawCommand(id, kind, purpose);
     }
 
-    private static IReadOnlyList<RekallAgeEntityDocument> Base2D(string loopKind)
+    private static IReadOnlyList<RekallAgeEntityDocument> Base2D()
     {
         return
         [
-            Entity("MainCamera", ["camera"], Component("Rekall.Camera2D", Props(("active", true), ("clearColor", "#102030")))),
-            Entity("GameRules", ["game_rules"], Component("Rekall.PlayableLoop", Props(("kind", loopKind), ("state", "ready"))))
+            Entity("MainCamera", ["camera"], Component("Rekall.Camera2D", Props(("active", true), ("clearColor", "#102030"))))
         ];
     }
 
-    private static IReadOnlyList<RekallAgeEntityDocument> Base3D(string loopKind)
+    private static IReadOnlyList<RekallAgeEntityDocument> Base3D()
     {
         return
         [
             Entity("MainCamera", ["camera"], Component("Rekall.Camera3D", Props(("active", true), ("fieldOfView", 65)))),
-            Entity("Sun", ["light"], Component("Rekall.DirectionalLight", Props(("intensity", 1.0)))),
-            Entity("GameRules", ["game_rules"], Component("Rekall.PlayableLoop", Props(("kind", loopKind), ("state", "ready"))))
+            Entity("Sun", ["light"], Component("Rekall.DirectionalLight", Props(("intensity", 1.0))))
         ];
     }
 
@@ -282,6 +277,17 @@ public sealed class RekallAgeGameTemplateCatalog
     private static RekallAgeComponentDocument Component(string type, JsonObject properties)
     {
         return RekallAgeComponentDocument.Create(type, properties);
+    }
+
+    private static RekallAgeComponentDocument TemplateComponent(string templateId, string name, JsonObject properties)
+    {
+        return Component($"Game.Templates.{ToTemplateNamespace(templateId)}.{name}", properties);
+    }
+
+    private static string ToTemplateNamespace(string templateId)
+    {
+        var parts = templateId.Split(['-', '_', '.'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return string.Concat(parts.Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
     }
 
     private static JsonObject Props(params (string Key, object? Value)[] values)

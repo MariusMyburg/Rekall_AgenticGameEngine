@@ -99,4 +99,27 @@ public sealed class CaptureRuntimeViewportCommandTests
             return output.Rgba[index] == 40 && output.Rgba[index + 1] == 220 && output.Rgba[index + 2] == 90;
         });
     }
+
+    [Fact]
+    public async Task CaptureRuntimeViewportCommandReportsMissingSpriteAssetsAsFallbacks()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"])
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Player", ["player"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.SpriteRenderer", new JsonObject { ["sprite"] = "asset_missing" })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 0, Path.Combine(root, "Viewport"), 160, 90, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("missing asset viewport"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.NonBlank);
+        Assert.Equal(0, result.Value.AssetBackedRenderableCount);
+        Assert.Equal(1, result.Value.FallbackRenderableCount);
+        Assert.Equal(1, result.Value.MissingAssetCount);
+        Assert.Contains("REKALL_RENDER_ASSET_MISSING", result.Value.AssetIssueCodes);
+    }
 }

@@ -1752,6 +1752,15 @@ internal static class RekallAgeCli
         Console.WriteLine($"Active camera: {result.Value.ActiveCamera ?? "(none)"}");
         Console.WriteLine($"Renderable: {result.Value.RenderableCount}");
         Console.WriteLine($"Renderable kinds: {string.Join(", ", result.Value.RenderableKinds)}");
+        Console.WriteLine($"Asset-backed: {result.Value.AssetBackedRenderableCount}");
+        Console.WriteLine($"Fallback: {result.Value.FallbackRenderableCount}");
+        Console.WriteLine($"Missing assets: {result.Value.MissingAssetCount}");
+        Console.WriteLine($"Unsupported assets: {result.Value.UnsupportedAssetCount}");
+        foreach (var code in result.Value.AssetIssueCodes)
+        {
+            Console.WriteLine($"Asset issue: {code}");
+        }
+
         Console.WriteLine($"Observations: {result.Value.ObservationCount}");
         foreach (var code in result.Value.ObservationCodes)
         {

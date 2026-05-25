@@ -55,6 +55,8 @@ public sealed class RuntimeInspectCliTests
         Assert.Contains("Runtime viewport Main frame 3", result.Output);
         Assert.Contains("Active camera: MainCamera", result.Output);
         Assert.Contains("Renderable: 1", result.Output);
+        Assert.Contains("Asset-backed: 0", result.Output);
+        Assert.Contains("Fallback: 1", result.Output);
         Assert.Contains("Main_runtime_003.png", result.Output);
         Assert.True(File.Exists(Path.Combine(outputDirectory, "Main_runtime_003.png")));
     }

@@ -560,6 +560,9 @@ public sealed class McpJsonRpcServerTests
             .GetProperty("value");
         Assert.True(inspectValue.GetProperty("ready").GetBoolean());
         Assert.Equal("pong", inspectValue.GetProperty("manifest").GetProperty("sourceTemplateId").GetString());
+        Assert.Contains(inspectValue.GetProperty("files").EnumerateArray(), file =>
+            file.GetProperty("path").GetString() == "Game/rekall.project.json" &&
+            file.GetProperty("isKeyArtifact").GetBoolean());
 
         var runValue = runDocument.RootElement
             .GetProperty("result")

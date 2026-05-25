@@ -300,6 +300,11 @@ public sealed class GameTemplateWorkflowTests
         Assert.Equal("pong", inspectArchive.Value.Manifest.SourceTemplateId);
         Assert.Contains(inspectArchive.Value.Manifest.DrawCommands, command => command.Id == "ball" && command.Kind == "circle");
         Assert.Contains(inspectArchive.Value.Manifest.DrawAssertions, assertion => assertion.Id == "ball" && assertion.Passed);
+        Assert.Contains(inspectArchive.Value.Files, file => file.Path == "rekall.package.json" && file.IsKeyArtifact);
+        Assert.Contains(inspectArchive.Value.Files, file => file.Path == "Game/rekall.project.json" && file.IsKeyArtifact);
+        Assert.Contains(inspectArchive.Value.Files, file => file.Path.EndsWith("PongPlayable.dll", StringComparison.Ordinal) && file.IsKeyArtifact);
+        Assert.True(inspectArchive.Value.FileCount > 0);
+        Assert.Contains("rekall.package.json", inspectArchive.Value.KeyArtifacts);
 
         var runArchive = await new RunPlayablePackageCommand().ExecuteAsync(
             new RunPlayablePackageRequest(package.Value.ArchivePath, Frames: 1),

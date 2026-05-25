@@ -92,12 +92,14 @@ public sealed class BuildModulesCommand
         startInfo.ArgumentList.Add(projectPath);
         startInfo.ArgumentList.Add("--nologo");
         startInfo.ArgumentList.Add("-v:minimal");
+        startInfo.ArgumentList.Add("/nr:false");
 
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start dotnet build.");
-        var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        output += await process.StandardError.ReadToEndAsync(cancellationToken);
+        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
         await process.WaitForExitAsync(cancellationToken);
+        var output = await outputTask + await errorTask;
 
         var moduleName = Path.GetFileNameWithoutExtension(projectPath);
         var assemblyPath = Path.Combine(

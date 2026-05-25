@@ -1296,6 +1296,13 @@ internal static class RekallAgeCli
         Console.WriteLine($"Launch: {result.Value.Manifest.LaunchPath}");
         Console.WriteLine($"Draw commands: {result.Value.Manifest.DrawCommands.Count}");
         Console.WriteLine($"Draw assertions: {result.Value.Manifest.DrawAssertions.Count}");
+        Console.WriteLine($"Files: {result.Value.FileCount}");
+        Console.WriteLine("Key artifacts:");
+        foreach (var artifact in result.Value.KeyArtifacts)
+        {
+            Console.WriteLine($"  {artifact}");
+        }
+
         foreach (var error in result.Errors)
         {
             Console.WriteLine($"{error.Code}: {error.Message}");

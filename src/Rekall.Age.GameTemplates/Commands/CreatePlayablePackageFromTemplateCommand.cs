@@ -140,7 +140,10 @@ public sealed class CreatePlayablePackageFromTemplateCommand
             new InspectPlayablePackageResult(
                 false,
                 manifestPath,
-                new RekallAgePlayablePackageManifest(string.Empty, string.Empty, string.Empty, string.Empty, [], [], null, [], [])));
+                new RekallAgePlayablePackageManifest(string.Empty, string.Empty, string.Empty, string.Empty, [], [], null, [], []),
+                0,
+                [],
+                []));
     }
 
     private static RekallAgeCommandResult<RunPlayablePackageResult> EmptyRun(string archivePath)

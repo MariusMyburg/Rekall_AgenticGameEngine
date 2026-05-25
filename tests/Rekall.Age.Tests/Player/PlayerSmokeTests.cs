@@ -16,10 +16,10 @@ public sealed class PlayerSmokeTests
             new CreatePlayableGameFromTemplateRequest(root, "Player Pong", "pong"),
             context);
         Assert.True(create.Ok, create.Summary);
-        var project = Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Player", "Rekall.Age.Player.csproj");
+        var playerAssembly = FindPlayerAssemblyPath();
 
         var run = await RunAsync(
-            project,
+            playerAssembly,
             root,
             "Main",
             "--frames",
@@ -33,7 +33,7 @@ public sealed class PlayerSmokeTests
         Assert.Contains("Left paddle lane 0", run.Output);
     }
 
-    private static async Task<(int ExitCode, string Output)> RunAsync(string project, params string[] args)
+    private static async Task<(int ExitCode, string Output)> RunAsync(string playerAssembly, params string[] args)
     {
         var startInfo = new ProcessStartInfo("dotnet")
         {
@@ -41,19 +41,17 @@ public sealed class PlayerSmokeTests
             RedirectStandardError = true
         };
 
-        startInfo.ArgumentList.Add("run");
-        startInfo.ArgumentList.Add("--project");
-        startInfo.ArgumentList.Add(project);
-        startInfo.ArgumentList.Add("--");
+        startInfo.ArgumentList.Add(playerAssembly);
         foreach (var arg in args)
         {
             startInfo.ArgumentList.Add(arg);
         }
 
         using var process = Process.Start(startInfo)!;
-        var output = await process.StandardOutput.ReadToEndAsync();
-        output += await process.StandardError.ReadToEndAsync();
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
+        var output = await outputTask + await errorTask;
         return (process.ExitCode, output);
     }
 
@@ -71,5 +69,23 @@ public sealed class PlayerSmokeTests
         }
 
         throw new InvalidOperationException("Could not find Rekall.AGE.sln from the test output directory.");
+    }
+
+    private static string FindPlayerAssemblyPath()
+    {
+        var playerAssembly = Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Rekall.Age.Player",
+            "bin",
+            "Debug",
+            "net10.0",
+            "Rekall.Age.Player.dll");
+        if (File.Exists(playerAssembly))
+        {
+            return playerAssembly;
+        }
+
+        throw new InvalidOperationException($"Could not find built player assembly at '{playerAssembly}'.");
     }
 }

@@ -32,6 +32,8 @@
     <ProjectReference Include="..\..\src\Rekall.Age.Playback\Rekall.Age.Playback.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.Modules\Rekall.Age.Modules.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.Build\Rekall.Age.Build.csproj" />
+    <ProjectReference Include="..\..\src\Rekall.Age.Cli\Rekall.Age.Cli.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\Rekall.Age.Player\Rekall.Age.Player.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

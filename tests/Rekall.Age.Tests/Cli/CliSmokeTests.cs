@@ -8,53 +8,53 @@ public sealed class CliSmokeTests
     public async Task CliCreatesTemplateProjectAndPrintsSummary()
     {
         var root = TestPaths.CreateTempDirectory();
-        var project = Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Cli", "Rekall.Age.Cli.csproj");
+        var cliAssembly = FindCliAssemblyPath();
 
-        var template = await RunAsync(project, "templates", "inspect", "puzzle");
+        var template = await RunAsync(cliAssembly, "templates", "inspect", "puzzle");
         Assert.Equal(0, template.ExitCode);
         Assert.Contains("puzzle: Puzzle Game", template.Output);
         Assert.Contains("rekall.workflow.create_playable_package_from_template", template.Output);
 
-        var engine = await RunAsync(project, "context", "engine");
+        var engine = await RunAsync(cliAssembly, "context", "engine");
         Assert.Equal(0, engine.ExitCode);
         Assert.Contains("Rekall AGE", engine.Output);
         Assert.Contains("Agent-first: True", engine.Output);
         Assert.Contains("rekall.workflow.create_playable_package_from_template", engine.Output);
 
-        var create = await RunAsync(project, "game", "create", root, "Crystal Mines", "puzzle");
+        var create = await RunAsync(cliAssembly, "game", "create", root, "Crystal Mines", "puzzle");
         Assert.Equal(0, create.ExitCode);
         Assert.Contains("Created puzzle game", create.Output);
 
-        var summary = await RunAsync(project, "context", "summary", root);
+        var summary = await RunAsync(cliAssembly, "context", "summary", root);
         Assert.Equal(0, summary.ExitCode);
         Assert.Contains("Crystal Mines: ok", summary.Output);
 
-        var run = await RunAsync(project, "run", "scene", root, "Main", "0.1");
+        var run = await RunAsync(cliAssembly, "run", "scene", root, "Main", "0.1");
         Assert.Equal(0, run.ExitCode);
         Assert.Contains("Simulated Main", run.Output);
         Assert.Contains("GridBoard", run.Output);
 
-        var sceneSummary = await RunAsync(project, "context", "scene", root, "Main");
+        var sceneSummary = await RunAsync(cliAssembly, "context", "scene", root, "Main");
         Assert.Equal(0, sceneSummary.ExitCode);
         Assert.Contains("Scene Main", sceneSummary.Output);
         Assert.Contains("PuzzleGrid", sceneSummary.Output);
 
-        var schemas = await RunAsync(project, "module", "schemas");
+        var schemas = await RunAsync(cliAssembly, "module", "schemas");
         Assert.Equal(0, schemas.ExitCode);
         Assert.Contains("Loaded", schemas.Output);
         Assert.Contains("Transform", schemas.Output);
 
-        var scaffold = await RunAsync(project, "module", "scaffold", root, "crystal.mining", "Crystal Mining", "CrystalMining", "MiningController");
+        var scaffold = await RunAsync(cliAssembly, "module", "scaffold", root, "crystal.mining", "Crystal Mining", "CrystalMining", "MiningController");
         Assert.Equal(0, scaffold.ExitCode);
         Assert.Contains("CrystalMiningModule.cs", scaffold.Output);
         Assert.True(File.Exists(Path.Combine(root, "Modules", "CrystalMining", "CrystalMiningModule.cs")));
 
-        var build = await RunAsync(project, "build", "modules", root);
+        var build = await RunAsync(cliAssembly, "build", "modules", root);
         Assert.Equal(0, build.ExitCode);
         Assert.Contains("Built 1 module project", build.Output);
         Assert.Contains("CrystalMining.dll", build.Output);
 
-        var capture = await RunAsync(project, "capture", "screenshot", root, "Main");
+        var capture = await RunAsync(cliAssembly, "capture", "screenshot", root, "Main");
         Assert.Equal(0, capture.ExitCode);
         Assert.Contains("Main_preview.png", capture.Output);
     }
@@ -63,13 +63,13 @@ public sealed class CliSmokeTests
     public async Task CliPlaytestsPlayableTemplateWithJsonAssertions()
     {
         var root = TestPaths.CreateTempDirectory();
-        var project = Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Cli", "Rekall.Age.Cli.csproj");
+        var cliAssembly = FindCliAssemblyPath();
 
-        var create = await RunAsync(project, "game", "create-playable", root, "CLI Pong", "pong");
+        var create = await RunAsync(cliAssembly, "game", "create-playable", root, "CLI Pong", "pong");
         Assert.Equal(0, create.ExitCode);
 
         var playtest = await RunAsync(
-            project,
+            cliAssembly,
             "playtest",
             "scene",
             root,
@@ -85,7 +85,7 @@ public sealed class CliSmokeTests
         Assert.Contains("Draw assertion frame 0 id=ball kind=circle text=<any>: True", playtest.Output);
 
         var verify = await RunAsync(
-            project,
+            cliAssembly,
             "game",
             "verify-playable",
             root,
@@ -99,29 +99,32 @@ public sealed class CliSmokeTests
         Assert.Contains("Draw assertion frame 0 id=ball kind=circle text=<any>: True", verify.Output);
 
         var captureDirectory = Path.Combine(root, "PlayCaptures");
-        var capture = await RunAsync(project, "play", "capture-frame", root, "Main", captureDirectory, "1");
+        var capture = await RunAsync(cliAssembly, "play", "capture-frame", root, "Main", captureDirectory, "1");
         Assert.Equal(0, capture.ExitCode);
         Assert.Contains("Main_play_frame_001.png", capture.Output);
         Assert.True(File.Exists(Path.Combine(captureDirectory, "Main_play_frame_001.png")));
 
         var packageDirectory = Path.Combine(root, "Packaged");
-        var package = await RunAsync(project, "game", "package-playable", root, "Main", packageDirectory);
+        var package = await RunAsync(cliAssembly, "game", "package-playable", root, "Main", packageDirectory);
         Assert.Equal(0, package.ExitCode);
 
-        var inspect = await RunAsync(project, "game", "inspect-package", $"{packageDirectory}.zip");
+        var inspect = await RunAsync(cliAssembly, "game", "inspect-package", $"{packageDirectory}.zip");
         Assert.Equal(0, inspect.ExitCode);
         Assert.Contains("Ready: True", inspect.Output);
         Assert.Contains("Template: pong", inspect.Output);
         Assert.Contains("Draw commands:", inspect.Output);
+        Assert.Contains("Files:", inspect.Output);
+        Assert.Contains("Key artifacts:", inspect.Output);
+        Assert.Contains("Game/rekall.project.json", inspect.Output);
 
-        var runPackage = await RunAsync(project, "game", "run-package", $"{packageDirectory}.zip", "1");
+        var runPackage = await RunAsync(cliAssembly, "game", "run-package", $"{packageDirectory}.zip", "1");
         Assert.Equal(0, runPackage.ExitCode);
         Assert.Contains("Ready: True", runPackage.Output);
         Assert.Contains("FRAME 1", runPackage.Output);
         Assert.Contains("PONG", runPackage.Output);
 
         var packageFrameDirectory = Path.Combine(root, "PackageFrames");
-        var capturePackageFrame = await RunAsync(project, "game", "capture-package-frame", $"{packageDirectory}.zip", packageFrameDirectory, "1");
+        var capturePackageFrame = await RunAsync(cliAssembly, "game", "capture-package-frame", $"{packageDirectory}.zip", packageFrameDirectory, "1");
         Assert.Equal(0, capturePackageFrame.ExitCode);
         Assert.Contains("Captured: True", capturePackageFrame.Output);
         Assert.Contains("Non-blank: True", capturePackageFrame.Output);
@@ -131,7 +134,7 @@ public sealed class CliSmokeTests
         var oneShotOutput = Path.Combine(oneShotRoot, "Packaged");
         var oneShotFrames = Path.Combine(oneShotRoot, "Frames");
         var oneShot = await RunAsync(
-            project,
+            cliAssembly,
             "game",
             "create-package-playable",
             oneShotRoot,
@@ -151,39 +154,38 @@ public sealed class CliSmokeTests
     public async Task CliReportsInvalidPlaytestJsonWithoutUnhandledException()
     {
         var root = TestPaths.CreateTempDirectory();
-        var project = Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Cli", "Rekall.Age.Cli.csproj");
+        var cliAssembly = FindCliAssemblyPath();
 
-        var create = await RunAsync(project, "game", "create-playable", root, "CLI Pong", "pong");
+        var create = await RunAsync(cliAssembly, "game", "create-playable", root, "CLI Pong", "pong");
         Assert.Equal(0, create.ExitCode);
 
-        var playtest = await RunAsync(project, "playtest", "scene", root, "Main", "1", "[{verticalAxis:1}]", "[]");
+        var playtest = await RunAsync(cliAssembly, "playtest", "scene", root, "Main", "1", "[{verticalAxis:1}]", "[]");
 
         Assert.Equal(1, playtest.ExitCode);
         Assert.Contains("JSON is invalid", playtest.Output);
         Assert.DoesNotContain("Unhandled exception", playtest.Output);
     }
 
-    private static async Task<(int ExitCode, string Output)> RunAsync(string project, params string[] args)
+    private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)
     {
         var startInfo = new ProcessStartInfo("dotnet")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
 
-        startInfo.ArgumentList.Add("run");
-        startInfo.ArgumentList.Add("--project");
-        startInfo.ArgumentList.Add(project);
-        startInfo.ArgumentList.Add("--");
+        startInfo.ArgumentList.Add(cliAssembly);
         foreach (var arg in args)
         {
             startInfo.ArgumentList.Add(arg);
         }
 
         using var process = Process.Start(startInfo)!;
-        var output = await process.StandardOutput.ReadToEndAsync();
-        output += await process.StandardError.ReadToEndAsync();
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
+        var output = await outputTask + await errorTask;
         return (process.ExitCode, output);
     }
 
@@ -201,5 +203,23 @@ public sealed class CliSmokeTests
         }
 
         throw new InvalidOperationException("Could not find Rekall.AGE.sln from the test output directory.");
+    }
+
+    private static string FindCliAssemblyPath()
+    {
+        var cliAssembly = Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Rekall.Age.Cli",
+            "bin",
+            "Debug",
+            "net10.0",
+            "Rekall.Age.Cli.dll");
+        if (File.Exists(cliAssembly))
+        {
+            return cliAssembly;
+        }
+
+        throw new InvalidOperationException($"Could not find built CLI assembly at '{cliAssembly}'.");
     }
 }

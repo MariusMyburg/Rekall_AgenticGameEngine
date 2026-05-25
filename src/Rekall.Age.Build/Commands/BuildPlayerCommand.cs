@@ -47,12 +47,14 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
         startInfo.ArgumentList.Add("Debug");
         startInfo.ArgumentList.Add("-o");
         startInfo.ArgumentList.Add(outputDirectory);
+        startInfo.ArgumentList.Add("/nr:false");
 
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start dotnet publish.");
-        var output = await process.StandardOutput.ReadToEndAsync(context.CancellationToken);
-        output += await process.StandardError.ReadToEndAsync(context.CancellationToken);
+        var outputTask = process.StandardOutput.ReadToEndAsync(context.CancellationToken);
+        var errorTask = process.StandardError.ReadToEndAsync(context.CancellationToken);
         await process.WaitForExitAsync(context.CancellationToken);
+        var output = await outputTask + await errorTask;
 
         var launchPath = FindLaunchPath(outputDirectory);
         var result = new BuildPlayerResult(

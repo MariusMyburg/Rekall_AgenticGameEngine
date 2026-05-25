@@ -81,4 +81,9 @@ public sealed record RekallAgeRuntimeViewportCapture(
     int FrameIndex,
     string? ActiveCamera,
     int RenderableCount,
-    int ObservationCount);
+    int ObservationCount,
+    int AssetBackedRenderableCount,
+    int FallbackRenderableCount,
+    int MissingAssetCount,
+    int UnsupportedAssetCount,
+    IReadOnlyList<string> AssetIssueCodes);

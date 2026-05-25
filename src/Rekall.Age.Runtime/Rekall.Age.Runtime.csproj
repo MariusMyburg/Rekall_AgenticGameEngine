@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Rekall.Age.Core\Rekall.Age.Core.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Runtime.Abstractions\Rekall.Age.Runtime.Abstractions.csproj" />
     <ProjectReference Include="..\Rekall.Age.World\Rekall.Age.World.csproj" />
     <ProjectReference Include="..\Rekall.Age.Validation\Rekall.Age.Validation.csproj" />
   </ItemGroup>

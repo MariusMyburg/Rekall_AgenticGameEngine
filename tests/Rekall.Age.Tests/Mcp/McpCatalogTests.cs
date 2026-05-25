@@ -1,5 +1,6 @@
 using Rekall.Age.Agent.Commands;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Transactions;
 using Rekall.Age.Build.Commands;
 using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.Mcp;
@@ -19,6 +20,7 @@ public sealed class McpCatalogTests
     {
         var registry = new RekallAgeCommandRegistry();
         registry.Register(new GetEngineStatusCommand());
+        registry.Register(new ListTransactionHistoryCommand());
         registry.Register(new CreateProjectCommand());
         registry.Register(new InspectGameTemplateCommand());
         registry.Register(new VerifyMvpTemplatesCommand());
@@ -50,6 +52,7 @@ public sealed class McpCatalogTests
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.engine_status");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.transaction.history");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.project.create");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.templates.inspect");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.templates.verify_mvp");
@@ -92,6 +95,9 @@ public sealed class McpCatalogTests
         Assert.Equal("rendering", renderTool.Category);
         Assert.False(renderTool.Recommended);
         Assert.True(renderTool.AgentPriority > oneShot.AgentPriority);
+        var transactionTool = catalog.Tools.Single(tool => tool.Name == "rekall.transaction.history");
+        Assert.Equal("transactions", transactionTool.Category);
+        Assert.True(transactionTool.AgentPriority < renderTool.AgentPriority);
         Assert.Equal("rekall.context.engine_status", catalog.Tools[0].Name);
         Assert.True(catalog.Tools.Index().All(item => item.Index == 0 || catalog.Tools[item.Index - 1].AgentPriority <= item.Item.AgentPriority));
     }

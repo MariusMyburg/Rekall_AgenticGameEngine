@@ -31,7 +31,7 @@ internal static class RekallAgeCli
     {
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|level|studio|play|playtest|run|runtime|context|capture|render|module|build|templates|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|level|studio|play|playtest|run|runtime|context|transaction|capture|render|module|build|templates|mcp> ...");
             return 2;
         }
 
@@ -195,6 +195,8 @@ internal static class RekallAgeCli
                 ["context", "engine"] => await PrintEngineStatusAsync(registry, context),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
+                ["transaction", "history", var root] => await PrintTransactionHistoryAsync(registry, context, root, "20"),
+                ["transaction", "history", var root, var limit] => await PrintTransactionHistoryAsync(registry, context, root, limit),
                 ["capture", "screenshot", var root, var scene] => await CaptureAsync(registry, context, root, scene),
                 _ => PrintUnknown(args)
             };
@@ -237,6 +239,7 @@ internal static class RekallAgeCli
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new GetEngineStatusCommand());
+        registry.Register(new ListTransactionHistoryCommand());
         registry.Register(new ListComponentSchemasCommand());
         registry.Register(new ListModuleSourcesCommand());
         registry.Register(new ReadModuleSourceCommand());
@@ -1720,6 +1723,27 @@ internal static class RekallAgeCli
         foreach (var entity in summary.Entities)
         {
             Console.WriteLine($"- {entity.Name}: {string.Join(", ", entity.Components)}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> PrintTransactionHistoryAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string limit)
+    {
+        var count = int.Parse(limit, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<ListTransactionHistoryRequest, ListTransactionHistoryResult>(
+            "rekall.transaction.history",
+            new ListTransactionHistoryRequest(root, count),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine(result.Value.LogPath);
+        foreach (var transaction in result.Value.Transactions)
+        {
+            Console.WriteLine($"{transaction.StartedAtUtc:u} {transaction.Name} [{transaction.Actor}] {transaction.ChangedResources.Count} change(s) {transaction.Id}");
         }
 
         return result.Ok ? 0 : 1;

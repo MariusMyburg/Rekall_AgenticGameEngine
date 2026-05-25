@@ -42,6 +42,11 @@ internal static class RekallAgeMcpToolClassifier
             return "workflow";
         }
 
+        if (name.StartsWith("rekall.transaction.", StringComparison.Ordinal))
+        {
+            return "transactions";
+        }
+
         if (name.StartsWith("rekall.render.", StringComparison.Ordinal))
         {
             return "rendering";
@@ -92,6 +97,7 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.workflow.audit_playable_package" => 15,
             "rekall.templates.verify_mvp" => 20,
             _ when name.StartsWith("rekall.workflow.", StringComparison.Ordinal) => 30,
+            _ when name.StartsWith("rekall.transaction.", StringComparison.Ordinal) => 35,
             _ when name.StartsWith("rekall.playtest.", StringComparison.Ordinal) => 40,
             _ when name.StartsWith("rekall.module.", StringComparison.Ordinal) => 50,
             _ when name.StartsWith("rekall.render.", StringComparison.Ordinal) => 70,

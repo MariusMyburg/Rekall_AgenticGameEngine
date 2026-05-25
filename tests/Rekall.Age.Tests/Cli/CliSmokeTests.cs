@@ -190,6 +190,11 @@ public sealed class CliSmokeTests
         Assert.Contains(
             transaction.ChangedResources,
             resource => resource.EndsWith("rekall.project.json", StringComparison.Ordinal));
+
+        var history = await RunAsync(cliAssembly, "transaction", "history", root);
+        Assert.Equal(0, history.ExitCode);
+        Assert.Contains("project create", history.Output);
+        Assert.Contains("cli", history.Output);
     }
 
     private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)

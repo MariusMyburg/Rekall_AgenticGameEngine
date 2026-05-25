@@ -81,18 +81,36 @@ public sealed class RekallAgeWorkbenchModelBuilder
 
     private static RekallAgeSceneGraphModel BuildSceneGraph(RekallAgeSceneDocument scene)
     {
+        var childrenByParent = scene.Entities
+            .Where(entity => !string.IsNullOrWhiteSpace(entity.ParentId))
+            .GroupBy(entity => entity.ParentId!, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderBy(entity => entity.Name, StringComparer.Ordinal).ToArray(),
+                StringComparer.Ordinal);
         var roots = scene.Entities
+            .Where(entity => string.IsNullOrWhiteSpace(entity.ParentId))
             .OrderBy(entity => entity.Name, StringComparer.Ordinal)
-            .Select(entity => new RekallAgeSceneEntityNode(
-                entity.Id,
-                entity.Name,
-                entity.Tags,
-                null,
-                true,
-                false,
-                Array.Empty<RekallAgeSceneEntityNode>()))
+            .Select(entity => ToNode(entity, childrenByParent))
             .ToArray();
         return new RekallAgeSceneGraphModel(scene.Id, scene.Name, roots);
+    }
+
+    private static RekallAgeSceneEntityNode ToNode(
+        RekallAgeEntityDocument entity,
+        IReadOnlyDictionary<string, RekallAgeEntityDocument[]> childrenByParent)
+    {
+        var children = childrenByParent.TryGetValue(entity.Id, out var items)
+            ? items.Select(child => ToNode(child, childrenByParent)).ToArray()
+            : Array.Empty<RekallAgeSceneEntityNode>();
+        return new RekallAgeSceneEntityNode(
+            entity.Id,
+            entity.Name,
+            entity.Tags,
+            entity.ParentId,
+            entity.Visible,
+            entity.Locked,
+            children);
     }
 
     private static RekallAgeInspectorModel BuildInspector(RekallAgeSceneDocument scene)

@@ -25,26 +25,37 @@ public sealed record RekallAgeSceneDocument(
         return this with { Entities = SortEntities(Entities.Append(entity)) };
     }
 
-    public RekallAgeSceneDocument UpdateEntity(string entityId, Func<RekallAgeEntityDocument, RekallAgeEntityDocument> update)
+    public RekallAgeSceneDocument ReplaceEntity(RekallAgeEntityDocument replacement)
     {
         var found = false;
         var entities = Entities.Select(entity =>
         {
-            if (!entity.Id.Equals(entityId, StringComparison.Ordinal))
+            if (!entity.Id.Equals(replacement.Id, StringComparison.Ordinal))
             {
                 return entity;
             }
 
             found = true;
-            return update(entity);
+            return replacement;
         }).ToArray();
 
         if (!found)
         {
-            throw new InvalidOperationException($"Entity '{entityId}' was not found in scene '{Name}'.");
+            throw new InvalidOperationException($"Entity '{replacement.Id}' was not found in scene '{Name}'.");
         }
 
         return this with { Entities = SortEntities(entities) };
+    }
+
+    public RekallAgeEntityDocument GetRequiredEntity(string entityId)
+    {
+        return Entities.FirstOrDefault(entity => entity.Id.Equals(entityId, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException($"Entity '{entityId}' was not found in scene '{Name}'.");
+    }
+
+    public RekallAgeSceneDocument UpdateEntity(string entityId, Func<RekallAgeEntityDocument, RekallAgeEntityDocument> update)
+    {
+        return ReplaceEntity(update(GetRequiredEntity(entityId)));
     }
 
     private static IReadOnlyList<RekallAgeEntityDocument> SortEntities(IEnumerable<RekallAgeEntityDocument> entities)

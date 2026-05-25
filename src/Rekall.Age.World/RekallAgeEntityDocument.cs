@@ -6,6 +6,14 @@ public sealed record RekallAgeEntityDocument(
     IReadOnlyList<string> Tags,
     IReadOnlyList<RekallAgeComponentDocument> Components)
 {
+    public string? ParentId { get; init; }
+
+    public string? PrefabSourceId { get; init; }
+
+    public bool Visible { get; init; } = true;
+
+    public bool Locked { get; init; }
+
     public static RekallAgeEntityDocument Create(string name, IEnumerable<string> tags)
     {
         if (string.IsNullOrWhiteSpace(name))

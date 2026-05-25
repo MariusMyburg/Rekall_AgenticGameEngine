@@ -125,4 +125,28 @@ public sealed class SceneRuntimeFoundationTests
         Assert.Equal("info", observation.Severity);
         Assert.Equal("REKALL_RUNTIME_SYSTEM_EVALUATED", observation.Code);
     }
+
+    [Fact]
+    public async Task ExecutionLoopAdvancesFramesDeterministically()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"]);
+        var initial = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        var loop = RekallAgeRuntimeExecutionLoop.CreateDefault();
+
+        var result = await loop.RunAsync(initial, frames: 3, CancellationToken.None);
+
+        Assert.Equal(3, result.World.FrameIndex);
+        Assert.Equal(TimeSpan.FromSeconds(3.0 / 60.0), result.World.ElapsedTime);
+        Assert.Equal(3, result.FramesSimulated);
+        Assert.Equal(
+            [
+                "runtime.animation",
+                "runtime.audio",
+                "runtime.physics",
+                "runtime.rendering",
+                "runtime.transform",
+                "runtime.ui"
+            ],
+            result.SystemsRun);
+    }
 }

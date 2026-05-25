@@ -166,4 +166,6 @@ Capture a deterministic viewport PNG from the same runtime snapshot used by insp
 dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport
 ```
 
-The command writes `Main_runtime_003.png` and reports the active camera, frame index, renderable kinds, and runtime observation count.
+The command writes `Main_runtime_003.png` and reports the active camera, frame index, renderable kinds, asset-backed renderable count, fallback renderable count, and runtime observation count.
+
+If a sprite renderable references an imported PNG asset, the software viewport draws that PNG into the frame. Missing or unsupported sprite assets fall back to deterministic markers and are reported in the command output.

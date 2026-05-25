@@ -8,6 +8,7 @@
     <ProjectReference Include="..\Rekall.Age.Validation\Rekall.Age.Validation.csproj" />
     <ProjectReference Include="..\Rekall.Age.Modules\Rekall.Age.Modules.csproj" />
     <ProjectReference Include="..\Rekall.Age.Core\Rekall.Age.Core.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Rendering.Abstractions\Rekall.Age.Rendering.Abstractions.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

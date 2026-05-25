@@ -26,9 +26,17 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         {
             var hasTransform = entity.Components.Any(component =>
                 component.Type is "Rekall.Transform2D" or "Rekall.Transform3D");
+            var hasAuthoredLight = entity.Components.Any(component => IsLight(component.Type));
+            var isStellarBody = IsStellarBody(entity);
+            var stellarColor = ReadStellarColor(entity);
 
             foreach (var component in entity.Components)
             {
+                if (!entity.Visible && IsVisibilityGatedComponent(component.Type))
+                {
+                    continue;
+                }
+
                 switch (component.Type)
                 {
                     case "Rekall.Camera2D":
@@ -94,6 +102,16 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             entity.Id,
                             entity.Name,
                             "rekall.planet.surface",
+                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
+                        break;
+                    case "Rekall.OrbitPathRenderer":
+                        meshes.Add(new RekallAgeRuntimeRenderMesh(
+                            entity.Id,
+                            entity.Name,
+                            null,
+                            Variant: "rekall.orbit.path",
+                            MaterialColor: ReadString(component.Properties, "color"),
+                            SortKey: 180,
                             ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
                         break;
                     case "Rekall.Rigidbody2D":
@@ -202,11 +220,25 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                                 entity.Name,
                                 component.Type["Rekall.".Length..],
                                 ReadNumber(component.Properties, "intensity", 1),
-                                RekallAgeRuntimeProjectionSources.BuiltIn));
+                                RekallAgeRuntimeProjectionSources.BuiltIn,
+                                ReadString(component.Properties, "color")
+                                    ?? ReadString(component.Properties, "lightColor")
+                                    ?? stellarColor));
                         }
 
                         break;
                 }
+            }
+
+            if (entity.Visible && isStellarBody && !hasAuthoredLight)
+            {
+                lights.Add(new RekallAgeRuntimeRenderLight(
+                    entity.Id,
+                    entity.Name,
+                    "PointLight",
+                    4,
+                    RekallAgeRuntimeProjectionSources.BuiltIn,
+                    stellarColor));
             }
         }
 
@@ -258,7 +290,10 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                 new RekallAgeRuntimeUiView(
                     Sort(canvases),
                     Sort(elements),
-                    elements.Count(element => element.Interactive))),
+                    elements.Count(element => element.Interactive)))
+                {
+                    Input = world.Subsystems.Input
+                },
             Observations = observations
                 .OrderBy(observation => observation.Severity, StringComparer.Ordinal)
                 .ThenBy(observation => observation.Subsystem, StringComparer.Ordinal)
@@ -315,10 +350,44 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             && type.Contains("Light", StringComparison.Ordinal);
     }
 
+    private static bool IsStellarBody(RekallAgeRuntimeEntity entity)
+    {
+        return entity.Components.Any(component =>
+            component.Type == "Rekall.CelestialBody"
+            && ReadString(component.Properties, "type")?.Contains("stellar", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    private static string? ReadStellarColor(RekallAgeRuntimeEntity entity)
+    {
+        var celestial = entity.Components.FirstOrDefault(component =>
+            component.Type == "Rekall.CelestialBody"
+            && ReadString(component.Properties, "type")?.Contains("stellar", StringComparison.OrdinalIgnoreCase) == true);
+        return celestial is null ? null : ReadString(celestial.Properties, "color");
+    }
+
     private static bool HasMeshRenderer(RekallAgeRuntimeEntity entity)
     {
         return entity.Components.Any(component =>
             component.Type is "Rekall.MeshRenderer" or "Rekall.MeshSet");
+    }
+
+    private static bool IsVisibilityGatedComponent(string componentType)
+    {
+        return componentType is
+            "Rekall.Camera2D" or
+            "Rekall.Camera3D" or
+            "Rekall.SpriteRenderer" or
+            "Rekall.MeshRenderer" or
+            "Rekall.MeshSet" or
+            "Rekall.GeometryPrimitive" or
+            "Rekall.GeometryMesh" or
+            "Rekall.PlanetRenderer" or
+            "Rekall.AtmosphereRenderer" or
+            "Rekall.OrbitPathRenderer" or
+            "Rekall.PointLight" or
+            "Rekall.DirectionalLight" or
+            "Rekall.UiCanvas" or
+            "Rekall.UiElement";
     }
 
     private static string? ReadString(JsonObject properties, string name)

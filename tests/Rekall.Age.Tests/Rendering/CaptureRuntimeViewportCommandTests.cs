@@ -83,6 +83,9 @@ public sealed class CaptureRuntimeViewportCommandTests
         Assert.Equal(0x22, output.Rgba[1]);
         Assert.Equal(0x33, output.Rgba[2]);
         Assert.Equal(255, output.Rgba[3]);
+        Assert.True(result.Value.FrameAnalysis.Analyzed);
+        Assert.False(result.Value.FrameAnalysis.VisuallyInformative);
+        Assert.Contains("REKALL_VIEWPORT_FLAT_COLOR", result.Value.FrameAnalysis.WarningCodes);
     }
 
     [Fact]

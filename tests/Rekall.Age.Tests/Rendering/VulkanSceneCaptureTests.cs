@@ -117,6 +117,67 @@ public sealed class VulkanSceneCaptureTests
         }
     }
 
+    [Fact]
+    public async Task NativeSceneCaptureSamplesGpuCompressedRuntimeTexturesWhenVulkanIsAvailable()
+    {
+        var textureId = "asset_red_bc1";
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "sphere-1",
+            "Textured Sphere",
+            "mesh",
+            "rekall.primitive.sphere",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.geometry.sphere",
+            TextureAssetId: textureId));
+        var assets = RekallAgeRuntimeViewportAssetSet.Empty with
+        {
+            Textures = new Dictionary<string, RekallAgeRuntimeTextureAsset>(StringComparer.Ordinal)
+            {
+                [textureId] = new RekallAgeRuntimeTextureAsset(
+                    textureId,
+                    "ktx2",
+                    4,
+                    4,
+                    1,
+                    "VK_FORMAT_BC1_RGB_UNORM_BLOCK",
+                    null,
+                    true,
+                    [new RekallAgeRuntimeTextureMipLevel(0, 4, 4, [0x00, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])])
+            }
+        };
+
+        var result = await new RekallAgeNativeVulkanSceneCapture(new FakeClearCapture()).CaptureSceneAsync(
+            frame,
+            assets,
+            TestPaths.CreateTempDirectory(),
+            "discrete-gpu",
+            CancellationToken.None);
+
+        if (!result.Captured)
+        {
+            Assert.NotEmpty(result.Errors);
+            return;
+        }
+
+        var image = await RekallAgePngReader.ReadRgbaAsync(result.OutputPath, CancellationToken.None);
+        Assert.True(CountRedDominantPixels(image) > 0);
+    }
+
+    [Theory]
+    [InlineData("VK_FORMAT_BC1_RGB_SRGB_BLOCK", "BC1RgbSrgbBlock")]
+    [InlineData("VK_FORMAT_BC3_UNORM_BLOCK", "BC3UnormBlock")]
+    [InlineData("VK_FORMAT_BC7_SRGB_BLOCK", "BC7SrgbBlock")]
+    public void VulkanCompressedTextureFormatMapperResolvesKtxAndDdsBlockFormats(
+        string format,
+        string expected)
+    {
+        Assert.True(RekallAgeVulkanTextureFormatMapper.TryMapBlockCompressedFormat(format, out var actual));
+        Assert.Equal(expected, actual.ToString());
+    }
+
     private static int CountPixelsDifferentFromClear(RekallAgeRgbaImage image)
     {
         var changed = 0;
@@ -125,6 +186,21 @@ public sealed class VulkanSceneCaptureTests
             if (Math.Abs(image.Rgba[offset + 0] - 20) > 2
                 || Math.Abs(image.Rgba[offset + 1] - 26) > 2
                 || Math.Abs(image.Rgba[offset + 2] - 36) > 2)
+            {
+                changed++;
+            }
+        }
+
+        return changed;
+    }
+
+    private static int CountRedDominantPixels(RekallAgeRgbaImage image)
+    {
+        var changed = 0;
+        for (var offset = 0; offset + 3 < image.Rgba.Length; offset += 4)
+        {
+            if (image.Rgba[offset] > image.Rgba[offset + 1] + 20
+                && image.Rgba[offset] > image.Rgba[offset + 2] + 20)
             {
                 changed++;
             }

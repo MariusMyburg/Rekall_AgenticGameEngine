@@ -48,10 +48,12 @@ The current MVP includes:
 - CLI adapter over the same command bus
 - headless runtime smoke execution with active gameplay-system observations
 - canonical runtime scene snapshots with render, physics, audio, animation, and UI projections
+- runtime input snapshots with keyboard, mouse button, mouse position, mouse delta, mouse wheel, and semantic action projections
 - deterministic transform animation for runtime pitch/yaw/roll rates
 - runtime scene inspection through command bus, CLI, MCP catalog, and Studio read models
 - runtime-backed viewport frame capture through command bus, CLI, MCP catalog, and Studio metadata
 - runtime viewport backend reporting with explicit software/Vulkan acceleration status
+- live player scene and asset editing over local named-pipe IPC through MCP tools
 - Serilog-backed CLI, MCP stdio, and Studio startup/exception logging with daily rolling files
 - deterministic software screenshot capture through command bus
 - software viewport rasterization for cube, sphere, cylinder, cone, and plane geometry primitives plus authored triangle meshes with material colors and directional-light shading
@@ -152,7 +154,9 @@ dotnet run --project src/Rekall.Age.Cli -- build player .age-sandbox Main
 dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main
 dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main --frames 2 --inputs '[{"verticalAxis":1,"primaryAction":true},{"verticalAxis":-1}]'
 dotnet run --project src/Rekall.Age.Cli -- run scene .age-sandbox Main 0.1
+dotnet run --project src/Rekall.Age.Cli -- run scene .age-sandbox Main 0.016 '[{"pressedKeys":["W"],"pressedKeysThisFrame":["W"]}]'
 dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
+dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 1 '[{"pressedKeys":["W"],"pressedKeysThisFrame":["W"],"mouseWheelDelta":1}]'
 dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport
 dotnet run --project src/Rekall.Age.Cli -- capture screenshot .age-sandbox Main
 ```
@@ -186,9 +190,10 @@ Inspect a deterministic runtime snapshot without mutating authoring files:
 
 ```powershell
 dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
+dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 1 '[{"pressedKeys":["W"],"pressedKeysThisFrame":["W"]}]'
 ```
 
-The command reports entity counts, renderable counts, physics/audio/animation/UI readiness, and structured runtime observations for agents and Studio.
+The command reports entity counts, renderable counts, physics/audio/animation/UI readiness, projected input actions, and structured runtime observations for agents and Studio. The optional final JSON argument is a per-frame array of runtime input frames, with fields such as `pressedKeys`, `pressedKeysThisFrame`, `releasedKeysThisFrame`, `pressedButtons`, `mouseX`, `mouseY`, `mouseDeltaX`, `mouseDeltaY`, and `mouseWheelDelta`; the argument can also be a path to a JSON file.
 
 ## Runtime Viewport Capture
 
@@ -201,9 +206,13 @@ dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox 
 
 The command writes `Main_runtime_003.png` and reports the active camera, frame index, renderable kinds, asset-backed renderable count, fallback renderable count, and runtime observation count.
 
-`Rekall.Camera2D` and `Rekall.Camera3D` are core configurable camera components. They remain plain entity components so project modules can drive them like any other authored data. Runtime rendering carries active state, projection mode, field of view, orthographic size, near/far clip distances, clear color, and transform into the viewport frame; Vulkan scene capture consumes those camera settings for view/projection, while software and Vulkan clear captures honor the active camera clear color.
+`Rekall.Camera2D` and `Rekall.Camera3D` are core configurable camera components. They remain plain entity components so project modules can drive them like any other authored data. Runtime rendering carries active state, projection mode, field of view, orthographic size, near/far clip distances, clear color, and transform into the viewport frame; Vulkan scene capture consumes those camera settings for view/projection, while software and Vulkan clear captures honor the active camera clear color. `Rekall.CameraTarget3D` can be added to a camera entity to follow and/or look at any target entity by id, name, or tag with configurable camera and target offsets. `Rekall.CameraZoomInput` can be added to a camera entity to opt into mouse-wheel zoom with configurable speed, orthographic/FOV clamps, and inverted-wheel behavior. The default runtime applies these after orbit, physics, and project-authored motion systems so the camera sees the final frame state.
 
-The default viewport backend is `software`, which is CPU rasterized. Passing `vulkan` requests native Vulkan capture. Empty runtime frames use the native clear-pass/readback path and report the selected device. Generated primitive mesh scenes and authored `Rekall.GeometryMesh` triangle meshes use native offscreen Vulkan scene rendering: Rekall AGE ships the bundled GLSL shaders beside the rendering assembly, compiles them with Shaderc, creates color and depth targets, uploads local-space vertex/index/uniform buffers, propagates active camera transforms into the view-projection uniform, binds per-mesh model matrices through push constants, submits indexed draw calls, copies the color image to a host buffer, and writes the captured PNG. Unsupported renderable kinds, such as sprites and imported mesh assets, fail with structured diagnostics instead of falling back silently.
+`Rekall.InputActionMap` is the core semantic input component. Its `actions` property is an array of bindings such as `{ "name": "thrust", "key": "W" }`, `{ "name": "strafe", "positiveKey": "D", "negativeKey": "A" }`, `{ "name": "fire", "button": "Left" }`, or `{ "name": "zoom", "mouseWheelScale": 0.5 }`. The Windows Vulkan player captures keyboard state, mouse button state, mouse position/delta, and wheel movement from Veldrid. The default runtime projects authored action maps into `world.Subsystems.Input.Actions` with `value`, `isDown`, `wasPressed`, and `wasReleased`, while project-authored systems can still read raw per-frame input from `RekallAgeRuntimeWorldFrameContext.Input`.
+
+Viewport capture results include frame-analysis diagnostics so agents can distinguish a technically nonblank capture from a useful visual proof. The analysis reports color diversity, dominant-color ratio, luminance statistics, and warning codes such as `REKALL_VIEWPORT_FLAT_COLOR`, `REKALL_VIEWPORT_DOMINATED_BY_ONE_COLOR`, `REKALL_VIEWPORT_LOW_LUMINANCE_VARIANCE`, `REKALL_VIEWPORT_VERY_DARK`, and `REKALL_VIEWPORT_NEARLY_TRANSPARENT`.
+
+The default viewport backend is `software`, which is CPU rasterized. Passing `vulkan` requests native Vulkan capture. Empty runtime frames use the native clear-pass/readback path and report the selected device. Generated primitive mesh scenes and authored `Rekall.GeometryMesh` triangle meshes use native offscreen Vulkan scene rendering: Rekall AGE ships the bundled GLSL shaders beside the rendering assembly, compiles them with Shaderc, creates color and depth targets, uploads local-space vertex/index/uniform buffers, propagates active camera transforms into the view-projection uniform, binds per-mesh model matrices through push constants, submits indexed draw calls, copies the color image to a host buffer, and writes the captured PNG. Vulkan materials support base color, normal, metallic-roughness, occlusion, and emissive texture/factor inputs. Unsupported renderable kinds, such as sprites and imported mesh assets, fail with structured diagnostics instead of falling back silently.
 
 If a sprite renderable references an imported PNG asset, the software viewport draws that PNG into the frame. Missing or unsupported sprite assets fall back to deterministic markers and are reported in the command output.
 
@@ -212,6 +221,22 @@ Primitive mesh renderables, including `rekall.primitive.cube`, and authored `Rek
 Agents can author renderable 3D geometry through `rekall.geometry.create_primitive` / `geometry primitive create`. Supported primitives are `cube`, `sphere`, `cylinder`, `cone`, and `plane`; the command writes `Rekall.Transform3D`, `Rekall.GeometryPrimitive`, and `Rekall.MeshRenderer` components so the same runtime viewport capture path can render the object immediately.
 
 For high-throughput world creation over MCP, agents can use `rekall.scene.apply_blueprint` to apply many generic entities and components to a scene in one transaction, optionally clearing existing scene entities first. `rekall.entity.delete` removes one authored entity during iteration without requiring a full scene rewrite.
+
+Agents can import Kitten Space Agency astronomical data through `rekall.solar.import_ksa_system` / `solar import-ksa-system <projectRoot> <sceneName> <ksaRoot> [systemFileName] [distanceScale] [radiusScale]`. The importer reads `Content/Core/Astronomicals.xml` plus a KSA system XML such as `SolSystem.xml` or `SolSystemDense.xml`, resolves `LoadFromLibrary` references, copies available diffuse KTX2 texture assets, and writes generic `Rekall.CelestialBody`, `Rekall.KeplerOrbit`, `Rekall.OrbitPathRenderer`, `Rekall.PlanetRenderer`, `Rekall.AtmosphereRenderer`, `Rekall.Material`, `Rekall.Transform3D`, camera, and light entities. Stellar bodies receive emissive material settings and point-light behavior by default; runtime projection also treats visible `Rekall.CelestialBody` entities with a stellar `type` as point lights when no explicit light component exists. Sol is normalized to a warm orange-yellow display/emissive color. Runtime snapshots run the built-in `runtime.celestial.kepler` system before project-authored gameplay systems so solar-system scenes can use real orbital elements while custom launch, travel, navigation, UI, and mission logic remains project module code. `Rekall.KeplerOrbit` supports `timeScale`, parent-body nesting, and readable local satellite scaling, so moons orbit their updated planets in the same frame instead of lagging behind or collapsing into the scaled planet mesh. `Rekall.OrbitPathRenderer` generates emissive orbit-path geometry for any Kepler body, including moon orbits around planets.
+
+`Rekall.Material` is the generic render material component for mesh-like entities. It can override `baseColor`, `baseColorTexture`, `metallicFactor`, `roughnessFactor`, `metallicRoughnessTexture`, `normalTexture`, `normalScale`, `occlusionTexture`, `occlusionStrength`, `emissiveColor`, `emissiveTexture`, and `emissiveStrength`. This keeps special cases like glowing suns, lamps, engine trails, screens, and magic effects in ordinary agent-authored entity data rather than in game-specific engine code.
+
+## Live Player Editing
+
+The Windows player starts a local named-pipe live-edit server for the loaded project and scene. MCP agents can target that running session without restarting the player:
+
+- `rekall.live.status` reports the session id, pipe name, frame index, entity/renderable counts, and scene/asset revisions.
+- `rekall.live.apply_scene_blueprint` applies generic entity/component blueprints to the running player, optionally persists them to scene storage, and can reload runtime assets in the same request.
+- `rekall.live.apply_scene_diff` applies generic upsert/delete/clear scene diffs to the running player, optionally persists them to scene storage, and can reload runtime assets in the same request.
+- `rekall.live.reload_scene` reloads the scene document from disk and rebuilds the runtime world.
+- `rekall.live.reload_assets` resolves the current runtime frame's assets again and recreates player-side GPU texture/material bindings.
+
+The default pipe name is deterministic for `<projectRoot, sceneName>`, so tools only need the project root and scene name while the player is open. Advanced callers can pass `pipeName` explicitly when they need to target a particular session. Mutations are queued onto the player render thread before being applied, which keeps GPU resource replacement and runtime-world swaps serialized with rendering. The player also watches the project `Assets` tree and debounces filesystem changes into an automatic asset/GPU-binding reload.
 
 Agents can also author arbitrary triangle meshes through `rekall.geometry.create_mesh` / `geometry mesh create`, or directly with a `Rekall.GeometryMesh` component. The runtime frame contract carries the parsed vertex/index payload into the Vulkan scene renderer. Vertices support `x`, `y`, `z`, optional normals through `nx`, `ny`, `nz`, optional vertex color through `r`, `g`, `b`, `a`, and optional `u`, `v` texture coordinates. Indices are 16-bit triangle-list indices. If normals are omitted, Rekall AGE infers averaged per-vertex normals from the triangle winding so simple generated meshes still light correctly.
 

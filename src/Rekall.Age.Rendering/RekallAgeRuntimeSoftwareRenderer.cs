@@ -117,6 +117,13 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         byte[] pixels)
     {
         if (renderable.Kind.Equals("mesh", StringComparison.Ordinal)
+            && renderable.LineSegments is { Segments.Count: > 0 })
+        {
+            DrawViewportLineSegments(frame, renderable, pixels);
+            return true;
+        }
+
+        if (renderable.Kind.Equals("mesh", StringComparison.Ordinal)
             && renderable.GeometryMesh is not null)
         {
             DrawAuthoredGeometryMesh(frame, renderable, pixels);
@@ -255,6 +262,36 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
             var shade = Math.Clamp(0.6 + diffuse * 0.4 * light.Intensity, 0.5, 1.1);
             var (r, g, b) = Shade(triangle.Color, shade);
             FillTriangle(frame, pixels, triangle.A, triangle.B, triangle.C, r, g, b);
+        }
+    }
+
+    private static void DrawViewportLineSegments(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable,
+        byte[] pixels)
+    {
+        var lineSegments = renderable.LineSegments;
+        if (lineSegments is null || lineSegments.Segments.Count == 0)
+        {
+            return;
+        }
+
+        var material = ResolveMaterialColor(renderable, new SoftwareColor(51, 221, 255));
+        var (centerX, centerY) = ResolveRenderableCenter(frame, renderable);
+        var size = ResolveLineSegmentSize(frame, renderable, lineSegments);
+        var thicknessPixels = Math.Max(1, (int)Math.Round(lineSegments.Thickness * size));
+
+        foreach (var segment in lineSegments.Segments)
+        {
+            var from = TransformLinePoint(segment.FromX, segment.FromY, segment.FromZ, renderable);
+            var to = TransformLinePoint(segment.ToX, segment.ToY, segment.ToZ, renderable);
+            DrawLine(
+                frame,
+                pixels,
+                Project(from, centerX, centerY, size),
+                Project(to, centerX, centerY, size),
+                material,
+                thicknessPixels);
         }
     }
 
@@ -439,6 +476,22 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         return Math.Max(14, Math.Min(frame.Width, frame.Height) * 0.22 * scale / extent);
     }
 
+    private static double ResolveLineSegmentSize(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable,
+        RekallAgeRuntimeViewportLineSegments lineSegments)
+    {
+        var minX = lineSegments.Segments.Min(segment => Math.Min(segment.FromX, segment.ToX));
+        var maxX = lineSegments.Segments.Max(segment => Math.Max(segment.FromX, segment.ToX));
+        var minY = lineSegments.Segments.Min(segment => Math.Min(segment.FromY, segment.ToY));
+        var maxY = lineSegments.Segments.Max(segment => Math.Max(segment.FromY, segment.ToY));
+        var minZ = lineSegments.Segments.Min(segment => Math.Min(segment.FromZ, segment.ToZ));
+        var maxZ = lineSegments.Segments.Max(segment => Math.Max(segment.FromZ, segment.ToZ));
+        var extent = Math.Max(0.1, Math.Max(maxX - minX, Math.Max(maxY - minY, maxZ - minZ)));
+        var scale = Math.Max(0.1, Math.Max(renderable.ScaleX, Math.Max(renderable.ScaleY, renderable.ScaleZ)));
+        return Math.Max(14, Math.Min(frame.Width, frame.Height) * 0.22 * scale / extent);
+    }
+
     private static SoftwareColor ResolveMaterialColor(
         RekallAgeRuntimeViewportRenderable renderable,
         SoftwareColor fallback)
@@ -518,6 +571,36 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         pixels[index + 1] = g;
         pixels[index + 2] = b;
         pixels[index + 3] = 255;
+    }
+
+    private static void DrawLine(
+        RekallAgeRuntimeViewportFrame frame,
+        byte[] pixels,
+        SoftwarePoint from,
+        SoftwarePoint to,
+        SoftwareColor material,
+        int thickness)
+    {
+        var deltaX = to.X - from.X;
+        var deltaY = to.Y - from.Y;
+        var steps = Math.Max(1, (int)Math.Ceiling(Math.Max(Math.Abs(deltaX), Math.Abs(deltaY))));
+        var radius = Math.Max(0, thickness / 2);
+        for (var step = 0; step <= steps; step++)
+        {
+            var t = step / (double)steps;
+            var x = (int)Math.Round(from.X + deltaX * t);
+            var y = (int)Math.Round(from.Y + deltaY * t);
+            for (var offsetY = -radius; offsetY <= radius; offsetY++)
+            {
+                for (var offsetX = -radius; offsetX <= radius; offsetX++)
+                {
+                    if (offsetX * offsetX + offsetY * offsetY <= radius * radius + 1)
+                    {
+                        SetPixel(frame, pixels, x + offsetX, y + offsetY, material, 1);
+                    }
+                }
+            }
+        }
     }
 
     private static (byte R, byte G, byte B) Shade(SoftwareColor material, double shade)
@@ -604,6 +687,22 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         var x = centerX + (vertex.X - vertex.Z * 0.42) * size;
         var y = centerY - (vertex.Y + vertex.Z * 0.28) * size;
         return new SoftwarePoint(x, y);
+    }
+
+    private static SoftwareVec3 TransformLinePoint(
+        double x,
+        double y,
+        double z,
+        RekallAgeRuntimeViewportRenderable renderable)
+    {
+        return Rotate(
+            new SoftwareVec3(
+                x * Math.Max(0.1, renderable.ScaleX),
+                y * Math.Max(0.1, renderable.ScaleY),
+                z * Math.Max(0.1, renderable.ScaleZ)),
+            renderable.RotationX,
+            renderable.RotationY,
+            renderable.RotationZ);
     }
 
     private static void FillQuad(

@@ -8,12 +8,15 @@ namespace Rekall.Age.Runtime.Commands;
 public sealed record RunSceneRequest(
     string ProjectRoot,
     string SceneName,
-    double Seconds);
+    double Seconds,
+    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null);
 
 public sealed record RunSceneResult(
     bool Ok,
     int FramesSimulated,
     IReadOnlyList<string> ActiveSystems,
+    int InputActionCount,
+    IReadOnlyList<RekallAgeRuntimeInputAction> InputActions,
     IReadOnlyList<RekallAgeRuntimeObservation> Observations,
     IReadOnlyList<string> Errors);
 
@@ -37,12 +40,15 @@ public sealed class RunSceneCommand : IRekallAgeCommand<RunSceneRequest, RunScen
             request.ProjectRoot,
             request.SceneName,
             TimeSpan.FromSeconds(request.Seconds),
-            context.CancellationToken);
+            context.CancellationToken,
+            request.Inputs);
 
         var value = new RunSceneResult(
             result.Ok,
             result.FramesSimulated,
             result.ActiveSystems,
+            result.InputActions.Count,
+            result.InputActions,
             result.Observations,
             result.Errors);
 

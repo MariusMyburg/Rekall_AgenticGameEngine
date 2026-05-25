@@ -17,6 +17,7 @@ using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
+using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.Runtime.Commands;
 using Rekall.Age.Validation;
 using Rekall.Age.World;
@@ -218,6 +219,12 @@ internal static class RekallAgeCli
                     await ImportKsaPlanetAsync(registry, context, root, scene, ksaRoot, bodyId, null),
                 ["planet", "import-ksa", var root, var scene, var ksaRoot, var bodyId, var entityName] =>
                     await ImportKsaPlanetAsync(registry, context, root, scene, ksaRoot, bodyId, entityName),
+                ["solar", "import-ksa-system", var root, var scene, var ksaRoot] =>
+                    await ImportKsaSolarSystemAsync(registry, context, root, scene, ksaRoot, "SolSystem.xml", "0.000001", "0.00002"),
+                ["solar", "import-ksa-system", var root, var scene, var ksaRoot, var systemFileName] =>
+                    await ImportKsaSolarSystemAsync(registry, context, root, scene, ksaRoot, systemFileName, "0.000001", "0.00002"),
+                ["solar", "import-ksa-system", var root, var scene, var ksaRoot, var systemFileName, var distanceScale, var radiusScale] =>
+                    await ImportKsaSolarSystemAsync(registry, context, root, scene, ksaRoot, systemFileName, distanceScale, radiusScale),
                 ["play", "scene", var root, var scene, var frames] => await PlaySceneAsync(registry, context, root, scene, frames, null),
                 ["play", "scene", var root, var scene, var frames, var inputsJson] => await PlaySceneAsync(registry, context, root, scene, frames, inputsJson),
                 ["play", "capture-frame", var root, var scene, var outputDirectory] =>
@@ -232,8 +239,10 @@ internal static class RekallAgeCli
                     await PlaytestSceneAsync(registry, context, root, scene, frames, inputsJson, assertionsJson, null),
                 ["playtest", "scene", var root, var scene, var frames, var inputsJson, var assertionsJson, var drawAssertionsJson] =>
                     await PlaytestSceneAsync(registry, context, root, scene, frames, inputsJson, assertionsJson, drawAssertionsJson),
-                ["run", "scene", var root, var scene, var seconds] => await RunSceneAsync(registry, context, root, scene, seconds),
-                ["runtime", "inspect", var root, var scene, var frames] => await InspectRuntimeAsync(registry, context, root, scene, frames),
+                ["run", "scene", var root, var scene, var seconds] => await RunSceneAsync(registry, context, root, scene, seconds, null),
+                ["run", "scene", var root, var scene, var seconds, var inputsJson] => await RunSceneAsync(registry, context, root, scene, seconds, inputsJson),
+                ["runtime", "inspect", var root, var scene, var frames] => await InspectRuntimeAsync(registry, context, root, scene, frames, null),
+                ["runtime", "inspect", var root, var scene, var frames, var inputsJson] => await InspectRuntimeAsync(registry, context, root, scene, frames, inputsJson),
                 ["context", "engine"] => await PrintEngineStatusAsync(registry, context),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
@@ -383,6 +392,7 @@ internal static class RekallAgeCli
         registry.Register(new CreateGeometryRecipeCommand());
         registry.Register(new CreateGeometryExtrusionCommand());
         registry.Register(new ImportKsaPlanetCommand());
+        registry.Register(new ImportKsaSolarSystemCommand());
         registry.Register(new ParentEntityCommand());
         registry.Register(new CreatePrefabFromEntityCommand());
         registry.Register(new InstantiatePrefabCommand());
@@ -391,6 +401,11 @@ internal static class RekallAgeCli
         registry.Register(new PlaytestSceneCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new InspectSceneRuntimeCommand());
+        registry.Register(new LivePlayerStatusCommand());
+        registry.Register(new LivePlayerReloadSceneCommand());
+        registry.Register(new LivePlayerReloadAssetsCommand());
+        registry.Register(new LivePlayerApplySceneBlueprintCommand());
+        registry.Register(new LivePlayerApplySceneDiffCommand());
         registry.Register(new CaptureScreenshotCommand());
         registry.Register(new CaptureRuntimeViewportCommand());
         registry.Register(new ExportSceneGlbCommand());
@@ -1307,6 +1322,33 @@ internal static class RekallAgeCli
         Console.WriteLine(result.Summary);
         Console.WriteLine(result.Value.EntityId);
         Console.WriteLine(result.Value.ImportedAssetCount);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ImportKsaSolarSystemAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string ksaRoot,
+        string systemFileName,
+        string distanceScale,
+        string radiusScale)
+    {
+        var result = await registry.ExecuteAsync<ImportKsaSolarSystemRequest, ImportKsaSolarSystemResult>(
+            "rekall.solar.import_ksa_system",
+            new ImportKsaSolarSystemRequest(
+                root,
+                scene,
+                ksaRoot,
+                systemFileName,
+                DistanceScale: double.Parse(distanceScale, CultureInfo.InvariantCulture),
+                RadiusScale: double.Parse(radiusScale, CultureInfo.InvariantCulture)),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Bodies: {result.Value.BodyCount}");
+        Console.WriteLine($"Imported assets: {result.Value.ImportedAssetCount}");
+        Console.WriteLine(string.Join(", ", result.Value.BodyIds));
         return result.Ok ? 0 : 1;
     }
 
@@ -2249,16 +2291,26 @@ internal static class RekallAgeCli
         RekallAgeCommandContext context,
         string root,
         string scene,
-        string seconds)
+        string seconds,
+        string? inputsJson)
     {
         var duration = double.Parse(seconds, System.Globalization.CultureInfo.InvariantCulture);
+        var inputs = await ParseRuntimeInputFramesAsync(inputsJson, context.CancellationToken);
         var result = await registry.ExecuteAsync<RunSceneRequest, RunSceneResult>(
             "rekall.run.scene",
-            new RunSceneRequest(root, scene, duration),
+            new RunSceneRequest(root, scene, duration, inputs),
             context);
 
         Console.WriteLine($"Simulated {scene}: {result.Value.FramesSimulated} frames");
         Console.WriteLine($"Systems: {string.Join(", ", result.Value.ActiveSystems)}");
+        Console.WriteLine(
+            $"Observation systems: {string.Join(", ", result.Value.Observations.Select(observation => observation.System).Distinct(StringComparer.Ordinal).OrderBy(system => system, StringComparer.Ordinal))}");
+        Console.WriteLine($"Input actions: {result.Value.InputActionCount}");
+        foreach (var action in result.Value.InputActions)
+        {
+            Console.WriteLine($"  {action.Name}: value={action.Value} down={action.IsDown} pressed={action.WasPressed} released={action.WasReleased}");
+        }
+
         return result.Ok ? 0 : 1;
     }
 
@@ -2267,12 +2319,14 @@ internal static class RekallAgeCli
         RekallAgeCommandContext context,
         string root,
         string scene,
-        string frames)
+        string frames,
+        string? inputsJson)
     {
         var frameCount = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
+        var inputs = await ParseRuntimeInputFramesAsync(inputsJson, context.CancellationToken);
         var result = await registry.ExecuteAsync<InspectSceneRuntimeRequest, InspectSceneRuntimeResult>(
             "rekall.runtime.inspect_scene",
-            new InspectSceneRuntimeRequest(root, scene, frameCount),
+            new InspectSceneRuntimeRequest(root, scene, frameCount, inputs),
             context);
 
         Console.WriteLine(result.Summary);
@@ -2283,6 +2337,12 @@ internal static class RekallAgeCli
         Console.WriteLine($"Audio: {result.Value.AudioListenerCount} listeners, {result.Value.AudioEmitterCount} emitters");
         Console.WriteLine($"Animation players: {result.Value.AnimationPlayerCount}");
         Console.WriteLine($"UI elements: {result.Value.UiElementCount}");
+        Console.WriteLine($"Input actions: {result.Value.InputActionCount}");
+        foreach (var action in result.Value.InputActions)
+        {
+            Console.WriteLine($"  {action.Name}: value={action.Value} down={action.IsDown} pressed={action.WasPressed} released={action.WasReleased}");
+        }
+
         Console.WriteLine($"Systems run: {string.Join(", ", result.Value.SystemsRun)}");
         foreach (var observation in result.Value.Observations)
         {
@@ -2323,6 +2383,15 @@ internal static class RekallAgeCli
         Console.WriteLine($"Acceleration: {result.Value.AccelerationStatus}");
         Console.WriteLine($"Selected device: {result.Value.SelectedDeviceName ?? "(none)"}");
         Console.WriteLine($"Active camera: {result.Value.ActiveCamera ?? "(none)"}");
+        Console.WriteLine(
+            $"Frame analysis: informative={result.Value.FrameAnalysis.VisuallyInformative}, analyzed={result.Value.FrameAnalysis.Analyzed}, distinctColors={result.Value.FrameAnalysis.DistinctColorCount}");
+        Console.WriteLine(
+            $"Dominant color: {result.Value.FrameAnalysis.DominantColorRatio:P1}, luminance={result.Value.FrameAnalysis.AverageLuminance:F3}, luminanceStdDev={result.Value.FrameAnalysis.LuminanceStandardDeviation:F3}");
+        foreach (var code in result.Value.FrameAnalysis.WarningCodes)
+        {
+            Console.WriteLine($"Frame warning: {code}");
+        }
+
         Console.WriteLine($"Renderable: {result.Value.RenderableCount}");
         Console.WriteLine($"Renderable kinds: {string.Join(", ", result.Value.RenderableKinds)}");
         Console.WriteLine($"Asset-backed: {result.Value.AssetBackedRenderableCount}");
@@ -2460,6 +2529,30 @@ internal static class RekallAgeCli
         catch (System.Text.Json.JsonException ex)
         {
             throw new ArgumentException($"Playback inputs JSON is invalid: {ex.Message}", ex);
+        }
+    }
+
+    private static async ValueTask<IReadOnlyList<RekallAgeRuntimeInputFrame>?> ParseRuntimeInputFramesAsync(
+        string? inputsJson,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(inputsJson))
+        {
+            return null;
+        }
+
+        var payload = File.Exists(inputsJson)
+            ? await File.ReadAllTextAsync(inputsJson, cancellationToken)
+            : inputsJson;
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<RekallAgeRuntimeInputFrame[]>(
+                payload,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new ArgumentException($"Runtime input frames JSON is invalid: {ex.Message}", ex);
         }
     }
 

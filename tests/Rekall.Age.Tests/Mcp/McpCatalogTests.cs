@@ -3,6 +3,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Build.Commands;
 using Rekall.Age.GameTemplates.Commands;
+using Rekall.Age.LevelDesign.Commands;
 using Rekall.Age.Mcp;
 using Rekall.Age.Modules.Commands;
 using Rekall.Age.Playback.Commands;
@@ -57,6 +58,12 @@ public sealed class McpCatalogTests
         registry.Register(new AssignShaderPipelineCommand());
         registry.Register(new ApplySceneBlueprintCommand());
         registry.Register(new DeleteEntityCommand());
+        registry.Register(new ImportKsaSolarSystemCommand());
+        registry.Register(new LivePlayerStatusCommand());
+        registry.Register(new LivePlayerReloadSceneCommand());
+        registry.Register(new LivePlayerReloadAssetsCommand());
+        registry.Register(new LivePlayerApplySceneBlueprintCommand());
+        registry.Register(new LivePlayerApplySceneDiffCommand());
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
@@ -97,6 +104,12 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.shader.assign_pipeline");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.scene.apply_blueprint");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.entity.delete");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.solar.import_ksa_system");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.live.status");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.live.reload_scene");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.live.reload_assets");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.live.apply_scene_blueprint");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.live.apply_scene_diff");
 
         var oneShot = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.create_playable_package_from_template");
         Assert.Equal("workflow", oneShot.Category);
@@ -122,6 +135,12 @@ public sealed class McpCatalogTests
         Assert.Equal("world", blueprintTool.Category);
         var deleteTool = catalog.Tools.Single(tool => tool.Name == "rekall.entity.delete");
         Assert.Equal("world", deleteTool.Category);
+        var solarTool = catalog.Tools.Single(tool => tool.Name == "rekall.solar.import_ksa_system");
+        Assert.Equal("world", solarTool.Category);
+        Assert.True(solarTool.Recommended);
+        var liveTool = catalog.Tools.Single(tool => tool.Name == "rekall.live.status");
+        Assert.Equal("live", liveTool.Category);
+        Assert.True(liveTool.Recommended);
         Assert.Equal("rekall.context.engine_status", catalog.Tools[0].Name);
         Assert.True(catalog.Tools.Index().All(item => item.Index == 0 || catalog.Tools[item.Index - 1].AgentPriority <= item.Item.AgentPriority));
     }

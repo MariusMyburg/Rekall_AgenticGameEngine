@@ -10,17 +10,20 @@ layout(set = 0, binding = 0) uniform FrameUniform
     mat4 viewProjection;
     vec4 lightDirection;
     vec4 lightColor;
+    vec4 lightPosition;
 } frame;
 
 layout(set = 0, binding = 1) uniform sampler2D baseColorTexture;
 layout(set = 0, binding = 2) uniform sampler2D normalTexture;
 layout(set = 0, binding = 3) uniform sampler2D metallicRoughnessTexture;
 layout(set = 0, binding = 4) uniform sampler2D occlusionTexture;
+layout(set = 0, binding = 5) uniform sampler2D emissiveTexture;
 
 layout(push_constant) uniform DrawPushConstants
 {
     mat4 model;
     vec4 materialFactors;
+    vec4 emissiveFactors;
 } draw;
 
 layout(location = 0) out vec4 outColor;
@@ -80,7 +83,9 @@ void main()
         occlusion = mix(1.0, texture(occlusionTexture, fragUv).r, draw.materialFactors.w);
     }
     vec3 normal = normalize(fragNormal);
-    vec3 light = normalize(-frame.lightDirection.xyz);
+    vec3 light = frame.lightPosition.w > 0.5
+        ? normalize(frame.lightPosition.xyz - fragWorldPosition)
+        : normalize(-frame.lightDirection.xyz);
     if (draw.materialFactors.z > 0.0001)
     {
         normal = perturbNormal(normal);
@@ -96,7 +101,8 @@ void main()
     vec3 specular = d * g * f / max(4.0 * ndotv * ndotl, 0.0001);
     vec3 diffuse = (1.0 - f) * (1.0 - metallic) * albedo / PI;
     vec3 ambient = albedo * 0.035 * occlusion;
-    vec3 color = ambient + (diffuse + specular) * frame.lightColor.rgb * ndotl * 2.4;
+    vec3 emissive = pow(max(texture(emissiveTexture, fragUv).rgb * draw.emissiveFactors.rgb, vec3(0.0)), vec3(2.2)) * draw.emissiveFactors.a;
+    vec3 color = emissive + ambient + (diffuse + specular) * frame.lightColor.rgb * ndotl * 2.4;
     vec3 lit = pow(color, vec3(1.0 / 2.2));
     outColor = vec4(lit, fragColor.a * textureColor.a);
 }

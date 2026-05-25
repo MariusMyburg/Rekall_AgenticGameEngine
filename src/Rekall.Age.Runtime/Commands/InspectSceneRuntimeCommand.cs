@@ -6,7 +6,8 @@ namespace Rekall.Age.Runtime.Commands;
 public sealed record InspectSceneRuntimeRequest(
     string ProjectRoot,
     string SceneName,
-    int Frames);
+    int Frames,
+    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null);
 
 public sealed record InspectSceneRuntimeResult(
     string SceneName,
@@ -20,6 +21,8 @@ public sealed record InspectSceneRuntimeResult(
     int AudioEmitterCount,
     int AnimationPlayerCount,
     int UiElementCount,
+    int InputActionCount,
+    IReadOnlyList<RekallAgeRuntimeInputAction> InputActions,
     IReadOnlyList<string> SystemsRun,
     IReadOnlyList<RekallAgeRuntimeObservation> Observations);
 
@@ -51,6 +54,8 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
                 0,
                 0,
                 0,
+                0,
+                Array.Empty<RekallAgeRuntimeInputAction>(),
                 Array.Empty<string>(),
                 Array.Empty<RekallAgeRuntimeObservation>());
             return RekallAgeCommandResult<InspectSceneRuntimeResult>.Failure(
@@ -68,6 +73,7 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
             request.ProjectRoot,
             request.SceneName,
             Math.Max(0, request.Frames),
+            request.Inputs,
             context.CancellationToken);
         var result = ToResult(world);
         return RekallAgeCommandResult<InspectSceneRuntimeResult>.Success(
@@ -95,6 +101,8 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
             audio.Emitters.Count,
             animation.Players.Count,
             ui.Elements.Count,
+            world.Subsystems.Input.Actions.Count,
+            world.Subsystems.Input.Actions,
             world.SystemsRun,
             world.Observations);
     }

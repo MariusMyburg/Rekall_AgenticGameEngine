@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace Rekall.Age.Rendering;
 
 public sealed record RekallAgeVulkanSceneMesh(
@@ -10,10 +12,12 @@ public sealed record RekallAgeVulkanSceneMesh(
     RekallAgeVulkanSceneTexture? MetallicRoughnessTexture = null,
     RekallAgeVulkanSceneTexture? NormalTexture = null,
     RekallAgeVulkanSceneTexture? OcclusionTexture = null,
+    RekallAgeVulkanSceneTexture? EmissiveTexture = null,
     float MetallicFactor = 0,
     float RoughnessFactor = 1,
     float NormalScale = 1,
-    float OcclusionStrength = 1);
+    float OcclusionStrength = 1,
+    Vector4 EmissiveFactor = default);
 
 public sealed record RekallAgeVulkanSceneTexture(
     string Id,

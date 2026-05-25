@@ -22,6 +22,7 @@ coverage/
 Artifacts/
 .age-sandbox/
 .age-tmp/
+.age-*/
 .agecache/
 *.agecache
 .worktrees/

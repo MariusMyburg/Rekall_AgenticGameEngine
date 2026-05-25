@@ -115,6 +115,58 @@ public sealed class SceneRuntimeFoundationTests
     }
 
     [Fact]
+    public void BuilderProjectsVisibleStellarBodiesAsPointLights()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "celestial", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Sol", ["celestial"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject()))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.CelestialBody",
+                    new JsonObject
+                    {
+                        ["bodyId"] = "Sol",
+                        ["type"] = "StellarBody",
+                        ["massKg"] = 1.98847e30,
+                        ["color"] = "#ffb347"
+                    })));
+
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var light = Assert.Single(world.Subsystems.Rendering.Lights);
+        Assert.Equal("Sol", light.EntityName);
+        Assert.Equal("PointLight", light.Kind);
+        Assert.Equal(4, light.Intensity);
+        Assert.Equal("#ffb347", light.Color);
+    }
+
+    [Fact]
+    public void BuilderDoesNotDuplicateAuthoredStellarPointLights()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "celestial", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Warm Star", ["celestial"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.CelestialBody",
+                    new JsonObject
+                    {
+                        ["bodyId"] = "WarmStar",
+                        ["type"] = "StellarBody",
+                        ["color"] = "#ffb347"
+                    }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PointLight",
+                    new JsonObject { ["intensity"] = 2.25 })));
+
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var light = Assert.Single(world.Subsystems.Rendering.Lights);
+        Assert.Equal("PointLight", light.Kind);
+        Assert.Equal(2.25, light.Intensity);
+        Assert.Equal("#ffb347", light.Color);
+    }
+
+    [Fact]
     public void GameplayInterpreterEmitsStructuredCompatibilityObservations()
     {
         var scene = RekallAgeSceneDocument.Create("Main", ["world"])
@@ -147,12 +199,17 @@ public sealed class SceneRuntimeFoundationTests
         Assert.Equal(3, result.FramesSimulated);
         Assert.Equal(
             [
+                "runtime.input.actions",
+                "runtime.celestial.kepler",
+                "runtime.celestial.rotation",
                 "runtime.animation",
                 "runtime.audio",
                 "runtime.physics.bepu",
                 "runtime.rendering",
                 "runtime.transform",
-                "runtime.ui"
+                "runtime.ui",
+                "runtime.input.camera",
+                "runtime.camera.target3d"
             ],
             result.SystemsRun);
     }

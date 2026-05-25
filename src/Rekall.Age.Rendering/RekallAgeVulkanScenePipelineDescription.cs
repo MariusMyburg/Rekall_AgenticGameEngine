@@ -23,9 +23,10 @@ public sealed record RekallAgeVulkanScenePipelineDescription(
             new RekallAgeVulkanDescriptorBindingDescription("BaseColorTexture", 1, "combined-image-sampler", "fragment"),
             new RekallAgeVulkanDescriptorBindingDescription("NormalTexture", 2, "combined-image-sampler", "fragment"),
             new RekallAgeVulkanDescriptorBindingDescription("MetallicRoughnessTexture", 3, "combined-image-sampler", "fragment"),
-            new RekallAgeVulkanDescriptorBindingDescription("OcclusionTexture", 4, "combined-image-sampler", "fragment")
+            new RekallAgeVulkanDescriptorBindingDescription("OcclusionTexture", 4, "combined-image-sampler", "fragment"),
+            new RekallAgeVulkanDescriptorBindingDescription("EmissiveTexture", 5, "combined-image-sampler", "fragment")
         ],
-        PushConstantBytes: 80,
+        PushConstantBytes: 96,
         DepthTestEnabled: true,
         TextureSamplingEnabled: true);
 }

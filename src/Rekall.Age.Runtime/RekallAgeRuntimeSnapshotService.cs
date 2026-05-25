@@ -30,6 +30,21 @@ public sealed class RekallAgeRuntimeSnapshotService
         int frames,
         CancellationToken cancellationToken)
     {
+        return await InspectSceneAsync(
+            projectRoot,
+            sceneName,
+            frames,
+            null,
+            cancellationToken);
+    }
+
+    public async ValueTask<RekallAgeRuntimeWorld> InspectSceneAsync(
+        string projectRoot,
+        string sceneName,
+        int frames,
+        IReadOnlyList<RekallAgeRuntimeInputFrame>? inputs,
+        CancellationToken cancellationToken)
+    {
         var scene = await _sceneStore.LoadAsync(projectRoot, sceneName, cancellationToken);
         var world = _worldBuilder.Build(scene);
         if (frames <= 0)
@@ -38,7 +53,15 @@ public sealed class RekallAgeRuntimeSnapshotService
         }
 
         var executionLoop = _executionLoop ?? RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
-        var result = await executionLoop.RunAsync(world, frames, cancellationToken);
-        return result.World;
+        for (var frame = 0; frame < frames; frame++)
+        {
+            var input = inputs is { Count: > 0 } && frame < inputs.Count
+                ? inputs[frame].ToState()
+                : RekallAgeRuntimeInputState.Empty;
+            var result = await executionLoop.RunAsync(world, 1, cancellationToken, input);
+            world = result.World;
+        }
+
+        return world;
     }
 }

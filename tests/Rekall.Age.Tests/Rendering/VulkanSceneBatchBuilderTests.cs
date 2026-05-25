@@ -77,6 +77,76 @@ public sealed class VulkanSceneBatchBuilderTests
         Assert.NotEqual(Matrix4x4.Identity, batch.Frame.ViewProjection);
         Assert.InRange(batch.Frame.LightDirection.Length(), 0.99f, 1.01f);
         Assert.Equal(new Vector4(2, 2, 2, 1), batch.Frame.LightColor);
+        Assert.Equal(0, batch.Frame.LightPosition.W);
+    }
+
+    [Fact]
+    public void BuildUsesPointLightPositionWhenFrameContainsPointLight()
+    {
+        var frame = CreateFrame(
+            new RekallAgeRuntimeViewportRenderable(
+                "planet-1",
+                "Planet",
+                "mesh",
+                "rekall.planet.surface",
+                30,
+                0,
+                0,
+                1,
+                Variant: "rekall.planet.surface"),
+            new RekallAgeRuntimeViewportRenderable(
+                "sun-light",
+                "Sun Light",
+                "light",
+                null,
+                0,
+                0,
+                0,
+                2,
+                Variant: "PointLight",
+                Intensity: 3));
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
+
+        Assert.Equal(new Vector4(0, 0, 0, 1), batch.Frame.LightPosition);
+        Assert.Equal(new Vector4(3, 3, 3, 1), batch.Frame.LightColor);
+    }
+
+    [Fact]
+    public void BuildTintsLightColorFromAuthoredLightMaterialColor()
+    {
+        var frame = CreateFrame(
+            new RekallAgeRuntimeViewportRenderable(
+                "planet-1",
+                "Planet",
+                "mesh",
+                "rekall.planet.surface",
+                30,
+                0,
+                0,
+                1,
+                Variant: "rekall.planet.surface"),
+            new RekallAgeRuntimeViewportRenderable(
+                "sun-light",
+                "Sun Light",
+                "light",
+                null,
+                0,
+                0,
+                0,
+                2,
+                Variant: "PointLight",
+                Intensity: 2,
+                MaterialColor: "#ffb347"));
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
+
+        Assert.Equal(2, batch.Frame.LightColor.X, precision: 3);
+        Assert.Equal(1.404, batch.Frame.LightColor.Y, precision: 3);
+        Assert.Equal(0.557, batch.Frame.LightColor.Z, precision: 3);
+        Assert.Equal(1, batch.Frame.LightColor.W);
     }
 
     [Fact]
@@ -138,6 +208,47 @@ public sealed class VulkanSceneBatchBuilderTests
         var draw = Assert.Single(new RekallAgeVulkanSceneBatchBuilder().Build(frame, [mesh]).Draws);
 
         Assert.Equal("asset_station/texture/0", draw.TextureId);
+    }
+
+    [Fact]
+    public void BuildCarriesEmissiveTextureIdAndFactorsIntoDrawRanges()
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "lamp",
+            "Lamp",
+            "mesh",
+            "rekall.geometry.sphere",
+            0,
+            0,
+            0,
+            1));
+        var texture = new RekallAgeVulkanSceneTexture(
+            "asset_lamp/emissive",
+            1,
+            1,
+            [255, 255, 255, 255],
+            new RekallAgeVulkanSceneSampler(
+                RekallAgeVulkanSceneFilter.Linear,
+                RekallAgeVulkanSceneFilter.Linear,
+                RekallAgeVulkanSceneWrapMode.Repeat,
+                RekallAgeVulkanSceneWrapMode.Repeat));
+        var mesh = new RekallAgeVulkanSceneMesh(
+            "lamp",
+            "Lamp Mesh",
+            "sphere",
+            [
+                new RekallAgeVulkanSceneVertex(0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0),
+                new RekallAgeVulkanSceneVertex(1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0),
+                new RekallAgeVulkanSceneVertex(0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 1)
+            ],
+            [0, 1, 2],
+            EmissiveTexture: texture,
+            EmissiveFactor: new Vector4(1, 0.5f, 0.1f, 4));
+
+        var draw = Assert.Single(new RekallAgeVulkanSceneBatchBuilder().Build(frame, [mesh]).Draws);
+
+        Assert.Equal("asset_lamp/emissive", draw.EmissiveTextureId);
+        Assert.Equal(new Vector4(1, 0.5f, 0.1f, 4), draw.EmissiveFactors);
     }
 
     private static RekallAgeVulkanSceneMesh CreateLargeMesh(string entityId, int vertexCount)

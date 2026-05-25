@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using Rekall.Age.Rendering.Abstractions;
 
 namespace Rekall.Age.Rendering;
@@ -54,7 +55,8 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
 
     public static bool IsSupportedMeshRenderable(RekallAgeRuntimeViewportRenderable renderable)
     {
-        return HasValidAuthoredGeometryMesh(renderable)
+        return HasValidViewportLineSegments(renderable)
+            || HasValidAuthoredGeometryMesh(renderable)
             || TryGetSupportedPrimitive(renderable) is not null;
     }
 
@@ -62,9 +64,15 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
         RekallAgeRuntimeViewportRenderable renderable,
         RekallAgeRuntimeViewportAssetSet assets)
     {
+        if (HasValidViewportLineSegments(renderable))
+        {
+            yield return BindRenderableMaterial(BuildViewportLineSegments(renderable), renderable, assets);
+            yield break;
+        }
+
         if (HasValidAuthoredGeometryMesh(renderable))
         {
-            yield return BindRenderableTexture(BuildAuthoredGeometryMesh(renderable), renderable, assets);
+            yield return BindRenderableMaterial(BuildAuthoredGeometryMesh(renderable), renderable, assets);
             yield break;
         }
 
@@ -81,7 +89,7 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
                 "cone" => BuildCone(renderable, primitive, 16),
                 _ => throw new InvalidOperationException($"Unsupported primitive '{primitive}'.")
             };
-            yield return BindRenderableTexture(mesh, renderable, assets);
+            yield return BindRenderableMaterial(mesh, renderable, assets);
             yield break;
         }
 
@@ -93,7 +101,7 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
 
         foreach (var mesh in modelMeshes)
         {
-            yield return BindRenderableTexture(mesh with
+            yield return BindRenderableMaterial(mesh with
             {
                 EntityId = renderable.EntityId,
                 EntityName = renderable.EntityName
@@ -101,41 +109,69 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
         }
     }
 
-    private static RekallAgeVulkanSceneMesh BindRenderableTexture(
+    private static RekallAgeVulkanSceneMesh BindRenderableMaterial(
         RekallAgeVulkanSceneMesh mesh,
         RekallAgeRuntimeViewportRenderable renderable,
         RekallAgeRuntimeViewportAssetSet assets)
     {
-        if (string.IsNullOrWhiteSpace(renderable.TextureAssetId))
-        {
-            return mesh;
-        }
-
-        if (!assets.Images.TryGetValue(renderable.TextureAssetId, out var image))
-        {
-            return assets.Textures.TryGetValue(renderable.TextureAssetId, out var runtimeTexture)
-                ? mesh with
-                {
-                    BaseColorTexture = new RekallAgeVulkanSceneTexture(
-                        renderable.TextureAssetId,
-                        runtimeTexture.Width,
-                        runtimeTexture.Height,
-                        [],
-                        DefaultSampler(),
-                        runtimeTexture)
-                }
-                : mesh;
-        }
-
         return mesh with
         {
-            BaseColorTexture = new RekallAgeVulkanSceneTexture(
-                renderable.TextureAssetId,
+            BaseColorTexture = ResolveTexture(renderable.TextureAssetId, assets) ?? mesh.BaseColorTexture,
+            MetallicRoughnessTexture = ResolveTexture(renderable.MetallicRoughnessTextureAssetId, assets) ?? mesh.MetallicRoughnessTexture,
+            NormalTexture = ResolveTexture(renderable.NormalTextureAssetId, assets) ?? mesh.NormalTexture,
+            OcclusionTexture = ResolveTexture(renderable.OcclusionTextureAssetId, assets) ?? mesh.OcclusionTexture,
+            EmissiveTexture = ResolveTexture(renderable.EmissiveTextureAssetId, assets) ?? mesh.EmissiveTexture,
+            MetallicFactor = renderable.MetallicFactor == 0 ? mesh.MetallicFactor : (float)Math.Clamp(renderable.MetallicFactor, 0, 1),
+            RoughnessFactor = renderable.RoughnessFactor == 1 ? mesh.RoughnessFactor : (float)Math.Clamp(renderable.RoughnessFactor, 0.04, 1),
+            NormalScale = renderable.NormalScale == 1 ? mesh.NormalScale : (float)Math.Clamp(renderable.NormalScale, 0, 4),
+            OcclusionStrength = renderable.OcclusionStrength == 1 ? mesh.OcclusionStrength : (float)Math.Clamp(renderable.OcclusionStrength, 0, 1),
+            EmissiveFactor = renderable.EmissiveStrength <= 0 ? mesh.EmissiveFactor : ResolveEmissiveFactor(renderable)
+        };
+    }
+
+    private static RekallAgeVulkanSceneTexture? ResolveTexture(
+        string? assetId,
+        RekallAgeRuntimeViewportAssetSet assets)
+    {
+        if (string.IsNullOrWhiteSpace(assetId))
+        {
+            return null;
+        }
+
+        if (assets.Images.TryGetValue(assetId, out var image))
+        {
+            return new RekallAgeVulkanSceneTexture(
+                assetId,
                 image.Width,
                 image.Height,
                 image.Rgba,
-                DefaultSampler())
-        };
+                DefaultSampler());
+        }
+
+        return assets.Textures.TryGetValue(assetId, out var runtimeTexture)
+            ? new RekallAgeVulkanSceneTexture(
+                assetId,
+                runtimeTexture.Width,
+                runtimeTexture.Height,
+                [],
+                DefaultSampler(),
+                runtimeTexture)
+            : null;
+    }
+
+    private static Vector4 ResolveEmissiveFactor(RekallAgeRuntimeViewportRenderable renderable)
+    {
+        if (renderable.EmissiveStrength <= 0)
+        {
+            return Vector4.Zero;
+        }
+
+        var color = ParseColor(renderable.EmissiveColor ?? "#ffffff");
+        return new Vector4(
+            color.R,
+            color.G,
+            color.B,
+            (float)Math.Clamp(renderable.EmissiveStrength, 0, 64));
     }
 
     private static RekallAgeVulkanSceneMesh BuildAuthoredGeometryMesh(RekallAgeRuntimeViewportRenderable renderable)
@@ -169,6 +205,103 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             "mesh",
             vertices,
             geometry.Indices.Select(index => (uint)index).ToArray());
+    }
+
+    private static RekallAgeVulkanSceneMesh BuildViewportLineSegments(RekallAgeRuntimeViewportRenderable renderable)
+    {
+        var lineSegments = renderable.LineSegments!;
+        var color = ParseColor(renderable.MaterialColor);
+        var thickness = Math.Clamp((float)lineSegments.Thickness, 0.001f, 100f);
+        var vertices = new List<RekallAgeVulkanSceneVertex>(lineSegments.Segments.Count * 8);
+        var indices = new List<uint>(lineSegments.Segments.Count * 12);
+
+        foreach (var segment in lineSegments.Segments)
+        {
+            AddLineSegmentRibbon(
+                vertices,
+                indices,
+                color,
+                new Vector3((float)segment.FromX, (float)segment.FromY, (float)segment.FromZ),
+                new Vector3((float)segment.ToX, (float)segment.ToY, (float)segment.ToZ),
+                thickness);
+        }
+
+        return new RekallAgeVulkanSceneMesh(
+            renderable.EntityId,
+            renderable.EntityName,
+            "line-segments",
+            vertices,
+            indices);
+    }
+
+    private static bool HasValidViewportLineSegments(RekallAgeRuntimeViewportRenderable renderable)
+    {
+        return renderable.Kind.Equals("mesh", StringComparison.Ordinal)
+            && renderable.LineSegments is { } lineSegments
+            && lineSegments.Segments.Count > 0
+            && lineSegments.Thickness > 0
+            && lineSegments.Segments.Count <= ushort.MaxValue / 8;
+    }
+
+    private static void AddLineSegmentRibbon(
+        List<RekallAgeVulkanSceneVertex> vertices,
+        List<uint> indices,
+        SceneColor color,
+        Vector3 from,
+        Vector3 to,
+        float thickness)
+    {
+        var direction = to - from;
+        if (direction.LengthSquared() <= 0.000001f)
+        {
+            return;
+        }
+
+        var side = Vector3.Normalize(Vector3.Cross(direction, Vector3.UnitY));
+        if (!IsFinite(side) || side.LengthSquared() <= 0.000001f)
+        {
+            side = Vector3.Normalize(Vector3.Cross(direction, Vector3.UnitX));
+        }
+
+        var secondSide = Vector3.Normalize(Vector3.Cross(direction, side));
+        AddLineRibbon(vertices, indices, color, from, to, side, thickness);
+        AddLineRibbon(vertices, indices, color, from, to, secondSide, thickness);
+    }
+
+    private static void AddLineRibbon(
+        List<RekallAgeVulkanSceneVertex> vertices,
+        List<uint> indices,
+        SceneColor color,
+        Vector3 from,
+        Vector3 to,
+        Vector3 side,
+        float thickness)
+    {
+        if (!IsFinite(side) || side.LengthSquared() <= 0.000001f)
+        {
+            return;
+        }
+
+        var normal = Normalize(side.X, side.Y, side.Z);
+        var offset = side * (thickness * 0.5f);
+        var start = checked((uint)vertices.Count);
+        vertices.Add(Vertex((from.X + offset.X, from.Y + offset.Y, from.Z + offset.Z), normal, color, 0, 0));
+        vertices.Add(Vertex((from.X - offset.X, from.Y - offset.Y, from.Z - offset.Z), normal, color, 0, 1));
+        vertices.Add(Vertex((to.X + offset.X, to.Y + offset.Y, to.Z + offset.Z), normal, color, 1, 0));
+        vertices.Add(Vertex((to.X - offset.X, to.Y - offset.Y, to.Z - offset.Z), normal, color, 1, 1));
+        indices.Add(start);
+        indices.Add(start + 2);
+        indices.Add(start + 1);
+        indices.Add(start + 1);
+        indices.Add(start + 2);
+        indices.Add(start + 3);
+    }
+
+    private static bool IsFinite(Vector3 value)
+    {
+        return float.IsFinite(value.X)
+            && float.IsFinite(value.Y)
+            && float.IsFinite(value.Z);
     }
 
     private static bool HasValidAuthoredGeometryMesh(RekallAgeRuntimeViewportRenderable renderable)

@@ -20,7 +20,8 @@ public sealed class RekallAgeHeadlessRuntime
         string projectRoot,
         string sceneName,
         TimeSpan duration,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyList<RekallAgeRuntimeInputFrame>? inputs = null)
     {
         var scene = await _sceneStore.LoadAsync(projectRoot, sceneName, cancellationToken);
 
@@ -35,14 +36,26 @@ public sealed class RekallAgeHeadlessRuntime
 
         var frameTime = TimeSpan.FromSeconds(1.0 / 60.0);
         var frames = Math.Max(1, (int)Math.Ceiling(duration.TotalSeconds / frameTime.TotalSeconds));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        var loop = RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
 
         for (var frame = 0; frame < frames; frame++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await Task.Yield();
+            var input = inputs is { Count: > 0 } && frame < inputs.Count
+                ? inputs[frame].ToState()
+                : RekallAgeRuntimeInputState.Empty;
+            var result = await loop.RunAsync(world, 1, cancellationToken, input);
+            world = result.World;
         }
 
-        var observations = _interpreter.Observe(scene, frames);
-        return new RekallAgeRuntimeResult(true, frames, duration, Array.Empty<string>(), observations);
+        var observations = world.Observations
+            .Concat(_interpreter.Observe(scene, frames))
+            .ToArray();
+        return new RekallAgeRuntimeResult(true, frames, duration, Array.Empty<string>(), observations)
+        {
+            SystemsRun = world.SystemsRun,
+            InputActions = world.Subsystems.Input.Actions
+        };
     }
 }

@@ -199,11 +199,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     draw.FirstIndex,
                     draw.IndexCount,
                     draw.VertexOffset,
-                    ToGpuDrawPushConstants(draw.Model, draw.MaterialFactors),
+                    ToGpuDrawPushConstants(draw.Model, draw.MaterialFactors, draw.EmissiveFactors),
                     draw.TextureId,
                     draw.MetallicRoughnessTextureId,
                     draw.NormalTextureId,
-                    draw.OcclusionTextureId))
+                    draw.OcclusionTextureId,
+                    draw.EmissiveTextureId))
                 .ToArray();
 
             if (gpuVertices.Length == 0 || indices.Length == 0)
@@ -223,8 +224,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 }
 
                 CreateDevice(state);
-                CreateImage(state, checked((uint)frame.Width), checked((uint)frame.Height), Format.R8G8B8A8Unorm, ImageUsageFlags.ColorAttachmentBit | ImageUsageFlags.TransferSrcBit, ImageAspectFlags.ColorBit, out state.ColorImage, out state.ColorMemory, out state.ColorView);
-                CreateImage(state, checked((uint)frame.Width), checked((uint)frame.Height), Format.D32Sfloat, ImageUsageFlags.DepthStencilAttachmentBit, ImageAspectFlags.DepthBit, out state.DepthImage, out state.DepthMemory, out state.DepthView);
+                CreateImage(state, checked((uint)frame.Width), checked((uint)frame.Height), Format.R8G8B8A8Unorm, ImageUsageFlags.ColorAttachmentBit | ImageUsageFlags.TransferSrcBit, ImageAspectFlags.ColorBit, 1, out state.ColorImage, out state.ColorMemory, out state.ColorView);
+                CreateImage(state, checked((uint)frame.Width), checked((uint)frame.Height), Format.D32Sfloat, ImageUsageFlags.DepthStencilAttachmentBit, ImageAspectFlags.DepthBit, 1, out state.DepthImage, out state.DepthMemory, out state.DepthView);
                 CreateRenderPass(state);
                 CreateFramebuffer(state, checked((uint)frame.Width), checked((uint)frame.Height));
                 CreateBuffers(state, batch.Frame, gpuVertices, indices, checked((ulong)frame.Width * (ulong)frame.Height * 4));
@@ -429,6 +430,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             Format format,
             ImageUsageFlags usage,
             ImageAspectFlags aspect,
+            uint mipLevels,
             out Image image,
             out DeviceMemory memory,
             out ImageView view)
@@ -439,7 +441,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 ImageType = ImageType.Type2D,
                 Format = format,
                 Extent = new Extent3D(width, height, 1),
-                MipLevels = 1,
+                MipLevels = mipLevels,
                 ArrayLayers = 1,
                 Samples = SampleCountFlags.Count1Bit,
                 Tiling = ImageTiling.Optimal,
@@ -458,7 +460,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 ViewType = ImageViewType.Type2D,
                 Format = format,
                 Components = new ComponentMapping(ComponentSwizzle.Identity, ComponentSwizzle.Identity, ComponentSwizzle.Identity, ComponentSwizzle.Identity),
-                SubresourceRange = new ImageSubresourceRange(aspect, 0, 1, 0, 1)
+                SubresourceRange = new ImageSubresourceRange(aspect, 0, mipLevels, 0, 1)
             };
             ThrowIfFailed(state.Vk.CreateImageView(state.Device, &viewInfo, null, out view), "vkCreateImageView");
         }
@@ -559,10 +561,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     mesh.BaseColorTexture,
                     mesh.MetallicRoughnessTexture,
                     mesh.NormalTexture,
-                    mesh.OcclusionTexture
+                    mesh.OcclusionTexture,
+                    mesh.EmissiveTexture
                 })
                 .OfType<RekallAgeVulkanSceneTexture>()
-                .Where(texture => texture.RuntimeTexture is null && texture.Rgba.Length > 0)
                 .GroupBy(texture => texture.Id, StringComparer.Ordinal)
                 .Select(group => group.First())
                 .Concat(CreateDefaultTextures())
@@ -570,19 +572,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
             foreach (var texture in textures)
             {
-                CreateHostBuffer(state, texture.Rgba, BufferUsageFlags.TransferSrcBit, out var stagingBuffer, out var stagingMemory);
-                CreateImage(
-                    state,
-                    checked((uint)texture.Width),
-                    checked((uint)texture.Height),
-                    Format.R8G8B8A8Unorm,
-                    ImageUsageFlags.TransferDstBit | ImageUsageFlags.SampledBit,
-                    ImageAspectFlags.ColorBit,
-                    out var image,
-                    out var memory,
-                    out var view);
-                var sampler = CreateSampler(state, texture.Sampler);
-                var resource = new VulkanTextureResource(texture.Id, checked((uint)texture.Width), checked((uint)texture.Height), stagingBuffer, stagingMemory, image, memory, view, sampler);
+                if (!TryCreateTextureResource(state, texture, out var resource))
+                {
+                    continue;
+                }
+
                 state.Textures.Add(resource);
                 if (texture.Id.Equals("__rekall_white", StringComparison.Ordinal))
                 {
@@ -603,6 +597,122 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             }
         }
 
+        private static bool TryCreateTextureResource(
+            VulkanState state,
+            RekallAgeVulkanSceneTexture texture,
+            out VulkanTextureResource resource)
+        {
+            resource = default!;
+            if (texture.RuntimeTexture is { } runtimeTexture
+                && RekallAgeVulkanTextureFormatMapper.TryMapBlockCompressedFormat(runtimeTexture.Format, out var compressedFormat)
+                && runtimeTexture.MipLevels.Count > 0
+                && IsSampledTransferDestinationFormatSupported(state, compressedFormat))
+            {
+                return TryCreateRuntimeTextureResource(state, texture, runtimeTexture, compressedFormat, out resource);
+            }
+
+            if (texture.Rgba.Length == 0)
+            {
+                return false;
+            }
+
+            var upload = new VulkanTextureMipUpload(
+                0,
+                0,
+                checked((uint)texture.Width),
+                checked((uint)texture.Height));
+            return TryCreateTextureResource(
+                state,
+                texture.Id,
+                texture.Sampler,
+                Format.R8G8B8A8Unorm,
+                checked((uint)texture.Width),
+                checked((uint)texture.Height),
+                [upload],
+                texture.Rgba,
+                out resource);
+        }
+
+        private static bool TryCreateRuntimeTextureResource(
+            VulkanState state,
+            RekallAgeVulkanSceneTexture texture,
+            RekallAgeRuntimeTextureAsset runtimeTexture,
+            Format format,
+            out VulkanTextureResource resource)
+        {
+            var mips = runtimeTexture.MipLevels
+                .OrderBy(level => level.Level)
+                .ToArray();
+            var uploadBytes = new byte[mips.Sum(level => level.Bytes.Length)];
+            var uploads = new VulkanTextureMipUpload[mips.Length];
+            var offset = 0;
+            for (var index = 0; index < mips.Length; index++)
+            {
+                var mip = mips[index];
+                mip.Bytes.CopyTo(uploadBytes, offset);
+                uploads[index] = new VulkanTextureMipUpload(
+                    checked((ulong)offset),
+                    checked((uint)mip.Level),
+                    checked((uint)mip.Width),
+                    checked((uint)mip.Height));
+                offset += mip.Bytes.Length;
+            }
+
+            return TryCreateTextureResource(
+                state,
+                texture.Id,
+                texture.Sampler,
+                format,
+                checked((uint)runtimeTexture.Width),
+                checked((uint)runtimeTexture.Height),
+                uploads,
+                uploadBytes,
+                out resource);
+        }
+
+        private static bool TryCreateTextureResource(
+            VulkanState state,
+            string id,
+            RekallAgeVulkanSceneSampler samplerDescription,
+            Format format,
+            uint width,
+            uint height,
+            IReadOnlyList<VulkanTextureMipUpload> uploads,
+            byte[] uploadBytes,
+            out VulkanTextureResource resource)
+        {
+            resource = default!;
+            if (uploads.Count == 0 || uploadBytes.Length == 0)
+            {
+                return false;
+            }
+
+            CreateHostBuffer(state, uploadBytes, BufferUsageFlags.TransferSrcBit, out var stagingBuffer, out var stagingMemory);
+            CreateImage(
+                state,
+                width,
+                height,
+                format,
+                ImageUsageFlags.TransferDstBit | ImageUsageFlags.SampledBit,
+                ImageAspectFlags.ColorBit,
+                checked((uint)uploads.Count),
+                out var image,
+                out var memory,
+                out var view);
+            var sampler = CreateSampler(state, samplerDescription);
+            resource = new VulkanTextureResource(id, width, height, uploads, stagingBuffer, stagingMemory, image, memory, view, sampler);
+            return true;
+        }
+
+        private static bool IsSampledTransferDestinationFormatSupported(VulkanState state, Format format)
+        {
+            state.Vk.GetPhysicalDeviceFormatProperties(state.PhysicalDevice, format, out var properties);
+            const FormatFeatureFlags required =
+                FormatFeatureFlags.SampledImageBit
+                | FormatFeatureFlags.TransferDstBit;
+            return (properties.OptimalTilingFeatures & required) == required;
+        }
+
         private static IEnumerable<RekallAgeVulkanSceneTexture> CreateDefaultTextures()
         {
             var sampler = new RekallAgeVulkanSceneSampler(
@@ -617,7 +727,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
         private static void CreateDescriptors(VulkanState state, IReadOnlyList<DrawRange> drawRanges)
         {
-            var bindings = stackalloc DescriptorSetLayoutBinding[5];
+            var bindings = stackalloc DescriptorSetLayoutBinding[6];
             bindings[0] = new DescriptorSetLayoutBinding
             {
                 Binding = 0,
@@ -625,7 +735,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 DescriptorType = DescriptorType.UniformBuffer,
                 StageFlags = ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit
             };
-            for (var i = 1u; i <= 4; i++)
+            for (var i = 1u; i <= 5; i++)
             {
                 bindings[i] = new DescriptorSetLayoutBinding
                 {
@@ -639,7 +749,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             var layoutInfo = new DescriptorSetLayoutCreateInfo
             {
                 SType = StructureType.DescriptorSetLayoutCreateInfo,
-                BindingCount = 5,
+                BindingCount = 6,
                 PBindings = bindings
             };
             ThrowIfFailed(state.Vk.CreateDescriptorSetLayout(state.Device, &layoutInfo, null, out state.DescriptorSetLayout), "vkCreateDescriptorSetLayout");
@@ -653,7 +763,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             var poolSizes = stackalloc DescriptorPoolSize[]
             {
                 new(DescriptorType.UniformBuffer, descriptorSetCount),
-                new(DescriptorType.CombinedImageSampler, checked(descriptorSetCount * 4))
+                new(DescriptorType.CombinedImageSampler, checked(descriptorSetCount * 5))
             };
             var poolInfo = new DescriptorPoolCreateInfo
             {
@@ -681,11 +791,13 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 var normal = ResolveTextureResource(state, key.NormalTextureId, state.FlatNormalTexture!);
                 var metallicRoughness = ResolveTextureResource(state, key.MetallicRoughnessTextureId, state.DefaultMetallicRoughnessTexture!);
                 var occlusion = ResolveTextureResource(state, key.OcclusionTextureId, state.WhiteTexture!);
+                var emissive = ResolveTextureResource(state, key.EmissiveTextureId, state.WhiteTexture!);
                 var baseColorInfo = new DescriptorImageInfo(baseColor.Sampler, baseColor.View, ImageLayout.ShaderReadOnlyOptimal);
                 var normalInfo = new DescriptorImageInfo(normal.Sampler, normal.View, ImageLayout.ShaderReadOnlyOptimal);
                 var metallicRoughnessInfo = new DescriptorImageInfo(metallicRoughness.Sampler, metallicRoughness.View, ImageLayout.ShaderReadOnlyOptimal);
                 var occlusionInfo = new DescriptorImageInfo(occlusion.Sampler, occlusion.View, ImageLayout.ShaderReadOnlyOptimal);
-                var writes = new WriteDescriptorSet[5];
+                var emissiveInfo = new DescriptorImageInfo(emissive.Sampler, emissive.View, ImageLayout.ShaderReadOnlyOptimal);
+                var writes = new WriteDescriptorSet[6];
                 writes[0] = new WriteDescriptorSet
                 {
                     SType = StructureType.WriteDescriptorSet,
@@ -699,9 +811,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 writes[2] = ImageWrite(descriptorSet, 2, &normalInfo);
                 writes[3] = ImageWrite(descriptorSet, 3, &metallicRoughnessInfo);
                 writes[4] = ImageWrite(descriptorSet, 4, &occlusionInfo);
+                writes[5] = ImageWrite(descriptorSet, 5, &emissiveInfo);
                 fixed (WriteDescriptorSet* writesPtr = writes)
                 {
-                    state.Vk.UpdateDescriptorSets(state.Device, 5, writesPtr, 0, null);
+                    state.Vk.UpdateDescriptorSets(state.Device, 6, writesPtr, 0, null);
                 }
                 state.MaterialDescriptorSets[key] = descriptorSet;
                 if (key.Equals(MaterialKey.Default))
@@ -1027,17 +1140,30 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     0,
                     AccessFlags.TransferWriteBit,
                     PipelineStageFlags.TopOfPipeBit,
-                    PipelineStageFlags.TransferBit);
-                var copy = new BufferImageCopy
+                    PipelineStageFlags.TransferBit,
+                    checked((uint)texture.MipUploads.Count));
+                var copies = texture.MipUploads
+                    .Select(upload => new BufferImageCopy
+                    {
+                        BufferOffset = upload.BufferOffset,
+                        BufferRowLength = 0,
+                        BufferImageHeight = 0,
+                        ImageSubresource = new ImageSubresourceLayers(ImageAspectFlags.ColorBit, upload.MipLevel, 0, 1),
+                        ImageOffset = new Offset3D(0, 0, 0),
+                        ImageExtent = new Extent3D(upload.Width, upload.Height, 1)
+                    })
+                    .ToArray();
+                fixed (BufferImageCopy* copy = copies)
                 {
-                    BufferOffset = 0,
-                    BufferRowLength = 0,
-                    BufferImageHeight = 0,
-                    ImageSubresource = new ImageSubresourceLayers(ImageAspectFlags.ColorBit, 0, 0, 1),
-                    ImageOffset = new Offset3D(0, 0, 0),
-                    ImageExtent = new Extent3D(texture.Width, texture.Height, 1)
-                };
-                state.Vk.CmdCopyBufferToImage(state.CommandBuffer, texture.StagingBuffer, texture.Image, ImageLayout.TransferDstOptimal, 1, &copy);
+                    state.Vk.CmdCopyBufferToImage(
+                        state.CommandBuffer,
+                        texture.StagingBuffer,
+                        texture.Image,
+                        ImageLayout.TransferDstOptimal,
+                        checked((uint)copies.Length),
+                        copy);
+                }
+
                 TransitionImage(
                     state,
                     texture.Image,
@@ -1046,7 +1172,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     AccessFlags.TransferWriteBit,
                     AccessFlags.ShaderReadBit,
                     PipelineStageFlags.TransferBit,
-                    PipelineStageFlags.FragmentShaderBit);
+                    PipelineStageFlags.FragmentShaderBit,
+                    checked((uint)texture.MipUploads.Count));
             }
         }
 
@@ -1058,7 +1185,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             AccessFlags srcAccess,
             AccessFlags dstAccess,
             PipelineStageFlags srcStage,
-            PipelineStageFlags dstStage)
+            PipelineStageFlags dstStage,
+            uint mipLevels = 1)
         {
             var barrier = new ImageMemoryBarrier
             {
@@ -1070,7 +1198,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
                 DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
                 Image = image,
-                SubresourceRange = new ImageSubresourceRange(ImageAspectFlags.ColorBit, 0, 1, 0, 1)
+                SubresourceRange = new ImageSubresourceRange(ImageAspectFlags.ColorBit, 0, mipLevels, 0, 1)
             };
             state.Vk.CmdPipelineBarrier(
                 state.CommandBuffer,
@@ -1217,7 +1345,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 frame.LightColor.X,
                 frame.LightColor.Y,
                 frame.LightColor.Z,
-                frame.LightColor.W);
+                frame.LightColor.W,
+                frame.LightPosition.X,
+                frame.LightPosition.Y,
+                frame.LightPosition.Z,
+                frame.LightPosition.W);
         }
 
         private static GpuMatrix4x4 ToGpuMatrix(Matrix4x4 matrix)
@@ -1241,14 +1373,18 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 matrix.M44);
         }
 
-        private static GpuDrawPushConstants ToGpuDrawPushConstants(Matrix4x4 model, Vector4 materialFactors)
+        private static GpuDrawPushConstants ToGpuDrawPushConstants(Matrix4x4 model, Vector4 materialFactors, Vector4 emissiveFactors)
         {
             return new GpuDrawPushConstants(
                 ToGpuMatrix(model),
                 materialFactors.X,
                 materialFactors.Y,
                 materialFactors.Z,
-                materialFactors.W);
+                materialFactors.W,
+                emissiveFactors.X,
+                emissiveFactors.Y,
+                emissiveFactors.Z,
+                emissiveFactors.W);
         }
 
         private static string ReadDeviceName(PhysicalDeviceProperties properties)
@@ -1339,18 +1475,41 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             float M44);
 
         [StructLayout(LayoutKind.Sequential)]
-        private readonly record struct FrameUniform(GpuMatrix4x4 ViewProjection, float LightX, float LightY, float LightZ, float LightPad, float LightR, float LightG, float LightB, float LightA);
+        private readonly record struct FrameUniform(
+            GpuMatrix4x4 ViewProjection,
+            float LightX,
+            float LightY,
+            float LightZ,
+            float LightPad,
+            float LightR,
+            float LightG,
+            float LightB,
+            float LightA,
+            float LightPositionX,
+            float LightPositionY,
+            float LightPositionZ,
+            float LightPositionW);
 
         [StructLayout(LayoutKind.Sequential)]
-        private readonly record struct GpuDrawPushConstants(GpuMatrix4x4 Model, float MetallicFactor, float RoughnessFactor, float NormalScale, float OcclusionStrength);
+        private readonly record struct GpuDrawPushConstants(
+            GpuMatrix4x4 Model,
+            float MetallicFactor,
+            float RoughnessFactor,
+            float NormalScale,
+            float OcclusionStrength,
+            float EmissiveR,
+            float EmissiveG,
+            float EmissiveB,
+            float EmissiveStrength);
 
         private readonly record struct MaterialKey(
             string? BaseColorTextureId,
             string? NormalTextureId,
             string? MetallicRoughnessTextureId,
-            string? OcclusionTextureId)
+            string? OcclusionTextureId,
+            string? EmissiveTextureId)
         {
-            public static MaterialKey Default { get; } = new(null, null, null, null);
+            public static MaterialKey Default { get; } = new(null, null, null, null, null);
         }
 
         private readonly record struct DrawRange(
@@ -1361,12 +1520,19 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             string? BaseColorTextureId,
             string? MetallicRoughnessTextureId,
             string? NormalTextureId,
-            string? OcclusionTextureId)
+            string? OcclusionTextureId,
+            string? EmissiveTextureId)
         {
-            public MaterialKey MaterialKey => new(BaseColorTextureId, NormalTextureId, MetallicRoughnessTextureId, OcclusionTextureId);
+            public MaterialKey MaterialKey => new(BaseColorTextureId, NormalTextureId, MetallicRoughnessTextureId, OcclusionTextureId, EmissiveTextureId);
         }
 
         private readonly record struct DeviceCandidate(PhysicalDevice Device, string Name, PhysicalDeviceType DeviceType, uint ApiVersion, uint? QueueFamily);
+
+        private readonly record struct VulkanTextureMipUpload(
+            ulong BufferOffset,
+            uint MipLevel,
+            uint Width,
+            uint Height);
 
         private sealed class VulkanState : IDisposable
         {
@@ -1529,6 +1695,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 string id,
                 uint width,
                 uint height,
+                IReadOnlyList<VulkanTextureMipUpload> mipUploads,
                 Buffer stagingBuffer,
                 DeviceMemory stagingMemory,
                 Image image,
@@ -1539,6 +1706,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 Id = id;
                 Width = width;
                 Height = height;
+                MipUploads = mipUploads;
                 StagingBuffer = stagingBuffer;
                 StagingMemory = stagingMemory;
                 Image = image;
@@ -1550,6 +1718,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public string Id { get; }
             public uint Width { get; }
             public uint Height { get; }
+            public IReadOnlyList<VulkanTextureMipUpload> MipUploads { get; }
             public Buffer StagingBuffer { get; }
             public DeviceMemory StagingMemory { get; }
             public Image Image { get; }

@@ -25,4 +25,33 @@ public sealed class BuildModulesCommandTests
         Assert.True(File.Exists(module.AssemblyPath));
         Assert.EndsWith("CrystalMining.dll", module.AssemblyPath, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task BuildModulesCompilesWhenProjectRootIsRelative()
+    {
+        var parent = TestPaths.CreateTempDirectory();
+        var projectRoot = Path.Combine(parent, "relative-game");
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("build modules relative"), CancellationToken.None);
+        await new ScaffoldModuleCommand().ExecuteAsync(
+            new ScaffoldModuleRequest(projectRoot, "relative.flight", "Relative Flight", "RelativeFlight", "FlightController"),
+            context);
+        var previous = Environment.CurrentDirectory;
+        try
+        {
+            Environment.CurrentDirectory = parent;
+
+            var result = await new BuildModulesCommand().ExecuteAsync(
+                new BuildModulesRequest("relative-game"),
+                context);
+
+            Assert.True(result.Ok, result.Summary);
+            var module = Assert.Single(result.Value.Modules);
+            Assert.True(Path.IsPathFullyQualified(module.ProjectPath));
+            Assert.True(File.Exists(module.AssemblyPath));
+        }
+        finally
+        {
+            Environment.CurrentDirectory = previous;
+        }
+    }
 }

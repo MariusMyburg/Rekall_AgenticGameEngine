@@ -18,9 +18,12 @@ public sealed record RekallAgeVulkanSceneDraw(
     string? MetallicRoughnessTextureId = null,
     string? NormalTextureId = null,
     string? OcclusionTextureId = null,
-    Vector4 MaterialFactors = default);
+    string? EmissiveTextureId = null,
+    Vector4 MaterialFactors = default,
+    Vector4 EmissiveFactors = default);
 
 public sealed record RekallAgeVulkanSceneFrameUniform(
     Matrix4x4 ViewProjection,
     Vector3 LightDirection,
-    Vector4 LightColor);
+    Vector4 LightColor,
+    Vector4 LightPosition);

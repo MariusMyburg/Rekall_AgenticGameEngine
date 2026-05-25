@@ -4,6 +4,7 @@ using Rekall.Age.Core.Transactions;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime;
+using System.Runtime.CompilerServices;
 
 namespace Rekall.Age.Tests.Examples;
 
@@ -65,17 +66,26 @@ public sealed class BouncingBallExampleSceneTests
         Assert.InRange(Math.Abs(velocity["y"]!.GetValue<float>()), 0, 0.05);
     }
 
-    private static string FindRepositoryRoot()
+    private static string FindRepositoryRoot([CallerFilePath] string sourceFilePath = "")
     {
-        var directory = new DirectoryInfo(Directory.GetCurrentDirectory());
-        while (directory is not null)
+        var candidates = new[]
         {
-            if (File.Exists(Path.Combine(directory.FullName, "Rekall.AGE.sln")))
+            Directory.GetCurrentDirectory(),
+            AppContext.BaseDirectory,
+            Path.GetDirectoryName(sourceFilePath)
+        };
+        foreach (var candidate in candidates.Where(path => !string.IsNullOrWhiteSpace(path)))
+        {
+            var directory = new DirectoryInfo(candidate!);
+            while (directory is not null)
             {
-                return directory.FullName;
-            }
+                if (File.Exists(Path.Combine(directory.FullName, "Rekall.AGE.sln")))
+                {
+                    return directory.FullName;
+                }
 
-            directory = directory.Parent;
+                directory = directory.Parent;
+            }
         }
 
         throw new InvalidOperationException("Could not find repository root.");

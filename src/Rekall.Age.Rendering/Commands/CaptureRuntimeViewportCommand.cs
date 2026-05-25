@@ -35,7 +35,8 @@ public sealed record CaptureRuntimeViewportResult(
     string BackendId,
     bool HardwareAccelerated,
     string AccelerationStatus,
-    string? SelectedDeviceName);
+    string? SelectedDeviceName,
+    RekallAgeViewportFrameAnalysis FrameAnalysis);
 
 public sealed class CaptureRuntimeViewportCommand
     : IRekallAgeCommand<CaptureRuntimeViewportRequest, CaptureRuntimeViewportResult>
@@ -108,6 +109,7 @@ public sealed class CaptureRuntimeViewportCommand
             $"{world.SceneName}_runtime_{world.FrameIndex:000}.png",
             assets,
             context.CancellationToken);
+        var frameAnalysis = await AnalyzeCaptureAsync(capture.Captured, capture.ScreenshotPath, context.CancellationToken);
         var result = new CaptureRuntimeViewportResult(
             capture.Captured,
             capture.ScreenshotPath,
@@ -136,7 +138,8 @@ public sealed class CaptureRuntimeViewportCommand
             "software",
             false,
             "software-rasterized",
-            null);
+            null,
+            frameAnalysis);
 
         context.Transaction.RecordChangedResource(capture.ScreenshotPath);
         return RekallAgeCommandResult<CaptureRuntimeViewportResult>.Success(
@@ -161,6 +164,7 @@ public sealed class CaptureRuntimeViewportCommand
             request.OutputDirectory,
             request.PreferredDeviceType,
             context.CancellationToken);
+        var frameAnalysis = await AnalyzeCaptureAsync(capture.Captured, capture.OutputPath, context.CancellationToken);
         var result = new CaptureRuntimeViewportResult(
             capture.Captured,
             capture.OutputPath,
@@ -195,7 +199,8 @@ public sealed class CaptureRuntimeViewportCommand
             "vulkan",
             capture.Captured && capture.SelectedDevice is not null,
             capture.Captured ? "vulkan-scene-rendered" : "vulkan-scene-failed",
-            capture.SelectedDevice?.Name);
+            capture.SelectedDevice?.Name,
+            frameAnalysis);
 
         if (capture.Captured)
         {
@@ -229,6 +234,7 @@ public sealed class CaptureRuntimeViewportCommand
             request.OutputDirectory,
             ParseClearColor(frame.ActiveCamera?.ClearColor),
             context.CancellationToken);
+        var frameAnalysis = await AnalyzeCaptureAsync(capture.Captured, capture.OutputPath, context.CancellationToken);
         var result = new CaptureRuntimeViewportResult(
             capture.Captured,
             capture.OutputPath,
@@ -253,7 +259,8 @@ public sealed class CaptureRuntimeViewportCommand
             "vulkan",
             capture.Captured && capture.SelectedDevice is not null,
             capture.Captured ? "vulkan-clear-pass" : "vulkan-unavailable",
-            capture.SelectedDevice?.Name);
+            capture.SelectedDevice?.Name,
+            frameAnalysis);
 
         if (capture.Captured)
         {
@@ -332,6 +339,20 @@ public sealed class CaptureRuntimeViewportCommand
         return RekallAgeVulkanClearColor.Default;
     }
 
+    private static async ValueTask<RekallAgeViewportFrameAnalysis> AnalyzeCaptureAsync(
+        bool captured,
+        string screenshotPath,
+        CancellationToken cancellationToken)
+    {
+        if (!captured || string.IsNullOrWhiteSpace(screenshotPath) || !File.Exists(screenshotPath))
+        {
+            return RekallAgeViewportFrameAnalysis.NotAnalyzed;
+        }
+
+        var image = await RekallAgePngReader.ReadRgbaAsync(screenshotPath, cancellationToken);
+        return RekallAgeViewportFrameAnalyzer.Analyze(image);
+    }
+
     private static CaptureRuntimeViewportResult Empty(CaptureRuntimeViewportRequest request)
     {
         return new CaptureRuntimeViewportResult(
@@ -354,6 +375,7 @@ public sealed class CaptureRuntimeViewportCommand
             NormalizeBackendId(request.BackendId),
             false,
             "not-captured",
-            null);
+            null,
+            RekallAgeViewportFrameAnalysis.NotAnalyzed);
     }
 }

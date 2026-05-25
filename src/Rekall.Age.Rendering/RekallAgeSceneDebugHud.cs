@@ -28,7 +28,14 @@ public static class RekallAgeSceneDebugHud
         int drawCallCount = 0)
     {
         var textureCount = meshes
-            .Select(mesh => mesh.BaseColorTexture?.Id)
+            .SelectMany(mesh => new[]
+            {
+                mesh.BaseColorTexture?.Id,
+                mesh.MetallicRoughnessTexture?.Id,
+                mesh.NormalTexture?.Id,
+                mesh.OcclusionTexture?.Id,
+                mesh.EmissiveTexture?.Id
+            })
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Distinct(StringComparer.Ordinal)
             .Count();

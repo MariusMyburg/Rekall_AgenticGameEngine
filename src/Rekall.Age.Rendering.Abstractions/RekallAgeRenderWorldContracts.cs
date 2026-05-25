@@ -83,7 +83,18 @@ public sealed record RekallAgeRuntimeViewportRenderable(
     string? MaterialColor = null,
     RekallAgeRuntimeViewportGeometryMesh? GeometryMesh = null,
     string? TextureAssetId = null,
-    RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null);
+    string? MetallicRoughnessTextureAssetId = null,
+    string? NormalTextureAssetId = null,
+    string? OcclusionTextureAssetId = null,
+    double MetallicFactor = 0,
+    double RoughnessFactor = 1,
+    double NormalScale = 1,
+    double OcclusionStrength = 1,
+    string? EmissiveColor = null,
+    string? EmissiveTextureAssetId = null,
+    double EmissiveStrength = 0,
+    RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null,
+    RekallAgeRuntimeViewportLineSegments? LineSegments = null);
 
 public sealed record RekallAgeRuntimeViewportShaderPipeline(
     string VertexShader,
@@ -106,6 +117,18 @@ public sealed record RekallAgeRuntimeViewportGeometryVertex(
     double A = double.NaN,
     double U = 0,
     double V = 0);
+
+public sealed record RekallAgeRuntimeViewportLineSegments(
+    IReadOnlyList<RekallAgeRuntimeViewportLineSegment> Segments,
+    double Thickness = 0.02);
+
+public sealed record RekallAgeRuntimeViewportLineSegment(
+    double FromX,
+    double FromY,
+    double FromZ,
+    double ToX,
+    double ToY,
+    double ToZ);
 
 public sealed record RekallAgeRuntimeViewportOverlay(
     bool Enabled,

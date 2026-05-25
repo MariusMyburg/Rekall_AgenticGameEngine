@@ -28,6 +28,62 @@ public sealed record RekallAgeRuntimeEntity(
 
 public sealed record RekallAgeRuntimeComponent(string Type, JsonObject Properties);
 
+public sealed record RekallAgeRuntimeInputState(
+    double MouseX = 0,
+    double MouseY = 0,
+    double MouseDeltaX = 0,
+    double MouseDeltaY = 0,
+    double MouseWheelDelta = 0,
+    IReadOnlySet<string>? PressedKeys = null,
+    IReadOnlySet<string>? PressedKeysThisFrame = null,
+    IReadOnlySet<string>? ReleasedKeysThisFrame = null,
+    IReadOnlySet<string>? PressedButtons = null,
+    IReadOnlySet<string>? PressedButtonsThisFrame = null,
+    IReadOnlySet<string>? ReleasedButtonsThisFrame = null)
+{
+    public static RekallAgeRuntimeInputState Empty { get; } = new();
+}
+
+public sealed record RekallAgeRuntimeInputFrame(
+    double MouseX = 0,
+    double MouseY = 0,
+    double MouseDeltaX = 0,
+    double MouseDeltaY = 0,
+    double MouseWheelDelta = 0,
+    IReadOnlyList<string>? PressedKeys = null,
+    IReadOnlyList<string>? PressedKeysThisFrame = null,
+    IReadOnlyList<string>? ReleasedKeysThisFrame = null,
+    IReadOnlyList<string>? PressedButtons = null,
+    IReadOnlyList<string>? PressedButtonsThisFrame = null,
+    IReadOnlyList<string>? ReleasedButtonsThisFrame = null)
+{
+    public RekallAgeRuntimeInputState ToState()
+    {
+        return new RekallAgeRuntimeInputState(
+            MouseX,
+            MouseY,
+            MouseDeltaX,
+            MouseDeltaY,
+            MouseWheelDelta,
+            ToSet(PressedKeys),
+            ToSet(PressedKeysThisFrame),
+            ToSet(ReleasedKeysThisFrame),
+            ToSet(PressedButtons),
+            ToSet(PressedButtonsThisFrame),
+            ToSet(ReleasedButtonsThisFrame));
+    }
+
+    private static IReadOnlySet<string>? ToSet(IReadOnlyList<string>? values)
+    {
+        return values is null
+            ? null
+            : values
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+}
+
 public sealed record RekallAgeRuntimeTransform(
     RekallAgeRuntimeVector2 Position2D,
     double Rotation2D,
@@ -56,6 +112,8 @@ public sealed record RekallAgeRuntimeSubsystemViews(
     RekallAgeRuntimeAnimationView Animation,
     RekallAgeRuntimeUiView Ui)
 {
+    public RekallAgeRuntimeInputView Input { get; init; } = RekallAgeRuntimeInputView.Empty;
+
     public static RekallAgeRuntimeSubsystemViews Empty { get; } = new(
         RekallAgeRuntimeRenderView.Empty,
         RekallAgeRuntimePhysicsView.Empty,
@@ -63,6 +121,22 @@ public sealed record RekallAgeRuntimeSubsystemViews(
         RekallAgeRuntimeAnimationView.Empty,
         RekallAgeRuntimeUiView.Empty);
 }
+
+public sealed record RekallAgeRuntimeInputView(
+    IReadOnlyList<RekallAgeRuntimeInputAction> Actions)
+{
+    public static RekallAgeRuntimeInputView Empty { get; } = new(
+        Array.Empty<RekallAgeRuntimeInputAction>());
+}
+
+public sealed record RekallAgeRuntimeInputAction(
+    string Name,
+    double Value,
+    bool IsDown,
+    bool WasPressed,
+    bool WasReleased,
+    string SourceEntityId,
+    string SourceEntityName);
 
 public sealed record RekallAgeRuntimeRenderView(
     IReadOnlyList<RekallAgeRuntimeRenderCamera> Cameras,
@@ -119,7 +193,8 @@ public sealed record RekallAgeRuntimeRenderLight(
     string EntityName,
     string Kind,
     double Intensity,
-    string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored);
+    string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored,
+    string? Color = null);
 
 public sealed record RekallAgeRuntimeRenderUiLayer(
     string EntityId,

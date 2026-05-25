@@ -107,40 +107,64 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 component.Type is "Rekall.MeshRenderer" or "Rekall.MeshSet");
             var planetComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.PlanetRenderer", StringComparison.Ordinal));
+            var materialComponent = entity?.Components.FirstOrDefault(component =>
+                component.Type.Equals("Rekall.Material", StringComparison.Ordinal));
             var geometry = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.GeometryPrimitive", StringComparison.Ordinal));
             var geometryMeshComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.GeometryMesh", StringComparison.Ordinal));
+            var orbitComponent = entity?.Components.FirstOrDefault(component =>
+                component.Type.Equals("Rekall.KeplerOrbit", StringComparison.Ordinal));
+            var orbitPathComponent = entity?.Components.FirstOrDefault(component =>
+                component.Type.Equals("Rekall.OrbitPathRenderer", StringComparison.Ordinal));
+            var isOrbitPathRenderable = mesh.Variant?.Equals("rekall.orbit.path", StringComparison.OrdinalIgnoreCase) == true;
             var primitive = ReadString(geometry, "primitive");
-            var geometryMesh = ReadGeometryMesh(geometryMeshComponent);
-            var materialColor = ReadString(geometryMeshComponent, "color") ?? ReadString(geometry, "color");
-            var textureAssetId = ReadString(geometryMeshComponent, "textureAssetId")
+            var orbitPathMesh = isOrbitPathRenderable ? ReadOrbitPathMesh(orbitComponent, orbitPathComponent) : null;
+            var geometryMesh = orbitPathMesh ?? ReadGeometryMesh(geometryMeshComponent);
+            var materialColor = ReadString(materialComponent, "baseColor")
+                ?? ReadString(materialComponent, "color")
+                ?? ReadString(orbitPathComponent, "color")
+                ?? ReadString(geometryMeshComponent, "color")
+                ?? ReadString(geometry, "color");
+            var textureAssetId = ReadString(materialComponent, "baseColorTexture")
+                ?? ReadString(materialComponent, "texture")
+                ?? ReadString(geometryMeshComponent, "textureAssetId")
                 ?? ReadString(geometryMeshComponent, "texture")
                 ?? ReadString(geometry, "textureAssetId")
                 ?? ReadString(geometry, "texture")
                 ?? ReadString(planetComponent, "surfaceTexture")
                 ?? ReadString(planetComponent, "SurfaceTexture");
+            var normalTextureAssetId = ReadString(materialComponent, "normalTexture")
+                ?? ReadString(planetComponent, "normalTexture")
+                ?? ReadString(planetComponent, "NormalTexture");
+            var metallicRoughnessTextureAssetId = ReadString(materialComponent, "metallicRoughnessTexture");
+            var occlusionTextureAssetId = ReadString(materialComponent, "occlusionTexture");
+            var emissiveTextureAssetId = ReadString(materialComponent, "emissiveTexture")
+                ?? ReadString(planetComponent, "emissiveTexture");
+            var emissiveColor = ReadString(materialComponent, "emissiveColor")
+                ?? ReadString(planetComponent, "emissiveColor");
             var variant = geometryMesh is not null
-                ? "rekall.geometry.mesh"
+                ? orbitPathMesh is not null ? "rekall.orbit.path" : "rekall.geometry.mesh"
                 : planetComponent is not null
                 ? "rekall.planet.surface"
                 : string.IsNullOrWhiteSpace(primitive)
                 ? mesh.AssetId
                 : $"rekall.geometry.{primitive.Trim().ToLowerInvariant()}";
             var radius = Math.Max(0.0001, ReadNumber(planetComponent, "radius", 0.5));
-            var scaleX = planetComponent is null ? transform.Scale3D.X : transform.Scale3D.X * radius * 2;
-            var scaleY = planetComponent is null ? transform.Scale3D.Y : transform.Scale3D.Y * radius * 2;
-            var scaleZ = planetComponent is null ? transform.Scale3D.Z : transform.Scale3D.Z * radius * 2;
+            var renderTransform = orbitPathMesh is null ? transform : FindOrbitParentTransform(world, orbitComponent);
+            var scaleX = orbitPathMesh is not null ? 1 : planetComponent is null ? transform.Scale3D.X : transform.Scale3D.X * radius * 2;
+            var scaleY = orbitPathMesh is not null ? 1 : planetComponent is null ? transform.Scale3D.Y : transform.Scale3D.Y * radius * 2;
+            var scaleZ = orbitPathMesh is not null ? 1 : planetComponent is null ? transform.Scale3D.Z : transform.Scale3D.Z * radius * 2;
             var sortKey = mesh.SortKey
                 + (entity?.Components.Any(component => component.Type.Equals("Rekall.Rigidbody3D", StringComparison.Ordinal)) == true ? 20 : 0);
             yield return new RekallAgeRuntimeViewportRenderable(
-                mesh.EntityId,
+                orbitPathMesh is null ? mesh.EntityId : $"{mesh.EntityId}:orbit-path",
                 mesh.EntityName,
                 string.IsNullOrWhiteSpace(mesh.Kind) ? "mesh" : mesh.Kind,
                 mesh.AssetId,
-                transform.Position3D.X,
-                transform.Position3D.Y,
-                transform.Position3D.Z,
+                renderTransform.Position3D.X,
+                renderTransform.Position3D.Y,
+                renderTransform.Position3D.Z,
                 sortKey,
                 Variant: mesh.Variant ?? variant,
                 RotationX: transform.Rotation3D.X,
@@ -149,9 +173,21 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 ScaleX: scaleX,
                 ScaleY: scaleY,
                 ScaleZ: scaleZ,
-                MaterialColor: mesh.MaterialColor ?? ReadString(planetComponent, "color") ?? ReadString(planetComponent, "Color") ?? materialColor,
+                MaterialColor: mesh.MaterialColor ?? materialColor ?? ReadString(planetComponent, "color") ?? ReadString(planetComponent, "Color"),
                 GeometryMesh: geometryMesh,
                 TextureAssetId: mesh.TextureAssetId ?? textureAssetId,
+                MetallicRoughnessTextureAssetId: metallicRoughnessTextureAssetId,
+                NormalTextureAssetId: normalTextureAssetId,
+                OcclusionTextureAssetId: occlusionTextureAssetId,
+                MetallicFactor: ReadNumber(materialComponent, "metallicFactor", 0),
+                RoughnessFactor: ReadNumber(materialComponent, "roughnessFactor", 1),
+                NormalScale: ReadNumber(materialComponent, "normalScale", 1),
+                OcclusionStrength: ReadNumber(materialComponent, "occlusionStrength", 1),
+                EmissiveColor: orbitPathMesh is not null ? materialColor : emissiveColor,
+                EmissiveTextureAssetId: emissiveTextureAssetId,
+                EmissiveStrength: orbitPathMesh is not null
+                    ? ReadNumber(orbitPathComponent, "emissiveStrength", 1.4)
+                    : ReadNumber(materialComponent, "emissiveStrength", ReadNumber(planetComponent, "emissiveStrength", 0)),
                 ShaderPipeline: ToViewportShaderPipeline(mesh.ShaderPipeline) ?? ReadShaderPipeline(meshRendererComponent));
         }
 
@@ -171,7 +207,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 RotationX: transform.Rotation3D.X,
                 RotationY: transform.Rotation3D.Y,
                 RotationZ: transform.Rotation3D.Z,
-                Intensity: light.Intensity);
+                Intensity: light.Intensity,
+                MaterialColor: light.Color);
         }
 
         foreach (var uiLayer in world.Subsystems.Rendering.UiLayers)
@@ -195,6 +232,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             var transform = entity.Transform;
             var collider = entity.Components.FirstOrDefault(component =>
                 component.Type is
+                    "Rekall.BoxCollider2D" or
+                    "Rekall.CircleCollider2D" or
                     "Rekall.BoxCollider3D" or
                     "Rekall.SphereCollider3D" or
                     "Rekall.CapsuleCollider3D" or
@@ -206,7 +245,46 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
 
             switch (collider.Type)
             {
+                case "Rekall.BoxCollider2D":
+                    var width2D = Math.Max(0.0001, ReadNumber(collider, "width", 1));
+                    var height2D = Math.Max(0.0001, ReadNumber(collider, "height", 1));
+                    var box2DColor = "#33ddff66";
+                    yield return new RekallAgeRuntimeViewportRenderable(
+                        $"{entity.Id}:collider",
+                        $"{entity.Name} Collider",
+                        "mesh",
+                        null,
+                        transform.Position2D.X,
+                        transform.Position2D.Y,
+                        transform.Position3D.Z,
+                        910,
+                        Variant: "rekall.debug.collider.lines",
+                        RotationZ: transform.Rotation2D,
+                        MaterialColor: box2DColor,
+                        LineSegments: CreateWireRectangle(width2D, height2D));
+                    break;
+                case "Rekall.CircleCollider2D":
+                    var radius2D = Math.Max(0.0001, ReadNumber(collider, "radius", 0.5));
+                    var circle2DColor = "#ffea0066";
+                    yield return new RekallAgeRuntimeViewportRenderable(
+                        $"{entity.Id}:collider",
+                        $"{entity.Name} Collider",
+                        "mesh",
+                        null,
+                        transform.Position2D.X,
+                        transform.Position2D.Y,
+                        transform.Position3D.Z,
+                        915,
+                        Variant: "rekall.debug.collider.lines",
+                        RotationZ: transform.Rotation2D,
+                        MaterialColor: circle2DColor,
+                        LineSegments: CreateWireCircle(radius2D));
+                    break;
                 case "Rekall.BoxCollider3D":
+                    var width = Math.Max(0.0001, ReadNumber(collider, "width", 1));
+                    var height = Math.Max(0.0001, ReadNumber(collider, "height", 1));
+                    var depth = Math.Max(0.0001, ReadNumber(collider, "depth", 1));
+                    var boxColor = "#33ddff66";
                     yield return new RekallAgeRuntimeViewportRenderable(
                         $"{entity.Id}:collider",
                         $"{entity.Name} Collider",
@@ -216,17 +294,16 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                         transform.Position3D.Y,
                         transform.Position3D.Z,
                         920,
-                        Variant: "rekall.geometry.cube",
+                        Variant: "rekall.debug.collider.lines",
                         RotationX: transform.Rotation3D.X,
                         RotationY: transform.Rotation3D.Y,
                         RotationZ: transform.Rotation3D.Z,
-                        ScaleX: ReadNumber(collider, "width", 1),
-                        ScaleY: ReadNumber(collider, "height", 1),
-                        ScaleZ: ReadNumber(collider, "depth", 1),
-                        MaterialColor: "#33ddff66");
+                        MaterialColor: boxColor,
+                        LineSegments: CreateWireBox(width, height, depth));
                     break;
                 case "Rekall.SphereCollider3D":
                     var radius = Math.Max(0.0001, ReadNumber(collider, "radius", 0.5));
+                    var sphereColor = "#ffea0066";
                     yield return new RekallAgeRuntimeViewportRenderable(
                         $"{entity.Id}:collider",
                         $"{entity.Name} Collider",
@@ -236,18 +313,17 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                         transform.Position3D.Y,
                         transform.Position3D.Z,
                         940,
-                        Variant: "rekall.geometry.sphere",
+                        Variant: "rekall.debug.collider.lines",
                         RotationX: transform.Rotation3D.X,
                         RotationY: transform.Rotation3D.Y,
                         RotationZ: transform.Rotation3D.Z,
-                        ScaleX: radius * 2,
-                        ScaleY: radius * 2,
-                        ScaleZ: radius * 2,
-                        MaterialColor: "#ffea0066");
+                        MaterialColor: sphereColor,
+                        LineSegments: CreateWireSphere(radius));
                     break;
                 case "Rekall.CapsuleCollider3D":
                     var capsuleRadius = Math.Max(0.0001, ReadNumber(collider, "radius", 0.5));
                     var length = Math.Max(0.0001, ReadNumber(collider, "length", 1));
+                    var capsuleColor = "#ff66ff66";
                     yield return new RekallAgeRuntimeViewportRenderable(
                         $"{entity.Id}:collider",
                         $"{entity.Name} Collider",
@@ -257,14 +333,12 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                         transform.Position3D.Y,
                         transform.Position3D.Z,
                         940,
-                        Variant: "rekall.geometry.cylinder",
+                        Variant: "rekall.debug.collider.lines",
                         RotationX: transform.Rotation3D.X,
                         RotationY: transform.Rotation3D.Y,
                         RotationZ: transform.Rotation3D.Z,
-                        ScaleX: capsuleRadius * 2,
-                        ScaleY: length + capsuleRadius * 2,
-                        ScaleZ: capsuleRadius * 2,
-                        MaterialColor: "#ff66ff66");
+                        MaterialColor: capsuleColor,
+                        LineSegments: CreateWireCapsule(capsuleRadius, length));
                     break;
                 case "Rekall.MeshCollider":
                     var geometryMesh = ReadGeometryMesh(entity.Components.FirstOrDefault(component =>
@@ -283,7 +357,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                         transform.Position3D.Y,
                         transform.Position3D.Z,
                         930,
-                        Variant: "rekall.geometry.mesh",
+                        Variant: "rekall.debug.collider.lines",
                         RotationX: transform.Rotation3D.X,
                         RotationY: transform.Rotation3D.Y,
                         RotationZ: transform.Rotation3D.Z,
@@ -291,10 +365,194 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                         ScaleY: transform.Scale3D.Y,
                         ScaleZ: transform.Scale3D.Z,
                         MaterialColor: "#66ff9966",
-                        GeometryMesh: geometryMesh);
+                        LineSegments: CreateWireFromTriangleMesh(geometryMesh));
                     break;
             }
         }
+    }
+
+    private static RekallAgeRuntimeViewportLineSegments CreateWireBox(
+        double width,
+        double height,
+        double depth)
+    {
+        var x = width * 0.5;
+        var y = height * 0.5;
+        var z = depth * 0.5;
+        var corners = new[]
+        {
+            new MeshVector3(-x, -y, -z),
+            new MeshVector3(x, -y, -z),
+            new MeshVector3(x, -y, z),
+            new MeshVector3(-x, -y, z),
+            new MeshVector3(-x, y, -z),
+            new MeshVector3(x, y, -z),
+            new MeshVector3(x, y, z),
+            new MeshVector3(-x, y, z)
+        };
+        var builder = new LineSegmentsBuilder(DefaultWireThickness(width, height, depth));
+        builder.AddSegment(corners[0], corners[1]);
+        builder.AddSegment(corners[1], corners[2]);
+        builder.AddSegment(corners[2], corners[3]);
+        builder.AddSegment(corners[3], corners[0]);
+        builder.AddSegment(corners[4], corners[5]);
+        builder.AddSegment(corners[5], corners[6]);
+        builder.AddSegment(corners[6], corners[7]);
+        builder.AddSegment(corners[7], corners[4]);
+        builder.AddSegment(corners[0], corners[4]);
+        builder.AddSegment(corners[1], corners[5]);
+        builder.AddSegment(corners[2], corners[6]);
+        builder.AddSegment(corners[3], corners[7]);
+        return builder.Build();
+    }
+
+    private static RekallAgeRuntimeViewportLineSegments CreateWireRectangle(
+        double width,
+        double height)
+    {
+        var x = width * 0.5;
+        var y = height * 0.5;
+        var corners = new[]
+        {
+            new MeshVector3(-x, -y, 0),
+            new MeshVector3(x, -y, 0),
+            new MeshVector3(x, y, 0),
+            new MeshVector3(-x, y, 0)
+        };
+        var builder = new LineSegmentsBuilder(DefaultWireThickness(width, height, 0));
+        builder.AddSegment(corners[0], corners[1]);
+        builder.AddSegment(corners[1], corners[2]);
+        builder.AddSegment(corners[2], corners[3]);
+        builder.AddSegment(corners[3], corners[0]);
+        return builder.Build();
+    }
+
+    private static RekallAgeRuntimeViewportLineSegments CreateWireCircle(double radius)
+    {
+        var builder = new LineSegmentsBuilder(DefaultWireThickness(radius * 2, radius * 2, 0));
+        AddRing(builder, radius, 32, Axis.Z);
+        return builder.Build();
+    }
+
+    private static RekallAgeRuntimeViewportLineSegments CreateWireSphere(double radius)
+    {
+        var builder = new LineSegmentsBuilder(DefaultWireThickness(radius * 2, radius * 2, radius * 2));
+        AddRing(builder, radius, 32, Axis.Y);
+        AddRing(builder, radius, 32, Axis.X);
+        AddRing(builder, radius, 32, Axis.Z);
+        return builder.Build();
+    }
+
+    private static RekallAgeRuntimeViewportLineSegments CreateWireCapsule(
+        double radius,
+        double length)
+    {
+        var builder = new LineSegmentsBuilder(DefaultWireThickness(radius * 2, length + radius * 2, radius * 2));
+        var half = length * 0.5;
+        AddRing(builder, radius, 24, Axis.Y, half);
+        AddRing(builder, radius, 24, Axis.Y, -half);
+        for (var index = 0; index < 8; index++)
+        {
+            var angle = index / 8.0 * Math.PI * 2;
+            var x = Math.Cos(angle) * radius;
+            var z = Math.Sin(angle) * radius;
+            builder.AddSegment(new MeshVector3(x, -half, z), new MeshVector3(x, half, z));
+        }
+
+        AddCapsuleArc(builder, radius, half, Axis.X);
+        AddCapsuleArc(builder, radius, half, Axis.Z);
+        return builder.Build();
+    }
+
+    private static RekallAgeRuntimeViewportLineSegments CreateWireFromTriangleMesh(
+        RekallAgeRuntimeViewportGeometryMesh geometry)
+    {
+        var builder = new LineSegmentsBuilder(0.025);
+        var edges = new HashSet<(ushort A, ushort B)>();
+        for (var index = 0; index + 2 < geometry.Indices.Count; index += 3)
+        {
+            AddEdge(edges, geometry.Indices[index], geometry.Indices[index + 1]);
+            AddEdge(edges, geometry.Indices[index + 1], geometry.Indices[index + 2]);
+            AddEdge(edges, geometry.Indices[index + 2], geometry.Indices[index]);
+        }
+
+        foreach (var (a, b) in edges)
+        {
+            var from = geometry.Vertices[a];
+            var to = geometry.Vertices[b];
+            builder.AddSegment(
+                new MeshVector3(from.X, from.Y, from.Z),
+                new MeshVector3(to.X, to.Y, to.Z));
+        }
+
+        return builder.Build();
+    }
+
+    private static void AddEdge(HashSet<(ushort A, ushort B)> edges, ushort a, ushort b)
+    {
+        edges.Add(a < b ? (a, b) : (b, a));
+    }
+
+    private static void AddRing(
+        LineSegmentsBuilder builder,
+        double radius,
+        int segments,
+        Axis normalAxis,
+        double yOffset = 0)
+    {
+        var points = Enumerable.Range(0, segments)
+            .Select(index =>
+            {
+                var angle = index / (double)segments * Math.PI * 2;
+                var a = Math.Cos(angle) * radius;
+                var b = Math.Sin(angle) * radius;
+                return normalAxis switch
+                {
+                    Axis.X => new MeshVector3(yOffset, a, b),
+                    Axis.Z => new MeshVector3(a, b, yOffset),
+                    _ => new MeshVector3(a, yOffset, b)
+                };
+            })
+            .ToArray();
+        for (var index = 0; index < points.Length; index++)
+        {
+            builder.AddSegment(points[index], points[(index + 1) % points.Length]);
+        }
+    }
+
+    private static void AddCapsuleArc(
+        LineSegmentsBuilder builder,
+        double radius,
+        double halfLength,
+        Axis sideAxis)
+    {
+        var segments = 12;
+        for (var hemisphere = -1; hemisphere <= 1; hemisphere += 2)
+        {
+            var centerY = hemisphere * halfLength;
+            MeshVector3? previous = null;
+            for (var index = 0; index <= segments; index++)
+            {
+                var angle = index / (double)segments * Math.PI;
+                var side = Math.Sin(angle) * radius;
+                var y = centerY + Math.Cos(angle) * radius * hemisphere;
+                var point = sideAxis == Axis.X
+                    ? new MeshVector3(side, y, 0)
+                    : new MeshVector3(0, y, side);
+                if (previous is { } from)
+                {
+                    builder.AddSegment(from, point);
+                    builder.AddSegment(new MeshVector3(-from.X, from.Y, -from.Z), new MeshVector3(-point.X, point.Y, -point.Z));
+                }
+
+                previous = point;
+            }
+        }
+    }
+
+    private static double DefaultWireThickness(double x, double y, double z)
+    {
+        return Math.Clamp(Math.Max(x, Math.Max(y, z)) * 0.0125, 0.015, 0.08);
     }
 
     private static RekallAgeRuntimeTransform FindTransform(RekallAgeRuntimeWorld world, string entityId)
@@ -306,6 +564,22 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
     private static RekallAgeRuntimeEntity? FindEntity(RekallAgeRuntimeWorld world, string entityId)
     {
         return world.Entities.FirstOrDefault(entity => entity.Id.Equals(entityId, StringComparison.Ordinal));
+    }
+
+    private static RekallAgeRuntimeTransform FindOrbitParentTransform(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeComponent? orbitComponent)
+    {
+        var parentBodyId = ReadString(orbitComponent, "parentBodyId");
+        if (string.IsNullOrWhiteSpace(parentBodyId))
+        {
+            return RekallAgeRuntimeTransform.Identity;
+        }
+
+        return world.Entities.FirstOrDefault(entity => entity.Components.Any(component =>
+            component.Type.Equals("Rekall.CelestialBody", StringComparison.Ordinal)
+            && (ReadString(component, "bodyId") ?? entity.Name).Equals(parentBodyId, StringComparison.Ordinal)))?.Transform
+            ?? RekallAgeRuntimeTransform.Identity;
     }
 
     private static string? ReadString(RekallAgeRuntimeComponent? component, string name)
@@ -402,6 +676,116 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         }
 
         return new RekallAgeRuntimeViewportGeometryMesh(CreateGeometryVertices(vertices, indices), indices);
+    }
+
+    private static RekallAgeRuntimeViewportGeometryMesh? ReadOrbitPathMesh(
+        RekallAgeRuntimeComponent? orbitComponent,
+        RekallAgeRuntimeComponent? orbitPathComponent)
+    {
+        if (orbitComponent is null
+            || orbitPathComponent is null
+            || !ReadBoolean(orbitPathComponent, "active", true))
+        {
+            return null;
+        }
+
+        var semiMajorAxisKm = Math.Max(0, ReadNumber(orbitComponent, "semiMajorAxisKm", 0));
+        if (semiMajorAxisKm <= 0)
+        {
+            return null;
+        }
+
+        var segments = (int)Math.Clamp(ReadNumber(orbitPathComponent, "segments", 128), 8, 512);
+        var thickness = Math.Max(0.001, ReadNumber(orbitPathComponent, "thickness", 0.035));
+        var eccentricity = Math.Clamp(ReadNumber(orbitComponent, "eccentricity", 0), 0, 0.999999);
+        var distanceScale = ReadNumber(orbitComponent, "distanceScale", 1);
+        var verticalOffset = ReadNumber(orbitPathComponent, "verticalOffset", -0.05);
+        var inclination = DegreesToRadians(ReadNumber(orbitComponent, "inclinationDegrees", 0));
+        var longitudeOfAscendingNode = DegreesToRadians(ReadNumber(orbitComponent, "longitudeOfAscendingNodeDegrees", 0));
+        var argumentOfPeriapsis = DegreesToRadians(ReadNumber(orbitComponent, "argumentOfPeriapsisDegrees", 0));
+        var color = ParseColor(ReadString(orbitPathComponent, "color") ?? "#88aaff");
+        var vertices = new List<RekallAgeRuntimeViewportGeometryVertex>(segments * 2);
+        var indices = new List<ushort>(segments * 6);
+        var points = Enumerable.Range(0, segments)
+            .Select(index =>
+            {
+                var eccentricAnomaly = index / (double)segments * Math.PI * 2;
+                var x = semiMajorAxisKm * (Math.Cos(eccentricAnomaly) - eccentricity);
+                var y = semiMajorAxisKm * Math.Sqrt(1 - eccentricity * eccentricity) * Math.Sin(eccentricAnomaly);
+                var point = Multiply(RotateOrbitPlane(x, y, inclination, longitudeOfAscendingNode, argumentOfPeriapsis), distanceScale);
+                return new MeshVector3(point.X, point.Y + verticalOffset, point.Z);
+            })
+            .ToArray();
+
+        for (var index = 0; index < points.Length; index++)
+        {
+            var previous = points[(index + points.Length - 1) % points.Length];
+            var next = points[(index + 1) % points.Length];
+            var tangent = Normalize(new MeshVector3(next.X - previous.X, next.Y - previous.Y, next.Z - previous.Z));
+            var side = Normalize(Cross(tangent, new MeshVector3(0, 1, 0)));
+            if (side.LengthSquared <= 0.000001)
+            {
+                side = new MeshVector3(1, 0, 0);
+            }
+
+            var half = thickness * 0.5;
+            var point = points[index];
+            vertices.Add(new RekallAgeRuntimeViewportGeometryVertex(
+                point.X + side.X * half,
+                point.Y + side.Y * half,
+                point.Z + side.Z * half,
+                0,
+                1,
+                0,
+                color.R,
+                color.G,
+                color.B,
+                color.A));
+            vertices.Add(new RekallAgeRuntimeViewportGeometryVertex(
+                point.X - side.X * half,
+                point.Y - side.Y * half,
+                point.Z - side.Z * half,
+                0,
+                1,
+                0,
+                color.R,
+                color.G,
+                color.B,
+                color.A));
+        }
+
+        for (var index = 0; index < segments; index++)
+        {
+            var a = checked((ushort)(index * 2));
+            var b = checked((ushort)(index * 2 + 1));
+            var c = checked((ushort)(((index + 1) % segments) * 2));
+            var d = checked((ushort)(((index + 1) % segments) * 2 + 1));
+            indices.Add(a);
+            indices.Add(c);
+            indices.Add(b);
+            indices.Add(b);
+            indices.Add(c);
+            indices.Add(d);
+        }
+
+        return new RekallAgeRuntimeViewportGeometryMesh(vertices, indices);
+    }
+
+    private static bool ReadBoolean(RekallAgeRuntimeComponent? component, string name, bool fallback)
+    {
+        if (component is null || !TryGetPropertyValue(component.Properties, name, out var node) || node is not JsonValue value)
+        {
+            return fallback;
+        }
+
+        if (value.TryGetValue<bool>(out var boolean))
+        {
+            return boolean;
+        }
+
+        return value.TryGetValue<string>(out var text) && bool.TryParse(text, out var parsed)
+            ? parsed
+            : fallback;
     }
 
     private static SceneColor ReadVertexColor(JsonObject vertex, SceneColor fallback)
@@ -590,15 +974,26 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
 
     private static SceneColor ParseColor(string? color)
     {
-        if (color is { Length: 7 } && color[0] == '#'
+        if (color is { Length: 7 or 9 } && color[0] == '#'
             && byte.TryParse(color.AsSpan(1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var r)
             && byte.TryParse(color.AsSpan(3, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var g)
             && byte.TryParse(color.AsSpan(5, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var b))
         {
-            return new SceneColor(r / 255d, g / 255d, b / 255d, 1);
+            var a = color.Length == 9
+                && byte.TryParse(color.AsSpan(7, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var parsedAlpha)
+                    ? parsedAlpha
+                    : (byte)255;
+            return new SceneColor(r / 255d, g / 255d, b / 255d, a / 255d);
         }
 
         return new SceneColor(0.35, 0.58, 0.85, 1);
+    }
+
+    private enum Axis
+    {
+        X,
+        Y,
+        Z
     }
 
     private readonly record struct SceneColor(double R, double G, double B, double A);
@@ -622,6 +1017,38 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         public double LengthSquared => X * X + Y * Y + Z * Z;
     }
 
+    private sealed class LineSegmentsBuilder
+    {
+        private readonly double _thickness;
+        private readonly List<RekallAgeRuntimeViewportLineSegment> _segments = [];
+
+        public LineSegmentsBuilder(double thickness)
+        {
+            _thickness = Math.Max(0.001, thickness);
+        }
+
+        public void AddSegment(MeshVector3 from, MeshVector3 to)
+        {
+            if (new MeshVector3(to.X - from.X, to.Y - from.Y, to.Z - from.Z).LengthSquared <= 0.000001)
+            {
+                return;
+            }
+
+            _segments.Add(new RekallAgeRuntimeViewportLineSegment(
+                from.X,
+                from.Y,
+                from.Z,
+                to.X,
+                to.Y,
+                to.Z));
+        }
+
+        public RekallAgeRuntimeViewportLineSegments Build()
+        {
+            return new RekallAgeRuntimeViewportLineSegments(_segments, _thickness);
+        }
+    }
+
     private static MeshVector3 Add(MeshVector3 left, MeshVector3 right)
     {
         return new MeshVector3(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
@@ -641,5 +1068,37 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         return length <= 0.000001
             ? new MeshVector3(0, 0, 0)
             : new MeshVector3(value.X / length, value.Y / length, value.Z / length);
+    }
+
+    private static MeshVector3 Multiply(MeshVector3 value, double scalar)
+    {
+        return new MeshVector3(value.X * scalar, value.Y * scalar, value.Z * scalar);
+    }
+
+    private static MeshVector3 RotateOrbitPlane(
+        double x,
+        double y,
+        double inclination,
+        double longitudeOfAscendingNode,
+        double argumentOfPeriapsis)
+    {
+        var cosNode = Math.Cos(longitudeOfAscendingNode);
+        var sinNode = Math.Sin(longitudeOfAscendingNode);
+        var cosInc = Math.Cos(inclination);
+        var sinInc = Math.Sin(inclination);
+        var cosArg = Math.Cos(argumentOfPeriapsis);
+        var sinArg = Math.Sin(argumentOfPeriapsis);
+
+        return new MeshVector3(
+            (cosNode * cosArg - sinNode * sinArg * cosInc) * x
+                + (-cosNode * sinArg - sinNode * cosArg * cosInc) * y,
+            (sinArg * sinInc) * x + (cosArg * sinInc) * y,
+            (sinNode * cosArg + cosNode * sinArg * cosInc) * x
+                + (-sinNode * sinArg + cosNode * cosArg * cosInc) * y);
+    }
+
+    private static double DegreesToRadians(double degrees)
+    {
+        return degrees * Math.PI / 180.0;
     }
 }

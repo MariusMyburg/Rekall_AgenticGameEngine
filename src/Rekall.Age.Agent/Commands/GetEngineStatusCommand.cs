@@ -70,6 +70,30 @@ public sealed class GetEngineStatusCommand
                     "Apply many generic entities and components to a scene in one transaction for high-throughput agent world authoring.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
+                    "rekall.solar.import_ksa_system",
+                    "Import KSA astronomical XML into generic celestial body, Kepler orbit, and renderable planet entities.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
+                    "rekall.live.status",
+                    "Inspect a running player session over local IPC before applying live edits.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
+                    "rekall.live.apply_scene_blueprint",
+                    "Apply generic entity/component blueprints directly to a running player session for real-time agent iteration.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
+                    "rekall.live.apply_scene_diff",
+                    "Apply a generic upsert/delete scene diff directly to a running player session for real-time agent iteration.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
+                    "rekall.live.reload_scene",
+                    "Ask a running player session to reload its scene from project storage.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
+                    "rekall.live.reload_assets",
+                    "Ask a running player session to refresh asset and texture bindings without restarting.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
                     "rekall.entity.delete",
                     "Remove one authored entity when iterating on generated scenes or cleaning duplicate attempts.",
                     Recommended: false),

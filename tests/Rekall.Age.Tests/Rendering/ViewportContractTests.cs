@@ -113,6 +113,72 @@ public sealed class ViewportContractTests
     }
 
     [Fact]
+    public void RuntimeFrameBuilderProjectsGenericMaterialSettingsForMeshRenderables()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Lamp", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "sphere" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Material", new JsonObject
+                {
+                    ["baseColor"] = "#202020",
+                    ["baseColorTexture"] = "asset_base",
+                    ["metallicFactor"] = 0.25,
+                    ["roughnessFactor"] = 0.4,
+                    ["metallicRoughnessTexture"] = "asset_mr",
+                    ["normalTexture"] = "asset_normal",
+                    ["normalScale"] = 0.75,
+                    ["occlusionTexture"] = "asset_occ",
+                    ["occlusionStrength"] = 0.5,
+                    ["emissiveColor"] = "#ff8800",
+                    ["emissiveTexture"] = "asset_glow",
+                    ["emissiveStrength"] = 4
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var renderable = Assert.Single(frame.Renderables, item => item.Kind == "mesh");
+        Assert.Equal("#202020", renderable.MaterialColor);
+        Assert.Equal("asset_base", renderable.TextureAssetId);
+        Assert.Equal("asset_mr", renderable.MetallicRoughnessTextureAssetId);
+        Assert.Equal("asset_normal", renderable.NormalTextureAssetId);
+        Assert.Equal("asset_occ", renderable.OcclusionTextureAssetId);
+        Assert.Equal(0.25, renderable.MetallicFactor);
+        Assert.Equal(0.4, renderable.RoughnessFactor);
+        Assert.Equal(0.75, renderable.NormalScale);
+        Assert.Equal(0.5, renderable.OcclusionStrength);
+        Assert.Equal("#ff8800", renderable.EmissiveColor);
+        Assert.Equal("asset_glow", renderable.EmissiveTextureAssetId);
+        Assert.Equal(4, renderable.EmissiveStrength);
+    }
+
+    [Fact]
+    public void RuntimeProjectionExcludesInvisibleRenderEntities()
+    {
+        var hiddenCamera = RekallAgeEntityDocument.Create("Hidden Camera", ["camera"]) with { Visible = false };
+        hiddenCamera = hiddenCamera.AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true }));
+        var visibleCamera = RekallAgeEntityDocument.Create("Visible Camera", ["camera"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true }));
+        var hiddenMesh = RekallAgeEntityDocument.Create("Hidden Mesh", ["prop"]) with { Visible = false };
+        hiddenMesh = hiddenMesh.AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" }));
+        var visibleMesh = RekallAgeEntityDocument.Create("Visible Mesh", ["prop"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(hiddenCamera)
+            .AddEntity(visibleCamera)
+            .AddEntity(hiddenMesh)
+            .AddEntity(visibleMesh);
+
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        Assert.Equal("Visible Camera", frame.ActiveCamera?.EntityName);
+        Assert.DoesNotContain(frame.Cameras, camera => camera.EntityName == "Hidden Camera");
+        Assert.Contains(frame.Renderables, renderable => renderable.EntityName == "Visible Mesh");
+        Assert.DoesNotContain(frame.Renderables, renderable => renderable.EntityName == "Hidden Mesh");
+    }
+
+    [Fact]
     public void VulkanSceneBatchBuilderUsesCameraFieldOfView()
     {
         var mesh = new RekallAgeVulkanSceneMesh(
@@ -255,6 +321,66 @@ public sealed class ViewportContractTests
     }
 
     [Fact]
+    public void RuntimeFrameBuilderProjectsOrbitPathRendererAroundParentBody()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "celestial"])
+            .AddEntity(RekallAgeEntityDocument.Create("Sol", ["celestial"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = 5,
+                    ["z"] = 7
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.CelestialBody", new JsonObject
+                {
+                    ["bodyId"] = "Sol",
+                    ["type"] = "StellarBody",
+                    ["massKg"] = 1.98847e30
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Luna", ["celestial"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.CelestialBody", new JsonObject
+                {
+                    ["bodyId"] = "Luna",
+                    ["parentBodyId"] = "Sol"
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.KeplerOrbit", new JsonObject
+                {
+                    ["parentBodyId"] = "Sol",
+                    ["semiMajorAxisKm"] = 10,
+                    ["eccentricity"] = 0,
+                    ["distanceScale"] = 1
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                {
+                    ["radius"] = 1,
+                    ["color"] = "#545454"
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.OrbitPathRenderer", new JsonObject
+                {
+                    ["segments"] = 32,
+                    ["thickness"] = 0.2,
+                    ["color"] = "#88aaff"
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var planet = Assert.Single(frame.Renderables, item => item.EntityName == "Luna" && item.Variant == "rekall.planet.surface");
+        var orbit = Assert.Single(frame.Renderables, item => item.EntityName == "Luna" && item.Variant == "rekall.orbit.path");
+        Assert.NotEqual(planet.EntityId, orbit.EntityId);
+        Assert.Equal("mesh", orbit.Kind);
+        Assert.Equal(5, orbit.X);
+        Assert.Equal(0, orbit.Y);
+        Assert.Equal(7, orbit.Z);
+        Assert.Equal("#88aaff", orbit.MaterialColor);
+        Assert.Equal("#88aaff", orbit.EmissiveColor);
+        Assert.True(orbit.EmissiveStrength > 0);
+        Assert.NotNull(orbit.GeometryMesh);
+        Assert.Equal(64, orbit.GeometryMesh.Vertices.Count);
+        Assert.Equal(192, orbit.GeometryMesh.Indices.Count);
+        Assert.True(orbit.GeometryMesh.Vertices.Max(vertex => vertex.X) > 9);
+    }
+
+    [Fact]
     public void RuntimeFrameBuilderPreservesAgentAuthoredRenderableContract()
     {
         var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
@@ -351,17 +477,71 @@ public sealed class ViewportContractTests
         Assert.DoesNotContain(withoutDebug.Renderables, renderable => renderable.EntityId.EndsWith(":collider", StringComparison.Ordinal));
         var floor = Assert.Single(withDebug.Renderables, renderable => renderable.EntityName == "Floor Collider");
         var ball = Assert.Single(withDebug.Renderables, renderable => renderable.EntityName == "Ball Collider");
-        Assert.Equal("rekall.geometry.cube", floor.Variant);
+        Assert.Equal("rekall.debug.collider.lines", floor.Variant);
         Assert.Equal("#33ddff66", floor.MaterialColor);
-        Assert.Equal(8, floor.ScaleX);
-        Assert.Equal(0.16, floor.ScaleY);
-        Assert.Equal(5, floor.ScaleZ);
-        Assert.Equal("rekall.geometry.sphere", ball.Variant);
+        Assert.Null(floor.GeometryMesh);
+        Assert.NotNull(floor.LineSegments);
+        Assert.Equal(12, floor.LineSegments!.Segments.Count);
+        Assert.Equal(0.08, floor.LineSegments.Thickness);
+        Assert.DoesNotContain(floor.LineSegments.Segments, segment =>
+            Math.Abs(segment.FromX) < 3.9 && Math.Abs(segment.FromY) < 0.07 && Math.Abs(segment.FromZ) < 2.4
+            && Math.Abs(segment.ToX) < 3.9 && Math.Abs(segment.ToY) < 0.07 && Math.Abs(segment.ToZ) < 2.4);
+        Assert.Equal("rekall.debug.collider.lines", ball.Variant);
         Assert.Equal("#ffea0066", ball.MaterialColor);
-        Assert.Equal(1.8, ball.ScaleX);
-        Assert.Equal(1.8, ball.ScaleY);
-        Assert.Equal(1.8, ball.ScaleZ);
+        Assert.Null(ball.GeometryMesh);
+        Assert.NotNull(ball.LineSegments);
+        Assert.True(ball.LineSegments!.Segments.Count > floor.LineSegments.Segments.Count);
         Assert.True(floor.SortKey > 300);
         Assert.True(ball.SortKey > floor.SortKey);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderAdds2DColliderDebugLinesWhenDebugOverlayIsEnabled()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering2d", "physics2d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Platform", ["level"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject
+                {
+                    ["x"] = 4,
+                    ["y"] = -2,
+                    ["rotation"] = 15
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.BoxCollider2D", new JsonObject
+                {
+                    ["width"] = 3,
+                    ["height"] = 0.5
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Coin", ["pickup"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject
+                {
+                    ["x"] = -1,
+                    ["y"] = 3
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.CircleCollider2D", new JsonObject
+                {
+                    ["radius"] = 0.75
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: true);
+
+        var platform = Assert.Single(frame.Renderables, renderable => renderable.EntityName == "Platform Collider");
+        var coin = Assert.Single(frame.Renderables, renderable => renderable.EntityName == "Coin Collider");
+        Assert.Equal("rekall.debug.collider.lines", platform.Variant);
+        Assert.Equal(4, platform.X);
+        Assert.Equal(-2, platform.Y);
+        Assert.Equal(15, platform.RotationZ);
+        Assert.Null(platform.GeometryMesh);
+        Assert.NotNull(platform.LineSegments);
+        Assert.Equal(4, platform.LineSegments!.Segments.Count);
+        Assert.DoesNotContain(platform.LineSegments.Segments, segment =>
+            Math.Abs(segment.FromX) < 1.4 && Math.Abs(segment.FromY) < 0.2
+            && Math.Abs(segment.ToX) < 1.4 && Math.Abs(segment.ToY) < 0.2);
+        Assert.Equal("rekall.debug.collider.lines", coin.Variant);
+        Assert.Equal(-1, coin.X);
+        Assert.Equal(3, coin.Y);
+        Assert.Null(coin.GeometryMesh);
+        Assert.NotNull(coin.LineSegments);
+        Assert.True(coin.LineSegments!.Segments.Count > platform.LineSegments.Segments.Count);
     }
 }

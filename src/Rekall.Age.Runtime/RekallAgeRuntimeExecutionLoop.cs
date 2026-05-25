@@ -35,12 +35,17 @@ public sealed class RekallAgeRuntimeExecutionLoop
 
         systems.AddRange(
         [
+            new RekallAgeInputActionSystem(),
+            new RekallAgeKeplerOrbitSystem(),
+            new RekallAgeCelestialRotationSystem(),
             new RekallAgeTransformAnimationSystem(),
             new NoOpRuntimeWorldSystem("runtime.audio"),
             new RekallAgeBepuPhysicsSystem(),
             new NoOpRuntimeWorldSystem("runtime.rendering"),
             new NoOpRuntimeWorldSystem("runtime.transform"),
-            new NoOpRuntimeWorldSystem("runtime.ui")
+            new NoOpRuntimeWorldSystem("runtime.ui"),
+            new RekallAgeCameraInputSystem(),
+            new RekallAgeCameraTarget3DSystem()
         ]);
 
         var loop = new RekallAgeRuntimeExecutionLoop(
@@ -53,7 +58,8 @@ public sealed class RekallAgeRuntimeExecutionLoop
     public async ValueTask<RekallAgeRuntimeRunResult> RunAsync(
         RekallAgeRuntimeWorld initialWorld,
         int frames,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        RekallAgeRuntimeInputState? input = null)
     {
         if (frames < 0)
         {
@@ -70,7 +76,12 @@ public sealed class RekallAgeRuntimeExecutionLoop
                 nextFrameIndex,
                 _fixedDeltaTime,
                 nextElapsed,
-                cancellationToken);
+                cancellationToken)
+            {
+                Input = frame == 0
+                    ? input ?? RekallAgeRuntimeInputState.Empty
+                    : RekallAgeRuntimeInputState.Empty
+            };
 
             foreach (var system in _systems)
             {
@@ -112,7 +123,10 @@ public sealed record RekallAgeRuntimeWorldFrameContext(
     int FrameIndex,
     TimeSpan DeltaTime,
     TimeSpan ElapsedTime,
-    CancellationToken CancellationToken);
+    CancellationToken CancellationToken)
+{
+    public RekallAgeRuntimeInputState Input { get; init; } = RekallAgeRuntimeInputState.Empty;
+}
 
 public interface IRekallAgeRuntimeWorldSystem
 {

@@ -322,10 +322,12 @@ public sealed class RekallAgeGlbMeshLoader
                 material.MetallicRoughnessTexture,
                 material.NormalTexture,
                 material.OcclusionTexture,
+                material.EmissiveTexture,
                 material.MetallicFactor,
                 material.RoughnessFactor,
                 material.NormalScale,
-                material.OcclusionStrength));
+                material.OcclusionStrength,
+                material.EmissiveFactor));
             vertices.Clear();
             indices.Clear();
             remap.Clear();
@@ -619,7 +621,9 @@ public sealed class RekallAgeGlbMeshLoader
                 RekallAgeVulkanSceneTexture? metallicRoughnessTexture = null;
                 RekallAgeVulkanSceneTexture? normalTexture = null;
                 RekallAgeVulkanSceneTexture? occlusionTexture = null;
+                RekallAgeVulkanSceneTexture? emissiveTexture = null;
                 var baseColor = new Vector4(0.72f, 0.78f, 0.86f, 1);
+                var emissiveFactor = Vector4.Zero;
                 var metallicFactor = 0f;
                 var roughnessFactor = 1f;
                 var normalScale = 1f;
@@ -686,16 +690,43 @@ public sealed class RekallAgeGlbMeshLoader
                     }
                 }
 
+                if (material.TryGetProperty("emissiveFactor", out var emissiveColor)
+                    && emissiveColor.ValueKind == JsonValueKind.Array)
+                {
+                    var values = emissiveColor.EnumerateArray().Select(item => item.GetSingle()).ToArray();
+                    if (values.Length >= 3)
+                    {
+                        emissiveFactor = new Vector4(values[0], values[1], values[2], 1);
+                    }
+                }
+
+                if (material.TryGetProperty("emissiveTexture", out var emissive)
+                    && emissive.ValueKind == JsonValueKind.Object)
+                {
+                    var textureIndex = ReadInt(emissive, "index", -1);
+                    if (textureIndex >= 0
+                        && textureIndex < textures.Count)
+                    {
+                        emissiveTexture = textures[textureIndex].ToSceneTexture($"{assetId}/texture/{textureIndex}");
+                        if (emissiveFactor.W <= 0)
+                        {
+                            emissiveFactor = new Vector4(1, 1, 1, 1);
+                        }
+                    }
+                }
+
                 return new MaterialInfo(
                     baseColor,
                     baseColorTexture,
                     metallicRoughnessTexture,
                     normalTexture,
                     occlusionTexture,
+                    emissiveTexture,
                     Math.Clamp(metallicFactor, 0, 1),
                     Math.Clamp(roughnessFactor, 0.04f, 1),
                     Math.Clamp(normalScale, 0, 4),
-                    Math.Clamp(occlusionStrength, 0, 1));
+                    Math.Clamp(occlusionStrength, 0, 1),
+                    emissiveFactor);
             })
             .ToArray();
     }
@@ -921,10 +952,12 @@ public sealed class RekallAgeGlbMeshLoader
         RekallAgeVulkanSceneTexture? MetallicRoughnessTexture,
         RekallAgeVulkanSceneTexture? NormalTexture,
         RekallAgeVulkanSceneTexture? OcclusionTexture,
+        RekallAgeVulkanSceneTexture? EmissiveTexture,
         float MetallicFactor,
         float RoughnessFactor,
         float NormalScale,
-        float OcclusionStrength)
+        float OcclusionStrength,
+        Vector4 EmissiveFactor)
     {
         public static MaterialInfo Default { get; } = new(
             new Vector4(0.72f, 0.78f, 0.86f, 1),
@@ -932,10 +965,12 @@ public sealed class RekallAgeGlbMeshLoader
             null,
             null,
             null,
+            null,
             0,
             1,
             1,
-            1);
+            1,
+            Vector4.Zero);
     }
 
     private sealed record TextureInfo(TextureImage? Image, RekallAgeVulkanSceneSampler Sampler)

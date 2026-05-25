@@ -24,6 +24,11 @@ public sealed class VulkanScenePipelineDescriptionTests
             && binding.Binding == 1
             && binding.DescriptorType == "combined-image-sampler"
             && binding.ShaderStage == "fragment");
+        Assert.Contains(pipeline.DescriptorBindings, binding =>
+            binding.Name == "EmissiveTexture"
+            && binding.Binding == 5
+            && binding.DescriptorType == "combined-image-sampler"
+            && binding.ShaderStage == "fragment");
         Assert.True(pipeline.PushConstantBytes >= 64);
     }
 
@@ -45,6 +50,11 @@ public sealed class VulkanScenePipelineDescriptionTests
         Assert.Contains("mat4 model;", vertex);
         Assert.Contains("layout(set = 0, binding = 0) uniform FrameUniform", fragment);
         Assert.Contains("layout(set = 0, binding = 1) uniform sampler2D baseColorTexture;", fragment);
+        Assert.Contains("layout(set = 0, binding = 5) uniform sampler2D emissiveTexture;", fragment);
+        Assert.Contains("vec4 lightPosition;", fragment);
+        Assert.Contains("frame.lightPosition.w > 0.5", fragment);
+        Assert.Contains("vec4 emissiveFactors;", fragment);
+        Assert.Contains("vec3 emissive =", fragment);
         Assert.Contains("mat4 viewProjection;", fragment);
         Assert.Contains("layout(location = 0) out vec4 outColor;", fragment);
     }

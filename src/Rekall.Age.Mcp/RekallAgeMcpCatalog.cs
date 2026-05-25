@@ -62,6 +62,11 @@ internal static class RekallAgeMcpToolClassifier
             return "modules";
         }
 
+        if (name.StartsWith("rekall.live.", StringComparison.Ordinal))
+        {
+            return "live";
+        }
+
         if (name.StartsWith("rekall.play", StringComparison.Ordinal))
         {
             return "playtesting";
@@ -76,6 +81,8 @@ internal static class RekallAgeMcpToolClassifier
             name.StartsWith("rekall.scene.", StringComparison.Ordinal) ||
             name.StartsWith("rekall.entity.", StringComparison.Ordinal) ||
             name.StartsWith("rekall.geometry.", StringComparison.Ordinal) ||
+            name.StartsWith("rekall.planet.", StringComparison.Ordinal) ||
+            name.StartsWith("rekall.solar.", StringComparison.Ordinal) ||
             name.StartsWith("rekall.component.", StringComparison.Ordinal))
         {
             return "world";
@@ -88,6 +95,12 @@ internal static class RekallAgeMcpToolClassifier
     {
         return name is
             "rekall.context.engine_status" or
+            "rekall.live.status" or
+            "rekall.live.reload_scene" or
+            "rekall.live.reload_assets" or
+            "rekall.live.apply_scene_blueprint" or
+            "rekall.live.apply_scene_diff" or
+            "rekall.solar.import_ksa_system" or
             "rekall.templates.inspect" or
             "rekall.workflow.create_playable_package_from_template" or
             "rekall.workflow.audit_playable_package";
@@ -101,6 +114,12 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.templates.inspect" => 8,
             "rekall.workflow.create_playable_package_from_template" => 10,
             "rekall.workflow.audit_playable_package" => 15,
+            "rekall.live.status" => 16,
+            "rekall.live.apply_scene_blueprint" => 17,
+            "rekall.live.apply_scene_diff" => 18,
+            "rekall.live.reload_scene" => 19,
+            "rekall.live.reload_assets" => 20,
+            "rekall.solar.import_ksa_system" => 21,
             "rekall.templates.verify_mvp" => 20,
             "rekall.scene.apply_blueprint" => 42,
             _ when name.StartsWith("rekall.workflow.", StringComparison.Ordinal) => 30,

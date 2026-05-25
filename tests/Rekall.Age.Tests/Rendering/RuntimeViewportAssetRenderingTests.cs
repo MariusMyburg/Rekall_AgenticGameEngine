@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Assets;
 using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime;
 using Rekall.Age.World;
 using ZstdSharp;
@@ -596,6 +597,58 @@ public sealed class RuntimeViewportAssetRenderingTests
         {
             var index = pixel * 4;
             return output.Rgba[index] > 180 && output.Rgba[index + 1] > 60 && output.Rgba[index + 1] < 150 && output.Rgba[index + 2] < 90;
+        });
+    }
+
+    [Fact]
+    public async Task SoftwareRendererRasterizesViewportLineSegmentsWithoutFallback()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main",
+            0,
+            0,
+            160,
+            100,
+            new RekallAgeRuntimeViewportCamera("camera", "Camera", "camera", true, ClearColor: "#080a0e"),
+            [],
+            [
+                new RekallAgeRuntimeViewportRenderable(
+                    "debug-lines",
+                    "Debug Lines",
+                    "mesh",
+                    null,
+                    0,
+                    0,
+                    0,
+                    900,
+                    Variant: "rekall.debug.lines",
+                    MaterialColor: "#33ddff",
+                    LineSegments: new RekallAgeRuntimeViewportLineSegments(
+                    [
+                        new RekallAgeRuntimeViewportLineSegment(-1, 0, 0, 1, 0, 0),
+                        new RekallAgeRuntimeViewportLineSegment(0, -1, 0, 0, 1, 0)
+                    ],
+                    0.05))
+            ],
+            0,
+            new RekallAgeRuntimeViewportOverlay(false, 0),
+            []);
+
+        var capture = await new RekallAgeRuntimeSoftwareRenderer().CaptureAsync(
+            frame,
+            Path.Combine(root, "captures"),
+            "Main_runtime_000.png",
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            CancellationToken.None);
+        var output = await RekallAgePngReader.ReadRgbaAsync(capture.ScreenshotPath, CancellationToken.None);
+
+        Assert.True(capture.NonBlank);
+        Assert.Equal(0, capture.FallbackRenderableCount);
+        Assert.Contains(Enumerable.Range(0, output.Rgba.Length / 4), pixel =>
+        {
+            var index = pixel * 4;
+            return output.Rgba[index] < 90 && output.Rgba[index + 1] > 170 && output.Rgba[index + 2] > 200;
         });
     }
 

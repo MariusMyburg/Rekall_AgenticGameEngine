@@ -31,6 +31,85 @@ public sealed class RuntimeInspectCliTests
     }
 
     [Fact]
+    public async Task RuntimeInspectAcceptsRuntimeInputJson()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Runtime Input CLI", ["world"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject { ["active"] = true })))
+                .AddEntity(RekallAgeEntityDocument.Create("Input", ["input"])
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.InputActionMap",
+                        new JsonObject
+                        {
+                            ["actions"] = new JsonArray
+                            {
+                                new JsonObject { ["name"] = "thrust", ["key"] = "W" }
+                            }
+                        }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            "runtime",
+            "inspect",
+            root,
+            "Main",
+            "1",
+            """[{"pressedKeys":["W"],"pressedKeysThisFrame":["W"]}]""");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Input actions: 1", result.Output);
+        Assert.Contains("thrust: value=1 down=True pressed=True released=False", result.Output);
+    }
+
+    [Fact]
+    public async Task RunSceneAcceptsRuntimeInputJson()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Run Scene Input CLI", ["world"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject { ["active"] = true })))
+                .AddEntity(RekallAgeEntityDocument.Create("Input", ["input"])
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.InputActionMap",
+                        new JsonObject
+                        {
+                            ["actions"] = new JsonArray
+                            {
+                                new JsonObject { ["name"] = "thrust", ["key"] = "W" }
+                            }
+                        }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            "run",
+            "scene",
+            root,
+            "Main",
+            "0.016",
+            """[{"pressedKeys":["W"],"pressedKeysThisFrame":["W"]}]""");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Systems: runtime.input.actions", result.Output);
+        Assert.Contains("Input actions: 1", result.Output);
+        Assert.Contains("thrust: value=1 down=True pressed=True released=False", result.Output);
+    }
+
+    [Fact]
     public async Task RuntimeViewportCapturePrintsCaptureSummary()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -57,6 +136,8 @@ public sealed class RuntimeInspectCliTests
         Assert.Contains("Hardware accelerated: False", result.Output);
         Assert.Contains("Acceleration: software-rasterized", result.Output);
         Assert.Contains("Active camera: MainCamera", result.Output);
+        Assert.Contains("Frame analysis: informative=", result.Output);
+        Assert.Contains("Dominant color:", result.Output);
         Assert.Contains("Renderable: 1", result.Output);
         Assert.Contains("Asset-backed: 0", result.Output);
         Assert.Contains("Fallback: 1", result.Output);

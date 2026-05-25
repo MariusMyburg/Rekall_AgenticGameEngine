@@ -10,6 +10,7 @@ layout(set = 0, binding = 0) uniform FrameUniform
     mat4 viewProjection;
     vec4 lightDirection;
     vec4 lightColor;
+    vec4 lightPosition;
 } frame;
 
 layout(push_constant) uniform DrawPushConstants

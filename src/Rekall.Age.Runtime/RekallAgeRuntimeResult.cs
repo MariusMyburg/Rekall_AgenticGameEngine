@@ -9,10 +9,17 @@ public sealed record RekallAgeRuntimeResult(
     IReadOnlyList<string> Errors,
     IReadOnlyList<RekallAgeRuntimeObservation> Observations)
 {
+    public IReadOnlyList<string> SystemsRun { get; init; } = Array.Empty<string>();
+
+    public IReadOnlyList<RekallAgeRuntimeInputAction> InputActions { get; init; } =
+        Array.Empty<RekallAgeRuntimeInputAction>();
+
     public IReadOnlyList<string> ActiveSystems =>
-        Observations
-            .Select(observation => observation.System)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(system => system, StringComparer.Ordinal)
-            .ToArray();
+        SystemsRun.Count > 0
+            ? SystemsRun
+            : Observations
+                .Select(observation => observation.System)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(system => system, StringComparer.Ordinal)
+                .ToArray();
 }

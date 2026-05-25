@@ -68,6 +68,41 @@ public sealed class VulkanSceneMeshBuilderTests
         });
     }
 
+    [Fact]
+    public void BuildMeshesExpandsViewportLineSegmentsToThinDebugGeometry()
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "debug-lines",
+            "Debug Lines",
+            "mesh",
+            null,
+            0,
+            0,
+            0,
+            900,
+            Variant: "rekall.debug.lines",
+            MaterialColor: "#33ddff66",
+            LineSegments: new RekallAgeRuntimeViewportLineSegments(
+            [
+                new RekallAgeRuntimeViewportLineSegment(-1, 0, 0, 1, 0, 0),
+                new RekallAgeRuntimeViewportLineSegment(0, -1, 0, 0, 1, 0)
+            ],
+            0.05)));
+
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame));
+
+        Assert.Equal("line-segments", mesh.Primitive);
+        Assert.Equal(16, mesh.Vertices.Count);
+        Assert.Equal(24, mesh.Indices.Count);
+        Assert.All(mesh.Vertices, vertex =>
+        {
+            Assert.Equal(51f / 255f, vertex.R, 6);
+            Assert.Equal(221f / 255f, vertex.G, 6);
+            Assert.Equal(1f, vertex.B, 6);
+            Assert.Equal(102f / 255f, vertex.A, 6);
+        });
+    }
+
     [Theory]
     [InlineData("sphere")]
     [InlineData("surface")]
@@ -191,6 +226,32 @@ public sealed class VulkanSceneMeshBuilderTests
         Assert.Equal(1, mesh.BaseColorTexture.Height);
         Assert.Equal([20, 40, 80, 255, 120, 140, 180, 255], mesh.BaseColorTexture.Rgba);
         Assert.Equal(RekallAgeVulkanSceneFilter.Linear, mesh.BaseColorTexture.Sampler.MinFilter);
+    }
+
+    [Fact]
+    public void BuildMeshesBindsEmissiveTextureAndFactorsToGeneratedPrimitive()
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "lamp-1",
+            "Lamp",
+            "mesh",
+            "rekall.geometry.sphere",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.geometry.sphere",
+            MaterialColor: "#202020",
+            EmissiveColor: "#ff8000",
+            EmissiveStrength: 3.5,
+            EmissiveTextureAssetId: "asset_glow"));
+        var assets = CreateAssetsWithTexture("asset_glow", 1, 1, [255, 128, 0, 255]);
+
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets));
+
+        Assert.NotNull(mesh.EmissiveTexture);
+        Assert.Equal("asset_glow", mesh.EmissiveTexture.Id);
+        Assert.Equal(new Vector4(1f, 128 / 255f, 0f, 3.5f), mesh.EmissiveFactor);
     }
 
     [Fact]

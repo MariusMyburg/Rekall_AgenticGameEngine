@@ -1,10 +1,17 @@
 using System.Diagnostics;
+using System.Collections.Concurrent;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime;
+using Rekall.Age.Runtime.Abstractions;
+using Rekall.Age.Runtime.Live;
+using Rekall.Age.World;
+using Rekall.Age.World.Commands;
 using Veldrid;
 using Veldrid.Sdl2;
 using Veldrid.SPIRV;
@@ -82,7 +89,19 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private const double MaximumAccumulatedSimulationSeconds = 0.25;
     private const int MaximumSimulationStepsPerRender = 8;
 
+    private static readonly JsonSerializerOptions LiveJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true
+    };
+
+    private readonly string _projectRoot;
     private readonly string _sceneName;
+    private readonly string _sessionId = Guid.NewGuid().ToString("N");
+    private readonly string _livePipeName;
+    private readonly ConcurrentQueue<LiveEditWorkItem> _liveEditQueue = new();
+    private readonly RekallAgeLivePlayerNamedPipeServer _liveServer;
+    private FileSystemWatcher? _assetWatcher;
     private readonly Sdl2Window _window;
     private readonly GraphicsDevice _device;
     private readonly ResourceFactory _factory;
@@ -99,8 +118,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private ResourceSet _drawSet;
     private readonly RekallAgeRuntimeExecutionLoop _runtimeLoop;
     private readonly RekallAgeRuntimeRenderFrameBuilder _frameBuilder = new();
-    private readonly RekallAgeRuntimeViewportAssetSet _assets;
-    private readonly int _entityCount;
+    private RekallAgeRuntimeViewportAssetSet _assets;
+    private int _entityCount;
     private readonly Dictionary<string, TextureBinding> _textures;
     private readonly Dictionary<MaterialKey, ResourceSet> _materialSets = new();
     private readonly TextureBinding _whiteTexture;
@@ -121,20 +140,38 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private uint _vertexBufferCapacityBytes;
     private uint _indexBufferCapacityBytes;
     private uint _hudVertexBufferCapacityBytes;
+    private readonly uint _drawUniformStrideBytes;
+    private uint _drawUniformBufferCapacityBytes;
     private int _frameIndex;
     private Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeWorld _runtimeWorld;
     private double _lastSimulationClockSeconds;
     private double _simulationAccumulatorSeconds;
+    private double _pendingMouseWheelDelta;
+    private Vector2 _lastMousePosition;
+    private Vector2 _previousMousePosition;
+    private readonly HashSet<string> _pressedKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _pressedKeysThisFrame = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _releasedKeysThisFrame = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _pressedButtons = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _pressedButtonsThisFrame = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _releasedButtonsThisFrame = new(StringComparer.OrdinalIgnoreCase);
     private int _lastFpsFrame;
     private double _lastFpsTime;
     private int _fps;
+    private int _sceneRevision = 1;
+    private int _assetRevision = 1;
+    private int _assetHotReloadPending;
+    private long _lastAssetHotReloadRequestTicks;
     private int _cachedWidth;
     private int _cachedHeight;
     private RenderPacket? _cachedStaticPacket;
     private bool _hudDirty = true;
+    private RekallAgeSceneDocument _sceneDocument;
 
     private RekallAgeVeldridPlayer(
+        string projectRoot,
         string sceneName,
+        RekallAgeSceneDocument sceneDocument,
         Sdl2Window window,
         GraphicsDevice device,
         CommandList commands,
@@ -163,7 +200,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         TextureBinding defaultMetallicRoughnessTexture,
         TextureBinding hudTexture)
     {
+        _projectRoot = projectRoot;
         _sceneName = sceneName;
+        _sceneDocument = sceneDocument;
+        _livePipeName = RekallAgeLivePlayerEndpoint.ResolvePipeName(projectRoot, sceneName);
+        _liveServer = new RekallAgeLivePlayerNamedPipeServer(_livePipeName, EnqueueLiveEditAsync);
         _window = window;
         _device = device;
         _factory = device.ResourceFactory;
@@ -186,6 +227,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _vertexBufferCapacityBytes = vertexBuffer.SizeInBytes;
         _indexBufferCapacityBytes = indexBuffer.SizeInBytes;
         _hudVertexBufferCapacityBytes = hudVertexBuffer.SizeInBytes;
+        _drawUniformStrideBytes = AlignTo(
+            checked((uint)Marshal.SizeOf<DrawUniform>()),
+            Math.Max(1, _device.UniformBufferMinOffsetAlignment));
+        _drawUniformBufferCapacityBytes = drawUniformBuffer.SizeInBytes;
         _runtimeWorld = runtimeWorld;
         _runtimeLoop = runtimeLoop;
         _assets = assets;
@@ -269,7 +314,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var frameLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
             new ResourceLayoutElementDescription("FrameUniform", ResourceKind.UniformBuffer, ShaderStages.Vertex | ShaderStages.Fragment)));
         var drawLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
-            new ResourceLayoutElementDescription("DrawUniform", ResourceKind.UniformBuffer, ShaderStages.Vertex)));
+            new ResourceLayoutElementDescription(
+                "DrawUniform",
+                ResourceKind.UniformBuffer,
+                ShaderStages.Vertex | ShaderStages.Fragment,
+                ResourceLayoutElementOptions.DynamicBinding)));
         var materialLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
             new ResourceLayoutElementDescription("BaseColorTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("BaseColorSampler", ResourceKind.Sampler, ShaderStages.Fragment),
@@ -278,7 +327,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             new ResourceLayoutElementDescription("MetallicRoughnessTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("MetallicRoughnessSampler", ResourceKind.Sampler, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("OcclusionTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
-            new ResourceLayoutElementDescription("OcclusionSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
+            new ResourceLayoutElementDescription("OcclusionSampler", ResourceKind.Sampler, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("EmissiveTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("EmissiveSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
         var presentTextureLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
             new ResourceLayoutElementDescription("SceneTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("SceneSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
@@ -335,8 +386,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var frameUniformBuffer = factory.CreateBuffer(new BufferDescription(
             checked((uint)Marshal.SizeOf<FrameUniform>()),
             BufferUsage.UniformBuffer | BufferUsage.Dynamic));
-        var drawUniformBuffer = factory.CreateBuffer(new BufferDescription(
+        var drawUniformStrideBytes = AlignTo(
             checked((uint)Marshal.SizeOf<DrawUniform>()),
+            Math.Max(1, device.UniformBufferMinOffsetAlignment));
+        var drawUniformBuffer = factory.CreateBuffer(new BufferDescription(
+            checked(drawUniformStrideBytes * 256),
             BufferUsage.UniformBuffer | BufferUsage.Dynamic));
         var frameSet = factory.CreateResourceSet(new ResourceSetDescription(frameLayout, frameUniformBuffer));
         var drawSet = factory.CreateResourceSet(new ResourceSetDescription(drawLayout, drawUniformBuffer));
@@ -399,7 +453,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                     RekallAgeVulkanSceneWrapMode.ClampToEdge)),
             hudTextureLayout);
         var player = new RekallAgeVeldridPlayer(
+            projectRoot,
             sceneName,
+            scene,
             window,
             device,
             commands,
@@ -427,15 +483,44 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             flatNormalTexture,
             defaultMetallicRoughnessTexture,
             hudTexture);
+        player.StartLiveEditServer();
+        player.StartAssetHotReloadWatcher();
         PlayerLog.Write("Player initialization complete.");
         return player;
+    }
+
+    private void StartLiveEditServer()
+    {
+        _liveServer.Start();
+        PlayerLog.Write($"Live-edit server listening pipe={_livePipeName} session={_sessionId}.");
+    }
+
+    private void StartAssetHotReloadWatcher()
+    {
+        var assetsRoot = Path.Combine(_projectRoot, "Assets");
+        Directory.CreateDirectory(assetsRoot);
+        _assetWatcher = new FileSystemWatcher(assetsRoot)
+        {
+            IncludeSubdirectories = true,
+            NotifyFilter = NotifyFilters.FileName
+                | NotifyFilters.DirectoryName
+                | NotifyFilters.LastWrite
+                | NotifyFilters.Size
+                | NotifyFilters.CreationTime
+        };
+        _assetWatcher.Changed += (_, _) => MarkAssetHotReloadPending();
+        _assetWatcher.Created += (_, _) => MarkAssetHotReloadPending();
+        _assetWatcher.Deleted += (_, _) => MarkAssetHotReloadPending();
+        _assetWatcher.Renamed += (_, _) => MarkAssetHotReloadPending();
+        _assetWatcher.EnableRaisingEvents = true;
+        PlayerLog.Write($"Asset hot reload watching {assetsRoot}.");
     }
 
     public void Run()
     {
         while (_window.Exists)
         {
-            _window.PumpEvents();
+            CaptureInput(_window.PumpEvents());
             if (!_window.Exists)
             {
                 break;
@@ -447,9 +532,56 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _device.WaitForIdle();
     }
 
-    public ValueTask DisposeAsync()
+    private void CaptureInput(InputSnapshot snapshot)
+    {
+        _previousMousePosition = _lastMousePosition;
+        _lastMousePosition = snapshot.MousePosition;
+        foreach (var keyEvent in snapshot.KeyEvents)
+        {
+            var key = keyEvent.Key.ToString();
+            if (keyEvent.Down)
+            {
+                if (_pressedKeys.Add(key))
+                {
+                    _pressedKeysThisFrame.Add(key);
+                }
+            }
+            else if (_pressedKeys.Remove(key))
+            {
+                _releasedKeysThisFrame.Add(key);
+            }
+        }
+
+        foreach (var mouseEvent in snapshot.MouseEvents)
+        {
+            var button = mouseEvent.MouseButton.ToString();
+            if (mouseEvent.Down)
+            {
+                if (_pressedButtons.Add(button))
+                {
+                    _pressedButtonsThisFrame.Add(button);
+                }
+            }
+            else if (_pressedButtons.Remove(button))
+            {
+                _releasedButtonsThisFrame.Add(button);
+            }
+        }
+
+        if (Math.Abs(snapshot.WheelDelta) <= 0.000001f)
+        {
+            return;
+        }
+
+        _pendingMouseWheelDelta += snapshot.WheelDelta;
+        _cachedStaticPacket = null;
+    }
+
+    public async ValueTask DisposeAsync()
     {
         _device.WaitForIdle();
+        _assetWatcher?.Dispose();
+        await _liveServer.DisposeAsync();
         _sceneTarget.Dispose();
         foreach (var materialSet in _materialSets.Values)
         {
@@ -483,7 +615,6 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _hudTextureLayout.Dispose();
         _commands.Dispose();
         _device.Dispose();
-        return ValueTask.CompletedTask;
     }
 
     private void EnsureSceneRenderTarget(int displayWidth, int displayHeight)
@@ -503,8 +634,379 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         PlayerLog.Write($"Recreated supersampled scene target {_sceneTarget.Width}x{_sceneTarget.Height} for window {displayWidth}x{displayHeight}.");
     }
 
+    private void MarkAssetHotReloadPending()
+    {
+        Interlocked.Exchange(ref _lastAssetHotReloadRequestTicks, Stopwatch.GetTimestamp());
+        Interlocked.Exchange(ref _assetHotReloadPending, 1);
+    }
+
+    private void ProcessAssetHotReload()
+    {
+        if (Volatile.Read(ref _assetHotReloadPending) == 0)
+        {
+            return;
+        }
+
+        var elapsedSeconds = (Stopwatch.GetTimestamp() - Volatile.Read(ref _lastAssetHotReloadRequestTicks))
+            / (double)Stopwatch.Frequency;
+        if (elapsedSeconds < 0.5)
+        {
+            return;
+        }
+
+        if (Interlocked.Exchange(ref _assetHotReloadPending, 0) == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            ReloadAssetsForCurrentWorld("Hot-reloaded runtime viewport assets after asset filesystem change.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or JsonException)
+        {
+            PlayerLog.Write($"Asset hot reload failed; retrying after debounce. error={ex.Message}");
+            MarkAssetHotReloadPending();
+        }
+    }
+
+    private ValueTask<JsonObject> EnqueueLiveEditAsync(
+        RekallAgeLivePlayerRequestEnvelope request,
+        CancellationToken cancellationToken)
+    {
+        var completion = new TaskCompletionSource<JsonObject>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _liveEditQueue.Enqueue(new LiveEditWorkItem(request, completion));
+        return new ValueTask<JsonObject>(completion.Task.WaitAsync(cancellationToken));
+    }
+
+    private void ProcessLiveEditQueue()
+    {
+        while (_liveEditQueue.TryDequeue(out var item))
+        {
+            try
+            {
+                item.Completion.SetResult(ApplyLiveEdit(item.Request));
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException or JsonException or ArgumentException)
+            {
+                item.Completion.SetException(ex);
+                PlayerLog.Write($"Live-edit request failed operation={item.Request.Operation} error={ex.Message}");
+            }
+        }
+    }
+
+    private JsonObject ApplyLiveEdit(RekallAgeLivePlayerRequestEnvelope request)
+    {
+        PlayerLog.Write($"Live-edit request operation={request.Operation} request={request.RequestId}.");
+        return request.Operation switch
+        {
+            "status" => CreateLiveStatus("status", false, "Live player is running."),
+            "reload_scene" => ReloadSceneFromDisk(ReadBoolean(request.Payload, "reloadAssets", true)),
+            "reload_assets" => ReloadAssetsForCurrentWorld("Reloaded runtime viewport assets."),
+            "apply_scene_blueprint" => ApplySceneBlueprintLive(request.Payload),
+            "apply_scene_diff" => ApplySceneDiffLive(request.Payload),
+            _ => throw new InvalidOperationException($"Live-edit operation '{request.Operation}' is not supported.")
+        };
+    }
+
+    private JsonObject ReloadSceneFromDisk(bool reloadAssets)
+    {
+        var scene = new RekallAgeSceneStore()
+            .LoadAsync(_projectRoot, _sceneName, CancellationToken.None)
+            .AsTask()
+            .GetAwaiter()
+            .GetResult();
+        ApplySceneDocument(scene);
+        if (reloadAssets)
+        {
+            ReloadAssetsForCurrentWorld("Reloaded scene and assets.");
+        }
+
+        return CreateLiveStatus("reload_scene", true, reloadAssets ? "Reloaded scene and assets." : "Reloaded scene.");
+    }
+
+    private JsonObject ApplySceneBlueprintLive(JsonObject? payload)
+    {
+        var request = payload.Deserialize<LiveApplySceneBlueprintPayload>(LiveJsonOptions)
+            ?? throw new JsonException("Live scene blueprint payload was null.");
+        if (request.Entities.Count == 0)
+        {
+            throw new InvalidOperationException("Live scene blueprint must contain at least one entity.");
+        }
+
+        var updated = ApplySceneDelta(
+            _sceneDocument,
+            request.Entities,
+            [],
+            [],
+            request.ClearExisting,
+            out var upsertedCount,
+            out var removedCount);
+        if (request.PersistToProject)
+        {
+            new RekallAgeSceneStore()
+                .SaveAsync(_projectRoot, updated, CancellationToken.None)
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
+        }
+
+        ApplySceneDocument(updated);
+        if (request.ReloadAssets)
+        {
+            ReloadAssetsForCurrentWorld("Applied live scene blueprint and reloaded assets.");
+        }
+
+        var status = CreateLiveStatus(
+            "apply_scene_blueprint",
+            true,
+            request.PersistToProject
+                ? "Applied live scene blueprint and persisted it to project scene storage."
+                : "Applied live scene blueprint to the running player.");
+        status["upsertedCount"] = upsertedCount;
+        status["removedCount"] = removedCount;
+        return status;
+    }
+
+    private JsonObject ApplySceneDiffLive(JsonObject? payload)
+    {
+        var request = payload.Deserialize<LiveApplySceneDiffPayload>(LiveJsonOptions)
+            ?? throw new JsonException("Live scene diff payload was null.");
+        var upserts = request.UpsertEntities ?? [];
+        var deleteIds = request.DeleteEntityIds ?? [];
+        var deleteNames = request.DeleteEntityNames ?? [];
+        if (!request.ClearExisting && upserts.Count == 0 && deleteIds.Count == 0 && deleteNames.Count == 0)
+        {
+            throw new InvalidOperationException("Live scene diff must contain an upsert, delete, or clear operation.");
+        }
+
+        var updated = ApplySceneDelta(
+            _sceneDocument,
+            upserts,
+            deleteIds,
+            deleteNames,
+            request.ClearExisting,
+            out var upsertedCount,
+            out var removedCount);
+        if (request.PersistToProject)
+        {
+            new RekallAgeSceneStore()
+                .SaveAsync(_projectRoot, updated, CancellationToken.None)
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
+        }
+
+        ApplySceneDocument(updated);
+        if (request.ReloadAssets)
+        {
+            ReloadAssetsForCurrentWorld("Applied live scene diff and reloaded assets.");
+        }
+
+        var status = CreateLiveStatus(
+            "apply_scene_diff",
+            true,
+            request.PersistToProject
+                ? "Applied live scene diff and persisted it to project scene storage."
+                : "Applied live scene diff to the running player.");
+        status["upsertedCount"] = upsertedCount;
+        status["removedCount"] = removedCount;
+        return status;
+    }
+
+    private void ApplySceneDocument(RekallAgeSceneDocument scene)
+    {
+        var initialWorld = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        var runResult = _runtimeLoop.RunAsync(initialWorld, 1, CancellationToken.None)
+            .AsTask()
+            .GetAwaiter()
+            .GetResult();
+        _sceneDocument = scene;
+        _runtimeWorld = runResult.World;
+        _entityCount = _runtimeWorld.Entities.Count;
+        _sceneRevision++;
+        _simulationAccumulatorSeconds = 0;
+        _lastSimulationClockSeconds = _clock.Elapsed.TotalSeconds;
+        _cachedStaticPacket = null;
+        _hudDirty = true;
+    }
+
+    private JsonObject ReloadAssetsForCurrentWorld(string message)
+    {
+        var frame = _frameBuilder.Build(
+            _runtimeWorld,
+            Math.Max(1, _window.Width),
+            Math.Max(1, _window.Height),
+            debugOverlay: true);
+        var assets = new RekallAgeRuntimeViewportAssetResolver()
+            .ResolveAsync(_projectRoot, frame, CancellationToken.None)
+            .AsTask()
+            .GetAwaiter()
+            .GetResult();
+
+        _device.WaitForIdle();
+        foreach (var materialSet in _materialSets.Values)
+        {
+            materialSet.Dispose();
+        }
+
+        _materialSets.Clear();
+        foreach (var texture in _textures.Values)
+        {
+            texture.Dispose();
+        }
+
+        _textures.Clear();
+        foreach (var item in CreateTextureBindings(_device, _factory, _hudTextureLayout, assets))
+        {
+            _textures[item.Key] = item.Value;
+        }
+
+        _assets = assets;
+        _assetRevision++;
+        _cachedStaticPacket = null;
+        _hudDirty = true;
+        PlayerLog.Write($"Live assets reloaded images={assets.Images.Count} textures={assets.Textures.Count} models={assets.Models.Count} issues={assets.Issues.Count}.");
+        return CreateLiveStatus("reload_assets", true, message);
+    }
+
+    private JsonObject CreateLiveStatus(string operation, bool applied, string message)
+    {
+        var frame = _frameBuilder.Build(
+            _runtimeWorld,
+            Math.Max(1, _window.Width),
+            Math.Max(1, _window.Height),
+            debugOverlay: true);
+        return new JsonObject
+        {
+            ["sessionId"] = _sessionId,
+            ["pipeName"] = _livePipeName,
+            ["operation"] = operation,
+            ["applied"] = applied,
+            ["frameIndex"] = _frameIndex,
+            ["entityCount"] = _entityCount,
+            ["renderableCount"] = frame.Renderables.Count,
+            ["sceneRevision"] = _sceneRevision,
+            ["assetRevision"] = _assetRevision,
+            ["message"] = message
+        };
+    }
+
+    private static RekallAgeSceneDocument ApplySceneDelta(
+        RekallAgeSceneDocument scene,
+        IReadOnlyList<RekallAgeSceneBlueprintEntity> upserts,
+        IReadOnlyList<string> deleteEntityIds,
+        IReadOnlyList<string> deleteEntityNames,
+        bool clearExisting,
+        out int upsertedCount,
+        out int removedCount)
+    {
+        var existing = clearExisting ? [] : scene.Entities.ToList();
+        removedCount = clearExisting ? scene.Entities.Count : 0;
+        upsertedCount = 0;
+
+        if (!clearExisting)
+        {
+            var deleteIds = ToTrimmedSet(deleteEntityIds);
+            var deleteNames = ToTrimmedSet(deleteEntityNames);
+            if (deleteIds.Count > 0 || deleteNames.Count > 0)
+            {
+                var before = existing.Count;
+                existing = existing
+                    .Where(entity => !deleteIds.Contains(entity.Id) && !deleteNames.Contains(entity.Name))
+                    .ToList();
+                removedCount += before - existing.Count;
+            }
+        }
+
+        foreach (var blueprint in upserts)
+        {
+            var entity = CreateEntity(blueprint);
+            var replacementIndex = FindReplacementIndex(existing, blueprint);
+            if (replacementIndex < 0)
+            {
+                existing.Add(entity);
+            }
+            else
+            {
+                existing[replacementIndex] = entity;
+            }
+
+            upsertedCount++;
+        }
+
+        return scene with
+        {
+            Entities = existing
+                .OrderBy(entity => entity.Name, StringComparer.Ordinal)
+                .ThenBy(entity => entity.Id, StringComparer.Ordinal)
+                .ToArray()
+        };
+    }
+
+    private static HashSet<string> ToTrimmedSet(IReadOnlyList<string> values)
+    {
+        return values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    private static int FindReplacementIndex(List<RekallAgeEntityDocument> existing, RekallAgeSceneBlueprintEntity blueprint)
+    {
+        if (!string.IsNullOrWhiteSpace(blueprint.Id))
+        {
+            var byId = existing.FindIndex(entity => entity.Id.Equals(blueprint.Id, StringComparison.Ordinal));
+            if (byId >= 0)
+            {
+                return byId;
+            }
+        }
+
+        var nameMatches = existing
+            .Select((entity, index) => (entity, index))
+            .Where(item => item.entity.Name.Equals(blueprint.Name.Trim(), StringComparison.Ordinal))
+            .ToArray();
+        return nameMatches.Length == 1 ? nameMatches[0].index : -1;
+    }
+
+    private static RekallAgeEntityDocument CreateEntity(RekallAgeSceneBlueprintEntity blueprint)
+    {
+        var entity = RekallAgeEntityDocument.Create(blueprint.Name, blueprint.Tags ?? []);
+        if (!string.IsNullOrWhiteSpace(blueprint.Id))
+        {
+            entity = entity with { Id = blueprint.Id.Trim() };
+        }
+
+        entity = entity with
+        {
+            ParentId = string.IsNullOrWhiteSpace(blueprint.ParentId) ? null : blueprint.ParentId.Trim(),
+            Visible = blueprint.Visible ?? true,
+            Locked = blueprint.Locked ?? false
+        };
+
+        foreach (var component in blueprint.Components ?? [])
+        {
+            entity = entity.AddComponent(RekallAgeComponentDocument.Create(component.Type, component.Properties));
+        }
+
+        return entity;
+    }
+
+    private static bool ReadBoolean(JsonObject? payload, string name, bool fallback)
+    {
+        return payload is not null
+            && payload.TryGetPropertyValue(name, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<bool>(out var boolean)
+            ? boolean
+            : fallback;
+    }
+
     private void RenderFrame()
     {
+        ProcessLiveEditQueue();
+        ProcessAssetHotReload();
         var frameNumber = Interlocked.Increment(ref _frameIndex);
         AdvanceSimulationToWallClock();
         var frame = _frameBuilder.Build(
@@ -526,6 +1028,19 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _device.UpdateBuffer(_vertexBuffer, 0, packet.Vertices);
             EnsureIndexBufferCapacity(packet.Indices);
             _device.UpdateBuffer(_indexBuffer, 0, packet.Indices);
+        }
+
+        if (packet.Draws.Length > 0)
+        {
+            EnsureDrawUniformBufferCapacity(packet.Draws.Length);
+            for (var i = 0; i < packet.Draws.Length; i++)
+            {
+                var draw = packet.Draws[i];
+                _device.UpdateBuffer(
+                    _drawUniformBuffer,
+                    checked(_drawUniformStrideBytes * (uint)i),
+                    new DrawUniform(draw.Model, draw.MaterialFactors, draw.EmissiveFactors));
+            }
         }
 
         UpdateTitle(frameNumber, _clock.Elapsed.TotalSeconds, packet.Vertices.Length);
@@ -555,10 +1070,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _commands.SetVertexBuffer(0, _vertexBuffer);
             _commands.SetIndexBuffer(_indexBuffer, IndexFormat.UInt32);
             _commands.SetGraphicsResourceSet(0, _frameSet);
-            _commands.SetGraphicsResourceSet(1, _drawSet);
-            foreach (var draw in packet.Draws)
+            for (var i = 0; i < packet.Draws.Length; i++)
             {
-                _device.UpdateBuffer(_drawUniformBuffer, 0, new DrawUniform(draw.Model, draw.MaterialFactors));
+                var draw = packet.Draws[i];
+                var drawUniformOffset = checked(_drawUniformStrideBytes * (uint)i);
+                _commands.SetGraphicsResourceSet(1, _drawSet, new[] { drawUniformOffset });
                 _commands.SetGraphicsResourceSet(2, ResolveMaterialSet(draw));
                 _commands.DrawIndexed(draw.IndexCount, 1, draw.FirstIndex, draw.VertexOffset, 0);
             }
@@ -598,7 +1114,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         while (_simulationAccumulatorSeconds >= FixedSimulationStepSeconds
             && steps < MaximumSimulationStepsPerRender)
         {
-            var runResult = _runtimeLoop.RunAsync(_runtimeWorld, 1, CancellationToken.None)
+            var input = steps == 0
+                ? ConsumeRuntimeInput()
+                : RekallAgeRuntimeInputState.Empty;
+            var runResult = _runtimeLoop.RunAsync(_runtimeWorld, 1, CancellationToken.None, input)
                 .AsTask()
                 .GetAwaiter()
                 .GetResult();
@@ -606,6 +1125,32 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _simulationAccumulatorSeconds -= FixedSimulationStepSeconds;
             steps++;
         }
+    }
+
+    private RekallAgeRuntimeInputState ConsumeRuntimeInput()
+    {
+        var wheelDelta = _pendingMouseWheelDelta;
+        var pressedKeysThisFrame = _pressedKeysThisFrame.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var releasedKeysThisFrame = _releasedKeysThisFrame.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var pressedButtonsThisFrame = _pressedButtonsThisFrame.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var releasedButtonsThisFrame = _releasedButtonsThisFrame.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _pendingMouseWheelDelta = 0;
+        _pressedKeysThisFrame.Clear();
+        _releasedKeysThisFrame.Clear();
+        _pressedButtonsThisFrame.Clear();
+        _releasedButtonsThisFrame.Clear();
+        return new RekallAgeRuntimeInputState(
+            MouseX: _lastMousePosition.X,
+            MouseY: _lastMousePosition.Y,
+            MouseDeltaX: _lastMousePosition.X - _previousMousePosition.X,
+            MouseDeltaY: _lastMousePosition.Y - _previousMousePosition.Y,
+            MouseWheelDelta: wheelDelta,
+            PressedKeys: _pressedKeys.ToHashSet(StringComparer.OrdinalIgnoreCase),
+            PressedKeysThisFrame: pressedKeysThisFrame,
+            ReleasedKeysThisFrame: releasedKeysThisFrame,
+            PressedButtons: _pressedButtons.ToHashSet(StringComparer.OrdinalIgnoreCase),
+            PressedButtonsThisFrame: pressedButtonsThisFrame,
+            ReleasedButtonsThisFrame: releasedButtonsThisFrame);
     }
 
     private RenderPacket GetRenderPacket(
@@ -669,7 +1214,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 draw.MetallicRoughnessTextureId,
                 draw.NormalTextureId,
                 draw.OcclusionTextureId,
-                draw.MaterialFactors))
+                draw.EmissiveTextureId,
+                draw.MaterialFactors,
+                draw.EmissiveFactors))
             .ToArray();
 
         var textureCount = meshes
@@ -678,7 +1225,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 mesh.BaseColorTexture?.Id,
                 mesh.MetallicRoughnessTexture?.Id,
                 mesh.NormalTexture?.Id,
-                mesh.OcclusionTexture?.Id
+                mesh.OcclusionTexture?.Id,
+                mesh.EmissiveTexture?.Id
             })
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Distinct(StringComparer.Ordinal)
@@ -690,7 +1238,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             new FrameUniform(
                 batch.Frame.ViewProjection,
                 new Vector4(batch.Frame.LightDirection, 0),
-                batch.Frame.LightColor),
+                batch.Frame.LightColor,
+                batch.Frame.LightPosition),
             meshes.Count,
             meshes.Sum(mesh => mesh.Indices.Count / 3),
             textureCount);
@@ -762,6 +1311,31 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             newCapacity,
             BufferUsage.VertexBuffer | BufferUsage.Dynamic));
         _hudVertexBufferCapacityBytes = newCapacity;
+    }
+
+    private void EnsureDrawUniformBufferCapacity(int drawCount)
+    {
+        var requiredBytes = checked(_drawUniformStrideBytes * (uint)Math.Max(1, drawCount));
+        if (requiredBytes <= _drawUniformBufferCapacityBytes)
+        {
+            return;
+        }
+
+        var newCapacity = _drawUniformBufferCapacityBytes;
+        while (newCapacity < requiredBytes)
+        {
+            newCapacity = checked(newCapacity * 2);
+        }
+
+        _device.WaitForIdle();
+        _drawSet.Dispose();
+        _drawUniformBuffer.Dispose();
+        _drawUniformBuffer = _factory.CreateBuffer(new BufferDescription(
+            newCapacity,
+            BufferUsage.UniformBuffer | BufferUsage.Dynamic));
+        _drawSet = _factory.CreateResourceSet(new ResourceSetDescription(_drawLayout, _drawUniformBuffer));
+        _drawUniformBufferCapacityBytes = newCapacity;
+        PlayerLog.Write($"Resized dynamic draw uniform buffer to {newCapacity} bytes for {drawCount} draw(s).");
     }
 
     private IReadOnlyList<string> BuildHudLines(
@@ -887,13 +1461,27 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         return 1f - y / Math.Max(1, height) * 2f;
     }
 
+    private static uint AlignTo(uint value, uint alignment)
+    {
+        if (alignment <= 1)
+        {
+            return value;
+        }
+
+        var remainder = value % alignment;
+        return remainder == 0
+            ? value
+            : checked(value + alignment - remainder);
+    }
+
     private ResourceSet ResolveMaterialSet(GpuDraw draw)
     {
         var key = new MaterialKey(
             draw.TextureId,
             draw.NormalTextureId,
             draw.MetallicRoughnessTextureId,
-            draw.OcclusionTextureId);
+            draw.OcclusionTextureId,
+            draw.EmissiveTextureId);
         if (_materialSets.TryGetValue(key, out var existing))
         {
             return existing;
@@ -903,6 +1491,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var normal = ResolveTexture(draw.NormalTextureId, _flatNormalTexture);
         var metallicRoughness = ResolveTexture(draw.MetallicRoughnessTextureId, _defaultMetallicRoughnessTexture);
         var occlusion = ResolveTexture(draw.OcclusionTextureId, _whiteTexture);
+        var emissive = ResolveTexture(draw.EmissiveTextureId, _whiteTexture);
         var resourceSet = _factory.CreateResourceSet(new ResourceSetDescription(
             _materialLayout,
             baseColor.Texture,
@@ -912,7 +1501,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             metallicRoughness.Texture,
             metallicRoughness.Sampler,
             occlusion.Texture,
-            occlusion.Sampler));
+            occlusion.Sampler,
+            emissive.Texture,
+            emissive.Sampler));
         _materialSets[key] = resourceSet;
         return resourceSet;
     }
@@ -1031,7 +1622,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 mesh.BaseColorTexture,
                 mesh.MetallicRoughnessTexture,
                 mesh.NormalTexture,
-                mesh.OcclusionTexture
+                mesh.OcclusionTexture,
+                mesh.EmissiveTexture
             })
             .OfType<RekallAgeVulkanSceneTexture>()
             .GroupBy(texture => texture.Id, StringComparer.Ordinal)
@@ -1248,12 +1840,14 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             mat4 ViewProjection;
             vec4 LightDirection;
             vec4 LightColor;
+            vec4 LightPosition;
         } Frame;
 
         layout(set = 1, binding = 0) uniform DrawUniformBuffer
         {
             mat4 Model;
             vec4 MaterialFactors;
+            vec4 EmissiveFactors;
         } Draw;
 
         layout(location = 0) out vec3 fsin_Normal;
@@ -1285,12 +1879,14 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             mat4 ViewProjection;
             vec4 LightDirection;
             vec4 LightColor;
+            vec4 LightPosition;
         } Frame;
 
         layout(set = 1, binding = 0) uniform DrawUniformBuffer
         {
             mat4 Model;
             vec4 MaterialFactors;
+            vec4 EmissiveFactors;
         } Draw;
 
         layout(set = 2, binding = 0) uniform texture2D BaseColorTexture;
@@ -1301,6 +1897,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         layout(set = 2, binding = 5) uniform sampler MetallicRoughnessSampler;
         layout(set = 2, binding = 6) uniform texture2D OcclusionTexture;
         layout(set = 2, binding = 7) uniform sampler OcclusionSampler;
+        layout(set = 2, binding = 8) uniform texture2D EmissiveTexture;
+        layout(set = 2, binding = 9) uniform sampler EmissiveSampler;
 
         layout(location = 0) out vec4 fsout_Color;
 
@@ -1359,7 +1957,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 occlusion = mix(1.0, texture(sampler2D(OcclusionTexture, OcclusionSampler), fsin_UV).r, Draw.MaterialFactors.w);
             }
             vec3 normal = normalize(fsin_Normal);
-            vec3 light = normalize(-Frame.LightDirection.xyz);
+            vec3 light = Frame.LightPosition.w > 0.5
+                ? normalize(Frame.LightPosition.xyz - fsin_WorldPosition)
+                : normalize(-Frame.LightDirection.xyz);
             if (Draw.MaterialFactors.z > 0.0001)
             {
                 normal = perturbNormal(normal);
@@ -1375,7 +1975,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec3 specular = d * g * f / max(4.0 * ndotv * ndotl, 0.0001);
             vec3 diffuse = (1.0 - f) * (1.0 - metallic) * albedo / PI;
             vec3 ambient = albedo * 0.035 * occlusion;
-            vec3 color = ambient + (diffuse + specular) * Frame.LightColor.rgb * ndotl * 2.4;
+            vec3 emissive = pow(max(texture(sampler2D(EmissiveTexture, EmissiveSampler), fsin_UV).rgb * Draw.EmissiveFactors.rgb, vec3(0.0)), vec3(2.2)) * Draw.EmissiveFactors.a;
+            vec3 color = emissive + ambient + (diffuse + specular) * Frame.LightColor.rgb * ndotl * 2.4;
             vec3 lit = pow(color, vec3(1.0 / 2.2));
             fsout_Color = vec4(lit, fsin_Color.a * textureColor.a);
         }
@@ -1455,10 +2056,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly record struct HudVertex(Vector3 Position, Vector4 Color, Vector2 UV);
 
     [StructLayout(LayoutKind.Sequential)]
-    private readonly record struct FrameUniform(Matrix4x4 ViewProjection, Vector4 LightDirection, Vector4 LightColor);
+    private readonly record struct FrameUniform(Matrix4x4 ViewProjection, Vector4 LightDirection, Vector4 LightColor, Vector4 LightPosition);
 
     [StructLayout(LayoutKind.Sequential)]
-    private readonly record struct DrawUniform(Matrix4x4 Model, Vector4 MaterialFactors);
+    private readonly record struct DrawUniform(Matrix4x4 Model, Vector4 MaterialFactors, Vector4 EmissiveFactors);
 
     private sealed record RenderPacket(
         GpuVertex[] Vertices,
@@ -1469,6 +2070,24 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         int TriangleCount = 0,
         int TextureCount = 0);
 
+    private sealed record LiveEditWorkItem(
+        RekallAgeLivePlayerRequestEnvelope Request,
+        TaskCompletionSource<JsonObject> Completion);
+
+    private sealed record LiveApplySceneBlueprintPayload(
+        IReadOnlyList<RekallAgeSceneBlueprintEntity> Entities,
+        bool ClearExisting,
+        bool PersistToProject,
+        bool ReloadAssets);
+
+    private sealed record LiveApplySceneDiffPayload(
+        IReadOnlyList<RekallAgeSceneBlueprintEntity>? UpsertEntities,
+        IReadOnlyList<string>? DeleteEntityIds,
+        IReadOnlyList<string>? DeleteEntityNames,
+        bool ClearExisting,
+        bool PersistToProject,
+        bool ReloadAssets);
+
     private readonly record struct GpuDraw(
         uint FirstIndex,
         uint IndexCount,
@@ -1478,13 +2097,16 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         string? MetallicRoughnessTextureId,
         string? NormalTextureId,
         string? OcclusionTextureId,
-        Vector4 MaterialFactors);
+        string? EmissiveTextureId,
+        Vector4 MaterialFactors,
+        Vector4 EmissiveFactors);
 
     private readonly record struct MaterialKey(
         string? BaseColorTextureId,
         string? NormalTextureId,
         string? MetallicRoughnessTextureId,
-        string? OcclusionTextureId);
+        string? OcclusionTextureId,
+        string? EmissiveTextureId);
 
     private sealed record TextureBinding(Texture Texture, Sampler Sampler, ResourceSet ResourceSet) : IDisposable
     {

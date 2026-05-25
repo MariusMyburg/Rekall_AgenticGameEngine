@@ -69,7 +69,7 @@ public sealed class BuildModulesCommand
 
     private static IReadOnlyList<string> FindModuleProjects(string projectRoot)
     {
-        var modulesRoot = Path.Combine(projectRoot, "Modules");
+        var modulesRoot = Path.Combine(Path.GetFullPath(projectRoot), "Modules");
         if (!Directory.Exists(modulesRoot))
         {
             return Array.Empty<string>();

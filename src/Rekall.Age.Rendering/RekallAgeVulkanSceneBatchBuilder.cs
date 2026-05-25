@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using Rekall.Age.Rendering.Abstractions;
 
@@ -52,11 +53,17 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
                 mesh.MetallicRoughnessTexture?.Id,
                 mesh.NormalTexture?.Id,
                 mesh.OcclusionTexture?.Id,
+                mesh.EmissiveTexture?.Id,
                 new Vector4(
                     Math.Clamp(mesh.MetallicFactor, 0, 1),
                     Math.Clamp(mesh.RoughnessFactor, 0.04f, 1),
                     mesh.NormalTexture is null ? 0 : Math.Clamp(mesh.NormalScale, 0, 4),
-                    mesh.OcclusionTexture is null ? 0 : Math.Clamp(mesh.OcclusionStrength, 0, 1))));
+                    mesh.OcclusionTexture is null ? 0 : Math.Clamp(mesh.OcclusionStrength, 0, 1)),
+                new Vector4(
+                    Math.Clamp(mesh.EmissiveFactor.X, 0, 16),
+                    Math.Clamp(mesh.EmissiveFactor.Y, 0, 16),
+                    Math.Clamp(mesh.EmissiveFactor.Z, 0, 16),
+                    Math.Clamp(mesh.EmissiveFactor.W, 0, 64))));
             indices.AddRange(mesh.Indices);
             vertexOffset = checked(vertexOffset + mesh.Vertices.Count);
         }
@@ -82,11 +89,12 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         var projection = CreateProjection(frame.ActiveCamera, frame, extent);
         projection.M22 *= -1f;
 
-        var lightIntensity = ResolveLightIntensity(frame);
+        var light = ResolvePrimaryLight(frame);
         return new RekallAgeVulkanSceneFrameUniform(
             view * projection,
-            ResolveLightDirection(frame),
-            new Vector4(lightIntensity, lightIntensity, lightIntensity, 1));
+            light.Direction,
+            light.Color,
+            light.Position);
     }
 
     private static SceneBounds ComputeWorldBounds(
@@ -182,25 +190,51 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             * Matrix4x4.CreateTranslation((float)renderable.X, (float)renderable.Y, (float)renderable.Z);
     }
 
-    private static Vector3 ResolveLightDirection(RekallAgeRuntimeViewportFrame frame)
+    private static SceneLight ResolvePrimaryLight(RekallAgeRuntimeViewportFrame frame)
     {
-        var light = frame.Renderables.FirstOrDefault(renderable =>
-            renderable.Kind.Equals("light", StringComparison.Ordinal));
-        return light is null
-            ? Vector3.Normalize(new Vector3(-0.45f, -0.65f, -0.6f))
-            : DirectionFromEuler(light.RotationX, light.RotationY, light.RotationZ);
+        var lights = frame.Renderables
+            .Where(renderable => renderable.Kind.Equals("light", StringComparison.Ordinal))
+            .ToArray();
+        var light = lights.FirstOrDefault(IsPointLight) ?? lights.FirstOrDefault();
+        if (light is null)
+        {
+            return new SceneLight(
+                Vector3.Normalize(new Vector3(-0.45f, -0.65f, -0.6f)),
+                new Vector4(0, 0, 0, 0),
+                Vector4.One);
+        }
+
+        return new SceneLight(
+            DirectionFromEuler(light.RotationX, light.RotationY, light.RotationZ),
+            IsPointLight(light)
+                ? new Vector4((float)light.X, (float)light.Y, (float)light.Z, 1)
+                : new Vector4((float)light.X, (float)light.Y, (float)light.Z, 0),
+            ResolveLightColor(light));
     }
 
-    private static float ResolveLightIntensity(RekallAgeRuntimeViewportFrame frame)
+    private static Vector4 ResolveLightColor(RekallAgeRuntimeViewportRenderable light)
     {
-        return (float)Math.Clamp(
-            frame.Renderables
-                .Where(renderable => renderable.Kind.Equals("light", StringComparison.Ordinal))
-                .Select(renderable => renderable.Intensity)
-                .DefaultIfEmpty(1)
-                .Max(),
-            0.05,
-            4.0);
+        var color = ParseColor(light.MaterialColor);
+        var intensity = (float)Math.Clamp(light.Intensity, 0.05, 4.0);
+        return new Vector4(color.X * intensity, color.Y * intensity, color.Z * intensity, 1);
+    }
+
+    private static Vector3 ParseColor(string? color)
+    {
+        if (color is { Length: 7 or 9 } && color[0] == '#'
+            && byte.TryParse(color.AsSpan(1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var r)
+            && byte.TryParse(color.AsSpan(3, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var g)
+            && byte.TryParse(color.AsSpan(5, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var b))
+        {
+            return new Vector3(r / 255f, g / 255f, b / 255f);
+        }
+
+        return Vector3.One;
+    }
+
+    private static bool IsPointLight(RekallAgeRuntimeViewportRenderable renderable)
+    {
+        return renderable.Variant?.Contains("PointLight", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private static Vector3 DirectionFromEuler(double degreesX, double degreesY, double degreesZ)
@@ -235,4 +269,6 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
     }
 
     private readonly record struct SceneBounds(float MinX, float MaxX, float MinY, float MaxY, float MinZ, float MaxZ);
+
+    private readonly record struct SceneLight(Vector3 Direction, Vector4 Position, Vector4 Color);
 }

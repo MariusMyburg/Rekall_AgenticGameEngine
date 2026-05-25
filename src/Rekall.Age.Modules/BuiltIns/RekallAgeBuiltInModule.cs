@@ -7,20 +7,32 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
     public override void Configure(RekallAgeModuleBuilder builder)
     {
         builder.RegisterComponent<RekallAgeTransformComponent>();
+        builder.RegisterComponent<RekallAgeInputActionMapComponent>();
         builder.RegisterComponent<RekallAgeCamera2DComponent>();
         builder.RegisterComponent<RekallAgeCamera3DComponent>();
+        builder.RegisterComponent<RekallAgeCameraZoomInputComponent>();
+        builder.RegisterComponent<RekallAgeCameraTarget3DComponent>();
+        builder.RegisterComponent<RekallAgeDirectionalLightComponent>();
+        builder.RegisterComponent<RekallAgePointLightComponent>();
         builder.RegisterComponent<RekallAgeGeometryPrimitiveComponent>();
         builder.RegisterComponent<RekallAgeGeometryMeshComponent>();
         builder.RegisterComponent<RekallAgeGeometryExtrusionComponent>();
+        builder.RegisterComponent<RekallAgeMaterialComponent>();
         builder.RegisterComponent<RekallAgePhysicsWorld3DComponent>();
         builder.RegisterComponent<RekallAgePhysicsMaterial3DComponent>();
         builder.RegisterComponent<RekallAgeRigidbody3DComponent>();
+        builder.RegisterComponent<RekallAgeBoxCollider2DComponent>();
+        builder.RegisterComponent<RekallAgeCircleCollider2DComponent>();
         builder.RegisterComponent<RekallAgeBoxCollider3DComponent>();
         builder.RegisterComponent<RekallAgeSphereCollider3DComponent>();
         builder.RegisterComponent<RekallAgeCapsuleCollider3DComponent>();
         builder.RegisterComponent<RekallAgeMeshColliderComponent>();
         builder.RegisterComponent<RekallAgePlanetRendererComponent>();
         builder.RegisterComponent<RekallAgeAtmosphereRendererComponent>();
+        builder.RegisterComponent<RekallAgeCelestialBodyComponent>();
+        builder.RegisterComponent<RekallAgeKeplerOrbitComponent>();
+        builder.RegisterComponent<RekallAgeCelestialRotationComponent>();
+        builder.RegisterComponent<RekallAgeOrbitPathRendererComponent>();
     }
 }
 
@@ -36,6 +48,29 @@ public sealed class RekallAgeTransformComponent : RekallAgeComponent
     [RekallAgeProperty]
     public double Z { get; init; }
 }
+
+[RekallAgeComponent("Input Action Map")]
+public sealed class RekallAgeInputActionMapComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+
+    [RekallAgeProperty(Kind = "inputActions")]
+    public RekallAgeInputActionBinding[] Actions { get; init; } =
+    [
+        new("primary", Key: "Space")
+    ];
+}
+
+public sealed record RekallAgeInputActionBinding(
+    string Name,
+    string? Key = null,
+    string? Button = null,
+    string? PositiveKey = null,
+    string? NegativeKey = null,
+    string? PositiveButton = null,
+    string? NegativeButton = null,
+    double MouseWheelScale = 0);
 
 [RekallAgeComponent("Camera 2D")]
 public sealed class RekallAgeCamera2DComponent : RekallAgeComponent
@@ -79,6 +114,91 @@ public sealed class RekallAgeCamera3DComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("Camera Zoom Input")]
+public sealed class RekallAgeCameraZoomInputComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double WheelZoomSpeed { get; init; } = 0.12;
+
+    [RekallAgeProperty(Minimum = 0.001)]
+    public double MinimumOrthographicSize { get; init; } = 0.1;
+
+    [RekallAgeProperty(Minimum = 0.001)]
+    public double MaximumOrthographicSize { get; init; } = 100000;
+
+    [RekallAgeProperty(Minimum = 1, Maximum = 179)]
+    public double MinimumFieldOfView { get; init; } = 15;
+
+    [RekallAgeProperty(Minimum = 1, Maximum = 179)]
+    public double MaximumFieldOfView { get; init; } = 120;
+
+    [RekallAgeProperty]
+    public bool InvertWheel { get; init; }
+}
+
+[RekallAgeComponent("Camera Target 3D")]
+public sealed class RekallAgeCameraTarget3DComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public string TargetEntityId { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public string TargetName { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public string TargetTag { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public double OffsetX { get; init; }
+
+    [RekallAgeProperty]
+    public double OffsetY { get; init; } = 2;
+
+    [RekallAgeProperty]
+    public double OffsetZ { get; init; } = 6;
+
+    [RekallAgeProperty]
+    public double TargetOffsetX { get; init; }
+
+    [RekallAgeProperty]
+    public double TargetOffsetY { get; init; }
+
+    [RekallAgeProperty]
+    public double TargetOffsetZ { get; init; }
+
+    [RekallAgeProperty]
+    public bool FollowPosition { get; init; } = true;
+
+    [RekallAgeProperty]
+    public bool LookAt { get; init; } = true;
+
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("Directional Light")]
+public sealed class RekallAgeDirectionalLightComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0)]
+    public double Intensity { get; init; } = 1;
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#ffffff";
+}
+
+[RekallAgeComponent("Point Light")]
+public sealed class RekallAgePointLightComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0)]
+    public double Intensity { get; init; } = 1;
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#ffffff";
 }
 
 [RekallAgeComponent("Geometry Primitive")]
@@ -144,6 +264,46 @@ public sealed class RekallAgeGeometryExtrusionComponent : RekallAgeComponent
 
 public sealed record RekallAgeGeometryProfilePoint(double X, double Y);
 
+[RekallAgeComponent("Material")]
+public sealed class RekallAgeMaterialComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Kind = "color")]
+    public string BaseColor { get; init; } = "#ffffff";
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
+    public string? BaseColorTexture { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double MetallicFactor { get; init; }
+
+    [RekallAgeProperty(Minimum = 0.04, Maximum = 1)]
+    public double RoughnessFactor { get; init; } = 1;
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
+    public string? MetallicRoughnessTexture { get; init; }
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
+    public string? NormalTexture { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 4)]
+    public double NormalScale { get; init; } = 1;
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
+    public string? OcclusionTexture { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double OcclusionStrength { get; init; } = 1;
+
+    [RekallAgeProperty(Kind = "color")]
+    public string EmissiveColor { get; init; } = "#000000";
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
+    public string? EmissiveTexture { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double EmissiveStrength { get; init; }
+}
+
 [RekallAgeComponent("Physics World 3D")]
 public sealed class RekallAgePhysicsWorld3DComponent : RekallAgeComponent
 {
@@ -184,6 +344,23 @@ public sealed class RekallAgeRigidbody3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
     public double Mass { get; init; } = 1;
+}
+
+[RekallAgeComponent("Box Collider 2D")]
+public sealed class RekallAgeBoxCollider2DComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Width { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Height { get; init; } = 1;
+}
+
+[RekallAgeComponent("Circle Collider 2D")]
+public sealed class RekallAgeCircleCollider2DComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Radius { get; init; } = 0.5;
 }
 
 [RekallAgeComponent("Box Collider 3D")]
@@ -253,4 +430,110 @@ public sealed class RekallAgeAtmosphereRendererComponent : RekallAgeComponent
 
     [RekallAgeProperty(Minimum = 0)]
     public double Density { get; init; } = 1;
+}
+
+[RekallAgeComponent("Celestial Body")]
+public sealed class RekallAgeCelestialBodyComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public string BodyId { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public string Type { get; init; } = "PlanetaryBody";
+
+    [RekallAgeProperty]
+    public string? ParentBodyId { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double MeanRadiusKm { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double MassKg { get; init; }
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#8f98a8";
+}
+
+[RekallAgeComponent("Kepler Orbit")]
+public sealed class RekallAgeKeplerOrbitComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public string ParentBodyId { get; init; } = string.Empty;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double SemiMajorAxisKm { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 0.999999)]
+    public double Eccentricity { get; init; }
+
+    [RekallAgeProperty]
+    public double InclinationDegrees { get; init; }
+
+    [RekallAgeProperty]
+    public double LongitudeOfAscendingNodeDegrees { get; init; }
+
+    [RekallAgeProperty]
+    public double ArgumentOfPeriapsisDegrees { get; init; }
+
+    [RekallAgeProperty]
+    public double TimeAtPeriapsisSeconds { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double PeriodSeconds { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double DistanceScale { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double TimeScale { get; init; } = 1;
+}
+
+[RekallAgeComponent("Celestial Rotation")]
+public sealed class RekallAgeCelestialRotationComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0)]
+    public double SiderealPeriodSeconds { get; init; }
+
+    [RekallAgeProperty]
+    public bool TidallyLocked { get; init; }
+
+    [RekallAgeProperty]
+    public double TiltDegrees { get; init; }
+
+    [RekallAgeProperty]
+    public double AzimuthDegrees { get; init; }
+
+    [RekallAgeProperty]
+    public double InitialLongitudeDegrees { get; init; }
+
+    [RekallAgeProperty]
+    public bool Retrograde { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double TimeScale { get; init; } = 1;
+
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("Orbit Path Renderer")]
+public sealed class RekallAgeOrbitPathRendererComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 8, Maximum = 512)]
+    public int Segments { get; init; } = 128;
+
+    [RekallAgeProperty(Minimum = 0.001)]
+    public double Thickness { get; init; } = 0.035;
+
+    [RekallAgeProperty]
+    public double VerticalOffset { get; init; } = -0.05;
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#88aaff";
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double EmissiveStrength { get; init; } = 1.4;
+
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
 }

@@ -15,14 +15,15 @@ public sealed class RekallAgeRuntimeWorldBuilder
             .Select(ToRuntimeEntity)
             .ToArray();
 
-        return new RekallAgeRuntimeWorld(
+        var world = new RekallAgeRuntimeWorld(
             scene.Id,
             scene.Name,
             0,
             TimeSpan.Zero,
             entities,
             RekallAgeRuntimeSubsystemViews.Empty,
-            Array.Empty<Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeObservation>());
+            Array.Empty<RekallAgeRuntimeObservation>());
+        return new RekallAgeRuntimeProjectionBuilder().Project(world);
     }
 
     private static RekallAgeRuntimeEntity ToRuntimeEntity(RekallAgeEntityDocument entity)

@@ -61,30 +61,121 @@ public sealed record RekallAgeRuntimeSubsystemViews(
         RekallAgeRuntimeUiView.Empty);
 }
 
-public sealed record RekallAgeRuntimeRenderView
+public sealed record RekallAgeRuntimeRenderView(
+    IReadOnlyList<RekallAgeRuntimeRenderCamera> Cameras,
+    IReadOnlyList<RekallAgeRuntimeRenderSprite> Sprites,
+    IReadOnlyList<RekallAgeRuntimeRenderMesh> Meshes,
+    IReadOnlyList<RekallAgeRuntimeRenderLight> Lights,
+    IReadOnlyList<RekallAgeRuntimeRenderUiLayer> UiLayers)
 {
-    public static RekallAgeRuntimeRenderView Empty { get; } = new();
+    public static RekallAgeRuntimeRenderView Empty { get; } = new(
+        Array.Empty<RekallAgeRuntimeRenderCamera>(),
+        Array.Empty<RekallAgeRuntimeRenderSprite>(),
+        Array.Empty<RekallAgeRuntimeRenderMesh>(),
+        Array.Empty<RekallAgeRuntimeRenderLight>(),
+        Array.Empty<RekallAgeRuntimeRenderUiLayer>());
 }
 
-public sealed record RekallAgeRuntimePhysicsView
+public sealed record RekallAgeRuntimeRenderCamera(
+    string EntityId,
+    string EntityName,
+    string Kind,
+    bool Active);
+
+public sealed record RekallAgeRuntimeRenderSprite(
+    string EntityId,
+    string EntityName,
+    string? AssetId);
+
+public sealed record RekallAgeRuntimeRenderMesh(
+    string EntityId,
+    string EntityName,
+    string? AssetId);
+
+public sealed record RekallAgeRuntimeRenderLight(
+    string EntityId,
+    string EntityName,
+    string Kind);
+
+public sealed record RekallAgeRuntimeRenderUiLayer(
+    string EntityId,
+    string EntityName,
+    int Layer);
+
+public sealed record RekallAgeRuntimePhysicsView(
+    IReadOnlyList<RekallAgeRuntimePhysicsBody> RigidBodies,
+    IReadOnlyList<RekallAgeRuntimePhysicsCollider> Colliders,
+    IReadOnlyList<RekallAgeRuntimePhysicsCollider> Triggers)
 {
-    public static RekallAgeRuntimePhysicsView Empty { get; } = new();
+    public static RekallAgeRuntimePhysicsView Empty { get; } = new(
+        Array.Empty<RekallAgeRuntimePhysicsBody>(),
+        Array.Empty<RekallAgeRuntimePhysicsCollider>(),
+        Array.Empty<RekallAgeRuntimePhysicsCollider>());
 }
 
-public sealed record RekallAgeRuntimeAudioView
+public sealed record RekallAgeRuntimePhysicsBody(
+    string EntityId,
+    string EntityName,
+    string Kind);
+
+public sealed record RekallAgeRuntimePhysicsCollider(
+    string EntityId,
+    string EntityName,
+    string Kind);
+
+public sealed record RekallAgeRuntimeAudioView(
+    IReadOnlyList<RekallAgeRuntimeAudioListener> Listeners,
+    IReadOnlyList<RekallAgeRuntimeAudioEmitter> Emitters)
 {
-    public static RekallAgeRuntimeAudioView Empty { get; } = new();
+    public static RekallAgeRuntimeAudioView Empty { get; } = new(
+        Array.Empty<RekallAgeRuntimeAudioListener>(),
+        Array.Empty<RekallAgeRuntimeAudioEmitter>());
 }
 
-public sealed record RekallAgeRuntimeAnimationView
+public sealed record RekallAgeRuntimeAudioListener(
+    string EntityId,
+    string EntityName);
+
+public sealed record RekallAgeRuntimeAudioEmitter(
+    string EntityId,
+    string EntityName,
+    string? ClipAssetId,
+    string? Bus);
+
+public sealed record RekallAgeRuntimeAnimationView(
+    IReadOnlyList<RekallAgeRuntimeAnimationPlayer> Players)
 {
-    public static RekallAgeRuntimeAnimationView Empty { get; } = new();
+    public static RekallAgeRuntimeAnimationView Empty { get; } = new(
+        Array.Empty<RekallAgeRuntimeAnimationPlayer>());
 }
 
-public sealed record RekallAgeRuntimeUiView
+public sealed record RekallAgeRuntimeAnimationPlayer(
+    string EntityId,
+    string EntityName,
+    string Kind,
+    string? ClipAssetId);
+
+public sealed record RekallAgeRuntimeUiView(
+    IReadOnlyList<RekallAgeRuntimeUiCanvas> Canvases,
+    IReadOnlyList<RekallAgeRuntimeUiElement> Elements,
+    int InteractiveElementCount)
 {
-    public static RekallAgeRuntimeUiView Empty { get; } = new();
+    public static RekallAgeRuntimeUiView Empty { get; } = new(
+        Array.Empty<RekallAgeRuntimeUiCanvas>(),
+        Array.Empty<RekallAgeRuntimeUiElement>(),
+        0);
 }
+
+public sealed record RekallAgeRuntimeUiCanvas(
+    string EntityId,
+    string EntityName,
+    int Layer);
+
+public sealed record RekallAgeRuntimeUiElement(
+    string EntityId,
+    string EntityName,
+    string Kind,
+    bool Interactive);
 
 public sealed record RekallAgeRuntimeObservation(
     int Frame,

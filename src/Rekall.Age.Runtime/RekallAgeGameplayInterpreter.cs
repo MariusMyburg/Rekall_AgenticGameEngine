@@ -1,3 +1,4 @@
+using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.World;
 
 namespace Rekall.Age.Runtime;
@@ -22,10 +23,14 @@ public sealed class RekallAgeGameplayInterpreter
 
                 observations.Add(new RekallAgeRuntimeObservation(
                     frame,
+                    "REKALL_RUNTIME_SYSTEM_EVALUATED",
+                    "info",
+                    GetSubsystemName(system),
                     entity.Id,
                     entity.Name,
                     system,
-                    CreateMessage(system, entity.Name)));
+                    CreateMessage(system, entity.Name),
+                    Array.Empty<string>()));
             }
         }
 
@@ -63,6 +68,19 @@ public sealed class RekallAgeGameplayInterpreter
             "FirstPersonController" or "ThirdPersonController" => "3D controller intent evaluated.",
             "PlatformerController2D" => "Platformer movement intent evaluated.",
             _ => $"{system} evaluated."
+        };
+    }
+
+    private static string GetSubsystemName(string system)
+    {
+        return system switch
+        {
+            "Camera2D" or "Camera3D" or "SpriteRenderer" or "MeshRenderer" or "MeshSet" => "rendering",
+            "Rigidbody2D" or "Rigidbody3D" or "BoxCollider2D" or "CircleCollider2D" or "BoxCollider3D" or "MeshCollider" or "Trigger" => "physics",
+            "AudioListener" or "AudioEmitter" => "audio",
+            "AnimationPlayer" or "SpriteAnimator" => "animation",
+            "UiCanvas" or "UiElement" or "Button" or "Label" or "Panel" => "ui",
+            _ => "gameplay"
         };
     }
 }

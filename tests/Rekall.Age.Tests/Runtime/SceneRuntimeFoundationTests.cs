@@ -68,4 +68,61 @@ public sealed class SceneRuntimeFoundationTests
         Assert.Equal(new RekallAgeRuntimeVector3(10, 20, 30), world.Entities.Single().Transform.Rotation3D);
         Assert.Equal(new RekallAgeRuntimeVector3(4, 5, 6), world.Entities.Single().Transform.Scale3D);
     }
+
+    [Fact]
+    public void BuilderProjectsSubsystemViewsAndWarnings()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject { ["x"] = 0, ["y"] = 0 }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Sprite", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject { ["x"] = 1, ["y"] = 2 }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.SpriteRenderer", new JsonObject { ["sprite"] = "asset_sprite" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Rigidbody2D", new JsonObject { ["mass"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.BoxCollider2D", new JsonObject { ["width"] = 1, ["height"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.AudioEmitter", new JsonObject { ["clip"] = "asset_step" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.AnimationPlayer", new JsonObject())))
+            .AddEntity(RekallAgeEntityDocument.Create("Mesh", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer", new JsonObject { ["mesh"] = "asset_mesh" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PointLight", new JsonObject { ["intensity"] = 1 })))
+            .AddEntity(RekallAgeEntityDocument.Create("HudCanvas", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.UiCanvas", new JsonObject { ["layer"] = 10 })))
+            .AddEntity(RekallAgeEntityDocument.Create("HudButton", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.UiElement", new JsonObject { ["interactive"] = true })));
+
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        Assert.Single(world.Subsystems.Rendering.Cameras);
+        Assert.Single(world.Subsystems.Rendering.Sprites);
+        Assert.Single(world.Subsystems.Rendering.Meshes);
+        Assert.Single(world.Subsystems.Rendering.Lights);
+        Assert.Single(world.Subsystems.Rendering.UiLayers);
+        Assert.Single(world.Subsystems.Physics.RigidBodies);
+        Assert.Single(world.Subsystems.Physics.Colliders);
+        Assert.Single(world.Subsystems.Audio.Emitters);
+        Assert.Empty(world.Subsystems.Audio.Listeners);
+        Assert.Single(world.Subsystems.Animation.Players);
+        Assert.Single(world.Subsystems.Ui.Canvases);
+        Assert.Single(world.Subsystems.Ui.Elements);
+        Assert.Contains(world.Observations, item => item.Code == "REKALL_AUDIO_NO_LISTENER" && item.Severity == "warning");
+        Assert.Contains(world.Observations, item => item.Code == "REKALL_ANIMATION_MISSING_CLIP" && item.Subsystem == "animation");
+    }
+
+    [Fact]
+    public void GameplayInterpreterEmitsStructuredCompatibilityObservations()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject { ["active"] = true })));
+
+        var observation = new RekallAgeGameplayInterpreter()
+            .Observe(scene, 3)
+            .Single(item => item.System == "Camera2D");
+
+        Assert.Equal(3, observation.Frame);
+        Assert.Equal("rendering", observation.Subsystem);
+        Assert.Equal("info", observation.Severity);
+        Assert.Equal("REKALL_RUNTIME_SYSTEM_EVALUATED", observation.Code);
+    }
 }

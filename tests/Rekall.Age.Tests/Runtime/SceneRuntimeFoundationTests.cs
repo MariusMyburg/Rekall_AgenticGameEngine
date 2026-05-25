@@ -1,5 +1,8 @@
 using System.Text.Json.Nodes;
+using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Transactions;
 using Rekall.Age.Runtime;
+using Rekall.Age.Runtime.Commands;
 using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.World;
 
@@ -148,5 +151,34 @@ public sealed class SceneRuntimeFoundationTests
                 "runtime.ui"
             ],
             result.SystemsRun);
+    }
+
+    [Fact]
+    public async Task InspectSceneRuntimeCommandReturnsCompactSubsystemCounts()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var sceneStore = new RekallAgeSceneStore();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Actor", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject { ["x"] = 1, ["y"] = 2 }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.SpriteRenderer", new JsonObject { ["sprite"] = "asset_actor" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Rigidbody2D", new JsonObject { ["mass"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.AudioEmitter", new JsonObject { ["clip"] = "asset_step" })));
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(root, "Main", 2),
+            new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("inspect runtime"), CancellationToken.None));
+
+        Assert.True(result.Ok);
+        Assert.Equal("Main", result.Value.SceneName);
+        Assert.Equal(2, result.Value.FrameIndex);
+        Assert.Equal(2, result.Value.EntityCount);
+        Assert.Equal(2, result.Value.RenderableCount);
+        Assert.Equal(1, result.Value.PhysicsBodyCount);
+        Assert.Equal(1, result.Value.AudioEmitterCount);
+        Assert.Contains(result.Value.Observations, item => item.Code == "REKALL_AUDIO_NO_LISTENER");
     }
 }

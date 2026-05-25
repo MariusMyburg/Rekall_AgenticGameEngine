@@ -14,6 +14,8 @@ The current MVP includes:
 - C# module build command for compiling scaffolded gameplay modules
 - playable game readiness verification workflow for validation, build, and playtest checks
 - playable game packaging workflow that verifies, bundles game content, writes a package manifest, creates a zip archive, and publishes launch artifacts
+- playable package inspection with file inventory, key-artifact detection, manifest checks, and source-template metadata
+- playable package audit workflow that inspects, runs, captures a PNG proof frame, and reports one deliverable-readiness verdict
 - project module assembly loading for agent-readable schemas after build
 - module-authored playable runtime execution; no engine-owned fallback games
 - Vulkan-first internal rendering backend catalog with Direct3D 12 extension point
@@ -103,6 +105,7 @@ dotnet run --project src/Rekall.Age.Cli -- game package-playable .age-sandbox Ma
 dotnet run --project src/Rekall.Age.Cli -- game inspect-package .age-sandbox/Builds/RekallAgePlayer.zip
 dotnet run --project src/Rekall.Age.Cli -- game run-package .age-sandbox/Builds/RekallAgePlayer.zip 2
 dotnet run --project src/Rekall.Age.Cli -- game capture-package-frame .age-sandbox/Builds/RekallAgePlayer.zip .age-sandbox/Artifacts/PackageFrames 1
+dotnet run --project src/Rekall.Age.Cli -- game audit-package .age-sandbox/Builds/RekallAgePlayer.zip .age-sandbox/Artifacts/PackageAudit
 dotnet run --project src/Rekall.Age.Cli -- asset import .age-sandbox .\player.png sprite "Player Ship"
 dotnet run --project src/Rekall.Age.Cli -- asset list .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- module scaffold-playable .age-sandbox crystal.playable "Crystal Playable" CrystalPlayable crystal

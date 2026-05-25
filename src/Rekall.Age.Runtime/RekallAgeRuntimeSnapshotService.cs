@@ -7,17 +7,17 @@ public sealed class RekallAgeRuntimeSnapshotService
 {
     private readonly RekallAgeSceneStore _sceneStore;
     private readonly RekallAgeRuntimeWorldBuilder _worldBuilder;
-    private readonly RekallAgeRuntimeExecutionLoop _executionLoop;
+    private readonly RekallAgeRuntimeExecutionLoop? _executionLoop;
 
     public RekallAgeRuntimeSnapshotService()
-        : this(new RekallAgeSceneStore(), new RekallAgeRuntimeWorldBuilder(), RekallAgeRuntimeExecutionLoop.CreateDefault())
+        : this(new RekallAgeSceneStore(), new RekallAgeRuntimeWorldBuilder(), null)
     {
     }
 
     public RekallAgeRuntimeSnapshotService(
         RekallAgeSceneStore sceneStore,
         RekallAgeRuntimeWorldBuilder worldBuilder,
-        RekallAgeRuntimeExecutionLoop executionLoop)
+        RekallAgeRuntimeExecutionLoop? executionLoop)
     {
         _sceneStore = sceneStore;
         _worldBuilder = worldBuilder;
@@ -37,7 +37,8 @@ public sealed class RekallAgeRuntimeSnapshotService
             return world;
         }
 
-        var result = await _executionLoop.RunAsync(world, frames, cancellationToken);
+        var executionLoop = _executionLoop ?? RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
+        var result = await executionLoop.RunAsync(world, frames, cancellationToken);
         return result.World;
     }
 }

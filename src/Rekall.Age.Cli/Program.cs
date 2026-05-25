@@ -1716,6 +1716,7 @@ internal static class RekallAgeCli
         Console.WriteLine($"Audio: {result.Value.AudioListenerCount} listeners, {result.Value.AudioEmitterCount} emitters");
         Console.WriteLine($"Animation players: {result.Value.AnimationPlayerCount}");
         Console.WriteLine($"UI elements: {result.Value.UiElementCount}");
+        Console.WriteLine($"Systems run: {string.Join(", ", result.Value.SystemsRun)}");
         foreach (var observation in result.Value.Observations)
         {
             Console.WriteLine($"{observation.Severity} {observation.Code} {observation.Subsystem} {observation.TargetId}: {observation.Message}");

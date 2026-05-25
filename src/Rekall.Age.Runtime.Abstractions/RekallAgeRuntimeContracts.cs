@@ -10,7 +10,10 @@ public sealed record RekallAgeRuntimeWorld(
     TimeSpan ElapsedTime,
     IReadOnlyList<RekallAgeRuntimeEntity> Entities,
     RekallAgeRuntimeSubsystemViews Subsystems,
-    IReadOnlyList<RekallAgeRuntimeObservation> Observations);
+    IReadOnlyList<RekallAgeRuntimeObservation> Observations)
+{
+    public IReadOnlyList<string> SystemsRun { get; init; } = Array.Empty<string>();
+}
 
 public sealed record RekallAgeRuntimeEntity(
     string Id,

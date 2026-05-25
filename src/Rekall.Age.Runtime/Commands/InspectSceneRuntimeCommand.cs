@@ -20,6 +20,7 @@ public sealed record InspectSceneRuntimeResult(
     int AudioEmitterCount,
     int AnimationPlayerCount,
     int UiElementCount,
+    IReadOnlyList<string> SystemsRun,
     IReadOnlyList<RekallAgeRuntimeObservation> Observations);
 
 public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneRuntimeRequest, InspectSceneRuntimeResult>
@@ -50,6 +51,7 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
                 0,
                 0,
                 0,
+                Array.Empty<string>(),
                 Array.Empty<RekallAgeRuntimeObservation>());
             return RekallAgeCommandResult<InspectSceneRuntimeResult>.Failure(
                 empty,
@@ -93,6 +95,7 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
             audio.Emitters.Count,
             animation.Players.Count,
             ui.Elements.Count,
+            world.SystemsRun,
             world.Observations);
     }
 }

@@ -25,17 +25,26 @@ public sealed class RekallAgeRuntimeExecutionLoop
         _fixedDeltaSeconds = fixedDeltaTime.TotalSeconds;
     }
 
-    public static RekallAgeRuntimeExecutionLoop CreateDefault()
+    public static RekallAgeRuntimeExecutionLoop CreateDefault(string? projectRoot = null)
     {
+        var systems = new List<IRekallAgeRuntimeWorldSystem>();
+        if (!string.IsNullOrWhiteSpace(projectRoot))
+        {
+            systems.AddRange(new RekallAgeProjectRuntimeSystemLoader().Load(projectRoot));
+        }
+
+        systems.AddRange(
+        [
+            new RekallAgeTransformAnimationSystem(),
+            new NoOpRuntimeWorldSystem("runtime.audio"),
+            new NoOpRuntimeWorldSystem("runtime.physics"),
+            new NoOpRuntimeWorldSystem("runtime.rendering"),
+            new NoOpRuntimeWorldSystem("runtime.transform"),
+            new NoOpRuntimeWorldSystem("runtime.ui")
+        ]);
+
         var loop = new RekallAgeRuntimeExecutionLoop(
-            [
-                new RekallAgeTransformAnimationSystem(),
-                new NoOpRuntimeWorldSystem("runtime.audio"),
-                new NoOpRuntimeWorldSystem("runtime.physics"),
-                new NoOpRuntimeWorldSystem("runtime.rendering"),
-                new NoOpRuntimeWorldSystem("runtime.transform"),
-                new NoOpRuntimeWorldSystem("runtime.ui")
-            ],
+            systems,
             DefaultFixedDeltaTime);
         loop._fixedDeltaSeconds = DefaultFixedDeltaSeconds;
         return loop;
@@ -72,7 +81,8 @@ public sealed class RekallAgeRuntimeExecutionLoop
             {
                 FrameIndex = nextFrameIndex,
                 ElapsedTime = nextElapsed,
-                Observations = Array.Empty<RekallAgeRuntimeObservation>()
+                Observations = Array.Empty<RekallAgeRuntimeObservation>(),
+                SystemsRun = _systems.Select(system => system.Id).ToArray()
             });
         }
 

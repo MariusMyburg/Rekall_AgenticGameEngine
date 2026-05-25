@@ -12,6 +12,7 @@ The current MVP includes:
 - C# module scaffolding for agent-authored or human-authored gameplay modules
 - C# module source writing through the command bus for MCP-first agents
 - C# module build command for compiling scaffolded gameplay modules
+- project-authored C# runtime systems that participate in runtime snapshots and viewport captures
 - playable game readiness verification workflow for validation, build, and playtest checks
 - playable game packaging workflow that verifies, bundles game content, writes a package manifest, creates a zip archive, and publishes launch artifacts
 - playable package inspection with file inventory, key-artifact detection, manifest checks, and source-template metadata
@@ -173,3 +174,5 @@ The command writes `Main_runtime_003.png` and reports the active camera, frame i
 If a sprite renderable references an imported PNG asset, the software viewport draws that PNG into the frame. Missing or unsupported sprite assets fall back to deterministic markers and are reported in the command output.
 
 Primitive mesh renderables, including `rekall.primitive.cube`, are projected into the software viewport as shaded cube geometry. `Rekall.DirectionalLight` entities contribute deterministic directional lighting from their `Rekall.Transform3D` rotation and `intensity` value. `Rekall.TransformAnimation` can apply `pitchDegreesPerSecond`, `yawDegreesPerSecond`, and `rollDegreesPerSecond` during runtime frame simulation before capture.
+
+Compiled project modules can also register `IRekallAgeRuntimeModuleSystem` implementations through `RekallAgeModuleBuilder.RegisterRuntimeSystem<T>()`. Runtime inspection and viewport capture load built project modules, run those systems during fixed-frame simulation, and expose the executed system IDs in runtime inspection output.

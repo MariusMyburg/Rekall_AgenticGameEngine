@@ -17,6 +17,8 @@ public sealed record RunSceneResult(
     IReadOnlyList<string> ActiveSystems,
     int InputActionCount,
     IReadOnlyList<RekallAgeRuntimeInputAction> InputActions,
+    int XrActionCount,
+    IReadOnlyList<RekallAgeRuntimeXrAction> XrActions,
     IReadOnlyList<RekallAgeRuntimeObservation> Observations,
     IReadOnlyList<string> Errors);
 
@@ -49,6 +51,8 @@ public sealed class RunSceneCommand : IRekallAgeCommand<RunSceneRequest, RunScen
             result.ActiveSystems,
             result.InputActions.Count,
             result.InputActions,
+            result.XrActions.Count,
+            result.XrActions,
             result.Observations,
             result.Errors);
 

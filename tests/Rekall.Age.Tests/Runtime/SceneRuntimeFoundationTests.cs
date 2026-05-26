@@ -200,6 +200,7 @@ public sealed class SceneRuntimeFoundationTests
         Assert.Equal(
             [
                 "runtime.input.actions",
+                "runtime.xr.pose",
                 "runtime.celestial.kepler",
                 "runtime.celestial.rotation",
                 "runtime.animation",

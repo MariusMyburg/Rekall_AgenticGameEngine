@@ -70,6 +70,51 @@ public sealed class RuntimeInspectCliTests
     }
 
     [Fact]
+    public async Task RuntimeInspectPrintsInjectedXrPoseAndActions()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Runtime XR CLI", ["world", "rendering3d", "vr"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "vr"])
+                .AddEntity(RekallAgeEntityDocument.Create("VrRig", ["xr"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.XrRig", new JsonObject { ["active"] = true })))
+                .AddEntity(RekallAgeEntityDocument.Create("HeadCamera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject()))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                    {
+                        ["active"] = true,
+                        ["stereoMode"] = "stereo"
+                    }))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.XrPoseSource", new JsonObject
+                    {
+                        ["source"] = "head"
+                    })))
+                .AddEntity(RekallAgeEntityDocument.Create("LeftHand", ["controller"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.XrController", new JsonObject
+                    {
+                        ["hand"] = "left"
+                    }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            "runtime",
+            "inspect",
+            root,
+            "Main",
+            "1",
+            """[{"xrPoses":[{"source":"head","isTracked":true,"x":1,"y":1.7,"z":-1}],"xrActions":[{"hand":"left","name":"trigger","value":0.8,"isDown":true,"wasPressed":true,"wasReleased":false}]}]""");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("XR: 1 rigs, 1 controllers, 1 poses, 1 actions", result.Output);
+        Assert.Contains("left/trigger: value=0.8 down=True pressed=True released=False", result.Output);
+    }
+
+    [Fact]
     public async Task RunSceneAcceptsRuntimeInputJson()
     {
         var root = TestPaths.CreateTempDirectory();

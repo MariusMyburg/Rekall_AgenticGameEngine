@@ -44,8 +44,8 @@ public sealed class OpenXrHeadsetFramePlanCommandTests
         Assert.Equal(1, result.Value.ColorSwapchainCount);
         Assert.Equal(1, result.Value.DepthSwapchainCount);
         Assert.Equal(2, result.Value.SwapchainArraySize);
-        Assert.Equal(1024, result.Value.RecommendedEyeWidth);
-        Assert.Equal(1024, result.Value.RecommendedEyeHeight);
+        Assert.Equal(1832, result.Value.RecommendedEyeWidth);
+        Assert.Equal(1920, result.Value.RecommendedEyeHeight);
         Assert.Contains(result.Value.RequiredOpenXrCalls, call => call == "xrWaitFrame");
         Assert.Contains(result.Value.RequiredOpenXrCalls, call => call == "xrEndFrame");
         Assert.Contains(result.Value.FrameLoopSteps, step => step.Contains("xrLocateViews", StringComparison.Ordinal));
@@ -88,6 +88,13 @@ public sealed class OpenXrHeadsetFramePlanCommandTests
             42,
             true,
             true,
+            true,
+            new RekallAgeOpenXrVulkanGraphicsRequirements("1.1.0", "1.3.0"),
+            true,
+            [
+                new RekallAgeOpenXrViewConfigurationView(0, 1832, 1920, 1920, 2048, 1, 4),
+                new RekallAgeOpenXrViewConfigurationView(1, 1832, 1920, 1920, 2048, 1, 4)
+            ],
             true,
             ["XR_KHR_vulkan_enable2"],
             ["XR_KHR_vulkan_enable2"],

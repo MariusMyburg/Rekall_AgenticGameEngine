@@ -16,6 +16,10 @@ public sealed record RekallAgeOpenXrSessionBootstrapResult(
     ulong? SystemId,
     bool VulkanEnable2Available,
     bool PrimaryStereoReady,
+    bool VulkanGraphicsRequirementsReady,
+    RekallAgeOpenXrVulkanGraphicsRequirements? VulkanGraphicsRequirements,
+    bool PrimaryStereoViewConfigurationReady,
+    IReadOnlyList<RekallAgeOpenXrViewConfigurationView> PrimaryStereoViews,
     bool HeadsetSessionReady,
     IReadOnlyList<string> RequiredExtensions,
     IReadOnlyList<string> EnabledExtensions,
@@ -23,12 +27,28 @@ public sealed record RekallAgeOpenXrSessionBootstrapResult(
     IReadOnlyList<string> NextRenderSteps,
     IReadOnlyList<string> Errors);
 
+public sealed record RekallAgeOpenXrVulkanGraphicsRequirements(
+    string MinimumApiVersion,
+    string MaximumApiVersion);
+
+public sealed record RekallAgeOpenXrViewConfigurationView(
+    int Index,
+    uint RecommendedImageRectWidth,
+    uint MaxImageRectWidth,
+    uint RecommendedImageRectHeight,
+    uint MaxImageRectHeight,
+    uint RecommendedSwapchainSampleCount,
+    uint MaxSwapchainSampleCount);
+
 public sealed class RekallAgeNativeOpenXrSessionBootstrap : IRekallAgeOpenXrSessionBootstrap
 {
     private const int XrSuccess = 0;
     private const int XrTypeInstanceCreateInfo = 3;
     private const int XrTypeSystemGetInfo = 4;
+    private const int XrTypeViewConfigurationView = 41;
+    private const int XrTypeGraphicsRequirementsVulkanKhr = 1000025002;
     private const int XrFormFactorHeadMountedDisplay = 1;
+    private const int XrViewConfigurationTypePrimaryStereo = 2;
     private const int XrMaxApplicationNameSize = 128;
     private const int XrMaxEngineNameSize = 128;
     private static readonly string[] RequiredExtensions = ["XR_KHR_vulkan_enable2"];
@@ -82,7 +102,13 @@ public sealed class RekallAgeNativeOpenXrSessionBootstrap : IRekallAgeOpenXrSess
 
         try
         {
-            if (!TryGetRequiredExports(loaderHandle, out var createInstance, out var getSystem, out var destroyInstance, out var exportError))
+            if (!TryGetRequiredExports(
+                    loaderHandle,
+                    out var createInstance,
+                    out var getSystem,
+                    out var getInstanceProcAddr,
+                    out var destroyInstance,
+                    out var exportError))
             {
                 return CreateNotReadyResult(
                     true,
@@ -128,15 +154,36 @@ public sealed class RekallAgeNativeOpenXrSessionBootstrap : IRekallAgeOpenXrSess
                             true,
                             false,
                             null,
-                            runtime.VulkanEnable2Available,
-                            runtime.PrimaryStereoReady,
-                            false,
-                            RequiredExtensions,
-                            enabledExtensions,
+                        runtime.VulkanEnable2Available,
+                        runtime.PrimaryStereoReady,
+                        false,
+                        null,
+                        false,
+                        [],
+                        false,
+                        RequiredExtensions,
+                        enabledExtensions,
                             missingExtensions,
                             ["Connect or wake a headset and make it available to the active OpenXR runtime."],
                             [$"xrGetSystem for XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY failed with XrResult {systemResult}."]);
                     }
+
+                    var nativeErrors = new List<string>();
+                    var vulkanRequirements = QueryVulkanGraphicsRequirements(
+                        instance,
+                        systemId,
+                        getInstanceProcAddr,
+                        nativeErrors,
+                        out var vulkanGraphicsRequirementsReady);
+                    var primaryStereoViews = QueryPrimaryStereoViews(
+                        instance,
+                        systemId,
+                        getInstanceProcAddr,
+                        nativeErrors,
+                        out var primaryStereoViewConfigurationReady);
+                    var headsetSessionReady = vulkanGraphicsRequirementsReady
+                        && primaryStereoViewConfigurationReady
+                        && primaryStereoViews.Count >= 2;
 
                     return new RekallAgeOpenXrSessionBootstrapResult(
                         true,
@@ -146,7 +193,11 @@ public sealed class RekallAgeNativeOpenXrSessionBootstrap : IRekallAgeOpenXrSess
                         systemId,
                         runtime.VulkanEnable2Available,
                         runtime.PrimaryStereoReady,
-                        true,
+                        vulkanGraphicsRequirementsReady,
+                        vulkanRequirements,
+                        primaryStereoViewConfigurationReady,
+                        primaryStereoViews,
+                        headsetSessionReady,
                         RequiredExtensions,
                         enabledExtensions,
                         missingExtensions,
@@ -156,7 +207,7 @@ public sealed class RekallAgeNativeOpenXrSessionBootstrap : IRekallAgeOpenXrSess
                             "Create primary-stereo swapchains and submit projection layers with xrEndFrame.",
                             "Drive view poses from xrLocateViews and controller actions from OpenXR input."
                         ],
-                        []);
+                        nativeErrors);
                 }
                 finally
                 {
@@ -202,6 +253,10 @@ public sealed class RekallAgeNativeOpenXrSessionBootstrap : IRekallAgeOpenXrSess
             null,
             vulkanEnable2Available,
             primaryStereoReady,
+            false,
+            null,
+            false,
+            [],
             false,
             RequiredExtensions,
             enabledExtensions,
@@ -278,11 +333,13 @@ public sealed class RekallAgeNativeOpenXrSessionBootstrap : IRekallAgeOpenXrSess
         IntPtr loaderHandle,
         out XrCreateInstanceDelegate createInstance,
         out XrGetSystemDelegate getSystem,
+        out XrGetInstanceProcAddrDelegate getInstanceProcAddr,
         out XrDestroyInstanceDelegate destroyInstance,
         out string error)
     {
         createInstance = null!;
         getSystem = null!;
+        getInstanceProcAddr = null!;
         destroyInstance = null!;
         if (!NativeLibrary.TryGetExport(loaderHandle, "xrCreateInstance", out var createInstanceSymbol))
         {
@@ -296,6 +353,12 @@ public sealed class RekallAgeNativeOpenXrSessionBootstrap : IRekallAgeOpenXrSess
             return false;
         }
 
+        if (!NativeLibrary.TryGetExport(loaderHandle, "xrGetInstanceProcAddr", out var getInstanceProcAddrSymbol))
+        {
+            error = "OpenXR loader does not export xrGetInstanceProcAddr.";
+            return false;
+        }
+
         if (!NativeLibrary.TryGetExport(loaderHandle, "xrDestroyInstance", out var destroyInstanceSymbol))
         {
             error = "OpenXR loader does not export xrDestroyInstance.";
@@ -304,7 +367,143 @@ public sealed class RekallAgeNativeOpenXrSessionBootstrap : IRekallAgeOpenXrSess
 
         createInstance = Marshal.GetDelegateForFunctionPointer<XrCreateInstanceDelegate>(createInstanceSymbol);
         getSystem = Marshal.GetDelegateForFunctionPointer<XrGetSystemDelegate>(getSystemSymbol);
+        getInstanceProcAddr = Marshal.GetDelegateForFunctionPointer<XrGetInstanceProcAddrDelegate>(getInstanceProcAddrSymbol);
         destroyInstance = Marshal.GetDelegateForFunctionPointer<XrDestroyInstanceDelegate>(destroyInstanceSymbol);
+        error = string.Empty;
+        return true;
+    }
+
+    private static RekallAgeOpenXrVulkanGraphicsRequirements? QueryVulkanGraphicsRequirements(
+        IntPtr instance,
+        ulong systemId,
+        XrGetInstanceProcAddrDelegate getInstanceProcAddr,
+        List<string> errors,
+        out bool ready)
+    {
+        ready = false;
+        if (!TryGetInstanceFunction(
+                instance,
+                getInstanceProcAddr,
+                "xrGetVulkanGraphicsRequirements2KHR",
+                out XrGetVulkanGraphicsRequirements2KhrDelegate getRequirements,
+                out var error))
+        {
+            errors.Add(error);
+            return null;
+        }
+
+        var requirements = new XrGraphicsRequirementsVulkanKhr
+        {
+            Type = XrTypeGraphicsRequirementsVulkanKhr,
+            Next = IntPtr.Zero,
+            MinApiVersionSupported = 0,
+            MaxApiVersionSupported = 0
+        };
+        var result = getRequirements(instance, systemId, ref requirements);
+        if (result != XrSuccess)
+        {
+            errors.Add($"xrGetVulkanGraphicsRequirements2KHR failed with XrResult {result}.");
+            return null;
+        }
+
+        ready = true;
+        return new RekallAgeOpenXrVulkanGraphicsRequirements(
+            FormatOpenXrVersion(requirements.MinApiVersionSupported),
+            FormatOpenXrVersion(requirements.MaxApiVersionSupported));
+    }
+
+    private static IReadOnlyList<RekallAgeOpenXrViewConfigurationView> QueryPrimaryStereoViews(
+        IntPtr instance,
+        ulong systemId,
+        XrGetInstanceProcAddrDelegate getInstanceProcAddr,
+        List<string> errors,
+        out bool ready)
+    {
+        ready = false;
+        if (!TryGetInstanceFunction(
+                instance,
+                getInstanceProcAddr,
+                "xrEnumerateViewConfigurationViews",
+                out XrEnumerateViewConfigurationViewsDelegate enumerateViews,
+                out var error))
+        {
+            errors.Add(error);
+            return [];
+        }
+
+        var countResult = enumerateViews(
+            instance,
+            systemId,
+            XrViewConfigurationTypePrimaryStereo,
+            0,
+            out var viewCount,
+            null);
+        if (countResult != XrSuccess)
+        {
+            errors.Add($"xrEnumerateViewConfigurationViews count query failed with XrResult {countResult}.");
+            return [];
+        }
+
+        if (viewCount == 0)
+        {
+            errors.Add("xrEnumerateViewConfigurationViews returned no primary-stereo views.");
+            return [];
+        }
+
+        var nativeViews = new XrViewConfigurationView[viewCount];
+        for (var i = 0; i < nativeViews.Length; i++)
+        {
+            nativeViews[i] = new XrViewConfigurationView
+            {
+                Type = XrTypeViewConfigurationView,
+                Next = IntPtr.Zero
+            };
+        }
+
+        var enumerateResult = enumerateViews(
+            instance,
+            systemId,
+            XrViewConfigurationTypePrimaryStereo,
+            viewCount,
+            out var written,
+            nativeViews);
+        if (enumerateResult != XrSuccess)
+        {
+            errors.Add($"xrEnumerateViewConfigurationViews failed with XrResult {enumerateResult}.");
+            return [];
+        }
+
+        ready = written >= 2;
+        return nativeViews
+            .Take(checked((int)Math.Min(viewCount, written)))
+            .Select((view, index) => new RekallAgeOpenXrViewConfigurationView(
+                index,
+                view.RecommendedImageRectWidth,
+                view.MaxImageRectWidth,
+                view.RecommendedImageRectHeight,
+                view.MaxImageRectHeight,
+                view.RecommendedSwapchainSampleCount,
+                view.MaxSwapchainSampleCount))
+            .ToArray();
+    }
+
+    private static bool TryGetInstanceFunction<TDelegate>(
+        IntPtr instance,
+        XrGetInstanceProcAddrDelegate getInstanceProcAddr,
+        string name,
+        out TDelegate function,
+        out string error)
+        where TDelegate : Delegate
+    {
+        var result = getInstanceProcAddr(instance, name, out var symbol);
+        if (result != XrSuccess || symbol == IntPtr.Zero)
+        {
+            function = null!;
+            error = $"{name} was not available from xrGetInstanceProcAddr (XrResult {result}).";
+            return false;
+        }
+
+        function = Marshal.GetDelegateForFunctionPointer<TDelegate>(symbol);
         error = string.Empty;
         return true;
     }
@@ -360,6 +559,14 @@ public sealed class RekallAgeNativeOpenXrSessionBootstrap : IRekallAgeOpenXrSess
         return ((ulong)major << 48) | ((ulong)minor << 32) | patch;
     }
 
+    private static string FormatOpenXrVersion(ulong version)
+    {
+        var major = version >> 48;
+        var minor = (version >> 32) & 0xffff;
+        var patch = version & 0xffffffff;
+        return $"{major}.{minor}.{patch}";
+    }
+
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     private delegate int XrCreateInstanceDelegate(ref XrInstanceCreateInfo createInfo, out IntPtr instance);
 
@@ -367,7 +574,28 @@ public sealed class RekallAgeNativeOpenXrSessionBootstrap : IRekallAgeOpenXrSess
     private delegate int XrGetSystemDelegate(IntPtr instance, ref XrSystemGetInfo getInfo, out ulong systemId);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate int XrGetInstanceProcAddrDelegate(
+        IntPtr instance,
+        [MarshalAs(UnmanagedType.LPStr)] string name,
+        out IntPtr function);
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     private delegate int XrDestroyInstanceDelegate(IntPtr instance);
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate int XrGetVulkanGraphicsRequirements2KhrDelegate(
+        IntPtr instance,
+        ulong systemId,
+        ref XrGraphicsRequirementsVulkanKhr graphicsRequirements);
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate int XrEnumerateViewConfigurationViewsDelegate(
+        IntPtr instance,
+        ulong systemId,
+        int viewConfigurationType,
+        uint viewCapacityInput,
+        out uint viewCountOutput,
+        [In, Out] XrViewConfigurationView[]? views);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct XrInstanceCreateInfo
@@ -403,6 +631,28 @@ public sealed class RekallAgeNativeOpenXrSessionBootstrap : IRekallAgeOpenXrSess
         public int Type;
         public IntPtr Next;
         public int FormFactor;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct XrGraphicsRequirementsVulkanKhr
+    {
+        public int Type;
+        public IntPtr Next;
+        public ulong MinApiVersionSupported;
+        public ulong MaxApiVersionSupported;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct XrViewConfigurationView
+    {
+        public int Type;
+        public IntPtr Next;
+        public uint RecommendedImageRectWidth;
+        public uint MaxImageRectWidth;
+        public uint RecommendedImageRectHeight;
+        public uint MaxImageRectHeight;
+        public uint RecommendedSwapchainSampleCount;
+        public uint MaxSwapchainSampleCount;
     }
 
     private readonly record struct NativeStringArray(IntPtr PointerArray, IReadOnlyList<IntPtr> StringPointers)

@@ -45,7 +45,7 @@ public sealed class GetEngineStatusCommand
         var result = new GetEngineStatusResult(
             EngineName: "Rekall AGE",
             AgentFirst: true,
-            RenderingPosture: "Vulkan-first internal renderer with backend-neutral render plans and Direct3D extension point.",
+            RenderingPosture: "Vulkan-first internal renderer with backend-neutral render plans, OpenXR headset readiness, and Direct3D extension point.",
             MvpTemplateIds: _templates.Templates.Select(template => template.Id).ToArray(),
             WorkflowTools:
             [
@@ -68,6 +68,10 @@ public sealed class GetEngineStatusCommand
                 new RekallAgeAgentWorkflowTool(
                     "rekall.scene.apply_blueprint",
                     "Apply many generic entities and components to a scene in one transaction for high-throughput agent world authoring.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
+                    "rekall.validation.scene",
+                    "Validate a scene and return blocking issues, warnings, and agent-readable next actions.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
                     "rekall.solar.import_ksa_system",
@@ -132,6 +136,18 @@ public sealed class GetEngineStatusCommand
                 new RekallAgeAgentWorkflowTool(
                     "rekall.render.plan.execute",
                     "Execute backend-neutral render plans through software or Vulkan targets.",
+                    Recommended: false),
+                new RekallAgeAgentWorkflowTool(
+                    "rekall.render.performance.inspect_scene_budget",
+                    "Inspect draw, triangle, texture, stereo, and render-target pressure against desktop, mobile, or VR performance budgets.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
+                    "rekall.render.openxr.bootstrap_session",
+                    "Inspect the active OpenXR runtime, HMD system, Vulkan API requirements, and primary-stereo eye configuration.",
+                    Recommended: false),
+                new RekallAgeAgentWorkflowTool(
+                    "rekall.render.openxr.inspect_headset_frame_plan",
+                    "Validate a scene against OpenXR primary-stereo swapchain and frame-loop requirements before headset launch.",
                     Recommended: false)
             ],
             AuthoringContracts:
@@ -181,6 +197,38 @@ public sealed class GetEngineStatusCommand
                         "rekall.shader.validate",
                         "rekall.module.write_source",
                         "rekall.build.modules"
+                    ]),
+                new RekallAgeAgentAuthoringContract(
+                    "runtime-lod-selection",
+                    "Rekall.LodGroup",
+                    "Renderable entities can provide camera-distance levels that swap to simpler primitives, alternate mesh assets, textures, colors, or scale multipliers before batching.",
+                    ["distance-levels", "primitive-override", "asset-override", "texture-override", "scale-multiplier"],
+                    [
+                        "rekall.module.component_schemas",
+                        "rekall.render.performance.inspect_scene_budget",
+                        "rekall.scene.apply_blueprint",
+                        "rekall.render.capture_runtime_viewport"
+                    ]),
+                new RekallAgeAgentAuthoringContract(
+                    "xr-camera-contract",
+                    "Rekall.Camera3D",
+                    "Camera entities can opt into primary-stereo OpenXR rendering without game-specific engine code.",
+                    ["active-camera", "stereo-mode", "single-pass-multiview", "primary-stereo-view-configuration"],
+                    [
+                        "rekall.render.stereo.inspect_plan",
+                        "rekall.render.openxr.bootstrap_session",
+                        "rekall.render.openxr.inspect_headset_frame_plan"
+                    ]),
+                new RekallAgeAgentAuthoringContract(
+                    "xr-runtime-input",
+                    "Rekall.XrPoseSource",
+                    "XR pose source and controller components let agent-authored entities bind headset and controller input to transforms and custom runtime systems.",
+                    ["headset-pose", "controller-pose", "controller-actions", "tracking-space", "generic-vr-rig"],
+                    [
+                        "rekall.module.component_schemas",
+                        "rekall.module.write_source",
+                        "rekall.build.modules",
+                        "rekall.runtime.inspect_scene"
                     ])
             ]);
         return ValueTask.FromResult(RekallAgeCommandResult<GetEngineStatusResult>.Success(

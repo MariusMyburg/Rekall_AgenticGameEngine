@@ -93,6 +93,13 @@ public sealed class OpenXrRuntimeProbeTests
             true,
             true,
             true,
+            new RekallAgeOpenXrVulkanGraphicsRequirements("1.1.0", "1.3.0"),
+            true,
+            [
+                new RekallAgeOpenXrViewConfigurationView(0, 1832, 1920, 1832, 1920, 1, 4),
+                new RekallAgeOpenXrViewConfigurationView(1, 1832, 1920, 1832, 1920, 1, 4)
+            ],
+            true,
             ["XR_KHR_vulkan_enable2"],
             ["XR_KHR_vulkan_enable2"],
             [],
@@ -110,6 +117,11 @@ public sealed class OpenXrRuntimeProbeTests
         Assert.True(result.Value.InstanceCreated);
         Assert.True(result.Value.HmdSystemAvailable);
         Assert.Equal(42UL, result.Value.SystemId);
+        Assert.True(result.Value.VulkanGraphicsRequirementsReady);
+        Assert.Equal("1.1.0", result.Value.VulkanGraphicsRequirements?.MinimumApiVersion);
+        Assert.True(result.Value.PrimaryStereoViewConfigurationReady);
+        Assert.Equal(2, result.Value.PrimaryStereoViews.Count);
+        Assert.Equal(1832u, result.Value.PrimaryStereoViews[0].RecommendedImageRectWidth);
         Assert.True(result.Value.HeadsetSessionReady);
         Assert.Contains(result.Value.NextRenderSteps, step => step.Contains("swapchains", StringComparison.OrdinalIgnoreCase));
     }
@@ -129,6 +141,10 @@ public sealed class OpenXrRuntimeProbeTests
             null,
             true,
             true,
+            false,
+            null,
+            false,
+            [],
             false,
             ["XR_KHR_vulkan_enable2"],
             ["XR_KHR_vulkan_enable2"],

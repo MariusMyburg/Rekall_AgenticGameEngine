@@ -36,6 +36,7 @@ public sealed class RekallAgeRuntimeExecutionLoop
         systems.AddRange(
         [
             new RekallAgeInputActionSystem(),
+            new RekallAgeXrPoseSystem(),
             new RekallAgeKeplerOrbitSystem(),
             new RekallAgeCelestialRotationSystem(),
             new RekallAgeTransformAnimationSystem(),

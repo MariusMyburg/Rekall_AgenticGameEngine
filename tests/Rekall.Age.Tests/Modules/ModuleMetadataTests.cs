@@ -59,6 +59,13 @@ public sealed class ModuleMetadataTests
         Assert.Contains(cameraTarget.Properties, property => property.Name == "TargetName" && property.Kind == "string");
         Assert.Contains(cameraTarget.Properties, property => property.Name == "OffsetZ" && property.Kind == "number");
         Assert.Contains(cameraTarget.Properties, property => property.Name == "LookAt" && property.Kind == "boolean");
+        var xrRig = Assert.Single(module.Components, component => component.DisplayName == "XR Rig");
+        Assert.Contains(xrRig.Properties, property => property.Name == "TrackingSpace" && property.Kind == "string");
+        var xrPoseSource = Assert.Single(module.Components, component => component.DisplayName == "XR Pose Source");
+        Assert.Contains(xrPoseSource.Properties, property => property.Name == "Source" && property.Kind == "string");
+        Assert.Contains(xrPoseSource.Properties, property => property.Name == "ApplyPosition" && property.Kind == "boolean");
+        var xrController = Assert.Single(module.Components, component => component.DisplayName == "XR Controller");
+        Assert.Contains(xrController.Properties, property => property.Name == "Hand" && property.Kind == "string");
         var directionalLight = Assert.Single(module.Components, component => component.DisplayName == "Directional Light");
         Assert.Contains(directionalLight.Properties, property => property.Name == "Intensity" && property.Minimum == 0);
         Assert.Contains(directionalLight.Properties, property => property.Name == "Color" && property.Kind == "color");

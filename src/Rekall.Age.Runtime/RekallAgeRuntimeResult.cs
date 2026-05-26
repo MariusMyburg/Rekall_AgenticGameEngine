@@ -14,6 +14,9 @@ public sealed record RekallAgeRuntimeResult(
     public IReadOnlyList<RekallAgeRuntimeInputAction> InputActions { get; init; } =
         Array.Empty<RekallAgeRuntimeInputAction>();
 
+    public IReadOnlyList<RekallAgeRuntimeXrAction> XrActions { get; init; } =
+        Array.Empty<RekallAgeRuntimeXrAction>();
+
     public IReadOnlyList<string> ActiveSystems =>
         SystemsRun.Count > 0
             ? SystemsRun

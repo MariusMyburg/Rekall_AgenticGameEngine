@@ -55,7 +55,8 @@ public sealed class RekallAgeHeadlessRuntime
         return new RekallAgeRuntimeResult(true, frames, duration, Array.Empty<string>(), observations)
         {
             SystemsRun = world.SystemsRun,
-            InputActions = world.Subsystems.Input.Actions
+            InputActions = world.Subsystems.Input.Actions,
+            XrActions = world.Subsystems.Xr.Actions
         };
     }
 }

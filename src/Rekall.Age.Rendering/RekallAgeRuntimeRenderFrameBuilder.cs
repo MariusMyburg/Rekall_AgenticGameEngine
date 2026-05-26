@@ -57,8 +57,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             .ToArray();
         var activeCamera = cameras.FirstOrDefault(camera => camera.Active) ?? cameras.FirstOrDefault();
         var renderableSource = debugOverlay
-            ? BuildRenderables(world).Concat(BuildColliderDebugRenderables(world))
-            : BuildRenderables(world);
+            ? BuildRenderables(world, activeCamera).Concat(BuildColliderDebugRenderables(world))
+            : BuildRenderables(world, activeCamera);
         var renderables = renderableSource
             .OrderBy(renderable => renderable.SortKey)
             .ThenBy(renderable => renderable.EntityName, StringComparer.Ordinal)
@@ -133,7 +133,9 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             eyes);
     }
 
-    private static IEnumerable<RekallAgeRuntimeViewportRenderable> BuildRenderables(RekallAgeRuntimeWorld world)
+    private static IEnumerable<RekallAgeRuntimeViewportRenderable> BuildRenderables(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeViewportCamera? activeCamera)
     {
         foreach (var sprite in world.Subsystems.Rendering.Sprites)
         {
@@ -172,6 +174,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 component.Type.Equals("Rekall.KeplerOrbit", StringComparison.Ordinal));
             var orbitPathComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.OrbitPathRenderer", StringComparison.Ordinal));
+            var lodSelection = SelectLod(entity, activeCamera, transform);
             var isOrbitPathRenderable = mesh.Variant?.Equals("rekall.orbit.path", StringComparison.OrdinalIgnoreCase) == true;
             var primitive = ReadString(geometry, "primitive");
             var orbitPathMesh = isOrbitPathRenderable ? ReadOrbitPathMesh(orbitComponent, orbitPathComponent) : null;
@@ -191,6 +194,11 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 ?? ReadString(geometry, "texture")
                 ?? ReadString(planetComponent, "surfaceTexture")
                 ?? ReadString(planetComponent, "SurfaceTexture");
+            primitive = lodSelection is { AssetId: not null, Primitive: null }
+                ? null
+                : lodSelection?.Primitive ?? primitive;
+            textureAssetId = lodSelection?.TextureAssetId ?? textureAssetId;
+            materialColor = lodSelection?.MaterialColor ?? materialColor;
             var normalTextureAssetId = ReadString(materialComponent, "normalTexture")
                 ?? ReadString(planetComponent, "normalTexture")
                 ?? ReadString(planetComponent, "NormalTexture");
@@ -205,34 +213,35 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 : planetComponent is not null
                 ? "rekall.planet.surface"
                 : string.IsNullOrWhiteSpace(primitive)
-                ? mesh.AssetId
+                ? lodSelection?.AssetId ?? mesh.AssetId
                 : $"rekall.geometry.{primitive.Trim().ToLowerInvariant()}";
             var radius = Math.Max(0.0001, ReadNumber(planetComponent, "radius", 0.5));
             var renderTransform = orbitPathMesh is null ? transform : FindOrbitParentTransform(world, orbitComponent);
-            var scaleX = orbitPathMesh is not null ? 1 : planetComponent is null ? transform.Scale3D.X : transform.Scale3D.X * radius * 2;
-            var scaleY = orbitPathMesh is not null ? 1 : planetComponent is null ? transform.Scale3D.Y : transform.Scale3D.Y * radius * 2;
-            var scaleZ = orbitPathMesh is not null ? 1 : planetComponent is null ? transform.Scale3D.Z : transform.Scale3D.Z * radius * 2;
+            var scaleMultiplier = Math.Max(0.0001, lodSelection?.ScaleMultiplier ?? 1);
+            var scaleX = (orbitPathMesh is not null ? 1 : planetComponent is null ? transform.Scale3D.X : transform.Scale3D.X * radius * 2) * scaleMultiplier;
+            var scaleY = (orbitPathMesh is not null ? 1 : planetComponent is null ? transform.Scale3D.Y : transform.Scale3D.Y * radius * 2) * scaleMultiplier;
+            var scaleZ = (orbitPathMesh is not null ? 1 : planetComponent is null ? transform.Scale3D.Z : transform.Scale3D.Z * radius * 2) * scaleMultiplier;
             var sortKey = mesh.SortKey
                 + (entity?.Components.Any(component => component.Type.Equals("Rekall.Rigidbody3D", StringComparison.Ordinal)) == true ? 20 : 0);
             yield return new RekallAgeRuntimeViewportRenderable(
                 orbitPathMesh is null ? mesh.EntityId : $"{mesh.EntityId}:orbit-path",
                 mesh.EntityName,
                 string.IsNullOrWhiteSpace(mesh.Kind) ? "mesh" : mesh.Kind,
-                mesh.AssetId,
+                lodSelection?.AssetId ?? mesh.AssetId,
                 renderTransform.Position3D.X,
                 renderTransform.Position3D.Y,
                 renderTransform.Position3D.Z,
                 sortKey,
-                Variant: mesh.Variant ?? variant,
+                Variant: lodSelection?.Variant ?? mesh.Variant ?? variant,
                 RotationX: transform.Rotation3D.X,
                 RotationY: transform.Rotation3D.Y,
                 RotationZ: transform.Rotation3D.Z,
                 ScaleX: scaleX,
                 ScaleY: scaleY,
                 ScaleZ: scaleZ,
-                MaterialColor: mesh.MaterialColor ?? materialColor ?? ReadString(planetComponent, "color") ?? ReadString(planetComponent, "Color"),
+                MaterialColor: lodSelection?.MaterialColor ?? mesh.MaterialColor ?? materialColor ?? ReadString(planetComponent, "color") ?? ReadString(planetComponent, "Color"),
                 GeometryMesh: geometryMesh,
-                TextureAssetId: mesh.TextureAssetId ?? textureAssetId,
+                TextureAssetId: lodSelection?.TextureAssetId ?? mesh.TextureAssetId ?? textureAssetId,
                 MetallicRoughnessTextureAssetId: metallicRoughnessTextureAssetId,
                 NormalTextureAssetId: normalTextureAssetId,
                 OcclusionTextureAssetId: occlusionTextureAssetId,
@@ -281,6 +290,86 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 0,
                 400 + uiLayer.Layer);
         }
+    }
+
+    private static LodSelection? SelectLod(
+        RekallAgeRuntimeEntity? entity,
+        RekallAgeRuntimeViewportCamera? activeCamera,
+        RekallAgeRuntimeTransform transform)
+    {
+        if (entity is null || activeCamera is null)
+        {
+            return null;
+        }
+
+        var component = entity.Components.FirstOrDefault(item =>
+            item.Type.Equals("Rekall.LodGroup", StringComparison.Ordinal));
+        if (component is null
+            || !ReadBoolean(component, "active", true)
+            || !TryGetPropertyValue(component.Properties, "levels", out var levelsNode)
+            || levelsNode is not JsonArray levels)
+        {
+            return null;
+        }
+
+        var distance = Distance(activeCamera, transform);
+        return levels
+            .OfType<JsonObject>()
+            .Select(level => ReadLodLevel(level))
+            .Where(level => level is not null)
+            .Select(level => level!)
+            .OrderByDescending(level => level.MinDistance)
+            .FirstOrDefault(level => distance >= level.MinDistance
+                && (level.MaxDistance is null || distance < level.MaxDistance.Value));
+    }
+
+    private static LodSelection? ReadLodLevel(JsonObject level)
+    {
+        var primitive = NormalizePrimitive(ReadString(level, "primitive"));
+        var assetId = EmptyToNull(ReadString(level, "assetId") ?? ReadString(level, "mesh"));
+        var textureAssetId = EmptyToNull(ReadString(level, "textureAssetId") ?? ReadString(level, "texture"));
+        var materialColor = EmptyToNull(ReadString(level, "materialColor") ?? ReadString(level, "color"));
+        if (primitive is null && assetId is null && textureAssetId is null && materialColor is null)
+        {
+            return null;
+        }
+
+        return new LodSelection(
+            Math.Max(0, ReadNumber(level, "minDistance", 0)),
+            ReadOptionalNumber(level, "maxDistance"),
+            assetId,
+            primitive,
+            textureAssetId,
+            materialColor,
+            Math.Max(0.0001, ReadNumber(level, "scaleMultiplier", 1)));
+    }
+
+    private static string? NormalizePrimitive(string? primitive)
+    {
+        if (string.IsNullOrWhiteSpace(primitive))
+        {
+            return null;
+        }
+
+        var normalized = primitive.Trim().ToLowerInvariant();
+        if (normalized.StartsWith("rekall.geometry.", StringComparison.Ordinal))
+        {
+            normalized = normalized["rekall.geometry.".Length..];
+        }
+
+        return normalized is "cube" or "sphere" or "cylinder" or "cone" or "plane" or "surface"
+            ? normalized
+            : null;
+    }
+
+    private static double Distance(
+        RekallAgeRuntimeViewportCamera camera,
+        RekallAgeRuntimeTransform transform)
+    {
+        var dx = transform.Position3D.X - camera.X;
+        var dy = transform.Position3D.Y - camera.Y;
+        var dz = transform.Position3D.Z - camera.Z;
+        return Math.Sqrt(dx * dx + dy * dy + dz * dz);
     }
 
     private static IEnumerable<RekallAgeRuntimeViewportRenderable> BuildColliderDebugRenderables(RekallAgeRuntimeWorld world)
@@ -652,6 +741,21 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         return value.TryGetValue<string>(out var text) ? text : null;
     }
 
+    private static string? ReadString(JsonObject properties, string name)
+    {
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
+        {
+            return null;
+        }
+
+        return value.TryGetValue<string>(out var text) ? text : null;
+    }
+
+    private static string? EmptyToNull(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
     private static double ReadNumber(RekallAgeRuntimeComponent? component, string name, double fallback)
     {
         return component is null ? fallback : ReadNumber(component.Properties, name, fallback);
@@ -948,7 +1052,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
 
     private static double? ReadOptionalNumber(JsonObject properties, string name)
     {
-        return properties.TryGetPropertyValue(name, out var node) && node is JsonValue value
+        return TryGetPropertyValue(properties, name, out var node) && node is JsonValue value
             ? ReadNumber(value)
             : null;
     }
@@ -1107,6 +1211,18 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         double A,
         double U,
         double V);
+
+    private sealed record LodSelection(
+        double MinDistance,
+        double? MaxDistance,
+        string? AssetId,
+        string? Primitive,
+        string? TextureAssetId,
+        string? MaterialColor,
+        double ScaleMultiplier)
+    {
+        public string? Variant => Primitive is null ? null : $"rekall.geometry.{Primitive}";
+    }
 
     private readonly record struct MeshVector3(double X, double Y, double Z)
     {

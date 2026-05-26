@@ -62,12 +62,16 @@ public sealed class AgentContextCommandTests
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.templates.inspect" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.geometry.create_primitive");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.scene.apply_blueprint" && workflow.Recommended);
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.validation.scene" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.entity.delete");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.module.scaffold_runtime_system" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.module.list_sources");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.module.read_source");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.build.modules" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.shader.assign_pipeline");
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.render.performance.inspect_scene_budget");
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.render.openxr.bootstrap_session");
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.render.openxr.inspect_headset_frame_plan");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.workflow.create_playable_package_from_template" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.templates.verify_mvp");
         Assert.Contains(result.Value.AuthoringContracts, contract =>
@@ -85,6 +89,19 @@ public sealed class AgentContextCommandTests
             && contract.Capabilities.Contains("custom-kind")
             && contract.Capabilities.Contains("custom-variant")
             && contract.Capabilities.Contains("shader-pipeline"));
+        Assert.Contains(result.Value.AuthoringContracts, contract =>
+            contract.Name == "runtime-lod-selection"
+            && contract.PrimaryType == "Rekall.LodGroup"
+            && contract.Capabilities.Contains("distance-levels"));
+        Assert.Contains(result.Value.AuthoringContracts, contract =>
+            contract.Name == "xr-camera-contract"
+            && contract.PrimaryType == "Rekall.Camera3D"
+            && contract.Capabilities.Contains("single-pass-multiview"));
+        Assert.Contains(result.Value.AuthoringContracts, contract =>
+            contract.Name == "xr-runtime-input"
+            && contract.PrimaryType == "Rekall.XrPoseSource"
+            && contract.Capabilities.Contains("headset-pose")
+            && contract.Capabilities.Contains("controller-actions"));
         Assert.Contains("vulkan", result.Value.RenderingPosture, StringComparison.OrdinalIgnoreCase);
     }
 }

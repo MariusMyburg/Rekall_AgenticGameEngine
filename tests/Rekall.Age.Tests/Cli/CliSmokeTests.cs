@@ -33,6 +33,10 @@ public sealed class CliSmokeTests
         Assert.Equal(0, create.ExitCode);
         Assert.Contains("Created puzzle game", create.Output);
 
+        var validation = await RunAsync(cliAssembly, "validation", "scene", root, "Main");
+        Assert.Equal(0, validation.ExitCode);
+        Assert.Contains("Status: ok", validation.Output);
+
         var summary = await RunAsync(cliAssembly, "context", "summary", root);
         Assert.Equal(0, summary.ExitCode);
         Assert.Contains("Crystal Mines: ok", summary.Output);

@@ -112,8 +112,13 @@ public sealed class InspectOpenXrHeadsetFramePlanCommand
         var stereoEnabled = stereo is { Enabled: true };
         var eyeCount = stereo?.EyeCount ?? 1;
         var usesMultiview = stereoEnabled && (stereo?.PreferSinglePassMultiview ?? false);
-        var recommendedEyeWidth = usesMultiview ? request.Width / Math.Max(1, eyeCount) : request.Width;
-        var recommendedEyeHeight = request.Height;
+        var firstRuntimeEye = session.PrimaryStereoViews.FirstOrDefault();
+        var recommendedEyeWidth = firstRuntimeEye is not null
+            ? checked((int)firstRuntimeEye.RecommendedImageRectWidth)
+            : usesMultiview ? request.Width / Math.Max(1, eyeCount) : request.Width;
+        var recommendedEyeHeight = firstRuntimeEye is not null
+            ? checked((int)firstRuntimeEye.RecommendedImageRectHeight)
+            : request.Height;
         var blockers = BuildBlockers(session, stereoEnabled, eyeCount, usesMultiview);
         var warnings = BuildWarnings(meshes.Count, batch.Draws.Count, usesMultiview);
         var result = new InspectOpenXrHeadsetFramePlanResult(

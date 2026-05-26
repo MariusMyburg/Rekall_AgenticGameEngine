@@ -22,6 +22,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         var elements = new List<RekallAgeRuntimeUiElement>();
         var networkSessions = new List<RekallAgeRuntimeNetworkSession>();
         var networkEntities = new List<RekallAgeRuntimeNetworkEntity>();
+        var xrRigs = new List<RekallAgeRuntimeXrRig>();
+        var xrControllers = new List<RekallAgeRuntimeXrController>();
         var observations = new List<RekallAgeRuntimeObservation>(world.Observations);
 
         foreach (var entity in world.Entities)
@@ -144,6 +146,23 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             ReadBooleanOptional(networkTransform?.Properties, "replicateScale", true),
                             NormalizeNetworkMode(ReadStringOptional(networkTransform?.Properties, "prediction"), "interpolated"),
                             Math.Max(0, ReadInt32Optional(networkTransform?.Properties, "priority", 0))));
+                        break;
+                    case "Rekall.XrRig":
+                        xrRigs.Add(new RekallAgeRuntimeXrRig(
+                            entity.Id,
+                            entity.Name,
+                            NormalizeXrMode(ReadString(component.Properties, "trackingSpace"), "local-floor"),
+                            NormalizeXrMode(ReadString(component.Properties, "viewConfiguration"), "primary-stereo"),
+                            ReadBoolean(component.Properties, "active", true)));
+                        break;
+                    case "Rekall.XrController":
+                        var hand = NormalizeXrMode(ReadString(component.Properties, "hand"), "unknown");
+                        xrControllers.Add(new RekallAgeRuntimeXrController(
+                            entity.Id,
+                            entity.Name,
+                            hand,
+                            NormalizeXrMode(ReadString(component.Properties, "poseSource"), $"{hand}-hand"),
+                            ReadBoolean(component.Properties, "active", true)));
                         break;
                     case "Rekall.PlanetRenderer":
                         meshes.Add(new RekallAgeRuntimeRenderMesh(
@@ -343,7 +362,18 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                     Input = world.Subsystems.Input,
                     Multiplayer = new RekallAgeRuntimeMultiplayerView(
                         Sort(networkSessions),
-                        Sort(networkEntities))
+                        Sort(networkEntities)),
+                    Xr = new RekallAgeRuntimeXrView(
+                        Sort(xrRigs),
+                        Sort(xrControllers),
+                        world.Subsystems.Xr.Poses
+                            .OrderBy(pose => pose.EntityName, StringComparer.Ordinal)
+                            .ThenBy(pose => pose.EntityId, StringComparer.Ordinal)
+                            .ToArray(),
+                        world.Subsystems.Xr.Actions
+                            .OrderBy(action => action.Hand, StringComparer.OrdinalIgnoreCase)
+                            .ThenBy(action => action.Name, StringComparer.OrdinalIgnoreCase)
+                            .ToArray())
                 },
             Observations = observations
                 .OrderBy(observation => observation.Severity, StringComparer.Ordinal)
@@ -436,6 +466,9 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             "Rekall.MultiplayerSession" or
             "Rekall.NetworkIdentity" or
             "Rekall.NetworkTransform" or
+            "Rekall.XrRig" or
+            "Rekall.XrController" or
+            "Rekall.XrPoseSource" or
             "Rekall.PlanetRenderer" or
             "Rekall.AtmosphereRenderer" or
             "Rekall.OrbitPathRenderer" or
@@ -467,6 +500,13 @@ public sealed class RekallAgeRuntimeProjectionBuilder
     private static string? EmptyToNull(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string NormalizeXrMode(string? value, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? fallback
+            : value.Trim().ToLowerInvariant();
     }
 
     private static bool ReadBoolean(JsonObject properties, string name, bool fallback)
@@ -630,6 +670,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             RekallAgeRuntimeUiElement value => value.EntityName,
             RekallAgeRuntimeNetworkSession value => value.EntityName,
             RekallAgeRuntimeNetworkEntity value => value.EntityName,
+            RekallAgeRuntimeXrRig value => value.EntityName,
+            RekallAgeRuntimeXrController value => value.EntityName,
             _ => string.Empty
         };
     }
@@ -652,6 +694,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             RekallAgeRuntimeUiElement value => value.EntityId,
             RekallAgeRuntimeNetworkSession value => value.EntityId,
             RekallAgeRuntimeNetworkEntity value => value.EntityId,
+            RekallAgeRuntimeXrRig value => value.EntityId,
+            RekallAgeRuntimeXrController value => value.EntityId,
             _ => string.Empty
         };
     }

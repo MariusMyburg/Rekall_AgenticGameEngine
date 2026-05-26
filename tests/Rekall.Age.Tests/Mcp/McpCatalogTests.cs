@@ -11,6 +11,7 @@ using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime.Commands;
+using Rekall.Age.Validation.Commands;
 using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Tests.Mcp;
@@ -22,6 +23,7 @@ public sealed class McpCatalogTests
     {
         var registry = new RekallAgeCommandRegistry();
         registry.Register(new GetEngineStatusCommand());
+        registry.Register(new ValidateSceneCommand());
         registry.Register(new ListTransactionHistoryCommand());
         registry.Register(new RestoreTransactionPreimageCommand());
         registry.Register(new CreateProjectCommand());
@@ -40,6 +42,7 @@ public sealed class McpCatalogTests
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
         registry.Register(new CaptureRuntimeViewportCommand());
+        registry.Register(new InspectScenePerformanceBudgetCommand());
         registry.Register(new CapturePlayableFrameCommand());
         registry.Register(new InspectStereoRenderPlanCommand());
         registry.Register(new ProbeOpenXrRuntimeCommand());
@@ -79,6 +82,7 @@ public sealed class McpCatalogTests
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.engine_status");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.validation.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.transaction.history");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.transaction.restore_preimage");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.project.create");
@@ -97,6 +101,7 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.run.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.capture.screenshot");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.capture_runtime_viewport");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.performance.inspect_scene_budget");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.stereo.inspect_plan");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.openxr.probe");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.openxr.bootstrap_session");
@@ -283,6 +288,10 @@ public sealed class McpCatalogTests
                 null,
                 false,
                 false,
+                false,
+                null,
+                false,
+                [],
                 false,
                 ["XR_KHR_vulkan_enable2"],
                 [],

@@ -20,6 +20,7 @@ using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.Runtime.Commands;
 using Rekall.Age.Validation;
+using Rekall.Age.Validation.Commands;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
 using System.Globalization;
@@ -37,7 +38,7 @@ internal static class RekallAgeCli
         Log.Information("Rekall AGE command starting. Args={Args}", string.Join(' ', args));
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|transaction|capture|render|module|build|templates|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|transaction|capture|render|module|build|validation|templates|mcp> ...");
             Log.Information("Rekall AGE command finished with usage error. LogDirectory={LogDirectory}", logDirectory);
             Log.CloseAndFlush();
             return 2;
@@ -61,6 +62,14 @@ internal static class RekallAgeCli
                     await InspectStereoRenderPlanAsync(registry, context, root, scene, frames, "1920", "1080"),
                 ["render", "stereo", "inspect", var root, var scene, var frames, var width, var height] =>
                     await InspectStereoRenderPlanAsync(registry, context, root, scene, frames, width, height),
+                ["render", "performance", "budget", var root, var scene] =>
+                    await InspectScenePerformanceBudgetAsync(registry, context, root, scene, "0", "1920", "1080", "desktop60"),
+                ["render", "performance", "budget", var root, var scene, var profile] =>
+                    await InspectScenePerformanceBudgetAsync(registry, context, root, scene, "0", "1920", "1080", profile),
+                ["render", "performance", "budget", var root, var scene, var profile, var frames] =>
+                    await InspectScenePerformanceBudgetAsync(registry, context, root, scene, frames, "1920", "1080", profile),
+                ["render", "performance", "budget", var root, var scene, var profile, var frames, var width, var height] =>
+                    await InspectScenePerformanceBudgetAsync(registry, context, root, scene, frames, width, height, profile),
                 ["render", "openxr", "probe"] => await ProbeOpenXrRuntimeAsync(registry, context),
                 ["render", "openxr", "bootstrap-session"] => await BootstrapOpenXrSessionAsync(registry, context),
                 ["render", "openxr", "frame-plan", var root, var scene] =>
@@ -271,6 +280,8 @@ internal static class RekallAgeCli
                 ["context", "engine"] => await PrintEngineStatusAsync(registry, context),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
+                ["validation", "scene", var root, var scene] => await ValidateSceneAsync(registry, context, root, scene),
+                ["scene", "validate", var root, var scene] => await ValidateSceneAsync(registry, context, root, scene),
                 ["transaction", "history", var root] => await PrintTransactionHistoryAsync(registry, context, root, "20"),
                 ["transaction", "history", var root, var limit] => await PrintTransactionHistoryAsync(registry, context, root, limit),
                 ["transaction", "restore-preimage", var root, var transactionId, var relativePath] =>
@@ -376,6 +387,7 @@ internal static class RekallAgeCli
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new GetEngineStatusCommand());
+        registry.Register(new ValidateSceneCommand());
         registry.Register(new ListTransactionHistoryCommand());
         registry.Register(new RestoreTransactionPreimageCommand());
         registry.Register(new ListComponentSchemasCommand());
@@ -387,6 +399,7 @@ internal static class RekallAgeCli
         registry.Register(new WriteModuleSourceCommand());
         registry.Register(new ListRenderBackendsCommand());
         registry.Register(new InspectStereoRenderPlanCommand());
+        registry.Register(new InspectScenePerformanceBudgetCommand());
         registry.Register(new ProbeOpenXrRuntimeCommand());
         registry.Register(new BootstrapOpenXrSessionCommand());
         registry.Register(new InspectOpenXrHeadsetFramePlanCommand());
@@ -598,6 +611,50 @@ internal static class RekallAgeCli
         return result.Ok ? 0 : 1;
     }
 
+    private static async Task<int> InspectScenePerformanceBudgetAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string frames,
+        string width,
+        string height,
+        string profile)
+    {
+        var frameCount = int.Parse(frames, CultureInfo.InvariantCulture);
+        var viewportWidth = int.Parse(width, CultureInfo.InvariantCulture);
+        var viewportHeight = int.Parse(height, CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<InspectScenePerformanceBudgetRequest, InspectScenePerformanceBudgetResult>(
+            "rekall.render.performance.inspect_scene_budget",
+            new InspectScenePerformanceBudgetRequest(root, scene, frameCount, viewportWidth, viewportHeight, profile),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Profile: {result.Value.Profile}; target FPS: {result.Value.TargetFramesPerSecond}");
+        Console.WriteLine($"Entities: {result.Value.EntityCount}; renderables: {result.Value.RenderableCount}; meshes: {result.Value.MeshCount}");
+        Console.WriteLine($"Draw calls: {result.Value.DrawCalls}; estimated invocations: {result.Value.EstimatedDrawInvocations}");
+        Console.WriteLine($"Triangles: {result.Value.Triangles}; vertices: {result.Value.Vertices}");
+        Console.WriteLine($"Textures: {result.Value.TextureCount}; runtime textures: {result.Value.RuntimeTextureCount}; asset issues: {result.Value.AssetIssueCount}");
+        Console.WriteLine($"Stereo: {result.Value.StereoEnabled}; multiview: {result.Value.UsesSinglePassMultiview}; eyes: {result.Value.EyeCount}");
+        Console.WriteLine($"Render target pixels: {result.Value.EstimatedRenderTargetPixels}; geometry bytes: {result.Value.EstimatedGeometryBytes}");
+        Console.WriteLine($"Budget: draws {result.Value.Limits.MaxDrawInvocations}, triangles {result.Value.Limits.MaxTriangles}, vertices {result.Value.Limits.MaxVertices}, textures {result.Value.Limits.MaxTextures}, pixels {result.Value.Limits.MaxRenderTargetPixels}");
+        foreach (var blocker in result.Value.Blockers)
+        {
+            Console.WriteLine($"Blocker: {blocker}");
+        }
+
+        foreach (var warning in result.Value.Warnings)
+        {
+            Console.WriteLine($"Warning: {warning}");
+        }
+
+        foreach (var recommendation in result.Value.Recommendations)
+        {
+            Console.WriteLine($"Recommendation: {recommendation}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
     private static async Task<int> ProbeOpenXrRuntimeAsync(
         RekallAgeCommandRegistry registry,
         RekallAgeCommandContext context)
@@ -647,6 +704,19 @@ internal static class RekallAgeCli
         Console.WriteLine($"HMD system available: {result.Value.HmdSystemAvailable}");
         Console.WriteLine($"System id: {result.Value.SystemId?.ToString(CultureInfo.InvariantCulture) ?? "<none>"}");
         Console.WriteLine($"XR_KHR_vulkan_enable2: {result.Value.VulkanEnable2Available}");
+        Console.WriteLine($"Vulkan requirements ready: {result.Value.VulkanGraphicsRequirementsReady}");
+        if (result.Value.VulkanGraphicsRequirements is not null)
+        {
+            Console.WriteLine($"Vulkan API range: {result.Value.VulkanGraphicsRequirements.MinimumApiVersion}..{result.Value.VulkanGraphicsRequirements.MaximumApiVersion}");
+        }
+
+        Console.WriteLine($"Primary stereo view config ready: {result.Value.PrimaryStereoViewConfigurationReady}");
+        foreach (var view in result.Value.PrimaryStereoViews)
+        {
+            Console.WriteLine(
+                $"View {view.Index}: recommended {view.RecommendedImageRectWidth}x{view.RecommendedImageRectHeight}, max {view.MaxImageRectWidth}x{view.MaxImageRectHeight}, samples {view.RecommendedSwapchainSampleCount}/{view.MaxSwapchainSampleCount}");
+        }
+
         Console.WriteLine($"Headset session ready: {result.Value.HeadsetSessionReady}");
         foreach (var extension in result.Value.EnabledExtensions)
         {
@@ -2416,6 +2486,39 @@ internal static class RekallAgeCli
         return result.Ok ? 0 : 1;
     }
 
+    private static async Task<int> ValidateSceneAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene)
+    {
+        var result = await registry.ExecuteAsync<ValidateSceneRequest, ValidateSceneResult>(
+            "rekall.validation.scene",
+            new ValidateSceneRequest(root, scene),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Scene: {result.Value.SceneName}");
+        Console.WriteLine($"Status: {result.Value.Status}");
+        Console.WriteLine(
+            $"Issues: {result.Value.IssueCount} (blocking {result.Value.BlockingCount}, warnings {result.Value.WarningCount})");
+        foreach (var issue in result.Value.Issues)
+        {
+            Console.WriteLine($"{issue.Severity} {issue.Code} {issue.Target ?? "<scene>"}: {issue.Message}");
+        }
+
+        foreach (var action in result.Value.SuggestedNextActions)
+        {
+            Console.WriteLine($"Next: {action.Tool}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.BlockingCount == 0 ? 0 : 1;
+    }
+
     private static async Task<int> PrintSceneSummaryAsync(
         RekallAgeCommandRegistry registry,
         RekallAgeCommandContext context,
@@ -2513,6 +2616,12 @@ internal static class RekallAgeCli
             Console.WriteLine($"  {action.Name}: value={action.Value} down={action.IsDown} pressed={action.WasPressed} released={action.WasReleased}");
         }
 
+        Console.WriteLine($"XR actions: {result.Value.XrActionCount}");
+        foreach (var action in result.Value.XrActions)
+        {
+            Console.WriteLine($"  {action.Hand}/{action.Name}: value={action.Value} down={action.IsDown} pressed={action.WasPressed} released={action.WasReleased}");
+        }
+
         return result.Ok ? 0 : 1;
     }
 
@@ -2543,6 +2652,12 @@ internal static class RekallAgeCli
         foreach (var action in result.Value.InputActions)
         {
             Console.WriteLine($"  {action.Name}: value={action.Value} down={action.IsDown} pressed={action.WasPressed} released={action.WasReleased}");
+        }
+
+        Console.WriteLine($"XR: {result.Value.XrRigCount} rigs, {result.Value.XrControllerCount} controllers, {result.Value.XrPoseCount} poses, {result.Value.XrActionCount} actions");
+        foreach (var action in result.Value.XrActions)
+        {
+            Console.WriteLine($"  {action.Hand}/{action.Name}: value={action.Value} down={action.IsDown} pressed={action.WasPressed} released={action.WasReleased}");
         }
 
         Console.WriteLine($"Systems run: {string.Join(", ", result.Value.SystemsRun)}");

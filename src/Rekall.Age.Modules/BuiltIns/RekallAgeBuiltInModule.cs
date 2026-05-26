@@ -12,6 +12,9 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeCamera3DComponent>();
         builder.RegisterComponent<RekallAgeCameraZoomInputComponent>();
         builder.RegisterComponent<RekallAgeCameraTarget3DComponent>();
+        builder.RegisterComponent<RekallAgeXrRigComponent>();
+        builder.RegisterComponent<RekallAgeXrPoseSourceComponent>();
+        builder.RegisterComponent<RekallAgeXrControllerComponent>();
         builder.RegisterComponent<RekallAgeDirectionalLightComponent>();
         builder.RegisterComponent<RekallAgePointLightComponent>();
         builder.RegisterComponent<RekallAgeMultiplayerSessionComponent>();
@@ -22,6 +25,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeLineSegmentsComponent>();
         builder.RegisterComponent<RekallAgeGeometryExtrusionComponent>();
         builder.RegisterComponent<RekallAgeMaterialComponent>();
+        builder.RegisterComponent<RekallAgeLodGroupComponent>();
         builder.RegisterComponent<RekallAgePhysicsWorld3DComponent>();
         builder.RegisterComponent<RekallAgePhysicsMaterial3DComponent>();
         builder.RegisterComponent<RekallAgeRigidbody3DComponent>();
@@ -201,6 +205,48 @@ public sealed class RekallAgeCameraTarget3DComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("XR Rig")]
+public sealed class RekallAgeXrRigComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+
+    [RekallAgeProperty]
+    public string TrackingSpace { get; init; } = "local-floor";
+
+    [RekallAgeProperty]
+    public string ViewConfiguration { get; init; } = "primary-stereo";
+}
+
+[RekallAgeComponent("XR Pose Source")]
+public sealed class RekallAgeXrPoseSourceComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+
+    [RekallAgeProperty]
+    public string Source { get; init; } = "head";
+
+    [RekallAgeProperty]
+    public bool ApplyPosition { get; init; } = true;
+
+    [RekallAgeProperty]
+    public bool ApplyRotation { get; init; } = true;
+}
+
+[RekallAgeComponent("XR Controller")]
+public sealed class RekallAgeXrControllerComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+
+    [RekallAgeProperty]
+    public string Hand { get; init; } = "left";
+
+    [RekallAgeProperty]
+    public string PoseSource { get; init; } = "left-hand";
 }
 
 [RekallAgeComponent("Directional Light")]
@@ -415,6 +461,30 @@ public sealed class RekallAgeMaterialComponent : RekallAgeComponent
     [RekallAgeProperty(Minimum = 0)]
     public double EmissiveStrength { get; init; }
 }
+
+[RekallAgeComponent("LOD Group")]
+public sealed class RekallAgeLodGroupComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+
+    [RekallAgeProperty(Kind = "lodLevels")]
+    public RekallAgeLodLevel[] Levels { get; init; } =
+    [
+        new(0, 50, Primitive: "cube"),
+        new(50, null, Primitive: "plane")
+    ];
+}
+
+public sealed record RekallAgeLodLevel(
+    double MinDistance = 0,
+    double? MaxDistance = null,
+    string? Mesh = null,
+    string? AssetId = null,
+    string? Primitive = null,
+    string? TextureAssetId = null,
+    string? MaterialColor = null,
+    double ScaleMultiplier = 1);
 
 [RekallAgeComponent("Physics World 3D")]
 public sealed class RekallAgePhysicsWorld3DComponent : RekallAgeComponent

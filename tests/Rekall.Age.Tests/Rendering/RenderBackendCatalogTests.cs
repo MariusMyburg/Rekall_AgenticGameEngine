@@ -37,5 +37,16 @@ public sealed class RenderBackendCatalogTests
         Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-session-bootstrap");
         Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-headset-frame-plan");
         Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-vulkan-enable2-readiness");
+        Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-vulkan-graphics-requirements");
+        Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-vulkan-graphics-binding-interop");
+        Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-compositor-session-bootstrap");
+        Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-swapchain-format-enumeration");
+        Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-color-depth-swapchain-allocation");
+        Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-vulkan-swapchain-image-enumeration");
+        Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-frame-loop-probe");
+        Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-swapchain-image-acquire-release");
+        Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-zero-layer-frame-submit");
+        Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-primary-stereo-view-enumeration");
+        Assert.Contains(result.Value.Backends[0].AgentExposedCapabilities, capability => capability == "openxr-external-vkimage-swapchain-wrapping");
     }
 }

@@ -39,7 +39,9 @@ public sealed record RekallAgeRuntimeInputState(
     IReadOnlySet<string>? ReleasedKeysThisFrame = null,
     IReadOnlySet<string>? PressedButtons = null,
     IReadOnlySet<string>? PressedButtonsThisFrame = null,
-    IReadOnlySet<string>? ReleasedButtonsThisFrame = null)
+    IReadOnlySet<string>? ReleasedButtonsThisFrame = null,
+    IReadOnlyList<RekallAgeRuntimeXrPose>? XrPoses = null,
+    IReadOnlyList<RekallAgeRuntimeXrAction>? XrActions = null)
 {
     public static RekallAgeRuntimeInputState Empty { get; } = new();
 }
@@ -55,7 +57,9 @@ public sealed record RekallAgeRuntimeInputFrame(
     IReadOnlyList<string>? ReleasedKeysThisFrame = null,
     IReadOnlyList<string>? PressedButtons = null,
     IReadOnlyList<string>? PressedButtonsThisFrame = null,
-    IReadOnlyList<string>? ReleasedButtonsThisFrame = null)
+    IReadOnlyList<string>? ReleasedButtonsThisFrame = null,
+    IReadOnlyList<RekallAgeRuntimeXrPose>? XrPoses = null,
+    IReadOnlyList<RekallAgeRuntimeXrAction>? XrActions = null)
 {
     public RekallAgeRuntimeInputState ToState()
     {
@@ -70,7 +74,9 @@ public sealed record RekallAgeRuntimeInputFrame(
             ToSet(ReleasedKeysThisFrame),
             ToSet(PressedButtons),
             ToSet(PressedButtonsThisFrame),
-            ToSet(ReleasedButtonsThisFrame));
+            ToSet(ReleasedButtonsThisFrame),
+            XrPoses,
+            XrActions);
     }
 
     private static IReadOnlySet<string>? ToSet(IReadOnlyList<string>? values)
@@ -105,6 +111,24 @@ public sealed record RekallAgeRuntimeVector2(double X, double Y);
 
 public sealed record RekallAgeRuntimeVector3(double X, double Y, double Z);
 
+public sealed record RekallAgeRuntimeXrPose(
+    string Source,
+    bool IsTracked,
+    double X = 0,
+    double Y = 0,
+    double Z = 0,
+    double Pitch = 0,
+    double Yaw = 0,
+    double Roll = 0);
+
+public sealed record RekallAgeRuntimeXrAction(
+    string Hand,
+    string Name,
+    double Value,
+    bool IsDown,
+    bool WasPressed,
+    bool WasReleased);
+
 public sealed record RekallAgeRuntimeSubsystemViews(
     RekallAgeRuntimeRenderView Rendering,
     RekallAgeRuntimePhysicsView Physics,
@@ -116,6 +140,8 @@ public sealed record RekallAgeRuntimeSubsystemViews(
 
     public RekallAgeRuntimeMultiplayerView Multiplayer { get; init; } =
         RekallAgeRuntimeMultiplayerView.Empty;
+
+    public RekallAgeRuntimeXrView Xr { get; init; } = RekallAgeRuntimeXrView.Empty;
 
     public static RekallAgeRuntimeSubsystemViews Empty { get; } = new(
         RekallAgeRuntimeRenderView.Empty,
@@ -140,6 +166,45 @@ public sealed record RekallAgeRuntimeInputAction(
     bool WasReleased,
     string SourceEntityId,
     string SourceEntityName);
+
+public sealed record RekallAgeRuntimeXrView(
+    IReadOnlyList<RekallAgeRuntimeXrRig> Rigs,
+    IReadOnlyList<RekallAgeRuntimeXrController> Controllers,
+    IReadOnlyList<RekallAgeRuntimeXrTrackedPose> Poses,
+    IReadOnlyList<RekallAgeRuntimeXrAction> Actions)
+{
+    public static RekallAgeRuntimeXrView Empty { get; } = new(
+        Array.Empty<RekallAgeRuntimeXrRig>(),
+        Array.Empty<RekallAgeRuntimeXrController>(),
+        Array.Empty<RekallAgeRuntimeXrTrackedPose>(),
+        Array.Empty<RekallAgeRuntimeXrAction>());
+}
+
+public sealed record RekallAgeRuntimeXrRig(
+    string EntityId,
+    string EntityName,
+    string TrackingSpace,
+    string ViewConfiguration,
+    bool Active);
+
+public sealed record RekallAgeRuntimeXrController(
+    string EntityId,
+    string EntityName,
+    string Hand,
+    string PoseSource,
+    bool Active);
+
+public sealed record RekallAgeRuntimeXrTrackedPose(
+    string EntityId,
+    string EntityName,
+    string Source,
+    bool IsTracked,
+    double X,
+    double Y,
+    double Z,
+    double Pitch,
+    double Yaw,
+    double Roll);
 
 public sealed record RekallAgeRuntimeMultiplayerView(
     IReadOnlyList<RekallAgeRuntimeNetworkSession> Sessions,

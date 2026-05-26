@@ -23,6 +23,11 @@ public sealed record InspectSceneRuntimeResult(
     int UiElementCount,
     int InputActionCount,
     IReadOnlyList<RekallAgeRuntimeInputAction> InputActions,
+    int XrRigCount,
+    int XrControllerCount,
+    int XrPoseCount,
+    int XrActionCount,
+    IReadOnlyList<RekallAgeRuntimeXrAction> XrActions,
     IReadOnlyList<string> SystemsRun,
     IReadOnlyList<RekallAgeRuntimeObservation> Observations);
 
@@ -56,6 +61,11 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
                 0,
                 0,
                 Array.Empty<RekallAgeRuntimeInputAction>(),
+                0,
+                0,
+                0,
+                0,
+                Array.Empty<RekallAgeRuntimeXrAction>(),
                 Array.Empty<string>(),
                 Array.Empty<RekallAgeRuntimeObservation>());
             return RekallAgeCommandResult<InspectSceneRuntimeResult>.Failure(
@@ -88,6 +98,7 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
         var audio = world.Subsystems.Audio;
         var animation = world.Subsystems.Animation;
         var ui = world.Subsystems.Ui;
+        var xr = world.Subsystems.Xr;
 
         return new InspectSceneRuntimeResult(
             world.SceneName,
@@ -103,6 +114,11 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
             ui.Elements.Count,
             world.Subsystems.Input.Actions.Count,
             world.Subsystems.Input.Actions,
+            xr.Rigs.Count,
+            xr.Controllers.Count,
+            xr.Poses.Count,
+            xr.Actions.Count,
+            xr.Actions,
             world.SystemsRun,
             world.Observations);
     }

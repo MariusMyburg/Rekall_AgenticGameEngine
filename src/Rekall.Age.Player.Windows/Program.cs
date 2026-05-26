@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -48,10 +49,14 @@ internal static class Program
         }
 
         var syncToVerticalBlank = !HasOption(args, "--no-vsync");
+        var openXrRequested = HasOption(args, "--xr") || HasOption(args, "--vr");
+        var simulateXrInput = HasOption(args, "--simulate-xr") || HasOption(args, "--xr-sim");
         await using var player = await RekallAgeVeldridPlayer.CreateAsync(
             Path.GetFullPath(args[0]),
             args[1],
             syncToVerticalBlank,
+            openXrRequested,
+            simulateXrInput,
             CancellationToken.None);
         PlayerLog.Write("Player entering render loop.");
         player.Run();
@@ -128,6 +133,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly TextureBinding _defaultMetallicRoughnessTexture;
     private readonly TextureBinding _hudTexture;
     private readonly ResourceSet _hudTextureSet;
+    private readonly RekallAgeOpenXrSessionBootstrapResult? _openXrStatus;
+    private readonly RekallAgeOpenXrVulkanInteropInspection? _openXrVulkanInterop;
+    private readonly RekallAgeOpenXrCompositorSessionBootstrapResult? _openXrCompositorSession;
+    private readonly bool _simulateXrInput;
     private SceneRenderTarget _sceneTarget;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly RekallAgeVulkanSceneMeshBuilder _meshBuilder = new();
@@ -164,8 +173,6 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private int _assetRevision = 1;
     private int _assetHotReloadPending;
     private long _lastAssetHotReloadRequestTicks;
-    private int _cachedWidth;
-    private int _cachedHeight;
     private CachedRenderGeometry? _cachedStaticGeometry;
     private bool _hudDirty = true;
     private RekallAgeSceneDocument _sceneDocument;
@@ -200,7 +207,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         TextureBinding whiteTexture,
         TextureBinding flatNormalTexture,
         TextureBinding defaultMetallicRoughnessTexture,
-        TextureBinding hudTexture)
+        TextureBinding hudTexture,
+        RekallAgeOpenXrSessionBootstrapResult? openXrStatus,
+        RekallAgeOpenXrVulkanInteropInspection? openXrVulkanInterop,
+        RekallAgeOpenXrCompositorSessionBootstrapResult? openXrCompositorSession,
+        bool simulateXrInput)
     {
         _projectRoot = projectRoot;
         _sceneName = sceneName;
@@ -243,6 +254,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _defaultMetallicRoughnessTexture = defaultMetallicRoughnessTexture;
         _hudTexture = hudTexture;
         _hudTextureSet = _factory.CreateResourceSet(new ResourceSetDescription(_hudTextureLayout, _hudTexture.Texture, _hudTexture.Sampler));
+        _openXrStatus = openXrStatus;
+        _openXrVulkanInterop = openXrVulkanInterop;
+        _openXrCompositorSession = openXrCompositorSession;
+        _simulateXrInput = simulateXrInput;
         _sceneTarget = CreateSceneRenderTarget(_factory, InitialWidth, InitialHeight, _presentTextureLayout);
         _lastSimulationClockSeconds = _clock.Elapsed.TotalSeconds;
     }
@@ -251,6 +266,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         string projectRoot,
         string sceneName,
         bool syncToVerticalBlank,
+        bool openXrRequested,
+        bool simulateXrInput,
         CancellationToken cancellationToken)
     {
         PlayerLog.Write("Loading runtime scene.");
@@ -273,13 +290,33 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             PlayerLog.Write($"Asset issue asset={issue.AssetId} code={issue.Code} message={issue.Message}");
         }
 
+        RekallAgeOpenXrSessionBootstrapResult? openXrStatus = null;
+        if (openXrRequested)
+        {
+            PlayerLog.Write("Bootstrapping OpenXR headset readiness.");
+            openXrStatus = await new RekallAgeNativeOpenXrSessionBootstrap()
+                .BootstrapAsync(cancellationToken)
+                .ConfigureAwait(false);
+            PlayerLog.Write(
+                $"OpenXR status ready={openXrStatus.HeadsetSessionReady} hmd={openXrStatus.HmdSystemAvailable} vulkanRequirements={openXrStatus.VulkanGraphicsRequirementsReady} stereoViews={openXrStatus.PrimaryStereoViews.Count}.");
+            foreach (var error in openXrStatus.Errors)
+            {
+                PlayerLog.Write($"OpenXR error: {error}");
+            }
+        }
+
+        if (simulateXrInput)
+        {
+            PlayerLog.Write("XR input simulator enabled.");
+        }
+
         var windowInfo = new WindowCreateInfo(
             100,
             100,
             InitialWidth,
             InitialHeight,
             WindowState.Normal,
-            $"Rekall AGE Player - {sceneName} | Vulkan swapchain");
+            BuildWindowTitle(sceneName, openXrRequested, simulateXrInput));
         PlayerLog.Write("Creating SDL window.");
         var window = VeldridStartup.CreateWindow(ref windowInfo);
         var options = new GraphicsDeviceOptions(
@@ -293,6 +330,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var device = VeldridStartup.CreateGraphicsDevice(window, options, GraphicsBackend.Vulkan);
         var factory = device.ResourceFactory;
         PlayerLog.Write($"Created graphics device backend={device.BackendType} vsync={syncToVerticalBlank} anisotropy={device.Features.SamplerAnisotropy}.");
+        var openXrVulkanInterop = InspectOpenXrVulkanInterop(device, openXrStatus);
+        var openXrCompositorSession = await BootstrapOpenXrCompositorSessionAsync(
+                device,
+                openXrVulkanInterop,
+                cancellationToken)
+            .ConfigureAwait(false);
         var commands = factory.CreateCommandList();
         PlayerLog.Write("Compiling SPIR-V shaders.");
         var sceneShaders = factory.CreateFromSpirv(
@@ -484,11 +527,91 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             whiteTexture,
             flatNormalTexture,
             defaultMetallicRoughnessTexture,
-            hudTexture);
+            hudTexture,
+            openXrStatus,
+            openXrVulkanInterop,
+            openXrCompositorSession,
+            simulateXrInput);
         player.StartLiveEditServer();
         player.StartAssetHotReloadWatcher();
         PlayerLog.Write("Player initialization complete.");
         return player;
+    }
+
+    private static RekallAgeOpenXrVulkanInteropInspection? InspectOpenXrVulkanInterop(
+        GraphicsDevice device,
+        RekallAgeOpenXrSessionBootstrapResult? openXrStatus)
+    {
+        if (openXrStatus is null)
+        {
+            return null;
+        }
+
+        RekallAgeOpenXrVulkanDeviceInteropInfo? vulkan = null;
+        if (device.GetVulkanInfo(out var info))
+        {
+            vulkan = new RekallAgeOpenXrVulkanDeviceInteropInfo(
+                device.BackendType.ToString(),
+                unchecked((ulong)info.Instance),
+                unchecked((ulong)info.PhysicalDevice),
+                unchecked((ulong)info.Device),
+                unchecked((ulong)info.GraphicsQueue),
+                info.GraphicsQueueFamilyIndex,
+                ExternalTextureWrappingSupported: true,
+                info.DriverName,
+                info.DriverInfo);
+        }
+
+        var inspection = RekallAgeOpenXrVulkanInteropInspector.Inspect(openXrStatus, vulkan);
+        PlayerLog.Write(
+            $"OpenXR Vulkan interop status={inspection.Status} graphicsBinding={inspection.ReadyForXrGraphicsBinding} swapchainWrapping={inspection.ReadyForXrSwapchainWrapping} compositor={inspection.ReadyForCompositorSession} eye={inspection.RecommendedEyeWidth}x{inspection.RecommendedEyeHeight} layers={inspection.SwapchainArrayLayers}.");
+        foreach (var capability in inspection.Capabilities)
+        {
+            PlayerLog.Write($"OpenXR Vulkan capability: {capability}");
+        }
+
+        foreach (var blocker in inspection.Blockers)
+        {
+            PlayerLog.Write($"OpenXR Vulkan blocker: {blocker}");
+        }
+
+        return inspection;
+    }
+
+    private static async ValueTask<RekallAgeOpenXrCompositorSessionBootstrapResult?> BootstrapOpenXrCompositorSessionAsync(
+        GraphicsDevice device,
+        RekallAgeOpenXrVulkanInteropInspection? inspection,
+        CancellationToken cancellationToken)
+    {
+        if (inspection is not { ReadyForXrGraphicsBinding: true }
+            || !device.GetVulkanInfo(out var info))
+        {
+            return null;
+        }
+
+        var vulkan = new RekallAgeOpenXrVulkanDeviceInteropInfo(
+            device.BackendType.ToString(),
+            unchecked((ulong)info.Instance),
+            unchecked((ulong)info.PhysicalDevice),
+            unchecked((ulong)info.Device),
+            unchecked((ulong)info.GraphicsQueue),
+            info.GraphicsQueueFamilyIndex,
+            ExternalTextureWrappingSupported: true,
+            info.DriverName,
+            info.DriverInfo,
+            inspection.RecommendedEyeWidth,
+            inspection.RecommendedEyeHeight);
+        var session = await new RekallAgeNativeOpenXrCompositorSessionBootstrap()
+            .BootstrapAsync(vulkan, cancellationToken)
+            .ConfigureAwait(false);
+        PlayerLog.Write(
+            $"OpenXR compositor session ready={session.ReadyForFrameSubmission} frameLoop={session.FrameLoopReady} sessionReadyEvent={session.SessionReadyEventObserved} lastState={RekallAgeNativeOpenXrCompositorSessionBootstrap.DescribeOpenXrSessionState(session.LastSessionState)} sessionCreated={session.SessionCreated} formats={session.SwapchainFormats.Count} preferredColor={session.PreferredColorFormat?.ToString(CultureInfo.InvariantCulture) ?? "<none>"} preferredDepth={session.PreferredDepthFormat?.ToString(CultureInfo.InvariantCulture) ?? "<none>"} colorImages={session.ColorSwapchainImageCount} depthImages={session.DepthSwapchainImageCount} frameWaited={session.FrameWaited} frameEnded={session.FrameEnded}.");
+        foreach (var error in session.Errors)
+        {
+            PlayerLog.Write($"OpenXR compositor session error: {error}");
+        }
+
+        return session;
     }
 
     private void StartLiveEditServer()
@@ -577,6 +700,25 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
         _pendingMouseWheelDelta += snapshot.WheelDelta;
         _cachedStaticGeometry = null;
+    }
+
+    private static string BuildWindowTitle(
+        string sceneName,
+        bool openXrRequested,
+        bool simulateXrInput)
+    {
+        var suffixes = new List<string> { "Vulkan swapchain" };
+        if (openXrRequested)
+        {
+            suffixes.Add("OpenXR mirror");
+        }
+
+        if (simulateXrInput)
+        {
+            suffixes.Add("XR sim");
+        }
+
+        return $"Rekall AGE Player - {sceneName} | {string.Join(" | ", suffixes)}";
     }
 
     public async ValueTask DisposeAsync()
@@ -1159,27 +1301,56 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private RekallAgeRuntimeInputState ConsumeRuntimeInput()
     {
         var wheelDelta = _pendingMouseWheelDelta;
-        var pressedKeysThisFrame = _pressedKeysThisFrame.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var releasedKeysThisFrame = _releasedKeysThisFrame.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var pressedButtonsThisFrame = _pressedButtonsThisFrame.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var releasedButtonsThisFrame = _releasedButtonsThisFrame.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var mouseDeltaX = _lastMousePosition.X - _previousMousePosition.X;
+        var mouseDeltaY = _lastMousePosition.Y - _previousMousePosition.Y;
+        if (wheelDelta == 0
+            && mouseDeltaX == 0
+            && mouseDeltaY == 0
+            && _pressedKeys.Count == 0
+            && _pressedButtons.Count == 0
+            && _pressedKeysThisFrame.Count == 0
+            && _releasedKeysThisFrame.Count == 0
+            && _pressedButtonsThisFrame.Count == 0
+            && _releasedButtonsThisFrame.Count == 0)
+        {
+            return _simulateXrInput
+                ? RekallAgeXrInputSimulator.CreateFrame(RekallAgeRuntimeInputState.Empty, _clock.Elapsed)
+                : RekallAgeRuntimeInputState.Empty;
+        }
+
+        var pressedKeysThisFrame = SnapshotSetOrNull(_pressedKeysThisFrame);
+        var releasedKeysThisFrame = SnapshotSetOrNull(_releasedKeysThisFrame);
+        var pressedButtonsThisFrame = SnapshotSetOrNull(_pressedButtonsThisFrame);
+        var releasedButtonsThisFrame = SnapshotSetOrNull(_releasedButtonsThisFrame);
+        var pressedKeys = SnapshotSetOrNull(_pressedKeys);
+        var pressedButtons = SnapshotSetOrNull(_pressedButtons);
         _pendingMouseWheelDelta = 0;
         _pressedKeysThisFrame.Clear();
         _releasedKeysThisFrame.Clear();
         _pressedButtonsThisFrame.Clear();
         _releasedButtonsThisFrame.Clear();
-        return new RekallAgeRuntimeInputState(
+        var input = new RekallAgeRuntimeInputState(
             MouseX: _lastMousePosition.X,
             MouseY: _lastMousePosition.Y,
-            MouseDeltaX: _lastMousePosition.X - _previousMousePosition.X,
-            MouseDeltaY: _lastMousePosition.Y - _previousMousePosition.Y,
+            MouseDeltaX: mouseDeltaX,
+            MouseDeltaY: mouseDeltaY,
             MouseWheelDelta: wheelDelta,
-            PressedKeys: _pressedKeys.ToHashSet(StringComparer.OrdinalIgnoreCase),
+            PressedKeys: pressedKeys,
             PressedKeysThisFrame: pressedKeysThisFrame,
             ReleasedKeysThisFrame: releasedKeysThisFrame,
-            PressedButtons: _pressedButtons.ToHashSet(StringComparer.OrdinalIgnoreCase),
+            PressedButtons: pressedButtons,
             PressedButtonsThisFrame: pressedButtonsThisFrame,
             ReleasedButtonsThisFrame: releasedButtonsThisFrame);
+        return _simulateXrInput
+            ? RekallAgeXrInputSimulator.CreateFrame(input, _clock.Elapsed)
+            : input;
+    }
+
+    private static IReadOnlySet<string>? SnapshotSetOrNull(HashSet<string> source)
+    {
+        return source.Count == 0
+            ? null
+            : source.ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private RenderPacket GetRenderPacket(
@@ -1189,7 +1360,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     {
         if (useStaticGeometryCache
             && _cachedStaticGeometry is not null
-            && _cachedStaticGeometry.Key.Equals(CreateGeometryCacheKey(frame), StringComparison.Ordinal))
+            && _cachedStaticGeometry.Key.Equals(CreateGeometryCacheKey(frame)))
         {
             var packet = BuildRenderPacket(frame, _cachedStaticGeometry, out _);
             changed = false;
@@ -1200,8 +1371,6 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         if (useStaticGeometryCache && geometry is not null)
         {
             _cachedStaticGeometry = geometry with { Key = CreateGeometryCacheKey(frame) };
-            _cachedWidth = frame.Width;
-            _cachedHeight = frame.Height;
         }
 
         changed = true;
@@ -1310,7 +1479,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         if (cachedGeometry is null)
         {
             builtGeometry = new CachedRenderGeometry(
-                string.Empty,
+                default,
                 meshes,
                 vertices,
                 indices,
@@ -1334,10 +1503,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             textureCount.Value);
     }
 
-    private string CreateGeometryCacheKey(Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame)
+    private GeometryCacheKey CreateGeometryCacheKey(Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame)
     {
-        var builder = new StringBuilder(frame.Renderables.Count * 96);
-        builder.Append("assets=").Append(_assetRevision).Append(";scene=").Append(_sceneRevision).Append(';');
+        var hash = new HashCode();
+        var meshRenderableCount = 0;
         foreach (var renderable in frame.Renderables)
         {
             if (!renderable.Kind.Equals("mesh", StringComparison.Ordinal))
@@ -1345,92 +1514,37 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 continue;
             }
 
-            builder
-                .Append(renderable.EntityId).Append('|')
-                .Append(renderable.AssetId).Append('|')
-                .Append(renderable.Variant).Append('|')
-                .Append(renderable.MaterialColor).Append('|')
-                .Append(renderable.TextureAssetId).Append('|')
-                .Append(renderable.MetallicRoughnessTextureAssetId).Append('|')
-                .Append(renderable.NormalTextureAssetId).Append('|')
-                .Append(renderable.OcclusionTextureAssetId).Append('|')
-                .Append(renderable.EmissiveColor).Append('|')
-                .Append(renderable.EmissiveTextureAssetId).Append('|')
-                .Append(renderable.MetallicFactor.ToString("R", CultureInfo.InvariantCulture)).Append('|')
-                .Append(renderable.RoughnessFactor.ToString("R", CultureInfo.InvariantCulture)).Append('|')
-                .Append(renderable.NormalScale.ToString("R", CultureInfo.InvariantCulture)).Append('|')
-                .Append(renderable.OcclusionStrength.ToString("R", CultureInfo.InvariantCulture)).Append('|')
-                .Append(renderable.EmissiveStrength.ToString("R", CultureInfo.InvariantCulture)).Append('|');
-
-            AppendGeometryMeshKey(builder, renderable.GeometryMesh);
-            AppendLineSegmentsKey(builder, renderable.LineSegments);
-            builder.Append(';');
+            meshRenderableCount++;
+            hash.Add(renderable.EntityId, StringComparer.Ordinal);
+            hash.Add(renderable.AssetId, StringComparer.Ordinal);
+            hash.Add(renderable.Variant, StringComparer.Ordinal);
+            hash.Add(renderable.MaterialColor, StringComparer.Ordinal);
+            hash.Add(renderable.TextureAssetId, StringComparer.Ordinal);
+            hash.Add(renderable.MetallicRoughnessTextureAssetId, StringComparer.Ordinal);
+            hash.Add(renderable.NormalTextureAssetId, StringComparer.Ordinal);
+            hash.Add(renderable.OcclusionTextureAssetId, StringComparer.Ordinal);
+            hash.Add(renderable.EmissiveColor, StringComparer.Ordinal);
+            hash.Add(renderable.EmissiveTextureAssetId, StringComparer.Ordinal);
+            hash.Add(renderable.MetallicFactor);
+            hash.Add(renderable.RoughnessFactor);
+            hash.Add(renderable.NormalScale);
+            hash.Add(renderable.OcclusionStrength);
+            hash.Add(renderable.EmissiveStrength);
+            hash.Add(renderable.GeometryMesh?.Vertices.Count ?? 0);
+            hash.Add(renderable.GeometryMesh?.Indices.Count ?? 0);
+            hash.Add(renderable.GeometryMesh is null ? 0 : RuntimeHelpers.GetHashCode(renderable.GeometryMesh));
+            hash.Add(renderable.LineSegments?.Segments.Count ?? 0);
+            hash.Add(renderable.LineSegments?.Thickness ?? 0);
+            hash.Add(renderable.LineSegments is null ? 0 : RuntimeHelpers.GetHashCode(renderable.LineSegments));
         }
 
-        return builder.ToString();
-    }
-
-    private static void AppendGeometryMeshKey(StringBuilder builder, RekallAgeRuntimeViewportGeometryMesh? geometry)
-    {
-        if (geometry is null)
-        {
-            builder.Append("geom:null|");
-            return;
-        }
-
-        builder.Append("geom:")
-            .Append(geometry.Vertices.Count)
-            .Append(':')
-            .Append(geometry.Indices.Count);
-        foreach (var vertex in geometry.Vertices)
-        {
-            builder.Append(':')
-                .Append(vertex.X.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(vertex.Y.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(vertex.Z.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(vertex.NormalX.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(vertex.NormalY.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(vertex.NormalZ.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(vertex.R.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(vertex.G.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(vertex.B.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(vertex.A.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(vertex.U.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(vertex.V.ToString("R", CultureInfo.InvariantCulture));
-        }
-
-        foreach (var index in geometry.Indices)
-        {
-            builder.Append(':').Append(index.ToString(CultureInfo.InvariantCulture));
-        }
-
-        builder.Append('|');
-    }
-
-    private static void AppendLineSegmentsKey(StringBuilder builder, RekallAgeRuntimeViewportLineSegments? lineSegments)
-    {
-        if (lineSegments is null)
-        {
-            builder.Append("lines:null|");
-            return;
-        }
-
-        builder.Append("lines:")
-            .Append(lineSegments.Thickness.ToString("R", CultureInfo.InvariantCulture))
-            .Append(':')
-            .Append(lineSegments.Segments.Count);
-        foreach (var segment in lineSegments.Segments)
-        {
-            builder.Append(':')
-                .Append(segment.FromX.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(segment.FromY.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(segment.FromZ.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(segment.ToX.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(segment.ToY.ToString("R", CultureInfo.InvariantCulture)).Append(',')
-                .Append(segment.ToZ.ToString("R", CultureInfo.InvariantCulture));
-        }
-
-        builder.Append('|');
+        return new GeometryCacheKey(
+            _sceneRevision,
+            _assetRevision,
+            frame.Width,
+            frame.Height,
+            meshRenderableCount,
+            hash.ToHashCode());
     }
 
     private static IReadOnlyList<StereoFrameUniform> BuildStereoUniforms(RekallAgeVulkanSceneBatch batch)
@@ -1574,8 +1688,46 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             packet.Draws.Length,
             packet.Vertices.Length,
             _fps,
-            $"{_device.BackendType} {SceneSupersampleFactor}xSSAA");
+            BuildBackendHudLine());
         return RekallAgeSceneDebugHud.FormatLines(stats);
+    }
+
+    private string BuildBackendHudLine()
+    {
+        var baseLine = $"{_device.BackendType} {SceneSupersampleFactor}xSSAA";
+        var suffixes = new List<string>();
+        if (_simulateXrInput)
+        {
+            suffixes.Add("XR SIM");
+        }
+
+        if (_openXrStatus is not null)
+        {
+            suffixes.Add(_openXrStatus.HeadsetSessionReady
+                ? "OXR READY"
+                : "OXR WAIT");
+        }
+
+        if (_openXrVulkanInterop is not null)
+        {
+            suffixes.Add(_openXrVulkanInterop.ReadyForCompositorSession
+                ? "CMP READY"
+                : "CMP WAIT");
+        }
+
+        if (_openXrCompositorSession is not null)
+        {
+            suffixes.Add(_openXrCompositorSession.FrameLoopReady
+                ? "SES READY"
+                : "SES WAIT");
+        }
+
+        if (suffixes.Count == 0)
+        {
+            return baseLine;
+        }
+
+        return $"{baseLine} {string.Join(' ', suffixes)}";
     }
 
     private void UpdateHudTexture(IReadOnlyList<string> lines)
@@ -2293,13 +2445,21 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         int TextureCount = 0);
 
     private sealed record CachedRenderGeometry(
-        string Key,
+        GeometryCacheKey Key,
         IReadOnlyList<RekallAgeVulkanSceneMesh> Meshes,
         GpuVertex[] Vertices,
         uint[] Indices,
         int MeshCount,
         int TriangleCount,
         int TextureCount);
+
+    private readonly record struct GeometryCacheKey(
+        int SceneRevision,
+        int AssetRevision,
+        int Width,
+        int Height,
+        int MeshRenderableCount,
+        int StructuralHash);
 
     private sealed record StereoFrameUniform(
         string Name,

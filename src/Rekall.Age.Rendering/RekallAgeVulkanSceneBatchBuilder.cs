@@ -123,7 +123,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         RekallAgeRuntimeViewportFrame frame,
         SceneBounds bounds)
     {
-        if (frame.Stereo is not { Enabled: true } stereo || frame.ActiveCamera is null)
+        var camera = frame.HeadsetCamera ?? frame.ActiveCamera;
+        if (frame.Stereo is not { Enabled: true } stereo || camera is null)
         {
             return null;
         }
@@ -136,8 +137,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         var extent = MathF.Max(1f, MathF.Max(
             bounds.MaxX - bounds.MinX,
             MathF.Max(bounds.MaxY - bounds.MinY, bounds.MaxZ - bounds.MinZ)));
-        var pose = ResolveCameraPose(frame.ActiveCamera, center, extent);
-        var projection = CreateProjection(frame.ActiveCamera, frame, extent);
+        var pose = ResolveCameraPose(camera, center, extent);
+        var projection = CreateProjection(camera, frame, extent);
         projection.M22 *= -1f;
         var views = stereo.Eyes
             .Select(eye =>

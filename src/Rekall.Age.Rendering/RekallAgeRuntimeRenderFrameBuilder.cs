@@ -64,6 +64,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             .ThenBy(camera => camera.EntityId, StringComparer.Ordinal)
             .ToArray();
         var activeCamera = cameras.FirstOrDefault(camera => camera.Active) ?? cameras.FirstOrDefault();
+        var headsetCamera = cameras.FirstOrDefault(IsHeadsetCamera);
         var renderableCandidates = (debugOverlay
             ? BuildRenderables(world, activeCamera).Concat(BuildColliderDebugRenderables(world))
             : BuildRenderables(world, activeCamera))
@@ -96,11 +97,19 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     observation.TargetName.Length > 0 ? observation.TargetName : observation.TargetId,
                     observation.Message))
                 .ToArray(),
-            BuildStereoSettings(activeCamera, width, height))
+            BuildStereoSettings(headsetCamera, width, height))
         {
             Culling = culling,
-            CameraViews = cameraViews
+            CameraViews = cameraViews,
+            HeadsetCamera = headsetCamera
         };
+    }
+
+    private static bool IsHeadsetCamera(RekallAgeRuntimeViewportCamera camera)
+    {
+        return camera.Active
+            && camera.Kind.Equals("Camera3D", StringComparison.Ordinal)
+            && camera.StereoMode.Equals("stereo", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyList<RekallAgeRuntimeViewportCameraView> BuildCameraViews(

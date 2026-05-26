@@ -50,6 +50,30 @@ public sealed record RekallAgeRuntimeViewportFrame(
 
     public IReadOnlyList<RekallAgeRuntimeViewportCameraView> CameraViews { get; init; } =
         Array.Empty<RekallAgeRuntimeViewportCameraView>();
+
+    public RekallAgeRuntimeViewportCamera? HeadsetCamera { get; init; }
+
+    public RekallAgeRuntimeViewportFrame ForHeadsetOutput()
+    {
+        return HeadsetCamera is null ? this : ForCameraView(HeadsetCamera);
+    }
+
+    public RekallAgeRuntimeViewportFrame ForCameraView(RekallAgeRuntimeViewportCamera camera)
+    {
+        var view = CameraViews.FirstOrDefault(item =>
+            item.Camera.EntityId.Equals(camera.EntityId, StringComparison.Ordinal));
+        if (view is null)
+        {
+            return this with { ActiveCamera = camera };
+        }
+
+        return this with
+        {
+            ActiveCamera = camera,
+            Renderables = view.Renderables,
+            Culling = new RekallAgeRuntimeViewportCulling(view.CulledRenderables.Count, view.CulledRenderables)
+        };
+    }
 }
 
 public sealed record RekallAgeRuntimeViewportCameraView(

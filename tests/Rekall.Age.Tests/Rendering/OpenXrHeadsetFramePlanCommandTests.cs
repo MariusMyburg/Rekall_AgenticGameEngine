@@ -119,6 +119,46 @@ public sealed class OpenXrHeadsetFramePlanCommandTests
             warning.Contains("SpectatorStereoCamera", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task InspectHeadsetFramePlanUsesHeadsetCameraWhenViewportCameraIsMono()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "vr"])
+            .AddEntity(RekallAgeEntityDocument.Create("SpectatorCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = -10
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("HeadCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = 0,
+                    ["stereoMode"] = "stereo",
+                    ["stereoRenderMode"] = "single-pass-multiview",
+                    ["xrViewConfiguration"] = "primary-stereo"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+        var context = new RekallAgeCommandContext(
+            "test",
+            RekallAgeTransaction.Begin("inspect headset camera openxr plan"),
+            CancellationToken.None);
+
+        var result = await new InspectOpenXrHeadsetFramePlanCommand(ReadyBootstrap()).ExecuteAsync(
+            new InspectOpenXrHeadsetFramePlanRequest(root, "Main"),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal("HeadCamera", result.Value.ActiveCamera);
+        Assert.True(result.Value.StereoEnabled);
+        Assert.True(result.Value.UsesMultiview);
+        Assert.Equal("primary-stereo", result.Value.ViewConfiguration);
+        Assert.Empty(result.Value.Blockers);
+    }
+
     private static IRekallAgeOpenXrSessionBootstrap ReadyBootstrap()
     {
         return new FakeOpenXrSessionBootstrap(new RekallAgeOpenXrSessionBootstrapResult(

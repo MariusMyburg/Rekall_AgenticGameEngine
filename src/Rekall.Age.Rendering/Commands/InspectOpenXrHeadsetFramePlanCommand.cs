@@ -102,13 +102,14 @@ public sealed class InspectOpenXrHeadsetFramePlanCommand
             request.Width,
             request.Height,
             request.DebugOverlay);
+        var renderFrame = frame.ForHeadsetOutput();
         var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(
             request.ProjectRoot,
-            frame,
+            renderFrame,
             context.CancellationToken).ConfigureAwait(false);
-        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets);
-        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
-        var stereo = frame.Stereo;
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(renderFrame, assets);
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(renderFrame, meshes);
+        var stereo = renderFrame.Stereo;
         var stereoEnabled = stereo is { Enabled: true };
         var eyeCount = stereo?.EyeCount ?? 1;
         var usesMultiview = stereoEnabled && (stereo?.PreferSinglePassMultiview ?? false);
@@ -127,10 +128,10 @@ public sealed class InspectOpenXrHeadsetFramePlanCommand
             session.HeadsetSessionReady,
             session.HmdSystemAvailable,
             session.SystemId,
-            frame.ActiveCamera?.EntityName,
+            renderFrame.ActiveCamera?.EntityName,
             stereoEnabled,
             stereo?.RenderMode ?? "mono",
-            frame.ActiveCamera?.XrViewConfiguration ?? "primary-stereo",
+            renderFrame.ActiveCamera?.XrViewConfiguration ?? "primary-stereo",
             eyeCount,
             usesMultiview,
             true,
@@ -221,7 +222,7 @@ public sealed class InspectOpenXrHeadsetFramePlanCommand
         if (activeStereoCameras.Length > 1)
         {
             warnings.Add(
-                $"Scene has multiple active stereo cameras ({string.Join(", ", activeStereoCameras.Select(camera => camera.EntityName))}); OpenXR headset output uses '{frame.ActiveCamera?.EntityName ?? "none"}'. Disable extra stereo cameras or make spectator cameras mono.");
+                $"Scene has multiple active stereo cameras ({string.Join(", ", activeStereoCameras.Select(camera => camera.EntityName))}); OpenXR headset output uses '{frame.HeadsetCamera?.EntityName ?? "none"}'. Disable extra stereo cameras or make spectator cameras mono.");
         }
 
         return warnings;

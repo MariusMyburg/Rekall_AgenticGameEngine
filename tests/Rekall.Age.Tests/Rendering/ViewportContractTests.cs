@@ -150,6 +150,47 @@ public sealed class ViewportContractTests
     }
 
     [Fact]
+    public void RuntimeFrameBuilderKeepsViewportCameraSeparateFromHeadsetCamera()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "vr"])
+            .AddEntity(RekallAgeEntityDocument.Create("Spectator Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = -10,
+                    ["cullingMask"] = "ui"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Head Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = 0,
+                    ["stereoMode"] = "stereo",
+                    ["stereoRenderMode"] = "single-pass-multiview",
+                    ["cullingMask"] = "world"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("World Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "world" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })))
+            .AddEntity(RekallAgeEntityDocument.Create("Ui Marker", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "ui" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "plane" })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 640, 360, debugOverlay: false);
+        var headsetFrame = frame.ForHeadsetOutput();
+
+        Assert.Equal("Spectator Camera", frame.ActiveCamera?.EntityName);
+        Assert.Equal("Head Camera", frame.HeadsetCamera?.EntityName);
+        Assert.NotNull(frame.Stereo);
+        Assert.Contains(frame.Renderables, renderable => renderable.EntityName == "Ui Marker");
+        Assert.DoesNotContain(frame.Renderables, renderable => renderable.EntityName == "World Cube");
+        Assert.Equal("Head Camera", headsetFrame.ActiveCamera?.EntityName);
+        Assert.Contains(headsetFrame.Renderables, renderable => renderable.EntityName == "World Cube");
+        Assert.DoesNotContain(headsetFrame.Renderables, renderable => renderable.EntityName == "Ui Marker");
+    }
+
+    [Fact]
     public void RuntimeFrameBuilderProjectsGenericMaterialSettingsForMeshRenderables()
     {
         var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])

@@ -44,6 +44,54 @@ public sealed class ScenePerformanceBudgetCommandTests
     }
 
     [Fact]
+    public async Task InspectScenePerformanceBudgetUsesHeadsetCameraForVrBudgets()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "vr"])
+            .AddEntity(RekallAgeEntityDocument.Create("SpectatorCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = -10,
+                    ["cullingMask"] = "ui"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("HeadCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = 0,
+                    ["stereoMode"] = "stereo",
+                    ["stereoRenderMode"] = "single-pass-multiview",
+                    ["cullingMask"] = "world"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("World Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "world" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+                {
+                    ["primitive"] = "cube"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Ui Plane", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "ui" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+                {
+                    ["primitive"] = "plane"
+                })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+        var context = new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("headset perf budget"), CancellationToken.None);
+
+        var result = await new InspectScenePerformanceBudgetCommand().ExecuteAsync(
+            new InspectScenePerformanceBudgetRequest(root, "Main", Profile: "vr90"),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.StereoEnabled);
+        Assert.True(result.Value.UsesSinglePassMultiview);
+        Assert.Equal(1, result.Value.DrawCalls);
+        Assert.Contains(result.Value.LayerBreakdown, layer => layer.Layer == "world" && layer.RenderableCount == 1);
+        Assert.DoesNotContain(result.Value.LayerBreakdown, layer => layer.Layer == "ui");
+    }
+
+    [Fact]
     public async Task InspectScenePerformanceBudgetBlocksMobileWhenDrawCallsExceedBudget()
     {
         var root = TestPaths.CreateTempDirectory();

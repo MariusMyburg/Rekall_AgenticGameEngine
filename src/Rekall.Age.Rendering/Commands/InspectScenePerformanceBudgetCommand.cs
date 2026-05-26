@@ -112,18 +112,19 @@ public sealed class InspectScenePerformanceBudgetCommand
             request.Width,
             request.Height,
             request.DebugOverlay);
+        var renderFrame = frame.ForHeadsetOutput();
         var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(
             request.ProjectRoot,
-            frame,
+            renderFrame,
             context.CancellationToken).ConfigureAwait(false);
-        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets);
-        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
-        var layerBreakdown = BuildLayerBreakdown(frame, meshes);
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(renderFrame, assets);
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(renderFrame, meshes);
+        var layerBreakdown = BuildLayerBreakdown(renderFrame, meshes);
         var cameraMasks = BuildCameraMasks(frame);
-        var stereoEnabled = frame.Stereo is { Enabled: true };
-        var usesSinglePassMultiview = frame.Stereo is { Enabled: true, PreferSinglePassMultiview: true };
+        var stereoEnabled = renderFrame.Stereo is { Enabled: true };
+        var usesSinglePassMultiview = renderFrame.Stereo is { Enabled: true, PreferSinglePassMultiview: true };
         var eyeCount = stereoEnabled
-            ? Math.Max(1, frame.Stereo?.EyeCount ?? 1)
+            ? Math.Max(1, renderFrame.Stereo?.EyeCount ?? 1)
             : profile.DefaultEyeCount;
         var drawInvocations = batch.Draws.Count * (usesSinglePassMultiview ? 1 : Math.Max(1, eyeCount));
         var triangles = checked(batch.Indices.Count / 3);
@@ -149,7 +150,7 @@ public sealed class InspectScenePerformanceBudgetCommand
             profile.Id,
             profile.TargetFramesPerSecond,
             world.Entities.Count,
-            frame.Renderables.Count,
+            renderFrame.Renderables.Count,
             meshes.Count,
             batch.Draws.Count,
             drawInvocations,
@@ -165,7 +166,7 @@ public sealed class InspectScenePerformanceBudgetCommand
             geometryBytes,
             layerBreakdown,
             cameraMasks,
-            BuildCulledRenderables(frame),
+            BuildCulledRenderables(renderFrame),
             profile.Limits,
             blockers,
             warnings,

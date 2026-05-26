@@ -4,6 +4,7 @@ using Silk.NET.Core;
 using Silk.NET.Core.Native;
 using Silk.NET.OpenXR;
 using Silk.NET.Vulkan;
+using Rekall.Age.Runtime.Abstractions;
 using XrResult = Silk.NET.OpenXR.Result;
 using VkResult = Silk.NET.Vulkan.Result;
 using XrInstance = Silk.NET.OpenXR.Instance;
@@ -368,7 +369,8 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
 
     public RekallAgeOpenXrHeadsetSoftwareSceneSubmitResult SubmitSoftwareScene(
         RekallAgeOpenXrHeadsetSoftwareSceneSubmitRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<RekallAgeRuntimeInputState>? inputProvider = null)
     {
         var plan = RekallAgeOpenXrHeadsetSubmitPlanner.Plan(request);
         var errors = new List<string>();
@@ -693,6 +695,7 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
                                             format.Value,
                                             plan,
                                             cancellationToken,
+                                            inputProvider,
                                             nativeFallbackReasons,
                                             errors);
                                         submittedFrames = frameCounts.Submitted;
@@ -923,6 +926,7 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
         long swapchainFormat,
         RekallAgeOpenXrHeadsetSoftwareSceneSubmitPlan plan,
         CancellationToken cancellationToken,
+        Func<RekallAgeRuntimeInputState>? inputProvider,
         List<string> nativeFallbackReasons,
         List<string> errors)
     {
@@ -993,9 +997,16 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
                 else
                 {
                     var selectedImage = images[Math.Min((int)imageIndex, images.Length - 1)];
+                    var headsetInput = CreateRuntimeHeadsetInput(views);
+                    var runtimeInput = MergeRuntimeInput(
+                        inputProvider?.Invoke() ?? RekallAgeRuntimeInputState.Empty,
+                        headsetInput);
                     var sceneFrame = frameIndex == 0
-                        ? sceneFrameSource.BuildCurrentFrame()
-                        : sceneFrameSource.AdvanceAsync(cancellationToken)
+                        ? sceneFrameSource.ApplyInputFrameAsync(runtimeInput, cancellationToken)
+                            .AsTask()
+                            .GetAwaiter()
+                            .GetResult()
+                        : sceneFrameSource.AdvanceAsync(cancellationToken, _ => runtimeInput)
                             .AsTask()
                             .GetAwaiter()
                             .GetResult();
@@ -1094,6 +1105,96 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
         int Submitted,
         int NativeVulkan,
         int SoftwareFallback);
+
+    private static RekallAgeRuntimeInputState MergeRuntimeInput(
+        RekallAgeRuntimeInputState desktopInput,
+        RekallAgeRuntimeInputState headsetInput)
+    {
+        return desktopInput with
+        {
+            XrPoses = MergeXrPoses(desktopInput.XrPoses, headsetInput.XrPoses),
+            XrActions = MergeXrActions(desktopInput.XrActions, headsetInput.XrActions)
+        };
+    }
+
+    private static IReadOnlyList<RekallAgeRuntimeXrPose>? MergeXrPoses(
+        IReadOnlyList<RekallAgeRuntimeXrPose>? desktopPoses,
+        IReadOnlyList<RekallAgeRuntimeXrPose>? headsetPoses)
+    {
+        if ((desktopPoses is null || desktopPoses.Count == 0)
+            && (headsetPoses is null || headsetPoses.Count == 0))
+        {
+            return null;
+        }
+
+        return (desktopPoses ?? Array.Empty<RekallAgeRuntimeXrPose>())
+            .Concat(headsetPoses ?? Array.Empty<RekallAgeRuntimeXrPose>())
+            .GroupBy(pose => pose.Source, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
+            .OrderBy(pose => pose.Source, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<RekallAgeRuntimeXrAction>? MergeXrActions(
+        IReadOnlyList<RekallAgeRuntimeXrAction>? desktopActions,
+        IReadOnlyList<RekallAgeRuntimeXrAction>? headsetActions)
+    {
+        if ((desktopActions is null || desktopActions.Count == 0)
+            && (headsetActions is null || headsetActions.Count == 0))
+        {
+            return null;
+        }
+
+        return (desktopActions ?? Array.Empty<RekallAgeRuntimeXrAction>())
+            .Concat(headsetActions ?? Array.Empty<RekallAgeRuntimeXrAction>())
+            .GroupBy(action => $"{action.Hand}/{action.Name}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
+            .OrderBy(action => action.Hand, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(action => action.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static RekallAgeRuntimeInputState CreateRuntimeHeadsetInput(View* views)
+    {
+        var headPosition = (ToNumerics(views[0].Pose.Position) + ToNumerics(views[1].Pose.Position)) * 0.5f;
+        var headRotation = ToEulerDegrees(ToNumerics(views[0].Pose.Orientation));
+        return new RekallAgeRuntimeInputState(
+            XrPoses:
+            [
+                new RekallAgeRuntimeXrPose(
+                    "head",
+                    true,
+                    headPosition.X,
+                    headPosition.Y,
+                    headPosition.Z,
+                    headRotation.X,
+                    headRotation.Y,
+                    headRotation.Z)
+            ]);
+    }
+
+    private static Vector3 ToEulerDegrees(Quaternion quaternion)
+    {
+        quaternion = Quaternion.Normalize(quaternion);
+        var sinX = 2 * (quaternion.W * quaternion.X + quaternion.Y * quaternion.Z);
+        var cosX = 1 - 2 * (quaternion.X * quaternion.X + quaternion.Y * quaternion.Y);
+        var rotationX = Math.Atan2(sinX, cosX);
+
+        var sinY = 2 * (quaternion.W * quaternion.Y - quaternion.Z * quaternion.X);
+        var rotationY = Math.Abs(sinY) >= 1
+            ? Math.CopySign(Math.PI / 2, sinY)
+            : Math.Asin(sinY);
+
+        var sinZ = 2 * (quaternion.W * quaternion.Z + quaternion.X * quaternion.Y);
+        var cosZ = 1 - 2 * (quaternion.Y * quaternion.Y + quaternion.Z * quaternion.Z);
+        var rotationZ = Math.Atan2(sinZ, cosZ);
+
+        const double radiansToDegrees = 180.0 / Math.PI;
+        return new Vector3(
+            (float)(rotationX * radiansToDegrees),
+            (float)(rotationY * radiansToDegrees),
+            (float)(rotationZ * radiansToDegrees));
+    }
 
     private static void EndEmptyFrame(XR xr, Silk.NET.OpenXR.Session session, long displayTime)
     {

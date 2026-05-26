@@ -18,6 +18,7 @@ Permanent architectural rule:
 - AI-authored realtime gameplay should use the engine-provided time step, such as playable `input.DeltaSeconds` or runtime `context.DeltaTime`, for motion, timers, animation, cooldowns, and simulation. Do not tie gameplay speed to render frame count.
 - AI-authored runtime camera logic should use generic camera/vector SDK helpers such as `Forward3D`, `Right3D`, `Up3D`, and `Offset3D` instead of guessing Euler signs or rebuilding camera basis math by hand.
 - AI-authored controls should expose semantic action maps through generic components such as `Rekall.InputActionMap`; modules should consume SDK helpers such as `InputActionValue`, `IsInputActionDown`, and `WasInputActionPressed` instead of guessing raw key meanings such as `A`/`D` or hard-coding keyboard folklore.
+- VR play mode must still create and keep a desktop player window. Keyboard and mouse input come from that window and must be bridged into the same generic runtime input stream as OpenXR poses/actions; do not treat a headless OpenXR submitter as a playable VR session.
 - AI-authored multiplayer logic should use generic multiplayer SDK helpers such as `NetworkSessions`, `PrimaryNetworkSession`, `NetworkEntities`, `NetworkEntityForEntity`, `NetworkEntityByNetworkId`, `NetworkEntitiesOwnedBy`, `RuntimeEntitiesOwnedBy`, `ReplicatedRuntimeEntities`, `IsNetworkOwner`, and `IsReplicated`; do not hard-code networking behavior around one genre or controller model.
 - Authoritative multiplayer snapshots should preserve generic replication metadata such as authority, replicate flags, prediction mode, and priority so clients and agents can interpret state without genre-specific assumptions.
 - Client-side multiplayer code should use generic snapshot utilities such as `RekallAgeMultiplayerSnapshotInterpolator`, `RekallAgeMultiplayerClientReconciler`, `RekallAgeMultiplayerSnapshotApplier`, and `RekallAgeMultiplayerSnapshotDeltaBuilder` before inventing game-specific replication loops.
@@ -26,3 +27,21 @@ Permanent architectural rule:
 - When agent-authored visual output is technically valid but weak, improve generic viewport/camera/layout diagnostics first. Do not add built-in "make a showcase" or game-specific composition workflows when agents can revise ordinary scene blueprints, transforms, cameras, and renderables from better inspection facts.
 - When a user-facing example fails, fix the generic engine contract first, then update the example as a consumer of that contract.
 - Before adding a new built-in runtime behavior, ask whether an AI agent could author it cleanly from existing primitives. If yes, improve the primitives instead.
+
+OpenXR operational note from the local FPS test:
+
+- On this machine, the active OpenXR runtime is registered, but `openxr_loader.dll` may not be on the default DLL search path for Codex-launched PowerShell sessions. Prepend the SteamVR loader directory before running OpenXR commands:
+  `$env:PATH = 'C:\Program Files (x86)\Steam\steamapps\common\SteamVR\bin\win64;' + $env:PATH`
+- Verify headset readiness before launching content:
+  `dotnet run --project src\Rekall.Age.Cli -- render openxr bootstrap-session`
+  A good run reports `Headset session ready: True`, `HMD system available: True`, `XR_KHR_vulkan_enable2: True`, and two primary-stereo views.
+- Playable VR should be launched through the windowed player, for example:
+  `Rekall.Age.Player.Windows.exe <projectRoot> <sceneName> --graphics --backend vulkan --vr`
+  This must show the normal desktop player window, capture SDL keyboard/mouse input there, and drive headset submission from that same windowed play session.
+- Windowed playable VR uses an interactive default eye render size instead of blindly using the OpenXR runtime's recommended eye size. On high-resolution headsets the runtime recommendation can be far too expensive for the current software/headset bridge. Agents can tune it explicitly with `--vr-eye-width <pixels>` and `--vr-eye-height <pixels>`.
+- The standalone OpenXR submitter remains a diagnostic/headset-output tool, not the normal playable path:
+  `dotnet run --project src\Rekall.Age.Cli -- render openxr submit-scene <projectRoot> <sceneName> 0 0 0`
+  The first `0` means continuous submission; the width/height `0 0` means use the runtime-recommended eye size.
+- For the black-box FPS scene tested locally, the command was:
+  `dotnet run --project src\Rekall.Age.Cli -- render openxr submit-scene .age-blackbox-mcp\RuntimeFPS Main 0 0 0`
+- The OpenXR scene submitter is headless when run directly from the CLI. It does not have SDL mouse/keyboard input by itself. Use it to diagnose compositor/headset presentation; use the windowed player for actual play.

@@ -54,6 +54,8 @@ internal static class Program
         var simulateXrInput = HasOption(args, "--simulate-xr") || HasOption(args, "--xr-sim");
         var probeOpenXrCompositor = HasOption(args, "--openxr-compositor-probe");
         var playableMode = HasOption(args, "--playable");
+        var openXrEyeWidth = ReadPositiveIntOption(args, "--vr-eye-width") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeWidth;
+        var openXrEyeHeight = ReadPositiveIntOption(args, "--vr-eye-height") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeHeight;
         await using var player = await RekallAgeVeldridPlayer.CreateAsync(
             Path.GetFullPath(args[0]),
             args[1],
@@ -62,6 +64,8 @@ internal static class Program
             simulateXrInput,
             probeOpenXrCompositor,
             playableMode,
+            openXrEyeWidth,
+            openXrEyeHeight,
             CancellationToken.None);
         PlayerLog.Write("Player entering render loop.");
         player.Run();
@@ -86,6 +90,14 @@ internal static class Program
     {
         return args.Skip(2).Any(arg => arg.Equals(name, StringComparison.OrdinalIgnoreCase));
     }
+
+    private static int? ReadPositiveIntOption(string[] args, string name)
+    {
+        var raw = ReadOption(args, name);
+        return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value > 0
+            ? value
+            : null;
+    }
 }
 
 internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
@@ -98,6 +110,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private const int SceneSupersampleFactor = 2;
     private const int PlayableWidth = 960;
     private const int PlayableHeight = 540;
+    public const int DefaultOpenXrPlayableEyeWidth = 1600;
+    public const int DefaultOpenXrPlayableEyeHeight = 1600;
 
     private static readonly JsonSerializerOptions LiveJsonOptions = new()
     {
@@ -145,6 +159,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly RekallAgeOpenXrVulkanInteropInspection? _openXrVulkanInterop;
     private readonly RekallAgeOpenXrCompositorSessionBootstrapResult? _openXrCompositorSession;
     private readonly bool _simulateXrInput;
+    private readonly int _openXrEyeWidth;
+    private readonly int _openXrEyeHeight;
     private SceneRenderTarget _sceneTarget;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly RekallAgeVulkanSceneMeshBuilder _meshBuilder = new();
@@ -187,6 +203,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private CachedRenderGeometry? _cachedStaticGeometry;
     private bool _hudDirty = true;
     private RekallAgeSceneDocument _sceneDocument;
+    private readonly object _runtimeInputGate = new();
+    private RekallAgeRuntimeInputState _latestRuntimeInput = RekallAgeRuntimeInputState.Empty;
+    private long _runtimeInputSequence;
+    private long _openXrLastConsumedInputSequence;
+    private CancellationTokenSource? _openXrSubmitCts;
+    private Task? _openXrSubmitTask;
 
     private RekallAgeVeldridPlayer(
         string projectRoot,
@@ -224,7 +246,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         RekallAgeOpenXrSessionBootstrapResult? openXrStatus,
         RekallAgeOpenXrVulkanInteropInspection? openXrVulkanInterop,
         RekallAgeOpenXrCompositorSessionBootstrapResult? openXrCompositorSession,
-        bool simulateXrInput)
+        bool simulateXrInput,
+        int openXrEyeWidth,
+        int openXrEyeHeight)
     {
         _projectRoot = projectRoot;
         _sceneName = sceneName;
@@ -274,6 +298,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _openXrVulkanInterop = openXrVulkanInterop;
         _openXrCompositorSession = openXrCompositorSession;
         _simulateXrInput = simulateXrInput;
+        _openXrEyeWidth = Math.Clamp(openXrEyeWidth, 64, RekallAgeOpenXrHeadsetSubmitPlanner.MaxSceneEyeExtent);
+        _openXrEyeHeight = Math.Clamp(openXrEyeHeight, 64, RekallAgeOpenXrHeadsetSubmitPlanner.MaxSceneEyeExtent);
         _sceneTarget = CreateSceneRenderTarget(_factory, InitialWidth, InitialHeight, _presentTextureLayout);
         if (!_playableMode)
         {
@@ -289,6 +315,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         bool simulateXrInput,
         bool probeOpenXrCompositor,
         bool playableMode,
+        int openXrEyeWidth,
+        int openXrEyeHeight,
         CancellationToken cancellationToken)
     {
         PlayerLog.Write("Loading runtime scene.");
@@ -372,7 +400,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         }
         else if (openXrRequested)
         {
-            PlayerLog.Write("OpenXR compositor probe skipped; running headset-ready stereo mirror until XR-created Vulkan swapchain submission is enabled.");
+            PlayerLog.Write("OpenXR compositor probe skipped; windowed player will drive headset submission when the HMD session is ready.");
         }
 
         var commands = factory.CreateCommandList();
@@ -572,9 +600,20 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             openXrStatus,
             openXrVulkanInterop,
             openXrCompositorSession,
-            simulateXrInput);
+            simulateXrInput,
+            openXrEyeWidth,
+            openXrEyeHeight);
         player.StartLiveEditServer();
         player.StartAssetHotReloadWatcher();
+        if (openXrRequested && openXrStatus?.HeadsetSessionReady == true && !playableMode)
+        {
+            player.StartOpenXrHeadsetSubmit();
+        }
+        else if (openXrRequested && playableMode)
+        {
+            PlayerLog.Write("OpenXR headset scene submission is skipped for legacy playable-module mode.");
+        }
+
         PlayerLog.Write("Player initialization complete.");
         return player;
     }
@@ -698,6 +737,43 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _device.WaitForIdle();
     }
 
+    private void StartOpenXrHeadsetSubmit()
+    {
+        if (_openXrSubmitTask is not null)
+        {
+            return;
+        }
+
+        _openXrSubmitCts = new CancellationTokenSource();
+        var cancellationToken = _openXrSubmitCts.Token;
+        PlayerLog.Write($"Starting OpenXR headset scene submit from the windowed player input stream at {_openXrEyeWidth}x{_openXrEyeHeight} per eye.");
+        _openXrSubmitTask = Task.Run(() =>
+        {
+            try
+            {
+                var result = new RekallAgeSilkOpenXrHeadsetClearSubmitter().SubmitSoftwareScene(
+                    new RekallAgeOpenXrHeadsetSoftwareSceneSubmitRequest(
+                        _projectRoot,
+                        _sceneName,
+                        FrameCount: RekallAgeOpenXrHeadsetSubmitPlanner.ContinuousSceneFrameCount,
+                        RenderWidth: _openXrEyeWidth,
+                        RenderHeight: _openXrEyeHeight),
+                    cancellationToken,
+                    ConsumePublishedRuntimeInputForOpenXr);
+                PlayerLog.Write(
+                    $"OpenXR headset scene submit ended submitted={result.Submitted} frames={result.SubmittedFrames} backend={result.RenderingBackend} errors={string.Join(" | ", result.Errors)}");
+            }
+            catch (OperationCanceledException)
+            {
+                PlayerLog.Write("OpenXR headset scene submit cancelled.");
+            }
+            catch (Exception ex)
+            {
+                PlayerLog.Write($"OpenXR headset scene submit failed: {ex.Message}");
+            }
+        });
+    }
+
     private void CaptureInput(InputSnapshot snapshot)
     {
         _previousMousePosition = _lastMousePosition;
@@ -779,7 +855,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var suffixes = new List<string> { playableMode ? "Playable" : "Vulkan swapchain" };
         if (openXrRequested)
         {
-            suffixes.Add("OpenXR mirror");
+            suffixes.Add("OpenXR window+headset");
         }
 
         if (simulateXrInput)
@@ -813,6 +889,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        await StopOpenXrHeadsetSubmitAsync().ConfigureAwait(false);
         _device.WaitForIdle();
         if (_mouseCaptured)
         {
@@ -854,6 +931,36 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _hudTextureLayout.Dispose();
         _commands.Dispose();
         _device.Dispose();
+    }
+
+    private async ValueTask StopOpenXrHeadsetSubmitAsync()
+    {
+        var cts = _openXrSubmitCts;
+        var task = _openXrSubmitTask;
+        if (cts is null || task is null)
+        {
+            return;
+        }
+
+        cts.Cancel();
+        try
+        {
+            await task.WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            PlayerLog.Write("OpenXR headset scene submit did not stop within the shutdown grace period.");
+        }
+        catch (OperationCanceledException)
+        {
+            PlayerLog.Write("OpenXR headset scene submit stopped.");
+        }
+        finally
+        {
+            cts.Dispose();
+            _openXrSubmitCts = null;
+            _openXrSubmitTask = null;
+        }
     }
 
     private void EnsureSceneRenderTarget(int displayWidth, int displayHeight)
@@ -1458,9 +1565,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             && _pressedButtonsThisFrame.Count == 0
             && _releasedButtonsThisFrame.Count == 0)
         {
-            return _simulateXrInput
+            var idleInput = _simulateXrInput
                 ? RekallAgeXrInputSimulator.CreateFrame(RekallAgeRuntimeInputState.Empty, _clock.Elapsed)
                 : RekallAgeRuntimeInputState.Empty;
+            PublishRuntimeInput(idleInput);
+            return idleInput;
         }
 
         var pressedKeysThisFrame = SnapshotSetOrNull(_pressedKeysThisFrame);
@@ -1488,9 +1597,45 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             PressedButtons: pressedButtons,
             PressedButtonsThisFrame: pressedButtonsThisFrame,
             ReleasedButtonsThisFrame: releasedButtonsThisFrame);
-        return _simulateXrInput
+        var inputFrame = _simulateXrInput
             ? RekallAgeXrInputSimulator.CreateFrame(input, _clock.Elapsed)
             : input;
+        PublishRuntimeInput(inputFrame);
+        return inputFrame;
+    }
+
+    private void PublishRuntimeInput(RekallAgeRuntimeInputState input)
+    {
+        lock (_runtimeInputGate)
+        {
+            _latestRuntimeInput = input;
+            _runtimeInputSequence++;
+        }
+    }
+
+    private RekallAgeRuntimeInputState ConsumePublishedRuntimeInputForOpenXr()
+    {
+        lock (_runtimeInputGate)
+        {
+            var input = _latestRuntimeInput;
+            var sequence = _runtimeInputSequence;
+            if (sequence == _openXrLastConsumedInputSequence)
+            {
+                return KeepHeldRuntimeInput(input);
+            }
+
+            _openXrLastConsumedInputSequence = sequence;
+            return input;
+        }
+    }
+
+    private static RekallAgeRuntimeInputState KeepHeldRuntimeInput(RekallAgeRuntimeInputState input)
+    {
+        return new RekallAgeRuntimeInputState(
+            MouseX: input.MouseX,
+            MouseY: input.MouseY,
+            PressedKeys: input.PressedKeys,
+            PressedButtons: input.PressedButtons);
     }
 
     private RekallAgePlaybackInput ConsumePlayableInput(double deltaSeconds)

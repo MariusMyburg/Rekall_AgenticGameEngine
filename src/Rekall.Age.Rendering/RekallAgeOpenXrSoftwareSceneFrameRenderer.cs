@@ -183,9 +183,10 @@ public sealed class RekallAgeOpenXrPerspectiveSceneFrameSource
     }
 
     public async ValueTask<RekallAgeOpenXrPerspectiveSceneFrame> AdvanceAsync(
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<int, RekallAgeRuntimeInputState>? inputForStep = null)
     {
-        var result = await _simulationClock.AdvanceToAsync(_world, _clock(), cancellationToken)
+        var result = await _simulationClock.AdvanceToAsync(_world, _clock(), cancellationToken, inputForStep)
             .ConfigureAwait(false);
         _world = result.World;
         return BuildCurrentFrame();
@@ -193,11 +194,23 @@ public sealed class RekallAgeOpenXrPerspectiveSceneFrameSource
 
     public async ValueTask<RekallAgeOpenXrPerspectiveSceneFrame> AdvanceByAsync(
         TimeSpan elapsedSinceLastHeadsetFrame,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<int, RekallAgeRuntimeInputState>? inputForStep = null)
     {
-        var result = await _simulationClock.AdvanceByAsync(_world, elapsedSinceLastHeadsetFrame, cancellationToken)
+        var result = await _simulationClock.AdvanceByAsync(_world, elapsedSinceLastHeadsetFrame, cancellationToken, inputForStep)
             .ConfigureAwait(false);
         _world = result.World;
+        return BuildCurrentFrame();
+    }
+
+    public async ValueTask<RekallAgeOpenXrPerspectiveSceneFrame> ApplyInputFrameAsync(
+        RekallAgeRuntimeInputState input,
+        CancellationToken cancellationToken)
+    {
+        var result = await _executionLoop.RunAsync(_world, 1, cancellationToken, input)
+            .ConfigureAwait(false);
+        _world = result.World;
+        _simulationClock.Reset(_clock());
         return BuildCurrentFrame();
     }
 }

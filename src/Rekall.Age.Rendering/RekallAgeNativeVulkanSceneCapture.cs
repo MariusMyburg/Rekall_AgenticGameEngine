@@ -177,7 +177,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             Errors: errors);
     }
 
-    private static unsafe class VulkanSceneRenderer
+    internal static unsafe class VulkanSceneRenderer
     {
         private const ulong FenceTimeoutNanoseconds = 5_000_000_000;
 
@@ -191,25 +191,23 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         {
             var errors = new List<string>();
             var state = new VulkanState(Vk.GetApi());
-            var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
-            var gpuVertices = BuildGpuVertices(batch.Vertices);
-            var indices = batch.Indices.ToArray();
-            var drawRanges = batch.Draws
-                .Select(draw => new DrawRange(
-                    draw.FirstIndex,
-                    draw.IndexCount,
-                    draw.VertexOffset,
-                    ToGpuDrawPushConstants(draw.Model, draw.MaterialFactors, draw.EmissiveFactors),
-                    draw.TextureId,
-                    draw.MetallicRoughnessTextureId,
-                    draw.NormalTextureId,
-                    draw.OcclusionTextureId,
-                    draw.EmissiveTextureId))
-                .ToArray();
+            var target = RekallAgeVulkanSceneRenderTarget.OffscreenCapture(
+                checked((uint)frame.Width),
+                checked((uint)frame.Height));
+            var backendPlan = RekallAgeVulkanSceneRenderBackendPlanner.Plan(target);
+            state.Ownership = backendPlan.Ownership;
+            var prepared = RekallAgeVulkanScenePreparedFrameBuilder.Build(frame, meshes, target);
+            var commandPlan = RekallAgeVulkanSceneCommandPlanBuilder.BuildOffscreen(prepared);
 
-            if (gpuVertices.Length == 0 || indices.Length == 0)
+            if (!prepared.HasDrawableGeometry)
             {
                 errors.Add("Vulkan scene capture could not build drawable mesh buffers.");
+                return Unavailable(frame, string.Empty, null, null, assets, meshes.Count, 0, 0, [], errors);
+            }
+
+            if (!commandPlan.Ready)
+            {
+                errors.AddRange(commandPlan.Blockers);
                 return Unavailable(frame, string.Empty, null, null, assets, meshes.Count, 0, 0, [], errors);
             }
 
@@ -224,13 +222,17 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 }
 
                 CreateDevice(state);
-                CreateImage(state, checked((uint)frame.Width), checked((uint)frame.Height), Format.R8G8B8A8Unorm, ImageUsageFlags.ColorAttachmentBit | ImageUsageFlags.TransferSrcBit, ImageAspectFlags.ColorBit, 1, out state.ColorImage, out state.ColorMemory, out state.ColorView);
-                CreateImage(state, checked((uint)frame.Width), checked((uint)frame.Height), Format.D32Sfloat, ImageUsageFlags.DepthStencilAttachmentBit, ImageAspectFlags.DepthBit, 1, out state.DepthImage, out state.DepthMemory, out state.DepthView);
-                CreateRenderPass(state);
-                CreateFramebuffer(state, checked((uint)frame.Width), checked((uint)frame.Height));
-                CreateBuffers(state, batch.Frame, gpuVertices, indices, checked((ulong)frame.Width * (ulong)frame.Height * 4));
+                CreateImage(state, target.Width, target.Height, target.ColorFormat, ImageUsageFlags.ColorAttachmentBit | ImageUsageFlags.TransferSrcBit, ImageAspectFlags.ColorBit, 1, out state.ColorImage, out state.ColorMemory, out state.ColorView);
+                CreateImage(state, target.Width, target.Height, target.DepthFormat, ImageUsageFlags.DepthStencilAttachmentBit, ImageAspectFlags.DepthBit, 1, out state.DepthImage, out state.DepthMemory, out state.DepthView);
+                CreateRenderPass(state, target);
+                CreateFramebuffer(state, target);
+                CreateBuffers(
+                    state,
+                    commandPlan.RenderPasses.Select(pass => pass.FrameUniform).ToArray(),
+                    prepared.GeometryUpload,
+                    prepared.ReadbackByteCount);
                 CreateTextures(state, meshes);
-                CreateDescriptors(state, drawRanges);
+                CreateDescriptors(state, prepared.DrawPlan.MaterialKeys);
                 if (!TryCompileSceneShaders(errors, out var shaders))
                 {
                     return Unavailable(frame, string.Empty, "Silk.NET Vulkan", state.SelectedDevice, assets, meshes.Count, 0, 0, [], errors) with
@@ -248,7 +250,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
                 CreatePipeline(state, frame, shaders);
                 CreateCommandPoolAndBuffer(state);
-                RecordCommands(state, checked((uint)frame.Width), checked((uint)frame.Height), drawRanges);
+                RecordCommands(state, commandPlan);
                 SubmitAndWait(state);
 
                 var rgba = ReadBack(state, checked((ulong)frame.Width * (ulong)frame.Height * 4));
@@ -264,12 +266,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     state.SelectedDevice,
                     checked((uint)frame.Width),
                     checked((uint)frame.Height),
-                    "R8G8B8A8_UNorm",
+                    ToFormatName(target.ColorFormat),
                     checked((ulong)rgba.Length),
                     nonZero,
                     firstPixel,
                     checksum,
-                    drawRanges.Length,
+                    commandPlan.RenderPasses[0].Draws.Count,
                     meshes.Count,
                     frame.Renderables.Count(renderable => renderable.Kind.Equals("sprite", StringComparison.Ordinal)),
                     0,
@@ -307,6 +309,286 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             finally
             {
                 state.Dispose();
+            }
+        }
+
+        public static RekallAgeOpenXrNativeVulkanSceneRenderResult TryRenderOpenXrFrame(
+            Vk vk,
+            Instance instance,
+            PhysicalDevice physicalDevice,
+            Device device,
+            Queue queue,
+            uint graphicsQueueFamily,
+            RekallAgeOpenXrPerspectiveSceneFrame sceneFrame,
+            RekallAgeVulkanSceneCommandPlan commandPlan,
+            Image colorImage,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var errors = new List<string>();
+            if (!commandPlan.Ready)
+            {
+                errors.AddRange(commandPlan.Blockers);
+                return new RekallAgeOpenXrNativeVulkanSceneRenderResult(false, errors);
+            }
+
+            var prepared = commandPlan.PreparedFrame;
+            if (!prepared.Target.IsOpenXrStereoSwapchain)
+            {
+                return new RekallAgeOpenXrNativeVulkanSceneRenderResult(
+                    false,
+                    ["Native OpenXR Vulkan frame rendering requires an OpenXR stereo swapchain target."]);
+            }
+
+            var state = new VulkanState(vk)
+            {
+                Instance = instance,
+                PhysicalDevice = physicalDevice,
+                Device = device,
+                GraphicsQueue = queue,
+                GraphicsQueueFamily = graphicsQueueFamily,
+                Ownership = RekallAgeVulkanSceneRenderBackendPlanner.Plan(prepared.Target).Ownership,
+                ColorImage = colorImage
+            };
+
+            try
+            {
+                var target = prepared.Target;
+                state.ColorViews = CreateLayerImageViews(
+                    state,
+                    colorImage,
+                    target.ColorFormat,
+                    ImageAspectFlags.ColorBit,
+                    target.EyeCount);
+                state.ColorView = state.ColorViews[0];
+                CreateImage(
+                    state,
+                    target.Width,
+                    target.Height,
+                    target.DepthFormat,
+                    ImageUsageFlags.DepthStencilAttachmentBit,
+                    ImageAspectFlags.DepthBit,
+                    1,
+                    target.EyeCount,
+                    out state.DepthImage,
+                    out state.DepthMemory,
+                    out state.DepthView);
+                state.DepthViews = CreateLayerImageViews(
+                    state,
+                    state.DepthImage,
+                    target.DepthFormat,
+                    ImageAspectFlags.DepthBit,
+                    target.EyeCount);
+                CreateRenderPass(state, target);
+                CreateLayerFramebuffers(state, target);
+                CreateBuffers(
+                    state,
+                    commandPlan.RenderPasses.Select(pass => pass.FrameUniform).ToArray(),
+                    prepared.GeometryUpload,
+                    0);
+                CreateTextures(state, prepared.Meshes);
+                CreateDescriptors(state, prepared.DrawPlan.MaterialKeys);
+                if (!TryCompileSceneShaders(errors, out var shaders))
+                {
+                    return new RekallAgeOpenXrNativeVulkanSceneRenderResult(false, errors);
+                }
+
+                CreatePipeline(state, sceneFrame.Frame, shaders);
+                CreateCommandPoolAndBuffer(state);
+                RecordCommands(state, commandPlan);
+                SubmitAndWait(state);
+                return new RekallAgeOpenXrNativeVulkanSceneRenderResult(true, Array.Empty<string>());
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                errors.Add(ex.Message);
+                return new RekallAgeOpenXrNativeVulkanSceneRenderResult(false, errors);
+            }
+            finally
+            {
+                state.Dispose();
+            }
+        }
+
+        public sealed class OpenXrSwapchainImageRenderer : IDisposable
+        {
+            private readonly VulkanState _state;
+            private readonly uint _targetWidth;
+            private readonly uint _targetHeight;
+            private readonly int _vertexByteCount;
+            private readonly int _indexByteCount;
+            private readonly string _materialSignature;
+            private bool _texturesUploaded;
+            private bool _disposed;
+
+            private OpenXrSwapchainImageRenderer(
+                VulkanState state,
+                RekallAgeVulkanSceneCommandPlan commandPlan)
+            {
+                _state = state;
+                _targetWidth = commandPlan.PreparedFrame.Target.Width;
+                _targetHeight = commandPlan.PreparedFrame.Target.Height;
+                _vertexByteCount = commandPlan.PreparedFrame.GeometryUpload.VertexBytes.Length;
+                _indexByteCount = commandPlan.PreparedFrame.GeometryUpload.IndexBytes.Length;
+                _materialSignature = BuildMaterialSignature(commandPlan.PreparedFrame.DrawPlan.MaterialKeys);
+            }
+
+            public ulong ColorImageHandle => _state.ColorImage.Handle;
+
+            public bool CanRender(RekallAgeVulkanSceneCommandPlan commandPlan)
+            {
+                return !_disposed
+                    && commandPlan.PreparedFrame.Target.IsOpenXrStereoSwapchain
+                    && commandPlan.PreparedFrame.Target.Width == _targetWidth
+                    && commandPlan.PreparedFrame.Target.Height == _targetHeight
+                    && commandPlan.PreparedFrame.GeometryUpload.VertexBytes.Length == _vertexByteCount
+                    && commandPlan.PreparedFrame.GeometryUpload.IndexBytes.Length == _indexByteCount
+                    && string.Equals(BuildMaterialSignature(commandPlan.PreparedFrame.DrawPlan.MaterialKeys), _materialSignature, StringComparison.Ordinal);
+            }
+
+            public static RekallAgeOpenXrNativeVulkanSceneRenderResult TryCreate(
+                Vk vk,
+                Instance instance,
+                PhysicalDevice physicalDevice,
+                Device device,
+                Queue queue,
+                uint graphicsQueueFamily,
+                RekallAgeOpenXrPerspectiveSceneFrame sceneFrame,
+                RekallAgeVulkanSceneCommandPlan commandPlan,
+                Image colorImage,
+                out OpenXrSwapchainImageRenderer? renderer)
+            {
+                renderer = null;
+                var errors = new List<string>();
+                if (!commandPlan.Ready)
+                {
+                    errors.AddRange(commandPlan.Blockers);
+                    return new RekallAgeOpenXrNativeVulkanSceneRenderResult(false, errors);
+                }
+
+                var prepared = commandPlan.PreparedFrame;
+                if (!prepared.Target.IsOpenXrStereoSwapchain)
+                {
+                    return new RekallAgeOpenXrNativeVulkanSceneRenderResult(
+                        false,
+                        ["Native OpenXR Vulkan frame rendering requires an OpenXR stereo swapchain target."]);
+                }
+
+                var state = new VulkanState(vk)
+                {
+                    Instance = instance,
+                    PhysicalDevice = physicalDevice,
+                    Device = device,
+                    GraphicsQueue = queue,
+                    GraphicsQueueFamily = graphicsQueueFamily,
+                    Ownership = RekallAgeVulkanSceneRenderBackendPlanner.Plan(prepared.Target).Ownership,
+                    ColorImage = colorImage
+                };
+
+                try
+                {
+                    var target = prepared.Target;
+                    state.ColorViews = CreateLayerImageViews(
+                        state,
+                        colorImage,
+                        target.ColorFormat,
+                        ImageAspectFlags.ColorBit,
+                        target.EyeCount);
+                    state.ColorView = state.ColorViews[0];
+                    CreateImage(
+                        state,
+                        target.Width,
+                        target.Height,
+                        target.DepthFormat,
+                        ImageUsageFlags.DepthStencilAttachmentBit,
+                        ImageAspectFlags.DepthBit,
+                        1,
+                        target.EyeCount,
+                        out state.DepthImage,
+                        out state.DepthMemory,
+                        out state.DepthView);
+                    state.DepthViews = CreateLayerImageViews(
+                        state,
+                        state.DepthImage,
+                        target.DepthFormat,
+                        ImageAspectFlags.DepthBit,
+                        target.EyeCount);
+                    CreateRenderPass(state, target);
+                    CreateLayerFramebuffers(state, target);
+                    CreateBuffers(
+                        state,
+                        commandPlan.RenderPasses.Select(pass => pass.FrameUniform).ToArray(),
+                        prepared.GeometryUpload,
+                        0);
+                    CreateTextures(state, prepared.Meshes);
+                    CreateDescriptors(state, prepared.DrawPlan.MaterialKeys);
+                    if (!TryCompileSceneShaders(errors, out var shaders))
+                    {
+                        state.Dispose();
+                        return new RekallAgeOpenXrNativeVulkanSceneRenderResult(false, errors);
+                    }
+
+                    CreatePipeline(state, sceneFrame.Frame, shaders);
+                    CreateCommandPoolAndBuffer(state);
+                    renderer = new OpenXrSwapchainImageRenderer(state, commandPlan);
+                    return new RekallAgeOpenXrNativeVulkanSceneRenderResult(true, Array.Empty<string>());
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    state.Dispose();
+                    errors.Add(ex.Message);
+                    return new RekallAgeOpenXrNativeVulkanSceneRenderResult(false, errors);
+                }
+            }
+
+            public RekallAgeOpenXrNativeVulkanSceneRenderResult Render(RekallAgeVulkanSceneCommandPlan commandPlan)
+            {
+                if (_disposed)
+                {
+                    return new RekallAgeOpenXrNativeVulkanSceneRenderResult(false, ["OpenXR swapchain image renderer has already been disposed."]);
+                }
+
+                if (!CanRender(commandPlan))
+                {
+                    return new RekallAgeOpenXrNativeVulkanSceneRenderResult(false, ["OpenXR swapchain image renderer resources do not match the current frame geometry or target."]);
+                }
+
+                try
+                {
+                    UpdateFrameUniformBuffers(_state, commandPlan.RenderPasses.Select(pass => pass.FrameUniform).ToArray());
+                    RecordCommands(_state, commandPlan, uploadTextures: !_texturesUploaded);
+                    _texturesUploaded = true;
+                    SubmitAndWait(_state);
+                    return new RekallAgeOpenXrNativeVulkanSceneRenderResult(true, Array.Empty<string>());
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    return new RekallAgeOpenXrNativeVulkanSceneRenderResult(false, [ex.Message]);
+                }
+            }
+
+            public void Dispose()
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _disposed = true;
+                _state.Dispose();
+            }
+
+            private static string BuildMaterialSignature(IReadOnlyList<RekallAgeVulkanSceneMaterialKey> materialKeys)
+            {
+                return string.Join(
+                    "|",
+                    materialKeys.Select(key => string.Join(
+                        ",",
+                        key.BaseColorTextureId ?? string.Empty,
+                        key.MetallicRoughnessTextureId ?? string.Empty,
+                        key.NormalTextureId ?? string.Empty,
+                        key.OcclusionTextureId ?? string.Empty,
+                        key.EmissiveTextureId ?? string.Empty)));
             }
         }
 
@@ -431,6 +713,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             ImageUsageFlags usage,
             ImageAspectFlags aspect,
             uint mipLevels,
+            uint arrayLayers,
             out Image image,
             out DeviceMemory memory,
             out ImageView view)
@@ -442,7 +725,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 Format = format,
                 Extent = new Extent3D(width, height, 1),
                 MipLevels = mipLevels,
-                ArrayLayers = 1,
+                ArrayLayers = arrayLayers,
                 Samples = SampleCountFlags.Count1Bit,
                 Tiling = ImageTiling.Optimal,
                 Usage = usage,
@@ -460,27 +743,67 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 ViewType = ImageViewType.Type2D,
                 Format = format,
                 Components = new ComponentMapping(ComponentSwizzle.Identity, ComponentSwizzle.Identity, ComponentSwizzle.Identity, ComponentSwizzle.Identity),
-                SubresourceRange = new ImageSubresourceRange(aspect, 0, mipLevels, 0, 1)
+                SubresourceRange = new ImageSubresourceRange(aspect, 0, mipLevels, 0, arrayLayers)
             };
             ThrowIfFailed(state.Vk.CreateImageView(state.Device, &viewInfo, null, out view), "vkCreateImageView");
         }
 
-        private static void CreateRenderPass(VulkanState state)
+        private static void CreateImage(
+            VulkanState state,
+            uint width,
+            uint height,
+            Format format,
+            ImageUsageFlags usage,
+            ImageAspectFlags aspect,
+            uint mipLevels,
+            out Image image,
+            out DeviceMemory memory,
+            out ImageView view)
+        {
+            CreateImage(state, width, height, format, usage, aspect, mipLevels, 1, out image, out memory, out view);
+        }
+
+        private static ImageView[] CreateLayerImageViews(
+            VulkanState state,
+            Image image,
+            Format format,
+            ImageAspectFlags aspect,
+            uint layerCount)
+        {
+            var views = new ImageView[checked((int)Math.Max(1, layerCount))];
+            for (uint layer = 0; layer < views.Length; layer++)
+            {
+                var viewInfo = new ImageViewCreateInfo
+                {
+                    SType = StructureType.ImageViewCreateInfo,
+                    Image = image,
+                    ViewType = ImageViewType.Type2D,
+                    Format = format,
+                    Components = new ComponentMapping(ComponentSwizzle.Identity, ComponentSwizzle.Identity, ComponentSwizzle.Identity, ComponentSwizzle.Identity),
+                    SubresourceRange = new ImageSubresourceRange(aspect, 0, 1, layer, 1)
+                };
+                ThrowIfFailed(state.Vk.CreateImageView(state.Device, &viewInfo, null, out views[layer]), "vkCreateImageView");
+            }
+
+            return views;
+        }
+
+        private static void CreateRenderPass(VulkanState state, RekallAgeVulkanSceneRenderTarget target)
         {
             var colorAttachment = new AttachmentDescription
             {
-                Format = Format.R8G8B8A8Unorm,
+                Format = target.ColorFormat,
                 Samples = SampleCountFlags.Count1Bit,
                 LoadOp = AttachmentLoadOp.Clear,
                 StoreOp = AttachmentStoreOp.Store,
                 StencilLoadOp = AttachmentLoadOp.DontCare,
                 StencilStoreOp = AttachmentStoreOp.DontCare,
-                InitialLayout = ImageLayout.Undefined,
-                FinalLayout = ImageLayout.TransferSrcOptimal
+                InitialLayout = target.InitialColorLayout,
+                FinalLayout = target.FinalColorLayout
             };
             var depthAttachment = new AttachmentDescription
             {
-                Format = Format.D32Sfloat,
+                Format = target.DepthFormat,
                 Samples = SampleCountFlags.Count1Bit,
                 LoadOp = AttachmentLoadOp.Clear,
                 StoreOp = AttachmentStoreOp.DontCare,
@@ -520,7 +843,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             ThrowIfFailed(state.Vk.CreateRenderPass(state.Device, &renderPassInfo, null, out state.RenderPass), "vkCreateRenderPass");
         }
 
-        private static void CreateFramebuffer(VulkanState state, uint width, uint height)
+        private static void CreateFramebuffer(VulkanState state, RekallAgeVulkanSceneRenderTarget target)
         {
             var attachments = stackalloc ImageView[] { state.ColorView, state.DepthView };
             var createInfo = new FramebufferCreateInfo
@@ -529,26 +852,72 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 RenderPass = state.RenderPass,
                 AttachmentCount = 2,
                 PAttachments = attachments,
-                Width = width,
-                Height = height,
+                Width = target.Width,
+                Height = target.Height,
                 Layers = 1
             };
             ThrowIfFailed(state.Vk.CreateFramebuffer(state.Device, &createInfo, null, out state.Framebuffer), "vkCreateFramebuffer");
+            state.Framebuffers = [state.Framebuffer];
+        }
+
+        private static void CreateLayerFramebuffers(VulkanState state, RekallAgeVulkanSceneRenderTarget target)
+        {
+            var framebufferCount = checked((int)Math.Max(target.EyeCount, 1));
+            state.Framebuffers = new Framebuffer[framebufferCount];
+            var attachments = stackalloc ImageView[2];
+            for (var index = 0; index < framebufferCount; index++)
+            {
+                var colorView = state.ColorViews[Math.Min(index, state.ColorViews.Length - 1)];
+                var depthView = state.DepthViews[Math.Min(index, state.DepthViews.Length - 1)];
+                attachments[0] = colorView;
+                attachments[1] = depthView;
+                var createInfo = new FramebufferCreateInfo
+                {
+                    SType = StructureType.FramebufferCreateInfo,
+                    RenderPass = state.RenderPass,
+                    AttachmentCount = 2,
+                    PAttachments = attachments,
+                    Width = target.Width,
+                    Height = target.Height,
+                    Layers = 1
+                };
+                ThrowIfFailed(state.Vk.CreateFramebuffer(state.Device, &createInfo, null, out state.Framebuffers[index]), "vkCreateFramebuffer");
+            }
+
+            state.Framebuffer = state.Framebuffers[0];
         }
 
         private static void CreateBuffers(
             VulkanState state,
-            RekallAgeVulkanSceneFrameUniform frameUniform,
-            GpuSceneVertex[] vertices,
-            uint[] indices,
+            IReadOnlyList<RekallAgeVulkanSceneGpuFrameUniform> frameUniforms,
+            RekallAgeVulkanSceneGeometryUpload geometryUpload,
             ulong readbackBytes)
         {
-            CreateHostBuffer(state, MemoryMarshal.AsBytes(vertices.AsSpan()), BufferUsageFlags.VertexBufferBit, out state.VertexBuffer, out state.VertexMemory);
-            CreateHostBuffer(state, MemoryMarshal.AsBytes(indices.AsSpan()), BufferUsageFlags.IndexBufferBit, out state.IndexBuffer, out state.IndexMemory);
+            CreateHostBuffer(state, geometryUpload.VertexBytes, BufferUsageFlags.VertexBufferBit, out state.VertexBuffer, out state.VertexMemory);
+            CreateHostBuffer(state, geometryUpload.IndexBytes, BufferUsageFlags.IndexBufferBit, out state.IndexBuffer, out state.IndexMemory);
 
-            var uniform = ToGpuFrameUniform(frameUniform);
-            CreateHostBuffer(state, MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref uniform, 1)), BufferUsageFlags.UniformBufferBit, out state.UniformBuffer, out state.UniformMemory);
-            CreateHostBuffer(state, new byte[checked((int)readbackBytes)], BufferUsageFlags.TransferDstBit, out state.ReadbackBuffer, out state.ReadbackMemory);
+            var uniformCount = Math.Max(1, frameUniforms.Count);
+            state.UniformBuffers = new Buffer[uniformCount];
+            state.UniformMemories = new DeviceMemory[uniformCount];
+            for (var index = 0; index < uniformCount; index++)
+            {
+                var frameUniform = frameUniforms.Count > 0
+                    ? frameUniforms[index]
+                    : default;
+                CreateHostBuffer(
+                    state,
+                    MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref frameUniform, 1)),
+                    BufferUsageFlags.UniformBufferBit,
+                    out state.UniformBuffers[index],
+                    out state.UniformMemories[index]);
+            }
+
+            state.UniformBuffer = state.UniformBuffers[0];
+            state.UniformMemory = state.UniformMemories[0];
+            if (readbackBytes > 0)
+            {
+                CreateHostBuffer(state, new byte[checked((int)readbackBytes)], BufferUsageFlags.TransferDstBit, out state.ReadbackBuffer, out state.ReadbackMemory);
+            }
         }
 
         private static void CreateTextures(
@@ -725,7 +1094,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             yield return new RekallAgeVulkanSceneTexture("__rekall_default_metallic_roughness", 1, 1, [0, 255, 0, 255], sampler);
         }
 
-        private static void CreateDescriptors(VulkanState state, IReadOnlyList<DrawRange> drawRanges)
+        private static void CreateDescriptors(
+            VulkanState state,
+            IReadOnlyList<RekallAgeVulkanSceneMaterialKey> materialKeys)
         {
             var bindings = stackalloc DescriptorSetLayoutBinding[6];
             bindings[0] = new DescriptorSetLayoutBinding
@@ -754,12 +1125,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             };
             ThrowIfFailed(state.Vk.CreateDescriptorSetLayout(state.Device, &layoutInfo, null, out state.DescriptorSetLayout), "vkCreateDescriptorSetLayout");
 
-            var materialKeys = drawRanges
-                .Select(range => range.MaterialKey)
-                .Append(MaterialKey.Default)
-                .Distinct()
-                .ToArray();
-            var descriptorSetCount = checked((uint)Math.Max(1, materialKeys.Length));
+            var descriptorSetCount = checked((uint)Math.Max(1, materialKeys.Count) * (uint)Math.Max(1, state.UniformBuffers.Length));
             var poolSizes = stackalloc DescriptorPoolSize[]
             {
                 new(DescriptorType.UniformBuffer, descriptorSetCount),
@@ -776,50 +1142,58 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
             foreach (var key in materialKeys)
             {
-                var setLayout = state.DescriptorSetLayout;
-                var allocateInfo = new DescriptorSetAllocateInfo
+                for (var uniformIndex = 0; uniformIndex < state.UniformBuffers.Length; uniformIndex++)
                 {
-                    SType = StructureType.DescriptorSetAllocateInfo,
-                    DescriptorPool = state.DescriptorPool,
-                    DescriptorSetCount = 1,
-                    PSetLayouts = &setLayout
-                };
-                ThrowIfFailed(state.Vk.AllocateDescriptorSets(state.Device, &allocateInfo, out var descriptorSet), "vkAllocateDescriptorSets");
+                    var setLayout = state.DescriptorSetLayout;
+                    var allocateInfo = new DescriptorSetAllocateInfo
+                    {
+                        SType = StructureType.DescriptorSetAllocateInfo,
+                        DescriptorPool = state.DescriptorPool,
+                        DescriptorSetCount = 1,
+                        PSetLayouts = &setLayout
+                    };
+                    ThrowIfFailed(state.Vk.AllocateDescriptorSets(state.Device, &allocateInfo, out var descriptorSet), "vkAllocateDescriptorSets");
 
-                var bufferInfo = new DescriptorBufferInfo(state.UniformBuffer, 0, (ulong)Marshal.SizeOf<FrameUniform>());
-                var baseColor = ResolveTextureResource(state, key.BaseColorTextureId, state.WhiteTexture!);
-                var normal = ResolveTextureResource(state, key.NormalTextureId, state.FlatNormalTexture!);
-                var metallicRoughness = ResolveTextureResource(state, key.MetallicRoughnessTextureId, state.DefaultMetallicRoughnessTexture!);
-                var occlusion = ResolveTextureResource(state, key.OcclusionTextureId, state.WhiteTexture!);
-                var emissive = ResolveTextureResource(state, key.EmissiveTextureId, state.WhiteTexture!);
-                var baseColorInfo = new DescriptorImageInfo(baseColor.Sampler, baseColor.View, ImageLayout.ShaderReadOnlyOptimal);
-                var normalInfo = new DescriptorImageInfo(normal.Sampler, normal.View, ImageLayout.ShaderReadOnlyOptimal);
-                var metallicRoughnessInfo = new DescriptorImageInfo(metallicRoughness.Sampler, metallicRoughness.View, ImageLayout.ShaderReadOnlyOptimal);
-                var occlusionInfo = new DescriptorImageInfo(occlusion.Sampler, occlusion.View, ImageLayout.ShaderReadOnlyOptimal);
-                var emissiveInfo = new DescriptorImageInfo(emissive.Sampler, emissive.View, ImageLayout.ShaderReadOnlyOptimal);
-                var writes = new WriteDescriptorSet[6];
-                writes[0] = new WriteDescriptorSet
-                {
-                    SType = StructureType.WriteDescriptorSet,
-                    DstSet = descriptorSet,
-                    DstBinding = 0,
-                    DescriptorCount = 1,
-                    DescriptorType = DescriptorType.UniformBuffer,
-                    PBufferInfo = &bufferInfo
-                };
-                writes[1] = ImageWrite(descriptorSet, 1, &baseColorInfo);
-                writes[2] = ImageWrite(descriptorSet, 2, &normalInfo);
-                writes[3] = ImageWrite(descriptorSet, 3, &metallicRoughnessInfo);
-                writes[4] = ImageWrite(descriptorSet, 4, &occlusionInfo);
-                writes[5] = ImageWrite(descriptorSet, 5, &emissiveInfo);
-                fixed (WriteDescriptorSet* writesPtr = writes)
-                {
-                    state.Vk.UpdateDescriptorSets(state.Device, 6, writesPtr, 0, null);
-                }
-                state.MaterialDescriptorSets[key] = descriptorSet;
-                if (key.Equals(MaterialKey.Default))
-                {
-                    state.DescriptorSet = descriptorSet;
+                    var bufferInfo = new DescriptorBufferInfo(state.UniformBuffers[uniformIndex], 0, (ulong)Marshal.SizeOf<RekallAgeVulkanSceneGpuFrameUniform>());
+                    var baseColor = ResolveTextureResource(state, key.BaseColorTextureId, state.WhiteTexture!);
+                    var normal = ResolveTextureResource(state, key.NormalTextureId, state.FlatNormalTexture!);
+                    var metallicRoughness = ResolveTextureResource(state, key.MetallicRoughnessTextureId, state.DefaultMetallicRoughnessTexture!);
+                    var occlusion = ResolveTextureResource(state, key.OcclusionTextureId, state.WhiteTexture!);
+                    var emissive = ResolveTextureResource(state, key.EmissiveTextureId, state.WhiteTexture!);
+                    var baseColorInfo = new DescriptorImageInfo(baseColor.Sampler, baseColor.View, ImageLayout.ShaderReadOnlyOptimal);
+                    var normalInfo = new DescriptorImageInfo(normal.Sampler, normal.View, ImageLayout.ShaderReadOnlyOptimal);
+                    var metallicRoughnessInfo = new DescriptorImageInfo(metallicRoughness.Sampler, metallicRoughness.View, ImageLayout.ShaderReadOnlyOptimal);
+                    var occlusionInfo = new DescriptorImageInfo(occlusion.Sampler, occlusion.View, ImageLayout.ShaderReadOnlyOptimal);
+                    var emissiveInfo = new DescriptorImageInfo(emissive.Sampler, emissive.View, ImageLayout.ShaderReadOnlyOptimal);
+                    var writes = new WriteDescriptorSet[6];
+                    writes[0] = new WriteDescriptorSet
+                    {
+                        SType = StructureType.WriteDescriptorSet,
+                        DstSet = descriptorSet,
+                        DstBinding = 0,
+                        DescriptorCount = 1,
+                        DescriptorType = DescriptorType.UniformBuffer,
+                        PBufferInfo = &bufferInfo
+                    };
+                    writes[1] = ImageWrite(descriptorSet, 1, &baseColorInfo);
+                    writes[2] = ImageWrite(descriptorSet, 2, &normalInfo);
+                    writes[3] = ImageWrite(descriptorSet, 3, &metallicRoughnessInfo);
+                    writes[4] = ImageWrite(descriptorSet, 4, &occlusionInfo);
+                    writes[5] = ImageWrite(descriptorSet, 5, &emissiveInfo);
+                    fixed (WriteDescriptorSet* writesPtr = writes)
+                    {
+                        state.Vk.UpdateDescriptorSets(state.Device, 6, writesPtr, 0, null);
+                    }
+
+                    state.MaterialDescriptorSets[(uniformIndex, key)] = descriptorSet;
+                    if (uniformIndex == 0)
+                    {
+                        state.MaterialDescriptorSets[(-1, key)] = descriptorSet;
+                        if (key.Equals(RekallAgeVulkanSceneMaterialKey.Default))
+                        {
+                            state.DescriptorSet = descriptorSet;
+                        }
+                    }
                 }
             }
         }
@@ -902,7 +1276,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     }
                 };
 
-                var bindingDescription = new VertexInputBindingDescription(0, (uint)Marshal.SizeOf<GpuSceneVertex>(), VertexInputRate.Vertex);
+                var bindingDescription = new VertexInputBindingDescription(0, (uint)Marshal.SizeOf<RekallAgeVulkanSceneGpuVertex>(), VertexInputRate.Vertex);
                 var attributes = stackalloc VertexInputAttributeDescription[]
                 {
                     new(0, 0, Format.R32G32B32Sfloat, 0),
@@ -969,7 +1343,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 {
                     StageFlags = ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
                     Offset = 0,
-                    Size = (uint)Marshal.SizeOf<GpuDrawPushConstants>()
+                    Size = (uint)Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>()
                 };
                 var layoutInfo = new PipelineLayoutCreateInfo
                 {
@@ -1050,7 +1424,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             var poolInfo = new CommandPoolCreateInfo
             {
                 SType = StructureType.CommandPoolCreateInfo,
-                QueueFamilyIndex = state.GraphicsQueueFamily
+                QueueFamilyIndex = state.GraphicsQueueFamily,
+                Flags = CommandPoolCreateFlags.ResetCommandBufferBit
             };
             ThrowIfFailed(state.Vk.CreateCommandPool(state.Device, &poolInfo, null, out state.CommandPool), "vkCreateCommandPool");
 
@@ -1064,63 +1439,89 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             ThrowIfFailed(state.Vk.AllocateCommandBuffers(state.Device, &allocateInfo, out state.CommandBuffer), "vkAllocateCommandBuffers");
         }
 
-        private static void RecordCommands(VulkanState state, uint width, uint height, DrawRange[] drawRanges)
+        private static void RecordCommands(
+            VulkanState state,
+            RekallAgeVulkanSceneCommandPlan commandPlan,
+            bool uploadTextures = true)
         {
+            var target = commandPlan.PreparedFrame.Target;
             var beginInfo = new CommandBufferBeginInfo { SType = StructureType.CommandBufferBeginInfo };
+            state.Vk.ResetCommandBuffer(state.CommandBuffer, 0);
             ThrowIfFailed(state.Vk.BeginCommandBuffer(state.CommandBuffer, &beginInfo), "vkBeginCommandBuffer");
-            RecordTextureUploads(state);
+            if (uploadTextures)
+            {
+                RecordTextureUploads(state);
+            }
 
             var clearValues = stackalloc ClearValue[2];
             clearValues[0].Color = new ClearColorValue(0.08f, 0.10f, 0.14f, 1f);
             clearValues[1].DepthStencil = new ClearDepthStencilValue(1f, 0);
-            var renderPassBegin = new RenderPassBeginInfo
+            for (var passIndex = 0; passIndex < commandPlan.RenderPasses.Count; passIndex++)
             {
-                SType = StructureType.RenderPassBeginInfo,
-                RenderPass = state.RenderPass,
-                Framebuffer = state.Framebuffer,
-                RenderArea = new Rect2D(new Offset2D(0, 0), new Extent2D(width, height)),
-                ClearValueCount = 2,
-                PClearValues = clearValues
-            };
+                var pass = commandPlan.RenderPasses[passIndex];
+                var framebufferIndex = checked((int)Math.Min(pass.FramebufferIndex, (uint)Math.Max(0, state.Framebuffers.Length - 1)));
+                var renderPassBegin = new RenderPassBeginInfo
+                {
+                    SType = StructureType.RenderPassBeginInfo,
+                    RenderPass = state.RenderPass,
+                    Framebuffer = state.Framebuffers.Length > 0 ? state.Framebuffers[framebufferIndex] : state.Framebuffer,
+                    RenderArea = new Rect2D(
+                        new Offset2D((int)pass.Viewport.X, (int)pass.Viewport.Y),
+                        new Extent2D((uint)pass.Viewport.Z, (uint)pass.Viewport.W)),
+                    ClearValueCount = 2,
+                    PClearValues = clearValues
+                };
 
-            state.Vk.CmdBeginRenderPass(state.CommandBuffer, &renderPassBegin, SubpassContents.Inline);
-            state.Vk.CmdBindPipeline(state.CommandBuffer, PipelineBindPoint.Graphics, state.Pipeline);
-            var vertexBuffer = state.VertexBuffer;
-            var offset = 0UL;
-            state.Vk.CmdBindVertexBuffers(state.CommandBuffer, 0, 1, &vertexBuffer, &offset);
-            state.Vk.CmdBindIndexBuffer(state.CommandBuffer, state.IndexBuffer, 0, IndexType.Uint32);
-            foreach (var range in drawRanges)
-            {
-                var descriptorSet = ResolveDescriptorSet(state, range.MaterialKey);
-                state.Vk.CmdBindDescriptorSets(state.CommandBuffer, PipelineBindPoint.Graphics, state.PipelineLayout, 0, 1, &descriptorSet, 0, null);
-                var draw = range.Draw;
-                state.Vk.CmdPushConstants(
-                    state.CommandBuffer,
-                    state.PipelineLayout,
-                    ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
-                    0,
-                    (uint)Marshal.SizeOf<GpuDrawPushConstants>(),
-                    &draw);
-                state.Vk.CmdDrawIndexed(state.CommandBuffer, range.IndexCount, 1, range.FirstIndex, range.VertexOffset, 0);
+                state.Vk.CmdBeginRenderPass(state.CommandBuffer, &renderPassBegin, SubpassContents.Inline);
+                state.Vk.CmdBindPipeline(state.CommandBuffer, PipelineBindPoint.Graphics, state.Pipeline);
+                var vertexBuffer = state.VertexBuffer;
+                var offset = 0UL;
+                state.Vk.CmdBindVertexBuffers(state.CommandBuffer, 0, 1, &vertexBuffer, &offset);
+                state.Vk.CmdBindIndexBuffer(state.CommandBuffer, state.IndexBuffer, 0, IndexType.Uint32);
+                foreach (var range in pass.Draws)
+                {
+                    var descriptorSet = ResolveDescriptorSet(state, passIndex, range.MaterialKey);
+                    state.Vk.CmdBindDescriptorSets(state.CommandBuffer, PipelineBindPoint.Graphics, state.PipelineLayout, 0, 1, &descriptorSet, 0, null);
+                    var draw = range.PushConstants;
+                    state.Vk.CmdPushConstants(
+                        state.CommandBuffer,
+                        state.PipelineLayout,
+                        ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
+                        0,
+                        (uint)Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>(),
+                        &draw);
+                    state.Vk.CmdDrawIndexed(state.CommandBuffer, range.IndexCount, 1, range.FirstIndex, range.VertexOffset, 0);
+                }
+
+                state.Vk.CmdEndRenderPass(state.CommandBuffer);
             }
 
-            state.Vk.CmdEndRenderPass(state.CommandBuffer);
-            var copy = new BufferImageCopy
+            if (commandPlan.CopiesColorToReadback && state.ReadbackBuffer.Handle != 0)
             {
-                BufferOffset = 0,
-                BufferRowLength = 0,
-                BufferImageHeight = 0,
-                ImageSubresource = new ImageSubresourceLayers(ImageAspectFlags.ColorBit, 0, 0, 1),
-                ImageOffset = new Offset3D(0, 0, 0),
-                ImageExtent = new Extent3D(width, height, 1)
-            };
-            state.Vk.CmdCopyImageToBuffer(state.CommandBuffer, state.ColorImage, ImageLayout.TransferSrcOptimal, state.ReadbackBuffer, 1, &copy);
+                var copy = new BufferImageCopy
+                {
+                    BufferOffset = 0,
+                    BufferRowLength = 0,
+                    BufferImageHeight = 0,
+                    ImageSubresource = new ImageSubresourceLayers(ImageAspectFlags.ColorBit, 0, 0, 1),
+                    ImageOffset = new Offset3D(0, 0, 0),
+                    ImageExtent = new Extent3D(target.Width, target.Height, 1)
+                };
+                state.Vk.CmdCopyImageToBuffer(state.CommandBuffer, state.ColorImage, ImageLayout.TransferSrcOptimal, state.ReadbackBuffer, 1, &copy);
+            }
+
             ThrowIfFailed(state.Vk.EndCommandBuffer(state.CommandBuffer), "vkEndCommandBuffer");
         }
 
-        private static DescriptorSet ResolveDescriptorSet(VulkanState state, MaterialKey key)
+        private static DescriptorSet ResolveDescriptorSet(VulkanState state, int uniformIndex, RekallAgeVulkanSceneMaterialKey key)
         {
-            if (state.MaterialDescriptorSets.TryGetValue(key, out var descriptorSet)
+            if (state.MaterialDescriptorSets.TryGetValue((uniformIndex, key), out var descriptorSet)
+                && descriptorSet.Handle != 0)
+            {
+                return descriptorSet;
+            }
+
+            if (state.MaterialDescriptorSets.TryGetValue((-1, key), out descriptorSet)
                 && descriptorSet.Handle != 0)
             {
                 return descriptorSet;
@@ -1216,8 +1617,17 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
         private static void SubmitAndWait(VulkanState state)
         {
-            var fenceInfo = new FenceCreateInfo { SType = StructureType.FenceCreateInfo };
-            ThrowIfFailed(state.Vk.CreateFence(state.Device, &fenceInfo, null, out state.Fence), "vkCreateFence");
+            if (state.Fence.Handle == 0)
+            {
+                var fenceInfo = new FenceCreateInfo { SType = StructureType.FenceCreateInfo };
+                ThrowIfFailed(state.Vk.CreateFence(state.Device, &fenceInfo, null, out state.Fence), "vkCreateFence");
+            }
+            else
+            {
+                var existingFence = state.Fence;
+                ThrowIfFailed(state.Vk.ResetFences(state.Device, 1, &existingFence), "vkResetFences");
+            }
+
             var commandBuffer = state.CommandBuffer;
             var submitInfo = new SubmitInfo
             {
@@ -1228,6 +1638,31 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             ThrowIfFailed(state.Vk.QueueSubmit(state.GraphicsQueue, 1, &submitInfo, state.Fence), "vkQueueSubmit");
             var fence = state.Fence;
             ThrowIfFailed(state.Vk.WaitForFences(state.Device, 1, &fence, true, FenceTimeoutNanoseconds), "vkWaitForFences");
+        }
+
+        private static void UpdateFrameUniformBuffers(
+            VulkanState state,
+            IReadOnlyList<RekallAgeVulkanSceneGpuFrameUniform> frameUniforms)
+        {
+            var count = Math.Min(state.UniformBuffers.Length, frameUniforms.Count);
+            for (var index = 0; index < count; index++)
+            {
+                var frameUniform = frameUniforms[index];
+                var bytes = MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref frameUniform, 1));
+                void* mapped;
+                ThrowIfFailed(state.Vk.MapMemory(state.Device, state.UniformMemories[index], 0, (ulong)bytes.Length, 0, &mapped), "vkMapMemory");
+                try
+                {
+                    fixed (byte* sourcePointer = bytes)
+                    {
+                        System.Buffer.MemoryCopy(sourcePointer, mapped, bytes.Length, bytes.Length);
+                    }
+                }
+                finally
+                {
+                    state.Vk.UnmapMemory(state.Device, state.UniformMemories[index]);
+                }
+            }
         }
 
         private static byte[] ReadBack(VulkanState state, ulong byteCount)
@@ -1316,78 +1751,6 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             throw new InvalidOperationException($"No Vulkan memory type satisfied flags '{requiredFlags}'.");
         }
 
-        private static GpuSceneVertex[] BuildGpuVertices(IReadOnlyList<RekallAgeVulkanSceneVertex> vertices)
-        {
-            return vertices
-                .Select(vertex => new GpuSceneVertex(
-                    vertex.X,
-                    vertex.Y,
-                    vertex.Z,
-                    vertex.NormalX,
-                    vertex.NormalY,
-                    vertex.NormalZ,
-                    vertex.R,
-                    vertex.G,
-                    vertex.B,
-                    vertex.A,
-                    vertex.U,
-                    vertex.V))
-                .ToArray();
-        }
-
-        private static FrameUniform ToGpuFrameUniform(RekallAgeVulkanSceneFrameUniform frame)
-        {
-            return new FrameUniform(
-                ToGpuMatrix(frame.ViewProjection),
-                frame.LightDirection.X,
-                frame.LightDirection.Y,
-                frame.LightDirection.Z,
-                0,
-                frame.LightColor.X,
-                frame.LightColor.Y,
-                frame.LightColor.Z,
-                frame.LightColor.W,
-                frame.LightPosition.X,
-                frame.LightPosition.Y,
-                frame.LightPosition.Z,
-                frame.LightPosition.W);
-        }
-
-        private static GpuMatrix4x4 ToGpuMatrix(Matrix4x4 matrix)
-        {
-            return new GpuMatrix4x4(
-                matrix.M11,
-                matrix.M12,
-                matrix.M13,
-                matrix.M14,
-                matrix.M21,
-                matrix.M22,
-                matrix.M23,
-                matrix.M24,
-                matrix.M31,
-                matrix.M32,
-                matrix.M33,
-                matrix.M34,
-                matrix.M41,
-                matrix.M42,
-                matrix.M43,
-                matrix.M44);
-        }
-
-        private static GpuDrawPushConstants ToGpuDrawPushConstants(Matrix4x4 model, Vector4 materialFactors, Vector4 emissiveFactors)
-        {
-            return new GpuDrawPushConstants(
-                ToGpuMatrix(model),
-                materialFactors.X,
-                materialFactors.Y,
-                materialFactors.Z,
-                materialFactors.W,
-                emissiveFactors.X,
-                emissiveFactors.Y,
-                emissiveFactors.Z,
-                emissiveFactors.W);
-        }
-
         private static string ReadDeviceName(PhysicalDeviceProperties properties)
         {
             var deviceName = properties.DeviceName;
@@ -1414,6 +1777,19 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 PhysicalDeviceType.VirtualGpu => "virtual-gpu",
                 PhysicalDeviceType.Cpu => "cpu",
                 _ => "other"
+            };
+        }
+
+        private static string ToFormatName(Format format)
+        {
+            return format switch
+            {
+                Format.R8G8B8A8Unorm => "R8G8B8A8_UNorm",
+                Format.R8G8B8A8Srgb => "R8G8B8A8_SRGB",
+                Format.B8G8R8A8Unorm => "B8G8R8A8_UNorm",
+                Format.B8G8R8A8Srgb => "B8G8R8A8_SRGB",
+                Format.D32Sfloat => "D32_SFLOAT",
+                _ => format.ToString()
             };
         }
 
@@ -1453,80 +1829,6 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             }
         }
 
-        [StructLayout(LayoutKind.Sequential)]
-        private readonly record struct GpuSceneVertex(float X, float Y, float Z, float NormalX, float NormalY, float NormalZ, float R, float G, float B, float A, float U, float V);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private readonly record struct GpuMatrix4x4(
-            float M11,
-            float M12,
-            float M13,
-            float M14,
-            float M21,
-            float M22,
-            float M23,
-            float M24,
-            float M31,
-            float M32,
-            float M33,
-            float M34,
-            float M41,
-            float M42,
-            float M43,
-            float M44);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private readonly record struct FrameUniform(
-            GpuMatrix4x4 ViewProjection,
-            float LightX,
-            float LightY,
-            float LightZ,
-            float LightPad,
-            float LightR,
-            float LightG,
-            float LightB,
-            float LightA,
-            float LightPositionX,
-            float LightPositionY,
-            float LightPositionZ,
-            float LightPositionW);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private readonly record struct GpuDrawPushConstants(
-            GpuMatrix4x4 Model,
-            float MetallicFactor,
-            float RoughnessFactor,
-            float NormalScale,
-            float OcclusionStrength,
-            float EmissiveR,
-            float EmissiveG,
-            float EmissiveB,
-            float EmissiveStrength);
-
-        private readonly record struct MaterialKey(
-            string? BaseColorTextureId,
-            string? NormalTextureId,
-            string? MetallicRoughnessTextureId,
-            string? OcclusionTextureId,
-            string? EmissiveTextureId)
-        {
-            public static MaterialKey Default { get; } = new(null, null, null, null, null);
-        }
-
-        private readonly record struct DrawRange(
-            uint FirstIndex,
-            uint IndexCount,
-            int VertexOffset,
-            GpuDrawPushConstants Draw,
-            string? BaseColorTextureId,
-            string? MetallicRoughnessTextureId,
-            string? NormalTextureId,
-            string? OcclusionTextureId,
-            string? EmissiveTextureId)
-        {
-            public MaterialKey MaterialKey => new(BaseColorTextureId, NormalTextureId, MetallicRoughnessTextureId, OcclusionTextureId, EmissiveTextureId);
-        }
-
         private readonly record struct DeviceCandidate(PhysicalDevice Device, string Name, PhysicalDeviceType DeviceType, uint ApiVersion, uint? QueueFamily);
 
         private readonly record struct VulkanTextureMipUpload(
@@ -1549,20 +1851,27 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public Queue GraphicsQueue;
             public uint GraphicsQueueFamily;
             public RekallAgeVulkanSelectedDevice? SelectedDevice;
+            public RekallAgeVulkanSceneResourceOwnershipPlan Ownership = RekallAgeVulkanSceneResourceOwnershipPlan.ForTarget(
+                RekallAgeVulkanSceneRenderTarget.OffscreenCapture(1, 1));
             public Image ColorImage;
             public DeviceMemory ColorMemory;
             public ImageView ColorView;
+            public ImageView[] ColorViews = [];
             public Image DepthImage;
             public DeviceMemory DepthMemory;
             public ImageView DepthView;
+            public ImageView[] DepthViews = [];
             public RenderPass RenderPass;
             public Framebuffer Framebuffer;
+            public Framebuffer[] Framebuffers = [];
             public Buffer VertexBuffer;
             public DeviceMemory VertexMemory;
             public Buffer IndexBuffer;
             public DeviceMemory IndexMemory;
             public Buffer UniformBuffer;
             public DeviceMemory UniformMemory;
+            public Buffer[] UniformBuffers = [];
+            public DeviceMemory[] UniformMemories = [];
             public Buffer ReadbackBuffer;
             public DeviceMemory ReadbackMemory;
             public DescriptorSetLayout DescriptorSetLayout;
@@ -1570,7 +1879,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public DescriptorSet DescriptorSet;
             public readonly List<VulkanTextureResource> Textures = [];
             public readonly Dictionary<string, VulkanTextureResource> TextureById = new(StringComparer.Ordinal);
-            public readonly Dictionary<MaterialKey, DescriptorSet> MaterialDescriptorSets = [];
+            public readonly Dictionary<(int UniformIndex, RekallAgeVulkanSceneMaterialKey Key), DescriptorSet> MaterialDescriptorSets = [];
             public VulkanTextureResource? WhiteTexture;
             public VulkanTextureResource? FlatNormalTexture;
             public VulkanTextureResource? DefaultMetallicRoughnessTexture;
@@ -1586,7 +1895,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             {
                 if (Device.Handle != 0)
                 {
-                    Vk.DeviceWaitIdle(Device);
+                    if (Ownership.OwnsVulkanDevice)
+                    {
+                        Vk.DeviceWaitIdle(Device);
+                    }
+
                     if (Fence.Handle != 0)
                     {
                         Vk.DestroyFence(Device, Fence, null);
@@ -1634,10 +1947,32 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
                     DestroyBuffer(VertexBuffer, VertexMemory);
                     DestroyBuffer(IndexBuffer, IndexMemory);
-                    DestroyBuffer(UniformBuffer, UniformMemory);
+                    if (UniformBuffers.Length > 0)
+                    {
+                        for (var index = 0; index < UniformBuffers.Length; index++)
+                        {
+                            var memory = index < UniformMemories.Length ? UniformMemories[index] : default;
+                            DestroyBuffer(UniformBuffers[index], memory);
+                        }
+                    }
+                    else
+                    {
+                        DestroyBuffer(UniformBuffer, UniformMemory);
+                    }
+
                     DestroyBuffer(ReadbackBuffer, ReadbackMemory);
 
-                    if (Framebuffer.Handle != 0)
+                    if (Framebuffers.Length > 0)
+                    {
+                        foreach (var framebuffer in Framebuffers)
+                        {
+                            if (framebuffer.Handle != 0)
+                            {
+                                Vk.DestroyFramebuffer(Device, framebuffer, null);
+                            }
+                        }
+                    }
+                    else if (Framebuffer.Handle != 0)
                     {
                         Vk.DestroyFramebuffer(Device, Framebuffer, null);
                     }
@@ -1647,12 +1982,15 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         Vk.DestroyRenderPass(Device, RenderPass, null);
                     }
 
-                    DestroyImage(ColorImage, ColorView, ColorMemory);
-                    DestroyImage(DepthImage, DepthView, DepthMemory);
-                    Vk.DestroyDevice(Device, null);
+                    DestroyImage(ColorImage, ColorView, ColorViews, ColorMemory, Ownership.OwnsImageViews, Ownership.OwnsColorImages);
+                    DestroyImage(DepthImage, DepthView, DepthViews, DepthMemory, Ownership.OwnsImageViews, Ownership.OwnsDepthImages);
+                    if (Ownership.OwnsVulkanDevice)
+                    {
+                        Vk.DestroyDevice(Device, null);
+                    }
                 }
 
-                if (Instance.Handle != 0)
+                if (Instance.Handle != 0 && Ownership.OwnsVulkanInstance)
                 {
                     Vk.DestroyInstance(Instance, null);
                 }
@@ -1671,19 +2009,40 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 }
             }
 
-            private void DestroyImage(Image image, ImageView view, DeviceMemory memory)
+            private void DestroyImage(
+                Image image,
+                ImageView view,
+                IReadOnlyList<ImageView> views,
+                DeviceMemory memory,
+                bool ownsView,
+                bool ownsImageAndMemory)
             {
-                if (view.Handle != 0)
+                if (views.Count > 0 && ownsView)
+                {
+                    foreach (var layerView in views)
+                    {
+                        if (layerView.Handle != 0)
+                        {
+                            Vk.DestroyImageView(Device, layerView, null);
+                        }
+                    }
+
+                    if (view.Handle != 0 && !views.Any(layerView => layerView.Handle == view.Handle))
+                    {
+                        Vk.DestroyImageView(Device, view, null);
+                    }
+                }
+                else if (view.Handle != 0 && ownsView)
                 {
                     Vk.DestroyImageView(Device, view, null);
                 }
 
-                if (image.Handle != 0)
+                if (image.Handle != 0 && ownsImageAndMemory)
                 {
                     Vk.DestroyImage(Device, image, null);
                 }
 
-                if (memory.Handle != 0)
+                if (memory.Handle != 0 && ownsImageAndMemory)
                 {
                     Vk.FreeMemory(Device, memory, null);
                 }

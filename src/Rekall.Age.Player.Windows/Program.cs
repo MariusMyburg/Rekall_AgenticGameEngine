@@ -93,9 +93,6 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private const int HudHeight = 224;
     private const int HudMargin = 16;
     private const int SceneSupersampleFactor = 2;
-    private const double FixedSimulationStepSeconds = 1.0 / 60.0;
-    private const double MaximumAccumulatedSimulationSeconds = 0.25;
-    private const int MaximumSimulationStepsPerRender = 8;
 
     private static readonly JsonSerializerOptions LiveJsonOptions = new()
     {
@@ -125,6 +122,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly ResourceSet _frameSet;
     private ResourceSet _drawSet;
     private readonly RekallAgeRuntimeExecutionLoop _runtimeLoop;
+    private readonly RekallAgeRuntimeSimulationClock _simulationClock;
     private readonly RekallAgeRuntimeRenderFrameBuilder _frameBuilder = new();
     private RekallAgeRuntimeViewportAssetSet _assets;
     private int _entityCount;
@@ -156,8 +154,6 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private uint _drawUniformBufferCapacityBytes;
     private int _frameIndex;
     private Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeWorld _runtimeWorld;
-    private double _lastSimulationClockSeconds;
-    private double _simulationAccumulatorSeconds;
     private double _pendingMouseWheelDelta;
     private Vector2 _lastMousePosition;
     private Vector2 _previousMousePosition;
@@ -248,6 +244,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _drawUniformBufferCapacityBytes = drawUniformBuffer.SizeInBytes;
         _runtimeWorld = runtimeWorld;
         _runtimeLoop = runtimeLoop;
+        _simulationClock = new RekallAgeRuntimeSimulationClock(_runtimeLoop, _clock.Elapsed);
         _assets = assets;
         _entityCount = entityCount;
         _textures = textures;
@@ -261,7 +258,6 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _openXrCompositorSession = openXrCompositorSession;
         _simulateXrInput = simulateXrInput;
         _sceneTarget = CreateSceneRenderTarget(_factory, InitialWidth, InitialHeight, _presentTextureLayout);
-        _lastSimulationClockSeconds = _clock.Elapsed.TotalSeconds;
     }
 
     public static async ValueTask<RekallAgeVeldridPlayer> CreateAsync(
@@ -982,8 +978,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _runtimeWorld = runResult.World;
         _entityCount = _runtimeWorld.Entities.Count;
         _sceneRevision++;
-        _simulationAccumulatorSeconds = 0;
-        _lastSimulationClockSeconds = _clock.Elapsed.TotalSeconds;
+        _simulationClock.Reset(_clock.Elapsed);
         _cachedStaticGeometry = null;
         _hudDirty = true;
     }
@@ -1287,28 +1282,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     private void AdvanceSimulationToWallClock()
     {
-        var now = _clock.Elapsed.TotalSeconds;
-        var delta = Math.Clamp(now - _lastSimulationClockSeconds, 0.0, MaximumAccumulatedSimulationSeconds);
-        _lastSimulationClockSeconds = now;
-        _simulationAccumulatorSeconds = Math.Min(
-            MaximumAccumulatedSimulationSeconds,
-            _simulationAccumulatorSeconds + delta);
-
-        var steps = 0;
-        while (_simulationAccumulatorSeconds >= FixedSimulationStepSeconds
-            && steps < MaximumSimulationStepsPerRender)
-        {
-            var input = steps == 0
-                ? ConsumeRuntimeInput()
-                : RekallAgeRuntimeInputState.Empty;
-            var runResult = _runtimeLoop.RunAsync(_runtimeWorld, 1, CancellationToken.None, input)
-                .AsTask()
-                .GetAwaiter()
-                .GetResult();
-            _runtimeWorld = runResult.World;
-            _simulationAccumulatorSeconds -= FixedSimulationStepSeconds;
-            steps++;
-        }
+        var result = _simulationClock.AdvanceToAsync(
+                _runtimeWorld,
+                _clock.Elapsed,
+                CancellationToken.None,
+                step => step == 0 ? ConsumeRuntimeInput() : RekallAgeRuntimeInputState.Empty)
+            .AsTask()
+            .GetAwaiter()
+            .GetResult();
+        _runtimeWorld = result.World;
     }
 
     private RekallAgeRuntimeInputState ConsumeRuntimeInput()

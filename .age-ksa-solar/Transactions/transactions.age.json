@@ -1,0 +1,740 @@
+{
+  "transactions": [
+    {
+      "id": "txn_45b858278a864d78a033ae519b4b62c5",
+      "name": "render viewport capture .\\.age-ksa-solar Main 300 .\\.age-ksa-solar\\Artifacts\\NormalCheck 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T14:05:50.8211966+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140552287.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140552287.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140552287.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_9718d0f643004e83895a858d523e1af3",
+      "name": "render viewport capture .\\.age-ksa-solar Main 120 .\\.age-ksa-solar\\Artifacts\\NormalCheck 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T14:04:53.1508037+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140454368.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140454368.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140454368.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_81da07b5d7ee46488495ce9bd8d0a879",
+      "name": "render viewport capture .\\.age-ksa-solar Main 120 .\\.age-ksa-solar\\Artifacts\\NormalCheck 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T14:03:53.6604328+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140354859.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140354859.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140354859.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_0d9ad99ab3d947a49232c340b3eac872",
+      "name": "render viewport capture .\\.age-ksa-solar Main 120 .\\.age-ksa-solar\\Artifacts\\NormalCheck 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T14:03:12.3096219+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140313527.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140313527.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140313527.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_7911dabd9fee456ca3fa937d317d91e8",
+      "name": "render viewport capture .\\.age-ksa-solar Main 120 .\\.age-ksa-solar\\Artifacts\\CameraTune_d 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T14:01:44.8128791+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\CameraTune_d\\vulkan-scene-1280x720-20260526140146036.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\CameraTune_d\\vulkan-scene-1280x720-20260526140146036.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\CameraTune_d\\vulkan-scene-1280x720-20260526140146036.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_6e1fec84bde94642a5c515c2ce66e266",
+      "name": "render viewport capture .\\.age-ksa-solar Main 120 .\\.age-ksa-solar\\Artifacts\\CameraTune_c 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T14:01:42.7334663+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\CameraTune_c\\vulkan-scene-1280x720-20260526140143883.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\CameraTune_c\\vulkan-scene-1280x720-20260526140143883.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\CameraTune_c\\vulkan-scene-1280x720-20260526140143883.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_963f5f763d2543868ce0476cdf70d3cd",
+      "name": "render viewport capture .\\.age-ksa-solar Main 120 .\\.age-ksa-solar\\Artifacts\\CameraTune_b 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T14:01:40.668157+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\CameraTune_b\\vulkan-scene-1280x720-20260526140141813.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\CameraTune_b\\vulkan-scene-1280x720-20260526140141813.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\CameraTune_b\\vulkan-scene-1280x720-20260526140141813.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_3658df9a96dc4ea8890fa7cf53a4c254",
+      "name": "render viewport capture .\\.age-ksa-solar Main 120 .\\.age-ksa-solar\\Artifacts\\CameraTune_a 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T14:01:38.6077975+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\CameraTune_a\\vulkan-scene-1280x720-20260526140139752.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\CameraTune_a\\vulkan-scene-1280x720-20260526140139752.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\CameraTune_a\\vulkan-scene-1280x720-20260526140139752.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_2bdf0058046b41c0a2cf1d2e643eecb2",
+      "name": "render viewport capture .\\.age-ksa-solar Main 120 .\\.age-ksa-solar\\Artifacts\\NormalCheck 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T14:00:48.020462+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140049185.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140049185.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140049185.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_ea41be9adc754c74b61c0f8acd8569be",
+      "name": "render viewport capture .\\.age-ksa-solar Main 300 .\\.age-ksa-solar\\Artifacts\\NormalCheck 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T14:00:32.1506999+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140033489.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140033489.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140033489.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_fb9e037d32f640c7a53afef80b301092",
+      "name": "render viewport capture .\\.age-ksa-solar Main 120 .\\.age-ksa-solar\\Artifacts\\NormalCheck 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T14:00:29.6974715+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140030915.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140030915.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140030915.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_e57a552f6fec4ee0877a753c5b327003",
+      "name": "render viewport capture .\\.age-ksa-solar Main 0 .\\.age-ksa-solar\\Artifacts\\NormalCheck 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T14:00:27.5969091+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140028725.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140028725.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526140028725.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_460c41e9b81849a79ce14bbd1686c479",
+      "name": "render viewport capture .\\.age-ksa-solar Main 120 .\\.age-ksa-solar\\Artifacts\\NormalCheck 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T13:56:44.5315858+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526135645818.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526135645818.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\NormalCheck\\vulkan-scene-1280x720-20260526135645818.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_cd0bac3ba9e14fc8b26594bdca0c6081",
+      "name": "render viewport capture .\\.age-ksa-solar Main 600 .\\.age-ksa-solar\\Artifacts\\OrbitCheck 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T13:23:26.1998928+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\OrbitCheck\\vulkan-scene-1280x720-20260526132327516.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\OrbitCheck\\vulkan-scene-1280x720-20260526132327516.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\OrbitCheck\\vulkan-scene-1280x720-20260526132327516.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_14d9293a21d242e7a7513b1829739da3",
+      "name": "render viewport capture .\\.age-ksa-solar Main 0 .\\.age-ksa-solar\\Artifacts\\OrbitCheck 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T13:23:24.0024013+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\OrbitCheck\\vulkan-scene-1280x720-20260526132325072.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\OrbitCheck\\vulkan-scene-1280x720-20260526132325072.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\OrbitCheck\\vulkan-scene-1280x720-20260526132325072.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_597f9ff52c2149bb8216d062c607bf5b",
+      "name": "render viewport capture .\\.age-ksa-solar Main 0 .\\.age-ksa-solar\\Artifacts\\DebugVr 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T13:18:43.8660622+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131844937.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131844937.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131844937.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_e5c9f872b4b24138aac3cd0c5628bf5d",
+      "name": "render viewport capture .\\.age-ksa-solar Main 0 .\\.age-ksa-solar\\Artifacts\\DebugVr 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T13:18:16.9104433+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131817977.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131817977.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131817977.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_ffc129b1ec7e4b67938c90555bf913a5",
+      "name": "render viewport capture .\\.age-ksa-solar Main 0 .\\.age-ksa-solar\\Artifacts\\DebugVr 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T13:17:33.0718249+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131734261.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131734261.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131734261.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_a65826af8efd4c33973d99d3a760e99f",
+      "name": "render viewport capture .\\.age-ksa-solar Main 0 .\\.age-ksa-solar\\Artifacts\\DebugVr 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T13:16:50.2011047+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131651788.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131651788.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131651788.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_0b84676a1bbc484e8035ef69ad7df01b",
+      "name": "render viewport capture .\\.age-ksa-solar Main 0 .\\.age-ksa-solar\\Artifacts\\DebugVr 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T13:14:30.7723403+00:00",
+      "changedResources": [
+        ".\\.age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131431446.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131431446.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\DebugVr\\vulkan-scene-1280x720-20260526131431446.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_49b8d0e052c84485b3b315230b7d27d6",
+      "name": "build modules .\\.age-ksa-solar",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-26T11:07:02.8606435+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Modules\\KsaSolarFlight\\bin\\Debug\\net10.0\\KsaSolarFlight.dll"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Modules\\KsaSolarFlight\\bin\\Debug\\net10.0\\KsaSolarFlight.dll",
+          "relativePath": "Modules\\KsaSolarFlight\\bin\\Debug\\net10.0\\KsaSolarFlight.dll",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 16384
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_03ac489e75f242589f47866052cb3fc8",
+      "name": "render viewport capture .age-ksa-solar Main 300 .age-ksa-solar\\Artifacts\\Viewport 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T21:35:33.4826723+00:00",
+      "changedResources": [
+        ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525213534150.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525213534150.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525213534150.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_743a21d2c56c453d9260dc6b30ae3281",
+      "name": "render viewport capture .age-ksa-solar Main 300 .age-ksa-solar\\Artifacts\\Viewport 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T21:32:17.2359766+00:00",
+      "changedResources": [
+        ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525213218408.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525213218408.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525213218408.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_727068f618274e5aab3e2543c3587d82",
+      "name": "render viewport capture .age-ksa-solar Main 300 .age-ksa-solar\\Artifacts\\Viewport 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T21:31:53.8796302+00:00",
+      "changedResources": [
+        ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525213155223.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525213155223.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525213155223.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_e3e73fe34d684958852705dd2bb9ab64",
+      "name": "render viewport capture .age-ksa-solar Main 300 .age-ksa-solar\\Artifacts\\Viewport 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T21:19:59.2718067+00:00",
+      "changedResources": [
+        ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525212000746.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525212000746.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525212000746.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_1cbcd487e2de40c2b719eb9c9ff7f411",
+      "name": "render viewport capture .age-ksa-solar Main 300 .age-ksa-solar\\Artifacts\\Viewport 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T21:11:21.6313576+00:00",
+      "changedResources": [
+        ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525211122867.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525211122867.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525211122867.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_a7a299b8101b47a69213b0b3957ac2fa",
+      "name": "render viewport capture .age-ksa-solar Main 300 .age-ksa-solar\\Artifacts\\Viewport 1280 720 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T21:10:35.767105+00:00",
+      "changedResources": [
+        ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525211036981.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525211036981.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-1280x720-20260525211036981.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_59b233c20deb4346a5bd57f59ef483d4",
+      "name": "build modules .age-ksa-solar",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T21:10:19.1942892+00:00",
+      "changedResources": [
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Modules\\KsaSolarFlight\\bin\\Debug\\net10.0\\KsaSolarFlight.dll"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Modules\\KsaSolarFlight\\bin\\Debug\\net10.0\\KsaSolarFlight.dll",
+          "relativePath": "Modules\\KsaSolarFlight\\bin\\Debug\\net10.0\\KsaSolarFlight.dll",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 16384
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_281e822f09524fb7b40fb653bec0e316",
+      "name": "module scaffold-runtime-system .age-ksa-solar game.ksa-solar-flight KSA Solar Flight KsaSolarFlight SpacecraftFlight KsaSolarFlightSystem",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T21:05:38.019176+00:00",
+      "changedResources": [
+        ".age-ksa-solar\\Modules\\KsaSolarFlight\\KsaSolarFlightModule.cs",
+        ".age-ksa-solar\\Modules\\KsaSolarFlight\\KsaSolarFlight.csproj"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Modules\\KsaSolarFlight\\KsaSolarFlightModule.cs",
+          "relativePath": ".age-ksa-solar\\Modules\\KsaSolarFlight\\KsaSolarFlightModule.cs",
+          "kind": "module-source",
+          "exists": false,
+          "sizeBytes": null
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Modules\\KsaSolarFlight\\KsaSolarFlight.csproj",
+          "relativePath": ".age-ksa-solar\\Modules\\KsaSolarFlight\\KsaSolarFlight.csproj",
+          "kind": "module-project",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_9bd3efb00e3d4c6e99e7e6e8e0b2462c",
+      "name": "render viewport capture .age-ksa-solar Main 120 .age-ksa-solar\\Artifacts\\Viewport 960 540 vulkan",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T21:04:21.6613649+00:00",
+      "changedResources": [
+        ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-960x540-20260525210422897.png"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-960x540-20260525210422897.png",
+          "relativePath": ".age-ksa-solar\\Artifacts\\Viewport\\vulkan-scene-960x540-20260525210422897.png",
+          "kind": "image",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_76836a2b2c08441ab4e5fd57d0bd5224",
+      "name": "solar import-ksa-system .age-ksa-solar Main D:\\Kitten Space Agency SolSystem.xml",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T21:04:00.5766031+00:00",
+      "changedResources": [
+        ".age-ksa-solar\\Assets\\assets.age.catalog.json",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_venus-diffuse_bcc7a960.ktx2",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_earth-diffuse_f55af866.ktx2",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_luna-diffuse_ffe642af.ktx2",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_mars-diffuse_8ae0e0f7.ktx2",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_phobos-diffuse_7a4985c7.ktx2",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_jupiter-diffuse_d8970f50.ktx2",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_io-diffuse_d30faa3a.ktx2",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_saturn-diffuse_2745cfdb.ktx2",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_pan-diffuse_0e401203.ktx2",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_mimas-diffuse_c70b9607.ktx2",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_titan-diffuse_4f76caea.ktx2",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_uranus-diffuse_5c65efdb.ktx2",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_neptune-diffuse_86b68e14.ktx2",
+        "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_eris-diffuse_2ec7f54d.ktx2",
+        ".age-ksa-solar\\Scenes\\Main.age.scene.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Assets\\assets.age.catalog.json",
+          "relativePath": ".age-ksa-solar\\Assets\\assets.age.catalog.json",
+          "kind": "asset-catalog",
+          "exists": false,
+          "sizeBytes": null
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_venus-diffuse_bcc7a960.ktx2",
+          "relativePath": "Assets\\texture\\asset_venus-diffuse_bcc7a960.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 13917509
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_earth-diffuse_f55af866.ktx2",
+          "relativePath": "Assets\\texture\\asset_earth-diffuse_f55af866.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 31626861
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_luna-diffuse_ffe642af.ktx2",
+          "relativePath": "Assets\\texture\\asset_luna-diffuse_ffe642af.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 43797565
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_mars-diffuse_8ae0e0f7.ktx2",
+          "relativePath": "Assets\\texture\\asset_mars-diffuse_8ae0e0f7.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 45209135
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_phobos-diffuse_7a4985c7.ktx2",
+          "relativePath": "Assets\\texture\\asset_phobos-diffuse_7a4985c7.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 3703836
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_jupiter-diffuse_d8970f50.ktx2",
+          "relativePath": "Assets\\texture\\asset_jupiter-diffuse_d8970f50.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 21092525
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_io-diffuse_d30faa3a.ktx2",
+          "relativePath": "Assets\\texture\\asset_io-diffuse_d30faa3a.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 5294995
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_saturn-diffuse_2745cfdb.ktx2",
+          "relativePath": "Assets\\texture\\asset_saturn-diffuse_2745cfdb.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 4428799
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_pan-diffuse_0e401203.ktx2",
+          "relativePath": "Assets\\texture\\asset_pan-diffuse_0e401203.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 4477030
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_mimas-diffuse_c70b9607.ktx2",
+          "relativePath": "Assets\\texture\\asset_mimas-diffuse_c70b9607.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 262401
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_titan-diffuse_4f76caea.ktx2",
+          "relativePath": "Assets\\texture\\asset_titan-diffuse_4f76caea.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 3234346
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_uranus-diffuse_5c65efdb.ktx2",
+          "relativePath": "Assets\\texture\\asset_uranus-diffuse_5c65efdb.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 268727
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_neptune-diffuse_86b68e14.ktx2",
+          "relativePath": "Assets\\texture\\asset_neptune-diffuse_86b68e14.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 674817
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_eris-diffuse_2ec7f54d.ktx2",
+          "relativePath": "Assets\\texture\\asset_eris-diffuse_2ec7f54d.ktx2",
+          "kind": "file",
+          "exists": true,
+          "sizeBytes": 1783306
+        },
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\Scenes\\Main.age.scene.json",
+          "relativePath": ".age-ksa-solar\\Scenes\\Main.age.scene.json",
+          "kind": "scene",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    },
+    {
+      "id": "txn_e105cbae261d485d9b3af6e389cd2f73",
+      "name": "project create .age-ksa-solar KSA Solar Prototype world,rendering3d,celestial,orbital",
+      "actor": "cli",
+      "startedAtUtc": "2026-05-25T21:03:25.5984107+00:00",
+      "changedResources": [
+        ".age-ksa-solar\\rekall.project.json"
+      ],
+      "resourceChanges": [
+        {
+          "path": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\.age-ksa-solar\\rekall.project.json",
+          "relativePath": ".age-ksa-solar\\rekall.project.json",
+          "kind": "project-manifest",
+          "exists": false,
+          "sizeBytes": null
+        }
+      ],
+      "resourcePreimages": []
+    }
+  ]
+}

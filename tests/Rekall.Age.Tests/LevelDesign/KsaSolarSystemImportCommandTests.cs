@@ -118,6 +118,7 @@ public sealed class KsaSolarSystemImportCommandTests
         var orbit = earth.Components.Single(component => component.Type == "Rekall.KeplerOrbit");
         Assert.Equal("Sol", orbit.Properties["parentBodyId"]!.GetValue<string>());
         Assert.Equal(149539627.7103892, orbit.Properties["semiMajorAxisKm"]!.GetValue<double>(), precision: 3);
+        Assert.Equal(2592000, orbit.Properties["timeScale"]!.GetValue<double>(), precision: 3);
         Assert.Contains(earth.Components, component => component.Type == "Rekall.OrbitPathRenderer");
         var planet = earth.Components.Single(component => component.Type == "Rekall.PlanetRenderer");
         Assert.StartsWith("asset_earth-diffuse_", planet.Properties["surfaceTexture"]!.GetValue<string>(), StringComparison.Ordinal);
@@ -136,6 +137,8 @@ public sealed class KsaSolarSystemImportCommandTests
         var catalog = await new RekallAgeAssetCatalogStore().LoadAsync(projectRoot, CancellationToken.None);
         Assert.Equal(2, catalog.Assets.Count);
         Assert.All(catalog.Assets, asset => Assert.Equal("texture", asset.Kind));
+        var camera = scene.Entities.SelectMany(entity => entity.Components).Single(component => component.Type == "Rekall.Camera3D");
+        Assert.Equal("#000000", camera.Properties["clearColor"]!.GetValue<string>());
     }
 
     private static byte[] CreateKtx2Header(uint vkFormat, uint width, uint height, uint mipLevels, uint supercompression)

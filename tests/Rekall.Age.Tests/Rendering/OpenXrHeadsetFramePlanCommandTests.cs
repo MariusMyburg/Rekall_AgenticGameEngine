@@ -44,11 +44,26 @@ public sealed class OpenXrHeadsetFramePlanCommandTests
         Assert.Equal(1, result.Value.ColorSwapchainCount);
         Assert.Equal(1, result.Value.DepthSwapchainCount);
         Assert.Equal(2, result.Value.SwapchainArraySize);
+        Assert.Equal(RekallAgeVulkanSceneRenderTargetKinds.OpenXrStereoSwapchain, result.Value.NativeVulkanTargetKind);
+        Assert.True(result.Value.NativeVulkanSceneTargetReady);
+        Assert.Equal("openxr-frame-loop", result.Value.NativeVulkanSynchronizationOwner);
+        Assert.False(result.Value.NativeVulkanOwnsColorImages);
+        Assert.True(result.Value.NativeVulkanOwnsDepthImages);
+        Assert.False(result.Value.NativeVulkanOwnsReadbackBuffers);
+        Assert.Equal(2, result.Value.NativeVulkanFramebufferCountPerSwapchainImage);
+        Assert.Equal(2, result.Value.NativeVulkanColorImageViewCountPerSwapchainImage);
+        Assert.Equal(2, result.Value.NativeVulkanRenderPassesPerFrame);
+        Assert.Equal(2, result.Value.NativeVulkanFrameUniformBuffers);
+        Assert.True(result.Value.NativeVulkanLeavesColorForCompositor);
+        Assert.Contains(result.Value.NativeVulkanRenderSteps, step => step.Contains("OpenXR-created Vulkan", StringComparison.Ordinal));
         Assert.Equal(1832, result.Value.RecommendedEyeWidth);
         Assert.Equal(1920, result.Value.RecommendedEyeHeight);
         Assert.Contains(result.Value.RequiredOpenXrCalls, call => call == "xrWaitFrame");
         Assert.Contains(result.Value.RequiredOpenXrCalls, call => call == "xrEndFrame");
         Assert.Contains(result.Value.FrameLoopSteps, step => step.Contains("xrLocateViews", StringComparison.Ordinal));
+        Assert.Contains(result.Value.FrameLoopSteps, step =>
+            step.Contains("2 eye layers", StringComparison.Ordinal) &&
+            step.Contains("per-eye frame uniforms", StringComparison.Ordinal));
         Assert.Empty(result.Value.Blockers);
     }
 

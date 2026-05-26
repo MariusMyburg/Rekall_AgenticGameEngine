@@ -526,6 +526,40 @@ public sealed class ViewportContractTests
     }
 
     [Fact]
+    public void RuntimeFrameBuilderSkipsInactiveOrbitPathRenderer()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "celestial"])
+            .AddEntity(RekallAgeEntityDocument.Create("Sol", ["celestial"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.CelestialBody", new JsonObject
+                {
+                    ["bodyId"] = "Sol",
+                    ["type"] = "StellarBody",
+                    ["massKg"] = 1.98847e30
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Luna", ["celestial"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.CelestialBody", new JsonObject
+                {
+                    ["bodyId"] = "Luna",
+                    ["parentBodyId"] = "Sol"
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.KeplerOrbit", new JsonObject
+                {
+                    ["parentBodyId"] = "Sol",
+                    ["semiMajorAxisKm"] = 10,
+                    ["distanceScale"] = 1
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.OrbitPathRenderer", new JsonObject
+                {
+                    ["active"] = false
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        Assert.DoesNotContain(frame.Renderables, item => item.Variant == "rekall.orbit.path");
+    }
+
+    [Fact]
     public void RuntimeFrameBuilderPreservesAgentAuthoredRenderableContract()
     {
         var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])

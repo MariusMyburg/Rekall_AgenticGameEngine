@@ -1,6 +1,8 @@
 using Rekall.Age.Runtime;
+using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.World;
 using Rekall.Age.Rendering.Abstractions;
+using System.Diagnostics;
 
 namespace Rekall.Age.Rendering;
 
@@ -45,16 +47,30 @@ public sealed class RekallAgeOpenXrSoftwareSceneFrameRenderer
         RekallAgeOpenXrHeadsetSoftwareSceneSubmitPlan plan,
         CancellationToken cancellationToken)
     {
+        var source = await CreateFrameSourceAsync(plan, cancellationToken).ConfigureAwait(false);
+        return source.BuildCurrentFrame();
+    }
+
+    public async ValueTask<RekallAgeOpenXrPerspectiveSceneFrameSource> CreateFrameSourceAsync(
+        RekallAgeOpenXrHeadsetSoftwareSceneSubmitPlan plan,
+        CancellationToken cancellationToken,
+        Silk.NET.Vulkan.Format colorFormat = Silk.NET.Vulkan.Format.R8G8B8A8Srgb)
+    {
         var sceneStore = new RekallAgeSceneStore();
         var worldBuilder = new RekallAgeRuntimeWorldBuilder();
         var executionLoop = RekallAgeRuntimeExecutionLoop.CreateDefault(plan.ProjectRoot);
-        var world = await new RekallAgeRuntimeSnapshotService(sceneStore, worldBuilder, executionLoop)
-            .InspectSceneAsync(
-                plan.ProjectRoot,
-                plan.SceneName,
-                plan.SimulationStartFrame,
-                cancellationToken)
+        var scene = await sceneStore.LoadAsync(plan.ProjectRoot, plan.SceneName, cancellationToken)
             .ConfigureAwait(false);
+        var world = worldBuilder.Build(scene);
+        if (plan.SimulationStartFrame > 0)
+        {
+            world = (await executionLoop.RunAsync(
+                    world,
+                    plan.SimulationStartFrame,
+                    cancellationToken)
+                .ConfigureAwait(false)).World;
+        }
+
         var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(
             world,
             plan.RenderWidth,
@@ -63,12 +79,17 @@ public sealed class RekallAgeOpenXrSoftwareSceneFrameRenderer
         var assets = await new RekallAgeRuntimeViewportAssetResolver()
             .ResolveAsync(plan.ProjectRoot, frame, cancellationToken)
             .ConfigureAwait(false);
-        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets);
-        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
-        return new RekallAgeOpenXrPerspectiveSceneFrame(frame, batch, meshes.Count, BuildTextureLookup(meshes));
+        return new RekallAgeOpenXrPerspectiveSceneFrameSource(
+            world,
+            executionLoop,
+            assets,
+            plan.RenderWidth,
+            plan.RenderHeight,
+            plan.DebugOverlay,
+            colorFormat);
     }
 
-    private static IReadOnlyDictionary<string, RekallAgeRgbaImage> BuildTextureLookup(
+    internal static IReadOnlyDictionary<string, RekallAgeRgbaImage> BuildTextureLookup(
         IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
     {
         var textures = new Dictionary<string, RekallAgeRgbaImage>(StringComparer.Ordinal);
@@ -103,8 +124,87 @@ public sealed class RekallAgeOpenXrSoftwareSceneFrameRenderer
     }
 }
 
+public sealed class RekallAgeOpenXrPerspectiveSceneFrameSource
+{
+    private RekallAgeRuntimeWorld _world;
+    private readonly RekallAgeRuntimeExecutionLoop _executionLoop;
+    private readonly RekallAgeRuntimeSimulationClock _simulationClock;
+    private readonly RekallAgeRuntimeViewportAssetSet _assets;
+    private readonly int _width;
+    private readonly int _height;
+    private readonly bool _debugOverlay;
+    private readonly Silk.NET.Vulkan.Format _colorFormat;
+    private readonly Func<TimeSpan> _clock;
+    private readonly Stopwatch? _ownedClock;
+
+    public RekallAgeOpenXrPerspectiveSceneFrameSource(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeExecutionLoop executionLoop,
+        RekallAgeRuntimeViewportAssetSet assets,
+        int width,
+        int height,
+        bool debugOverlay,
+        Silk.NET.Vulkan.Format colorFormat = Silk.NET.Vulkan.Format.R8G8B8A8Srgb,
+        Func<TimeSpan>? clock = null)
+    {
+        _world = world;
+        _executionLoop = executionLoop;
+        _assets = assets;
+        _width = width;
+        _height = height;
+        _debugOverlay = debugOverlay;
+        _colorFormat = colorFormat;
+        _ownedClock = clock is null ? Stopwatch.StartNew() : null;
+        _clock = clock ?? (() => _ownedClock!.Elapsed);
+        _simulationClock = new RekallAgeRuntimeSimulationClock(_executionLoop, _clock());
+    }
+
+    public RekallAgeOpenXrPerspectiveSceneFrame BuildCurrentFrame()
+    {
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(
+            _world,
+            _width,
+            _height,
+            _debugOverlay).ForHeadsetOutput();
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, _assets);
+        var target = RekallAgeVulkanSceneRenderTarget.OpenXrStereoSwapchain(
+            checked((uint)_width),
+            checked((uint)_height),
+            2,
+            _colorFormat,
+            Silk.NET.Vulkan.Format.D32Sfloat);
+        var preparedFrame = RekallAgeVulkanScenePreparedFrameBuilder.Build(frame, meshes, target);
+        return new RekallAgeOpenXrPerspectiveSceneFrame(
+            frame,
+            preparedFrame.Batch,
+            meshes.Count,
+            RekallAgeOpenXrSoftwareSceneFrameRenderer.BuildTextureLookup(meshes),
+            preparedFrame);
+    }
+
+    public async ValueTask<RekallAgeOpenXrPerspectiveSceneFrame> AdvanceAsync(
+        CancellationToken cancellationToken)
+    {
+        var result = await _simulationClock.AdvanceToAsync(_world, _clock(), cancellationToken)
+            .ConfigureAwait(false);
+        _world = result.World;
+        return BuildCurrentFrame();
+    }
+
+    public async ValueTask<RekallAgeOpenXrPerspectiveSceneFrame> AdvanceByAsync(
+        TimeSpan elapsedSinceLastHeadsetFrame,
+        CancellationToken cancellationToken)
+    {
+        var result = await _simulationClock.AdvanceByAsync(_world, elapsedSinceLastHeadsetFrame, cancellationToken)
+            .ConfigureAwait(false);
+        _world = result.World;
+        return BuildCurrentFrame();
+    }
+}
+
 public sealed record RekallAgeOpenXrPerspectiveSceneFrame(
     RekallAgeRuntimeViewportFrame Frame,
     RekallAgeVulkanSceneBatch Batch,
     int MeshCount,
-    IReadOnlyDictionary<string, RekallAgeRgbaImage> Textures);
+    IReadOnlyDictionary<string, RekallAgeRgbaImage> Textures,
+    RekallAgeVulkanScenePreparedFrame PreparedFrame);

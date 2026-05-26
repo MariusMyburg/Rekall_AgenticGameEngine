@@ -1,0 +1,11 @@
+{
+  "name": "KSA Solar Prototype",
+  "schemaVersion": 1,
+  "capabilities": [
+    "celestial",
+    "orbital",
+    "rendering3d",
+    "world"
+  ],
+  "sourceTemplateId": null
+}

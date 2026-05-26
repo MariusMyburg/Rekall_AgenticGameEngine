@@ -90,6 +90,46 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
         Quaternion relativeOrientation,
         Vector3 relativePosition)
     {
+        var (_, view) = CreateCameraView(camera, relativeOrientation, relativePosition);
+        var aspect = height <= 0 ? 1 : width / (float)height;
+        var nearClip = MathF.Max(0.001f, (float)camera.NearClip);
+        var farClip = MathF.Max(nearClip + 0.001f, (float)camera.FarClip);
+        var fov = Math.Clamp((float)camera.FieldOfViewDegrees, 1, 179);
+        var projection = Matrix4x4.CreatePerspectiveFieldOfView(ToRadians(fov), aspect, nearClip, farClip);
+        return view * projection;
+    }
+
+    public Matrix4x4 CreateCameraViewProjection(
+        RekallAgeRuntimeViewportCamera camera,
+        int width,
+        int height,
+        Quaternion relativeOrientation,
+        Vector3 relativePosition,
+        float angleLeft,
+        float angleRight,
+        float angleUp,
+        float angleDown)
+    {
+        var (_, view) = CreateCameraView(camera, relativeOrientation, relativePosition);
+        var nearClip = MathF.Max(0.001f, (float)camera.NearClip);
+        var farClip = MathF.Max(nearClip + 0.001f, (float)camera.FarClip);
+        var left = MathF.Tan(angleLeft) * nearClip;
+        var right = MathF.Tan(angleRight) * nearClip;
+        var bottom = MathF.Tan(angleDown) * nearClip;
+        var top = MathF.Tan(angleUp) * nearClip;
+        if (right <= left || top <= bottom)
+        {
+            return CreateCameraViewProjection(camera, width, height, relativeOrientation, relativePosition);
+        }
+
+        return view * Matrix4x4.CreatePerspectiveOffCenter(left, right, bottom, top, nearClip, farClip);
+    }
+
+    private static (CameraPose Pose, Matrix4x4 View) CreateCameraView(
+        RekallAgeRuntimeViewportCamera camera,
+        Quaternion relativeOrientation,
+        Vector3 relativePosition)
+    {
         var pose = CreateCameraPose(camera);
         var localForward = Vector3.Transform(Vector3.UnitZ, relativeOrientation);
         var localUp = Vector3.Transform(Vector3.UnitY, relativeOrientation);
@@ -104,12 +144,7 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
             + pose.Up * relativePosition.Y
             + pose.Forward * relativePosition.Z;
         var view = Matrix4x4.CreateLookAt(eye, eye + worldForward, worldUp);
-        var aspect = height <= 0 ? 1 : width / (float)height;
-        var nearClip = MathF.Max(0.001f, (float)camera.NearClip);
-        var farClip = MathF.Max(nearClip + 0.001f, (float)camera.FarClip);
-        var fov = Math.Clamp((float)camera.FieldOfViewDegrees, 1, 179);
-        var projection = Matrix4x4.CreatePerspectiveFieldOfView(ToRadians(fov), aspect, nearClip, farClip);
-        return view * projection;
+        return (pose, view);
     }
 
     private static SceneVertex? ReadVertex(

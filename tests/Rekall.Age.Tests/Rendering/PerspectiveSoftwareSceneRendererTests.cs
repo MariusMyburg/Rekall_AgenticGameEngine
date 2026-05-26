@@ -129,4 +129,42 @@ public sealed class PerspectiveSoftwareSceneRendererTests
                 && pixels[offset + 1] < 100;
         });
     }
+
+    [Fact]
+    public void CameraViewProjectionCanUseOpenXrPerEyeFov()
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera",
+            "Camera",
+            "Rekall.Camera3D",
+            true,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            FieldOfViewDegrees: 60);
+        var renderer = new RekallAgePerspectiveSoftwareSceneRenderer();
+
+        var symmetric = renderer.CreateCameraViewProjection(
+            camera,
+            100,
+            100,
+            Quaternion.Identity,
+            Vector3.Zero);
+        var perEye = renderer.CreateCameraViewProjection(
+            camera,
+            100,
+            100,
+            Quaternion.Identity,
+            Vector3.Zero,
+            -0.45f,
+            0.75f,
+            0.50f,
+            -0.50f);
+
+        Assert.NotEqual(symmetric.M31, perEye.M31);
+        Assert.NotEqual(symmetric.M11, perEye.M11);
+    }
 }

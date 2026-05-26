@@ -109,7 +109,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
     {
         return camera.Active
             && camera.Kind.Equals("Camera3D", StringComparison.Ordinal)
-            && camera.StereoMode.Equals("stereo", StringComparison.OrdinalIgnoreCase);
+            && (camera.StereoMode.Equals("stereo", StringComparison.OrdinalIgnoreCase)
+                || camera.StereoMode.Equals("vr", StringComparison.OrdinalIgnoreCase));
     }
 
     private static IReadOnlyList<RekallAgeRuntimeViewportCameraView> BuildCameraViews(
@@ -273,8 +274,18 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 component.Type.Equals("Rekall.OrbitPathRenderer", StringComparison.Ordinal));
             var lodSelection = SelectLod(entity, activeCamera, transform);
             var isOrbitPathRenderable = mesh.Variant?.Equals("rekall.orbit.path", StringComparison.OrdinalIgnoreCase) == true;
+            if (isOrbitPathRenderable && !ReadBoolean(orbitPathComponent, "active", true))
+            {
+                continue;
+            }
+
             var primitive = ReadString(geometry, "primitive");
             var orbitPathMesh = isOrbitPathRenderable ? ReadOrbitPathMesh(orbitComponent, orbitPathComponent) : null;
+            if (isOrbitPathRenderable && orbitPathMesh is null)
+            {
+                continue;
+            }
+
             var geometryMesh = orbitPathMesh ?? ReadGeometryMesh(geometryMeshComponent);
             var lineSegments = ReadLineSegments(lineSegmentsComponent);
             var materialColor = ReadString(materialComponent, "baseColor")

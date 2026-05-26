@@ -1,0 +1,270 @@
+{
+  "assets": [
+    {
+      "id": "asset_earth-diffuse_f55af866",
+      "name": "earth-diffuse",
+      "displayName": "Earth Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Earth_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_earth-diffuse_f55af866.ktx2",
+      "contentHash": "f55af866f70df29c1a18eb10bd6db0a7aae02373f88162434f3abb805679062a",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 4096,
+        "height": 4096,
+        "mipLevelCount": 13,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    },
+    {
+      "id": "asset_eris-diffuse_2ec7f54d",
+      "name": "eris-diffuse",
+      "displayName": "Eris Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Eris_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_eris-diffuse_2ec7f54d.ktx2",
+      "contentHash": "2ec7f54db6b7f9fa0b1a83b0ae1b3436a3f9323c456b44f6b101e979adc5e007",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 512,
+        "height": 512,
+        "mipLevelCount": 10,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    },
+    {
+      "id": "asset_io-diffuse_d30faa3a",
+      "name": "io-diffuse",
+      "displayName": "Io Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Io_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_io-diffuse_d30faa3a.ktx2",
+      "contentHash": "d30faa3a61d8b2856562511bf1e1ef31886da48469783b1b06d14af66b45c377",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 1024,
+        "height": 1024,
+        "mipLevelCount": 11,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    },
+    {
+      "id": "asset_jupiter-diffuse_d8970f50",
+      "name": "jupiter-diffuse",
+      "displayName": "Jupiter Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Jupiter_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_jupiter-diffuse_d8970f50.ktx2",
+      "contentHash": "d8970f50d60ee9d1f8822b962e6714cf46f36474343ab9c662335c5707f1f23e",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 2048,
+        "height": 2048,
+        "mipLevelCount": 12,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    },
+    {
+      "id": "asset_luna-diffuse_ffe642af",
+      "name": "luna-diffuse",
+      "displayName": "Luna Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Luna_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_luna-diffuse_ffe642af.ktx2",
+      "contentHash": "ffe642afab190802337f01b2d8fbd81246acba78daf2d692ce18380577b73e5b",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 4096,
+        "height": 4096,
+        "mipLevelCount": 13,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    },
+    {
+      "id": "asset_mars-diffuse_8ae0e0f7",
+      "name": "mars-diffuse",
+      "displayName": "Mars Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Mars_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_mars-diffuse_8ae0e0f7.ktx2",
+      "contentHash": "8ae0e0f773314c8058f7d4ee66362ebffaa0b06db8af08a7edcf409b3d1e1ae9",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 4096,
+        "height": 4096,
+        "mipLevelCount": 13,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    },
+    {
+      "id": "asset_mimas-diffuse_c70b9607",
+      "name": "mimas-diffuse",
+      "displayName": "Mimas Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Mimas_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_mimas-diffuse_c70b9607.ktx2",
+      "contentHash": "c70b9607db3b5a21b827dbc239729a999e5679d5f03b5df6d2a6e44afacc0406",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 256,
+        "height": 256,
+        "mipLevelCount": 9,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    },
+    {
+      "id": "asset_neptune-diffuse_86b68e14",
+      "name": "neptune-diffuse",
+      "displayName": "Neptune Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Neptune_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_neptune-diffuse_86b68e14.ktx2",
+      "contentHash": "86b68e14450b08368cc51521a28e18c6de408414a0537e4ee44adec047af919d",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 512,
+        "height": 512,
+        "mipLevelCount": 10,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    },
+    {
+      "id": "asset_pan-diffuse_0e401203",
+      "name": "pan-diffuse",
+      "displayName": "Pan Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Pan_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_pan-diffuse_0e401203.ktx2",
+      "contentHash": "0e401203cac122927ca13097187733fd142890d5cbf3e41679d912f928db877c",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 1024,
+        "height": 1024,
+        "mipLevelCount": 11,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    },
+    {
+      "id": "asset_phobos-diffuse_7a4985c7",
+      "name": "phobos-diffuse",
+      "displayName": "Phobos Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Phobos_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_phobos-diffuse_7a4985c7.ktx2",
+      "contentHash": "7a4985c7e04bde2a05138a50f0f6d59fd737467003220354e58210f677e20018",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 1024,
+        "height": 1024,
+        "mipLevelCount": 11,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    },
+    {
+      "id": "asset_saturn-diffuse_2745cfdb",
+      "name": "saturn-diffuse",
+      "displayName": "Saturn Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Saturn_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_saturn-diffuse_2745cfdb.ktx2",
+      "contentHash": "2745cfdbe45e2f39c96695f8c8d39ce1485e2718f9ddb845225e6516d621712d",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 1024,
+        "height": 1024,
+        "mipLevelCount": 11,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    },
+    {
+      "id": "asset_titan-diffuse_4f76caea",
+      "name": "titan-diffuse",
+      "displayName": "Titan Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Titan_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_titan-diffuse_4f76caea.ktx2",
+      "contentHash": "4f76caea1ab83a55f5ee76b82735dc01aa493e92b9880990c1bafef9fae7b5ab",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 1024,
+        "height": 1024,
+        "mipLevelCount": 11,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    },
+    {
+      "id": "asset_uranus-diffuse_5c65efdb",
+      "name": "uranus-diffuse",
+      "displayName": "Uranus Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Uranus_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_uranus-diffuse_5c65efdb.ktx2",
+      "contentHash": "5c65efdb4a277325256b41727ccbfc5208ab58d23a905da2d60324b5c98d3244",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 512,
+        "height": 512,
+        "mipLevelCount": 10,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    },
+    {
+      "id": "asset_venus-diffuse_bcc7a960",
+      "name": "venus-diffuse",
+      "displayName": "Venus Diffuse",
+      "kind": "texture",
+      "sourcePath": "D:\\Kitten Space Agency\\Content\\Core\\Textures\\Venus_Diffuse.ktx2",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.age-ksa-solar\\Assets\\texture\\asset_venus-diffuse_bcc7a960.ktx2",
+      "contentHash": "bcc7a96038ea8f404b91f1a1406ce3d91373060f19123c7d45f95a17b1725397",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "ktx2",
+        "width": 2048,
+        "height": 2048,
+        "mipLevelCount": 12,
+        "format": "VK_FORMAT_BC7_SRGB_BLOCK",
+        "supercompression": "Zstandard",
+        "gpuCompressed": true
+      }
+    }
+  ]
+}

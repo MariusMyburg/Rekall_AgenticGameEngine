@@ -1,0 +1,3666 @@
+{
+  "id": "scene_e6a0611152de4bef83e3a78ec2406fe2",
+  "name": "Main",
+  "capabilities": [
+    "celestial",
+    "orbital",
+    "rendering3d",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "ent_9f8dc7e67a2541ffbfcaf4ea77e06853",
+      "name": "3I_ATLAS",
+      "tags": [
+        "3i_atlas",
+        "celestial",
+        "interstellarcomet",
+        "ksa"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "3I_ATLAS",
+            "type": "InterstellarComet",
+            "meanRadiusKm": 0.5,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 44000000000,
+            "color": "#66ccff",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 0,
+            "eccentricity": 0.999999,
+            "inclinationDegrees": 175.1167,
+            "longitudeOfAscendingNodeDegrees": 322.2722,
+            "argumentOfPeriapsisDegrees": 127.7932,
+            "timeAtPeriapsisSeconds": 10213426.08,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#66ccff"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_1f37f9b05aa449d48f422b01aedab5da",
+      "name": "Amalthea",
+      "tags": [
+        "amalthea",
+        "celestial",
+        "ksa",
+        "minorbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Amalthea",
+            "type": "MinorBody",
+            "meanRadiusKm": 83.5,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 2080000000000000000,
+            "color": "#ff331a",
+            "parentBodyId": "Jupiter"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Jupiter",
+            "semiMajorAxisKm": 181400,
+            "eccentricity": 0.0032,
+            "inclinationDegrees": 0.374,
+            "longitudeOfAscendingNodeDegrees": 85.1,
+            "argumentOfPeriapsisDegrees": 54.1,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#ff331a"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.18139999999999998
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_cb99595742404737a4c6d349b20d952b",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_97e1446d2c5445e8b5f55126f96fc33e",
+      "name": "Ariel",
+      "tags": [
+        "ariel",
+        "celestial",
+        "ksa",
+        "minorbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Ariel",
+            "type": "MinorBody",
+            "meanRadiusKm": 578.9,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 1.2331e+21,
+            "color": "#8f98a8",
+            "parentBodyId": "Uranus"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Uranus",
+            "semiMajorAxisKm": 191020,
+            "eccentricity": 0.0012,
+            "inclinationDegrees": 0.26,
+            "longitudeOfAscendingNodeDegrees": 74.392,
+            "argumentOfPeriapsisDegrees": 326.528,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.19102
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_ae95fb55ea2b484c891b12753a632801",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_fc94a5bdd8fa4023970f3968fb81420f",
+      "name": "Borisov",
+      "tags": [
+        "borisov",
+        "celestial",
+        "interstellarcomet",
+        "ksa"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Borisov",
+            "type": "InterstellarComet",
+            "meanRadiusKm": 0.5,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 0,
+            "color": "#8f98a8",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 0,
+            "eccentricity": 0.999999,
+            "inclinationDegrees": 44.0535,
+            "longitudeOfAscendingNodeDegrees": 308.15,
+            "argumentOfPeriapsisDegrees": 209.1244,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e3148d34b5f24b2ba820a74615db25df",
+      "name": "Callisto",
+      "tags": [
+        "callisto",
+        "celestial",
+        "ksa",
+        "planetarybody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Callisto",
+            "type": "PlanetaryBody",
+            "meanRadiusKm": 2410.3,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 1.075938e+23,
+            "color": "#8f98a8",
+            "parentBodyId": "Jupiter"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Jupiter",
+            "semiMajorAxisKm": 1882700,
+            "eccentricity": 0.0074,
+            "inclinationDegrees": 0.192,
+            "longitudeOfAscendingNodeDegrees": 21.6,
+            "argumentOfPeriapsisDegrees": 298.848,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 1.8826999999999998
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_cb99595742404737a4c6d349b20d952b",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_2f9007cc676d4993ac81af01309a90db",
+      "name": "Ceres",
+      "tags": [
+        "celestial",
+        "ceres",
+        "ksa",
+        "minorbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Ceres",
+            "type": "MinorBody",
+            "meanRadiusKm": 469.73,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 938392000000000000000,
+            "color": "#b8b8b8",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 414236503.9683,
+            "eccentricity": 0.0758,
+            "inclinationDegrees": 10.594,
+            "longitudeOfAscendingNodeDegrees": 80.3056,
+            "argumentOfPeriapsisDegrees": 73.5977,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#b8b8b8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 414.2365039683
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_9112fdeed04645feb0bd929c45a9fe8d",
+      "name": "Charon",
+      "tags": [
+        "celestial",
+        "charon",
+        "ksa",
+        "minorbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Charon",
+            "type": "MinorBody",
+            "meanRadiusKm": 606,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 1.5897e+21,
+            "color": "#8f98a8",
+            "parentBodyId": "Pluto"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Pluto",
+            "semiMajorAxisKm": 19571,
+            "eccentricity": 0.0022,
+            "inclinationDegrees": 0.001,
+            "longitudeOfAscendingNodeDegrees": 0,
+            "argumentOfPeriapsisDegrees": 0,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.019570999999999998
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_2094f1a2993e4a94be6030a4858a051a",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_d2427bdc9b0c4e66add35db27ad7d6e0",
+      "name": "Deimos",
+      "tags": [
+        "celestial",
+        "deimos",
+        "ksa",
+        "minorbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Deimos",
+            "type": "MinorBody",
+            "meanRadiusKm": 6.2,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 1800000000000000,
+            "color": "#8f98a8",
+            "parentBodyId": "Mars"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Mars",
+            "semiMajorAxisKm": 23458.39038729485,
+            "eccentricity": 0.0001984652800573767,
+            "inclinationDegrees": 24.18396669450255,
+            "longitudeOfAscendingNodeDegrees": 81.16938156204388,
+            "argumentOfPeriapsisDegrees": 38.16862353970838,
+            "timeAtPeriapsisSeconds": -53307.6243952032,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.023458390387294848
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_5892027c804c4bd59313fc82adef1ee6",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_f986d13a5e104c4db3cdfdc79c661cdb",
+      "name": "Dione",
+      "tags": [
+        "celestial",
+        "dione",
+        "ksa",
+        "planetarybody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Dione",
+            "type": "PlanetaryBody",
+            "meanRadiusKm": 561.4,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 1.09572e+21,
+            "color": "#8f98a8",
+            "parentBodyId": "Saturn"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Saturn",
+            "semiMajorAxisKm": 377396,
+            "eccentricity": 0.0022,
+            "inclinationDegrees": 0.02,
+            "longitudeOfAscendingNodeDegrees": 168.8,
+            "argumentOfPeriapsisDegrees": 90.771,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.377396
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_42fb18e0920e4ffdbabbf55fbc580ff0",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_a1fb29a548c9435396f3f9bba80a360a",
+      "name": "Earth",
+      "tags": [
+        "atmosphericbody",
+        "celestial",
+        "earth",
+        "ksa"
+      ],
+      "components": [
+        {
+          "type": "Rekall.AtmosphereRenderer",
+          "properties": {
+            "height": 0.0101936,
+            "density": 1,
+            "rayleighColor": "#7fb6ff"
+          }
+        },
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Earth",
+            "type": "AtmosphericBody",
+            "meanRadiusKm": 6371,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 5.9722e+24,
+            "color": "#1c4f6a",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 149539627.7103892,
+            "eccentricity": 0.0165744378494006,
+            "inclinationDegrees": 0.004495777668608611,
+            "longitudeOfAscendingNodeDegrees": 200.1005464352027,
+            "argumentOfPeriapsisDegrees": 264.7204271842132,
+            "timeAtPeriapsisSeconds": 3155415.2731954656,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#1c4f6a",
+            "surfaceTexture": "asset_earth-diffuse_f55af866"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 149.5396277103892
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 192,
+            "thickness": 8,
+            "verticalOffset": -0.05,
+            "color": "#64b7ff",
+            "emissiveStrength": 4,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_746f91306d8b4f109dd4e1e1e6ef9c4d",
+      "name": "Elara",
+      "tags": [
+        "celestial",
+        "elara",
+        "ksa",
+        "minorbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Elara",
+            "type": "MinorBody",
+            "meanRadiusKm": 43,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 0,
+            "color": "#8f98a8",
+            "parentBodyId": "Jupiter"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Jupiter",
+            "semiMajorAxisKm": 11740000,
+            "eccentricity": 0.217,
+            "inclinationDegrees": 26.6,
+            "longitudeOfAscendingNodeDegrees": 141.4,
+            "argumentOfPeriapsisDegrees": 218.02,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 11.74
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_cb99595742404737a4c6d349b20d952b",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_3cc140b6a0f0452abb65adbac0e738f2",
+      "name": "Enceladus",
+      "tags": [
+        "celestial",
+        "enceladus",
+        "ksa",
+        "planetarybody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Enceladus",
+            "type": "PlanetaryBody",
+            "meanRadiusKm": 252.1,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 108050000000000000000,
+            "color": "#8f98a8",
+            "parentBodyId": "Saturn"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Saturn",
+            "semiMajorAxisKm": 237948,
+            "eccentricity": 0.0047,
+            "inclinationDegrees": 0.009,
+            "longitudeOfAscendingNodeDegrees": 143.7,
+            "argumentOfPeriapsisDegrees": 203.459,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.237948
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_42fb18e0920e4ffdbabbf55fbc580ff0",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_429648bce4704f409ac7dc647a06df6a",
+      "name": "Eris",
+      "tags": [
+        "celestial",
+        "eris",
+        "ksa",
+        "minorbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Eris",
+            "type": "MinorBody",
+            "meanRadiusKm": 1163,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 1.6466000000000002e+22,
+            "color": "#8f98a8",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 10139743676.046,
+            "eccentricity": 0.436,
+            "inclinationDegrees": 44.187,
+            "longitudeOfAscendingNodeDegrees": 35.951,
+            "argumentOfPeriapsisDegrees": 151.95,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#8f98a8",
+            "surfaceTexture": "asset_eris-diffuse_2ec7f54d"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 10139.743676045999
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_90ded726339443f8878c663f310cfef2",
+      "name": "Eros",
+      "tags": [
+        "celestial",
+        "eros",
+        "ksa",
+        "minorbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Eros",
+            "type": "MinorBody",
+            "meanRadiusKm": 8.42,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 6687000000000000,
+            "color": "#e6ccb2",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 218113695.48059997,
+            "eccentricity": 0.223,
+            "inclinationDegrees": 10.829,
+            "longitudeOfAscendingNodeDegrees": 304.4,
+            "argumentOfPeriapsisDegrees": 178.8,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#e6ccb2"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 218.11369548059997
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_a15f7ecc7efa40aa81c53ba06448f785",
+      "name": "Europa",
+      "tags": [
+        "celestial",
+        "europa",
+        "ksa",
+        "planetarybody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Europa",
+            "type": "PlanetaryBody",
+            "meanRadiusKm": 1560.8,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 4.799839999999999e+22,
+            "color": "#8f98a8",
+            "parentBodyId": "Jupiter"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Jupiter",
+            "semiMajorAxisKm": 671100,
+            "eccentricity": 0.0094,
+            "inclinationDegrees": 0.466,
+            "longitudeOfAscendingNodeDegrees": 181.4,
+            "argumentOfPeriapsisDegrees": 219.106,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.6710999999999999
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_cb99595742404737a4c6d349b20d952b",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_d28289145c5b474886a3ae7b5c21bbfc",
+      "name": "Ganymede",
+      "tags": [
+        "celestial",
+        "ganymede",
+        "ksa",
+        "planetarybody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Ganymede",
+            "type": "PlanetaryBody",
+            "meanRadiusKm": 2634.1,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 1.4819e+23,
+            "color": "#8f98a8",
+            "parentBodyId": "Jupiter"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Jupiter",
+            "semiMajorAxisKm": 1070400,
+            "eccentricity": 0.0015,
+            "inclinationDegrees": 0.177,
+            "longitudeOfAscendingNodeDegrees": 52.2,
+            "argumentOfPeriapsisDegrees": 63.552,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 1.0704
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_cb99595742404737a4c6d349b20d952b",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_4a051b5d0bb8449a8949d9d9276f5666",
+      "name": "HaleBoppComet",
+      "tags": [
+        "celestial",
+        "haleboppcomet",
+        "ksa",
+        "periodiccomet"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "HaleBoppComet",
+            "type": "PeriodicComet",
+            "meanRadiusKm": 30,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 190000000000000,
+            "color": "#8f98a8",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 27825203950.199997,
+            "eccentricity": 0.995,
+            "inclinationDegrees": 89.43,
+            "longitudeOfAscendingNodeDegrees": 282.47,
+            "argumentOfPeriapsisDegrees": 130.59,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 27825.203950199997
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_09cf8096f195471582b6bc2a323d8fc3",
+      "name": "HalleysComet",
+      "tags": [
+        "celestial",
+        "halleyscomet",
+        "ksa",
+        "periodiccomet"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "HalleysComet",
+            "type": "PeriodicComet",
+            "meanRadiusKm": 11,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 220000000000000,
+            "color": "#8f98a8",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 2653417432.6058993,
+            "eccentricity": 0.96658,
+            "inclinationDegrees": 161.96,
+            "longitudeOfAscendingNodeDegrees": 59.396,
+            "argumentOfPeriapsisDegrees": 112.05,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 2653.417432605899
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ba8fc0ca53c94565bdffb35c0d143cdd",
+      "name": "Haumea",
+      "tags": [
+        "celestial",
+        "haumea",
+        "ksa",
+        "minorbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Haumea",
+            "type": "MinorBody",
+            "meanRadiusKm": 816,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 3.95244e+21,
+            "color": "#8f98a8",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 6483571716.138,
+            "eccentricity": 0.195,
+            "inclinationDegrees": 28.19,
+            "longitudeOfAscendingNodeDegrees": 121.77,
+            "argumentOfPeriapsisDegrees": 239.61,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 6483.571716137999
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_f40c39a7fe7a4c8f96797afa6a9344f0",
+      "name": "Himalia",
+      "tags": [
+        "celestial",
+        "himalia",
+        "ksa",
+        "minorbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Himalia",
+            "type": "MinorBody",
+            "meanRadiusKm": 85,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 4200000000000000000,
+            "color": "#ffd191",
+            "parentBodyId": "Jupiter"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Jupiter",
+            "semiMajorAxisKm": 11461000,
+            "eccentricity": 0.162,
+            "inclinationDegrees": 27.5,
+            "longitudeOfAscendingNodeDegrees": 25.3,
+            "argumentOfPeriapsisDegrees": 187.48,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#ffd191"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 11.461
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_cb99595742404737a4c6d349b20d952b",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_829c49c958484f3799ddcfc20b466987",
+      "name": "Hygiea",
+      "tags": [
+        "celestial",
+        "hygiea",
+        "ksa",
+        "minorbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Hygiea",
+            "type": "MinorBody",
+            "meanRadiusKm": 215,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 87400000000000000000,
+            "color": "#999999",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 469587716.1272999,
+            "eccentricity": 0.113,
+            "inclinationDegrees": 3.842,
+            "longitudeOfAscendingNodeDegrees": 283.916,
+            "argumentOfPeriapsisDegrees": 312.345,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#999999"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 469.58771612729987
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_4abe1d7eb5c34a348881a466af77dc5d",
+      "name": "Iapetus",
+      "tags": [
+        "celestial",
+        "iapetus",
+        "ksa",
+        "minorbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Iapetus",
+            "type": "MinorBody",
+            "meanRadiusKm": 734.5,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 1.8059e+21,
+            "color": "#8f98a8",
+            "parentBodyId": "Saturn"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Saturn",
+            "semiMajorAxisKm": 3560820,
+            "eccentricity": 0.0293,
+            "inclinationDegrees": 14.72,
+            "longitudeOfAscendingNodeDegrees": 15.47,
+            "argumentOfPeriapsisDegrees": 271.608,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 3.5608199999999997
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_42fb18e0920e4ffdbabbf55fbc580ff0",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_d6a7efc2480c45f9acabe378b888c84d",
+      "name": "Io",
+      "tags": [
+        "celestial",
+        "io",
+        "ksa",
+        "planetarybody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Io",
+            "type": "PlanetaryBody",
+            "meanRadiusKm": 1821.6,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 8.931938e+22,
+            "color": "#8f98a8",
+            "parentBodyId": "Jupiter"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Jupiter",
+            "semiMajorAxisKm": 421700,
+            "eccentricity": 0.0041,
+            "inclinationDegrees": 0.036,
+            "longitudeOfAscendingNodeDegrees": 355.8,
+            "argumentOfPeriapsisDegrees": 84.129,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8",
+            "surfaceTexture": "asset_io-diffuse_d30faa3a"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.42169999999999996
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_cb99595742404737a4c6d349b20d952b",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_cb99595742404737a4c6d349b20d952b",
+      "name": "Jupiter",
+      "tags": [
+        "atmosphericbody",
+        "celestial",
+        "jupiter",
+        "ksa"
+      ],
+      "components": [
+        {
+          "type": "Rekall.AtmosphereRenderer",
+          "properties": {
+            "height": 0.1118576,
+            "density": 1,
+            "rayleighColor": "#7fb6ff"
+          }
+        },
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Jupiter",
+            "type": "AtmosphericBody",
+            "meanRadiusKm": 69911,
+            "radiusScale": 0.00002,
+            "renderRadius": 97.8754,
+            "massKg": 1.89813e+27,
+            "color": "#ffb05c",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 778318437.2433803,
+            "eccentricity": 0.04832479219312407,
+            "inclinationDegrees": 1.303590359360468,
+            "longitudeOfAscendingNodeDegrees": 100.51803872114,
+            "argumentOfPeriapsisDegrees": 273.5957096173138,
+            "timeAtPeriapsisSeconds": -90113548.82714154,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 97.8754,
+            "color": "#ffb05c",
+            "surfaceTexture": "asset_jupiter-diffuse_d8970f50"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 778.3184372433802
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 192,
+            "thickness": 8,
+            "verticalOffset": -0.05,
+            "color": "#64b7ff",
+            "emissiveStrength": 4,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_d8192890b88149a689502f030f2df336",
+      "name": "LovejoyComet",
+      "tags": [
+        "celestial",
+        "ksa",
+        "lovejoycomet",
+        "periodiccomet"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "LovejoyComet",
+            "type": "PeriodicComet",
+            "meanRadiusKm": 0.5,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 0,
+            "color": "#8f98a8",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 11770360466.676,
+            "eccentricity": 0.99993,
+            "inclinationDegrees": 134.2,
+            "longitudeOfAscendingNodeDegrees": 326.369,
+            "argumentOfPeriapsisDegrees": 53.5092,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 11770.360466676
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_8dc6cb2ab222448cb5d7840df32d702f",
+      "name": "Luna",
+      "tags": [
+        "celestial",
+        "ksa",
+        "luna",
+        "planetarybody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Luna",
+            "type": "PlanetaryBody",
+            "meanRadiusKm": 1737.1,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 7.342e+22,
+            "color": "#545454",
+            "parentBodyId": "Earth"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Earth",
+            "semiMajorAxisKm": 380863.3349807188,
+            "eccentricity": 0.06734146418596218,
+            "inclinationDegrees": 5.027765739305488,
+            "longitudeOfAscendingNodeDegrees": 343.9586928342719,
+            "argumentOfPeriapsisDegrees": 90.95632163367938,
+            "timeAtPeriapsisSeconds": 442332.8562855744,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#545454",
+            "surfaceTexture": "asset_luna-diffuse_ffe642af"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.3808633349807188
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_a1fb29a548c9435396f3f9bba80a360a",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_dc994b2c89de448c84d9526e11445530",
+      "name": "Lysithea",
+      "tags": [
+        "celestial",
+        "ksa",
+        "lysithea",
+        "minorbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Lysithea",
+            "type": "MinorBody",
+            "meanRadiusKm": 18,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 0,
+            "color": "#8f98a8",
+            "parentBodyId": "Jupiter"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Jupiter",
+            "semiMajorAxisKm": 11717000,
+            "eccentricity": 0.11,
+            "inclinationDegrees": 28.3,
+            "longitudeOfAscendingNodeDegrees": 116.7,
+            "argumentOfPeriapsisDegrees": 91.41,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 11.716999999999999
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_cb99595742404737a4c6d349b20d952b",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_d18ed5bedb4d454e9b2684f98e377998",
+      "name": "Solar System VR Camera",
+      "tags": [
+        "camera"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "active": true,
+            "fieldOfView": 72,
+            "nearClip": 0.05,
+            "farClip": 12000,
+            "stereoMode": "stereo",
+            "stereoRenderMode": "single-pass-multiview",
+            "stereoEyeSeparation": 0.064,
+            "stereoConvergenceDistance": 1800,
+            "clearColor": "#000000",
+            "renderOrder": 100
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 2250,
+            "y": 250,
+            "z": -2500,
+            "pitch": 5.7,
+            "yaw": 0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_4e81bfb75bb34044b67e4c307e717228",
+      "name": "MakemakeComet",
+      "tags": [
+        "celestial",
+        "ksa",
+        "makemakecomet",
+        "periodiccomet"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "MakemakeComet",
+            "type": "PeriodicComet",
+            "meanRadiusKm": 739,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 2.69e+21,
+            "color": "#8f98a8",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 6850086499.353,
+            "eccentricity": 0.159,
+            "inclinationDegrees": 28.98,
+            "longitudeOfAscendingNodeDegrees": 79.35,
+            "argumentOfPeriapsisDegrees": 294.88,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 6850.086499352999
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_5892027c804c4bd59313fc82adef1ee6",
+      "name": "Mars",
+      "tags": [
+        "atmosphericbody",
+        "celestial",
+        "ksa",
+        "mars"
+      ],
+      "components": [
+        {
+          "type": "Rekall.AtmosphereRenderer",
+          "properties": {
+            "height": 0.01,
+            "density": 1,
+            "rayleighColor": "#7fb6ff"
+          }
+        },
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Mars",
+            "type": "AtmosphericBody",
+            "meanRadiusKm": 3389.5,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 6.4171e+23,
+            "color": "#ff4500",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 227939944.0595953,
+            "eccentricity": 0.0934856032556727,
+            "inclinationDegrees": 1.847500920441235,
+            "longitudeOfAscendingNodeDegrees": 49.48350995893581,
+            "argumentOfPeriapsisDegrees": 286.6279383251176,
+            "timeAtPeriapsisSeconds": 10049350.434708614,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#ff4500",
+            "surfaceTexture": "asset_mars-diffuse_8ae0e0f7"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 227.93994405959526
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 192,
+            "thickness": 8,
+            "verticalOffset": -0.05,
+            "color": "#64b7ff",
+            "emissiveStrength": 4,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_013f5cf992954f979d00218627a06ea0",
+      "name": "Mercury",
+      "tags": [
+        "celestial",
+        "ksa",
+        "mercury",
+        "planetarybody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Mercury",
+            "type": "PlanetaryBody",
+            "meanRadiusKm": 2439.7,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 3.302e+23,
+            "color": "#ffffff",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 57908961.53292818,
+            "eccentricity": 0.2056462028967717,
+            "inclinationDegrees": 7.003433958539783,
+            "longitudeOfAscendingNodeDegrees": 48.29884437379905,
+            "argumentOfPeriapsisDegrees": 29.19855011314794,
+            "timeAtPeriapsisSeconds": -563615.3399035392,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#ffffff"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 57.90896153292818
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 192,
+            "thickness": 8,
+            "verticalOffset": -0.05,
+            "color": "#64b7ff",
+            "emissiveStrength": 4,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_7c9b4cae274e42d5bdfcbd20485668fe",
+      "name": "Mimas",
+      "tags": [
+        "celestial",
+        "ksa",
+        "mimas",
+        "planetarybody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Mimas",
+            "type": "PlanetaryBody",
+            "meanRadiusKm": 198.2,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 37509400000000000000,
+            "color": "#8f98a8",
+            "parentBodyId": "Saturn"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Saturn",
+            "semiMajorAxisKm": 185539,
+            "eccentricity": 0.0202,
+            "inclinationDegrees": 1.6,
+            "longitudeOfAscendingNodeDegrees": 342.7,
+            "argumentOfPeriapsisDegrees": 130.822,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8",
+            "surfaceTexture": "asset_mimas-diffuse_c70b9607"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.18553899999999998
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_42fb18e0920e4ffdbabbf55fbc580ff0",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_3be587f0a0c748e69aecdeebecacac38",
+      "name": "Miranda",
+      "tags": [
+        "celestial",
+        "ksa",
+        "minorbody",
+        "miranda"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Miranda",
+            "type": "MinorBody",
+            "meanRadiusKm": 235.8,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 62930000000000000000,
+            "color": "#8f98a8",
+            "parentBodyId": "Uranus"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Uranus",
+            "semiMajorAxisKm": 129390,
+            "eccentricity": 0.0013,
+            "inclinationDegrees": 4.338,
+            "longitudeOfAscendingNodeDegrees": 326.438,
+            "argumentOfPeriapsisDegrees": 285.431,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.12939
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_ae95fb55ea2b484c891b12753a632801",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_615bac82be0b4954be48769079736488",
+      "name": "Neptune",
+      "tags": [
+        "atmosphericbody",
+        "celestial",
+        "ksa",
+        "neptune"
+      ],
+      "components": [
+        {
+          "type": "Rekall.AtmosphereRenderer",
+          "properties": {
+            "height": 0.039395200000000005,
+            "density": 1,
+            "rayleighColor": "#7fb6ff"
+          }
+        },
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Neptune",
+            "type": "AtmosphericBody",
+            "meanRadiusKm": 24622,
+            "radiusScale": 0.00002,
+            "renderRadius": 34.470800000000004,
+            "massKg": 1.02409e+26,
+            "color": "#618af5",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 4507242315.76114,
+            "eccentricity": 0.01138133706260087,
+            "inclinationDegrees": 1.76859727763164,
+            "longitudeOfAscendingNodeDegrees": 131.7269095031692,
+            "argumentOfPeriapsisDegrees": 274.3220743935685,
+            "timeAtPeriapsisSeconds": 642412304.1308463,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 34.470800000000004,
+            "color": "#618af5",
+            "surfaceTexture": "asset_neptune-diffuse_86b68e14"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 4507.242315761139
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 192,
+            "thickness": 8,
+            "verticalOffset": -0.05,
+            "color": "#64b7ff",
+            "emissiveStrength": 4,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ccded05a96ac4e5cb12e96f6ef50b8bb",
+      "name": "Oberon",
+      "tags": [
+        "celestial",
+        "ksa",
+        "minorbody",
+        "oberon"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Oberon",
+            "type": "MinorBody",
+            "meanRadiusKm": 761.4,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 3.1104e+21,
+            "color": "#8f98a8",
+            "parentBodyId": "Uranus"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Uranus",
+            "semiMajorAxisKm": 583520,
+            "eccentricity": 0.0014,
+            "inclinationDegrees": 0.058,
+            "longitudeOfAscendingNodeDegrees": 79.709,
+            "argumentOfPeriapsisDegrees": 271.885,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.5835199999999999
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_ae95fb55ea2b484c891b12753a632801",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_86bc16d379f74d2abe27d7eef7c3775e",
+      "name": "Oumuamua",
+      "tags": [
+        "celestial",
+        "interstellarcomet",
+        "ksa",
+        "oumuamua"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Oumuamua",
+            "type": "InterstellarComet",
+            "meanRadiusKm": 0.1,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 0,
+            "color": "#8f98a8",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 0,
+            "eccentricity": 0.999999,
+            "inclinationDegrees": 122.5,
+            "longitudeOfAscendingNodeDegrees": 24.597,
+            "argumentOfPeriapsisDegrees": 241.1,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_8e53762c405d49a68414d25b9acfd199",
+      "name": "Pallas",
+      "tags": [
+        "celestial",
+        "ksa",
+        "minorbody",
+        "pallas"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Pallas",
+            "type": "MinorBody",
+            "meanRadiusKm": 265,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 204200000000000000000,
+            "color": "#bfbfbf",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 414834895.4511,
+            "eccentricity": 0.231,
+            "inclinationDegrees": 34.837,
+            "longitudeOfAscendingNodeDegrees": 173.085,
+            "argumentOfPeriapsisDegrees": 310.881,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#bfbfbf"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 414.83489545109995
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_5f51bdd436544622ae666a6f950952cf",
+      "name": "Pan",
+      "tags": [
+        "celestial",
+        "ksa",
+        "pan",
+        "planetarybody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Pan",
+            "type": "PlanetaryBody",
+            "meanRadiusKm": 13.7,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 4300000000000000,
+            "color": "#8f98a8",
+            "parentBodyId": "Saturn"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Saturn",
+            "semiMajorAxisKm": 133584,
+            "eccentricity": 0,
+            "inclinationDegrees": 0.0001,
+            "longitudeOfAscendingNodeDegrees": 0,
+            "argumentOfPeriapsisDegrees": 130.822,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8",
+            "surfaceTexture": "asset_pan-diffuse_0e401203"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.13358399999999998
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_42fb18e0920e4ffdbabbf55fbc580ff0",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ddd58f0dcabc4275ac9b9fa5a2682772",
+      "name": "Pasiphae",
+      "tags": [
+        "celestial",
+        "ksa",
+        "minorbody",
+        "pasiphae"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Pasiphae",
+            "type": "MinorBody",
+            "meanRadiusKm": 30,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 172000000000000000,
+            "color": "#8f98a8",
+            "parentBodyId": "Jupiter"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Jupiter",
+            "semiMajorAxisKm": 23509000,
+            "eccentricity": 0.409,
+            "inclinationDegrees": 151.4,
+            "longitudeOfAscendingNodeDegrees": 45.9,
+            "argumentOfPeriapsisDegrees": 192.82,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 23.509
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_cb99595742404737a4c6d349b20d952b",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_45d4e8f1613c48c79411b6ffadd585cd",
+      "name": "Phobos",
+      "tags": [
+        "celestial",
+        "ksa",
+        "minorbody",
+        "phobos"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Phobos",
+            "type": "MinorBody",
+            "meanRadiusKm": 11.267,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 10800000000000000,
+            "color": "#545454",
+            "parentBodyId": "Mars"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Mars",
+            "semiMajorAxisKm": 9379.383282690138,
+            "eccentricity": 0.01504527739875488,
+            "inclinationDegrees": 27.59125810541645,
+            "longitudeOfAscendingNodeDegrees": 81.503276691264,
+            "argumentOfPeriapsisDegrees": 143.4659767065662,
+            "timeAtPeriapsisSeconds": 7342.3314482112,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#545454",
+            "surfaceTexture": "asset_phobos-diffuse_7a4985c7"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.009379383282690137
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_5892027c804c4bd59313fc82adef1ee6",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_2094f1a2993e4a94be6030a4858a051a",
+      "name": "Pluto",
+      "tags": [
+        "celestial",
+        "ksa",
+        "planetarybody",
+        "pluto"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Pluto",
+            "type": "PlanetaryBody",
+            "meanRadiusKm": 1188.3,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 1.3025e+22,
+            "color": "#f2c7a3",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 5923845154.796118,
+            "eccentricity": 0.2471491415054861,
+            "inclinationDegrees": 17.01891625997185,
+            "longitudeOfAscendingNodeDegrees": 110.2120704382104,
+            "argumentOfPeriapsisDegrees": 114.9008997051256,
+            "timeAtPeriapsisSeconds": -1131531650.2537966,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#f2c7a3"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 5923.845154796118
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 192,
+            "thickness": 8,
+            "verticalOffset": -0.05,
+            "color": "#64b7ff",
+            "emissiveStrength": 4,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_abba90d1d922437996fd5612a981d9ec",
+      "name": "Rhea",
+      "tags": [
+        "celestial",
+        "ksa",
+        "planetarybody",
+        "rhea"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Rhea",
+            "type": "PlanetaryBody",
+            "meanRadiusKm": 763.8,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 2.3090000000000003e+21,
+            "color": "#8f98a8",
+            "parentBodyId": "Saturn"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Saturn",
+            "semiMajorAxisKm": 527108,
+            "eccentricity": 0.001,
+            "inclinationDegrees": 0.35,
+            "longitudeOfAscendingNodeDegrees": 227.9,
+            "argumentOfPeriapsisDegrees": 359.856,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.527108
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_42fb18e0920e4ffdbabbf55fbc580ff0",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_42fb18e0920e4ffdbabbf55fbc580ff0",
+      "name": "Saturn",
+      "tags": [
+        "atmosphericbody",
+        "celestial",
+        "ksa",
+        "saturn"
+      ],
+      "components": [
+        {
+          "type": "Rekall.AtmosphereRenderer",
+          "properties": {
+            "height": 0.09317120000000001,
+            "density": 1,
+            "rayleighColor": "#7fb6ff"
+          }
+        },
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Saturn",
+            "type": "AtmosphericBody",
+            "meanRadiusKm": 58232,
+            "radiusScale": 0.00002,
+            "renderRadius": 81.52480000000001,
+            "massKg": 5.68317e+26,
+            "color": "#ffd191",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 1427887258.370589,
+            "eccentricity": 0.05542239872393825,
+            "inclinationDegrees": 2.486575364141227,
+            "longitudeOfAscendingNodeDegrees": 113.560185791113,
+            "argumentOfPeriapsisDegrees": 338.3383032687136,
+            "timeAtPeriapsisSeconds": 219817510.33108234,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 81.52480000000001,
+            "color": "#ffd191",
+            "surfaceTexture": "asset_saturn-diffuse_2745cfdb"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 1427.887258370589
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 192,
+            "thickness": 8,
+            "verticalOffset": -0.05,
+            "color": "#64b7ff",
+            "emissiveStrength": 4,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_8eb1905ee38e433e97ecffbad3fe5d2c",
+      "name": "Sedna",
+      "tags": [
+        "celestial",
+        "ksa",
+        "minorbody",
+        "sedna"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Sedna",
+            "type": "MinorBody",
+            "meanRadiusKm": 995,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 0,
+            "color": "#8f98a8",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 75696522574.2,
+            "eccentricity": 0.8496,
+            "inclinationDegrees": 11.93,
+            "longitudeOfAscendingNodeDegrees": 144.248,
+            "argumentOfPeriapsisDegrees": 311.352,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 75696.52257419999
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_d4adf8bf8e6842a687e76aacc04eb9d4",
+      "name": "Sinope",
+      "tags": [
+        "celestial",
+        "ksa",
+        "minorbody",
+        "sinope"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Sinope",
+            "type": "MinorBody",
+            "meanRadiusKm": 19,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 0,
+            "color": "#8f98a8",
+            "parentBodyId": "Jupiter"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Jupiter",
+            "semiMajorAxisKm": 23760000,
+            "eccentricity": 0.25,
+            "inclinationDegrees": 158.1,
+            "longitudeOfAscendingNodeDegrees": 298.5,
+            "argumentOfPeriapsisDegrees": 158.42,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 23.759999999999998
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_cb99595742404737a4c6d349b20d952b",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "name": "Sol",
+      "tags": [
+        "celestial",
+        "ksa",
+        "sol",
+        "stellarbody"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Sol",
+            "type": "StellarBody",
+            "meanRadiusKm": 696342,
+            "radiusScale": 0.00002,
+            "renderRadius": 180,
+            "massKg": 1.98847e+30,
+            "color": "#ffffff"
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 180,
+            "color": "#ffcc55",
+            "emissiveColor": "#ffcc55"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_2fa7cca01f0d4365a27b8b34bc45017e",
+      "name": "Solar Key Light",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": {
+            "intensity": 2
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "pitch": -10,
+            "yaw": -20
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_b5200a0000184f40920d4c99b9d9cc16",
+      "name": "Tethys",
+      "tags": [
+        "celestial",
+        "ksa",
+        "planetarybody",
+        "tethys"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Tethys",
+            "type": "PlanetaryBody",
+            "meanRadiusKm": 531.1,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 617600000000000000000,
+            "color": "#8f98a8",
+            "parentBodyId": "Saturn"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Saturn",
+            "semiMajorAxisKm": 294619,
+            "eccentricity": 0.0001,
+            "inclinationDegrees": 1.12,
+            "longitudeOfAscendingNodeDegrees": 285.3,
+            "argumentOfPeriapsisDegrees": 5.576,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.29461899999999996
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_42fb18e0920e4ffdbabbf55fbc580ff0",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_46f376b5473548c3aef3ad22fbe32ff1",
+      "name": "Titan",
+      "tags": [
+        "atmosphericbody",
+        "celestial",
+        "ksa",
+        "titan"
+      ],
+      "components": [
+        {
+          "type": "Rekall.AtmosphereRenderer",
+          "properties": {
+            "height": 0.01,
+            "density": 1,
+            "rayleighColor": "#7fb6ff"
+          }
+        },
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Titan",
+            "type": "AtmosphericBody",
+            "meanRadiusKm": 2575.5,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 1.34553e+23,
+            "color": "#8f98a8",
+            "parentBodyId": "Saturn"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Saturn",
+            "semiMajorAxisKm": 1221870,
+            "eccentricity": 0.0288,
+            "inclinationDegrees": 0.348,
+            "longitudeOfAscendingNodeDegrees": 187.3,
+            "argumentOfPeriapsisDegrees": 28.06,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8",
+            "surfaceTexture": "asset_titan-diffuse_4f76caea"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 1.22187
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_42fb18e0920e4ffdbabbf55fbc580ff0",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_387398e4d1aa4052b281c3d9c3e31880",
+      "name": "Titania",
+      "tags": [
+        "celestial",
+        "ksa",
+        "minorbody",
+        "titania"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Titania",
+            "type": "MinorBody",
+            "meanRadiusKm": 788.9,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 3.455e+21,
+            "color": "#8f98a8",
+            "parentBodyId": "Uranus"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Uranus",
+            "semiMajorAxisKm": 435910,
+            "eccentricity": 0.0011,
+            "inclinationDegrees": 0.34,
+            "longitudeOfAscendingNodeDegrees": 314.608,
+            "argumentOfPeriapsisDegrees": 284.419,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.43590999999999996
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_ae95fb55ea2b484c891b12753a632801",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_9893b607efd4433db61caff5920f8dd8",
+      "name": "Triton",
+      "tags": [
+        "celestial",
+        "ksa",
+        "minorbody",
+        "triton"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Triton",
+            "type": "MinorBody",
+            "meanRadiusKm": 1353.4,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 2.1389e+22,
+            "color": "#8f98a8",
+            "parentBodyId": "Neptune"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Neptune",
+            "semiMajorAxisKm": 354759,
+            "eccentricity": 0,
+            "inclinationDegrees": 156.865,
+            "longitudeOfAscendingNodeDegrees": 131.721,
+            "argumentOfPeriapsisDegrees": 272.846,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.354759
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_615bac82be0b4954be48769079736488",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_f8b40b25aea04a0487b35cc57a239689",
+      "name": "Umbriel",
+      "tags": [
+        "celestial",
+        "ksa",
+        "minorbody",
+        "umbriel"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Umbriel",
+            "type": "MinorBody",
+            "meanRadiusKm": 584.7,
+            "radiusScale": 0.00002,
+            "renderRadius": 8,
+            "massKg": 1.2885e+21,
+            "color": "#8f98a8",
+            "parentBodyId": "Uranus"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Uranus",
+            "semiMajorAxisKm": 266300,
+            "eccentricity": 0.0039,
+            "inclinationDegrees": 0.128,
+            "longitudeOfAscendingNodeDegrees": 170.606,
+            "argumentOfPeriapsisDegrees": 270.572,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 8,
+            "color": "#8f98a8"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.2663
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 96,
+            "thickness": 2.5,
+            "verticalOffset": -0.05,
+            "color": "#b7d7ff",
+            "emissiveStrength": 2.5,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_ae95fb55ea2b484c891b12753a632801",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ae95fb55ea2b484c891b12753a632801",
+      "name": "Uranus",
+      "tags": [
+        "atmosphericbody",
+        "celestial",
+        "ksa",
+        "uranus"
+      ],
+      "components": [
+        {
+          "type": "Rekall.AtmosphereRenderer",
+          "properties": {
+            "height": 0.0405792,
+            "density": 1,
+            "rayleighColor": "#7fb6ff"
+          }
+        },
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Uranus",
+            "type": "AtmosphericBody",
+            "meanRadiusKm": 25362,
+            "radiusScale": 0.00002,
+            "renderRadius": 35.5068,
+            "massKg": 8.6813e+25,
+            "color": "#b0ffde",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 2884868668.009094,
+            "eccentricity": 0.04674030784521282,
+            "inclinationDegrees": 0.7715046771137,
+            "longitudeOfAscendingNodeDegrees": 74.04163324936681,
+            "argumentOfPeriapsisDegrees": 91.30136405887312,
+            "timeAtPeriapsisSeconds": 749579493.83723,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 35.5068,
+            "color": "#b0ffde",
+            "surfaceTexture": "asset_uranus-diffuse_5c65efdb"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 2884.868668009094
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 192,
+            "thickness": 8,
+            "verticalOffset": -0.05,
+            "color": "#64b7ff",
+            "emissiveStrength": 4,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_12ae24aa2b8645f1bb8925f1271bb231",
+      "name": "Venus",
+      "tags": [
+        "atmosphericbody",
+        "celestial",
+        "ksa",
+        "venus"
+      ],
+      "components": [
+        {
+          "type": "Rekall.AtmosphereRenderer",
+          "properties": {
+            "height": 0.01,
+            "density": 1,
+            "rayleighColor": "#7fb6ff"
+          }
+        },
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Venus",
+            "type": "AtmosphericBody",
+            "meanRadiusKm": 6051.8,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 4.8685e+24,
+            "color": "#ffdead",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 108208636.8510616,
+            "eccentricity": 0.006781458454862293,
+            "inclinationDegrees": 3.394398656865404,
+            "longitudeOfAscendingNodeDegrees": 76.60714455490883,
+            "argumentOfPeriapsisDegrees": 54.81586957836043,
+            "timeAtPeriapsisSeconds": -5064962.5577151645,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#ffdead",
+            "surfaceTexture": "asset_venus-diffuse_bcc7a960"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 108.2086368510616
+          }
+        },
+        {
+          "type": "Rekall.OrbitPathRenderer",
+          "properties": {
+            "segments": 192,
+            "thickness": 8,
+            "verticalOffset": -0.05,
+            "color": "#64b7ff",
+            "emissiveStrength": 4,
+            "active": true
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_c876ce6b3e5d4802b8d7270deaee0798",
+      "name": "Vesta",
+      "tags": [
+        "celestial",
+        "ksa",
+        "minorbody",
+        "vesta"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CelestialBody",
+          "properties": {
+            "bodyId": "Vesta",
+            "type": "MinorBody",
+            "meanRadiusKm": 262.7,
+            "radiusScale": 0.00002,
+            "renderRadius": 30,
+            "massKg": 259027100000000000000,
+            "color": "#ccb280",
+            "parentBodyId": "Sol"
+          }
+        },
+        {
+          "type": "Rekall.KeplerOrbit",
+          "properties": {
+            "parentBodyId": "Sol",
+            "semiMajorAxisKm": 353200572.7227,
+            "eccentricity": 0.089,
+            "inclinationDegrees": 7.14,
+            "longitudeOfAscendingNodeDegrees": 103.851,
+            "argumentOfPeriapsisDegrees": 151.198,
+            "timeAtPeriapsisSeconds": 0,
+            "distanceScale": 0.000001,
+            "timeScale": 2592000
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 30,
+            "color": "#ccb280"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 353.2005727227
+          }
+        }
+      ],
+      "parentId": "ent_50ac63d410d946e1bc3ffbffc7bec04d",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ksa_earth_chase_camera",
+      "name": "Earth Chase Camera",
+      "tags": [
+        "camera"
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false,
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "active": false,
+            "fieldOfView": 45,
+            "nearClip": 0.01,
+            "farClip": 1000,
+            "stereoMode": "vr",
+            "stereoRenderMode": "single-pass-multiview",
+            "stereoEyeSeparation": 0.064,
+            "stereoConvergenceDistance": 10,
+            "clearColor": "#000000"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0
+          }
+        },
+        {
+          "type": "Rekall.CameraTarget3D",
+          "properties": {
+            "targetName": "Earth",
+            "offsetX": 0,
+            "offsetY": 0.25,
+            "offsetZ": 0.9,
+            "targetOffsetX": 0,
+            "targetOffsetY": 0,
+            "targetOffsetZ": 0,
+            "followPosition": true,
+            "lookAt": true,
+            "active": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "ent_ksa_launch_vehicle",
+      "name": "Launch Vehicle",
+      "tags": [
+        "spacecraft",
+        "player",
+        "rocket"
+      ],
+      "parentId": "ent_a1fb29a548c9435396f3f9bba80a360a",
+      "prefabSourceId": null,
+      "visible": false,
+      "locked": false,
+      "components": [
+        {
+          "type": "Game.Modules.KsaSolarFlight.SpacecraftFlight",
+          "properties": {
+            "parentBodyId": "Earth",
+            "positionXKm": 6371.2,
+            "positionYKm": 0,
+            "positionZKm": 0,
+            "velocityXKmPerSecond": 0,
+            "velocityYKmPerSecond": 0,
+            "velocityZKmPerSecond": 0.46,
+            "dryMassKg": 9000,
+            "fuelMassKg": 80000,
+            "thrustKilonewtons": 1800,
+            "specificImpulseSeconds": 310,
+            "throttle": 1,
+            "launchPitchDegrees": 68,
+            "displayDistanceScale": 0.00003
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cone",
+            "color": "#f2f5ff"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cone"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 149.7307637103892,
+            "y": 0,
+            "z": 0,
+            "scaleX": 0.6,
+            "scaleY": 1.8,
+            "scaleZ": 0.6,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": -90
+          }
+        }
+      ]
+    },
+    {
+      "id": "entity_desktop-orrery-camera",
+      "name": "Desktop Orrery Camera",
+      "tags": [
+        "camera",
+        "desktop",
+        "orrery"
+      ],
+      "visible": true,
+      "locked": false,
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 2600,
+            "z": 0,
+            "pitch": 90,
+            "yaw": 0,
+            "roll": 0
+          }
+        },
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "active": true,
+            "projectionMode": "orthographic",
+            "orthographicSize": 3600,
+            "fieldOfView": 60,
+            "nearClip": 0.1,
+            "farClip": 8000,
+            "clearColor": "#000000",
+            "stereoMode": "mono",
+            "renderOrder": 0
+          }
+        }
+      ]
+    }
+  ]
+}

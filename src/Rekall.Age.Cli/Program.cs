@@ -79,9 +79,9 @@ internal static class RekallAgeCli
                 ["render", "openxr", "submit-clear"] => await SubmitOpenXrClearAsync("120"),
                 ["render", "openxr", "submit-clear", var frames] => await SubmitOpenXrClearAsync(frames),
                 ["render", "openxr", "submit-scene", var root, var scene] =>
-                    await SubmitOpenXrSoftwareSceneAsync(root, scene, "120", "1920", "1080"),
+                    await SubmitOpenXrSoftwareSceneAsync(root, scene, "0", "0", "0"),
                 ["render", "openxr", "submit-scene", var root, var scene, var frames] =>
-                    await SubmitOpenXrSoftwareSceneAsync(root, scene, frames, "1920", "1080"),
+                    await SubmitOpenXrSoftwareSceneAsync(root, scene, frames, "0", "0"),
                 ["render", "openxr", "submit-scene", var root, var scene, var frames, var width, var height] =>
                     await SubmitOpenXrSoftwareSceneAsync(root, scene, frames, width, height),
                 ["render", "openxr", "frame-plan", var root, var scene] =>
@@ -879,6 +879,13 @@ internal static class RekallAgeCli
         Console.WriteLine($"Swapchain: {result.SwapchainCreated}");
         Console.WriteLine($"Recommended eye size: {result.RecommendedWidth}x{result.RecommendedHeight}");
         Console.WriteLine($"Submitted eye size: {result.RenderWidth}x{result.RenderHeight}");
+        Console.WriteLine($"Rendering backend: {result.RenderingBackend}");
+        Console.WriteLine($"Native Vulkan frames: {result.NativeVulkanFrames}");
+        Console.WriteLine($"Software fallback frames: {result.SoftwareFallbackFrames}");
+        foreach (var reason in result.NativeVulkanFallbackReasons)
+        {
+            Console.WriteLine($"Native Vulkan fallback: {reason}");
+        }
         Console.WriteLine($"Active camera: {result.ActiveCamera ?? "<none>"}");
         Console.WriteLine($"Renderables: {result.RenderableCount}");
         foreach (var error in result.Errors)
@@ -917,6 +924,16 @@ internal static class RekallAgeCli
         Console.WriteLine($"Color swapchains: {result.Value.ColorSwapchainCount}; depth swapchains: {result.Value.DepthSwapchainCount}; array size: {result.Value.SwapchainArraySize}");
         Console.WriteLine($"Recommended eye size: {result.Value.RecommendedEyeWidth}x{result.Value.RecommendedEyeHeight}");
         Console.WriteLine($"Geometry: {result.Value.VertexCount} vertices, {result.Value.IndexCount} indices, {result.Value.DrawCount} draws");
+        Console.WriteLine($"Native Vulkan target: {result.Value.NativeVulkanTargetKind}; ready: {result.Value.NativeVulkanSceneTargetReady}");
+        Console.WriteLine($"Native Vulkan sync owner: {result.Value.NativeVulkanSynchronizationOwner}");
+        Console.WriteLine($"Native Vulkan ownership: colorImages={result.Value.NativeVulkanOwnsColorImages}; depthImages={result.Value.NativeVulkanOwnsDepthImages}; readback={result.Value.NativeVulkanOwnsReadbackBuffers}");
+        Console.WriteLine($"Native Vulkan framebuffers: {result.Value.NativeVulkanFramebufferCountPerSwapchainImage} per swapchain image; color views: {result.Value.NativeVulkanColorImageViewCountPerSwapchainImage}");
+        Console.WriteLine($"Native Vulkan command passes: {result.Value.NativeVulkanRenderPassesPerFrame}; frame uniforms: {result.Value.NativeVulkanFrameUniformBuffers}; compositor color handoff: {result.Value.NativeVulkanLeavesColorForCompositor}");
+        foreach (var step in result.Value.NativeVulkanRenderSteps)
+        {
+            Console.WriteLine($"Native Vulkan: {step}");
+        }
+
         foreach (var call in result.Value.RequiredOpenXrCalls)
         {
             Console.WriteLine($"Call: {call}");

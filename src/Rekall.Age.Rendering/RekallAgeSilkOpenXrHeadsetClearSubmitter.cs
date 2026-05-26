@@ -379,6 +379,9 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
         var referenceSpaceCreated = false;
         var swapchainCreated = false;
         var submittedFrames = 0;
+        var nativeVulkanFrames = 0;
+        var softwareFallbackFrames = 0;
+        var nativeFallbackReasons = new List<string>();
         var recommendedWidth = 0;
         var recommendedHeight = 0;
         var renderableCount = 0;
@@ -599,6 +602,15 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
                                         viewConfigViews);
                                     recommendedWidth = checked((int)Math.Max(1, viewConfigViews[0].RecommendedImageRectWidth));
                                     recommendedHeight = checked((int)Math.Max(1, viewConfigViews[0].RecommendedImageRectHeight));
+                                    plan = plan with
+                                    {
+                                        RenderWidth = plan.RenderWidth <= 0
+                                            ? Math.Min(recommendedWidth, RekallAgeOpenXrHeadsetSubmitPlanner.MaxSceneEyeExtent)
+                                            : plan.RenderWidth,
+                                        RenderHeight = plan.RenderHeight <= 0
+                                            ? Math.Min(recommendedHeight, RekallAgeOpenXrHeadsetSubmitPlanner.MaxSceneEyeExtent)
+                                            : plan.RenderHeight
+                                    };
 
                                     var format = SelectSwapchainFormat(xr, session, errors);
                                     if (format is null)
@@ -646,11 +658,15 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
                                             return SoftwareSceneResult(false);
                                         }
 
-                                        var sceneFrame = new RekallAgeOpenXrSoftwareSceneFrameRenderer()
-                                            .BuildSceneAsync(plan, cancellationToken)
+                                        var sceneColorFormat = RekallAgeVulkanSceneSwapchainFormatMapper.TryMapColorFormat(format.Value, out var mappedSceneColorFormat)
+                                            ? mappedSceneColorFormat
+                                            : Format.R8G8B8A8Srgb;
+                                        var sceneFrameSource = new RekallAgeOpenXrSoftwareSceneFrameRenderer()
+                                            .CreateFrameSourceAsync(plan, cancellationToken, sceneColorFormat)
                                             .AsTask()
                                             .GetAwaiter()
                                             .GetResult();
+                                        var sceneFrame = sceneFrameSource.BuildCurrentFrame();
                                         renderableCount = sceneFrame.Frame.Renderables.Count;
                                         activeCamera = sceneFrame.Frame.ActiveCamera?.EntityName;
 
@@ -659,21 +675,29 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
                                             return SoftwareSceneResult(false);
                                         }
 
-                                        submittedFrames = SubmitSoftwareSceneFrames(
+                                        var frameCounts = SubmitSoftwareSceneFrames(
                                             xr,
                                             vk,
+                                            vkInstance,
+                                            physicalDevice,
+                                            vkDevice,
                                             session,
                                             space,
                                             swapchain,
                                             images,
                                             locateViews,
                                             queue,
+                                            queueFamilyIndex.Value,
                                             vkFrameResources,
-                                            sceneFrame,
+                                            sceneFrameSource,
                                             format.Value,
                                             plan,
                                             cancellationToken,
+                                            nativeFallbackReasons,
                                             errors);
+                                        submittedFrames = frameCounts.Submitted;
+                                        nativeVulkanFrames = frameCounts.NativeVulkan;
+                                        softwareFallbackFrames = frameCounts.SoftwareFallback;
                                         return SoftwareSceneResult(submittedFrames > 0 && errors.Count == 0);
                                     }
                                     finally
@@ -737,6 +761,14 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
                 plan.RenderHeight,
                 renderableCount,
                 activeCamera,
+                nativeVulkanFrames,
+                softwareFallbackFrames,
+                nativeVulkanFrames > 0 && softwareFallbackFrames == 0
+                    ? "native-vulkan-openxr-swapchain"
+                    : nativeVulkanFrames > 0
+                        ? "native-vulkan-openxr-swapchain-with-software-fallback"
+                        : "software-vulkan-upload-bridge",
+                nativeFallbackReasons.Distinct(StringComparer.Ordinal).ToArray(),
                 errors);
         }
     }
@@ -873,145 +905,195 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
         return submitted;
     }
 
-    private static int SubmitSoftwareSceneFrames(
+    private static OpenXrSceneSubmitFrameCounts SubmitSoftwareSceneFrames(
         XR xr,
         Vk vk,
+        VkInstance vkInstance,
+        PhysicalDevice physicalDevice,
+        Device vkDevice,
         Silk.NET.OpenXR.Session session,
         Space space,
         Swapchain swapchain,
         Image[] images,
         XrLocateViewsDelegate locateViews,
         Queue queue,
+        uint queueFamilyIndex,
         VulkanSoftwareSceneFrameResources vkFrameResources,
-        RekallAgeOpenXrPerspectiveSceneFrame sceneFrame,
+        RekallAgeOpenXrPerspectiveSceneFrameSource sceneFrameSource,
         long swapchainFormat,
         RekallAgeOpenXrHeadsetSoftwareSceneSubmitPlan plan,
         CancellationToken cancellationToken,
+        List<string> nativeFallbackReasons,
         List<string> errors)
     {
         var submitted = 0;
+        var nativeVulkan = 0;
+        var softwareFallback = 0;
         var perspectiveRenderer = new RekallAgePerspectiveSoftwareSceneRenderer();
+        var nativeRenderers = new Dictionary<ulong, RekallAgeNativeVulkanSceneCapture.VulkanSceneRenderer.OpenXrSwapchainImageRenderer>();
         var views = stackalloc View[2];
         var projectionViews = stackalloc CompositionLayerProjectionView[2];
         var layerPointers = stackalloc CompositionLayerBaseHeader*[1];
-        for (var frame = 0; frame < plan.FrameCount; frame++)
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            views[0] = new View { Type = XrStructureType.View };
-            views[1] = new View { Type = XrStructureType.View };
-            var waitInfo = new FrameWaitInfo { Type = XrStructureType.FrameWaitInfo };
-            var frameState = new FrameState { Type = XrStructureType.FrameState };
-            if (xr.WaitFrame(session, &waitInfo, ref frameState) != XrResult.Success)
+            for (var frameIndex = 0; plan.FrameCount == RekallAgeOpenXrHeadsetSubmitPlanner.ContinuousSceneFrameCount || frameIndex < plan.FrameCount; frameIndex++)
             {
-                errors.Add("xrWaitFrame failed.");
-                break;
-            }
-
-            var beginInfo = new FrameBeginInfo { Type = XrStructureType.FrameBeginInfo };
-            if (xr.BeginFrame(session, &beginInfo) != XrResult.Success)
-            {
-                errors.Add("xrBeginFrame failed.");
-                break;
-            }
-
-            var locateInfo = new ViewLocateInfo
-            {
-                Type = XrStructureType.ViewLocateInfo,
-                ViewConfigurationType = ViewConfigurationType.PrimaryStereo,
-                DisplayTime = frameState.PredictedDisplayTime,
-                Space = space
-            };
-            var viewState = new ViewState { Type = XrStructureType.ViewState };
-            var locateResult = locateViews(session, &locateInfo, &viewState, 2, out var viewCount, views);
-            if (locateResult != XrResult.Success || viewCount < 2)
-            {
-                errors.Add($"xrLocateViews failed or returned fewer than 2 views ({locateResult}, {viewCount}).");
-                EndEmptyFrame(xr, session, frameState.PredictedDisplayTime);
-                break;
-            }
-
-            var acquireInfo = new SwapchainImageAcquireInfo { Type = XrStructureType.SwapchainImageAcquireInfo };
-            uint imageIndex;
-            if (xr.AcquireSwapchainImage(swapchain, &acquireInfo, &imageIndex) != XrResult.Success)
-            {
-                errors.Add("xrAcquireSwapchainImage failed.");
-                EndEmptyFrame(xr, session, frameState.PredictedDisplayTime);
-                break;
-            }
-
-            var imageWaitInfo = new SwapchainImageWaitInfo
-            {
-                Type = XrStructureType.SwapchainImageWaitInfo,
-                Timeout = XrInfiniteDuration
-            };
-            if (xr.WaitSwapchainImage(swapchain, &imageWaitInfo) != XrResult.Success)
-            {
-                errors.Add("xrWaitSwapchainImage failed.");
-            }
-            else
-            {
-                var selectedImage = images[Math.Min((int)imageIndex, images.Length - 1)];
-                var stereoPixels = RenderStereoScenePixels(
-                    perspectiveRenderer,
-                    sceneFrame,
-                    views,
-                    plan.RenderWidth,
-                    plan.RenderHeight,
-                    swapchainFormat);
-                UploadSoftwareSceneImage(vk, queue, vkFrameResources, selectedImage, stereoPixels, plan.RenderWidth, plan.RenderHeight);
-            }
-
-            var releaseInfo = new SwapchainImageReleaseInfo { Type = XrStructureType.SwapchainImageReleaseInfo };
-            if (xr.ReleaseSwapchainImage(swapchain, &releaseInfo) != XrResult.Success)
-            {
-                errors.Add("xrReleaseSwapchainImage failed.");
-            }
-
-            for (var eye = 0; eye < 2; eye++)
-            {
-                projectionViews[eye] = new CompositionLayerProjectionView
+                cancellationToken.ThrowIfCancellationRequested();
+                views[0] = new View { Type = XrStructureType.View };
+                views[1] = new View { Type = XrStructureType.View };
+                var waitInfo = new FrameWaitInfo { Type = XrStructureType.FrameWaitInfo };
+                var frameState = new FrameState { Type = XrStructureType.FrameState };
+                if (xr.WaitFrame(session, &waitInfo, ref frameState) != XrResult.Success)
                 {
-                    Type = XrStructureType.CompositionLayerProjectionView,
-                    Pose = views[eye].Pose,
-                    Fov = views[eye].Fov,
-                    SubImage = new SwapchainSubImage
-                    {
-                        Swapchain = swapchain,
-                        ImageRect = new Rect2Di(
-                            new Offset2Di(0, 0),
-                            new Extent2Di(plan.RenderWidth, plan.RenderHeight)),
-                        ImageArrayIndex = (uint)eye
-                    }
+                    errors.Add("xrWaitFrame failed.");
+                    break;
+                }
+
+                var beginInfo = new FrameBeginInfo { Type = XrStructureType.FrameBeginInfo };
+                if (xr.BeginFrame(session, &beginInfo) != XrResult.Success)
+                {
+                    errors.Add("xrBeginFrame failed.");
+                    break;
+                }
+
+                var locateInfo = new ViewLocateInfo
+                {
+                    Type = XrStructureType.ViewLocateInfo,
+                    ViewConfigurationType = ViewConfigurationType.PrimaryStereo,
+                    DisplayTime = frameState.PredictedDisplayTime,
+                    Space = space
                 };
-            }
+                var viewState = new ViewState { Type = XrStructureType.ViewState };
+                var locateResult = locateViews(session, &locateInfo, &viewState, 2, out var viewCount, views);
+                if (locateResult != XrResult.Success || viewCount < 2)
+                {
+                    errors.Add($"xrLocateViews failed or returned fewer than 2 views ({locateResult}, {viewCount}).");
+                    EndEmptyFrame(xr, session, frameState.PredictedDisplayTime);
+                    break;
+                }
 
-            var projection = new CompositionLayerProjection
-            {
-                Type = XrStructureType.CompositionLayerProjection,
-                Space = space,
-                ViewCount = 2,
-                Views = projectionViews
-            };
-            layerPointers[0] = (CompositionLayerBaseHeader*)&projection;
-            var endInfo = new FrameEndInfo
-            {
-                Type = XrStructureType.FrameEndInfo,
-                DisplayTime = frameState.PredictedDisplayTime,
-                EnvironmentBlendMode = EnvironmentBlendMode.Opaque,
-                LayerCount = 1,
-                Layers = layerPointers
-            };
-            if (xr.EndFrame(session, &endInfo) != XrResult.Success)
-            {
-                errors.Add("xrEndFrame failed.");
-                break;
-            }
+                var acquireInfo = new SwapchainImageAcquireInfo { Type = XrStructureType.SwapchainImageAcquireInfo };
+                uint imageIndex;
+                if (xr.AcquireSwapchainImage(swapchain, &acquireInfo, &imageIndex) != XrResult.Success)
+                {
+                    errors.Add("xrAcquireSwapchainImage failed.");
+                    EndEmptyFrame(xr, session, frameState.PredictedDisplayTime);
+                    break;
+                }
 
-            submitted++;
+                var imageWaitInfo = new SwapchainImageWaitInfo
+                {
+                    Type = XrStructureType.SwapchainImageWaitInfo,
+                    Timeout = XrInfiniteDuration
+                };
+                if (xr.WaitSwapchainImage(swapchain, &imageWaitInfo) != XrResult.Success)
+                {
+                    errors.Add("xrWaitSwapchainImage failed.");
+                }
+                else
+                {
+                    var selectedImage = images[Math.Min((int)imageIndex, images.Length - 1)];
+                    var sceneFrame = frameIndex == 0
+                        ? sceneFrameSource.BuildCurrentFrame()
+                        : sceneFrameSource.AdvanceAsync(cancellationToken)
+                            .AsTask()
+                            .GetAwaiter()
+                            .GetResult();
+                    var nativeSubmitted = TryRenderNativeOpenXrSceneFrame(
+                        vk,
+                        vkInstance,
+                        physicalDevice,
+                        vkDevice,
+                        queue,
+                        queueFamilyIndex,
+                        sceneFrame,
+                        selectedImage,
+                        views,
+                        nativeRenderers,
+                        out var nativeErrors);
+                    if (!nativeSubmitted)
+                    {
+                        nativeFallbackReasons.AddRange(nativeErrors);
+                        var stereoPixels = RenderStereoScenePixels(
+                            perspectiveRenderer,
+                            sceneFrame,
+                            views,
+                            plan.RenderWidth,
+                            plan.RenderHeight,
+                            swapchainFormat);
+                        UploadSoftwareSceneImage(vk, queue, vkFrameResources, selectedImage, stereoPixels, plan.RenderWidth, plan.RenderHeight);
+                        softwareFallback++;
+                    }
+                    else
+                    {
+                        nativeVulkan++;
+                    }
+                }
+
+                var releaseInfo = new SwapchainImageReleaseInfo { Type = XrStructureType.SwapchainImageReleaseInfo };
+                if (xr.ReleaseSwapchainImage(swapchain, &releaseInfo) != XrResult.Success)
+                {
+                    errors.Add("xrReleaseSwapchainImage failed.");
+                }
+
+                for (var eye = 0; eye < 2; eye++)
+                {
+                    projectionViews[eye] = new CompositionLayerProjectionView
+                    {
+                        Type = XrStructureType.CompositionLayerProjectionView,
+                        Pose = views[eye].Pose,
+                        Fov = views[eye].Fov,
+                        SubImage = new SwapchainSubImage
+                        {
+                            Swapchain = swapchain,
+                            ImageRect = new Rect2Di(
+                                new Offset2Di(0, 0),
+                                new Extent2Di(plan.RenderWidth, plan.RenderHeight)),
+                            ImageArrayIndex = (uint)eye
+                        }
+                    };
+                }
+
+                var projection = new CompositionLayerProjection
+                {
+                    Type = XrStructureType.CompositionLayerProjection,
+                    Space = space,
+                    ViewCount = 2,
+                    Views = projectionViews
+                };
+                layerPointers[0] = (CompositionLayerBaseHeader*)&projection;
+                var endInfo = new FrameEndInfo
+                {
+                    Type = XrStructureType.FrameEndInfo,
+                    DisplayTime = frameState.PredictedDisplayTime,
+                    EnvironmentBlendMode = EnvironmentBlendMode.Opaque,
+                    LayerCount = 1,
+                    Layers = layerPointers
+                };
+                if (xr.EndFrame(session, &endInfo) != XrResult.Success)
+                {
+                    errors.Add("xrEndFrame failed.");
+                    break;
+                }
+
+                submitted++;
+            }
+        }
+        finally
+        {
+            foreach (var renderer in nativeRenderers.Values)
+            {
+                renderer.Dispose();
+            }
         }
 
-        return submitted;
+        return new OpenXrSceneSubmitFrameCounts(submitted, nativeVulkan, softwareFallback);
     }
+
+    private readonly record struct OpenXrSceneSubmitFrameCounts(
+        int Submitted,
+        int NativeVulkan,
+        int SoftwareFallback);
 
     private static void EndEmptyFrame(XR xr, Silk.NET.OpenXR.Session session, long displayTime)
     {
@@ -1260,7 +1342,15 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
 
     private static byte[] PreparePixelsForSwapchain(byte[] rgba, long format)
     {
-        if (format != VkFormatB8G8R8A8Srgb)
+        if (RekallAgeVulkanSceneSwapchainFormatMapper.TryMapColorFormat(format, out var mappedFormat)
+            && mappedFormat != Format.B8G8R8A8Srgb
+            && mappedFormat != Format.B8G8R8A8Unorm)
+        {
+            return rgba;
+        }
+
+        if (!RekallAgeVulkanSceneSwapchainFormatMapper.TryMapColorFormat(format, out _)
+            && format != VkFormatB8G8R8A8Srgb)
         {
             return rgba;
         }
@@ -1289,28 +1379,120 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
             ?? throw new InvalidOperationException("OpenXR scene rendering requires an active camera.");
         var layerBytes = checked(width * height * 4);
         var stereo = new byte[checked(layerBytes * 2)];
+        var locatedEyes = new RekallAgeOpenXrLocatedEyeView[2];
         for (var eye = 0; eye < 2; eye++)
         {
-            var orientation = ToNumerics(views[eye].Pose.Orientation);
-            var position = ToNumerics(views[eye].Pose.Position);
-            var viewProjection = renderer.CreateCameraViewProjection(
-                camera,
-                width,
-                height,
-                orientation,
-                position);
+            locatedEyes[eye] = new RekallAgeOpenXrLocatedEyeView(
+                eye,
+                ToNumerics(views[eye].Pose.Orientation),
+                ToNumerics(views[eye].Pose.Position),
+                views[eye].Fov.AngleLeft,
+                views[eye].Fov.AngleRight,
+                views[eye].Fov.AngleUp,
+                views[eye].Fov.AngleDown);
+        }
+
+        var nativePlan = RekallAgeOpenXrNativeSceneRenderPlanBuilder.Build(sceneFrame.PreparedFrame, locatedEyes);
+        if (!nativePlan.Ready)
+        {
+            throw new InvalidOperationException($"OpenXR native scene eye plan was not ready: {string.Join(" ", nativePlan.Blockers)}");
+        }
+
+        foreach (var eyePlan in nativePlan.Eyes)
+        {
             var rgba = renderer.Render(
                 sceneFrame.Batch,
                 width,
                 height,
-                viewProjection,
+                eyePlan.ViewProjection,
                 camera.ClearColor,
                 sceneFrame.Textures);
             var formatted = PreparePixelsForSwapchain(rgba, swapchainFormat);
-            System.Buffer.BlockCopy(formatted, 0, stereo, eye * layerBytes, layerBytes);
+            System.Buffer.BlockCopy(formatted, 0, stereo, eyePlan.EyeIndex * layerBytes, layerBytes);
         }
 
         return stereo;
+    }
+
+    private static bool TryRenderNativeOpenXrSceneFrame(
+        Vk vk,
+        VkInstance vkInstance,
+        PhysicalDevice physicalDevice,
+        Device vkDevice,
+        Queue queue,
+        uint queueFamilyIndex,
+        RekallAgeOpenXrPerspectiveSceneFrame sceneFrame,
+        Image selectedImage,
+        View* views,
+        Dictionary<ulong, RekallAgeNativeVulkanSceneCapture.VulkanSceneRenderer.OpenXrSwapchainImageRenderer> nativeRenderers,
+        out IReadOnlyList<string> errors)
+    {
+        errors = [];
+        var locatedEyes = BuildLocatedEyeViews(views);
+        var nativePlan = RekallAgeOpenXrNativeSceneRenderPlanBuilder.Build(sceneFrame.PreparedFrame, locatedEyes);
+        if (!nativePlan.Ready)
+        {
+            errors = nativePlan.Blockers;
+            return false;
+        }
+
+        var commandPlan = RekallAgeVulkanSceneCommandPlanBuilder.BuildOpenXr(nativePlan);
+        if (!commandPlan.Ready)
+        {
+            errors = commandPlan.Blockers;
+            return false;
+        }
+
+        var key = selectedImage.Handle;
+        if (nativeRenderers.TryGetValue(key, out var renderer) && !renderer.CanRender(commandPlan))
+        {
+            renderer.Dispose();
+            nativeRenderers.Remove(key);
+        }
+
+        if (!nativeRenderers.TryGetValue(key, out renderer))
+        {
+            var create = RekallAgeNativeVulkanSceneCapture.VulkanSceneRenderer.OpenXrSwapchainImageRenderer.TryCreate(
+                vk,
+                vkInstance,
+                physicalDevice,
+                vkDevice,
+                queue,
+                queueFamilyIndex,
+                sceneFrame,
+                commandPlan,
+                selectedImage,
+                out renderer);
+            if (!create.Rendered || renderer is null)
+            {
+                errors = create.Errors;
+                return false;
+            }
+
+            nativeRenderers[key] = renderer;
+        }
+
+        var result = renderer.Render(commandPlan);
+        errors = result.Errors;
+        return result.Rendered;
+    }
+
+    private static RekallAgeOpenXrLocatedEyeView[] BuildLocatedEyeViews(View* views)
+    {
+        var locatedEyes = new RekallAgeOpenXrLocatedEyeView[2];
+        for (var eye = 0; eye < 2; eye++)
+        {
+            locatedEyes[eye] = new RekallAgeOpenXrLocatedEyeView(
+                eye,
+                ToNumerics(views[eye].Pose.Orientation),
+                ToNumerics(views[eye].Pose.Position),
+                views[eye].Fov.AngleLeft,
+                views[eye].Fov.AngleRight,
+                views[eye].Fov.AngleUp,
+                views[eye].Fov.AngleDown);
+        }
+
+        return locatedEyes;
     }
 
     private static Quaternion ToNumerics(Quaternionf value)

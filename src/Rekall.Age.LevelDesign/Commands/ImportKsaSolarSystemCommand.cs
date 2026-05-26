@@ -27,6 +27,7 @@ public sealed class ImportKsaSolarSystemCommand
 {
     private const double AstronomicalUnitKm = 149_597_870.7;
     private const double DefaultVisualRotationTimeScale = 86_400;
+    private const double DefaultVisualOrbitTimeScale = 2_592_000;
     private const string SolDisplayColor = "#ffb347";
     private readonly RekallAgeAssetCatalogStore _assetStore = new();
     private readonly RekallAgeSceneStore _sceneStore = new();
@@ -208,6 +209,7 @@ public sealed class ImportKsaSolarSystemCommand
                     ["longitudeOfAscendingNodeDegrees"] = body.Orbit.LongitudeOfAscendingNodeDegrees,
                     ["argumentOfPeriapsisDegrees"] = body.Orbit.ArgumentOfPeriapsisDegrees,
                     ["timeAtPeriapsisSeconds"] = body.Orbit.TimeAtPeriapsisSeconds,
+                    ["timeScale"] = DefaultVisualOrbitTimeScale,
                     ["distanceScale"] = ResolveOrbitDistanceScale(body, bodyById, distanceScale, radiusScale)
                 }));
             entity = entity.AddComponent(RekallAgeComponentDocument.Create(
@@ -215,10 +217,10 @@ public sealed class ImportKsaSolarSystemCommand
                 new JsonObject
                 {
                     ["segments"] = IsPrimaryOrbit(body, bodyById) ? 192 : 96,
-                    ["thickness"] = IsPrimaryOrbit(body, bodyById) ? 0.045 : 0.03,
+                    ["thickness"] = IsPrimaryOrbit(body, bodyById) ? 8 : 2.5,
                     ["verticalOffset"] = -0.05,
-                    ["color"] = IsPrimaryOrbit(body, bodyById) ? "#5aa8ff" : "#a9c8ff",
-                    ["emissiveStrength"] = 1.4,
+                    ["color"] = IsPrimaryOrbit(body, bodyById) ? "#64b7ff" : "#b7d7ff",
+                    ["emissiveStrength"] = IsPrimaryOrbit(body, bodyById) ? 4 : 2.5,
                     ["active"] = true
                 }));
         }
@@ -330,7 +332,7 @@ public sealed class ImportKsaSolarSystemCommand
                     new JsonObject { ["z"] = cameraDistance, ["y"] = cameraDistance * 0.2, ["pitch"] = -12 }))
                 .AddComponent(RekallAgeComponentDocument.Create(
                     "Rekall.Camera3D",
-                    new JsonObject { ["active"] = true, ["farClip"] = cameraDistance * 20, ["clearColor"] = "#01040a" }))
+                    new JsonObject { ["active"] = true, ["farClip"] = cameraDistance * 20, ["clearColor"] = "#000000" }))
                 .AddComponent(RekallAgeComponentDocument.Create(
                     "Rekall.CameraZoomInput",
                     new JsonObject

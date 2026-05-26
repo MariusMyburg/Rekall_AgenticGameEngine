@@ -60,10 +60,19 @@ public sealed record RekallAgeOpenXrHeadsetSoftwareSceneSubmitResult(
     int RenderHeight,
     int RenderableCount,
     string? ActiveCamera,
+    int NativeVulkanFrames,
+    int SoftwareFallbackFrames,
+    string RenderingBackend,
+    IReadOnlyList<string> NativeVulkanFallbackReasons,
     IReadOnlyList<string> Errors);
 
 public static class RekallAgeOpenXrHeadsetSubmitPlanner
 {
+    public const int ContinuousSceneFrameCount = 0;
+    public const int RecommendedRuntimeExtent = 0;
+    public const int MaxSceneEyeExtent = 8192;
+    public const int MaxSceneFrameCount = 72_000;
+
     public static RekallAgeOpenXrHeadsetClearSubmitPlan Plan(RekallAgeOpenXrHeadsetClearSubmitRequest request)
     {
         return new RekallAgeOpenXrHeadsetClearSubmitPlan(
@@ -79,10 +88,19 @@ public static class RekallAgeOpenXrHeadsetSubmitPlanner
         return new RekallAgeOpenXrHeadsetSoftwareSceneSubmitPlan(
             request.ProjectRoot.Trim(),
             request.SceneName.Trim(),
-            Math.Clamp(request.FrameCount, 1, 600),
+            request.FrameCount <= 0
+                ? ContinuousSceneFrameCount
+                : Math.Clamp(request.FrameCount, 1, MaxSceneFrameCount),
             Math.Max(0, request.SimulationStartFrame),
-            Math.Clamp(request.RenderWidth, 64, 4096),
-            Math.Clamp(request.RenderHeight, 64, 4096),
+            NormalizeSceneEyeExtent(request.RenderWidth),
+            NormalizeSceneEyeExtent(request.RenderHeight),
             request.DebugOverlay);
+    }
+
+    private static int NormalizeSceneEyeExtent(int extent)
+    {
+        return extent <= 0
+            ? RecommendedRuntimeExtent
+            : Math.Clamp(extent, 64, MaxSceneEyeExtent);
     }
 }

@@ -34,6 +34,18 @@ public sealed record InspectOpenXrHeadsetFramePlanResult(
     int RecommendedEyeHeight,
     string RecommendedColorFormat,
     string RecommendedDepthFormat,
+    string NativeVulkanTargetKind,
+    bool NativeVulkanSceneTargetReady,
+    string NativeVulkanSynchronizationOwner,
+    bool NativeVulkanOwnsColorImages,
+    bool NativeVulkanOwnsDepthImages,
+    bool NativeVulkanOwnsReadbackBuffers,
+    int NativeVulkanFramebufferCountPerSwapchainImage,
+    int NativeVulkanColorImageViewCountPerSwapchainImage,
+    int NativeVulkanRenderPassesPerFrame,
+    int NativeVulkanFrameUniformBuffers,
+    bool NativeVulkanLeavesColorForCompositor,
+    IReadOnlyList<string> NativeVulkanRenderSteps,
     IReadOnlyList<string> RequiredOpenXrCalls,
     IReadOnlyList<string> FrameLoopSteps,
     IReadOnlyList<string> Blockers,
@@ -120,8 +132,16 @@ public sealed class InspectOpenXrHeadsetFramePlanCommand
         var recommendedEyeHeight = firstRuntimeEye is not null
             ? checked((int)firstRuntimeEye.RecommendedImageRectHeight)
             : request.Height;
-        var blockers = BuildBlockers(session, stereoEnabled, eyeCount, usesMultiview);
+        var blockers = BuildBlockers(session, stereoEnabled, eyeCount, usesMultiview).ToList();
         var warnings = BuildWarnings(frame, meshes.Count, batch.Draws.Count, usesMultiview);
+        var nativeTargetPlan = RekallAgeVulkanSceneRenderBackendPlanner.Plan(
+            RekallAgeVulkanSceneRenderTarget.OpenXrStereoSwapchain(
+                checked((uint)Math.Max(1, recommendedEyeWidth)),
+                checked((uint)Math.Max(1, recommendedEyeHeight)),
+                checked((uint)Math.Max(2, eyeCount)),
+                Silk.NET.Vulkan.Format.R8G8B8A8Srgb,
+                Silk.NET.Vulkan.Format.D32Sfloat));
+        blockers.AddRange(nativeTargetPlan.Blockers);
         var result = new InspectOpenXrHeadsetFramePlanResult(
             world.SceneName,
             world.FrameIndex,
@@ -145,8 +165,20 @@ public sealed class InspectOpenXrHeadsetFramePlanCommand
             recommendedEyeHeight,
             "R8G8B8A8_SRGB",
             "D32_SFLOAT",
+            nativeTargetPlan.Target.Kind,
+            nativeTargetPlan.CanUseNativeScenePipeline,
+            nativeTargetPlan.Ownership.SynchronizationOwner,
+            nativeTargetPlan.Ownership.OwnsColorImages,
+            nativeTargetPlan.Ownership.OwnsDepthImages,
+            nativeTargetPlan.Ownership.OwnsReadbackBuffers,
+            checked((int)nativeTargetPlan.Framebuffers.FramebufferCountPerSwapchainImage),
+            checked((int)nativeTargetPlan.Framebuffers.ColorImageViewCountPerSwapchainImage),
+            checked((int)nativeTargetPlan.CommandSubmission.RenderPassesPerFrame),
+            checked((int)nativeTargetPlan.CommandSubmission.FrameUniformBufferCount),
+            nativeTargetPlan.CommandSubmission.LeavesColorForCompositor,
+            nativeTargetPlan.RequiredSteps,
             RequiredOpenXrCalls,
-            BuildFrameLoopSteps(usesMultiview, eyeCount),
+            BuildFrameLoopSteps(usesMultiview, eyeCount, nativeTargetPlan.CommandSubmission.RenderPassesPerFrame),
             blockers,
             warnings);
 
@@ -235,18 +267,21 @@ public sealed class InspectOpenXrHeadsetFramePlanCommand
             string.Equals(stereoMode, "xr", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static IReadOnlyList<string> BuildFrameLoopSteps(bool usesMultiview, int eyeCount)
+    private static IReadOnlyList<string> BuildFrameLoopSteps(bool usesMultiview, int eyeCount, uint renderPassesPerFrame)
     {
         var swapchainDescription = usesMultiview
             ? $"Acquire one color/depth array swapchain image with array size {Math.Max(1, eyeCount)}."
             : $"Acquire {Math.Max(1, eyeCount)} color/depth swapchain image pairs.";
+        var renderDescription = renderPassesPerFrame <= 1
+            ? "Render scene geometry with a single native Vulkan pass."
+            : $"Render scene geometry into {renderPassesPerFrame} eye layers with shared geometry buffers and per-eye frame uniforms.";
         return
         [
             "Poll OpenXR events and react to session state changes.",
             "Call xrWaitFrame and xrBeginFrame.",
             "Call xrLocateViews for XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO.",
             swapchainDescription,
-            "Render scene geometry once with multiview eye uniforms when available.",
+            renderDescription,
             "Release swapchain images.",
             "Submit an XrCompositionLayerProjection with one projection view per eye via xrEndFrame."
         ];
@@ -277,31 +312,43 @@ public sealed class InspectOpenXrHeadsetFramePlanCommand
     private static InspectOpenXrHeadsetFramePlanResult Empty(InspectOpenXrHeadsetFramePlanRequest request)
     {
         return new InspectOpenXrHeadsetFramePlanResult(
-            request.SceneName,
-            Math.Max(0, request.Frames),
-            false,
-            false,
-            null,
-            null,
-            false,
-            "invalid",
-            "primary-stereo",
-            0,
-            false,
-            false,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            "unknown",
-            "unknown",
-            [],
-            [],
-            [],
-            []);
+            SceneName: request.SceneName,
+            FrameIndex: Math.Max(0, request.Frames),
+            HeadsetSessionReady: false,
+            HmdSystemAvailable: false,
+            SystemId: null,
+            ActiveCamera: null,
+            StereoEnabled: false,
+            StereoRenderMode: "invalid",
+            ViewConfiguration: "primary-stereo",
+            EyeCount: 0,
+            UsesMultiview: false,
+            SharedGeometryBuffers: false,
+            VertexCount: 0,
+            IndexCount: 0,
+            DrawCount: 0,
+            ColorSwapchainCount: 0,
+            DepthSwapchainCount: 0,
+            SwapchainArraySize: 0,
+            RecommendedEyeWidth: 0,
+            RecommendedEyeHeight: 0,
+            RecommendedColorFormat: "unknown",
+            RecommendedDepthFormat: "unknown",
+            NativeVulkanTargetKind: "invalid",
+            NativeVulkanSceneTargetReady: false,
+            NativeVulkanSynchronizationOwner: "unknown",
+            NativeVulkanOwnsColorImages: false,
+            NativeVulkanOwnsDepthImages: false,
+            NativeVulkanOwnsReadbackBuffers: false,
+            NativeVulkanFramebufferCountPerSwapchainImage: 0,
+            NativeVulkanColorImageViewCountPerSwapchainImage: 0,
+            NativeVulkanRenderPassesPerFrame: 0,
+            NativeVulkanFrameUniformBuffers: 0,
+            NativeVulkanLeavesColorForCompositor: false,
+            NativeVulkanRenderSteps: [],
+            RequiredOpenXrCalls: [],
+            FrameLoopSteps: [],
+            Blockers: [],
+            Warnings: []);
     }
 }

@@ -76,6 +76,8 @@ internal static class RekallAgeCli
                     await InspectSceneVisibilityAsync(registry, context, root, scene, frames),
                 ["render", "openxr", "probe"] => await ProbeOpenXrRuntimeAsync(registry, context),
                 ["render", "openxr", "bootstrap-session"] => await BootstrapOpenXrSessionAsync(registry, context),
+                ["render", "openxr", "submit-clear"] => await SubmitOpenXrClearAsync("120"),
+                ["render", "openxr", "submit-clear", var frames] => await SubmitOpenXrClearAsync(frames),
                 ["render", "openxr", "frame-plan", var root, var scene] =>
                     await InspectOpenXrHeadsetFramePlanAsync(registry, context, root, scene, "0", "1920", "1080"),
                 ["render", "openxr", "frame-plan", var root, var scene, var frames] =>
@@ -806,6 +808,35 @@ internal static class RekallAgeCli
         }
 
         return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> SubmitOpenXrClearAsync(string frames)
+    {
+        if (!int.TryParse(frames, NumberStyles.Integer, CultureInfo.InvariantCulture, out var frameCount))
+        {
+            Console.WriteLine($"Invalid frame count '{frames}'.");
+            return 2;
+        }
+
+        var result = await new RekallAgeSilkOpenXrHeadsetClearSubmitter().SubmitAsync(
+            new RekallAgeOpenXrHeadsetClearSubmitRequest(FrameCount: frameCount),
+            CancellationToken.None);
+        Console.WriteLine(result.Submitted
+            ? $"Submitted {result.SubmittedFrames} OpenXR headset clear frame(s)."
+            : "OpenXR headset clear submit failed.");
+        Console.WriteLine($"Instance: {result.InstanceCreated}");
+        Console.WriteLine($"Vulkan instance: {result.VulkanInstanceCreated}");
+        Console.WriteLine($"Vulkan device: {result.VulkanDeviceCreated}");
+        Console.WriteLine($"Session: {result.SessionCreated}");
+        Console.WriteLine($"Reference space: {result.ReferenceSpaceCreated}");
+        Console.WriteLine($"Swapchain: {result.SwapchainCreated}");
+        Console.WriteLine($"Recommended eye size: {result.RecommendedWidth}x{result.RecommendedHeight}");
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"Error: {error}");
+        }
+
+        return result.Submitted ? 0 : 1;
     }
 
     private static async Task<int> InspectOpenXrHeadsetFramePlanAsync(

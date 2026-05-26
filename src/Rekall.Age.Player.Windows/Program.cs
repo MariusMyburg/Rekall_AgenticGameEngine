@@ -51,12 +51,14 @@ internal static class Program
         var syncToVerticalBlank = !HasOption(args, "--no-vsync");
         var openXrRequested = HasOption(args, "--xr") || HasOption(args, "--vr");
         var simulateXrInput = HasOption(args, "--simulate-xr") || HasOption(args, "--xr-sim");
+        var probeOpenXrCompositor = HasOption(args, "--openxr-compositor-probe");
         await using var player = await RekallAgeVeldridPlayer.CreateAsync(
             Path.GetFullPath(args[0]),
             args[1],
             syncToVerticalBlank,
             openXrRequested,
             simulateXrInput,
+            probeOpenXrCompositor,
             CancellationToken.None);
         PlayerLog.Write("Player entering render loop.");
         player.Run();
@@ -268,6 +270,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         bool syncToVerticalBlank,
         bool openXrRequested,
         bool simulateXrInput,
+        bool probeOpenXrCompositor,
         CancellationToken cancellationToken)
     {
         PlayerLog.Write("Loading runtime scene.");
@@ -331,11 +334,21 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var factory = device.ResourceFactory;
         PlayerLog.Write($"Created graphics device backend={device.BackendType} vsync={syncToVerticalBlank} anisotropy={device.Features.SamplerAnisotropy}.");
         var openXrVulkanInterop = InspectOpenXrVulkanInterop(device, openXrStatus);
-        var openXrCompositorSession = await BootstrapOpenXrCompositorSessionAsync(
-                device,
-                openXrVulkanInterop,
-                cancellationToken)
-            .ConfigureAwait(false);
+        RekallAgeOpenXrCompositorSessionBootstrapResult? openXrCompositorSession = null;
+        if (probeOpenXrCompositor)
+        {
+            PlayerLog.Write("OpenXR compositor probe enabled.");
+            openXrCompositorSession = await BootstrapOpenXrCompositorSessionAsync(
+                    device,
+                    openXrVulkanInterop,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        else if (openXrRequested)
+        {
+            PlayerLog.Write("OpenXR compositor probe skipped; running headset-ready stereo mirror until XR-created Vulkan swapchain submission is enabled.");
+        }
+
         var commands = factory.CreateCommandList();
         PlayerLog.Write("Compiling SPIR-V shaders.");
         var sceneShaders = factory.CreateFromSpirv(

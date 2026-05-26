@@ -416,6 +416,37 @@ public sealed class GameTemplateWorkflowTests
     }
 
     [Fact]
+    public async Task AgentAuthoringGauntletCreatesVerifiesPackagesAndAuditsTemplateGame()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var output = Path.Combine(root, "Builds", "GauntletPackage");
+        var auditOutput = Path.Combine(root, "Artifacts", "GauntletAudit");
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("agent authoring gauntlet"), CancellationToken.None);
+
+        var result = await new RunAgentAuthoringGauntletCommand().ExecuteAsync(
+            new RunAgentAuthoringGauntletRequest(
+                root,
+                "Gauntlet Pong",
+                "pong",
+                OutputDirectory: output,
+                AuditOutputDirectory: auditOutput,
+                Frames: 1),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.Ready);
+        Assert.Equal("pong", result.Value.TemplateId);
+        Assert.True(File.Exists(result.Value.PackageArchivePath), result.Value.PackageArchivePath);
+        Assert.True(File.Exists(result.Value.ProofFramePath), result.Value.ProofFramePath);
+        Assert.Contains(result.Value.Checks, check => check.Name == "create-playable" && check.Passed);
+        Assert.Contains(result.Value.Checks, check => check.Name == "verify-playable" && check.Passed);
+        Assert.Contains(result.Value.Checks, check => check.Name == "package-playable" && check.Passed);
+        Assert.Contains(result.Value.Checks, check => check.Name == "audit-package" && check.Passed);
+        Assert.Contains("rekall.workflow.inspect_playable_package", result.Value.RecommendedNextActions);
+        Assert.Contains("rekall.workflow.run_playable_package", result.Value.RecommendedNextActions);
+    }
+
+    [Fact]
     public async Task VerifyMvpTemplatesReportsEveryRequiredTemplateReady()
     {
         var root = TestPaths.CreateTempDirectory();

@@ -54,6 +54,10 @@ public sealed class GetEngineStatusCommand
                     "Inspect one MVP template, its draw contract, and suggested creation workflows.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
+                    "rekall.workflow.agent_authoring_gauntlet",
+                    "Run the preferred closed-loop proof: create, verify, package, audit, and return agent next actions for a playable game.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
                     "rekall.workflow.create_playable_package_from_template",
                     "Create, build, package, run, and capture a proof frame for a playable template game in one call.",
                     Recommended: true),

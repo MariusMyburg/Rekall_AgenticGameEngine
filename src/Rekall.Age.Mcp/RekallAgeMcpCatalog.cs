@@ -113,6 +113,7 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.render.visibility.inspect_scene" or
             "rekall.solar.import_ksa_system" or
             "rekall.templates.inspect" or
+            "rekall.workflow.agent_authoring_gauntlet" or
             "rekall.workflow.create_playable_package_from_template" or
             "rekall.workflow.audit_playable_package";
     }
@@ -123,6 +124,7 @@ internal static class RekallAgeMcpToolClassifier
         {
             "rekall.context.engine_status" => 5,
             "rekall.templates.inspect" => 8,
+            "rekall.workflow.agent_authoring_gauntlet" => 9,
             "rekall.workflow.create_playable_package_from_template" => 10,
             "rekall.workflow.audit_playable_package" => 15,
             "rekall.live.status" => 16,

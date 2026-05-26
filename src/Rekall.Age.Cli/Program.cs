@@ -176,6 +176,12 @@ internal static class RekallAgeCli
                 ["build", "player", var root, var scene, "--graphics"] => await BuildPlayerAsync(registry, context, root, scene, graphics: true),
                 ["game", "create", var root, var name, var template] => await CreateGameAsync(registry, context, root, name, template),
                 ["game", "create-playable", var root, var name, var template] => await CreatePlayableGameAsync(registry, context, root, name, template),
+                ["game", "gauntlet", var root, var name, var template] =>
+                    await RunAgentAuthoringGauntletAsync(registry, context, root, name, template, null, null),
+                ["game", "gauntlet", var root, var name, var template, var outputDirectory] =>
+                    await RunAgentAuthoringGauntletAsync(registry, context, root, name, template, outputDirectory, null),
+                ["game", "gauntlet", var root, var name, var template, var outputDirectory, var auditOutputDirectory] =>
+                    await RunAgentAuthoringGauntletAsync(registry, context, root, name, template, outputDirectory, auditOutputDirectory),
                 ["game", "create-package-playable", var root, var name, var template] =>
                     await CreatePlayablePackageFromTemplateAsync(registry, context, root, name, template, null, null),
                 ["game", "create-package-playable", var root, var name, var template, var outputDirectory] =>
@@ -387,6 +393,7 @@ internal static class RekallAgeCli
         registry.Register(new InspectEntityCommand());
         registry.Register(new CreateGameFromTemplateCommand());
         registry.Register(new CreatePlayableGameFromTemplateCommand());
+        registry.Register(new RunAgentAuthoringGauntletCommand());
         registry.Register(new CreatePlayablePackageFromTemplateCommand());
         registry.Register(new InspectGameTemplateCommand());
         registry.Register(new VerifyMvpTemplatesCommand());
@@ -2336,6 +2343,50 @@ internal static class RekallAgeCli
         Console.WriteLine($"Manifest: {result.Value.Package.ManifestPath}");
         Console.WriteLine($"Run exit code: {result.Value.Run.ExitCode}");
         Console.WriteLine($"Capture: {result.Value.Capture.OutputPath}");
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.Ready ? 0 : 1;
+    }
+
+    private static async Task<int> RunAgentAuthoringGauntletAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string name,
+        string template,
+        string? outputDirectory,
+        string? auditOutputDirectory)
+    {
+        var result = await registry.ExecuteAsync<RunAgentAuthoringGauntletRequest, RunAgentAuthoringGauntletResult>(
+            "rekall.workflow.agent_authoring_gauntlet",
+            new RunAgentAuthoringGauntletRequest(
+                root,
+                name,
+                template,
+                OutputDirectory: outputDirectory,
+                AuditOutputDirectory: auditOutputDirectory),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Ready: {result.Value.Ready}");
+        Console.WriteLine($"Template: {result.Value.TemplateId}");
+        Console.WriteLine($"Project: {result.Value.ProjectRoot}");
+        Console.WriteLine($"Scene: {result.Value.SceneName}");
+        Console.WriteLine($"Archive: {result.Value.PackageArchivePath}");
+        Console.WriteLine($"Proof frame: {result.Value.ProofFramePath}");
+        foreach (var check in result.Value.Checks)
+        {
+            Console.WriteLine($"{check.Name}: {check.Passed} - {check.Summary}");
+        }
+
+        Console.WriteLine("Next actions:");
+        foreach (var action in result.Value.RecommendedNextActions)
+        {
+            Console.WriteLine($"  {action}");
+        }
+
         foreach (var error in result.Errors)
         {
             Console.WriteLine($"{error.Code}: {error.Message}");

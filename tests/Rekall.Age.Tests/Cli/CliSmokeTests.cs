@@ -24,6 +24,7 @@ public sealed class CliSmokeTests
         Assert.Equal(0, engine.ExitCode);
         Assert.Contains("Rekall AGE", engine.Output);
         Assert.Contains("Agent-first: True", engine.Output);
+        Assert.Contains("rekall.workflow.agent_authoring_gauntlet", engine.Output);
         Assert.Contains("rekall.workflow.create_playable_package_from_template", engine.Output);
         Assert.Contains("Authoring contracts:", engine.Output);
         Assert.Contains("IRekallAgeRuntimeModuleSystem", engine.Output);
@@ -168,6 +169,29 @@ public sealed class CliSmokeTests
         Assert.Contains("Capture:", oneShot.Output);
         Assert.True(File.Exists($"{oneShotOutput}.zip"));
         Assert.True(File.Exists(Path.Combine(oneShotFrames, "package_play_frame_001.png")));
+
+        var gauntletRoot = TestPaths.CreateTempDirectory();
+        var gauntletOutput = Path.Combine(gauntletRoot, "GauntletPackage");
+        var gauntletAudit = Path.Combine(gauntletRoot, "GauntletAudit");
+        var gauntlet = await RunAsync(
+            cliAssembly,
+            "game",
+            "gauntlet",
+            gauntletRoot,
+            "CLI Gauntlet Pong",
+            "pong",
+            gauntletOutput,
+            gauntletAudit);
+        Assert.Equal(0, gauntlet.ExitCode);
+        Assert.Contains("Ready: True", gauntlet.Output);
+        Assert.Contains("create-playable: True", gauntlet.Output);
+        Assert.Contains("verify-playable: True", gauntlet.Output);
+        Assert.Contains("package-playable: True", gauntlet.Output);
+        Assert.Contains("audit-package: True", gauntlet.Output);
+        Assert.Contains("Next actions:", gauntlet.Output);
+        Assert.Contains("rekall.workflow.inspect_playable_package", gauntlet.Output);
+        Assert.True(File.Exists($"{gauntletOutput}.zip"));
+        Assert.True(File.Exists(Path.Combine(gauntletAudit, "package_play_frame_001.png")));
     }
 
     [Fact]

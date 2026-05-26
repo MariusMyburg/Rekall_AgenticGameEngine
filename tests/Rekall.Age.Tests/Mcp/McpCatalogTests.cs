@@ -31,6 +31,7 @@ public sealed class McpCatalogTests
         registry.Register(new VerifyMvpTemplatesCommand());
         registry.Register(new CreateGameFromTemplateCommand());
         registry.Register(new CreatePlayableGameFromTemplateCommand());
+        registry.Register(new RunAgentAuthoringGauntletCommand());
         registry.Register(new CreatePlayablePackageFromTemplateCommand());
         registry.Register(new VerifyPlayableGameCommand());
         registry.Register(new PackagePlayableGameCommand());
@@ -92,6 +93,7 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.templates.verify_mvp");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_game_from_template");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_playable_game_from_template");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.agent_authoring_gauntlet");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_playable_package_from_template");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.verify_playable_game");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.package_playable_game");
@@ -146,6 +148,11 @@ public sealed class McpCatalogTests
         Assert.Equal("workflow", oneShot.Category);
         Assert.True(oneShot.Recommended);
         Assert.Equal(10, oneShot.AgentPriority);
+
+        var gauntlet = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.agent_authoring_gauntlet");
+        Assert.Equal("workflow", gauntlet.Category);
+        Assert.True(gauntlet.Recommended);
+        Assert.True(gauntlet.AgentPriority < oneShot.AgentPriority);
 
         var audit = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.audit_playable_package");
         Assert.Equal("workflow", audit.Category);

@@ -65,6 +65,7 @@ The current MVP includes:
 - agent-accessible GLB export through `rekall.render.export_scene_glb` / `render glb export`
 - built-in starter game workflows
 - one-shot playable game workflow that creates, scaffolds, and builds genre-aware C# module code
+- closed-loop agent authoring gauntlet that creates, verifies, packages, audits, and reports next actions for a playable game
 
 ## Starter Game Workflows
 
@@ -82,6 +83,16 @@ Agents can create these game foundations through the command bus or CLI:
 - `puzzle`
 
 Each template creates a project manifest, `Main` scene, active camera, core render primitives, and starter game-owned entities/components under `Game.Templates.*`; game behavior belongs in project-authored modules, not engine built-ins.
+
+## Agent Authoring Gauntlet
+
+The preferred proof loop for agent-authored playable games is `rekall.workflow.agent_authoring_gauntlet` / `game gauntlet`. It composes existing generic workflow contracts rather than adding runtime gameplay behavior: create a playable template project, verify scene readiness, package the player, audit the package, capture a proof frame, and return recommended next actions.
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- game gauntlet .age-sandbox "Gauntlet Pong" pong .age-sandbox/Builds/GauntletPong .age-sandbox/Artifacts/GauntletAudit
+```
+
+Use this before adding broader engine capability. A failure in the gauntlet should usually improve an inspectable engine contract, diagnostic, SDK helper, workflow command, or example consumer.
 
 ## Build
 

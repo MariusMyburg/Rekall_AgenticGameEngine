@@ -61,6 +61,7 @@ public sealed class McpJsonRpcServerTests
     {
         var registry = new RekallAgeCommandRegistry();
         registry.Register(new GetEngineStatusCommand());
+        registry.Register(new RunAgentAuthoringGauntletCommand());
         registry.Register(new CreatePlayablePackageFromTemplateCommand());
         registry.Register(new CreateRenderPlanCommand());
         var server = new RekallAgeMcpJsonRpcServer(registry);
@@ -72,12 +73,16 @@ public sealed class McpJsonRpcServerTests
         using var document = JsonDocument.Parse(response!);
         var tools = document.RootElement.GetProperty("result").GetProperty("tools").EnumerateArray().ToArray();
         var engineStatus = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.context.engine_status");
+        var gauntlet = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.workflow.agent_authoring_gauntlet");
         var oneShot = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.workflow.create_playable_package_from_template");
         var render = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.render.plan.create");
         Assert.Equal("rekall.context.engine_status", tools[0].GetProperty("name").GetString());
         Assert.Equal("context", engineStatus.GetProperty("rekallCategory").GetString());
         Assert.True(engineStatus.GetProperty("rekallRecommended").GetBoolean());
         Assert.Equal(5, engineStatus.GetProperty("rekallAgentPriority").GetInt32());
+        Assert.Equal("workflow", gauntlet.GetProperty("rekallCategory").GetString());
+        Assert.True(gauntlet.GetProperty("rekallRecommended").GetBoolean());
+        Assert.True(gauntlet.GetProperty("rekallAgentPriority").GetInt32() < oneShot.GetProperty("rekallAgentPriority").GetInt32());
         Assert.Equal("workflow", oneShot.GetProperty("rekallCategory").GetString());
         Assert.True(oneShot.GetProperty("rekallRecommended").GetBoolean());
         Assert.True(render.GetProperty("rekallAgentPriority").GetInt32() > oneShot.GetProperty("rekallAgentPriority").GetInt32());

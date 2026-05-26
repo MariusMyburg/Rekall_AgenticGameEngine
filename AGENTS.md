@@ -18,5 +18,6 @@ Permanent architectural rule:
 - Authoritative multiplayer snapshots should preserve generic replication metadata such as authority, replicate flags, prediction mode, and priority so clients and agents can interpret state without genre-specific assumptions.
 - Client-side multiplayer code should use generic snapshot utilities such as `RekallAgeMultiplayerSnapshotInterpolator`, `RekallAgeMultiplayerClientReconciler`, `RekallAgeMultiplayerSnapshotApplier`, and `RekallAgeMultiplayerSnapshotDeltaBuilder` before inventing game-specific replication loops.
 - Running authoritative multiplayer sessions should expose generic snapshot and delta operations, including `rekall.multiplayer.snapshot` and `rekall.multiplayer.delta`, before adding transport-specific streaming behavior.
+- When proving a user-facing playable game path, prefer the closed-loop `rekall.workflow.agent_authoring_gauntlet` / `game gauntlet` workflow before adding narrower bespoke checks; it should create, verify, package, audit, capture a proof frame, and return next actions through generic commands.
 - When a user-facing example fails, fix the generic engine contract first, then update the example as a consumer of that contract.
 - Before adding a new built-in runtime behavior, ask whether an AI agent could author it cleanly from existing primitives. If yes, improve the primitives instead.

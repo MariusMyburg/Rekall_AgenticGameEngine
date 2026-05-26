@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Rekall.Age.Modules;
 using Rekall.Age.Modules.BuiltIns;
 using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime;
 using Rekall.Age.World;
 
@@ -130,6 +131,57 @@ public sealed class RenderLayerCullingTests
                 Assert.Equal(0, camera.ViewportY);
                 Assert.Equal(0.25, camera.ViewportWidth);
                 Assert.Equal(0.25, camera.ViewportHeight);
+            });
+    }
+
+    [Fact]
+    public void RuntimeRenderFrameBuildsPerCameraViewsWithVisibleRenderablesAndPixelRectangles()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("World Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = 0,
+                    ["viewportWidth"] = 0.5,
+                    ["cullingMask"] = "world"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Ui Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = 10,
+                    ["viewportX"] = 0.5,
+                    ["viewportWidth"] = 0.5,
+                    ["cullingMask"] = "ui"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("World Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "world" })))
+            .AddEntity(RekallAgeEntityDocument.Create("Ui Panel", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "plane" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "ui" })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 1000, 500, debugOverlay: false);
+
+        Assert.Collection(
+            frame.CameraViews,
+            view =>
+            {
+                Assert.Equal("World Camera", view.Camera.EntityName);
+                Assert.Equal(new RekallAgeRuntimeViewportCameraRect(0, 0, 500, 500), view.PixelRect);
+                Assert.Contains(view.Renderables, renderable => renderable.EntityName == "World Cube");
+                Assert.DoesNotContain(view.Renderables, renderable => renderable.EntityName == "Ui Panel");
+                Assert.Contains(view.CulledRenderables, renderable => renderable.EntityName == "Ui Panel");
+            },
+            view =>
+            {
+                Assert.Equal("Ui Camera", view.Camera.EntityName);
+                Assert.Equal(new RekallAgeRuntimeViewportCameraRect(500, 0, 500, 500), view.PixelRect);
+                Assert.Contains(view.Renderables, renderable => renderable.EntityName == "Ui Panel");
+                Assert.DoesNotContain(view.Renderables, renderable => renderable.EntityName == "World Cube");
+                Assert.Contains(view.CulledRenderables, renderable => renderable.EntityName == "World Cube");
             });
     }
 }

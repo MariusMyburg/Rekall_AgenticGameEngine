@@ -47,7 +47,16 @@ public sealed record RekallAgeRuntimeViewportFrame(
     RekallAgeRuntimeViewportStereoSettings? Stereo = null)
 {
     public RekallAgeRuntimeViewportCulling Culling { get; init; } = RekallAgeRuntimeViewportCulling.Empty;
+
+    public IReadOnlyList<RekallAgeRuntimeViewportCameraView> CameraViews { get; init; } =
+        Array.Empty<RekallAgeRuntimeViewportCameraView>();
 }
+
+public sealed record RekallAgeRuntimeViewportCameraView(
+    RekallAgeRuntimeViewportCamera Camera,
+    RekallAgeRuntimeViewportCameraRect PixelRect,
+    IReadOnlyList<RekallAgeRuntimeViewportRenderable> Renderables,
+    IReadOnlyList<RekallAgeRuntimeViewportCulledRenderable> CulledRenderables);
 
 public readonly record struct RekallAgeRuntimeViewportCameraRect(
     int X,
@@ -68,14 +77,27 @@ public readonly record struct RekallAgeRuntimeViewportCameraRect(
             return new RekallAgeRuntimeViewportCameraRect(0, 0, frame.Width, frame.Height);
         }
 
-        var x = (int)Math.Round(Math.Clamp(camera.ViewportX, 0, 1) * frame.Width);
-        var y = (int)Math.Round(Math.Clamp(camera.ViewportY, 0, 1) * frame.Height);
-        x = Math.Clamp(x, 0, frame.Width - 1);
-        y = Math.Clamp(y, 0, frame.Height - 1);
-        var requestedWidth = (int)Math.Round(Math.Clamp(camera.ViewportWidth, 0.001, 1) * frame.Width);
-        var requestedHeight = (int)Math.Round(Math.Clamp(camera.ViewportHeight, 0.001, 1) * frame.Height);
-        var width = Math.Clamp(requestedWidth, 1, frame.Width - x);
-        var height = Math.Clamp(requestedHeight, 1, frame.Height - y);
+        return FromCamera(frame.Width, frame.Height, camera);
+    }
+
+    public static RekallAgeRuntimeViewportCameraRect FromCamera(
+        int frameWidth,
+        int frameHeight,
+        RekallAgeRuntimeViewportCamera camera)
+    {
+        if (frameWidth <= 0 || frameHeight <= 0)
+        {
+            return new RekallAgeRuntimeViewportCameraRect(0, 0, 0, 0);
+        }
+
+        var x = (int)Math.Round(Math.Clamp(camera.ViewportX, 0, 1) * frameWidth);
+        var y = (int)Math.Round(Math.Clamp(camera.ViewportY, 0, 1) * frameHeight);
+        x = Math.Clamp(x, 0, frameWidth - 1);
+        y = Math.Clamp(y, 0, frameHeight - 1);
+        var requestedWidth = (int)Math.Round(Math.Clamp(camera.ViewportWidth, 0.001, 1) * frameWidth);
+        var requestedHeight = (int)Math.Round(Math.Clamp(camera.ViewportHeight, 0.001, 1) * frameHeight);
+        var width = Math.Clamp(requestedWidth, 1, frameWidth - x);
+        var height = Math.Clamp(requestedHeight, 1, frameHeight - y);
         return new RekallAgeRuntimeViewportCameraRect(x, y, width, height);
     }
 }

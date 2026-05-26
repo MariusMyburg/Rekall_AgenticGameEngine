@@ -75,6 +75,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             .ThenBy(renderable => renderable.EntityId, StringComparer.Ordinal)
             .ToArray();
         var culling = BuildCullingDiagnostics(renderableCandidates, activeCamera);
+        var cameraViews = BuildCameraViews(cameras, renderableCandidates, width, height);
 
         return new RekallAgeRuntimeViewportFrame(
             world.SceneName,
@@ -97,8 +98,54 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 .ToArray(),
             BuildStereoSettings(activeCamera, width, height))
         {
-            Culling = culling
+            Culling = culling,
+            CameraViews = cameraViews
         };
+    }
+
+    private static IReadOnlyList<RekallAgeRuntimeViewportCameraView> BuildCameraViews(
+        IReadOnlyList<RekallAgeRuntimeViewportCamera> cameras,
+        IReadOnlyList<RekallAgeRuntimeViewportRenderable> candidates,
+        int width,
+        int height)
+    {
+        var renderCameras = cameras.Where(camera => camera.Active).ToArray();
+        if (renderCameras.Length == 0)
+        {
+            renderCameras = cameras.ToArray();
+        }
+
+        return renderCameras
+            .Select(camera =>
+            {
+                var renderables = candidates
+                    .Where(renderable => RekallAgeRenderLayerMask.IncludesLayer(renderable.Layer, camera.CullingMask))
+                    .OrderBy(renderable => renderable.SortKey)
+                    .ThenBy(renderable => renderable.EntityName, StringComparer.Ordinal)
+                    .ThenBy(renderable => renderable.EntityId, StringComparer.Ordinal)
+                    .ToArray();
+                var culled = candidates
+                    .Where(renderable => !RekallAgeRenderLayerMask.IncludesLayer(renderable.Layer, camera.CullingMask))
+                    .Select(renderable => new RekallAgeRuntimeViewportCulledRenderable(
+                        renderable.EntityId,
+                        renderable.EntityName,
+                        renderable.Kind,
+                        renderable.Layer,
+                        "camera-culling-mask",
+                        camera.EntityId,
+                        camera.EntityName,
+                        camera.CullingMask))
+                    .OrderBy(renderable => renderable.EntityName, StringComparer.Ordinal)
+                    .ThenBy(renderable => renderable.EntityId, StringComparer.Ordinal)
+                    .ToArray();
+
+                return new RekallAgeRuntimeViewportCameraView(
+                    camera,
+                    RekallAgeRuntimeViewportCameraRect.FromCamera(width, height, camera),
+                    renderables,
+                    culled);
+            })
+            .ToArray();
     }
 
     private static RekallAgeRuntimeViewportCulling BuildCullingDiagnostics(

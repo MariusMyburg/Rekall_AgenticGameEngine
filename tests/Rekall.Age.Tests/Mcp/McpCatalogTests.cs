@@ -43,6 +43,7 @@ public sealed class McpCatalogTests
         registry.Register(new CaptureScreenshotCommand());
         registry.Register(new CaptureRuntimeViewportCommand());
         registry.Register(new InspectScenePerformanceBudgetCommand());
+        registry.Register(new InspectSceneVisibilityCommand());
         registry.Register(new CapturePlayableFrameCommand());
         registry.Register(new InspectStereoRenderPlanCommand());
         registry.Register(new ProbeOpenXrRuntimeCommand());
@@ -102,6 +103,7 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.capture.screenshot");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.capture_runtime_viewport");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.performance.inspect_scene_budget");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.visibility.inspect_scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.stereo.inspect_plan");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.openxr.probe");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.openxr.bootstrap_session");

@@ -109,6 +109,7 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.multiplayer.connect" or
             "rekall.multiplayer.submit_input" or
             "rekall.multiplayer.snapshot" or
+            "rekall.render.visibility.inspect_scene" or
             "rekall.solar.import_ksa_system" or
             "rekall.templates.inspect" or
             "rekall.workflow.create_playable_package_from_template" or
@@ -133,7 +134,8 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.multiplayer.submit_input" => 23,
             "rekall.multiplayer.tick" => 24,
             "rekall.multiplayer.snapshot" => 25,
-            "rekall.solar.import_ksa_system" => 26,
+            "rekall.render.visibility.inspect_scene" => 26,
+            "rekall.solar.import_ksa_system" => 27,
             "rekall.templates.verify_mvp" => 20,
             "rekall.scene.apply_blueprint" => 42,
             _ when name.StartsWith("rekall.workflow.", StringComparison.Ordinal) => 30,

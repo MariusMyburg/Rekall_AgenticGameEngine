@@ -252,6 +252,42 @@ public sealed class RuntimeInspectCliTests
         Assert.Contains("Render layer: world; renderables: 1; entities: World Cube", result.Output);
     }
 
+    [Fact]
+    public async Task RenderVisibilityInspectPrintsPerCameraVisibility()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Render Visibility CLI", ["world", "rendering3d"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                    {
+                        ["active"] = true,
+                        ["cullingMask"] = "world"
+                    })))
+                .AddEntity(RekallAgeEntityDocument.Create("World Cube", ["prop"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "world" }))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })))
+                .AddEntity(RekallAgeEntityDocument.Create("Hidden Helper", ["debug"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "helpers" }))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "sphere" }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(FindCliAssemblyPath(), "render", "visibility", "inspect", root, "Main");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("visibility: 2 renderables across 1 camera", result.Output);
+        Assert.Contains("Camera: Camera; active: True; culling mask: world; visible: 1; culled: 1", result.Output);
+        Assert.Contains("Visible: World Cube; kind: mesh; layer: world", result.Output);
+        Assert.Contains("Culled: Hidden Helper; kind: mesh; layer: helpers; reason: camera-culling-mask", result.Output);
+        Assert.Contains("Unseen by active camera: Hidden Helper; kind: mesh; layer: helpers", result.Output);
+        Assert.Contains("Unseen by any camera: Hidden Helper; kind: mesh; layer: helpers", result.Output);
+    }
+
     private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)
     {
         var startInfo = new ProcessStartInfo("dotnet")

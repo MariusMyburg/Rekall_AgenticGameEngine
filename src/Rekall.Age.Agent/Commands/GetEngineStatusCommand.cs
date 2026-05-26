@@ -142,6 +142,10 @@ public sealed class GetEngineStatusCommand
                     "Inspect draw, triangle, texture, stereo, and render-target pressure against desktop, mobile, or VR performance budgets.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
+                    "rekall.render.visibility.inspect_scene",
+                    "Inspect per-camera render-layer visibility so agents can see which authored entities each camera includes or hides.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
                     "rekall.render.openxr.bootstrap_session",
                     "Inspect the active OpenXR runtime, HMD system, Vulkan API requirements, and primary-stereo eye configuration.",
                     Recommended: false),
@@ -213,11 +217,12 @@ public sealed class GetEngineStatusCommand
                     "runtime-render-layers",
                     "Rekall.RenderLayer",
                     "Renderable entities can opt into named render layers, camera components can use CullingMask to include or exclude layers, and viewport diagnostics report renderables hidden by the active camera.",
-                    ["camera-culling-mask", "mask-exclusions", "render-layer", "multi-camera", "world-ui-separation", "culling-diagnostics"],
+                    ["camera-culling-mask", "mask-exclusions", "render-layer", "multi-camera", "world-ui-separation", "per-camera-visibility", "culling-diagnostics"],
                     [
                         "rekall.module.component_schemas",
                         "rekall.scene.apply_blueprint",
                         "rekall.render.capture_runtime_viewport",
+                        "rekall.render.visibility.inspect_scene",
                         "rekall.render.performance.inspect_scene_budget"
                     ]),
                 new RekallAgeAgentAuthoringContract(

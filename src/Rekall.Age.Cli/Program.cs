@@ -70,6 +70,10 @@ internal static class RekallAgeCli
                     await InspectScenePerformanceBudgetAsync(registry, context, root, scene, frames, "1920", "1080", profile),
                 ["render", "performance", "budget", var root, var scene, var profile, var frames, var width, var height] =>
                     await InspectScenePerformanceBudgetAsync(registry, context, root, scene, frames, width, height, profile),
+                ["render", "visibility", "inspect", var root, var scene] =>
+                    await InspectSceneVisibilityAsync(registry, context, root, scene, "0"),
+                ["render", "visibility", "inspect", var root, var scene, var frames] =>
+                    await InspectSceneVisibilityAsync(registry, context, root, scene, frames),
                 ["render", "openxr", "probe"] => await ProbeOpenXrRuntimeAsync(registry, context),
                 ["render", "openxr", "bootstrap-session"] => await BootstrapOpenXrSessionAsync(registry, context),
                 ["render", "openxr", "frame-plan", var root, var scene] =>
@@ -400,6 +404,7 @@ internal static class RekallAgeCli
         registry.Register(new ListRenderBackendsCommand());
         registry.Register(new InspectStereoRenderPlanCommand());
         registry.Register(new InspectScenePerformanceBudgetCommand());
+        registry.Register(new InspectSceneVisibilityCommand());
         registry.Register(new ProbeOpenXrRuntimeCommand());
         registry.Register(new BootstrapOpenXrSessionCommand());
         registry.Register(new InspectOpenXrHeadsetFramePlanCommand());
@@ -751,6 +756,53 @@ internal static class RekallAgeCli
         foreach (var error in result.Value.Errors)
         {
             Console.WriteLine($"Error: {error}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectSceneVisibilityAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string frames)
+    {
+        var frameCount = int.Parse(frames, CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<InspectSceneVisibilityRequest, InspectSceneVisibilityResult>(
+            "rekall.render.visibility.inspect_scene",
+            new InspectSceneVisibilityRequest(root, scene, frameCount),
+            context);
+
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Renderables: {result.Value.TotalRenderableCount}");
+        foreach (var camera in result.Value.Cameras)
+        {
+            Console.WriteLine($"Camera: {camera.EntityName}; active: {camera.Active}; culling mask: {camera.CullingMask}; visible: {camera.VisibleRenderableCount}; culled: {camera.CulledRenderableCount}");
+            foreach (var renderable in camera.VisibleRenderables)
+            {
+                Console.WriteLine($"  Visible: {renderable.EntityName}; kind: {renderable.Kind}; layer: {renderable.Layer}");
+            }
+
+            foreach (var renderable in camera.CulledRenderables)
+            {
+                Console.WriteLine($"  Culled: {renderable.EntityName}; kind: {renderable.Kind}; layer: {renderable.Layer}; reason: {renderable.Reason}");
+            }
+        }
+
+        foreach (var renderable in result.Value.UnseenByActiveCameraRenderables)
+        {
+            Console.WriteLine($"Unseen by active camera: {renderable.EntityName}; kind: {renderable.Kind}; layer: {renderable.Layer}");
+        }
+
+        foreach (var renderable in result.Value.UnseenByAnyCameraRenderables)
+        {
+            Console.WriteLine($"Unseen by any camera: {renderable.EntityName}; kind: {renderable.Kind}; layer: {renderable.Layer}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
         }
 
         return result.Ok ? 0 : 1;

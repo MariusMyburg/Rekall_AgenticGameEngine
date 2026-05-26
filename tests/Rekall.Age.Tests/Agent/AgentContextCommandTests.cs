@@ -103,6 +103,7 @@ public sealed class AgentContextCommandTests
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.build.modules" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.shader.assign_pipeline");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.render.performance.inspect_scene_budget");
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.render.visibility.inspect_scene");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.render.openxr.bootstrap_session");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.render.openxr.inspect_headset_frame_plan");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.workflow.create_playable_package_from_template" && workflow.Recommended);
@@ -131,6 +132,7 @@ public sealed class AgentContextCommandTests
             && contract.PrimaryType == "Rekall.RenderLayer"
             && contract.Capabilities.Contains("camera-culling-mask")
             && contract.Capabilities.Contains("mask-exclusions")
+            && contract.Capabilities.Contains("per-camera-visibility")
             && contract.Capabilities.Contains("culling-diagnostics"));
         Assert.Contains(result.Value.AuthoringContracts, contract =>
             contract.Name == "xr-camera-contract"

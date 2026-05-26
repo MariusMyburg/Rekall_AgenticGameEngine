@@ -78,6 +78,12 @@ internal static class RekallAgeCli
                 ["render", "openxr", "bootstrap-session"] => await BootstrapOpenXrSessionAsync(registry, context),
                 ["render", "openxr", "submit-clear"] => await SubmitOpenXrClearAsync("120"),
                 ["render", "openxr", "submit-clear", var frames] => await SubmitOpenXrClearAsync(frames),
+                ["render", "openxr", "submit-scene", var root, var scene] =>
+                    await SubmitOpenXrSoftwareSceneAsync(root, scene, "120", "1920", "1080"),
+                ["render", "openxr", "submit-scene", var root, var scene, var frames] =>
+                    await SubmitOpenXrSoftwareSceneAsync(root, scene, frames, "1920", "1080"),
+                ["render", "openxr", "submit-scene", var root, var scene, var frames, var width, var height] =>
+                    await SubmitOpenXrSoftwareSceneAsync(root, scene, frames, width, height),
                 ["render", "openxr", "frame-plan", var root, var scene] =>
                     await InspectOpenXrHeadsetFramePlanAsync(registry, context, root, scene, "0", "1920", "1080"),
                 ["render", "openxr", "frame-plan", var root, var scene, var frames] =>
@@ -837,6 +843,50 @@ internal static class RekallAgeCli
         }
 
         return result.Submitted ? 0 : 1;
+    }
+
+    private static Task<int> SubmitOpenXrSoftwareSceneAsync(
+        string root,
+        string scene,
+        string frames,
+        string width,
+        string height)
+    {
+        if (!int.TryParse(frames, NumberStyles.Integer, CultureInfo.InvariantCulture, out var frameCount)
+            || !int.TryParse(width, NumberStyles.Integer, CultureInfo.InvariantCulture, out var renderWidth)
+            || !int.TryParse(height, NumberStyles.Integer, CultureInfo.InvariantCulture, out var renderHeight))
+        {
+            Console.WriteLine("Invalid OpenXR scene submit frame count or render size.");
+            return Task.FromResult(2);
+        }
+
+        var result = new RekallAgeSilkOpenXrHeadsetClearSubmitter().SubmitSoftwareScene(
+            new RekallAgeOpenXrHeadsetSoftwareSceneSubmitRequest(
+                root,
+                scene,
+                FrameCount: frameCount,
+                RenderWidth: renderWidth,
+                RenderHeight: renderHeight),
+            CancellationToken.None);
+        Console.WriteLine(result.Submitted
+            ? $"Submitted {result.SubmittedFrames} OpenXR headset scene frame(s)."
+            : "OpenXR headset scene submit failed.");
+        Console.WriteLine($"Instance: {result.InstanceCreated}");
+        Console.WriteLine($"Vulkan instance: {result.VulkanInstanceCreated}");
+        Console.WriteLine($"Vulkan device: {result.VulkanDeviceCreated}");
+        Console.WriteLine($"Session: {result.SessionCreated}");
+        Console.WriteLine($"Reference space: {result.ReferenceSpaceCreated}");
+        Console.WriteLine($"Swapchain: {result.SwapchainCreated}");
+        Console.WriteLine($"Recommended eye size: {result.RecommendedWidth}x{result.RecommendedHeight}");
+        Console.WriteLine($"Submitted eye size: {result.RenderWidth}x{result.RenderHeight}");
+        Console.WriteLine($"Active camera: {result.ActiveCamera ?? "<none>"}");
+        Console.WriteLine($"Renderables: {result.RenderableCount}");
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"Error: {error}");
+        }
+
+        return Task.FromResult(result.Submitted ? 0 : 1);
     }
 
     private static async Task<int> InspectOpenXrHeadsetFramePlanAsync(

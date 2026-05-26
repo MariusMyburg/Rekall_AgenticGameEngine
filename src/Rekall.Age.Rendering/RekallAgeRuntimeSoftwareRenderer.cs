@@ -4,6 +4,36 @@ namespace Rekall.Age.Rendering;
 
 public sealed class RekallAgeRuntimeSoftwareRenderer
 {
+    public RekallAgeRuntimeViewportRgbaFrame RenderRgba(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets)
+    {
+        var pixels = new byte[frame.Width * frame.Height * 4];
+        FillBackground(frame, pixels);
+
+        var (assetBackedCount, fallbackCount) = RenderFrameContent(frame, assets, pixels);
+
+        if (frame.DebugOverlay.Enabled)
+        {
+            DrawDebugOverlay(frame, pixels);
+        }
+
+        return new RekallAgeRuntimeViewportRgbaFrame(
+            frame.Width,
+            frame.Height,
+            pixels,
+            frame.FrameIndex,
+            frame.ActiveCamera?.EntityName,
+            frame.Renderables.Count,
+            assetBackedCount,
+            fallbackCount,
+            assets.Issues.Count(issue =>
+                issue.Code.Equals("REKALL_RENDER_ASSET_MISSING", StringComparison.Ordinal)),
+            assets.Issues.Count(issue =>
+                issue.Code.Equals("REKALL_RENDER_ASSET_UNSUPPORTED", StringComparison.Ordinal)),
+            IsNonBlank(pixels));
+    }
+
     public async ValueTask<RekallAgeRuntimeViewportCapture> CaptureAsync(
         RekallAgeRuntimeViewportFrame frame,
         string outputDirectory,
@@ -26,15 +56,8 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(outputDirectory);
-        var pixels = new byte[frame.Width * frame.Height * 4];
-        FillBackground(frame, pixels);
-
-        var (assetBackedCount, fallbackCount) = RenderFrameContent(frame, assets, pixels);
-
-        if (frame.DebugOverlay.Enabled)
-        {
-            DrawDebugOverlay(frame, pixels);
-        }
+        var rendered = RenderRgba(frame, assets);
+        var pixels = rendered.Rgba;
 
         var path = Path.Combine(outputDirectory, fileName);
         await RekallAgePngWriter.WriteRgbaAsync(path, frame.Width, frame.Height, pixels, cancellationToken);
@@ -45,15 +68,13 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
             Width: frame.Width,
             Height: frame.Height,
             FrameIndex: frame.FrameIndex,
-            ActiveCamera: frame.ActiveCamera?.EntityName,
-            RenderableCount: frame.Renderables.Count,
+            ActiveCamera: rendered.ActiveCamera,
+            RenderableCount: rendered.RenderableCount,
             ObservationCount: frame.Observations.Count,
-            AssetBackedRenderableCount: assetBackedCount,
-            FallbackRenderableCount: fallbackCount,
-            MissingAssetCount: assets.Issues.Count(issue =>
-                issue.Code.Equals("REKALL_RENDER_ASSET_MISSING", StringComparison.Ordinal)),
-            UnsupportedAssetCount: assets.Issues.Count(issue =>
-                issue.Code.Equals("REKALL_RENDER_ASSET_UNSUPPORTED", StringComparison.Ordinal)),
+            AssetBackedRenderableCount: rendered.AssetBackedRenderableCount,
+            FallbackRenderableCount: rendered.FallbackRenderableCount,
+            MissingAssetCount: rendered.MissingAssetCount,
+            UnsupportedAssetCount: rendered.UnsupportedAssetCount,
             AssetIssueCodes: assets.Issues
                 .Select(issue => issue.Code)
                 .Distinct(StringComparer.Ordinal)
@@ -1133,3 +1154,16 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         SoftwareVec3 Direction,
         double Intensity);
 }
+
+public sealed record RekallAgeRuntimeViewportRgbaFrame(
+    int Width,
+    int Height,
+    byte[] Rgba,
+    int FrameIndex,
+    string? ActiveCamera,
+    int RenderableCount,
+    int AssetBackedRenderableCount,
+    int FallbackRenderableCount,
+    int MissingAssetCount,
+    int UnsupportedAssetCount,
+    bool NonBlank);

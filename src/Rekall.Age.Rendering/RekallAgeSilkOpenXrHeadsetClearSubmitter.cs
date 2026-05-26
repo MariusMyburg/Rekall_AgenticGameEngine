@@ -365,6 +365,381 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
             errors));
     }
 
+    public RekallAgeOpenXrHeadsetSoftwareSceneSubmitResult SubmitSoftwareScene(
+        RekallAgeOpenXrHeadsetSoftwareSceneSubmitRequest request,
+        CancellationToken cancellationToken)
+    {
+        var plan = RekallAgeOpenXrHeadsetSubmitPlanner.Plan(request);
+        var errors = new List<string>();
+        var instanceCreated = false;
+        var vulkanInstanceCreated = false;
+        var vulkanDeviceCreated = false;
+        var sessionCreated = false;
+        var referenceSpaceCreated = false;
+        var swapchainCreated = false;
+        var submittedFrames = 0;
+        var recommendedWidth = 0;
+        var recommendedHeight = 0;
+        var renderableCount = 0;
+        string? activeCamera = null;
+
+        if (string.IsNullOrWhiteSpace(plan.ProjectRoot) || string.IsNullOrWhiteSpace(plan.SceneName))
+        {
+            errors.Add("OpenXR scene submit requires a project root and scene name.");
+            return SoftwareSceneResult(false);
+        }
+
+        try
+        {
+            using var xr = XR.GetApi();
+            using var vk = Vk.GetApi();
+            var extensionName = SilkMarshal.StringToPtr(VulkanEnable2Extension);
+            var appName = SilkMarshal.StringToPtr("Rekall AGE");
+            var engineName = SilkMarshal.StringToPtr("Rekall AGE");
+            try
+            {
+                var extensionNames = stackalloc byte*[1];
+                extensionNames[0] = (byte*)extensionName;
+                var createInfo = new Silk.NET.OpenXR.InstanceCreateInfo
+                {
+                    Type = XrStructureType.InstanceCreateInfo,
+                    EnabledExtensionCount = 1,
+                    EnabledExtensionNames = extensionNames,
+                    ApplicationInfo = new Silk.NET.OpenXR.ApplicationInfo
+                    {
+                        ApplicationVersion = 1,
+                        EngineVersion = 1,
+                        ApiVersion = MakeOpenXrVersion(1, 0, 0)
+                    }
+                };
+                CopyAscii((byte*)createInfo.ApplicationInfo.ApplicationName, 128, "Rekall AGE");
+                CopyAscii((byte*)createInfo.ApplicationInfo.EngineName, 128, "Rekall AGE");
+
+                XrInstance xrInstance;
+                if (xr.CreateInstance(&createInfo, &xrInstance) != XrResult.Success)
+                {
+                    errors.Add("xrCreateInstance failed.");
+                    return SoftwareSceneResult(false);
+                }
+
+                instanceCreated = true;
+                try
+                {
+                    var systemInfo = new SystemGetInfo
+                    {
+                        Type = XrStructureType.SystemGetInfo,
+                        FormFactor = FormFactor.HeadMountedDisplay
+                    };
+                    ulong systemId;
+                    if (xr.GetSystem(xrInstance, &systemInfo, &systemId) != XrResult.Success)
+                    {
+                        errors.Add("xrGetSystem did not return a head-mounted display.");
+                        return SoftwareSceneResult(false);
+                    }
+
+                    if (!TryLoadXrFunction(xr, xrInstance, "xrCreateVulkanInstanceKHR", out XrCreateVulkanInstanceKhr createVulkanInstance, errors)
+                        || !TryLoadXrFunction(xr, xrInstance, "xrGetVulkanGraphicsDevice2KHR", out XrGetVulkanGraphicsDevice2Khr getVulkanGraphicsDevice, errors)
+                        || !TryLoadXrFunction(xr, xrInstance, "xrCreateVulkanDeviceKHR", out XrCreateVulkanDeviceKhr createVulkanDevice, errors)
+                        || !TryLoadXrFunction(xr, xrInstance, "xrGetVulkanGraphicsRequirements2KHR", out XrGetVulkanGraphicsRequirements2Khr getVulkanGraphicsRequirements, errors)
+                        || !TryLoadXrFunction(xr, xrInstance, "xrEnumerateViewConfigurationViews", out XrEnumerateViewConfigurationViewsDelegate enumerateViewConfigurationViews, errors)
+                        || !TryLoadXrFunction(xr, xrInstance, "xrLocateViews", out XrLocateViewsDelegate locateViews, errors))
+                    {
+                        return SoftwareSceneResult(false);
+                    }
+
+                    var requirements = new GraphicsRequirementsVulkan2KHR
+                    {
+                        Type = XrStructureType.GraphicsRequirementsVulkanKhr
+                    };
+                    var requirementsResult = getVulkanGraphicsRequirements(xrInstance, systemId, &requirements);
+                    if (requirementsResult != XrResult.Success)
+                    {
+                        errors.Add($"xrGetVulkanGraphicsRequirements2KHR failed with {requirementsResult}.");
+                        return SoftwareSceneResult(false);
+                    }
+
+                    var vkGetInstanceProcAddr = vk.GetInstanceProcAddr(default, "vkGetInstanceProcAddr");
+                    var vkAppInfo = new Silk.NET.Vulkan.ApplicationInfo
+                    {
+                        SType = Silk.NET.Vulkan.StructureType.ApplicationInfo,
+                        PApplicationName = (byte*)appName,
+                        ApplicationVersion = 1,
+                        PEngineName = (byte*)engineName,
+                        EngineVersion = 1,
+                        ApiVersion = Vk.Version11
+                    };
+                    var vkInstanceCreateInfo = new Silk.NET.Vulkan.InstanceCreateInfo
+                    {
+                        SType = Silk.NET.Vulkan.StructureType.InstanceCreateInfo,
+                        PApplicationInfo = &vkAppInfo
+                    };
+                    var xrVkInstanceCreateInfo = new VulkanInstanceCreateInfoKHR
+                    {
+                        Type = XrStructureType.VulkanInstanceCreateInfoKhr,
+                        SystemId = systemId,
+                        PfnGetInstanceProcAddr = vkGetInstanceProcAddr,
+                        VulkanCreateInfo = &vkInstanceCreateInfo
+                    };
+                    var xrCreateVkInstanceResult = createVulkanInstance(xrInstance, &xrVkInstanceCreateInfo, out var vkInstance, out var vkCreateInstanceResult);
+                    if (xrCreateVkInstanceResult != XrResult.Success || vkCreateInstanceResult != VkResult.Success)
+                    {
+                        errors.Add($"xrCreateVulkanInstanceKHR failed xr={xrCreateVkInstanceResult} vk={vkCreateInstanceResult}.");
+                        return SoftwareSceneResult(false);
+                    }
+
+                    vulkanInstanceCreated = true;
+                    try
+                    {
+                        var graphicsDeviceInfo = new VulkanGraphicsDeviceGetInfoKHR
+                        {
+                            Type = XrStructureType.VulkanGraphicsDeviceGetInfoKhr,
+                            SystemId = systemId,
+                            VulkanInstance = new VkHandle(vkInstance.Handle)
+                        };
+                        if (getVulkanGraphicsDevice(xrInstance, &graphicsDeviceInfo, out var physicalDevice) != XrResult.Success)
+                        {
+                            errors.Add("xrGetVulkanGraphicsDevice2KHR failed.");
+                            return SoftwareSceneResult(false);
+                        }
+
+                        var queueFamilyIndex = SelectGraphicsQueueFamily(vk, physicalDevice, errors);
+                        if (queueFamilyIndex is null)
+                        {
+                            return SoftwareSceneResult(false);
+                        }
+
+                        var priority = 1f;
+                        var queueInfo = new DeviceQueueCreateInfo
+                        {
+                            SType = Silk.NET.Vulkan.StructureType.DeviceQueueCreateInfo,
+                            QueueFamilyIndex = queueFamilyIndex.Value,
+                            QueueCount = 1,
+                            PQueuePriorities = &priority
+                        };
+                        var vkDeviceCreateInfo = new DeviceCreateInfo
+                        {
+                            SType = Silk.NET.Vulkan.StructureType.DeviceCreateInfo,
+                            QueueCreateInfoCount = 1,
+                            PQueueCreateInfos = &queueInfo
+                        };
+                        var xrVkDeviceCreateInfo = new VulkanDeviceCreateInfoKHR
+                        {
+                            Type = XrStructureType.VulkanDeviceCreateInfoKhr,
+                            SystemId = systemId,
+                            PfnGetInstanceProcAddr = vkGetInstanceProcAddr,
+                            VulkanPhysicalDevice = new VkHandle(physicalDevice.Handle),
+                            VulkanCreateInfo = &vkDeviceCreateInfo
+                        };
+                        var xrCreateVkDeviceResult = createVulkanDevice(xrInstance, &xrVkDeviceCreateInfo, out var vkDevice, out var vkCreateDeviceResult);
+                        if (xrCreateVkDeviceResult != XrResult.Success || vkCreateDeviceResult != VkResult.Success)
+                        {
+                            errors.Add($"xrCreateVulkanDeviceKHR failed xr={xrCreateVkDeviceResult} vk={vkCreateDeviceResult}.");
+                            return SoftwareSceneResult(false);
+                        }
+
+                        vulkanDeviceCreated = true;
+                        try
+                        {
+                            vk.GetDeviceQueue(vkDevice, queueFamilyIndex.Value, 0, out var queue);
+                            var binding = new GraphicsBindingVulkan2KHR
+                            {
+                                Type = XrStructureType.GraphicsBindingVulkanKhr,
+                                Instance = new VkHandle(vkInstance.Handle),
+                                PhysicalDevice = new VkHandle(physicalDevice.Handle),
+                                Device = new VkHandle(vkDevice.Handle),
+                                QueueFamilyIndex = queueFamilyIndex.Value,
+                                QueueIndex = 0
+                            };
+                            var sessionCreateInfo = new Silk.NET.OpenXR.SessionCreateInfo
+                            {
+                                Type = XrStructureType.SessionCreateInfo,
+                                Next = &binding,
+                                SystemId = systemId
+                            };
+                            Silk.NET.OpenXR.Session session;
+                            var createSessionResult = xr.CreateSession(xrInstance, &sessionCreateInfo, &session);
+                            if (createSessionResult != XrResult.Success)
+                            {
+                                errors.Add($"xrCreateSession failed for XR-created Vulkan device with {createSessionResult}.");
+                                return SoftwareSceneResult(false);
+                            }
+
+                            sessionCreated = true;
+                            try
+                            {
+                                var spaceCreateInfo = new ReferenceSpaceCreateInfo
+                                {
+                                    Type = XrStructureType.ReferenceSpaceCreateInfo,
+                                    ReferenceSpaceType = ReferenceSpaceType.Local,
+                                    PoseInReferenceSpace = IdentityPose()
+                                };
+                                Space space;
+                                if (xr.CreateReferenceSpace(session, &spaceCreateInfo, &space) != XrResult.Success)
+                                {
+                                    errors.Add("xrCreateReferenceSpace failed.");
+                                    return SoftwareSceneResult(false);
+                                }
+
+                                referenceSpaceCreated = true;
+                                try
+                                {
+                                    var viewConfigViews = stackalloc ViewConfigurationView[2];
+                                    for (var i = 0; i < 2; i++)
+                                    {
+                                        viewConfigViews[i] = new ViewConfigurationView { Type = XrStructureType.ViewConfigurationView };
+                                    }
+
+                                    enumerateViewConfigurationViews(
+                                        xrInstance,
+                                        systemId,
+                                        ViewConfigurationType.PrimaryStereo,
+                                        2,
+                                        out _,
+                                        viewConfigViews);
+                                    recommendedWidth = checked((int)Math.Max(1, viewConfigViews[0].RecommendedImageRectWidth));
+                                    recommendedHeight = checked((int)Math.Max(1, viewConfigViews[0].RecommendedImageRectHeight));
+
+                                    var format = SelectSwapchainFormat(xr, session, errors);
+                                    if (format is null)
+                                    {
+                                        return SoftwareSceneResult(false);
+                                    }
+
+                                    var swapchainCreateInfo = new SwapchainCreateInfo
+                                    {
+                                        Type = XrStructureType.SwapchainCreateInfo,
+                                        UsageFlags = SwapchainUsageFlags.ColorAttachmentBit | SwapchainUsageFlags.TransferDstBit,
+                                        Format = format.Value,
+                                        SampleCount = 1,
+                                        Width = (uint)plan.RenderWidth,
+                                        Height = (uint)plan.RenderHeight,
+                                        FaceCount = 1,
+                                        ArraySize = 2,
+                                        MipCount = 1
+                                    };
+                                    Swapchain swapchain;
+                                    if (xr.CreateSwapchain(session, &swapchainCreateInfo, &swapchain) != XrResult.Success)
+                                    {
+                                        errors.Add("xrCreateSwapchain failed.");
+                                        return SoftwareSceneResult(false);
+                                    }
+
+                                    swapchainCreated = true;
+                                    try
+                                    {
+                                        var images = EnumerateSwapchainImages(xr, swapchain, errors);
+                                        if (images.Length == 0)
+                                        {
+                                            return SoftwareSceneResult(false);
+                                        }
+
+                                        using var vkFrameResources = VulkanSoftwareSceneFrameResources.Create(
+                                            vk,
+                                            vkDevice,
+                                            physicalDevice,
+                                            queueFamilyIndex.Value,
+                                            checked((ulong)plan.RenderWidth * (ulong)plan.RenderHeight * 4),
+                                            errors);
+                                        if (vkFrameResources is null)
+                                        {
+                                            return SoftwareSceneResult(false);
+                                        }
+
+                                        var rendered = new RekallAgeOpenXrSoftwareSceneFrameRenderer()
+                                            .RenderAsync(plan, cancellationToken)
+                                            .AsTask()
+                                            .GetAwaiter()
+                                            .GetResult();
+                                        renderableCount = rendered.RenderableCount;
+                                        activeCamera = rendered.ActiveCamera;
+                                        var pixels = PreparePixelsForSwapchain(rendered.Rgba, format.Value);
+
+                                        if (!BeginSessionWhenReady(xr, xrInstance, session, errors))
+                                        {
+                                            return SoftwareSceneResult(false);
+                                        }
+
+                                        submittedFrames = SubmitSoftwareSceneFrames(
+                                            xr,
+                                            vk,
+                                            session,
+                                            space,
+                                            swapchain,
+                                            images,
+                                            locateViews,
+                                            queue,
+                                            vkFrameResources,
+                                            pixels,
+                                            plan,
+                                            cancellationToken,
+                                            errors);
+                                        return SoftwareSceneResult(submittedFrames > 0 && errors.Count == 0);
+                                    }
+                                    finally
+                                    {
+                                        xr.DestroySwapchain(swapchain);
+                                    }
+                                }
+                                finally
+                                {
+                                    xr.DestroySpace(space);
+                                }
+                            }
+                            finally
+                            {
+                                xr.DestroySession(session);
+                            }
+                        }
+                        finally
+                        {
+                            vk.DestroyDevice(vkDevice, null);
+                        }
+                    }
+                    finally
+                    {
+                        vk.DestroyInstance(vkInstance, null);
+                    }
+                }
+                finally
+                {
+                    xr.DestroyInstance(xrInstance);
+                }
+            }
+            finally
+            {
+                SilkMarshal.Free(extensionName);
+                SilkMarshal.Free(appName);
+                SilkMarshal.Free(engineName);
+            }
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or SEHException or AccessViolationException or InvalidOperationException)
+        {
+            errors.Add($"OpenXR headset software scene submit failed: {ex.Message}");
+        }
+
+        return SoftwareSceneResult(false);
+
+        RekallAgeOpenXrHeadsetSoftwareSceneSubmitResult SoftwareSceneResult(bool submitted)
+        {
+            return new RekallAgeOpenXrHeadsetSoftwareSceneSubmitResult(
+                submitted,
+                instanceCreated,
+                vulkanInstanceCreated,
+                vulkanDeviceCreated,
+                sessionCreated,
+                referenceSpaceCreated,
+                swapchainCreated,
+                submittedFrames,
+                recommendedWidth,
+                recommendedHeight,
+                plan.RenderWidth,
+                plan.RenderHeight,
+                renderableCount,
+                activeCamera,
+                errors);
+        }
+    }
+
     private static int SubmitFrames(
         XR xr,
         Vk vk,
@@ -464,6 +839,137 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
                         ImageRect = new Rect2Di(
                             new Offset2Di(0, 0),
                             new Extent2Di(width, height)),
+                        ImageArrayIndex = (uint)eye
+                    }
+                };
+            }
+
+            var projection = new CompositionLayerProjection
+            {
+                Type = XrStructureType.CompositionLayerProjection,
+                Space = space,
+                ViewCount = 2,
+                Views = projectionViews
+            };
+            layerPointers[0] = (CompositionLayerBaseHeader*)&projection;
+            var endInfo = new FrameEndInfo
+            {
+                Type = XrStructureType.FrameEndInfo,
+                DisplayTime = frameState.PredictedDisplayTime,
+                EnvironmentBlendMode = EnvironmentBlendMode.Opaque,
+                LayerCount = 1,
+                Layers = layerPointers
+            };
+            if (xr.EndFrame(session, &endInfo) != XrResult.Success)
+            {
+                errors.Add("xrEndFrame failed.");
+                break;
+            }
+
+            submitted++;
+        }
+
+        return submitted;
+    }
+
+    private static int SubmitSoftwareSceneFrames(
+        XR xr,
+        Vk vk,
+        Silk.NET.OpenXR.Session session,
+        Space space,
+        Swapchain swapchain,
+        Image[] images,
+        XrLocateViewsDelegate locateViews,
+        Queue queue,
+        VulkanSoftwareSceneFrameResources vkFrameResources,
+        byte[] pixels,
+        RekallAgeOpenXrHeadsetSoftwareSceneSubmitPlan plan,
+        CancellationToken cancellationToken,
+        List<string> errors)
+    {
+        var submitted = 0;
+        var views = stackalloc View[2];
+        var projectionViews = stackalloc CompositionLayerProjectionView[2];
+        var layerPointers = stackalloc CompositionLayerBaseHeader*[1];
+        for (var frame = 0; frame < plan.FrameCount; frame++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            views[0] = new View { Type = XrStructureType.View };
+            views[1] = new View { Type = XrStructureType.View };
+            var waitInfo = new FrameWaitInfo { Type = XrStructureType.FrameWaitInfo };
+            var frameState = new FrameState { Type = XrStructureType.FrameState };
+            if (xr.WaitFrame(session, &waitInfo, ref frameState) != XrResult.Success)
+            {
+                errors.Add("xrWaitFrame failed.");
+                break;
+            }
+
+            var beginInfo = new FrameBeginInfo { Type = XrStructureType.FrameBeginInfo };
+            if (xr.BeginFrame(session, &beginInfo) != XrResult.Success)
+            {
+                errors.Add("xrBeginFrame failed.");
+                break;
+            }
+
+            var locateInfo = new ViewLocateInfo
+            {
+                Type = XrStructureType.ViewLocateInfo,
+                ViewConfigurationType = ViewConfigurationType.PrimaryStereo,
+                DisplayTime = frameState.PredictedDisplayTime,
+                Space = space
+            };
+            var viewState = new ViewState { Type = XrStructureType.ViewState };
+            var locateResult = locateViews(session, &locateInfo, &viewState, 2, out var viewCount, views);
+            if (locateResult != XrResult.Success || viewCount < 2)
+            {
+                errors.Add($"xrLocateViews failed or returned fewer than 2 views ({locateResult}, {viewCount}).");
+                EndEmptyFrame(xr, session, frameState.PredictedDisplayTime);
+                break;
+            }
+
+            var acquireInfo = new SwapchainImageAcquireInfo { Type = XrStructureType.SwapchainImageAcquireInfo };
+            uint imageIndex;
+            if (xr.AcquireSwapchainImage(swapchain, &acquireInfo, &imageIndex) != XrResult.Success)
+            {
+                errors.Add("xrAcquireSwapchainImage failed.");
+                EndEmptyFrame(xr, session, frameState.PredictedDisplayTime);
+                break;
+            }
+
+            var imageWaitInfo = new SwapchainImageWaitInfo
+            {
+                Type = XrStructureType.SwapchainImageWaitInfo,
+                Timeout = XrInfiniteDuration
+            };
+            if (xr.WaitSwapchainImage(swapchain, &imageWaitInfo) != XrResult.Success)
+            {
+                errors.Add("xrWaitSwapchainImage failed.");
+            }
+            else
+            {
+                var selectedImage = images[Math.Min((int)imageIndex, images.Length - 1)];
+                UploadSoftwareSceneImage(vk, queue, vkFrameResources, selectedImage, pixels, plan.RenderWidth, plan.RenderHeight);
+            }
+
+            var releaseInfo = new SwapchainImageReleaseInfo { Type = XrStructureType.SwapchainImageReleaseInfo };
+            if (xr.ReleaseSwapchainImage(swapchain, &releaseInfo) != XrResult.Success)
+            {
+                errors.Add("xrReleaseSwapchainImage failed.");
+            }
+
+            for (var eye = 0; eye < 2; eye++)
+            {
+                projectionViews[eye] = new CompositionLayerProjectionView
+                {
+                    Type = XrStructureType.CompositionLayerProjectionView,
+                    Pose = views[eye].Pose,
+                    Fov = views[eye].Fov,
+                    SubImage = new SwapchainSubImage
+                    {
+                        Swapchain = swapchain,
+                        ImageRect = new Rect2Di(
+                            new Offset2Di(0, 0),
+                            new Extent2Di(plan.RenderWidth, plan.RenderHeight)),
                         ImageArrayIndex = (uint)eye
                     }
                 };
@@ -742,6 +1248,152 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
         vk.QueueWaitIdle(queue);
     }
 
+    private static byte[] PreparePixelsForSwapchain(byte[] rgba, long format)
+    {
+        if (format != VkFormatB8G8R8A8Srgb)
+        {
+            return rgba;
+        }
+
+        var bgra = new byte[rgba.Length];
+        for (var offset = 0; offset + 3 < rgba.Length; offset += 4)
+        {
+            bgra[offset + 0] = rgba[offset + 2];
+            bgra[offset + 1] = rgba[offset + 1];
+            bgra[offset + 2] = rgba[offset + 0];
+            bgra[offset + 3] = rgba[offset + 3];
+        }
+
+        return bgra;
+    }
+
+    private static void UploadSoftwareSceneImage(
+        Vk vk,
+        Queue queue,
+        VulkanSoftwareSceneFrameResources resources,
+        Image image,
+        byte[] pixels,
+        int width,
+        int height)
+    {
+        resources.WritePixels(pixels);
+        vk.ResetCommandBuffer(resources.CommandBuffer, 0);
+        var beginInfo = new CommandBufferBeginInfo
+        {
+            SType = Silk.NET.Vulkan.StructureType.CommandBufferBeginInfo,
+            Flags = CommandBufferUsageFlags.OneTimeSubmitBit
+        };
+        vk.BeginCommandBuffer(resources.CommandBuffer, &beginInfo);
+        var range = new ImageSubresourceRange
+        {
+            AspectMask = ImageAspectFlags.ColorBit,
+            BaseMipLevel = 0,
+            LevelCount = 1,
+            BaseArrayLayer = 0,
+            LayerCount = 2
+        };
+        var toTransfer = new ImageMemoryBarrier
+        {
+            SType = Silk.NET.Vulkan.StructureType.ImageMemoryBarrier,
+            OldLayout = ImageLayout.Undefined,
+            NewLayout = ImageLayout.TransferDstOptimal,
+            SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            Image = image,
+            SubresourceRange = range,
+            DstAccessMask = AccessFlags.TransferWriteBit
+        };
+        vk.CmdPipelineBarrier(
+            resources.CommandBuffer,
+            PipelineStageFlags.TopOfPipeBit,
+            PipelineStageFlags.TransferBit,
+            0,
+            0,
+            null,
+            0,
+            null,
+            1,
+            &toTransfer);
+        var copies = stackalloc BufferImageCopy[2];
+        for (uint eye = 0; eye < 2; eye++)
+        {
+            copies[eye] = new BufferImageCopy
+            {
+                BufferOffset = 0,
+                BufferRowLength = 0,
+                BufferImageHeight = 0,
+                ImageSubresource = new ImageSubresourceLayers(ImageAspectFlags.ColorBit, 0, eye, 1),
+                ImageOffset = new Offset3D(0, 0, 0),
+                ImageExtent = new Extent3D((uint)width, (uint)height, 1)
+            };
+        }
+
+        vk.CmdCopyBufferToImage(
+            resources.CommandBuffer,
+            resources.StagingBuffer,
+            image,
+            ImageLayout.TransferDstOptimal,
+            2,
+            copies);
+        var toColorAttachment = new ImageMemoryBarrier
+        {
+            SType = Silk.NET.Vulkan.StructureType.ImageMemoryBarrier,
+            OldLayout = ImageLayout.TransferDstOptimal,
+            NewLayout = ImageLayout.ColorAttachmentOptimal,
+            SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            Image = image,
+            SubresourceRange = range,
+            SrcAccessMask = AccessFlags.TransferWriteBit,
+            DstAccessMask = AccessFlags.ColorAttachmentReadBit
+        };
+        vk.CmdPipelineBarrier(
+            resources.CommandBuffer,
+            PipelineStageFlags.TransferBit,
+            PipelineStageFlags.ColorAttachmentOutputBit,
+            0,
+            0,
+            null,
+            0,
+            null,
+            1,
+            &toColorAttachment);
+        vk.EndCommandBuffer(resources.CommandBuffer);
+        var commandBuffer = resources.CommandBuffer;
+        var submitInfo = new SubmitInfo
+        {
+            SType = Silk.NET.Vulkan.StructureType.SubmitInfo,
+            CommandBufferCount = 1,
+            PCommandBuffers = &commandBuffer
+        };
+        vk.QueueSubmit(queue, 1, &submitInfo, default);
+        vk.QueueWaitIdle(queue);
+    }
+
+    private static uint FindMemoryType(
+        Vk vk,
+        PhysicalDevice physicalDevice,
+        uint memoryTypeBits,
+        MemoryPropertyFlags requiredFlags)
+    {
+        vk.GetPhysicalDeviceMemoryProperties(physicalDevice, out var properties);
+        for (uint i = 0; i < properties.MemoryTypeCount; i++)
+        {
+            if ((memoryTypeBits & (1u << (int)i)) == 0)
+            {
+                continue;
+            }
+
+            var flags = properties.MemoryTypes[(int)i].PropertyFlags;
+            if ((flags & requiredFlags) == requiredFlags)
+            {
+                return i;
+            }
+        }
+
+        throw new InvalidOperationException($"No Vulkan memory type satisfied flags '{requiredFlags}'.");
+    }
+
     private static bool TryLoadXrFunction<TDelegate>(
         XR xr,
         XrInstance instance,
@@ -891,6 +1543,164 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
 
         public void Dispose()
         {
+            _vk.DestroyCommandPool(_device, _commandPool, null);
+        }
+    }
+
+    private sealed class VulkanSoftwareSceneFrameResources : IDisposable
+    {
+        private readonly Vk _vk;
+        private readonly Device _device;
+        private readonly CommandPool _commandPool;
+        private readonly DeviceMemory _stagingMemory;
+        private readonly ulong _stagingBytes;
+
+        private VulkanSoftwareSceneFrameResources(
+            Vk vk,
+            Device device,
+            CommandPool commandPool,
+            CommandBuffer commandBuffer,
+            Silk.NET.Vulkan.Buffer stagingBuffer,
+            DeviceMemory stagingMemory,
+            ulong stagingBytes)
+        {
+            _vk = vk;
+            _device = device;
+            _commandPool = commandPool;
+            CommandBuffer = commandBuffer;
+            StagingBuffer = stagingBuffer;
+            _stagingMemory = stagingMemory;
+            _stagingBytes = stagingBytes;
+        }
+
+        public CommandBuffer CommandBuffer { get; }
+
+        public Silk.NET.Vulkan.Buffer StagingBuffer { get; }
+
+        public static VulkanSoftwareSceneFrameResources? Create(
+            Vk vk,
+            Device device,
+            PhysicalDevice physicalDevice,
+            uint queueFamilyIndex,
+            ulong stagingBytes,
+            List<string> errors)
+        {
+            var commandPoolInfo = new CommandPoolCreateInfo
+            {
+                SType = Silk.NET.Vulkan.StructureType.CommandPoolCreateInfo,
+                Flags = CommandPoolCreateFlags.ResetCommandBufferBit,
+                QueueFamilyIndex = queueFamilyIndex
+            };
+            if (vk.CreateCommandPool(device, &commandPoolInfo, null, out var commandPool) != VkResult.Success)
+            {
+                errors.Add("vkCreateCommandPool failed.");
+                return null;
+            }
+
+            var allocateInfo = new CommandBufferAllocateInfo
+            {
+                SType = Silk.NET.Vulkan.StructureType.CommandBufferAllocateInfo,
+                CommandPool = commandPool,
+                Level = CommandBufferLevel.Primary,
+                CommandBufferCount = 1
+            };
+            if (vk.AllocateCommandBuffers(device, &allocateInfo, out var commandBuffer) != VkResult.Success)
+            {
+                vk.DestroyCommandPool(device, commandPool, null);
+                errors.Add("vkAllocateCommandBuffers failed.");
+                return null;
+            }
+
+            var bufferInfo = new BufferCreateInfo
+            {
+                SType = Silk.NET.Vulkan.StructureType.BufferCreateInfo,
+                Size = stagingBytes,
+                Usage = BufferUsageFlags.TransferSrcBit,
+                SharingMode = SharingMode.Exclusive
+            };
+            if (vk.CreateBuffer(device, &bufferInfo, null, out var stagingBuffer) != VkResult.Success)
+            {
+                vk.DestroyCommandPool(device, commandPool, null);
+                errors.Add("vkCreateBuffer failed for OpenXR software scene upload.");
+                return null;
+            }
+
+            vk.GetBufferMemoryRequirements(device, stagingBuffer, out var requirements);
+            var memoryInfo = new MemoryAllocateInfo
+            {
+                SType = Silk.NET.Vulkan.StructureType.MemoryAllocateInfo,
+                AllocationSize = requirements.Size,
+                MemoryTypeIndex = FindMemoryType(
+                    vk,
+                    physicalDevice,
+                    requirements.MemoryTypeBits,
+                    MemoryPropertyFlags.HostVisibleBit | MemoryPropertyFlags.HostCoherentBit)
+            };
+            if (vk.AllocateMemory(device, &memoryInfo, null, out var stagingMemory) != VkResult.Success)
+            {
+                vk.DestroyBuffer(device, stagingBuffer, null);
+                vk.DestroyCommandPool(device, commandPool, null);
+                errors.Add("vkAllocateMemory failed for OpenXR software scene upload.");
+                return null;
+            }
+
+            if (vk.BindBufferMemory(device, stagingBuffer, stagingMemory, 0) != VkResult.Success)
+            {
+                vk.FreeMemory(device, stagingMemory, null);
+                vk.DestroyBuffer(device, stagingBuffer, null);
+                vk.DestroyCommandPool(device, commandPool, null);
+                errors.Add("vkBindBufferMemory failed for OpenXR software scene upload.");
+                return null;
+            }
+
+            return new VulkanSoftwareSceneFrameResources(
+                vk,
+                device,
+                commandPool,
+                commandBuffer,
+                stagingBuffer,
+                stagingMemory,
+                stagingBytes);
+        }
+
+        public void WritePixels(byte[] pixels)
+        {
+            if ((ulong)pixels.Length > _stagingBytes)
+            {
+                throw new InvalidOperationException("OpenXR software scene upload pixels exceed the staging buffer.");
+            }
+
+            void* mapped;
+            if (_vk.MapMemory(_device, _stagingMemory, 0, (ulong)pixels.Length, 0, &mapped) != VkResult.Success)
+            {
+                throw new InvalidOperationException("vkMapMemory failed for OpenXR software scene upload.");
+            }
+
+            try
+            {
+                fixed (byte* source = pixels)
+                {
+                    System.Buffer.MemoryCopy(source, mapped, pixels.Length, pixels.Length);
+                }
+            }
+            finally
+            {
+                _vk.UnmapMemory(_device, _stagingMemory);
+            }
+        }
+
+        public void Dispose()
+        {
+            if (StagingBuffer.Handle != 0)
+            {
+                _vk.DestroyBuffer(_device, StagingBuffer, null);
+            }
+
+            if (_stagingMemory.Handle != 0)
+            {
+                _vk.FreeMemory(_device, _stagingMemory, null);
+            }
+
             _vk.DestroyCommandPool(_device, _commandPool, null);
         }
     }

@@ -172,6 +172,53 @@ public sealed class VulkanSceneBatchBuilderTests
     }
 
     [Fact]
+    public void BuildIndexesRenderablesInsteadOfRepeatedlyScanningPerMesh()
+    {
+        var renderables = new CountingRenderableList(Enumerable.Range(0, 6)
+            .Select(index => new RekallAgeRuntimeViewportRenderable(
+                $"entity-{index}",
+                $"Entity {index}",
+                "mesh",
+                $"asset-{index}",
+                index,
+                0,
+                0,
+                index + 1))
+            .ToArray());
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main",
+            0,
+            0,
+            128,
+            72,
+            null,
+            [],
+            renderables,
+            0,
+            new RekallAgeRuntimeViewportOverlay(false, 0),
+            []);
+        var meshes = renderables
+            .Select(renderable => new RekallAgeVulkanSceneMesh(
+                renderable.EntityId,
+                renderable.EntityName,
+                "glb",
+                [
+                    new RekallAgeVulkanSceneVertex(0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0),
+                    new RekallAgeVulkanSceneVertex(1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0),
+                    new RekallAgeVulkanSceneVertex(0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 1)
+                ],
+                [0, 1, 2]))
+            .ToArray();
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
+
+        Assert.Equal(meshes.Length, batch.Draws.Count);
+        Assert.True(
+            renderables.EnumerationCount <= 3,
+            $"Expected renderables to be indexed once and reused, but they were enumerated {renderables.EnumerationCount} times.");
+    }
+
+    [Fact]
     public void BuildCarriesMeshTextureIdIntoDrawRanges()
     {
         var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
@@ -278,5 +325,32 @@ public sealed class VulkanSceneBatchBuilderTests
             0,
             new RekallAgeRuntimeViewportOverlay(false, 0),
             []);
+    }
+
+    private sealed class CountingRenderableList : IReadOnlyList<RekallAgeRuntimeViewportRenderable>
+    {
+        private readonly IReadOnlyList<RekallAgeRuntimeViewportRenderable> _inner;
+
+        public CountingRenderableList(IReadOnlyList<RekallAgeRuntimeViewportRenderable> inner)
+        {
+            _inner = inner;
+        }
+
+        public int EnumerationCount { get; private set; }
+
+        public int Count => _inner.Count;
+
+        public RekallAgeRuntimeViewportRenderable this[int index] => _inner[index];
+
+        public IEnumerator<RekallAgeRuntimeViewportRenderable> GetEnumerator()
+        {
+            EnumerationCount++;
+            return _inner.GetEnumerator();
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 }

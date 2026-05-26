@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -155,6 +156,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly HashSet<string> _pressedButtons = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _pressedButtonsThisFrame = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _releasedButtonsThisFrame = new(StringComparer.OrdinalIgnoreCase);
+    private readonly uint[] _drawUniformDynamicOffsets = new uint[1];
     private int _lastFpsFrame;
     private double _lastFpsTime;
     private int _fps;
@@ -164,7 +166,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private long _lastAssetHotReloadRequestTicks;
     private int _cachedWidth;
     private int _cachedHeight;
-    private RenderPacket? _cachedStaticPacket;
+    private CachedRenderGeometry? _cachedStaticGeometry;
     private bool _hudDirty = true;
     private RekallAgeSceneDocument _sceneDocument;
 
@@ -574,7 +576,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         }
 
         _pendingMouseWheelDelta += snapshot.WheelDelta;
-        _cachedStaticPacket = null;
+        _cachedStaticGeometry = null;
     }
 
     public async ValueTask DisposeAsync()
@@ -630,7 +632,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _device.WaitForIdle();
         _sceneTarget.Dispose();
         _sceneTarget = CreateSceneRenderTarget(_factory, displayWidth, displayHeight, _presentTextureLayout);
-        _cachedStaticPacket = null;
+        _cachedStaticGeometry = null;
         PlayerLog.Write($"Recreated supersampled scene target {_sceneTarget.Width}x{_sceneTarget.Height} for window {displayWidth}x{displayHeight}.");
     }
 
@@ -827,7 +829,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _sceneRevision++;
         _simulationAccumulatorSeconds = 0;
         _lastSimulationClockSeconds = _clock.Elapsed.TotalSeconds;
-        _cachedStaticPacket = null;
+        _cachedStaticGeometry = null;
         _hudDirty = true;
     }
 
@@ -864,7 +866,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
         _assets = assets;
         _assetRevision++;
-        _cachedStaticPacket = null;
+        _cachedStaticGeometry = null;
         _hudDirty = true;
         PlayerLog.Write($"Live assets reloaded images={assets.Images.Count} textures={assets.Textures.Count} models={assets.Models.Count} issues={assets.Issues.Count}.");
         return CreateLiveStatus("reload_assets", true, message);
@@ -1020,7 +1022,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             Width = _sceneTarget.Width,
             Height = _sceneTarget.Height
         };
-        var packet = GetRenderPacket(sceneFrame, useStaticGeometryCache: false, out var verticesChanged);
+        var packet = GetRenderPacket(
+            sceneFrame,
+            useStaticGeometryCache: ShouldUseStaticGeometryCache(sceneFrame),
+            out var verticesChanged);
 
         if (verticesChanged && packet.Vertices.Length > 0)
         {
@@ -1071,7 +1076,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _commands.SetGraphicsResourceSet(0, _frameSet);
             if (packet.StereoFrameUniforms.Count >= 2)
             {
-                foreach (var stereoUniform in packet.StereoFrameUniforms.OrderBy(eye => eye.Index))
+                foreach (var stereoUniform in packet.StereoFrameUniforms)
                 {
                     _device.UpdateBuffer(_frameUniformBuffer, 0, stereoUniform.Uniform);
                     _commands.SetViewport(0, new Viewport(
@@ -1118,7 +1123,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         {
             var draw = packet.Draws[i];
             var drawUniformOffset = checked(_drawUniformStrideBytes * (uint)i);
-            _commands.SetGraphicsResourceSet(1, _drawSet, new[] { drawUniformOffset });
+            _drawUniformDynamicOffsets[0] = drawUniformOffset;
+            _commands.SetGraphicsResourceSet(1, _drawSet, _drawUniformDynamicOffsets);
             _commands.SetGraphicsResourceSet(2, ResolveMaterialSet(draw));
             _commands.DrawIndexed(draw.IndexCount, 1, draw.FirstIndex, draw.VertexOffset, 0);
         }
@@ -1182,53 +1188,81 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         out bool changed)
     {
         if (useStaticGeometryCache
-            && _cachedStaticPacket is not null
-            && _cachedWidth == frame.Width
-            && _cachedHeight == frame.Height)
+            && _cachedStaticGeometry is not null
+            && _cachedStaticGeometry.Key.Equals(CreateGeometryCacheKey(frame), StringComparison.Ordinal))
         {
+            var packet = BuildRenderPacket(frame, _cachedStaticGeometry, out _);
             changed = false;
-            return _cachedStaticPacket;
+            return packet;
         }
 
-        var vertices = BuildRenderPacket(frame);
-        if (useStaticGeometryCache)
+        var result = BuildRenderPacket(frame, null, out var geometry);
+        if (useStaticGeometryCache && geometry is not null)
         {
-            _cachedStaticPacket = vertices;
+            _cachedStaticGeometry = geometry with { Key = CreateGeometryCacheKey(frame) };
             _cachedWidth = frame.Width;
             _cachedHeight = frame.Height;
         }
 
         changed = true;
-        return vertices;
+        return result;
     }
 
     private bool ShouldUseStaticGeometryCache(Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame)
     {
-        return frame.Renderables.Any(renderable =>
-            renderable.Kind.Equals("mesh", StringComparison.Ordinal)
-            && renderable.AssetId is not null
-            && _assets.Models.ContainsKey(renderable.AssetId));
+        foreach (var renderable in frame.Renderables)
+        {
+            if (renderable.Kind.Equals("mesh", StringComparison.Ordinal)
+                && (renderable.AssetId is not null
+                    || renderable.Variant is not null
+                    || renderable.GeometryMesh is not null
+                    || renderable.LineSegments is not null))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    private RenderPacket BuildRenderPacket(Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame)
+    private RenderPacket BuildRenderPacket(
+        Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame,
+        CachedRenderGeometry? cachedGeometry,
+        out CachedRenderGeometry? builtGeometry)
     {
-        var meshes = _meshBuilder.BuildMeshes(frame, _assets);
+        builtGeometry = null;
+        var meshes = cachedGeometry?.Meshes ?? _meshBuilder.BuildMeshes(frame, _assets);
         if (meshes.Count == 0)
         {
             return new RenderPacket([], [], [], default, [], 0, 0, 0);
         }
 
         var batch = _batchBuilder.Build(frame, meshes);
-        var vertices = batch.Vertices
-            .Select(vertex => new GpuVertex(
-                new Vector3(vertex.X, vertex.Y, vertex.Z),
-                new Vector3(vertex.NormalX, vertex.NormalY, vertex.NormalZ),
-                new Vector4(vertex.R, vertex.G, vertex.B, vertex.A),
-                new Vector2(vertex.U, vertex.V)))
-            .ToArray();
-        var draws = batch.Draws
-            .Where(draw => draw.IndexCount > 0)
-            .Select(draw => new GpuDraw(
+        var vertices = cachedGeometry?.Vertices;
+        if (vertices is null)
+        {
+            vertices = new GpuVertex[batch.Vertices.Count];
+            for (var i = 0; i < batch.Vertices.Count; i++)
+            {
+                var vertex = batch.Vertices[i];
+                vertices[i] = new GpuVertex(
+                    new Vector3(vertex.X, vertex.Y, vertex.Z),
+                    new Vector3(vertex.NormalX, vertex.NormalY, vertex.NormalZ),
+                    new Vector4(vertex.R, vertex.G, vertex.B, vertex.A),
+                    new Vector2(vertex.U, vertex.V));
+            }
+        }
+
+        var drawList = new List<GpuDraw>(batch.Draws.Count);
+        for (var i = 0; i < batch.Draws.Count; i++)
+        {
+            var draw = batch.Draws[i];
+            if (draw.IndexCount == 0)
+            {
+                continue;
+            }
+
+            drawList.Add(new GpuDraw(
                 draw.FirstIndex,
                 draw.IndexCount,
                 draw.VertexOffset,
@@ -1239,34 +1273,164 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 draw.OcclusionTextureId,
                 draw.EmissiveTextureId,
                 draw.MaterialFactors,
-                draw.EmissiveFactors))
-            .ToArray();
+                draw.EmissiveFactors));
+        }
 
-        var textureCount = meshes
-            .SelectMany(mesh => new[]
+        var indices = cachedGeometry?.Indices;
+        if (indices is null)
+        {
+            indices = new uint[batch.Indices.Count];
+            for (var i = 0; i < batch.Indices.Count; i++)
             {
-                mesh.BaseColorTexture?.Id,
-                mesh.MetallicRoughnessTexture?.Id,
-                mesh.NormalTexture?.Id,
-                mesh.OcclusionTexture?.Id,
-                mesh.EmissiveTexture?.Id
-            })
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Distinct(StringComparer.Ordinal)
-            .Count();
+                indices[i] = batch.Indices[i];
+            }
+        }
+
+        var meshCount = cachedGeometry?.MeshCount ?? meshes.Count;
+        var triangleCount = cachedGeometry?.TriangleCount;
+        var textureCount = cachedGeometry?.TextureCount;
+        if (triangleCount is null || textureCount is null)
+        {
+            var textureIds = new HashSet<string>(StringComparer.Ordinal);
+            var triangles = 0;
+            foreach (var mesh in meshes)
+            {
+                triangles += mesh.Indices.Count / 3;
+                AddTextureId(textureIds, mesh.BaseColorTexture?.Id);
+                AddTextureId(textureIds, mesh.MetallicRoughnessTexture?.Id);
+                AddTextureId(textureIds, mesh.NormalTexture?.Id);
+                AddTextureId(textureIds, mesh.OcclusionTexture?.Id);
+                AddTextureId(textureIds, mesh.EmissiveTexture?.Id);
+            }
+
+            triangleCount = triangles;
+            textureCount = textureIds.Count;
+        }
+
+        if (cachedGeometry is null)
+        {
+            builtGeometry = new CachedRenderGeometry(
+                string.Empty,
+                meshes,
+                vertices,
+                indices,
+                meshCount,
+                triangleCount.Value,
+                textureCount.Value);
+        }
+
         return new RenderPacket(
             vertices,
-            batch.Indices.ToArray(),
-            draws,
+            indices,
+            drawList.ToArray(),
             new FrameUniform(
                 batch.Frame.ViewProjection,
                 new Vector4(batch.Frame.LightDirection, 0),
                 batch.Frame.LightColor,
                 batch.Frame.LightPosition),
             BuildStereoUniforms(batch),
-            meshes.Count,
-            meshes.Sum(mesh => mesh.Indices.Count / 3),
-            textureCount);
+            meshCount,
+            triangleCount.Value,
+            textureCount.Value);
+    }
+
+    private string CreateGeometryCacheKey(Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame)
+    {
+        var builder = new StringBuilder(frame.Renderables.Count * 96);
+        builder.Append("assets=").Append(_assetRevision).Append(";scene=").Append(_sceneRevision).Append(';');
+        foreach (var renderable in frame.Renderables)
+        {
+            if (!renderable.Kind.Equals("mesh", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            builder
+                .Append(renderable.EntityId).Append('|')
+                .Append(renderable.AssetId).Append('|')
+                .Append(renderable.Variant).Append('|')
+                .Append(renderable.MaterialColor).Append('|')
+                .Append(renderable.TextureAssetId).Append('|')
+                .Append(renderable.MetallicRoughnessTextureAssetId).Append('|')
+                .Append(renderable.NormalTextureAssetId).Append('|')
+                .Append(renderable.OcclusionTextureAssetId).Append('|')
+                .Append(renderable.EmissiveColor).Append('|')
+                .Append(renderable.EmissiveTextureAssetId).Append('|')
+                .Append(renderable.MetallicFactor.ToString("R", CultureInfo.InvariantCulture)).Append('|')
+                .Append(renderable.RoughnessFactor.ToString("R", CultureInfo.InvariantCulture)).Append('|')
+                .Append(renderable.NormalScale.ToString("R", CultureInfo.InvariantCulture)).Append('|')
+                .Append(renderable.OcclusionStrength.ToString("R", CultureInfo.InvariantCulture)).Append('|')
+                .Append(renderable.EmissiveStrength.ToString("R", CultureInfo.InvariantCulture)).Append('|');
+
+            AppendGeometryMeshKey(builder, renderable.GeometryMesh);
+            AppendLineSegmentsKey(builder, renderable.LineSegments);
+            builder.Append(';');
+        }
+
+        return builder.ToString();
+    }
+
+    private static void AppendGeometryMeshKey(StringBuilder builder, RekallAgeRuntimeViewportGeometryMesh? geometry)
+    {
+        if (geometry is null)
+        {
+            builder.Append("geom:null|");
+            return;
+        }
+
+        builder.Append("geom:")
+            .Append(geometry.Vertices.Count)
+            .Append(':')
+            .Append(geometry.Indices.Count);
+        foreach (var vertex in geometry.Vertices)
+        {
+            builder.Append(':')
+                .Append(vertex.X.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(vertex.Y.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(vertex.Z.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(vertex.NormalX.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(vertex.NormalY.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(vertex.NormalZ.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(vertex.R.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(vertex.G.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(vertex.B.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(vertex.A.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(vertex.U.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(vertex.V.ToString("R", CultureInfo.InvariantCulture));
+        }
+
+        foreach (var index in geometry.Indices)
+        {
+            builder.Append(':').Append(index.ToString(CultureInfo.InvariantCulture));
+        }
+
+        builder.Append('|');
+    }
+
+    private static void AppendLineSegmentsKey(StringBuilder builder, RekallAgeRuntimeViewportLineSegments? lineSegments)
+    {
+        if (lineSegments is null)
+        {
+            builder.Append("lines:null|");
+            return;
+        }
+
+        builder.Append("lines:")
+            .Append(lineSegments.Thickness.ToString("R", CultureInfo.InvariantCulture))
+            .Append(':')
+            .Append(lineSegments.Segments.Count);
+        foreach (var segment in lineSegments.Segments)
+        {
+            builder.Append(':')
+                .Append(segment.FromX.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(segment.FromY.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(segment.FromZ.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(segment.ToX.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(segment.ToY.ToString("R", CultureInfo.InvariantCulture)).Append(',')
+                .Append(segment.ToZ.ToString("R", CultureInfo.InvariantCulture));
+        }
+
+        builder.Append('|');
     }
 
     private static IReadOnlyList<StereoFrameUniform> BuildStereoUniforms(RekallAgeVulkanSceneBatch batch)
@@ -1276,9 +1440,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             return [];
         }
 
-        return stereo.Views
-            .OrderBy(view => view.Index)
-            .Select(view => new StereoFrameUniform(
+        var uniforms = new StereoFrameUniform[stereo.Views.Count];
+        for (var i = 0; i < stereo.Views.Count; i++)
+        {
+            var view = stereo.Views[i];
+            uniforms[i] = new StereoFrameUniform(
                 view.Name,
                 view.Index,
                 new FrameUniform(
@@ -1286,8 +1452,18 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                     new Vector4(batch.Frame.LightDirection, 0),
                     batch.Frame.LightColor,
                     batch.Frame.LightPosition),
-                view.Viewport))
-            .ToArray();
+                view.Viewport);
+        }
+
+        return uniforms;
+    }
+
+    private static void AddTextureId(HashSet<string> textureIds, string? textureId)
+    {
+        if (!string.IsNullOrWhiteSpace(textureId))
+        {
+            textureIds.Add(textureId);
+        }
     }
 
     private void EnsureVertexBufferCapacity(IReadOnlyCollection<GpuVertex> vertices)
@@ -2115,6 +2291,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         int MeshCount = 0,
         int TriangleCount = 0,
         int TextureCount = 0);
+
+    private sealed record CachedRenderGeometry(
+        string Key,
+        IReadOnlyList<RekallAgeVulkanSceneMesh> Meshes,
+        GpuVertex[] Vertices,
+        uint[] Indices,
+        int MeshCount,
+        int TriangleCount,
+        int TextureCount);
 
     private sealed record StereoFrameUniform(
         string Name,

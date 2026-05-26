@@ -10,20 +10,27 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         RekallAgeRuntimeViewportFrame frame,
         IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
     {
+        var renderablesByEntityId = BuildRenderableLookup(frame);
         var vertices = BuildLocalVertices(meshes);
-        var indices = FlattenIndices(frame, meshes, out var draws);
+        var indices = FlattenIndices(renderablesByEntityId, meshes, out var draws, out var bounds);
         return new RekallAgeVulkanSceneBatch(
             vertices,
             indices,
             draws,
-            BuildFrameUniform(frame, meshes),
-            BuildStereoFrame(frame, meshes));
+            BuildFrameUniform(frame, bounds),
+            BuildStereoFrame(frame, bounds));
     }
 
     private static IReadOnlyList<RekallAgeVulkanSceneVertex> BuildLocalVertices(
         IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
     {
-        var vertices = new List<RekallAgeVulkanSceneVertex>();
+        var vertexCount = 0;
+        foreach (var mesh in meshes)
+        {
+            vertexCount = checked(vertexCount + mesh.Vertices.Count);
+        }
+
+        var vertices = new List<RekallAgeVulkanSceneVertex>(vertexCount);
         foreach (var mesh in meshes)
         {
             vertices.AddRange(mesh.Vertices);
@@ -33,23 +40,31 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
     }
 
     private static IReadOnlyList<uint> FlattenIndices(
-        RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyDictionary<string, RekallAgeRuntimeViewportRenderable> renderablesByEntityId,
         IReadOnlyList<RekallAgeVulkanSceneMesh> meshes,
-        out IReadOnlyList<RekallAgeVulkanSceneDraw> draws)
+        out IReadOnlyList<RekallAgeVulkanSceneDraw> draws,
+        out SceneBounds bounds)
     {
-        var indices = new List<uint>();
-        var ranges = new List<RekallAgeVulkanSceneDraw>();
+        var indexCount = 0;
+        foreach (var mesh in meshes)
+        {
+            indexCount = checked(indexCount + mesh.Indices.Count);
+        }
+
+        var indices = new List<uint>(indexCount);
+        var ranges = new List<RekallAgeVulkanSceneDraw>(meshes.Count);
+        bounds = SceneBounds.Empty;
         var vertexOffset = 0;
         foreach (var mesh in meshes)
         {
-            var renderable = frame.Renderables.FirstOrDefault(candidate =>
-                candidate.EntityId.Equals(mesh.EntityId, StringComparison.Ordinal));
+            renderablesByEntityId.TryGetValue(mesh.EntityId, out var renderable);
+            var model = CreateModelMatrix(renderable);
             ranges.Add(new RekallAgeVulkanSceneDraw(
                 (uint)indices.Count,
                 (uint)mesh.Indices.Count,
                 vertexOffset,
                 (uint)mesh.Vertices.Count,
-                CreateModelMatrix(renderable),
+                model,
                 mesh.BaseColorTexture?.Id,
                 mesh.MetallicRoughnessTexture?.Id,
                 mesh.NormalTexture?.Id,
@@ -65,6 +80,12 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
                     Math.Clamp(mesh.EmissiveFactor.Y, 0, 16),
                     Math.Clamp(mesh.EmissiveFactor.Z, 0, 16),
                     Math.Clamp(mesh.EmissiveFactor.W, 0, 64))));
+            foreach (var vertex in mesh.Vertices)
+            {
+                var world = Vector3.Transform(new Vector3(vertex.X, vertex.Y, vertex.Z), model);
+                bounds = bounds.Include(world);
+            }
+
             indices.AddRange(mesh.Indices);
             vertexOffset = checked(vertexOffset + mesh.Vertices.Count);
         }
@@ -75,9 +96,9 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
 
     private static RekallAgeVulkanSceneFrameUniform BuildFrameUniform(
         RekallAgeRuntimeViewportFrame frame,
-        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
+        SceneBounds bounds)
     {
-        var bounds = ComputeWorldBounds(frame, meshes);
+        bounds = bounds.OrDefault();
         var center = new Vector3(
             (bounds.MinX + bounds.MaxX) * 0.5f,
             (bounds.MinY + bounds.MaxY) * 0.5f,
@@ -100,14 +121,14 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
 
     private static RekallAgeVulkanSceneStereoFrame? BuildStereoFrame(
         RekallAgeRuntimeViewportFrame frame,
-        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
+        SceneBounds bounds)
     {
         if (frame.Stereo is not { Enabled: true } stereo || frame.ActiveCamera is null)
         {
             return null;
         }
 
-        var bounds = ComputeWorldBounds(frame, meshes);
+        bounds = bounds.OrDefault();
         var center = new Vector3(
             (bounds.MinX + bounds.MaxX) * 0.5f,
             (bounds.MinY + bounds.MaxY) * 0.5f,
@@ -146,32 +167,18 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             views);
     }
 
-    private static SceneBounds ComputeWorldBounds(
-        RekallAgeRuntimeViewportFrame frame,
-        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
+    private static IReadOnlyDictionary<string, RekallAgeRuntimeViewportRenderable> BuildRenderableLookup(
+        RekallAgeRuntimeViewportFrame frame)
     {
-        var bounds = new SceneBounds(float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue);
-        foreach (var mesh in meshes)
+        var lookup = new Dictionary<string, RekallAgeRuntimeViewportRenderable>(
+            frame.Renderables.Count,
+            StringComparer.Ordinal);
+        foreach (var renderable in frame.Renderables)
         {
-            var renderable = frame.Renderables.FirstOrDefault(candidate =>
-                candidate.EntityId.Equals(mesh.EntityId, StringComparison.Ordinal));
-            var model = CreateModelMatrix(renderable);
-            foreach (var vertex in mesh.Vertices)
-            {
-                var world = Vector3.Transform(new Vector3(vertex.X, vertex.Y, vertex.Z), model);
-                bounds = new SceneBounds(
-                    MathF.Min(bounds.MinX, world.X),
-                    MathF.Max(bounds.MaxX, world.X),
-                    MathF.Min(bounds.MinY, world.Y),
-                    MathF.Max(bounds.MaxY, world.Y),
-                    MathF.Min(bounds.MinZ, world.Z),
-                    MathF.Max(bounds.MaxZ, world.Z));
-            }
+            lookup.TryAdd(renderable.EntityId, renderable);
         }
 
-        return bounds.MinX == float.MaxValue
-            ? new SceneBounds(-1, 1, -1, 1, -1, 1)
-            : bounds;
+        return lookup;
     }
 
     private static CameraPose ResolveCameraPose(
@@ -250,10 +257,23 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
 
     private static SceneLight ResolvePrimaryLight(RekallAgeRuntimeViewportFrame frame)
     {
-        var lights = frame.Renderables
-            .Where(renderable => renderable.Kind.Equals("light", StringComparison.Ordinal))
-            .ToArray();
-        var light = lights.FirstOrDefault(IsPointLight) ?? lights.FirstOrDefault();
+        RekallAgeRuntimeViewportRenderable? firstLight = null;
+        RekallAgeRuntimeViewportRenderable? firstPointLight = null;
+        foreach (var renderable in frame.Renderables)
+        {
+            if (!renderable.Kind.Equals("light", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            firstLight ??= renderable;
+            if (firstPointLight is null && IsPointLight(renderable))
+            {
+                firstPointLight = renderable;
+            }
+        }
+
+        var light = firstPointLight ?? firstLight;
         if (light is null)
         {
             return new SceneLight(
@@ -326,7 +346,28 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         return MathF.PI / 180f * (float)degrees;
     }
 
-    private readonly record struct SceneBounds(float MinX, float MaxX, float MinY, float MaxY, float MinZ, float MaxZ);
+    private readonly record struct SceneBounds(float MinX, float MaxX, float MinY, float MaxY, float MinZ, float MaxZ)
+    {
+        public static SceneBounds Empty { get; } = new(float.MaxValue, float.MinValue, float.MaxValue, float.MinValue, float.MaxValue, float.MinValue);
+
+        public SceneBounds Include(Vector3 point)
+        {
+            return new SceneBounds(
+                MathF.Min(MinX, point.X),
+                MathF.Max(MaxX, point.X),
+                MathF.Min(MinY, point.Y),
+                MathF.Max(MaxY, point.Y),
+                MathF.Min(MinZ, point.Z),
+                MathF.Max(MaxZ, point.Z));
+        }
+
+        public SceneBounds OrDefault()
+        {
+            return MinX == float.MaxValue
+                ? new SceneBounds(-1, 1, -1, 1, -1, 1)
+                : this;
+        }
+    }
 
     private readonly record struct SceneLight(Vector3 Direction, Vector4 Position, Vector4 Color);
 

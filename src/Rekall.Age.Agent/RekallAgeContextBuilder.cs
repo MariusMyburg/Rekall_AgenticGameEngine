@@ -1,6 +1,8 @@
+using Rekall.Age.Core.Rendering;
 using Rekall.Age.Project;
 using Rekall.Age.Validation;
 using Rekall.Age.World;
+using System.Text.Json.Nodes;
 
 namespace Rekall.Age.Agent;
 
@@ -71,7 +73,117 @@ public sealed class RekallAgeContextBuilder
             .OrderBy(component => component, StringComparer.Ordinal)
             .ToArray();
 
-        return new RekallAgeSceneSummary(scene.Name, scene.Capabilities, entities, componentTypes);
+        return new RekallAgeSceneSummary(
+            scene.Name,
+            scene.Capabilities,
+            entities,
+            componentTypes,
+            BuildCameraSummaries(scene),
+            BuildRenderLayerSummaries(scene));
+    }
+
+    private static IReadOnlyList<RekallAgeSceneCameraSummary> BuildCameraSummaries(
+        RekallAgeSceneDocument scene)
+    {
+        return scene.Entities
+            .SelectMany(entity => entity.Components
+                .Where(component => component.Type is "Rekall.Camera2D" or "Rekall.Camera3D")
+                .Select(component => new RekallAgeSceneCameraSummary(
+                    entity.Id,
+                    entity.Name,
+                    SimplifyComponentType(component.Type),
+                    ReadBoolean(component.Properties, "active", true),
+                    RekallAgeRenderLayerMask.NormalizeCullingMask(ReadString(component.Properties, "cullingMask")))))
+            .OrderByDescending(camera => camera.Active)
+            .ThenBy(camera => camera.EntityName, StringComparer.Ordinal)
+            .ThenBy(camera => camera.EntityId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<RekallAgeSceneRenderLayerSummary> BuildRenderLayerSummaries(
+        RekallAgeSceneDocument scene)
+    {
+        return scene.Entities
+            .Where(entity => entity.Components.Any(component => IsRenderable(component.Type)))
+            .GroupBy(ReadRenderLayer, StringComparer.Ordinal)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => new RekallAgeSceneRenderLayerSummary(
+                group.Key,
+                group.Count(),
+                group.Select(entity => entity.Name)
+                    .OrderBy(name => name, StringComparer.Ordinal)
+                    .ToArray()))
+            .ToArray();
+    }
+
+    private static string ReadRenderLayer(RekallAgeEntityDocument entity)
+    {
+        var component = entity.Components.FirstOrDefault(item =>
+            item.Type.Equals("Rekall.RenderLayer", StringComparison.Ordinal));
+        return RekallAgeRenderLayerMask.NormalizeLayer(component is null
+            ? null
+            : ReadString(component.Properties, "layer"));
+    }
+
+    private static bool IsRenderable(string componentType)
+    {
+        return componentType is "Rekall.SpriteRenderer"
+            or "Rekall.MeshRenderer"
+            or "Rekall.MeshSet"
+            or "Rekall.GeometryPrimitive"
+            or "Rekall.GeometryMesh"
+            or "Rekall.LineSegments"
+            or "Rekall.PlanetRenderer"
+            or "Rekall.OrbitPathRenderer"
+            or "Rekall.RenderLight"
+            or "Rekall.DirectionalLight"
+            or "Rekall.PointLight";
+    }
+
+    private static bool ReadBoolean(JsonObject properties, string name, bool fallback)
+    {
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
+        {
+            return fallback;
+        }
+
+        if (value.TryGetValue<bool>(out var boolean))
+        {
+            return boolean;
+        }
+
+        return value.TryGetValue<string>(out var text) && bool.TryParse(text, out var parsed)
+            ? parsed
+            : fallback;
+    }
+
+    private static string? ReadString(JsonObject properties, string name)
+    {
+        return TryGetPropertyValue(properties, name, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<string>(out var text)
+            ? text
+            : null;
+    }
+
+    private static bool TryGetPropertyValue(JsonObject properties, string name, out JsonNode? node)
+    {
+        if (properties.TryGetPropertyValue(name, out node))
+        {
+            return true;
+        }
+
+        if (name.Length > 0)
+        {
+            var pascalName = char.ToUpperInvariant(name[0]) + name[1..];
+            if (properties.TryGetPropertyValue(pascalName, out node))
+            {
+                return true;
+            }
+        }
+
+        node = null;
+        return false;
     }
 
     private static string SimplifyComponentType(string componentType)

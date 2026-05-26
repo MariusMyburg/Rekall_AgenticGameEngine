@@ -20,12 +20,11 @@ public sealed class RekallAgeMultiplayerWebSocketClient
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutSource.CancelAfter(timeout);
         try
         {
-            using var socket = new ClientWebSocket();
-            await socket.ConnectAsync(endpoint, timeoutSource.Token).ConfigureAwait(false);
+            using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutSource.CancelAfter(timeout);
+            using var socket = await ConnectWithRetryAsync(endpoint, timeout, timeoutSource.Token).ConfigureAwait(false);
             var requestBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request, JsonOptions));
             await socket.SendAsync(
                 requestBytes,
@@ -74,6 +73,61 @@ public sealed class RekallAgeMultiplayerWebSocketClient
                 ex.Message,
                 null);
         }
+    }
+
+    private static async ValueTask<ClientWebSocket> ConnectWithRetryAsync(
+        Uri endpoint,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        Exception? lastError = null;
+        while (true)
+        {
+            var remaining = deadline - DateTimeOffset.UtcNow;
+            if (remaining <= TimeSpan.Zero)
+            {
+                throw new OperationCanceledException("Timed out connecting to multiplayer WebSocket.", lastError, cancellationToken);
+            }
+
+            var socket = new ClientWebSocket();
+            try
+            {
+                using var attemptSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                attemptSource.CancelAfter(ClampConnectAttemptTimeout(remaining));
+                await socket.ConnectAsync(endpoint, attemptSource.Token).ConfigureAwait(false);
+                return socket;
+            }
+            catch (Exception ex) when (IsRetryableConnectFailure(ex) && !cancellationToken.IsCancellationRequested)
+            {
+                lastError = ex;
+                socket.Dispose();
+                var delay = remaining > TimeSpan.FromMilliseconds(75)
+                    ? TimeSpan.FromMilliseconds(50)
+                    : TimeSpan.FromMilliseconds(Math.Max(1, remaining.TotalMilliseconds * 0.5));
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                socket.Dispose();
+                throw;
+            }
+        }
+    }
+
+    private static TimeSpan ClampConnectAttemptTimeout(TimeSpan remaining)
+    {
+        if (remaining <= TimeSpan.FromMilliseconds(250))
+        {
+            return remaining;
+        }
+
+        return TimeSpan.FromMilliseconds(Math.Min(500, remaining.TotalMilliseconds));
+    }
+
+    private static bool IsRetryableConnectFailure(Exception ex)
+    {
+        return ex is WebSocketException or IOException or OperationCanceledException;
     }
 
     private static async ValueTask<string> ReceiveTextAsync(

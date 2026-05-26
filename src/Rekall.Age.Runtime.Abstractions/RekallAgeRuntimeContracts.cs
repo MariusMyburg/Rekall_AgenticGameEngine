@@ -273,13 +273,15 @@ public sealed record RekallAgeRuntimeRenderCamera(
     double InterpupillaryDistance = 0.064,
     double StereoConvergenceDistance = 10,
     string XrViewConfiguration = "primary-stereo",
-    bool FoveatedRendering = false);
+    bool FoveatedRendering = false,
+    string CullingMask = "*");
 
 public sealed record RekallAgeRuntimeRenderSprite(
     string EntityId,
     string EntityName,
     string? AssetId,
-    string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored);
+    string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored,
+    string Layer = "default");
 
 public sealed record RekallAgeRuntimeRenderMesh(
     string EntityId,
@@ -291,7 +293,8 @@ public sealed record RekallAgeRuntimeRenderMesh(
     string Kind = "mesh",
     int SortKey = 200,
     RekallAgeRuntimeRenderShaderPipeline? ShaderPipeline = null,
-    string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored);
+    string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored,
+    string Layer = "default");
 
 public sealed record RekallAgeRuntimeRenderShaderPipeline(
     string VertexShader,
@@ -303,7 +306,8 @@ public sealed record RekallAgeRuntimeRenderLight(
     string Kind,
     double Intensity,
     string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored,
-    string? Color = null);
+    string? Color = null,
+    string Layer = "default");
 
 public sealed record RekallAgeRuntimeRenderUiLayer(
     string EntityId,

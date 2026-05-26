@@ -44,7 +44,29 @@ public sealed record RekallAgeRuntimeViewportFrame(
     int UiLayerCount,
     RekallAgeRuntimeViewportOverlay DebugOverlay,
     IReadOnlyList<RekallAgeRuntimeViewportObservation> Observations,
-    RekallAgeRuntimeViewportStereoSettings? Stereo = null);
+    RekallAgeRuntimeViewportStereoSettings? Stereo = null)
+{
+    public RekallAgeRuntimeViewportCulling Culling { get; init; } = RekallAgeRuntimeViewportCulling.Empty;
+}
+
+public sealed record RekallAgeRuntimeViewportCulling(
+    int CulledRenderableCount,
+    IReadOnlyList<RekallAgeRuntimeViewportCulledRenderable> CulledRenderables)
+{
+    public static RekallAgeRuntimeViewportCulling Empty { get; } = new(
+        0,
+        Array.Empty<RekallAgeRuntimeViewportCulledRenderable>());
+}
+
+public sealed record RekallAgeRuntimeViewportCulledRenderable(
+    string EntityId,
+    string EntityName,
+    string Kind,
+    string Layer,
+    string Reason,
+    string? CameraEntityId,
+    string? CameraEntityName,
+    string CullingMask);
 
 public sealed record RekallAgeRuntimeViewportCamera(
     string EntityId,
@@ -68,7 +90,8 @@ public sealed record RekallAgeRuntimeViewportCamera(
     double InterpupillaryDistance = 0.064,
     double StereoConvergenceDistance = 10,
     string XrViewConfiguration = "primary-stereo",
-    bool FoveatedRendering = false);
+    bool FoveatedRendering = false,
+    string CullingMask = "*");
 
 public sealed record RekallAgeRuntimeViewportStereoSettings(
     bool Enabled,
@@ -124,7 +147,8 @@ public sealed record RekallAgeRuntimeViewportRenderable(
     string? EmissiveTextureAssetId = null,
     double EmissiveStrength = 0,
     RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null,
-    RekallAgeRuntimeViewportLineSegments? LineSegments = null);
+    RekallAgeRuntimeViewportLineSegments? LineSegments = null,
+    string Layer = "default");
 
 public sealed record RekallAgeRuntimeViewportShaderPipeline(
     string VertexShader,

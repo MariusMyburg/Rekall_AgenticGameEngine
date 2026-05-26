@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using Rekall.Age.Core.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime.Abstractions;
 
@@ -49,21 +50,25 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     camera.InterpupillaryDistance,
                     camera.StereoConvergenceDistance,
                     camera.XrViewConfiguration,
-                    camera.FoveatedRendering);
+                    camera.FoveatedRendering,
+                    camera.CullingMask);
             })
             .OrderByDescending(camera => camera.Active)
             .ThenBy(camera => camera.EntityName, StringComparer.Ordinal)
             .ThenBy(camera => camera.EntityId, StringComparer.Ordinal)
             .ToArray();
         var activeCamera = cameras.FirstOrDefault(camera => camera.Active) ?? cameras.FirstOrDefault();
-        var renderableSource = debugOverlay
+        var renderableCandidates = (debugOverlay
             ? BuildRenderables(world, activeCamera).Concat(BuildColliderDebugRenderables(world))
-            : BuildRenderables(world, activeCamera);
-        var renderables = renderableSource
+            : BuildRenderables(world, activeCamera))
+            .ToArray();
+        var renderables = renderableCandidates
+            .Where(renderable => RekallAgeRenderLayerMask.IncludesLayer(renderable.Layer, activeCamera?.CullingMask))
             .OrderBy(renderable => renderable.SortKey)
             .ThenBy(renderable => renderable.EntityName, StringComparer.Ordinal)
             .ThenBy(renderable => renderable.EntityId, StringComparer.Ordinal)
             .ToArray();
+        var culling = BuildCullingDiagnostics(renderableCandidates, activeCamera);
 
         return new RekallAgeRuntimeViewportFrame(
             world.SceneName,
@@ -84,7 +89,32 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     observation.TargetName.Length > 0 ? observation.TargetName : observation.TargetId,
                     observation.Message))
                 .ToArray(),
-            BuildStereoSettings(activeCamera, width, height));
+            BuildStereoSettings(activeCamera, width, height))
+        {
+            Culling = culling
+        };
+    }
+
+    private static RekallAgeRuntimeViewportCulling BuildCullingDiagnostics(
+        IReadOnlyList<RekallAgeRuntimeViewportRenderable> candidates,
+        RekallAgeRuntimeViewportCamera? activeCamera)
+    {
+        var culled = candidates
+            .Where(renderable => !RekallAgeRenderLayerMask.IncludesLayer(renderable.Layer, activeCamera?.CullingMask))
+            .Select(renderable => new RekallAgeRuntimeViewportCulledRenderable(
+                renderable.EntityId,
+                renderable.EntityName,
+                renderable.Kind,
+                renderable.Layer,
+                "camera-culling-mask",
+                activeCamera?.EntityId,
+                activeCamera?.EntityName,
+                activeCamera?.CullingMask ?? "*"))
+            .OrderBy(renderable => renderable.EntityName, StringComparer.Ordinal)
+            .ThenBy(renderable => renderable.EntityId, StringComparer.Ordinal)
+            .ToArray();
+
+        return new RekallAgeRuntimeViewportCulling(culled.Length, culled);
     }
 
     private static RekallAgeRuntimeViewportStereoSettings? BuildStereoSettings(
@@ -151,7 +181,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 100,
                 RotationZ: transform.Rotation2D,
                 ScaleX: transform.Scale2D.X,
-                ScaleY: transform.Scale2D.Y);
+                ScaleY: transform.Scale2D.Y,
+                Layer: sprite.Layer);
         }
 
         foreach (var mesh in world.Subsystems.Rendering.Meshes)
@@ -255,7 +286,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     ? ReadNumber(orbitPathComponent, "emissiveStrength", 1.4)
                     : ReadNumber(materialComponent, "emissiveStrength", ReadNumber(planetComponent, "emissiveStrength", 0)),
                 ShaderPipeline: ToViewportShaderPipeline(mesh.ShaderPipeline) ?? ReadShaderPipeline(meshRendererComponent),
-                LineSegments: lineSegments);
+                LineSegments: lineSegments,
+                Layer: mesh.Layer);
         }
 
         foreach (var light in world.Subsystems.Rendering.Lights)
@@ -275,7 +307,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 RotationY: transform.Rotation3D.Y,
                 RotationZ: transform.Rotation3D.Z,
                 Intensity: light.Intensity,
-                MaterialColor: light.Color);
+                MaterialColor: light.Color,
+                Layer: light.Layer);
         }
 
         foreach (var uiLayer in world.Subsystems.Rendering.UiLayers)

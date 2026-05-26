@@ -118,6 +118,36 @@ public sealed class MultiplayerIpcTests
     }
 
     [Fact]
+    public async Task WebSocketClientRetriesUntilServerStartsWithinTimeout()
+    {
+        var endpoint = RekallAgeMultiplayerEndpoint.ResolveWebSocketUri("127.0.0.1", GetFreeTcpPort());
+        var host = new RekallAgeMultiplayerAuthorityHost("session-delayed-ws", CreateSession());
+        await using var server = new RekallAgeMultiplayerWebSocketServer(endpoint, host.HandleAsync);
+        var startTask = Task.Run(async () =>
+        {
+            await Task.Delay(1500);
+            server.Start();
+            await server.WaitUntilListeningAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+        });
+
+        var client = new RekallAgeMultiplayerWebSocketClient();
+        var response = await client.SendAsync(
+            endpoint,
+            new RekallAgeMultiplayerRequestEnvelope(
+                "snapshot",
+                Guid.NewGuid().ToString("N"),
+                "F:/Game",
+                "Main",
+                null),
+            TimeSpan.FromSeconds(5),
+            CancellationToken.None);
+
+        await startTask;
+        Assert.True(response.Ok, response.ErrorMessage);
+        Assert.Equal("session-delayed-ws", response.Payload!["sessionId"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task MultiplayerCommandsCanTargetWebSocketAuthoritativeSession()
     {
         var endpoint = RekallAgeMultiplayerEndpoint.ResolveWebSocketUri("127.0.0.1", GetFreeTcpPort());

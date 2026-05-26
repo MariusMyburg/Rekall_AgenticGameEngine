@@ -1,4 +1,5 @@
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Rendering;
 using Rekall.Age.Runtime.Abstractions;
 
 namespace Rekall.Age.Runtime.Commands;
@@ -29,7 +30,19 @@ public sealed record InspectSceneRuntimeResult(
     int XrActionCount,
     IReadOnlyList<RekallAgeRuntimeXrAction> XrActions,
     IReadOnlyList<string> SystemsRun,
-    IReadOnlyList<RekallAgeRuntimeObservation> Observations);
+    IReadOnlyList<RekallAgeRuntimeObservation> Observations,
+    int VisibleRenderableCount,
+    int CulledRenderableCount,
+    IReadOnlyList<InspectSceneRuntimeCulledRenderable> CulledRenderables);
+
+public sealed record InspectSceneRuntimeCulledRenderable(
+    string EntityId,
+    string EntityName,
+    string Kind,
+    string Layer,
+    string Reason,
+    string? CameraEntityName,
+    string CullingMask);
 
 public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneRuntimeRequest, InspectSceneRuntimeResult>
 {
@@ -67,7 +80,10 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
                 0,
                 Array.Empty<RekallAgeRuntimeXrAction>(),
                 Array.Empty<string>(),
-                Array.Empty<RekallAgeRuntimeObservation>());
+                Array.Empty<RekallAgeRuntimeObservation>(),
+                0,
+                0,
+                Array.Empty<InspectSceneRuntimeCulledRenderable>());
             return RekallAgeCommandResult<InspectSceneRuntimeResult>.Failure(
                 empty,
                 "Runtime inspection requires a non-negative frame count.",
@@ -99,6 +115,7 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
         var animation = world.Subsystems.Animation;
         var ui = world.Subsystems.Ui;
         var xr = world.Subsystems.Xr;
+        var culling = BuildCullingSummary(rendering);
 
         return new InspectSceneRuntimeResult(
             world.SceneName,
@@ -120,6 +137,68 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
             xr.Actions.Count,
             xr.Actions,
             world.SystemsRun,
-            world.Observations);
+            world.Observations,
+            culling.VisibleRenderableCount,
+            culling.CulledRenderables.Count,
+            culling.CulledRenderables);
     }
+
+    private static RuntimeCullingSummary BuildCullingSummary(RekallAgeRuntimeRenderView rendering)
+    {
+        var activeCamera = rendering.Cameras
+            .OrderByDescending(camera => camera.Active)
+            .ThenBy(camera => camera.EntityName, StringComparer.Ordinal)
+            .ThenBy(camera => camera.EntityId, StringComparer.Ordinal)
+            .FirstOrDefault();
+        var candidates = EnumerateRenderableCandidates(rendering).ToArray();
+        var culled = candidates
+            .Where(candidate => !RekallAgeRenderLayerMask.IncludesLayer(candidate.Layer, activeCamera?.CullingMask))
+            .Select(candidate => new InspectSceneRuntimeCulledRenderable(
+                candidate.EntityId,
+                candidate.EntityName,
+                candidate.Kind,
+                candidate.Layer,
+                "camera-culling-mask",
+                activeCamera?.EntityName,
+                activeCamera?.CullingMask ?? "*"))
+            .OrderBy(candidate => candidate.EntityName, StringComparer.Ordinal)
+            .ThenBy(candidate => candidate.EntityId, StringComparer.Ordinal)
+            .ToArray();
+
+        return new RuntimeCullingSummary(candidates.Length - culled.Length, culled);
+    }
+
+    private static IEnumerable<RuntimeRenderableCandidate> EnumerateRenderableCandidates(
+        RekallAgeRuntimeRenderView rendering)
+    {
+        foreach (var sprite in rendering.Sprites)
+        {
+            yield return new RuntimeRenderableCandidate(sprite.EntityId, sprite.EntityName, "sprite", RekallAgeRenderLayerMask.NormalizeLayer(sprite.Layer));
+        }
+
+        foreach (var mesh in rendering.Meshes)
+        {
+            yield return new RuntimeRenderableCandidate(mesh.EntityId, mesh.EntityName, "mesh", RekallAgeRenderLayerMask.NormalizeLayer(mesh.Layer));
+        }
+
+        foreach (var light in rendering.Lights)
+        {
+            yield return new RuntimeRenderableCandidate(light.EntityId, light.EntityName, "light", RekallAgeRenderLayerMask.NormalizeLayer(light.Layer));
+        }
+
+        foreach (var uiLayer in rendering.UiLayers)
+        {
+            yield return new RuntimeRenderableCandidate(uiLayer.EntityId, uiLayer.EntityName, "ui", "default");
+        }
+    }
+
+    private sealed record RuntimeCullingSummary(
+        int VisibleRenderableCount,
+        IReadOnlyList<InspectSceneRuntimeCulledRenderable> CulledRenderables);
+
+    private sealed record RuntimeRenderableCandidate(
+        string EntityId,
+        string EntityName,
+        string Kind,
+        string Layer);
 }

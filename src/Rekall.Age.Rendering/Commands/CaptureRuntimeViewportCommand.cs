@@ -25,6 +25,8 @@ public sealed record CaptureRuntimeViewportResult(
     string? ActiveCamera,
     int RenderableCount,
     IReadOnlyList<string> RenderableKinds,
+    int CulledRenderableCount,
+    IReadOnlyList<CaptureRuntimeViewportCulledRenderable> CulledRenderables,
     int ObservationCount,
     IReadOnlyList<string> ObservationCodes,
     int AssetBackedRenderableCount,
@@ -37,6 +39,15 @@ public sealed record CaptureRuntimeViewportResult(
     string AccelerationStatus,
     string? SelectedDeviceName,
     RekallAgeViewportFrameAnalysis FrameAnalysis);
+
+public sealed record CaptureRuntimeViewportCulledRenderable(
+    string EntityId,
+    string EntityName,
+    string Kind,
+    string Layer,
+    string Reason,
+    string? CameraEntityName,
+    string CullingMask);
 
 public sealed class CaptureRuntimeViewportCommand
     : IRekallAgeCommand<CaptureRuntimeViewportRequest, CaptureRuntimeViewportResult>
@@ -124,6 +135,8 @@ public sealed class CaptureRuntimeViewportCommand
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(kind => kind, StringComparer.Ordinal)
                 .ToArray(),
+            frame.Culling.CulledRenderableCount,
+            BuildCulledRenderables(frame),
             capture.ObservationCount,
             frame.Observations
                 .Select(observation => observation.Code)
@@ -179,6 +192,8 @@ public sealed class CaptureRuntimeViewportCommand
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(kind => kind, StringComparer.Ordinal)
                 .ToArray(),
+            frame.Culling.CulledRenderableCount,
+            BuildCulledRenderables(frame),
             frame.Observations.Count,
             frame.Observations
                 .Select(observation => observation.Code)
@@ -245,6 +260,8 @@ public sealed class CaptureRuntimeViewportCommand
             frame.ActiveCamera?.EntityName,
             frame.Renderables.Count,
             Array.Empty<string>(),
+            frame.Culling.CulledRenderableCount,
+            BuildCulledRenderables(frame),
             frame.Observations.Count,
             frame.Observations
                 .Select(observation => observation.Code)
@@ -325,6 +342,21 @@ public sealed class CaptureRuntimeViewportCommand
             : backendId.Trim().ToLowerInvariant();
     }
 
+    private static IReadOnlyList<CaptureRuntimeViewportCulledRenderable> BuildCulledRenderables(
+        Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame)
+    {
+        return frame.Culling.CulledRenderables
+            .Select(renderable => new CaptureRuntimeViewportCulledRenderable(
+                renderable.EntityId,
+                renderable.EntityName,
+                renderable.Kind,
+                renderable.Layer,
+                renderable.Reason,
+                renderable.CameraEntityName,
+                renderable.CullingMask))
+            .ToArray();
+    }
+
     private static RekallAgeVulkanClearColor ParseClearColor(string? clearColor)
     {
         if (clearColor is { Length: 7 }
@@ -365,6 +397,8 @@ public sealed class CaptureRuntimeViewportCommand
             null,
             0,
             Array.Empty<string>(),
+            0,
+            Array.Empty<CaptureRuntimeViewportCulledRenderable>(),
             0,
             Array.Empty<string>(),
             0,

@@ -30,6 +30,112 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneReportsCameraCullingMaskWithNoMatchingRenderableLayer()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["cullingMask"] = "world, helpers"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("World Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "world" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        var issue = Assert.Single(report.Issues, item => item.Code == "REKALL_CAMERA_CULLING_MASK_EMPTY_LAYER");
+        Assert.Equal("warning", issue.Severity);
+        Assert.Equal("Camera", issue.Target);
+        Assert.Contains("helpers", issue.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ValidateSceneReportsRenderableLayerExcludedFromEveryActiveCamera()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["cullingMask"] = "world"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("World Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "world" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })))
+            .AddEntity(RekallAgeEntityDocument.Create("Helper Cube", ["debug"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "helpers" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        var issue = Assert.Single(report.Issues, item => item.Code == "REKALL_RENDER_LAYER_NOT_VISIBLE");
+        Assert.Equal("warning", issue.Severity);
+        Assert.Equal("helpers", issue.Target);
+        Assert.Contains("Helper Cube", issue.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ValidateSceneAcceptsRenderableLayersWhenActiveCameraUsesWildcardMask()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["cullingMask"] = "*"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Helper Cube", ["debug"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "helpers" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        Assert.DoesNotContain(report.Issues, item => item.Code == "REKALL_RENDER_LAYER_NOT_VISIBLE");
+    }
+
+    [Fact]
+    public async Task ValidateSceneTreatsExcludedCameraMaskLayerAsNotVisible()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["cullingMask"] = "*, !helpers"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Helper Cube", ["debug"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "helpers" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        Assert.Contains(report.Issues, item =>
+            item.Code == "REKALL_RENDER_LAYER_NOT_VISIBLE"
+            && item.Target == "helpers");
+        Assert.DoesNotContain(report.Issues, item =>
+            item.Code == "REKALL_CAMERA_CULLING_MASK_EMPTY_LAYER"
+            && item.Message.Contains("helpers", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ValidateVrSceneReportsMissingRigAndTrackedCamera()
     {
         var root = TestPaths.CreateTempDirectory();

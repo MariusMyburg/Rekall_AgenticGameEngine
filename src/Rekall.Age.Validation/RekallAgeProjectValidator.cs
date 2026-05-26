@@ -1,4 +1,5 @@
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Rendering;
 using Rekall.Age.World;
 using System.Text.Json.Nodes;
 
@@ -57,8 +58,59 @@ public sealed class RekallAgeProjectValidator
         }
 
         ValidateXrScene(scene, activeCameras.Select(camera => camera.Entity).ToArray(), issues);
+        ValidateRenderLayers(scene, activeCameras.Select(camera => (camera.Entity, camera.Component)).ToArray(), issues);
 
         return new RekallAgeValidationReport(issues);
+    }
+
+    private static void ValidateRenderLayers(
+        RekallAgeSceneDocument scene,
+        IReadOnlyList<(RekallAgeEntityDocument Entity, RekallAgeComponentDocument Camera)> activeCameras,
+        List<RekallAgeValidationIssue> issues)
+    {
+        var renderableLayers = scene.Entities
+            .Where(entity => entity.Components.Any(component => IsRenderable(component.Type)
+                && ReadBoolean(component.Properties, "active", true)))
+            .GroupBy(ReadRenderLayer, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(entity => entity.Name)
+                    .OrderBy(name => name, StringComparer.Ordinal)
+                    .ToArray(),
+                StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (entity, camera) in activeCameras)
+        {
+            var mask = ReadString(camera.Properties, "cullingMask") ?? "*";
+            foreach (var layer in RekallAgeRenderLayerMask.EnumerateIncludedLayers(mask))
+            {
+                if (renderableLayers.ContainsKey(layer))
+                {
+                    continue;
+                }
+
+                issues.Add(new RekallAgeValidationIssue(
+                    "REKALL_CAMERA_CULLING_MASK_EMPTY_LAYER",
+                    $"Camera '{entity.Name}' culling mask references layer '{layer}', but no active renderable uses that layer.",
+                    "warning",
+                    entity.Name));
+            }
+        }
+
+        foreach (var (layer, entityNames) in renderableLayers)
+        {
+            if (activeCameras.Any(camera =>
+                    RekallAgeRenderLayerMask.IncludesLayer(layer, ReadString(camera.Camera.Properties, "cullingMask"))))
+            {
+                continue;
+            }
+
+            issues.Add(new RekallAgeValidationIssue(
+                "REKALL_RENDER_LAYER_NOT_VISIBLE",
+                $"Render layer '{layer}' contains active renderables but no active camera culling mask includes it. Entities: {string.Join(", ", entityNames)}.",
+                "warning",
+                layer));
+        }
     }
 
     private static void ValidateXrScene(
@@ -172,6 +224,26 @@ public sealed class RekallAgeProjectValidator
     {
         return type.Equals("Rekall.Camera2D", StringComparison.Ordinal)
             || type.Equals("Rekall.Camera3D", StringComparison.Ordinal);
+    }
+
+    private static bool IsRenderable(string type)
+    {
+        return type is "Rekall.SpriteRenderer"
+            or "Rekall.MeshRenderer"
+            or "Rekall.MeshSet"
+            or "Rekall.GeometryPrimitive"
+            or "Rekall.PlanetRenderer"
+            or "Rekall.OrbitPathRenderer"
+            or "Rekall.RenderLight";
+    }
+
+    private static string ReadRenderLayer(RekallAgeEntityDocument entity)
+    {
+        var component = entity.Components.FirstOrDefault(item =>
+            item.Type.Equals("Rekall.RenderLayer", StringComparison.Ordinal));
+        return RekallAgeRenderLayerMask.NormalizeLayer(component is null
+            ? null
+            : ReadString(component.Properties, "layer"));
     }
 
     private static bool ReadBoolean(JsonObject properties, string name, bool fallback)

@@ -155,6 +155,38 @@ public sealed class CaptureRuntimeViewportCommandTests
     }
 
     [Fact]
+    public async Task CaptureRuntimeViewportCommandReportsRenderablesCulledByCameraMask()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["cullingMask"] = "world"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Visible Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "world" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })))
+            .AddEntity(RekallAgeEntityDocument.Create("Hidden Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "helpers" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 0, Path.Combine(root, "Viewport"), 160, 90, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("culled viewport"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(1, result.Value.RenderableCount);
+        Assert.Equal(1, result.Value.CulledRenderableCount);
+        Assert.Contains(result.Value.CulledRenderables, renderable =>
+            renderable.EntityName == "Hidden Cube"
+            && renderable.Layer == "helpers"
+            && renderable.Reason == "camera-culling-mask");
+    }
+
+    [Fact]
     public async Task CaptureRuntimeViewportCommandCanUseVulkanForClearOnlyRuntimeFrames()
     {
         var root = TestPaths.CreateTempDirectory();

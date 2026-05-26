@@ -1,4 +1,6 @@
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Rendering;
+using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime;
 
 namespace Rekall.Age.Rendering.Commands;
@@ -32,10 +34,36 @@ public sealed record InspectScenePerformanceBudgetResult(
     int EyeCount,
     long EstimatedRenderTargetPixels,
     long EstimatedGeometryBytes,
+    IReadOnlyList<RekallAgeScenePerformanceLayerBreakdown> LayerBreakdown,
+    IReadOnlyList<RekallAgeScenePerformanceCameraMask> CameraMasks,
+    IReadOnlyList<RekallAgeScenePerformanceCulledRenderable> CulledRenderables,
     RekallAgeScenePerformanceBudgetLimits Limits,
     IReadOnlyList<string> Blockers,
     IReadOnlyList<string> Warnings,
     IReadOnlyList<string> Recommendations);
+
+public sealed record RekallAgeScenePerformanceLayerBreakdown(
+    string Layer,
+    int RenderableCount,
+    int MeshCount,
+    int DrawCalls,
+    int Triangles,
+    int Vertices);
+
+public sealed record RekallAgeScenePerformanceCameraMask(
+    string EntityId,
+    string EntityName,
+    bool Active,
+    string CullingMask);
+
+public sealed record RekallAgeScenePerformanceCulledRenderable(
+    string EntityId,
+    string EntityName,
+    string Kind,
+    string Layer,
+    string Reason,
+    string? CameraEntityName,
+    string CullingMask);
 
 public sealed record RekallAgeScenePerformanceBudgetLimits(
     int MaxDrawInvocations,
@@ -85,6 +113,8 @@ public sealed class InspectScenePerformanceBudgetCommand
             context.CancellationToken).ConfigureAwait(false);
         var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets);
         var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
+        var layerBreakdown = BuildLayerBreakdown(frame, meshes);
+        var cameraMasks = BuildCameraMasks(frame);
         var stereoEnabled = frame.Stereo is { Enabled: true };
         var usesSinglePassMultiview = frame.Stereo is { Enabled: true, PreferSinglePassMultiview: true };
         var eyeCount = stereoEnabled
@@ -128,6 +158,9 @@ public sealed class InspectScenePerformanceBudgetCommand
             eyeCount,
             renderTargetPixels,
             geometryBytes,
+            layerBreakdown,
+            cameraMasks,
+            BuildCulledRenderables(frame),
             profile.Limits,
             blockers,
             warnings,
@@ -256,6 +289,78 @@ public sealed class InspectScenePerformanceBudgetCommand
         return recommendations;
     }
 
+    private static IReadOnlyList<RekallAgeScenePerformanceLayerBreakdown> BuildLayerBreakdown(
+        RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
+    {
+        var meshesByEntityId = meshes
+            .GroupBy(mesh => mesh.EntityId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+        var layers = new SortedDictionary<string, MutableLayerBreakdown>(StringComparer.Ordinal);
+        foreach (var renderable in frame.Renderables)
+        {
+            var layer = RekallAgeRenderLayerMask.NormalizeLayer(renderable.Layer);
+            if (!layers.TryGetValue(layer, out var breakdown))
+            {
+                breakdown = new MutableLayerBreakdown(layer);
+                layers.Add(layer, breakdown);
+            }
+
+            breakdown.RenderableCount++;
+            if (!meshesByEntityId.TryGetValue(renderable.EntityId, out var renderableMeshes))
+            {
+                continue;
+            }
+
+            breakdown.MeshCount += renderableMeshes.Length;
+            breakdown.DrawCalls += renderableMeshes.Length;
+            foreach (var mesh in renderableMeshes)
+            {
+                breakdown.Triangles += mesh.Indices.Count / 3;
+                breakdown.Vertices += mesh.Vertices.Count;
+            }
+        }
+
+        return layers.Values
+            .Select(layer => new RekallAgeScenePerformanceLayerBreakdown(
+                layer.Layer,
+                layer.RenderableCount,
+                layer.MeshCount,
+                layer.DrawCalls,
+                layer.Triangles,
+                layer.Vertices))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<RekallAgeScenePerformanceCameraMask> BuildCameraMasks(
+        RekallAgeRuntimeViewportFrame frame)
+    {
+        return frame.Cameras
+            .Select(camera => new RekallAgeScenePerformanceCameraMask(
+                camera.EntityId,
+                camera.EntityName,
+                camera.Active,
+                RekallAgeRenderLayerMask.NormalizeCullingMask(camera.CullingMask)))
+            .OrderByDescending(camera => camera.Active)
+            .ThenBy(camera => camera.EntityName, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<RekallAgeScenePerformanceCulledRenderable> BuildCulledRenderables(
+        RekallAgeRuntimeViewportFrame frame)
+    {
+        return frame.Culling.CulledRenderables
+            .Select(renderable => new RekallAgeScenePerformanceCulledRenderable(
+                renderable.EntityId,
+                renderable.EntityName,
+                renderable.Kind,
+                renderable.Layer,
+                renderable.Reason,
+                renderable.CameraEntityName,
+                renderable.CullingMask))
+            .ToArray();
+    }
+
     private static void AddExceeded(List<string> messages, string label, long value, long limit)
     {
         if (value > limit)
@@ -324,10 +429,28 @@ public sealed class InspectScenePerformanceBudgetCommand
             profile.DefaultEyeCount,
             0,
             0,
+            [],
+            [],
+            [],
             profile.Limits,
             [],
             [],
             []);
+    }
+
+    private sealed class MutableLayerBreakdown(string layer)
+    {
+        public string Layer { get; } = layer;
+
+        public int RenderableCount { get; set; }
+
+        public int MeshCount { get; set; }
+
+        public int DrawCalls { get; set; }
+
+        public int Triangles { get; set; }
+
+        public int Vertices { get; set; }
     }
 
     private sealed record BudgetProfile(

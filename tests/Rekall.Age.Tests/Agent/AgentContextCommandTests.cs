@@ -31,6 +31,39 @@ public sealed class AgentContextCommandTests
     }
 
     [Fact]
+    public async Task SceneSummaryReportsAuthoredRenderLayersAndCameraMasks()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = Rekall.Age.World.RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(Rekall.Age.World.RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(Rekall.Age.World.RekallAgeComponentDocument.Create("Rekall.Camera3D", new System.Text.Json.Nodes.JsonObject
+                {
+                    ["active"] = true,
+                    ["cullingMask"] = "world, helpers"
+                })))
+            .AddEntity(Rekall.Age.World.RekallAgeEntityDocument.Create("World Cube", ["prop"])
+                .AddComponent(Rekall.Age.World.RekallAgeComponentDocument.Create("Rekall.RenderLayer", new System.Text.Json.Nodes.JsonObject { ["layer"] = "world" }))
+                .AddComponent(Rekall.Age.World.RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new System.Text.Json.Nodes.JsonObject { ["primitive"] = "cube" })))
+            .AddEntity(Rekall.Age.World.RekallAgeEntityDocument.Create("Helper Cube", ["debug"])
+                .AddComponent(Rekall.Age.World.RekallAgeComponentDocument.Create("Rekall.RenderLayer", new System.Text.Json.Nodes.JsonObject { ["layer"] = "helpers" }))
+                .AddComponent(Rekall.Age.World.RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new System.Text.Json.Nodes.JsonObject { ["primitive"] = "cube" })));
+        await new Rekall.Age.World.RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new GetSceneSummaryCommand().ExecuteAsync(
+            new GetSceneSummaryRequest(root, "Main"),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("scene summary"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains(result.Value.Summary.Cameras, camera =>
+            camera.EntityName == "Camera"
+            && camera.Kind == "Camera3D"
+            && camera.Active
+            && camera.CullingMask == "world, helpers");
+        Assert.Contains(result.Value.Summary.RenderLayers, layer => layer.Layer == "world" && layer.RenderableCount == 1);
+        Assert.Contains(result.Value.Summary.RenderLayers, layer => layer.Layer == "helpers" && layer.RenderableCount == 1);
+    }
+
+    [Fact]
     public void ContextCommandsAreVisibleToMcpCatalog()
     {
         var registry = new RekallAgeCommandRegistry();
@@ -93,6 +126,12 @@ public sealed class AgentContextCommandTests
             contract.Name == "runtime-lod-selection"
             && contract.PrimaryType == "Rekall.LodGroup"
             && contract.Capabilities.Contains("distance-levels"));
+        Assert.Contains(result.Value.AuthoringContracts, contract =>
+            contract.Name == "runtime-render-layers"
+            && contract.PrimaryType == "Rekall.RenderLayer"
+            && contract.Capabilities.Contains("camera-culling-mask")
+            && contract.Capabilities.Contains("mask-exclusions")
+            && contract.Capabilities.Contains("culling-diagnostics"));
         Assert.Contains(result.Value.AuthoringContracts, contract =>
             contract.Name == "xr-camera-contract"
             && contract.PrimaryType == "Rekall.Camera3D"

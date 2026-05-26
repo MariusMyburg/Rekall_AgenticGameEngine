@@ -210,6 +210,17 @@ public sealed class GetEngineStatusCommand
                         "rekall.render.capture_runtime_viewport"
                     ]),
                 new RekallAgeAgentAuthoringContract(
+                    "runtime-render-layers",
+                    "Rekall.RenderLayer",
+                    "Renderable entities can opt into named render layers, camera components can use CullingMask to include or exclude layers, and viewport diagnostics report renderables hidden by the active camera.",
+                    ["camera-culling-mask", "mask-exclusions", "render-layer", "multi-camera", "world-ui-separation", "culling-diagnostics"],
+                    [
+                        "rekall.module.component_schemas",
+                        "rekall.scene.apply_blueprint",
+                        "rekall.render.capture_runtime_viewport",
+                        "rekall.render.performance.inspect_scene_budget"
+                    ]),
+                new RekallAgeAgentAuthoringContract(
                     "xr-camera-contract",
                     "Rekall.Camera3D",
                     "Camera entities can opt into primary-stereo OpenXR rendering without game-specific engine code.",

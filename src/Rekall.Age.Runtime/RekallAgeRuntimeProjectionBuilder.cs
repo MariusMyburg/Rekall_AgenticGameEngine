@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Rekall.Age.Core.Rendering;
 using Rekall.Age.Runtime.Abstractions;
 
 namespace Rekall.Age.Runtime;
@@ -33,6 +34,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             var hasAuthoredLight = entity.Components.Any(component => IsLight(component.Type));
             var isStellarBody = IsStellarBody(entity);
             var stellarColor = ReadStellarColor(entity);
+            var renderLayer = ReadRenderLayer(entity);
 
             foreach (var component in entity.Components)
             {
@@ -65,14 +67,16 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             Math.Clamp(ReadNumber(component.Properties, "interpupillaryDistance", 0.064), 0, 1),
                             Math.Max(0.001, ReadNumber(component.Properties, "stereoConvergenceDistance", 10)),
                             NormalizeXrViewConfiguration(ReadString(component.Properties, "xrViewConfiguration")),
-                            ReadBoolean(component.Properties, "foveatedRendering", false)));
+                            ReadBoolean(component.Properties, "foveatedRendering", false),
+                            RekallAgeRenderLayerMask.NormalizeCullingMask(ReadString(component.Properties, "cullingMask"))));
                         break;
                     case "Rekall.SpriteRenderer":
                         sprites.Add(new RekallAgeRuntimeRenderSprite(
                             entity.Id,
                             entity.Name,
                             ReadString(component.Properties, "sprite") ?? ReadString(component.Properties, "assetId"),
-                            RekallAgeRuntimeProjectionSources.BuiltIn));
+                            RekallAgeRuntimeProjectionSources.BuiltIn,
+                            renderLayer));
                         break;
                     case "Rekall.MeshRenderer":
                     case "Rekall.MeshSet":
@@ -80,7 +84,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             entity.Id,
                             entity.Name,
                             ReadString(component.Properties, "mesh") ?? ReadString(component.Properties, "assetId"),
-                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
+                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
+                            Layer: renderLayer));
                         break;
                     case "Rekall.GeometryPrimitive":
                         if (!HasMeshRenderer(entity))
@@ -92,7 +97,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                                 string.IsNullOrWhiteSpace(primitive)
                                     ? "rekall.geometry.cube"
                                     : $"rekall.geometry.{primitive.Trim().ToLowerInvariant()}",
-                                ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
+                                ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
+                                Layer: renderLayer));
                         }
 
                         break;
@@ -103,7 +109,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                                 entity.Id,
                                 entity.Name,
                                 "rekall.geometry.mesh",
-                                ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
+                                ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
+                                Layer: renderLayer));
                         }
 
                         break;
@@ -115,7 +122,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             Variant: "rekall.geometry.lines",
                             MaterialColor: ReadString(component.Properties, "color"),
                             SortKey: 150,
-                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
+                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
+                            Layer: renderLayer));
                         break;
                     case "Rekall.MultiplayerSession":
                         networkSessions.Add(new RekallAgeRuntimeNetworkSession(
@@ -169,7 +177,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             entity.Id,
                             entity.Name,
                             "rekall.planet.surface",
-                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
+                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
+                            Layer: renderLayer));
                         break;
                     case "Rekall.OrbitPathRenderer":
                         meshes.Add(new RekallAgeRuntimeRenderMesh(
@@ -179,7 +188,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             Variant: "rekall.orbit.path",
                             MaterialColor: ReadString(component.Properties, "color"),
                             SortKey: 180,
-                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
+                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
+                            Layer: renderLayer));
                         break;
                     case "Rekall.Rigidbody2D":
                     case "Rekall.Rigidbody3D":
@@ -290,7 +300,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                                 RekallAgeRuntimeProjectionSources.BuiltIn,
                                 ReadString(component.Properties, "color")
                                     ?? ReadString(component.Properties, "lightColor")
-                                    ?? stellarColor));
+                                    ?? stellarColor,
+                                renderLayer));
                         }
 
                         break;
@@ -305,7 +316,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                     "PointLight",
                     4,
                     RekallAgeRuntimeProjectionSources.BuiltIn,
-                    stellarColor));
+                    stellarColor,
+                    renderLayer));
             }
         }
 
@@ -457,6 +469,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         return componentType is
             "Rekall.Camera2D" or
             "Rekall.Camera3D" or
+            "Rekall.RenderLayer" or
             "Rekall.SpriteRenderer" or
             "Rekall.MeshRenderer" or
             "Rekall.MeshSet" or
@@ -476,6 +489,14 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             "Rekall.DirectionalLight" or
             "Rekall.UiCanvas" or
             "Rekall.UiElement";
+    }
+
+    private static string ReadRenderLayer(RekallAgeRuntimeEntity entity)
+    {
+        var component = entity.Components.FirstOrDefault(item =>
+            item.Type.Equals("Rekall.RenderLayer", StringComparison.Ordinal));
+        var layer = component is null ? null : ReadString(component.Properties, "layer");
+        return RekallAgeRenderLayerMask.NormalizeLayer(layer);
     }
 
     private static string? ReadString(JsonObject properties, string name)

@@ -525,4 +525,37 @@ public sealed class SceneRuntimeFoundationTests
         Assert.Equal(1, result.Value.AudioEmitterCount);
         Assert.Contains(result.Value.Observations, item => item.Code == "REKALL_AUDIO_NO_LISTENER");
     }
+
+    [Fact]
+    public async Task InspectSceneRuntimeCommandReportsRenderablesCulledByActiveCameraMask()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["cullingMask"] = "world"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Visible Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "world" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })))
+            .AddEntity(RekallAgeEntityDocument.Create("Hidden Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "helpers" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(root, "Main", 0),
+            new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("inspect runtime culling"), CancellationToken.None));
+
+        Assert.True(result.Ok);
+        Assert.Equal(3, result.Value.RenderableCount);
+        Assert.Equal(1, result.Value.VisibleRenderableCount);
+        Assert.Equal(1, result.Value.CulledRenderableCount);
+        Assert.Contains(result.Value.CulledRenderables, renderable =>
+            renderable.EntityName == "Hidden Cube"
+            && renderable.Layer == "helpers"
+            && renderable.Reason == "camera-culling-mask");
+    }
 }

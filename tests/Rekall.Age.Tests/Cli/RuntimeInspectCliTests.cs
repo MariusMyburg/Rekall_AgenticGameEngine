@@ -70,6 +70,39 @@ public sealed class RuntimeInspectCliTests
     }
 
     [Fact]
+    public async Task RuntimeInspectPrintsCameraCulledRenderables()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Runtime Culling CLI", ["world", "rendering3d"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                    {
+                        ["active"] = true,
+                        ["cullingMask"] = "world"
+                    })))
+                .AddEntity(RekallAgeEntityDocument.Create("Visible Cube", ["prop"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "world" }))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })))
+                .AddEntity(RekallAgeEntityDocument.Create("Hidden Cube", ["prop"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "helpers" }))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(FindCliAssemblyPath(), "runtime", "inspect", root, "Main", "0");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Visible renderables: 1", result.Output);
+        Assert.Contains("Culled renderables: 1", result.Output);
+        Assert.Contains("Culled: Hidden Cube; layer: helpers; reason: camera-culling-mask", result.Output);
+    }
+
+    [Fact]
     public async Task RuntimeInspectPrintsInjectedXrPoseAndActions()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -188,6 +221,35 @@ public sealed class RuntimeInspectCliTests
         Assert.Contains("Fallback: 1", result.Output);
         Assert.Contains("Main_runtime_003.png", result.Output);
         Assert.True(File.Exists(Path.Combine(outputDirectory, "Main_runtime_003.png")));
+    }
+
+    [Fact]
+    public async Task ContextScenePrintsCameraMasksAndRenderLayers()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Context Scene CLI", ["world", "rendering3d"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                    {
+                        ["active"] = true,
+                        ["cullingMask"] = "world"
+                    })))
+                .AddEntity(RekallAgeEntityDocument.Create("World Cube", ["prop"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "world" }))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(FindCliAssemblyPath(), "context", "scene", root, "Main");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Camera: Camera; kind: Camera3D; active: True; culling mask: world", result.Output);
+        Assert.Contains("Render layer: world; renderables: 1; entities: World Cube", result.Output);
     }
 
     private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)

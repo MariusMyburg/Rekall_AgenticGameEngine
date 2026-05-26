@@ -12,6 +12,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeCamera3DComponent>();
         builder.RegisterComponent<RekallAgeCameraZoomInputComponent>();
         builder.RegisterComponent<RekallAgeCameraTarget3DComponent>();
+        builder.RegisterComponent<RekallAgeRenderLayerComponent>();
         builder.RegisterComponent<RekallAgeXrRigComponent>();
         builder.RegisterComponent<RekallAgeXrPoseSourceComponent>();
         builder.RegisterComponent<RekallAgeXrControllerComponent>();
@@ -89,6 +90,9 @@ public sealed class RekallAgeCamera2DComponent : RekallAgeComponent
     [RekallAgeProperty]
     public string ClearColor { get; init; } = "#102030";
 
+    [RekallAgeProperty]
+    public string CullingMask { get; init; } = "*";
+
     [RekallAgeProperty(Minimum = 0.001)]
     public double OrthographicSize { get; init; } = 10;
 
@@ -119,6 +123,9 @@ public sealed class RekallAgeCamera3DComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public string ClearColor { get; init; } = "#101820";
+
+    [RekallAgeProperty]
+    public string CullingMask { get; init; } = "*";
 
     [RekallAgeProperty]
     public bool Active { get; init; } = true;
@@ -205,6 +212,13 @@ public sealed class RekallAgeCameraTarget3DComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("Render Layer")]
+public sealed class RekallAgeRenderLayerComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public string Layer { get; init; } = "default";
 }
 
 [RekallAgeComponent("XR Rig")]

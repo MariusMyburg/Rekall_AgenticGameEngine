@@ -637,6 +637,21 @@ internal static class RekallAgeCli
         Console.WriteLine($"Stereo: {result.Value.StereoEnabled}; multiview: {result.Value.UsesSinglePassMultiview}; eyes: {result.Value.EyeCount}");
         Console.WriteLine($"Render target pixels: {result.Value.EstimatedRenderTargetPixels}; geometry bytes: {result.Value.EstimatedGeometryBytes}");
         Console.WriteLine($"Budget: draws {result.Value.Limits.MaxDrawInvocations}, triangles {result.Value.Limits.MaxTriangles}, vertices {result.Value.Limits.MaxVertices}, textures {result.Value.Limits.MaxTextures}, pixels {result.Value.Limits.MaxRenderTargetPixels}");
+        foreach (var camera in result.Value.CameraMasks)
+        {
+            Console.WriteLine($"Camera: {camera.EntityName}; active: {camera.Active}; culling mask: {camera.CullingMask}");
+        }
+
+        foreach (var layer in result.Value.LayerBreakdown)
+        {
+            Console.WriteLine($"Layer: {layer.Layer}; renderables: {layer.RenderableCount}; meshes: {layer.MeshCount}; draws: {layer.DrawCalls}; triangles: {layer.Triangles}; vertices: {layer.Vertices}");
+        }
+
+        foreach (var renderable in result.Value.CulledRenderables)
+        {
+            Console.WriteLine($"Culled: {renderable.EntityName}; layer: {renderable.Layer}; reason: {renderable.Reason}; camera: {renderable.CameraEntityName ?? "none"}; mask: {renderable.CullingMask}");
+        }
+
         foreach (var blocker in result.Value.Blockers)
         {
             Console.WriteLine($"Blocker: {blocker}");
@@ -2532,6 +2547,16 @@ internal static class RekallAgeCli
         var summary = result.Value.Summary;
         Console.WriteLine($"Scene {summary.Scene}: {summary.EntityCount} entities");
         Console.WriteLine($"Components: {string.Join(", ", summary.ComponentTypes)}");
+        foreach (var camera in summary.Cameras)
+        {
+            Console.WriteLine($"Camera: {camera.EntityName}; kind: {camera.Kind}; active: {camera.Active}; culling mask: {camera.CullingMask}");
+        }
+
+        foreach (var layer in summary.RenderLayers)
+        {
+            Console.WriteLine($"Render layer: {layer.Layer}; renderables: {layer.RenderableCount}; entities: {string.Join(", ", layer.EntityNames)}");
+        }
+
         foreach (var entity in summary.Entities)
         {
             Console.WriteLine($"- {entity.Name}: {string.Join(", ", entity.Components)}");
@@ -2643,6 +2668,13 @@ internal static class RekallAgeCli
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Entities: {result.Value.EntityCount}");
         Console.WriteLine($"Renderable: {result.Value.RenderableCount}");
+        Console.WriteLine($"Visible renderables: {result.Value.VisibleRenderableCount}");
+        Console.WriteLine($"Culled renderables: {result.Value.CulledRenderableCount}");
+        foreach (var renderable in result.Value.CulledRenderables)
+        {
+            Console.WriteLine($"Culled: {renderable.EntityName}; layer: {renderable.Layer}; reason: {renderable.Reason}; camera: {renderable.CameraEntityName ?? "none"}; mask: {renderable.CullingMask}");
+        }
+
         Console.WriteLine($"Physics bodies: {result.Value.PhysicsBodyCount}");
         Console.WriteLine($"Physics colliders: {result.Value.PhysicsColliderCount}");
         Console.WriteLine($"Audio: {result.Value.AudioListenerCount} listeners, {result.Value.AudioEmitterCount} emitters");
@@ -2855,6 +2887,12 @@ internal static class RekallAgeCli
 
         Console.WriteLine($"Renderable: {result.Value.RenderableCount}");
         Console.WriteLine($"Renderable kinds: {string.Join(", ", result.Value.RenderableKinds)}");
+        Console.WriteLine($"Culled renderables: {result.Value.CulledRenderableCount}");
+        foreach (var renderable in result.Value.CulledRenderables)
+        {
+            Console.WriteLine($"Culled: {renderable.EntityName}; layer: {renderable.Layer}; reason: {renderable.Reason}; camera: {renderable.CameraEntityName ?? "none"}; mask: {renderable.CullingMask}");
+        }
+
         Console.WriteLine($"Asset-backed: {result.Value.AssetBackedRenderableCount}");
         Console.WriteLine($"Fallback: {result.Value.FallbackRenderableCount}");
         Console.WriteLine($"Missing assets: {result.Value.MissingAssetCount}");

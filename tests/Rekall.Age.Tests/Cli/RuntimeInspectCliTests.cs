@@ -253,6 +253,41 @@ public sealed class RuntimeInspectCliTests
     }
 
     [Fact]
+    public async Task ContextScenePrintsHeadsetCameraMetadata()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Context Scene VR CLI", ["world", "rendering3d", "vr"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "vr"])
+                .AddEntity(RekallAgeEntityDocument.Create("SpectatorCamera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                    {
+                        ["active"] = true,
+                        ["renderOrder"] = -10
+                    })))
+                .AddEntity(RekallAgeEntityDocument.Create("HeadCamera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                    {
+                        ["active"] = true,
+                        ["renderOrder"] = 0,
+                        ["stereoMode"] = "vr",
+                        ["stereoRenderMode"] = "single-pass-multiview"
+                    }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(FindCliAssemblyPath(), "context", "scene", root, "Main");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Headset camera: HeadCamera", result.Output);
+        Assert.Contains("Camera: SpectatorCamera; kind: Camera3D; active: True; order: -10; viewport: 0,0 1x1; culling mask: *; stereo: mono; headset: False", result.Output);
+        Assert.Contains("Camera: HeadCamera; kind: Camera3D; active: True; order: 0; viewport: 0,0 1x1; culling mask: *; stereo: stereo; headset: True", result.Output);
+    }
+
+    [Fact]
     public async Task RenderVisibilityInspectPrintsPerCameraVisibility()
     {
         var root = TestPaths.CreateTempDirectory();

@@ -228,8 +228,8 @@ public sealed class GetEngineStatusCommand
                 new RekallAgeAgentAuthoringContract(
                     "xr-camera-contract",
                     "Rekall.Camera3D",
-                    "Camera entities can opt into primary-stereo OpenXR rendering without game-specific engine code.",
-                    ["active-camera", "render-order", "normalized-viewport", "stereo-mode", "single-pass-multiview", "primary-stereo-view-configuration"],
+                    "Camera entities can opt into primary-stereo OpenXR rendering without game-specific engine code; the first active stereo Camera3D drives headset output separately from viewport composition cameras.",
+                    ["active-camera", "render-order", "normalized-viewport", "stereo-mode", "headset-camera-selection", "spectator-camera", "single-pass-multiview", "primary-stereo-view-configuration"],
                     [
                         "rekall.render.stereo.inspect_plan",
                         "rekall.render.visibility.inspect_scene",

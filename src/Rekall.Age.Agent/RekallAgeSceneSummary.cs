@@ -6,7 +6,8 @@ public sealed record RekallAgeSceneSummary(
     IReadOnlyList<RekallAgeEntitySummary> Entities,
     IReadOnlyList<string> ComponentTypes,
     IReadOnlyList<RekallAgeSceneCameraSummary> Cameras,
-    IReadOnlyList<RekallAgeSceneRenderLayerSummary> RenderLayers)
+    IReadOnlyList<RekallAgeSceneRenderLayerSummary> RenderLayers,
+    string? HeadsetCameraName = null)
 {
     public int EntityCount => Entities.Count;
 }
@@ -27,7 +28,11 @@ public sealed record RekallAgeSceneCameraSummary(
     double ViewportX = 0,
     double ViewportY = 0,
     double ViewportWidth = 1,
-    double ViewportHeight = 1);
+    double ViewportHeight = 1,
+    string StereoMode = "mono",
+    string StereoRenderMode = "single-pass-multiview",
+    string XrViewConfiguration = "primary-stereo",
+    bool DrivesHeadsetOutput = false);
 
 public sealed record RekallAgeSceneRenderLayerSummary(
     string Layer,

@@ -2599,9 +2599,14 @@ internal static class RekallAgeCli
         var summary = result.Value.Summary;
         Console.WriteLine($"Scene {summary.Scene}: {summary.EntityCount} entities");
         Console.WriteLine($"Components: {string.Join(", ", summary.ComponentTypes)}");
+        if (!string.IsNullOrWhiteSpace(summary.HeadsetCameraName))
+        {
+            Console.WriteLine($"Headset camera: {summary.HeadsetCameraName}");
+        }
+
         foreach (var camera in summary.Cameras)
         {
-            Console.WriteLine($"Camera: {camera.EntityName}; kind: {camera.Kind}; active: {camera.Active}; order: {camera.RenderOrder}; viewport: {camera.ViewportX},{camera.ViewportY} {camera.ViewportWidth}x{camera.ViewportHeight}; culling mask: {camera.CullingMask}");
+            Console.WriteLine($"Camera: {camera.EntityName}; kind: {camera.Kind}; active: {camera.Active}; order: {camera.RenderOrder}; viewport: {camera.ViewportX},{camera.ViewportY} {camera.ViewportWidth}x{camera.ViewportHeight}; culling mask: {camera.CullingMask}; stereo: {camera.StereoMode}; headset: {camera.DrivesHeadsetOutput}");
         }
 
         foreach (var layer in summary.RenderLayers)

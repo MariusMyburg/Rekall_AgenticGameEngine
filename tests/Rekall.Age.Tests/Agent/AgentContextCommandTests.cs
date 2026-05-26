@@ -70,6 +70,48 @@ public sealed class AgentContextCommandTests
     }
 
     [Fact]
+    public async Task SceneSummaryIdentifiesHeadsetCameraSeparatelyFromViewportCamera()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = Rekall.Age.World.RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "vr"])
+            .AddEntity(Rekall.Age.World.RekallAgeEntityDocument.Create("SpectatorCamera", ["camera"])
+                .AddComponent(Rekall.Age.World.RekallAgeComponentDocument.Create("Rekall.Camera3D", new System.Text.Json.Nodes.JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = -10
+                })))
+            .AddEntity(Rekall.Age.World.RekallAgeEntityDocument.Create("HeadCamera", ["camera"])
+                .AddComponent(Rekall.Age.World.RekallAgeComponentDocument.Create("Rekall.Camera3D", new System.Text.Json.Nodes.JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = 0,
+                    ["stereoMode"] = "xr",
+                    ["stereoRenderMode"] = "single-pass-multiview",
+                    ["xrViewConfiguration"] = "primary-stereo"
+                })));
+        await new Rekall.Age.World.RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new GetSceneSummaryCommand().ExecuteAsync(
+            new GetSceneSummaryRequest(root, "Main"),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("vr scene summary"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal("HeadCamera", result.Value.Summary.HeadsetCameraName);
+        Assert.Contains(result.Value.Summary.Cameras, camera =>
+            camera.EntityName == "SpectatorCamera"
+            && camera.Active
+            && !camera.DrivesHeadsetOutput
+            && camera.StereoMode == "mono");
+        Assert.Contains(result.Value.Summary.Cameras, camera =>
+            camera.EntityName == "HeadCamera"
+            && camera.Active
+            && camera.DrivesHeadsetOutput
+            && camera.StereoMode == "stereo"
+            && camera.StereoRenderMode == "single-pass-multiview"
+            && camera.XrViewConfiguration == "primary-stereo");
+    }
+
+    [Fact]
     public void ContextCommandsAreVisibleToMcpCatalog()
     {
         var registry = new RekallAgeCommandRegistry();
@@ -145,6 +187,7 @@ public sealed class AgentContextCommandTests
             && contract.PrimaryType == "Rekall.Camera3D"
             && contract.Capabilities.Contains("render-order")
             && contract.Capabilities.Contains("normalized-viewport")
+            && contract.Capabilities.Contains("headset-camera-selection")
             && contract.Capabilities.Contains("single-pass-multiview"));
         Assert.Contains(result.Value.AuthoringContracts, contract =>
             contract.Name == "xr-runtime-input"

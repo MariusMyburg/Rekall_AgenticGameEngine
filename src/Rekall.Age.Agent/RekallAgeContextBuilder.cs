@@ -73,20 +73,22 @@ public sealed class RekallAgeContextBuilder
             .Distinct(StringComparer.Ordinal)
             .OrderBy(component => component, StringComparer.Ordinal)
             .ToArray();
+        var cameras = BuildCameraSummaries(scene);
 
         return new RekallAgeSceneSummary(
             scene.Name,
             scene.Capabilities,
             entities,
             componentTypes,
-            BuildCameraSummaries(scene),
-            BuildRenderLayerSummaries(scene));
+            cameras,
+            BuildRenderLayerSummaries(scene),
+            cameras.FirstOrDefault(camera => camera.DrivesHeadsetOutput)?.EntityName);
     }
 
     private static IReadOnlyList<RekallAgeSceneCameraSummary> BuildCameraSummaries(
         RekallAgeSceneDocument scene)
     {
-        return scene.Entities
+        var cameras = scene.Entities
             .SelectMany(entity => entity.Components
                 .Where(component => component.Type is "Rekall.Camera2D" or "Rekall.Camera3D")
                 .Select(component => new RekallAgeSceneCameraSummary(
@@ -99,12 +101,58 @@ public sealed class RekallAgeContextBuilder
                     Math.Clamp(ReadNumber(component.Properties, "viewportX", 0), 0, 1),
                     Math.Clamp(ReadNumber(component.Properties, "viewportY", 0), 0, 1),
                     Math.Clamp(ReadNumber(component.Properties, "viewportWidth", 1), 0.001, 1),
-                    Math.Clamp(ReadNumber(component.Properties, "viewportHeight", 1), 0.001, 1))))
+                    Math.Clamp(ReadNumber(component.Properties, "viewportHeight", 1), 0.001, 1),
+                    NormalizeStereoMode(ReadString(component.Properties, "stereoMode")),
+                    NormalizeStereoRenderMode(ReadString(component.Properties, "stereoRenderMode")),
+                    NormalizeXrViewConfiguration(ReadString(component.Properties, "xrViewConfiguration")))))
             .OrderByDescending(camera => camera.Active)
             .ThenBy(camera => camera.RenderOrder)
             .ThenBy(camera => camera.EntityName, StringComparer.Ordinal)
             .ThenBy(camera => camera.EntityId, StringComparer.Ordinal)
             .ToArray();
+        var headsetCamera = cameras.FirstOrDefault(IsHeadsetCamera);
+        return cameras
+            .Select(camera => camera with
+            {
+                DrivesHeadsetOutput = headsetCamera?.EntityId.Equals(camera.EntityId, StringComparison.Ordinal) == true
+            })
+            .ToArray();
+    }
+
+    private static bool IsHeadsetCamera(RekallAgeSceneCameraSummary camera)
+    {
+        return camera.Active
+            && camera.Kind.Equals("Camera3D", StringComparison.Ordinal)
+            && camera.StereoMode.Equals("stereo", StringComparison.Ordinal);
+    }
+
+    private static string NormalizeStereoMode(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "stereo" or "vr" or "xr" => "stereo",
+            _ => "mono"
+        };
+    }
+
+    private static string NormalizeStereoRenderMode(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "side-by-side" or "side_by_side" or "sbs" => "side-by-side",
+            "dual-pass" or "dual_pass" => "dual-pass",
+            _ => "single-pass-multiview"
+        };
+    }
+
+    private static string NormalizeXrViewConfiguration(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "primary-mono" or "mono" => "primary-mono",
+            "primary-stereo-with-foveated-inset" or "foveated-stereo" => "primary-stereo-with-foveated-inset",
+            _ => "primary-stereo"
+        };
     }
 
     private static IReadOnlyList<RekallAgeSceneRenderLayerSummary> BuildRenderLayerSummaries(

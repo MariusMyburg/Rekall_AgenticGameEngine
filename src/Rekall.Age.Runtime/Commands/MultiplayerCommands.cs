@@ -70,6 +70,16 @@ public sealed record MultiplayerSnapshotRequest(
     string Transport = "pipe",
     string? Endpoint = null);
 
+public sealed record MultiplayerDeltaRequest(
+    string ProjectRoot,
+    string SceneName,
+    int FromServerTick,
+    string? PipeName = null,
+    string? SessionId = null,
+    int TimeoutMilliseconds = 2000,
+    string Transport = "pipe",
+    string? Endpoint = null);
+
 public sealed record MultiplayerHostRequest(
     string ProjectRoot,
     string SceneName,
@@ -96,6 +106,7 @@ public sealed record MultiplayerCommandResult(
     int ClientCount,
     int EntityCount,
     RekallAgeMultiplayerSnapshot? Snapshot,
+    RekallAgeMultiplayerSnapshotDelta? Delta,
     string Message);
 
 public sealed record MultiplayerHostResult(
@@ -362,6 +373,34 @@ public sealed class MultiplayerSnapshotCommand
     }
 }
 
+public sealed class MultiplayerDeltaCommand
+    : RekallAgeMultiplayerCommandBase<MultiplayerDeltaRequest>
+{
+    public override string Name => "rekall.multiplayer.delta";
+
+    protected override string Operation => "delta";
+
+    protected override JsonObject? CreatePayload(MultiplayerDeltaRequest request)
+    {
+        return new JsonObject
+        {
+            ["fromServerTick"] = request.FromServerTick
+        };
+    }
+
+    protected override RekallAgeMultiplayerConnection GetConnection(MultiplayerDeltaRequest request)
+    {
+        return new RekallAgeMultiplayerConnection(
+            request.ProjectRoot,
+            request.SceneName,
+            request.PipeName,
+            request.SessionId,
+            request.TimeoutMilliseconds,
+            request.Transport,
+            request.Endpoint);
+    }
+}
+
 public abstract class RekallAgeMultiplayerCommandBase<TRequest>
     : IRekallAgeCommand<TRequest, MultiplayerCommandResult>
 {
@@ -462,6 +501,7 @@ public abstract class RekallAgeMultiplayerCommandBase<TRequest>
             0,
             0,
             null,
+            null,
             message);
     }
 
@@ -487,6 +527,7 @@ public abstract class RekallAgeMultiplayerCommandBase<TRequest>
             ReadInt32(payload, "clientCount"),
             ReadInt32(payload, "entityCount"),
             ReadSnapshot(payload),
+            ReadDelta(payload),
             ReadString(payload, "message") ?? "OK");
     }
 
@@ -520,6 +561,15 @@ public abstract class RekallAgeMultiplayerCommandBase<TRequest>
             && payload.TryGetPropertyValue("snapshot", out var node)
             && node is not null
             ? node.Deserialize<RekallAgeMultiplayerSnapshot>(JsonOptions)
+            : null;
+    }
+
+    private static RekallAgeMultiplayerSnapshotDelta? ReadDelta(JsonObject? payload)
+    {
+        return payload is not null
+            && payload.TryGetPropertyValue("delta", out var node)
+            && node is not null
+            ? node.Deserialize<RekallAgeMultiplayerSnapshotDelta>(JsonOptions)
             : null;
     }
 

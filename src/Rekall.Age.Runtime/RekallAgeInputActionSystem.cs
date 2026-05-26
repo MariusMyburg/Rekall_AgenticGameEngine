@@ -140,6 +140,19 @@ public sealed class RekallAgeInputActionSystem : IRekallAgeRuntimeWorldSystem
             wasPressed = true;
         }
 
+        var mouseAxis = ReadString(definition, "mouseAxis") ?? ReadString(definition, "mouseDeltaAxis");
+        if (!string.IsNullOrWhiteSpace(mouseAxis))
+        {
+            var mouseValue = ReadMouseAxis(input, mouseAxis);
+            var mouseScale = ReadNumber(definition, "mouseScale", 1);
+            if (Math.Abs(mouseScale) > 0.000001 && Math.Abs(mouseValue) > 0.000001)
+            {
+                value += mouseValue * mouseScale;
+                isDown = true;
+                wasPressed = true;
+            }
+        }
+
         return new RekallAgeRuntimeInputAction(
             name.Trim(),
             value,
@@ -174,6 +187,16 @@ public sealed class RekallAgeInputActionSystem : IRekallAgeRuntimeWorldSystem
 
         wasPressed |= Contains(pressedThisFrame, binding);
         wasReleased |= Contains(releasedThisFrame, binding);
+    }
+
+    private static double ReadMouseAxis(RekallAgeRuntimeInputState input, string mouseAxis)
+    {
+        return mouseAxis.Trim().ToLowerInvariant() switch
+        {
+            "x" or "horizontal" or "deltax" or "mousex" => input.MouseDeltaX,
+            "y" or "vertical" or "deltay" or "mousey" => input.MouseDeltaY,
+            _ => 0
+        };
     }
 
     private static bool Contains(IReadOnlySet<string>? values, string value)

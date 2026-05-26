@@ -76,6 +76,42 @@ public sealed class InputActionSystemTests
         Assert.Equal(-1, zoom.Value);
     }
 
+    [Fact]
+    public async Task InputActionMapProjectsMouseDeltaAxes()
+    {
+        var world = CreateWorld(new JsonArray
+        {
+            new JsonObject
+            {
+                ["name"] = "lookX",
+                ["mouseAxis"] = "x",
+                ["mouseScale"] = 0.25
+            },
+            new JsonObject
+            {
+                ["name"] = "lookY",
+                ["mouseAxis"] = "y",
+                ["mouseScale"] = -0.5
+            }
+        });
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(
+                world,
+                1,
+                CancellationToken.None,
+                new RekallAgeRuntimeInputState(MouseDeltaX: 8, MouseDeltaY: -4));
+
+        var lookX = Assert.Single(result.World.Subsystems.Input.Actions, action => action.Name == "lookX");
+        Assert.True(lookX.IsDown);
+        Assert.True(lookX.WasPressed);
+        Assert.Equal(2, lookX.Value);
+        var lookY = Assert.Single(result.World.Subsystems.Input.Actions, action => action.Name == "lookY");
+        Assert.True(lookY.IsDown);
+        Assert.True(lookY.WasPressed);
+        Assert.Equal(2, lookY.Value);
+    }
+
     private static RekallAgeRuntimeWorld CreateWorld(JsonArray actions)
     {
         var input = new RekallAgeRuntimeEntity(

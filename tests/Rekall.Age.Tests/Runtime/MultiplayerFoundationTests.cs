@@ -80,7 +80,14 @@ public sealed class MultiplayerFoundationTests
                     ["ownerClientId"] = "client-a",
                     ["authority"] = "server"
                 }))
-                .AddComponent(RekallAgeComponentDocument.Create("Rekall.NetworkTransform", new JsonObject())));
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.NetworkTransform", new JsonObject
+                {
+                    ["replicatePosition"] = true,
+                    ["replicateRotation"] = false,
+                    ["replicateScale"] = false,
+                    ["prediction"] = "client-predicted",
+                    ["priority"] = 7
+                })));
         var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
         var session = new RekallAgeAuthoritativeMultiplayerSession(world, RekallAgeRuntimeExecutionLoop.CreateDefault());
 
@@ -117,6 +124,12 @@ public sealed class MultiplayerFoundationTests
         Assert.Equal("client-a", entityState.OwnerClientId);
         Assert.Equal(4, entityState.Position.X);
         Assert.Equal(-2, entityState.Position.Z);
+        Assert.Equal("server", entityState.Authority);
+        Assert.True(entityState.ReplicatePosition);
+        Assert.False(entityState.ReplicateRotation);
+        Assert.False(entityState.ReplicateScale);
+        Assert.Equal("client-predicted", entityState.Prediction);
+        Assert.Equal(7, entityState.Priority);
     }
 
     [Fact]
@@ -134,6 +147,10 @@ public sealed class MultiplayerFoundationTests
                     new RekallAgeRuntimeVector3(0, 0, 0),
                     new RekallAgeRuntimeVector3(0, 10, 0),
                     new RekallAgeRuntimeVector3(1, 1, 1))
+                {
+                    Prediction = "interpolated",
+                    Priority = 1
+                }
             ],
             new Dictionary<string, int>());
         var next = new RekallAgeMultiplayerSnapshot(
@@ -148,6 +165,11 @@ public sealed class MultiplayerFoundationTests
                     new RekallAgeRuntimeVector3(10, 0, 0),
                     new RekallAgeRuntimeVector3(0, 30, 0),
                     new RekallAgeRuntimeVector3(2, 2, 2))
+                {
+                    ReplicateRotation = false,
+                    Prediction = "client-predicted",
+                    Priority = 9
+                }
             ],
             new Dictionary<string, int>());
 
@@ -158,6 +180,9 @@ public sealed class MultiplayerFoundationTests
         Assert.Equal(5, state.Position.X, 6);
         Assert.Equal(20, state.Rotation.Y, 6);
         Assert.Equal(1.5, state.Scale.X, 6);
+        Assert.False(state.ReplicateRotation);
+        Assert.Equal("client-predicted", state.Prediction);
+        Assert.Equal(9, state.Priority);
     }
 
     [Fact]
@@ -195,5 +220,163 @@ public sealed class MultiplayerFoundationTests
         Assert.Equal(10, result.CorrectedState.Position.X);
         var remaining = Assert.Single(result.PendingInputs);
         Assert.Equal(6, remaining.Sequence);
+    }
+
+    [Fact]
+    public void SnapshotApplierUpdatesOnlyReplicatedTransformChannels()
+    {
+        var world = new RekallAgeRuntimeWorld(
+            "scene",
+            "Arena",
+            4,
+            TimeSpan.FromSeconds(0.4),
+            [
+                new RekallAgeRuntimeEntity(
+                    "entity-1",
+                    "Player Ship",
+                    [],
+                    null,
+                    null,
+                    true,
+                    false,
+                    RekallAgeRuntimeTransform.Identity with
+                    {
+                        Position3D = new RekallAgeRuntimeVector3(1, 2, 3),
+                        Rotation3D = new RekallAgeRuntimeVector3(4, 5, 6),
+                        Scale3D = new RekallAgeRuntimeVector3(1, 1, 1)
+                    },
+                    []),
+                new RekallAgeRuntimeEntity(
+                    "entity-2",
+                    "Local Decoration",
+                    [],
+                    null,
+                    null,
+                    true,
+                    false,
+                    RekallAgeRuntimeTransform.Identity with
+                    {
+                        Position3D = new RekallAgeRuntimeVector3(9, 9, 9)
+                    },
+                    [])
+            ],
+            RekallAgeRuntimeSubsystemViews.Empty,
+            []);
+        var snapshot = new RekallAgeMultiplayerSnapshot(
+            12,
+            1.2,
+            [
+                new RekallAgeMultiplayerEntityState(
+                    "ship-1",
+                    "entity-1",
+                    "Player Ship",
+                    "client-a",
+                    new RekallAgeRuntimeVector3(10, 20, 30),
+                    new RekallAgeRuntimeVector3(40, 50, 60),
+                    new RekallAgeRuntimeVector3(2, 3, 4))
+                {
+                    ReplicatePosition = true,
+                    ReplicateRotation = false,
+                    ReplicateScale = true
+                },
+                new RekallAgeMultiplayerEntityState(
+                    "missing",
+                    "missing-entity",
+                    "Missing",
+                    null,
+                    new RekallAgeRuntimeVector3(100, 100, 100),
+                    new RekallAgeRuntimeVector3(100, 100, 100),
+                    new RekallAgeRuntimeVector3(100, 100, 100))
+            ],
+            new Dictionary<string, int>());
+
+        var updated = RekallAgeMultiplayerSnapshotApplier.Apply(world, snapshot);
+
+        Assert.Equal(12, updated.FrameIndex);
+        Assert.Equal(1.2, updated.ElapsedTime.TotalSeconds, precision: 6);
+        var player = updated.Entities.Single(entity => entity.Id == "entity-1");
+        Assert.Equal(new RekallAgeRuntimeVector3(10, 20, 30), player.Transform.Position3D);
+        Assert.Equal(new RekallAgeRuntimeVector3(4, 5, 6), player.Transform.Rotation3D);
+        Assert.Equal(new RekallAgeRuntimeVector3(2, 3, 4), player.Transform.Scale3D);
+        Assert.Equal(new RekallAgeRuntimeVector3(9, 9, 9), updated.Entities.Single(entity => entity.Id == "entity-2").Transform.Position3D);
+    }
+
+    [Fact]
+    public void SnapshotDeltaTracksChangedAndRemovedNetworkEntities()
+    {
+        var previous = new RekallAgeMultiplayerSnapshot(
+            3,
+            0.3,
+            [
+                CreateEntityState("ship-1", "entity-1", new RekallAgeRuntimeVector3(1, 0, 0)),
+                CreateEntityState("ship-2", "entity-2", new RekallAgeRuntimeVector3(2, 0, 0)),
+                CreateEntityState("removed", "entity-removed", new RekallAgeRuntimeVector3(3, 0, 0))
+            ],
+            new Dictionary<string, int> { ["client-a"] = 4 });
+        var next = new RekallAgeMultiplayerSnapshot(
+            4,
+            0.4,
+            [
+                CreateEntityState("ship-1", "entity-1", new RekallAgeRuntimeVector3(1, 0, 0)),
+                CreateEntityState("ship-2", "entity-2", new RekallAgeRuntimeVector3(20, 0, 0)) with { Priority = 7 },
+                CreateEntityState("new", "entity-new", new RekallAgeRuntimeVector3(5, 0, 0))
+            ],
+            new Dictionary<string, int> { ["client-a"] = 5 });
+
+        var delta = RekallAgeMultiplayerSnapshotDeltaBuilder.Build(previous, next);
+
+        Assert.Equal(3, delta.FromServerTick);
+        Assert.Equal(4, delta.ToServerTick);
+        Assert.Equal(0.4, delta.ToServerTimeSeconds, precision: 6);
+        Assert.Equal(["new", "ship-2"], delta.ChangedEntities.Select(entity => entity.NetworkId));
+        Assert.Equal(["removed"], delta.RemovedNetworkIds);
+        Assert.Equal(5, delta.LastProcessedInputSequenceByClient["client-a"]);
+    }
+
+    [Fact]
+    public void SnapshotDeltaAppliesChangesAndRemovalsToPreviousSnapshot()
+    {
+        var previous = new RekallAgeMultiplayerSnapshot(
+            3,
+            0.3,
+            [
+                CreateEntityState("ship-1", "entity-1", new RekallAgeRuntimeVector3(1, 0, 0)),
+                CreateEntityState("ship-2", "entity-2", new RekallAgeRuntimeVector3(2, 0, 0)),
+                CreateEntityState("removed", "entity-removed", new RekallAgeRuntimeVector3(3, 0, 0))
+            ],
+            new Dictionary<string, int> { ["client-a"] = 4 });
+        var delta = new RekallAgeMultiplayerSnapshotDelta(
+            3,
+            4,
+            0.4,
+            [
+                CreateEntityState("ship-2", "entity-2", new RekallAgeRuntimeVector3(20, 0, 0)),
+                CreateEntityState("new", "entity-new", new RekallAgeRuntimeVector3(5, 0, 0))
+            ],
+            ["removed"],
+            new Dictionary<string, int> { ["client-a"] = 5 });
+
+        var next = RekallAgeMultiplayerSnapshotDeltaBuilder.Apply(previous, delta);
+
+        Assert.Equal(4, next.ServerTick);
+        Assert.Equal(0.4, next.ServerTimeSeconds, precision: 6);
+        Assert.Equal(["new", "ship-1", "ship-2"], next.Entities.Select(entity => entity.NetworkId));
+        Assert.Equal(20, next.Entities.Single(entity => entity.NetworkId == "ship-2").Position.X);
+        Assert.Equal(5, next.LastProcessedInputSequenceByClient["client-a"]);
+    }
+
+    private static RekallAgeMultiplayerEntityState CreateEntityState(
+        string networkId,
+        string entityId,
+        RekallAgeRuntimeVector3 position)
+    {
+        return new RekallAgeMultiplayerEntityState(
+            networkId,
+            entityId,
+            entityId,
+            null,
+            position,
+            new RekallAgeRuntimeVector3(0, 0, 0),
+            new RekallAgeRuntimeVector3(1, 1, 1));
     }
 }

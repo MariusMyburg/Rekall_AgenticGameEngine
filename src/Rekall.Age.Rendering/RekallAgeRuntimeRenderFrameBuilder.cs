@@ -262,6 +262,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 component.Type.Equals("Rekall.PlanetRenderer", StringComparison.Ordinal));
             var materialComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.Material", StringComparison.Ordinal));
+            var proceduralMaterialComponent = entity?.Components.FirstOrDefault(component =>
+                component.Type.Equals("Rekall.ProceduralMaterial", StringComparison.Ordinal));
             var geometry = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.GeometryPrimitive", StringComparison.Ordinal));
             var geometryMeshComponent = entity?.Components.FirstOrDefault(component =>
@@ -364,7 +366,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     : ReadNumber(materialComponent, "emissiveStrength", ReadNumber(planetComponent, "emissiveStrength", 0)),
                 ShaderPipeline: ToViewportShaderPipeline(mesh.ShaderPipeline) ?? ReadShaderPipeline(meshRendererComponent),
                 LineSegments: lineSegments,
-                Layer: mesh.Layer);
+                Layer: mesh.Layer,
+                ProceduralMaterial: ReadProceduralMaterial(proceduralMaterialComponent));
         }
 
         foreach (var light in world.Subsystems.Rendering.Lights)
@@ -888,6 +891,27 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             : new RekallAgeRuntimeViewportShaderPipeline(
                 pipeline.VertexShader.Trim(),
                 pipeline.FragmentShader.Trim());
+    }
+
+    private static RekallAgeRuntimeViewportProceduralMaterial? ReadProceduralMaterial(RekallAgeRuntimeComponent? component)
+    {
+        if (component is null)
+        {
+            return null;
+        }
+
+        return new RekallAgeRuntimeViewportProceduralMaterial(
+            EmptyToNull(ReadString(component, "generator")) ?? "checker",
+            (int)Math.Clamp(Math.Round(ReadNumber(component, "resolution", 128)), 2, 2048),
+            Math.Max(0.0001, ReadNumber(component, "scale", 8)),
+            (int)Math.Clamp(Math.Round(ReadNumber(component, "seed", 0)), int.MinValue, int.MaxValue),
+            EmptyToNull(ReadString(component, "baseColorA")) ?? "#ffffff",
+            EmptyToNull(ReadString(component, "baseColorB")) ?? "#202020",
+            Math.Clamp(ReadNumber(component, "metallicFactor", 0), 0, 1),
+            Math.Clamp(ReadNumber(component, "roughnessA", 1), 0.04, 1),
+            Math.Clamp(ReadNumber(component, "roughnessB", 1), 0.04, 1),
+            Math.Clamp(ReadNumber(component, "normalStrength", 0), 0, 4),
+            Math.Max(0, ReadNumber(component, "emissiveStrength", 0)));
     }
 
     private static RekallAgeRuntimeViewportLineSegments? ReadLineSegments(RekallAgeRuntimeComponent? component)

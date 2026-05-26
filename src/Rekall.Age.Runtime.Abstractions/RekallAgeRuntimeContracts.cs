@@ -138,6 +138,8 @@ public sealed record RekallAgeRuntimeSubsystemViews(
 {
     public RekallAgeRuntimeInputView Input { get; init; } = RekallAgeRuntimeInputView.Empty;
 
+    public RekallAgeRuntimeEventView Events { get; init; } = RekallAgeRuntimeEventView.Empty;
+
     public RekallAgeRuntimeMultiplayerView Multiplayer { get; init; } =
         RekallAgeRuntimeMultiplayerView.Empty;
 
@@ -166,6 +168,22 @@ public sealed record RekallAgeRuntimeInputAction(
     bool WasReleased,
     string SourceEntityId,
     string SourceEntityName);
+
+public sealed record RekallAgeRuntimeEventView(
+    IReadOnlyList<RekallAgeRuntimeEvent> Events)
+{
+    public static RekallAgeRuntimeEventView Empty { get; } = new(
+        Array.Empty<RekallAgeRuntimeEvent>());
+}
+
+public sealed record RekallAgeRuntimeEvent(
+    int Frame,
+    string Type,
+    string EntityId,
+    string EntityName,
+    string Source,
+    string? Handler,
+    JsonObject Payload);
 
 public sealed record RekallAgeRuntimeXrView(
     IReadOnlyList<RekallAgeRuntimeXrRig> Rigs,

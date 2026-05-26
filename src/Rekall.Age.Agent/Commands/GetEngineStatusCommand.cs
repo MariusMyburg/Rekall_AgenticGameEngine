@@ -214,6 +214,17 @@ public sealed class GetEngineStatusCommand
                         "rekall.render.capture_runtime_viewport"
                     ]),
                 new RekallAgeAgentAuthoringContract(
+                    "runtime-procedural-material",
+                    "Rekall.ProceduralMaterial",
+                    "Renderable entities can generate deterministic standard PBR texture channels from inspectable procedural material parameters.",
+                    ["pbr-texture-generation", "deterministic-seed", "base-color", "metallic-roughness", "normal-map", "emissive"],
+                    [
+                        "rekall.module.component_schemas",
+                        "rekall.scene.apply_blueprint",
+                        "rekall.live.apply_scene_blueprint",
+                        "rekall.render.capture_runtime_viewport"
+                    ]),
+                new RekallAgeAgentAuthoringContract(
                     "runtime-render-layers",
                     "Rekall.RenderLayer",
                     "Renderable entities can opt into named render layers, camera components can use CullingMask to include or exclude layers, and viewport diagnostics report renderables hidden by the active camera.",

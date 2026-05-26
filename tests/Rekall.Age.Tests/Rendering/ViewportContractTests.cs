@@ -231,6 +231,45 @@ public sealed class ViewportContractTests
     }
 
     [Fact]
+    public void RuntimeFrameBuilderProjectsProceduralMaterialSettingsForMeshRenderables()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Generated Panel", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "plane" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.ProceduralMaterial", new JsonObject
+                {
+                    ["generator"] = "checker",
+                    ["resolution"] = 32,
+                    ["scale"] = 8,
+                    ["seed"] = 17,
+                    ["baseColorA"] = "#101820",
+                    ["baseColorB"] = "#f2c94c",
+                    ["metallicFactor"] = 0.6,
+                    ["roughnessA"] = 0.25,
+                    ["roughnessB"] = 0.75,
+                    ["normalStrength"] = 0.4,
+                    ["emissiveStrength"] = 1.5
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var renderable = Assert.Single(frame.Renderables, item => item.Kind == "mesh");
+        Assert.NotNull(renderable.ProceduralMaterial);
+        Assert.Equal("checker", renderable.ProceduralMaterial.Generator);
+        Assert.Equal(32, renderable.ProceduralMaterial.Resolution);
+        Assert.Equal(8, renderable.ProceduralMaterial.Scale);
+        Assert.Equal(17, renderable.ProceduralMaterial.Seed);
+        Assert.Equal("#101820", renderable.ProceduralMaterial.BaseColorA);
+        Assert.Equal("#f2c94c", renderable.ProceduralMaterial.BaseColorB);
+        Assert.Equal(0.6, renderable.ProceduralMaterial.MetallicFactor);
+        Assert.Equal(0.25, renderable.ProceduralMaterial.RoughnessA);
+        Assert.Equal(0.75, renderable.ProceduralMaterial.RoughnessB);
+        Assert.Equal(0.4, renderable.ProceduralMaterial.NormalStrength);
+        Assert.Equal(1.5, renderable.ProceduralMaterial.EmissiveStrength);
+    }
+
+    [Fact]
     public void RuntimeProjectionExcludesInvisibleRenderEntities()
     {
         var hiddenCamera = RekallAgeEntityDocument.Create("Hidden Camera", ["camera"]) with { Visible = false };

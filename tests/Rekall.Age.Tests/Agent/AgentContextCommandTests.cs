@@ -176,6 +176,11 @@ public sealed class AgentContextCommandTests
             && contract.PrimaryType == "Rekall.LodGroup"
             && contract.Capabilities.Contains("distance-levels"));
         Assert.Contains(result.Value.AuthoringContracts, contract =>
+            contract.Name == "runtime-procedural-material"
+            && contract.PrimaryType == "Rekall.ProceduralMaterial"
+            && contract.Capabilities.Contains("pbr-texture-generation")
+            && contract.Capabilities.Contains("deterministic-seed"));
+        Assert.Contains(result.Value.AuthoringContracts, contract =>
             contract.Name == "runtime-render-layers"
             && contract.PrimaryType == "Rekall.RenderLayer"
             && contract.Capabilities.Contains("camera-culling-mask")

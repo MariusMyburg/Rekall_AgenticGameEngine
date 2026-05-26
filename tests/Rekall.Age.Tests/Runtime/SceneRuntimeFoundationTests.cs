@@ -200,7 +200,10 @@ public sealed class SceneRuntimeFoundationTests
         Assert.Equal(
             [
                 "runtime.input.actions",
+                "runtime.events.lifecycle",
                 "runtime.xr.pose",
+                "runtime.events.pointer",
+                "runtime.events.timer",
                 "runtime.celestial.kepler",
                 "runtime.celestial.rotation",
                 "runtime.animation",
@@ -209,6 +212,8 @@ public sealed class SceneRuntimeFoundationTests
                 "runtime.rendering",
                 "runtime.transform",
                 "runtime.ui",
+                "runtime.events.collision",
+                "runtime.events.trigger",
                 "runtime.input.camera",
                 "runtime.camera.target3d"
             ],

@@ -255,6 +255,87 @@ public sealed class VulkanSceneMeshBuilderTests
     }
 
     [Fact]
+    public void BuildMeshesGeneratesDeterministicPbrTexturesForProceduralMaterial()
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "panel-1",
+            "Generated Panel",
+            "mesh",
+            "rekall.geometry.plane",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.geometry.plane",
+            ProceduralMaterial: new RekallAgeRuntimeViewportProceduralMaterial(
+                "checker",
+                4,
+                2,
+                0,
+                "#000000",
+                "#ffffff",
+                0.5,
+                0.25,
+                0.75,
+                0.6,
+                2)));
+
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame));
+
+        Assert.NotNull(mesh.BaseColorTexture);
+        Assert.Equal("panel-1/procedural/baseColor", mesh.BaseColorTexture.Id);
+        Assert.Equal(4, mesh.BaseColorTexture.Width);
+        Assert.Equal(4, mesh.BaseColorTexture.Height);
+        Assert.Equal([0, 0, 0, 255], mesh.BaseColorTexture.Rgba.Take(4).ToArray());
+        Assert.Equal([255, 255, 255, 255], mesh.BaseColorTexture.Rgba.Skip(8).Take(4).ToArray());
+        Assert.NotNull(mesh.MetallicRoughnessTexture);
+        Assert.Equal(64, mesh.MetallicRoughnessTexture.Rgba[1]);
+        Assert.Equal(128, mesh.MetallicRoughnessTexture.Rgba[2]);
+        Assert.Equal(191, mesh.MetallicRoughnessTexture.Rgba[9]);
+        Assert.Equal(0.5f, mesh.MetallicFactor);
+        Assert.NotNull(mesh.NormalTexture);
+        Assert.Contains(mesh.NormalTexture.Rgba.Where((value, index) => index % 4 == 0), value => value != 128);
+        Assert.NotNull(mesh.EmissiveTexture);
+        Assert.Equal(new Vector4(1, 1, 1, 2), mesh.EmissiveFactor);
+    }
+
+    [Fact]
+    public void BuildMeshesKeepsAuthoredTextureAssetsAheadOfProceduralBaseColor()
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "panel-1",
+            "Generated Panel",
+            "mesh",
+            "rekall.geometry.plane",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.geometry.plane",
+            TextureAssetId: "asset_paint",
+            ProceduralMaterial: new RekallAgeRuntimeViewportProceduralMaterial(
+                "checker",
+                4,
+                2,
+                0,
+                "#000000",
+                "#ffffff",
+                0.5,
+                0.25,
+                0.75,
+                0.6,
+                2)));
+        var assets = CreateAssetsWithTexture("asset_paint", 1, 1, [20, 30, 40, 255]);
+
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets));
+
+        Assert.NotNull(mesh.BaseColorTexture);
+        Assert.Equal("asset_paint", mesh.BaseColorTexture.Id);
+        Assert.NotNull(mesh.MetallicRoughnessTexture);
+        Assert.Equal("panel-1/procedural/metallicRoughness", mesh.MetallicRoughnessTexture.Id);
+    }
+
+    [Fact]
     public void BuildMeshesBindsGpuReadyTexturePayloadToGeneratedPlanetSurface()
     {
         var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(

@@ -6,6 +6,7 @@ using Rekall.Age.Modules.Commands;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime;
+using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.Runtime.Commands;
 using Rekall.Age.World;
 
@@ -135,6 +136,50 @@ public sealed class ProjectRuntimeSystemTests
         Assert.Contains(target.Components, component =>
             component.Type == "Game.Modules.AgentAuthoredGameplay.LastEffect"
             && component.Properties["source"]!.GetValue<string>() == "Agent Actor");
+    }
+
+    [Fact]
+    public async Task ProjectRuntimeSystemReceivesRuntimeInputState()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("project runtime input"), CancellationToken.None);
+        var scaffold = await new ScaffoldRuntimeSystemModuleCommand().ExecuteAsync(
+            new ScaffoldRuntimeSystemModuleRequest(
+                root,
+                "agent.input-driven",
+                "Agent Input Driven",
+                "AgentInputDriven",
+                "InputMotor",
+                "InputDrivenSystem"),
+            context);
+        var write = await new WriteModuleSourceCommand().ExecuteAsync(
+            new WriteModuleSourceRequest(
+                root,
+                "AgentInputDriven",
+                "AgentInputDrivenModule.cs",
+                CreateInputDrivenModuleSource()),
+            context);
+        var build = await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
+        await SaveInputDrivenSceneAsync(root);
+
+        Assert.True(scaffold.Ok, scaffold.Summary);
+        Assert.True(write.Ok, write.Summary);
+        Assert.True(build.Ok, build.Summary);
+
+        var world = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(
+            root,
+            "Main",
+            1,
+            [
+                new RekallAgeRuntimeInputFrame(
+                    PressedKeys: ["W"],
+                    PressedKeysThisFrame: ["W"])
+            ],
+            CancellationToken.None);
+        var actor = world.Entities.Single(entity => entity.Name == "Input Actor");
+
+        Assert.Contains("InputDrivenSystem", world.SystemsRun);
+        Assert.Equal(1, actor.Transform.Position3D.Z, precision: 3);
     }
 
     private static async Task CreateOrbitModuleAsync(string root, RekallAgeCommandContext context)
@@ -317,6 +362,82 @@ public sealed class OrbitMotionSystem : IRekallAgeRuntimeModuleSystem
             .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
                 .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })));
         await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+    }
+
+    private static async Task SaveInputDrivenSceneAsync(string root)
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "input"])
+            .AddEntity(RekallAgeEntityDocument.Create("Input Actor", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = 0, ["y"] = 0, ["z"] = 0 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Game.Modules.AgentInputDriven.InputMotor",
+                    new JsonObject { ["moveZPerFrame"] = 1 })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+    }
+
+    private static string CreateInputDrivenModuleSource()
+    {
+        return """
+using Rekall.Age.Modules;
+using Rekall.Age.Runtime.Abstractions;
+
+namespace Game.Modules.AgentInputDriven;
+
+[RekallAgeModule("agent.input-driven", "Agent Input Driven")]
+[RekallAgeRequiresCapability("world")]
+public sealed class AgentInputDrivenModule : RekallAgeModule
+{
+    public override void Configure(RekallAgeModuleBuilder builder)
+    {
+        builder.RegisterComponent<InputMotor>();
+        builder.RegisterRuntimeSystem<InputDrivenSystem>();
+    }
+}
+
+[RekallAgeComponent("Input Motor")]
+public sealed class InputMotor : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public double MoveZPerFrame { get; init; } = 1;
+}
+
+public sealed class InputDrivenSystem : IRekallAgeRuntimeModuleSystem
+{
+    private const string MotorType = "Game.Modules.AgentInputDriven.InputMotor";
+
+    public string Id => nameof(InputDrivenSystem);
+
+    public int Priority => -10;
+
+    public ValueTask<RekallAgeRuntimeWorld> UpdateAsync(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeModuleFrameContext context)
+    {
+        if (context.Input.PressedKeys?.Contains("W") != true)
+        {
+            return ValueTask.FromResult(world);
+        }
+
+        var entities = world.Entities.Select(entity =>
+        {
+            var motor = entity.FindComponent(MotorType);
+            if (motor is null)
+            {
+                return entity;
+            }
+
+            var move = motor.Properties.ReadNumber("moveZPerFrame", 1);
+            return entity.WithPosition3D(entity.Transform.Position3D with
+            {
+                Z = entity.Transform.Position3D.Z + move
+            });
+        }).ToArray();
+        return ValueTask.FromResult(world with { Entities = entities });
+    }
+}
+""";
     }
 
     private static string CreateAgentAuthoredGameplayModuleSource()

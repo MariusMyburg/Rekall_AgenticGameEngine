@@ -69,14 +69,9 @@ void main()
 {
     vec4 textureColor = texture(baseColorTexture, fragUv);
     vec3 albedo = pow(max(fragColor.rgb * textureColor.rgb, vec3(0.0)), vec3(2.2));
-    float metallic = 0.0;
-    float roughness = clamp(draw.materialFactors.y, 0.04, 1.0);
-    if (draw.materialFactors.x > 0.0001)
-    {
-        vec4 metalRough = texture(metallicRoughnessTexture, fragUv);
-        metallic = clamp(metalRough.b * draw.materialFactors.x, 0.0, 1.0);
-        roughness = clamp(metalRough.g * draw.materialFactors.y, 0.04, 1.0);
-    }
+    vec4 metalRough = texture(metallicRoughnessTexture, fragUv);
+    float metallic = clamp(metalRough.b * draw.materialFactors.x, 0.0, 1.0);
+    float roughness = clamp(metalRough.g * draw.materialFactors.y, 0.04, 1.0);
     float occlusion = 1.0;
     if (draw.materialFactors.w > 0.0001)
     {

@@ -24,7 +24,13 @@ public static class RekallAgeMultiplayerSnapshotInterpolator
                 {
                     Position = Lerp(previousEntity.Position, nextEntity.Position, alpha),
                     Rotation = Lerp(previousEntity.Rotation, nextEntity.Rotation, alpha),
-                    Scale = Lerp(previousEntity.Scale, nextEntity.Scale, alpha)
+                    Scale = Lerp(previousEntity.Scale, nextEntity.Scale, alpha),
+                    Authority = nextEntity.Authority,
+                    ReplicatePosition = nextEntity.ReplicatePosition,
+                    ReplicateRotation = nextEntity.ReplicateRotation,
+                    ReplicateScale = nextEntity.ReplicateScale,
+                    Prediction = nextEntity.Prediction,
+                    Priority = nextEntity.Priority
                 };
             })
             .OrderBy(entity => entity.NetworkId, StringComparer.Ordinal)
@@ -83,3 +89,98 @@ public sealed record RekallAgeMultiplayerReconciliationResult(
     double PositionError,
     RekallAgeMultiplayerEntityState CorrectedState,
     IReadOnlyList<RekallAgeMultiplayerInputCommand> PendingInputs);
+
+public static class RekallAgeMultiplayerSnapshotApplier
+{
+    public static RekallAgeRuntimeWorld Apply(
+        RekallAgeRuntimeWorld world,
+        RekallAgeMultiplayerSnapshot snapshot)
+    {
+        var statesByEntityId = snapshot.Entities.ToDictionary(entity => entity.EntityId, StringComparer.Ordinal);
+        var entities = world.Entities.Select(entity =>
+        {
+            if (!statesByEntityId.TryGetValue(entity.Id, out var state))
+            {
+                return entity;
+            }
+
+            return entity with
+            {
+                Transform = entity.Transform with
+                {
+                    Position3D = state.ReplicatePosition ? state.Position : entity.Transform.Position3D,
+                    Rotation3D = state.ReplicateRotation ? state.Rotation : entity.Transform.Rotation3D,
+                    Scale3D = state.ReplicateScale ? state.Scale : entity.Transform.Scale3D
+                }
+            };
+        }).ToArray();
+
+        return world with
+        {
+            FrameIndex = snapshot.ServerTick,
+            ElapsedTime = TimeSpan.FromSeconds(Math.Max(0, snapshot.ServerTimeSeconds)),
+            Entities = entities
+        };
+    }
+}
+
+public sealed record RekallAgeMultiplayerSnapshotDelta(
+    int FromServerTick,
+    int ToServerTick,
+    double ToServerTimeSeconds,
+    IReadOnlyList<RekallAgeMultiplayerEntityState> ChangedEntities,
+    IReadOnlyList<string> RemovedNetworkIds,
+    IReadOnlyDictionary<string, int> LastProcessedInputSequenceByClient);
+
+public static class RekallAgeMultiplayerSnapshotDeltaBuilder
+{
+    public static RekallAgeMultiplayerSnapshotDelta Build(
+        RekallAgeMultiplayerSnapshot previous,
+        RekallAgeMultiplayerSnapshot next)
+    {
+        var previousByNetworkId = previous.Entities.ToDictionary(entity => entity.NetworkId, StringComparer.Ordinal);
+        var nextByNetworkId = next.Entities.ToDictionary(entity => entity.NetworkId, StringComparer.Ordinal);
+        var changed = next.Entities
+            .Where(entity =>
+                !previousByNetworkId.TryGetValue(entity.NetworkId, out var previousEntity)
+                || !Equals(previousEntity, entity))
+            .OrderBy(entity => entity.NetworkId, StringComparer.Ordinal)
+            .ToArray();
+        var removed = previous.Entities
+            .Where(entity => !nextByNetworkId.ContainsKey(entity.NetworkId))
+            .Select(entity => entity.NetworkId)
+            .OrderBy(networkId => networkId, StringComparer.Ordinal)
+            .ToArray();
+
+        return new RekallAgeMultiplayerSnapshotDelta(
+            previous.ServerTick,
+            next.ServerTick,
+            next.ServerTimeSeconds,
+            changed,
+            removed,
+            new Dictionary<string, int>(next.LastProcessedInputSequenceByClient, StringComparer.Ordinal));
+    }
+
+    public static RekallAgeMultiplayerSnapshot Apply(
+        RekallAgeMultiplayerSnapshot previous,
+        RekallAgeMultiplayerSnapshotDelta delta)
+    {
+        var removed = delta.RemovedNetworkIds.ToHashSet(StringComparer.Ordinal);
+        var entities = previous.Entities
+            .Where(entity => !removed.Contains(entity.NetworkId))
+            .ToDictionary(entity => entity.NetworkId, StringComparer.Ordinal);
+
+        foreach (var changed in delta.ChangedEntities)
+        {
+            entities[changed.NetworkId] = changed;
+        }
+
+        return new RekallAgeMultiplayerSnapshot(
+            delta.ToServerTick,
+            delta.ToServerTimeSeconds,
+            entities.Values
+                .OrderBy(entity => entity.NetworkId, StringComparer.Ordinal)
+                .ToArray(),
+            new Dictionary<string, int>(delta.LastProcessedInputSequenceByClient, StringComparer.Ordinal));
+    }
+}

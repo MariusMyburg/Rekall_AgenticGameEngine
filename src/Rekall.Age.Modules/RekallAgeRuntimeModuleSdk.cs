@@ -25,6 +25,306 @@ public static class RekallAgeRuntimeModuleSdk
         return entity.Tags.Any(item => item.Equals(tag, StringComparison.OrdinalIgnoreCase));
     }
 
+    public static RekallAgeRuntimeEntity WithTag(this RekallAgeRuntimeEntity entity, string tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return entity;
+        }
+
+        return entity with
+        {
+            Tags = NormalizeTags(entity.Tags.Append(tag))
+        };
+    }
+
+    public static RekallAgeRuntimeEntity WithoutTag(this RekallAgeRuntimeEntity entity, string tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return entity;
+        }
+
+        var trimmed = tag.Trim();
+        return entity with
+        {
+            Tags = entity.Tags
+                .Where(item => !item.Equals(trimmed, StringComparison.OrdinalIgnoreCase))
+                .ToArray()
+        };
+    }
+
+    public static RekallAgeRuntimeEntity WithVisible(
+        this RekallAgeRuntimeEntity entity,
+        bool visible)
+    {
+        return entity with { Visible = visible };
+    }
+
+    public static RekallAgeRuntimeEntity? FindEntity(
+        this RekallAgeRuntimeWorld world,
+        string entityId)
+    {
+        if (string.IsNullOrWhiteSpace(entityId))
+        {
+            return null;
+        }
+
+        var id = entityId.Trim();
+        return world.Entities.FirstOrDefault(entity =>
+            entity.Id.Equals(id, StringComparison.Ordinal));
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeEntity> EntitiesNamed(
+        this RekallAgeRuntimeWorld world,
+        string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return Array.Empty<RekallAgeRuntimeEntity>();
+        }
+
+        var trimmed = name.Trim();
+        return StableEntities(world)
+            .Where(entity => entity.Name.Equals(trimmed, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeEntity> EntitiesWithTag(
+        this RekallAgeRuntimeWorld world,
+        string tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return Array.Empty<RekallAgeRuntimeEntity>();
+        }
+
+        var trimmed = tag.Trim();
+        return StableEntities(world)
+            .Where(entity => entity.HasTag(trimmed))
+            .ToArray();
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeEntity> EntitiesWithComponent(
+        this RekallAgeRuntimeWorld world,
+        string componentType)
+    {
+        if (string.IsNullOrWhiteSpace(componentType))
+        {
+            return Array.Empty<RekallAgeRuntimeEntity>();
+        }
+
+        var trimmed = componentType.Trim();
+        return StableEntities(world)
+            .Where(entity => entity.FindComponent(trimmed) is not null)
+            .ToArray();
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeEntity> EntitiesWithTagAndComponent(
+        this RekallAgeRuntimeWorld world,
+        string tag,
+        string componentType)
+    {
+        if (string.IsNullOrWhiteSpace(tag) || string.IsNullOrWhiteSpace(componentType))
+        {
+            return Array.Empty<RekallAgeRuntimeEntity>();
+        }
+
+        var trimmedTag = tag.Trim();
+        var trimmedComponentType = componentType.Trim();
+        return StableEntities(world)
+            .Where(entity => entity.HasTag(trimmedTag) && entity.FindComponent(trimmedComponentType) is not null)
+            .ToArray();
+    }
+
+    public static RekallAgeRuntimeWorld ReplaceEntity(
+        this RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeEntity replacement)
+    {
+        var found = false;
+        var entities = world.Entities.Select(entity =>
+        {
+            if (!entity.Id.Equals(replacement.Id, StringComparison.Ordinal))
+            {
+                return entity;
+            }
+
+            found = true;
+            return replacement;
+        }).ToArray();
+
+        return found ? world with { Entities = entities } : world;
+    }
+
+    public static RekallAgeRuntimeWorld UpdateEntity(
+        this RekallAgeRuntimeWorld world,
+        string entityId,
+        Func<RekallAgeRuntimeEntity, RekallAgeRuntimeEntity> update)
+    {
+        if (string.IsNullOrWhiteSpace(entityId))
+        {
+            return world;
+        }
+
+        var id = entityId.Trim();
+        return world.UpdateEntities(entity => entity.Id.Equals(id, StringComparison.Ordinal), update);
+    }
+
+    public static RekallAgeRuntimeWorld UpdateEntitiesWithTag(
+        this RekallAgeRuntimeWorld world,
+        string tag,
+        Func<RekallAgeRuntimeEntity, RekallAgeRuntimeEntity> update)
+    {
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return world;
+        }
+
+        var trimmed = tag.Trim();
+        return world.UpdateEntities(entity => entity.HasTag(trimmed), update);
+    }
+
+    public static RekallAgeRuntimeWorld UpdateEntitiesWithComponent(
+        this RekallAgeRuntimeWorld world,
+        string componentType,
+        Func<RekallAgeRuntimeEntity, RekallAgeRuntimeEntity> update)
+    {
+        if (string.IsNullOrWhiteSpace(componentType))
+        {
+            return world;
+        }
+
+        var trimmed = componentType.Trim();
+        return world.UpdateEntities(entity => entity.FindComponent(trimmed) is not null, update);
+    }
+
+    public static RekallAgeRuntimeWorld UpdateEntitiesWithTagAndComponent(
+        this RekallAgeRuntimeWorld world,
+        string tag,
+        string componentType,
+        Func<RekallAgeRuntimeEntity, RekallAgeRuntimeEntity> update)
+    {
+        if (string.IsNullOrWhiteSpace(tag) || string.IsNullOrWhiteSpace(componentType))
+        {
+            return world;
+        }
+
+        var trimmedTag = tag.Trim();
+        var trimmedComponentType = componentType.Trim();
+        return world.UpdateEntities(
+            entity => entity.HasTag(trimmedTag) && entity.FindComponent(trimmedComponentType) is not null,
+            update);
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeNetworkSession> NetworkSessions(
+        this RekallAgeRuntimeWorld world)
+    {
+        return world.Subsystems.Multiplayer.Sessions
+            .OrderBy(session => session.EntityName, StringComparer.Ordinal)
+            .ThenBy(session => session.EntityId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public static RekallAgeRuntimeNetworkSession? PrimaryNetworkSession(
+        this RekallAgeRuntimeWorld world)
+    {
+        return world.NetworkSessions().FirstOrDefault();
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeNetworkEntity> NetworkEntities(
+        this RekallAgeRuntimeWorld world)
+    {
+        return StableNetworkEntities(world.Subsystems.Multiplayer.Entities)
+            .ToArray();
+    }
+
+    public static RekallAgeRuntimeNetworkEntity? NetworkEntityForEntity(
+        this RekallAgeRuntimeWorld world,
+        string entityId)
+    {
+        if (string.IsNullOrWhiteSpace(entityId))
+        {
+            return null;
+        }
+
+        var trimmed = entityId.Trim();
+        return world.NetworkEntities()
+            .FirstOrDefault(entity => entity.EntityId.Equals(trimmed, StringComparison.Ordinal));
+    }
+
+    public static RekallAgeRuntimeNetworkEntity? NetworkEntityByNetworkId(
+        this RekallAgeRuntimeWorld world,
+        string networkId)
+    {
+        if (string.IsNullOrWhiteSpace(networkId))
+        {
+            return null;
+        }
+
+        var trimmed = networkId.Trim();
+        return world.NetworkEntities()
+            .FirstOrDefault(entity => entity.NetworkId.Equals(trimmed, StringComparison.Ordinal));
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeNetworkEntity> NetworkEntitiesOwnedBy(
+        this RekallAgeRuntimeWorld world,
+        string clientId)
+    {
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            return Array.Empty<RekallAgeRuntimeNetworkEntity>();
+        }
+
+        var trimmed = clientId.Trim();
+        return world.NetworkEntities()
+            .Where(entity => entity.OwnerClientId?.Equals(trimmed, StringComparison.Ordinal) == true)
+            .ToArray();
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeEntity> RuntimeEntitiesOwnedBy(
+        this RekallAgeRuntimeWorld world,
+        string clientId)
+    {
+        var ownedIds = world.NetworkEntitiesOwnedBy(clientId)
+            .Select(entity => entity.EntityId)
+            .ToHashSet(StringComparer.Ordinal);
+        return StableEntities(world)
+            .Where(entity => ownedIds.Contains(entity.Id))
+            .ToArray();
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeEntity> ReplicatedRuntimeEntities(
+        this RekallAgeRuntimeWorld world)
+    {
+        var replicatedIds = world.NetworkEntities()
+            .Where(entity => entity.IsReplicated())
+            .Select(entity => entity.EntityId)
+            .ToHashSet(StringComparer.Ordinal);
+        return StableEntities(world)
+            .Where(entity => replicatedIds.Contains(entity.Id))
+            .ToArray();
+    }
+
+    public static bool IsNetworkOwner(
+        this RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeEntity entity,
+        string clientId)
+    {
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            return false;
+        }
+
+        return world.NetworkEntityForEntity(entity.Id)?.OwnerClientId?.Equals(
+            clientId.Trim(),
+            StringComparison.Ordinal) == true;
+    }
+
+    public static bool IsReplicated(this RekallAgeRuntimeNetworkEntity entity)
+    {
+        return entity.ReplicatePosition || entity.ReplicateRotation || entity.ReplicateScale;
+    }
+
     public static RekallAgeRuntimeEntity WithPosition3D(
         this RekallAgeRuntimeEntity entity,
         RekallAgeRuntimeVector3 position)
@@ -93,6 +393,236 @@ public static class RekallAgeRuntimeModuleSdk
         return entity.UpsertComponent(
             componentType,
             update((entity.FindComponent(componentType)?.Properties.DeepClone() as JsonObject) ?? new JsonObject()));
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeInputAction> InputActions(
+        this RekallAgeRuntimeWorld world,
+        string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return Array.Empty<RekallAgeRuntimeInputAction>();
+        }
+
+        return world.Subsystems.Input.Actions
+            .Where(action => action.Name.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+    }
+
+    public static double InputActionValue(
+        this RekallAgeRuntimeWorld world,
+        string name,
+        double fallback = 0)
+    {
+        var actions = world.InputActions(name);
+        return actions.Count == 0
+            ? fallback
+            : actions.Sum(action => action.Value);
+    }
+
+    public static bool IsInputActionDown(this RekallAgeRuntimeWorld world, string name)
+    {
+        return world.InputActions(name).Any(action => action.IsDown);
+    }
+
+    public static bool WasInputActionPressed(this RekallAgeRuntimeWorld world, string name)
+    {
+        return world.InputActions(name).Any(action => action.WasPressed);
+    }
+
+    public static bool WasInputActionReleased(this RekallAgeRuntimeWorld world, string name)
+    {
+        return world.InputActions(name).Any(action => action.WasReleased);
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeEvent> EventsOfType(
+        this RekallAgeRuntimeWorld world,
+        string type)
+    {
+        if (string.IsNullOrWhiteSpace(type))
+        {
+            return Array.Empty<RekallAgeRuntimeEvent>();
+        }
+
+        return world.Subsystems.Events.Events
+            .Where(runtimeEvent => runtimeEvent.Type.Equals(type.Trim(), StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeEvent> EventsFor(
+        this RekallAgeRuntimeWorld world,
+        string entityId)
+    {
+        if (string.IsNullOrWhiteSpace(entityId))
+        {
+            return Array.Empty<RekallAgeRuntimeEvent>();
+        }
+
+        return world.Subsystems.Events.Events
+            .Where(runtimeEvent => runtimeEvent.EntityId.Equals(entityId.Trim(), StringComparison.Ordinal))
+            .ToArray();
+    }
+
+    public static bool WasEventRaised(
+        this RekallAgeRuntimeWorld world,
+        string entityId,
+        string type)
+    {
+        if (string.IsNullOrWhiteSpace(type))
+        {
+            return false;
+        }
+
+        return world.EventsFor(entityId)
+            .Any(runtimeEvent => runtimeEvent.Type.Equals(type.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeObservation> ObservationsWithCode(
+        this RekallAgeRuntimeWorld world,
+        string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return Array.Empty<RekallAgeRuntimeObservation>();
+        }
+
+        var trimmed = code.Trim();
+        return world.Observations
+            .Where(observation => observation.Code.Equals(trimmed, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeObservation> ObservationsWithSeverity(
+        this RekallAgeRuntimeWorld world,
+        string severity)
+    {
+        if (string.IsNullOrWhiteSpace(severity))
+        {
+            return Array.Empty<RekallAgeRuntimeObservation>();
+        }
+
+        var trimmed = severity.Trim();
+        return world.Observations
+            .Where(observation => observation.Severity.Equals(trimmed, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeObservation> ObservationsFor(
+        this RekallAgeRuntimeWorld world,
+        string entityId)
+    {
+        if (string.IsNullOrWhiteSpace(entityId))
+        {
+            return Array.Empty<RekallAgeRuntimeObservation>();
+        }
+
+        var trimmed = entityId.Trim();
+        return world.Observations
+            .Where(observation => observation.TargetId.Equals(trimmed, StringComparison.Ordinal))
+            .ToArray();
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeObservation> ObservationsForScene(
+        this RekallAgeRuntimeWorld world)
+    {
+        return world.ObservationsFor(world.SceneId);
+    }
+
+    public static bool HasBlockingObservations(this RekallAgeRuntimeWorld world)
+    {
+        return world.ObservationsWithSeverity("blocking").Count > 0;
+    }
+
+    public static RekallAgeRuntimeWorld EmitObservation(
+        this RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeEntity entity,
+        string code,
+        string severity,
+        string subsystem,
+        string system,
+        string message,
+        IReadOnlyList<string>? suggestedCommands = null)
+    {
+        return world.WithObservation(
+            code,
+            severity,
+            subsystem,
+            entity.Id,
+            entity.Name,
+            system,
+            message,
+            suggestedCommands);
+    }
+
+    public static RekallAgeRuntimeWorld EmitSceneObservation(
+        this RekallAgeRuntimeWorld world,
+        string code,
+        string severity,
+        string subsystem,
+        string system,
+        string message,
+        IReadOnlyList<string>? suggestedCommands = null)
+    {
+        return world.WithObservation(
+            code,
+            severity,
+            subsystem,
+            world.SceneId,
+            world.SceneName,
+            system,
+            message,
+            suggestedCommands);
+    }
+
+    public static RekallAgeRuntimeWorld EmitEvent(
+        this RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeEntity entity,
+        string type,
+        string source,
+        string? handler = null,
+        JsonObject? payload = null)
+    {
+        if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(source))
+        {
+            return world;
+        }
+
+        return world.WithEvents(
+        [
+            new RekallAgeRuntimeEvent(
+                world.FrameIndex,
+                type.Trim(),
+                entity.Id,
+                entity.Name,
+                source.Trim(),
+                string.IsNullOrWhiteSpace(handler) ? null : handler.Trim(),
+                ClonePayload(payload))
+        ]);
+    }
+
+    public static RekallAgeRuntimeWorld EmitBoundEvents(
+        this RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeEntity entity,
+        string type,
+        string source,
+        JsonObject? payload = null)
+    {
+        if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(source))
+        {
+            return world;
+        }
+
+        var events = EventBindingsFor(entity, type.Trim())
+            .Select(binding => new RekallAgeRuntimeEvent(
+                world.FrameIndex,
+                type.Trim(),
+                entity.Id,
+                entity.Name,
+                source.Trim(),
+                binding.Handler,
+                ClonePayload(payload)))
+            .ToArray();
+        return world.WithEvents(events);
     }
 
     public static IReadOnlyList<RekallAgeRuntimeRaycastHit> Raycast3D(
@@ -202,6 +732,222 @@ public static class RekallAgeRuntimeModuleSdk
         }
 
         return value.TryGetValue<string>(out var text) ? text : fallback;
+    }
+
+    private static RekallAgeRuntimeWorld WithEvents(
+        this RekallAgeRuntimeWorld world,
+        IReadOnlyList<RekallAgeRuntimeEvent> events)
+    {
+        if (events.Count == 0)
+        {
+            return world;
+        }
+
+        return world with
+        {
+            Subsystems = world.Subsystems with
+            {
+                Events = new RekallAgeRuntimeEventView(
+                    world.Subsystems.Events.Events
+                        .Concat(events)
+                        .OrderBy(runtimeEvent => runtimeEvent.Frame)
+                        .ThenBy(runtimeEvent => runtimeEvent.EntityName, StringComparer.Ordinal)
+                        .ThenBy(runtimeEvent => runtimeEvent.Type, StringComparer.Ordinal)
+                        .ThenBy(runtimeEvent => runtimeEvent.Handler, StringComparer.Ordinal)
+                        .ToArray())
+            }
+        };
+    }
+
+    private static RekallAgeRuntimeWorld WithObservation(
+        this RekallAgeRuntimeWorld world,
+        string code,
+        string severity,
+        string subsystem,
+        string targetId,
+        string targetName,
+        string system,
+        string message,
+        IReadOnlyList<string>? suggestedCommands)
+    {
+        if (string.IsNullOrWhiteSpace(code)
+            || string.IsNullOrWhiteSpace(severity)
+            || string.IsNullOrWhiteSpace(subsystem)
+            || string.IsNullOrWhiteSpace(system)
+            || string.IsNullOrWhiteSpace(message))
+        {
+            return world;
+        }
+
+        var observation = new RekallAgeRuntimeObservation(
+            world.FrameIndex,
+            code.Trim(),
+            severity.Trim().ToLowerInvariant(),
+            subsystem.Trim(),
+            targetId,
+            targetName,
+            system.Trim(),
+            message.Trim(),
+            NormalizeSuggestedCommands(suggestedCommands));
+
+        return world with
+        {
+            Observations = world.Observations
+                .Concat([observation])
+                .ToArray()
+        };
+    }
+
+    private static IEnumerable<RekallAgeRuntimeEntity> StableEntities(RekallAgeRuntimeWorld world)
+    {
+        return world.Entities
+            .OrderBy(entity => entity.Name, StringComparer.Ordinal)
+            .ThenBy(entity => entity.Id, StringComparer.Ordinal);
+    }
+
+    private static IEnumerable<RekallAgeRuntimeNetworkEntity> StableNetworkEntities(
+        IEnumerable<RekallAgeRuntimeNetworkEntity> entities)
+    {
+        return entities
+            .OrderByDescending(entity => entity.Priority)
+            .ThenBy(entity => entity.NetworkId, StringComparer.Ordinal)
+            .ThenBy(entity => entity.EntityId, StringComparer.Ordinal);
+    }
+
+    private static RekallAgeRuntimeWorld UpdateEntities(
+        this RekallAgeRuntimeWorld world,
+        Func<RekallAgeRuntimeEntity, bool> predicate,
+        Func<RekallAgeRuntimeEntity, RekallAgeRuntimeEntity> update)
+    {
+        var changed = false;
+        var entities = world.Entities.Select(entity =>
+        {
+            if (!predicate(entity))
+            {
+                return entity;
+            }
+
+            changed = true;
+            return update(entity);
+        }).ToArray();
+
+        return changed ? world with { Entities = entities } : world;
+    }
+
+    private static IReadOnlyList<string> NormalizeTags(IEnumerable<string> tags)
+    {
+        return tags
+            .Select(tag => tag.Trim().ToLowerInvariant())
+            .Where(tag => tag.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(tag => tag, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<string> NormalizeSuggestedCommands(IReadOnlyList<string>? suggestedCommands)
+    {
+        return suggestedCommands is null
+            ? Array.Empty<string>()
+            : suggestedCommands
+                .Select(command => command.Trim())
+                .Where(command => command.Length > 0)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(command => command, StringComparer.Ordinal)
+                .ToArray();
+    }
+
+    private static IReadOnlyList<EventBinding> EventBindingsFor(
+        RekallAgeRuntimeEntity entity,
+        string type)
+    {
+        var bindings = new List<EventBinding>();
+        foreach (var component in entity.Components.Where(component =>
+                     component.Type.Equals("Rekall.EventBindings", StringComparison.Ordinal)))
+        {
+            if (!ReadBooleanCaseInsensitive(component.Properties, "active", true)
+                || !TryGetPropertyValueCaseInsensitive(component.Properties, "events", out var eventNodes)
+                || eventNodes is not JsonArray eventArray)
+            {
+                continue;
+            }
+
+            foreach (var eventNode in eventArray.OfType<JsonObject>())
+            {
+                if (!ReadBooleanCaseInsensitive(eventNode, "active", true))
+                {
+                    continue;
+                }
+
+                var eventType = ReadStringCaseInsensitive(eventNode, "event")
+                    ?? ReadStringCaseInsensitive(eventNode, "type");
+                if (eventType?.Equals(type, StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    bindings.Add(new EventBinding(Clean(ReadStringCaseInsensitive(eventNode, "handler"))));
+                }
+            }
+        }
+
+        return bindings;
+    }
+
+    private static JsonObject ClonePayload(JsonObject? payload)
+    {
+        return payload is null
+            ? new JsonObject()
+            : payload.DeepClone().AsObject();
+    }
+
+    private static string? Clean(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string? ReadStringCaseInsensitive(JsonObject properties, string name)
+    {
+        return TryGetPropertyValueCaseInsensitive(properties, name, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<string>(out var text)
+            ? text
+            : null;
+    }
+
+    private static bool ReadBooleanCaseInsensitive(JsonObject properties, string name, bool fallback)
+    {
+        if (!TryGetPropertyValueCaseInsensitive(properties, name, out var node) || node is not JsonValue value)
+        {
+            return fallback;
+        }
+
+        if (value.TryGetValue<bool>(out var boolean))
+        {
+            return boolean;
+        }
+
+        return value.TryGetValue<string>(out var text) && bool.TryParse(text, out var parsed)
+            ? parsed
+            : fallback;
+    }
+
+    private static bool TryGetPropertyValueCaseInsensitive(
+        JsonObject properties,
+        string name,
+        out JsonNode? node)
+    {
+        if (properties.TryGetPropertyValue(name, out node))
+        {
+            return true;
+        }
+
+        var pascalName = char.ToUpperInvariant(name[0]) + name[1..];
+        if (properties.TryGetPropertyValue(pascalName, out node))
+        {
+            return true;
+        }
+
+        var match = properties.FirstOrDefault(property =>
+            property.Key.Equals(name, StringComparison.OrdinalIgnoreCase));
+        node = match.Value;
+        return !string.IsNullOrEmpty(match.Key);
     }
 
     private static bool Is3DCollider(RekallAgeRuntimeComponent component)
@@ -338,4 +1084,6 @@ public static class RekallAgeRuntimeModuleSdk
     {
         return new RekallAgeRuntimeVector3(value.X * scalar, value.Y * scalar, value.Z * scalar);
     }
+
+    private sealed record EventBinding(string? Handler);
 }

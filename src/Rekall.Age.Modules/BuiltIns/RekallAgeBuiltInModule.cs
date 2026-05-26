@@ -8,6 +8,9 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
     {
         builder.RegisterComponent<RekallAgeTransformComponent>();
         builder.RegisterComponent<RekallAgeInputActionMapComponent>();
+        builder.RegisterComponent<RekallAgeEventBindingsComponent>();
+        builder.RegisterComponent<RekallAgePointerRayComponent>();
+        builder.RegisterComponent<RekallAgeTimerComponent>();
         builder.RegisterComponent<RekallAgeCamera2DComponent>();
         builder.RegisterComponent<RekallAgeCamera3DComponent>();
         builder.RegisterComponent<RekallAgeCameraZoomInputComponent>();
@@ -26,10 +29,12 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeLineSegmentsComponent>();
         builder.RegisterComponent<RekallAgeGeometryExtrusionComponent>();
         builder.RegisterComponent<RekallAgeMaterialComponent>();
+        builder.RegisterComponent<RekallAgeProceduralMaterialComponent>();
         builder.RegisterComponent<RekallAgeLodGroupComponent>();
         builder.RegisterComponent<RekallAgePhysicsWorld3DComponent>();
         builder.RegisterComponent<RekallAgePhysicsMaterial3DComponent>();
         builder.RegisterComponent<RekallAgeRigidbody3DComponent>();
+        builder.RegisterComponent<RekallAgeTriggerComponent>();
         builder.RegisterComponent<RekallAgeBoxCollider2DComponent>();
         builder.RegisterComponent<RekallAgeCircleCollider2DComponent>();
         builder.RegisterComponent<RekallAgeBoxCollider3DComponent>();
@@ -79,7 +84,83 @@ public sealed record RekallAgeInputActionBinding(
     string? NegativeKey = null,
     string? PositiveButton = null,
     string? NegativeButton = null,
-    double MouseWheelScale = 0);
+    double MouseWheelScale = 0,
+    string? MouseAxis = null,
+    double MouseScale = 1);
+
+[RekallAgeComponent("Event Bindings")]
+public sealed class RekallAgeEventBindingsComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+
+    [RekallAgeProperty(Kind = "runtimeEvents")]
+    public RekallAgeEventBinding[] Events { get; init; } =
+    [
+        new("entity.tick")
+    ];
+}
+
+public sealed record RekallAgeEventBinding(
+    string Event,
+    string? Handler = null,
+    bool Active = true);
+
+[RekallAgeComponent("Pointer Ray")]
+public sealed class RekallAgePointerRayComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+
+    [RekallAgeProperty]
+    public string PointerId { get; init; } = "primary";
+
+    [RekallAgeProperty]
+    public double OriginX { get; init; }
+
+    [RekallAgeProperty]
+    public double OriginY { get; init; }
+
+    [RekallAgeProperty]
+    public double OriginZ { get; init; }
+
+    [RekallAgeProperty]
+    public double DirectionX { get; init; }
+
+    [RekallAgeProperty]
+    public double DirectionY { get; init; }
+
+    [RekallAgeProperty]
+    public double DirectionZ { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double Range { get; init; } = 100;
+
+    [RekallAgeProperty]
+    public string Button { get; init; } = "Left";
+
+    [RekallAgeProperty]
+    public string TargetTag { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public string TargetComponentType { get; init; } = string.Empty;
+}
+
+[RekallAgeComponent("Timer")]
+public sealed class RekallAgeTimerComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+
+    [RekallAgeProperty]
+    public string TimerId { get; init; } = "timer";
+
+    [RekallAgeProperty(Minimum = 0.000001)]
+    public double DurationSeconds { get; init; } = 1;
+
+    [RekallAgeProperty]
+    public bool Repeat { get; init; }
+}
 
 [RekallAgeComponent("Camera 2D")]
 public sealed class RekallAgeCamera2DComponent : RekallAgeComponent
@@ -506,6 +587,43 @@ public sealed class RekallAgeMaterialComponent : RekallAgeComponent
     public double EmissiveStrength { get; init; }
 }
 
+[RekallAgeComponent("Procedural Material")]
+public sealed class RekallAgeProceduralMaterialComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public string Generator { get; init; } = "checker";
+
+    [RekallAgeProperty(Minimum = 2, Maximum = 2048)]
+    public int Resolution { get; init; } = 128;
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Scale { get; init; } = 8;
+
+    [RekallAgeProperty]
+    public int Seed { get; init; }
+
+    [RekallAgeProperty(Kind = "color")]
+    public string BaseColorA { get; init; } = "#ffffff";
+
+    [RekallAgeProperty(Kind = "color")]
+    public string BaseColorB { get; init; } = "#202020";
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double MetallicFactor { get; init; }
+
+    [RekallAgeProperty(Minimum = 0.04, Maximum = 1)]
+    public double RoughnessA { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.04, Maximum = 1)]
+    public double RoughnessB { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 4)]
+    public double NormalStrength { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double EmissiveStrength { get; init; }
+}
+
 [RekallAgeComponent("LOD Group")]
 public sealed class RekallAgeLodGroupComponent : RekallAgeComponent
 {
@@ -570,6 +688,34 @@ public sealed class RekallAgeRigidbody3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
     public double Mass { get; init; } = 1;
+}
+
+[RekallAgeComponent("Trigger")]
+public sealed class RekallAgeTriggerComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+
+    [RekallAgeProperty]
+    public string Shape { get; init; } = "sphere";
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Radius { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Width { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Height { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Depth { get; init; } = 1;
+
+    [RekallAgeProperty]
+    public string TargetTag { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public string TargetComponentType { get; init; } = string.Empty;
 }
 
 [RekallAgeComponent("Box Collider 2D")]

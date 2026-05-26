@@ -340,6 +340,7 @@ public sealed class RekallAgeMultiplayerAuthorityHost
                 "submit_input" => SubmitInput(request.Payload),
                 "tick" => await TickAsync(request.Payload, cancellationToken).ConfigureAwait(false),
                 "snapshot" => Snapshot("snapshot", false, "Authoritative snapshot returned."),
+                "delta" => Delta(request.Payload),
                 _ => throw new InvalidOperationException($"Multiplayer operation '{request.Operation}' is not supported.")
             };
         }
@@ -402,6 +403,15 @@ public sealed class RekallAgeMultiplayerAuthorityHost
         snapshot ??= _session.BuildSnapshot();
         var output = Status(operation, applied, message);
         output["snapshot"] = JsonSerializer.SerializeToNode(snapshot, JsonOptions);
+        return output;
+    }
+
+    private JsonObject Delta(JsonObject? payload)
+    {
+        var fromServerTick = Math.Max(0, ReadInt32(payload, "fromServerTick", required: true));
+        var delta = _session.BuildSnapshotDeltaSince(fromServerTick);
+        var output = Status("delta", false, $"Authoritative delta since tick {fromServerTick} returned.");
+        output["delta"] = JsonSerializer.SerializeToNode(delta, JsonOptions);
         return output;
     }
 

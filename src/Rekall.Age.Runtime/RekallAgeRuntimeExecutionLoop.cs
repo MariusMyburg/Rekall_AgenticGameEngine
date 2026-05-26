@@ -36,7 +36,10 @@ public sealed class RekallAgeRuntimeExecutionLoop
         systems.AddRange(
         [
             new RekallAgeInputActionSystem(),
+            new RekallAgeLifecycleEventSystem(),
             new RekallAgeXrPoseSystem(),
+            new RekallAgePointerEventSystem(),
+            new RekallAgeTimerEventSystem(),
             new RekallAgeKeplerOrbitSystem(),
             new RekallAgeCelestialRotationSystem(),
             new RekallAgeTransformAnimationSystem(),
@@ -45,6 +48,8 @@ public sealed class RekallAgeRuntimeExecutionLoop
             new NoOpRuntimeWorldSystem("runtime.rendering"),
             new NoOpRuntimeWorldSystem("runtime.transform"),
             new NoOpRuntimeWorldSystem("runtime.ui"),
+            new RekallAgeCollisionEventSystem(),
+            new RekallAgeTriggerEventSystem(),
             new RekallAgeCameraInputSystem(),
             new RekallAgeCameraTarget3DSystem()
         ]);
@@ -82,6 +87,14 @@ public sealed class RekallAgeRuntimeExecutionLoop
                 Input = frame == 0
                     ? input ?? RekallAgeRuntimeInputState.Empty
                     : RekallAgeRuntimeInputState.Empty
+            };
+
+            world = world with
+            {
+                Subsystems = world.Subsystems with
+                {
+                    Events = RekallAgeRuntimeEventView.Empty
+                }
             };
 
             foreach (var system in _systems)

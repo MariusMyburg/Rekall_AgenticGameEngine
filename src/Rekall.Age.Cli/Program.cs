@@ -289,6 +289,7 @@ internal static class RekallAgeCli
                 ["multiplayer", "tick", var root, var scene] => await MultiplayerTickAsync(registry, context, root, scene, "1"),
                 ["multiplayer", "tick", var root, var scene, var ticks] => await MultiplayerTickAsync(registry, context, root, scene, ticks),
                 ["multiplayer", "snapshot", var root, var scene] => await MultiplayerSnapshotAsync(registry, context, root, scene),
+                ["multiplayer", "delta", var root, var scene, var fromServerTick] => await MultiplayerDeltaAsync(registry, context, root, scene, fromServerTick),
                 ["context", "engine"] => await PrintEngineStatusAsync(registry, context),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
@@ -463,6 +464,7 @@ internal static class RekallAgeCli
         registry.Register(new MultiplayerSubmitInputCommand());
         registry.Register(new MultiplayerTickCommand());
         registry.Register(new MultiplayerSnapshotCommand());
+        registry.Register(new MultiplayerDeltaCommand());
         registry.Register(new LivePlayerStatusCommand());
         registry.Register(new LivePlayerReloadSceneCommand());
         registry.Register(new LivePlayerReloadAssetsCommand());
@@ -2841,6 +2843,12 @@ internal static class RekallAgeCli
             Console.WriteLine($"  {action.Name}: value={action.Value} down={action.IsDown} pressed={action.WasPressed} released={action.WasReleased}");
         }
 
+        Console.WriteLine($"Events: {result.Value.EventCount}");
+        foreach (var runtimeEvent in result.Value.Events)
+        {
+            Console.WriteLine($"  {runtimeEvent.Type}: entity={runtimeEvent.EntityName} source={runtimeEvent.Source} handler={runtimeEvent.Handler ?? "none"}");
+        }
+
         Console.WriteLine($"XR: {result.Value.XrRigCount} rigs, {result.Value.XrControllerCount} controllers, {result.Value.XrPoseCount} poses, {result.Value.XrActionCount} actions");
         foreach (var action in result.Value.XrActions)
         {
@@ -2979,6 +2987,22 @@ internal static class RekallAgeCli
         return result.Ok ? 0 : 1;
     }
 
+    private static async Task<int> MultiplayerDeltaAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string fromServerTick)
+    {
+        var parsedFromServerTick = int.Parse(fromServerTick, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<MultiplayerDeltaRequest, MultiplayerCommandResult>(
+            "rekall.multiplayer.delta",
+            new MultiplayerDeltaRequest(root, scene, parsedFromServerTick),
+            context);
+        PrintMultiplayerResult(result.Value);
+        return result.Ok ? 0 : 1;
+    }
+
     private static void PrintMultiplayerResult(MultiplayerCommandResult result)
     {
         Console.WriteLine(result.Message);
@@ -3002,6 +3026,14 @@ internal static class RekallAgeCli
         {
             Console.WriteLine($"Snapshot entities: {result.Snapshot.Entities.Count}");
             Console.WriteLine($"Ack clients: {result.Snapshot.LastProcessedInputSequenceByClient.Count}");
+        }
+
+        if (result.Delta is not null)
+        {
+            Console.WriteLine($"Delta ticks: {result.Delta.FromServerTick}->{result.Delta.ToServerTick}");
+            Console.WriteLine($"Delta changed: {result.Delta.ChangedEntities.Count}");
+            Console.WriteLine($"Delta removed: {result.Delta.RemovedNetworkIds.Count}");
+            Console.WriteLine($"Ack clients: {result.Delta.LastProcessedInputSequenceByClient.Count}");
         }
     }
 

@@ -17,4 +17,7 @@ public sealed record RekallAgeRuntimeModuleFrameContext(
     int FrameIndex,
     TimeSpan DeltaTime,
     TimeSpan ElapsedTime,
-    CancellationToken CancellationToken);
+    CancellationToken CancellationToken)
+{
+    public RekallAgeRuntimeInputState Input { get; init; } = RekallAgeRuntimeInputState.Empty;
+}

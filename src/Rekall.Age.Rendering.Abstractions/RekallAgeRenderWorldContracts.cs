@@ -230,7 +230,21 @@ public sealed record RekallAgeRuntimeViewportRenderable(
     double EmissiveStrength = 0,
     RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null,
     RekallAgeRuntimeViewportLineSegments? LineSegments = null,
-    string Layer = "default");
+    string Layer = "default",
+    RekallAgeRuntimeViewportProceduralMaterial? ProceduralMaterial = null);
+
+public sealed record RekallAgeRuntimeViewportProceduralMaterial(
+    string Generator = "checker",
+    int Resolution = 128,
+    double Scale = 8,
+    int Seed = 0,
+    string BaseColorA = "#ffffff",
+    string BaseColorB = "#202020",
+    double MetallicFactor = 0,
+    double RoughnessA = 1,
+    double RoughnessB = 1,
+    double NormalStrength = 0,
+    double EmissiveStrength = 0);
 
 public sealed record RekallAgeRuntimeViewportShaderPipeline(
     string VertexShader,

@@ -79,6 +79,7 @@ public sealed class McpCatalogTests
         registry.Register(new MultiplayerSubmitInputCommand());
         registry.Register(new MultiplayerTickCommand());
         registry.Register(new MultiplayerSnapshotCommand());
+        registry.Register(new MultiplayerDeltaCommand());
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
@@ -139,6 +140,7 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.submit_input");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.tick");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.snapshot");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.delta");
 
         var oneShot = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.create_playable_package_from_template");
         Assert.Equal("workflow", oneShot.Category);
@@ -173,6 +175,11 @@ public sealed class McpCatalogTests
         var multiplayerTool = catalog.Tools.Single(tool => tool.Name == "rekall.multiplayer.status");
         Assert.Equal("multiplayer", multiplayerTool.Category);
         Assert.True(multiplayerTool.Recommended);
+        var multiplayerSnapshotTool = catalog.Tools.Single(tool => tool.Name == "rekall.multiplayer.snapshot");
+        var multiplayerDeltaTool = catalog.Tools.Single(tool => tool.Name == "rekall.multiplayer.delta");
+        Assert.Equal("multiplayer", multiplayerDeltaTool.Category);
+        Assert.True(multiplayerDeltaTool.Recommended);
+        Assert.Equal(multiplayerSnapshotTool.AgentPriority + 1, multiplayerDeltaTool.AgentPriority);
         Assert.Equal("rekall.context.engine_status", catalog.Tools[0].Name);
         Assert.True(catalog.Tools.Index().All(item => item.Index == 0 || catalog.Tools[item.Index - 1].AgentPriority <= item.Item.AgentPriority));
     }

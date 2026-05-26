@@ -8,6 +8,7 @@ public sealed class RekallAgeAuthoritativeMultiplayerSession
     private readonly Dictionary<string, RekallAgeMultiplayerClient> _clients = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _lastAcceptedSequenceByClient = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _lastProcessedSequenceByClient = new(StringComparer.Ordinal);
+    private readonly Dictionary<int, RekallAgeMultiplayerSnapshot> _snapshotsByTick = new();
     private readonly List<RekallAgeMultiplayerInputCommand> _pendingInputs = [];
 
     public RekallAgeAuthoritativeMultiplayerSession(
@@ -16,6 +17,7 @@ public sealed class RekallAgeAuthoritativeMultiplayerSession
     {
         World = initialWorld;
         _loop = loop;
+        _snapshotsByTick[ServerTick] = BuildSnapshot();
     }
 
     public RekallAgeRuntimeWorld World { get; private set; }
@@ -88,7 +90,26 @@ public sealed class RekallAgeAuthoritativeMultiplayerSession
         var result = await _loop.RunAsync(World, 1, cancellationToken, firstInput).ConfigureAwait(false);
         World = result.World;
         ServerTick = World.FrameIndex;
-        return BuildSnapshot();
+        var snapshot = BuildSnapshot();
+        _snapshotsByTick[ServerTick] = snapshot;
+        return snapshot;
+    }
+
+    public RekallAgeMultiplayerSnapshotDelta BuildSnapshotDeltaSince(int fromServerTick)
+    {
+        var current = BuildSnapshot();
+        if (_snapshotsByTick.TryGetValue(fromServerTick, out var previous))
+        {
+            return RekallAgeMultiplayerSnapshotDeltaBuilder.Build(previous, current);
+        }
+
+        return new RekallAgeMultiplayerSnapshotDelta(
+            fromServerTick,
+            current.ServerTick,
+            current.ServerTimeSeconds,
+            current.Entities,
+            Array.Empty<string>(),
+            new Dictionary<string, int>(current.LastProcessedInputSequenceByClient, StringComparer.Ordinal));
     }
 
     public RekallAgeMultiplayerSnapshot BuildSnapshot()
@@ -104,7 +125,15 @@ public sealed class RekallAgeAuthoritativeMultiplayerSession
                     entity.OwnerClientId,
                     runtimeEntity.Transform.Position3D,
                     runtimeEntity.Transform.Rotation3D,
-                    runtimeEntity.Transform.Scale3D);
+                    runtimeEntity.Transform.Scale3D)
+                {
+                    Authority = entity.Authority,
+                    ReplicatePosition = entity.ReplicatePosition,
+                    ReplicateRotation = entity.ReplicateRotation,
+                    ReplicateScale = entity.ReplicateScale,
+                    Prediction = entity.Prediction,
+                    Priority = entity.Priority
+                };
             })
             .OrderBy(entity => entity.NetworkId, StringComparer.Ordinal)
             .ToArray();
@@ -145,4 +174,17 @@ public sealed record RekallAgeMultiplayerEntityState(
     string? OwnerClientId,
     RekallAgeRuntimeVector3 Position,
     RekallAgeRuntimeVector3 Rotation,
-    RekallAgeRuntimeVector3 Scale);
+    RekallAgeRuntimeVector3 Scale)
+{
+    public string Authority { get; init; } = "server";
+
+    public bool ReplicatePosition { get; init; } = true;
+
+    public bool ReplicateRotation { get; init; } = true;
+
+    public bool ReplicateScale { get; init; } = true;
+
+    public string Prediction { get; init; } = "interpolated";
+
+    public int Priority { get; init; }
+}

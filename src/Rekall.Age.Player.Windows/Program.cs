@@ -2311,14 +2311,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         {
             vec4 textureColor = texture(sampler2D(BaseColorTexture, BaseColorSampler), fsin_UV);
             vec3 albedo = pow(max(fsin_Color.rgb * textureColor.rgb, vec3(0.0)), vec3(2.2));
-            float metallic = 0.0;
-            float roughness = clamp(Draw.MaterialFactors.y, 0.04, 1.0);
-            if (Draw.MaterialFactors.x > 0.0001)
-            {
-                vec4 metalRough = texture(sampler2D(MetallicRoughnessTexture, MetallicRoughnessSampler), fsin_UV);
-                metallic = clamp(metalRough.b * Draw.MaterialFactors.x, 0.0, 1.0);
-                roughness = clamp(metalRough.g * Draw.MaterialFactors.y, 0.04, 1.0);
-            }
+            vec4 metalRough = texture(sampler2D(MetallicRoughnessTexture, MetallicRoughnessSampler), fsin_UV);
+            float metallic = clamp(metalRough.b * Draw.MaterialFactors.x, 0.0, 1.0);
+            float roughness = clamp(metalRough.g * Draw.MaterialFactors.y, 0.04, 1.0);
             float occlusion = 1.0;
             if (Draw.MaterialFactors.w > 0.0001)
             {

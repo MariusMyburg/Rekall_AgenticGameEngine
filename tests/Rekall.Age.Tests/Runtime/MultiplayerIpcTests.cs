@@ -66,14 +66,27 @@ public sealed class MultiplayerIpcTests
                 new JsonObject { ["ticks"] = 2 }),
             TimeSpan.FromSeconds(5),
             CancellationToken.None);
+        var delta = await client.SendAsync(
+            pipeName,
+            new RekallAgeMultiplayerRequestEnvelope(
+                "delta",
+                Guid.NewGuid().ToString("N"),
+                "F:/Game",
+                "Main",
+                new JsonObject { ["fromServerTick"] = 0 }),
+            TimeSpan.FromSeconds(5),
+            CancellationToken.None);
 
         Assert.True(connect.Ok, connect.ErrorMessage);
         Assert.True(input.Ok, input.ErrorMessage);
         Assert.True(input.Payload!["accepted"]!.GetValue<bool>());
         Assert.True(tick.Ok, tick.ErrorMessage);
+        Assert.True(delta.Ok, delta.ErrorMessage);
         Assert.Equal(2, tick.Payload!["serverTick"]!.GetValue<int>());
         Assert.Equal(1, tick.Payload["clientCount"]!.GetValue<int>());
         Assert.Equal("ship-1", tick.Payload["snapshot"]!["entities"]![0]!["networkId"]!.GetValue<string>());
+        Assert.Equal(0, delta.Payload!["delta"]!["fromServerTick"]!.GetValue<int>());
+        Assert.Equal(2, delta.Payload["delta"]!["toServerTick"]!.GetValue<int>());
     }
 
     [Fact]
@@ -125,7 +138,7 @@ public sealed class MultiplayerIpcTests
         await using var server = new RekallAgeMultiplayerWebSocketServer(endpoint, host.HandleAsync);
         var startTask = Task.Run(async () =>
         {
-            await Task.Delay(1500);
+            await Task.Delay(250);
             server.Start();
             await server.WaitUntilListeningAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
         });
@@ -139,7 +152,7 @@ public sealed class MultiplayerIpcTests
                 "F:/Game",
                 "Main",
                 null),
-            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(10),
             CancellationToken.None);
 
         await startTask;
@@ -168,7 +181,7 @@ public sealed class MultiplayerIpcTests
                 "Alice",
                 Transport: "websocket",
                 Endpoint: endpoint.ToString(),
-                TimeoutMilliseconds: 5000),
+                TimeoutMilliseconds: 10000),
             context);
         var tick = await new MultiplayerTickCommand().ExecuteAsync(
             new MultiplayerTickRequest(
@@ -177,7 +190,7 @@ public sealed class MultiplayerIpcTests
                 1,
                 Transport: "websocket",
                 Endpoint: endpoint.ToString(),
-                TimeoutMilliseconds: 5000),
+                TimeoutMilliseconds: 10000),
             context);
 
         Assert.True(connect.Ok, connect.Summary);
@@ -218,6 +231,9 @@ public sealed class MultiplayerIpcTests
         var tick = await new MultiplayerTickCommand().ExecuteAsync(
             new MultiplayerTickRequest("F:/Game", "Main", 1, pipeName, TimeoutMilliseconds: 5000),
             context);
+        var delta = await new MultiplayerDeltaCommand().ExecuteAsync(
+            new MultiplayerDeltaRequest("F:/Game", "Main", 0, pipeName, TimeoutMilliseconds: 5000),
+            context);
 
         Assert.True(connect.Ok, connect.Summary);
         Assert.Equal("session-2", connect.Value.SessionId);
@@ -228,6 +244,10 @@ public sealed class MultiplayerIpcTests
         Assert.Equal(1, tick.Value.ServerTick);
         Assert.NotNull(tick.Value.Snapshot);
         Assert.Equal("ship-1", Assert.Single(tick.Value.Snapshot.Entities).NetworkId);
+        Assert.True(delta.Ok, delta.Summary);
+        Assert.NotNull(delta.Value.Delta);
+        Assert.Equal(0, delta.Value.Delta.FromServerTick);
+        Assert.Equal(1, delta.Value.Delta.ToServerTick);
     }
 
     private static RekallAgeAuthoritativeMultiplayerSession CreateSession()

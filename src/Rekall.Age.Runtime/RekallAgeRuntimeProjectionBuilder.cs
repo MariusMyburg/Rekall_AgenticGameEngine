@@ -377,6 +377,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                     elements.Count(element => element.Interactive)))
                 {
                     Input = world.Subsystems.Input,
+                    Events = world.Subsystems.Events,
                     Multiplayer = new RekallAgeRuntimeMultiplayerView(
                         Sort(networkSessions),
                         Sort(networkEntities)),

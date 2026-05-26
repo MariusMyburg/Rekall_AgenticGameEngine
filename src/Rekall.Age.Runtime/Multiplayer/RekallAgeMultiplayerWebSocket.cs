@@ -214,7 +214,14 @@ public sealed class RekallAgeMultiplayerWebSocketServer : IAsyncDisposable
 
     public void Start()
     {
-        _loop ??= Task.Factory.StartNew(
+        if (_loop is not null)
+        {
+            return;
+        }
+
+        _listener.Start();
+        _listening.TrySetResult();
+        _loop = Task.Factory.StartNew(
             () => RunAsync(_stop.Token),
             _stop.Token,
             TaskCreationOptions.LongRunning,
@@ -267,8 +274,6 @@ public sealed class RekallAgeMultiplayerWebSocketServer : IAsyncDisposable
     {
         try
         {
-            _listener.Start();
-            _listening.TrySetResult();
             while (!cancellationToken.IsCancellationRequested && _listener.IsListening)
             {
                 HttpListenerContext context;

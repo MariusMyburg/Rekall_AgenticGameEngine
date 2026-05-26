@@ -59,7 +59,10 @@ public sealed class RekallAgeProjectRuntimeSystemLoader
                     context.FrameIndex,
                     context.DeltaTime,
                     context.ElapsedTime,
-                    context.CancellationToken));
+                    context.CancellationToken)
+                {
+                    Input = context.Input
+                });
         }
     }
 }

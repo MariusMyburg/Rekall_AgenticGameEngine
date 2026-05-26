@@ -758,6 +758,62 @@ public sealed class McpJsonRpcServerTests
     }
 
     [Fact]
+    public async Task ToolsCallCanRunAgentAuthoringGauntlet()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var packageOutput = Path.Combine(root, "GauntletPackage");
+        var auditOutput = Path.Combine(root, "GauntletAudit");
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new RunAgentAuthoringGauntletCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 36,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.workflow.agent_authoring_gauntlet",
+                arguments = new
+                {
+                    projectRoot = root,
+                    projectName = "MCP Gauntlet Pong",
+                    templateId = "pong",
+                    outputDirectory = packageOutput,
+                    auditOutputDirectory = auditOutput,
+                    frames = 1
+                }
+            }
+        }), CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var result = document.RootElement.GetProperty("result");
+        Assert.False(result.GetProperty("isError").GetBoolean());
+        var structured = result.GetProperty("structuredContent");
+        var value = structured.GetProperty("value");
+        Assert.True(value.GetProperty("ready").GetBoolean());
+        Assert.Equal("pong", value.GetProperty("templateId").GetString());
+        Assert.True(File.Exists(value.GetProperty("packageArchivePath").GetString()));
+        Assert.True(File.Exists(value.GetProperty("proofFramePath").GetString()));
+        Assert.Contains(value.GetProperty("checks").EnumerateArray(), check =>
+            check.GetProperty("name").GetString() == "audit-package" &&
+            check.GetProperty("passed").GetBoolean());
+        Assert.Contains(value.GetProperty("recommendedNextActions").EnumerateArray(), action =>
+            action.GetString() == "rekall.workflow.inspect_playable_package");
+
+        var transaction = structured.GetProperty("transaction");
+        Assert.Equal("rekall.workflow.agent_authoring_gauntlet", transaction.GetProperty("name").GetString());
+        Assert.Contains(transaction.GetProperty("changedResources").EnumerateArray(), resource =>
+            resource.GetString()!.EndsWith("GauntletPackage.zip", StringComparison.Ordinal));
+        Assert.Contains(transaction.GetProperty("changedResources").EnumerateArray(), resource =>
+            resource.GetString()!.EndsWith("package_play_frame_001.png", StringComparison.Ordinal));
+
+        var log = await new RekallAgeTransactionLogStore().LoadAsync(root, CancellationToken.None);
+        Assert.Contains(log.Transactions, item => item.Name == "rekall.workflow.agent_authoring_gauntlet");
+    }
+
+    [Fact]
     public async Task ToolsCallCanAuthorBuildAndPlaytestCustomModuleGame()
     {
         var root = TestPaths.CreateTempDirectory();

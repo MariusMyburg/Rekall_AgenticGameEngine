@@ -113,6 +113,43 @@ public sealed class ViewportContractTests
     }
 
     [Fact]
+    public void RuntimeFrameBuilderIncludesStereoCameraSettings()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "vr"])
+            .AddEntity(RekallAgeEntityDocument.Create("Vr Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["stereoMode"] = "vr",
+                    ["stereoRenderMode"] = "side-by-side",
+                    ["interpupillaryDistance"] = 0.07,
+                    ["stereoConvergenceDistance"] = 25,
+                    ["xrViewConfiguration"] = "primary-stereo-with-foveated-inset",
+                    ["foveatedRendering"] = true
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 1000, 500, debugOverlay: false);
+
+        Assert.NotNull(frame.ActiveCamera);
+        Assert.Equal("stereo", frame.ActiveCamera.StereoMode);
+        Assert.Equal("side-by-side", frame.ActiveCamera.StereoRenderMode);
+        Assert.Equal(0.07, frame.ActiveCamera.InterpupillaryDistance);
+        Assert.Equal(25, frame.ActiveCamera.StereoConvergenceDistance);
+        Assert.NotNull(frame.Stereo);
+        Assert.True(frame.Stereo.Enabled);
+        Assert.Equal("side-by-side", frame.Stereo.RenderMode);
+        Assert.False(frame.Stereo.PreferSinglePassMultiview);
+        Assert.True(frame.Stereo.FoveatedRendering);
+        Assert.Equal("primary-stereo-with-foveated-inset", frame.Stereo.XrViewConfiguration);
+        Assert.Equal(2, frame.Stereo.Eyes.Count);
+        Assert.Equal(-0.035, frame.Stereo.Eyes[0].OffsetX, 6);
+        Assert.Equal(0.035, frame.Stereo.Eyes[1].OffsetX, 6);
+        Assert.Equal(500, frame.Stereo.Eyes[0].ViewportWidth);
+        Assert.Equal(500, frame.Stereo.Eyes[1].ViewportX);
+    }
+
+    [Fact]
     public void RuntimeFrameBuilderProjectsGenericMaterialSettingsForMeshRenderables()
     {
         var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
@@ -231,6 +268,73 @@ public sealed class ViewportContractTests
 
         Assert.NotEqual(narrow.Frame.ViewProjection.M11, wide.Frame.ViewProjection.M11);
         Assert.True(narrow.Frame.ViewProjection.M11 > wide.Frame.ViewProjection.M11);
+    }
+
+    [Fact]
+    public void VulkanSceneBatchBuilderCreatesStereoEyeUniformsWithSharedGeometry()
+    {
+        var mesh = new RekallAgeVulkanSceneMesh(
+            "cube-1",
+            "Cube",
+            "cube",
+            [
+                new RekallAgeVulkanSceneVertex(-0.5f, -0.5f, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0),
+                new RekallAgeVulkanSceneVertex(0.5f, -0.5f, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0),
+                new RekallAgeVulkanSceneVertex(0, 0.5f, 0, 0, 0, 1, 1, 1, 1, 1, 0.5f, 1)
+            ],
+            [0, 1, 2]);
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera-1",
+            "Camera",
+            "Camera3D",
+            true,
+            0,
+            0,
+            5,
+            ProjectionMode: "perspective",
+            StereoMode: "stereo",
+            StereoRenderMode: "single-pass-multiview",
+            InterpupillaryDistance: 0.064);
+        var stereo = new RekallAgeRuntimeViewportStereoSettings(
+            true,
+            "stereo",
+            "single-pass-multiview",
+            2,
+            0.064,
+            10,
+            "primary-stereo",
+            false,
+            true,
+            [
+                new RekallAgeRuntimeViewportEye("left", 0, -0.032, 0, 0, 0, 0, 320, 180),
+                new RekallAgeRuntimeViewportEye("right", 1, 0.032, 0, 0, 0, 0, 320, 180)
+            ]);
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main",
+            0,
+            0,
+            320,
+            180,
+            camera,
+            [camera],
+            [
+                new RekallAgeRuntimeViewportRenderable("cube-1", "Cube", "mesh", null, 0, 0, 0, 200)
+            ],
+            0,
+            new RekallAgeRuntimeViewportOverlay(false, 0),
+            [],
+            stereo);
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, [mesh]);
+
+        Assert.Equal(3, batch.Vertices.Count);
+        Assert.Single(batch.Draws);
+        Assert.NotNull(batch.Stereo);
+        Assert.True(batch.Stereo.PreferSinglePassMultiview);
+        Assert.Equal(2, batch.Stereo.Views.Count);
+        Assert.NotEqual(batch.Stereo.Views[0].ViewProjection, batch.Stereo.Views[1].ViewProjection);
+        Assert.Equal(-0.032f, batch.Stereo.Views[0].EyePosition.X, 6);
+        Assert.Equal(0.032f, batch.Stereo.Views[1].EyePosition.X, 6);
     }
 
     [Fact]

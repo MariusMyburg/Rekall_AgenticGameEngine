@@ -136,7 +136,11 @@ public sealed class RekallAgeLivePlayerNamedPipeServer : IAsyncDisposable
 
     public void Start()
     {
-        _loop ??= Task.Run(() => RunAsync(_stop.Token));
+        _loop ??= Task.Factory.StartNew(
+            () => RunAsync(_stop.Token),
+            _stop.Token,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default).Unwrap();
     }
 
     public async ValueTask WaitUntilListeningAsync(TimeSpan timeout, CancellationToken cancellationToken)
@@ -181,20 +185,28 @@ public sealed class RekallAgeLivePlayerNamedPipeServer : IAsyncDisposable
 
     private async Task RunAsync(CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            await using var pipe = new NamedPipeServerStream(
-                PipeName,
-                PipeDirection.InOut,
-                1,
-                PipeTransmissionMode.Byte,
-                PipeOptions.Asynchronous);
-            _listening.TrySetResult();
-            await pipe.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
-            if (!cancellationToken.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                await HandleConnectionAsync(pipe, cancellationToken).ConfigureAwait(false);
+                await using var pipe = new NamedPipeServerStream(
+                    PipeName,
+                    PipeDirection.InOut,
+                    1,
+                    PipeTransmissionMode.Byte,
+                    PipeOptions.Asynchronous);
+                _listening.TrySetResult();
+                await pipe.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    await HandleConnectionAsync(pipe, cancellationToken).ConfigureAwait(false);
+                }
             }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            _listening.TrySetException(ex);
+            throw;
         }
     }
 

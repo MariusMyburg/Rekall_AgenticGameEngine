@@ -43,7 +43,8 @@ public sealed record RekallAgeRuntimeViewportFrame(
     IReadOnlyList<RekallAgeRuntimeViewportRenderable> Renderables,
     int UiLayerCount,
     RekallAgeRuntimeViewportOverlay DebugOverlay,
-    IReadOnlyList<RekallAgeRuntimeViewportObservation> Observations);
+    IReadOnlyList<RekallAgeRuntimeViewportObservation> Observations,
+    RekallAgeRuntimeViewportStereoSettings? Stereo = null);
 
 public sealed record RekallAgeRuntimeViewportCamera(
     string EntityId,
@@ -61,7 +62,36 @@ public sealed record RekallAgeRuntimeViewportCamera(
     double OrthographicSize = 10,
     double NearClip = 0.05,
     double FarClip = 1000,
-    string ClearColor = "#101820");
+    string ClearColor = "#101820",
+    string StereoMode = "mono",
+    string StereoRenderMode = "single-pass-multiview",
+    double InterpupillaryDistance = 0.064,
+    double StereoConvergenceDistance = 10,
+    string XrViewConfiguration = "primary-stereo",
+    bool FoveatedRendering = false);
+
+public sealed record RekallAgeRuntimeViewportStereoSettings(
+    bool Enabled,
+    string Mode,
+    string RenderMode,
+    int EyeCount,
+    double InterpupillaryDistance,
+    double ConvergenceDistance,
+    string XrViewConfiguration,
+    bool FoveatedRendering,
+    bool PreferSinglePassMultiview,
+    IReadOnlyList<RekallAgeRuntimeViewportEye> Eyes);
+
+public sealed record RekallAgeRuntimeViewportEye(
+    string Name,
+    int Index,
+    double OffsetX,
+    double OffsetY,
+    double OffsetZ,
+    double ViewportX,
+    double ViewportY,
+    double ViewportWidth,
+    double ViewportHeight);
 
 public sealed record RekallAgeRuntimeViewportRenderable(
     string EntityId,

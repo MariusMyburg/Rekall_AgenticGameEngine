@@ -28,6 +28,15 @@ public sealed record RekallAgeRenderBackendCatalog(IReadOnlyList<RekallAgeRender
                     "render-pass-submit-clear",
                     "render-pass-read-clear",
                     "render-pass-capture-clear",
+                    "stereo-frame-uniforms",
+                    "stereo-side-by-side-preview",
+                    "single-pass-multiview-ready",
+                    "openxr-primary-stereo-metadata",
+                    "openxr-runtime-probe",
+                    "openxr-session-bootstrap",
+                    "openxr-headset-frame-plan",
+                    "openxr-vulkan-enable2-readiness",
+                    "foveated-rendering-metadata",
                     "synchronization"
                 ]),
             new RekallAgeRenderBackendDescriptor(

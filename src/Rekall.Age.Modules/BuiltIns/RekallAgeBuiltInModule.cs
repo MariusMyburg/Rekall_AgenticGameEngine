@@ -118,6 +118,24 @@ public sealed class RekallAgeCamera3DComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public bool Active { get; init; } = true;
+
+    [RekallAgeProperty]
+    public string StereoMode { get; init; } = "mono";
+
+    [RekallAgeProperty]
+    public string StereoRenderMode { get; init; } = "single-pass-multiview";
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double InterpupillaryDistance { get; init; } = 0.064;
+
+    [RekallAgeProperty(Minimum = 0.001)]
+    public double StereoConvergenceDistance { get; init; } = 10;
+
+    [RekallAgeProperty]
+    public string XrViewConfiguration { get; init; } = "primary-stereo";
+
+    [RekallAgeProperty]
+    public bool FoveatedRendering { get; init; }
 }
 
 [RekallAgeComponent("Camera Zoom Input")]

@@ -160,7 +160,11 @@ public sealed class RekallAgeMultiplayerNamedPipeServer : IAsyncDisposable
 
     public void Start()
     {
-        _loop ??= Task.Run(() => RunAsync(_stop.Token));
+        _loop ??= Task.Factory.StartNew(
+            () => RunAsync(_stop.Token),
+            _stop.Token,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default).Unwrap();
     }
 
     public async ValueTask WaitUntilListeningAsync(TimeSpan timeout, CancellationToken cancellationToken)
@@ -219,28 +223,36 @@ public sealed class RekallAgeMultiplayerNamedPipeServer : IAsyncDisposable
 
     private async Task RunAsync(CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            var pipe = new NamedPipeServerStream(
-                PipeName,
-                PipeDirection.InOut,
-                16,
-                PipeTransmissionMode.Byte,
-                PipeOptions.Asynchronous);
-            _listening.TrySetResult();
-            await pipe.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
-            if (cancellationToken.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                await pipe.DisposeAsync().ConfigureAwait(false);
-                break;
-            }
+                var pipe = new NamedPipeServerStream(
+                    PipeName,
+                    PipeDirection.InOut,
+                    16,
+                    PipeTransmissionMode.Byte,
+                    PipeOptions.Asynchronous);
+                _listening.TrySetResult();
+                await pipe.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    await pipe.DisposeAsync().ConfigureAwait(false);
+                    break;
+                }
 
-            var connection = HandleConnectionAndDisposeAsync(pipe, cancellationToken);
-            lock (_connectionsLock)
-            {
-                _connections.RemoveAll(task => task.IsCompleted);
-                _connections.Add(connection);
+                var connection = HandleConnectionAndDisposeAsync(pipe, cancellationToken);
+                lock (_connectionsLock)
+                {
+                    _connections.RemoveAll(task => task.IsCompleted);
+                    _connections.Add(connection);
+                }
             }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            _listening.TrySetException(ex);
+            throw;
         }
     }
 

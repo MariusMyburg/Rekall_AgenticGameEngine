@@ -41,6 +41,10 @@ public sealed class McpCatalogTests
         registry.Register(new CaptureScreenshotCommand());
         registry.Register(new CaptureRuntimeViewportCommand());
         registry.Register(new CapturePlayableFrameCommand());
+        registry.Register(new InspectStereoRenderPlanCommand());
+        registry.Register(new ProbeOpenXrRuntimeCommand());
+        registry.Register(new BootstrapOpenXrSessionCommand(new FakeOpenXrSessionBootstrap()));
+        registry.Register(new InspectOpenXrHeadsetFramePlanCommand(new FakeOpenXrSessionBootstrap()));
         registry.Register(new ListComponentSchemasCommand(GetType().Assembly));
         registry.Register(new ListModuleSourcesCommand());
         registry.Register(new ReadModuleSourceCommand());
@@ -93,6 +97,10 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.run.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.capture.screenshot");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.capture_runtime_viewport");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.stereo.inspect_plan");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.openxr.probe");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.openxr.bootstrap_session");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.openxr.inspect_headset_frame_plan");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.play.capture_frame");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.component_schemas");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.list_sources");
@@ -260,6 +268,27 @@ public sealed class McpCatalogTests
                 FirstPixel: new RekallAgeVulkanReadbackPixel(20, 25, 36, 255),
                 ByteChecksum: 336,
                 Errors: []));
+        }
+    }
+
+    private sealed class FakeOpenXrSessionBootstrap : IRekallAgeOpenXrSessionBootstrap
+    {
+        public ValueTask<RekallAgeOpenXrSessionBootstrapResult> BootstrapAsync(CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult(new RekallAgeOpenXrSessionBootstrapResult(
+                false,
+                false,
+                false,
+                false,
+                null,
+                false,
+                false,
+                false,
+                ["XR_KHR_vulkan_enable2"],
+                [],
+                ["XR_KHR_vulkan_enable2"],
+                ["Install and activate an OpenXR runtime."],
+                ["OpenXR loader was not found."]));
         }
     }
 }

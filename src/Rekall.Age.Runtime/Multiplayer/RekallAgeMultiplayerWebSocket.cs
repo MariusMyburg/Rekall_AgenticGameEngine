@@ -133,7 +133,11 @@ public sealed class RekallAgeMultiplayerWebSocketServer : IAsyncDisposable
 
     public void Start()
     {
-        _loop ??= Task.Run(() => RunAsync(_stop.Token));
+        _loop ??= Task.Factory.StartNew(
+            () => RunAsync(_stop.Token),
+            _stop.Token,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default).Unwrap();
     }
 
     public async ValueTask WaitUntilListeningAsync(TimeSpan timeout, CancellationToken cancellationToken)
@@ -180,26 +184,34 @@ public sealed class RekallAgeMultiplayerWebSocketServer : IAsyncDisposable
 
     private async Task RunAsync(CancellationToken cancellationToken)
     {
-        _listener.Start();
-        _listening.TrySetResult();
-        while (!cancellationToken.IsCancellationRequested && _listener.IsListening)
+        try
         {
-            HttpListenerContext context;
-            try
+            _listener.Start();
+            _listening.TrySetResult();
+            while (!cancellationToken.IsCancellationRequested && _listener.IsListening)
             {
-                context = await _listener.GetContextAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or HttpListenerException)
-            {
-                break;
-            }
+                HttpListenerContext context;
+                try
+                {
+                    context = await _listener.GetContextAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or HttpListenerException)
+                {
+                    break;
+                }
 
-            var connection = HandleContextAsync(context, cancellationToken);
-            lock (_connectionsLock)
-            {
-                _connections.RemoveAll(task => task.IsCompleted);
-                _connections.Add(connection);
+                var connection = HandleContextAsync(context, cancellationToken);
+                lock (_connectionsLock)
+                {
+                    _connections.RemoveAll(task => task.IsCompleted);
+                    _connections.Add(connection);
+                }
             }
+        }
+        catch (Exception ex) when (ex is HttpListenerException or InvalidOperationException)
+        {
+            _listening.TrySetException(ex);
+            throw;
         }
     }
 

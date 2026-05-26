@@ -1065,18 +1065,29 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _commands.ClearDepthStencil(1f);
         if (packet.Vertices.Length > 0)
         {
-            _device.UpdateBuffer(_frameUniformBuffer, 0, packet.FrameUniform);
             _commands.SetPipeline(_scenePipeline);
             _commands.SetVertexBuffer(0, _vertexBuffer);
             _commands.SetIndexBuffer(_indexBuffer, IndexFormat.UInt32);
             _commands.SetGraphicsResourceSet(0, _frameSet);
-            for (var i = 0; i < packet.Draws.Length; i++)
+            if (packet.StereoFrameUniforms.Count >= 2)
             {
-                var draw = packet.Draws[i];
-                var drawUniformOffset = checked(_drawUniformStrideBytes * (uint)i);
-                _commands.SetGraphicsResourceSet(1, _drawSet, new[] { drawUniformOffset });
-                _commands.SetGraphicsResourceSet(2, ResolveMaterialSet(draw));
-                _commands.DrawIndexed(draw.IndexCount, 1, draw.FirstIndex, draw.VertexOffset, 0);
+                foreach (var stereoUniform in packet.StereoFrameUniforms.OrderBy(eye => eye.Index))
+                {
+                    _device.UpdateBuffer(_frameUniformBuffer, 0, stereoUniform.Uniform);
+                    _commands.SetViewport(0, new Viewport(
+                        stereoUniform.Viewport.X,
+                        stereoUniform.Viewport.Y,
+                        Math.Max(1, stereoUniform.Viewport.Z),
+                        Math.Max(1, stereoUniform.Viewport.W),
+                        0,
+                        1));
+                    DrawScenePacket(packet);
+                }
+            }
+            else
+            {
+                _device.UpdateBuffer(_frameUniformBuffer, 0, packet.FrameUniform);
+                DrawScenePacket(packet);
             }
         }
 
@@ -1099,6 +1110,18 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _commands.End();
         _device.SubmitCommands(_commands);
         _device.SwapBuffers();
+    }
+
+    private void DrawScenePacket(RenderPacket packet)
+    {
+        for (var i = 0; i < packet.Draws.Length; i++)
+        {
+            var draw = packet.Draws[i];
+            var drawUniformOffset = checked(_drawUniformStrideBytes * (uint)i);
+            _commands.SetGraphicsResourceSet(1, _drawSet, new[] { drawUniformOffset });
+            _commands.SetGraphicsResourceSet(2, ResolveMaterialSet(draw));
+            _commands.DrawIndexed(draw.IndexCount, 1, draw.FirstIndex, draw.VertexOffset, 0);
+        }
     }
 
     private void AdvanceSimulationToWallClock()
@@ -1192,7 +1215,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var meshes = _meshBuilder.BuildMeshes(frame, _assets);
         if (meshes.Count == 0)
         {
-            return new RenderPacket([], [], [], default, 0, 0, 0);
+            return new RenderPacket([], [], [], default, [], 0, 0, 0);
         }
 
         var batch = _batchBuilder.Build(frame, meshes);
@@ -1240,9 +1263,31 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 new Vector4(batch.Frame.LightDirection, 0),
                 batch.Frame.LightColor,
                 batch.Frame.LightPosition),
+            BuildStereoUniforms(batch),
             meshes.Count,
             meshes.Sum(mesh => mesh.Indices.Count / 3),
             textureCount);
+    }
+
+    private static IReadOnlyList<StereoFrameUniform> BuildStereoUniforms(RekallAgeVulkanSceneBatch batch)
+    {
+        if (batch.Stereo is not { Enabled: true } stereo || stereo.Views.Count < 2)
+        {
+            return [];
+        }
+
+        return stereo.Views
+            .OrderBy(view => view.Index)
+            .Select(view => new StereoFrameUniform(
+                view.Name,
+                view.Index,
+                new FrameUniform(
+                    view.ViewProjection,
+                    new Vector4(batch.Frame.LightDirection, 0),
+                    batch.Frame.LightColor,
+                    batch.Frame.LightPosition),
+                view.Viewport))
+            .ToArray();
     }
 
     private void EnsureVertexBufferCapacity(IReadOnlyCollection<GpuVertex> vertices)
@@ -2066,9 +2111,16 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         uint[] Indices,
         GpuDraw[] Draws,
         FrameUniform FrameUniform,
+        IReadOnlyList<StereoFrameUniform> StereoFrameUniforms,
         int MeshCount = 0,
         int TriangleCount = 0,
         int TextureCount = 0);
+
+    private sealed record StereoFrameUniform(
+        string Name,
+        int Index,
+        FrameUniform Uniform,
+        Vector4 Viewport);
 
     private sealed record LiveEditWorkItem(
         RekallAgeLivePlayerRequestEnvelope Request,

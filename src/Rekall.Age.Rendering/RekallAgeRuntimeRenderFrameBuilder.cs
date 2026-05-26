@@ -43,7 +43,13 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     camera.OrthographicSize,
                     camera.NearClip,
                     camera.FarClip,
-                    camera.ClearColor);
+                    camera.ClearColor,
+                    camera.StereoMode,
+                    camera.StereoRenderMode,
+                    camera.InterpupillaryDistance,
+                    camera.StereoConvergenceDistance,
+                    camera.XrViewConfiguration,
+                    camera.FoveatedRendering);
             })
             .OrderByDescending(camera => camera.Active)
             .ThenBy(camera => camera.EntityName, StringComparer.Ordinal)
@@ -77,7 +83,54 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     observation.Subsystem,
                     observation.TargetName.Length > 0 ? observation.TargetName : observation.TargetId,
                     observation.Message))
-                .ToArray());
+                .ToArray(),
+            BuildStereoSettings(activeCamera, width, height));
+    }
+
+    private static RekallAgeRuntimeViewportStereoSettings? BuildStereoSettings(
+        RekallAgeRuntimeViewportCamera? activeCamera,
+        int width,
+        int height)
+    {
+        if (activeCamera is null
+            || !activeCamera.StereoMode.Equals("stereo", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var eyeSeparation = Math.Clamp(activeCamera.InterpupillaryDistance, 0, 1);
+        var halfSeparation = eyeSeparation * 0.5;
+        var renderMode = activeCamera.StereoRenderMode.Equals("side-by-side", StringComparison.OrdinalIgnoreCase)
+            ? "side-by-side"
+            : activeCamera.StereoRenderMode.Equals("dual-pass", StringComparison.OrdinalIgnoreCase)
+                ? "dual-pass"
+                : "single-pass-multiview";
+        var preferMultiview = renderMode.Equals("single-pass-multiview", StringComparison.Ordinal);
+        var eyeWidth = renderMode.Equals("side-by-side", StringComparison.Ordinal)
+            ? Math.Max(1, width / 2.0)
+            : Math.Max(1, width);
+        var eyes = renderMode.Equals("side-by-side", StringComparison.Ordinal)
+            ? new[]
+            {
+                new RekallAgeRuntimeViewportEye("left", 0, -halfSeparation, 0, 0, 0, 0, eyeWidth, height),
+                new RekallAgeRuntimeViewportEye("right", 1, halfSeparation, 0, 0, eyeWidth, 0, eyeWidth, height)
+            }
+            : new[]
+            {
+                new RekallAgeRuntimeViewportEye("left", 0, -halfSeparation, 0, 0, 0, 0, width, height),
+                new RekallAgeRuntimeViewportEye("right", 1, halfSeparation, 0, 0, 0, 0, width, height)
+            };
+        return new RekallAgeRuntimeViewportStereoSettings(
+            true,
+            "stereo",
+            renderMode,
+            2,
+            eyeSeparation,
+            Math.Max(0.001, activeCamera.StereoConvergenceDistance),
+            activeCamera.XrViewConfiguration,
+            activeCamera.FoveatedRendering,
+            preferMultiview,
+            eyes);
     }
 
     private static IEnumerable<RekallAgeRuntimeViewportRenderable> BuildRenderables(RekallAgeRuntimeWorld world)

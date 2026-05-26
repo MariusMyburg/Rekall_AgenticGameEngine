@@ -57,7 +57,13 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             ReadNumber(component.Properties, "nearClip", component.Type == "Rekall.Camera2D" ? -1000 : 0.05),
                             ReadNumber(component.Properties, "farClip", component.Type == "Rekall.Camera2D" ? 1000 : 1000),
                             ReadString(component.Properties, "clearColor")
-                                ?? (component.Type == "Rekall.Camera2D" ? "#102030" : "#101820")));
+                                ?? (component.Type == "Rekall.Camera2D" ? "#102030" : "#101820"),
+                            NormalizeStereoMode(ReadString(component.Properties, "stereoMode")),
+                            NormalizeStereoRenderMode(ReadString(component.Properties, "stereoRenderMode")),
+                            Math.Clamp(ReadNumber(component.Properties, "interpupillaryDistance", 0.064), 0, 1),
+                            Math.Max(0.001, ReadNumber(component.Properties, "stereoConvergenceDistance", 10)),
+                            NormalizeXrViewConfiguration(ReadString(component.Properties, "xrViewConfiguration")),
+                            ReadBoolean(component.Properties, "foveatedRendering", false)));
                         break;
                     case "Rekall.SpriteRenderer":
                         sprites.Add(new RekallAgeRuntimeRenderSprite(
@@ -562,6 +568,35 @@ public sealed class RekallAgeRuntimeProjectionBuilder
     {
         var normalized = value.Trim().ToLowerInvariant();
         return normalized is "orthographic" or "ortho" ? "orthographic" : "perspective";
+    }
+
+    private static string NormalizeStereoMode(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "stereo" or "vr" or "xr" => "stereo",
+            _ => "mono"
+        };
+    }
+
+    private static string NormalizeStereoRenderMode(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "side-by-side" or "side_by_side" or "sbs" => "side-by-side",
+            "dual-pass" or "dual_pass" => "dual-pass",
+            _ => "single-pass-multiview"
+        };
+    }
+
+    private static string NormalizeXrViewConfiguration(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "primary-mono" or "mono" => "primary-mono",
+            "primary-stereo-with-foveated-inset" or "foveated-stereo" => "primary-stereo-with-foveated-inset",
+            _ => "primary-stereo"
+        };
     }
 
     private static double Clamp(double value, double min, double max)

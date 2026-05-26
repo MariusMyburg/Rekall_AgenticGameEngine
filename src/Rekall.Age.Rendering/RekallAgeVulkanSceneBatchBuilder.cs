@@ -16,7 +16,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             vertices,
             indices,
             draws,
-            BuildFrameUniform(frame, meshes));
+            BuildFrameUniform(frame, meshes),
+            BuildStereoFrame(frame, meshes));
     }
 
     private static IReadOnlyList<RekallAgeVulkanSceneVertex> BuildLocalVertices(
@@ -84,8 +85,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         var extent = MathF.Max(1f, MathF.Max(
             bounds.MaxX - bounds.MinX,
             MathF.Max(bounds.MaxY - bounds.MinY, bounds.MaxZ - bounds.MinZ)));
-        var (eye, target) = ResolveCamera(frame.ActiveCamera, center, extent);
-        var view = Matrix4x4.CreateLookAt(eye, target, Vector3.UnitY);
+        var pose = ResolveCameraPose(frame.ActiveCamera, center, extent);
+        var view = Matrix4x4.CreateLookAt(pose.Eye, pose.Eye + pose.Forward, pose.Up);
         var projection = CreateProjection(frame.ActiveCamera, frame, extent);
         projection.M22 *= -1f;
 
@@ -95,6 +96,54 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             light.Direction,
             light.Color,
             light.Position);
+    }
+
+    private static RekallAgeVulkanSceneStereoFrame? BuildStereoFrame(
+        RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
+    {
+        if (frame.Stereo is not { Enabled: true } stereo || frame.ActiveCamera is null)
+        {
+            return null;
+        }
+
+        var bounds = ComputeWorldBounds(frame, meshes);
+        var center = new Vector3(
+            (bounds.MinX + bounds.MaxX) * 0.5f,
+            (bounds.MinY + bounds.MaxY) * 0.5f,
+            (bounds.MinZ + bounds.MaxZ) * 0.5f);
+        var extent = MathF.Max(1f, MathF.Max(
+            bounds.MaxX - bounds.MinX,
+            MathF.Max(bounds.MaxY - bounds.MinY, bounds.MaxZ - bounds.MinZ)));
+        var pose = ResolveCameraPose(frame.ActiveCamera, center, extent);
+        var projection = CreateProjection(frame.ActiveCamera, frame, extent);
+        projection.M22 *= -1f;
+        var views = stereo.Eyes
+            .Select(eye =>
+            {
+                var offset = pose.Right * (float)eye.OffsetX
+                    + pose.Up * (float)eye.OffsetY
+                    + pose.Forward * (float)eye.OffsetZ;
+                var eyePosition = pose.Eye + offset;
+                var view = Matrix4x4.CreateLookAt(eyePosition, eyePosition + pose.Forward, pose.Up);
+                return new RekallAgeVulkanSceneViewUniform(
+                    eye.Name,
+                    eye.Index,
+                    view * projection,
+                    new Vector4(eyePosition, 1),
+                    new Vector4(
+                        (float)eye.ViewportX,
+                        (float)eye.ViewportY,
+                        (float)Math.Max(1, eye.ViewportWidth),
+                        (float)Math.Max(1, eye.ViewportHeight)));
+            })
+            .OrderBy(view => view.Index)
+            .ToArray();
+        return new RekallAgeVulkanSceneStereoFrame(
+            true,
+            stereo.RenderMode,
+            stereo.PreferSinglePassMultiview,
+            views);
     }
 
     private static SceneBounds ComputeWorldBounds(
@@ -125,20 +174,29 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             : bounds;
     }
 
-    private static (Vector3 Eye, Vector3 Target) ResolveCamera(
+    private static CameraPose ResolveCameraPose(
         RekallAgeRuntimeViewportCamera? camera,
         Vector3 fallbackCenter,
         float fallbackExtent)
     {
         if (camera is null || IsDefaultCamera(camera))
         {
-            return (
-                new Vector3(fallbackCenter.X, fallbackCenter.Y, fallbackCenter.Z + MathF.Max(3f, fallbackExtent * 2.5f)),
-                fallbackCenter);
+            var fallbackEye = new Vector3(fallbackCenter.X, fallbackCenter.Y, fallbackCenter.Z + MathF.Max(3f, fallbackExtent * 2.5f));
+            var fallbackForward = Vector3.Normalize(fallbackCenter - fallbackEye);
+            var fallbackRight = Vector3.Normalize(Vector3.Cross(fallbackForward, Vector3.UnitY));
+            var fallbackUp = Vector3.Normalize(Vector3.Cross(fallbackRight, fallbackForward));
+            return new CameraPose(fallbackEye, fallbackForward, fallbackRight, fallbackUp);
         }
 
-        var eye = new Vector3((float)camera.X, (float)camera.Y, (float)camera.Z);
-        return (eye, eye + DirectionFromEuler(camera.RotationX, camera.RotationY, camera.RotationZ));
+        var cameraEye = new Vector3((float)camera.X, (float)camera.Y, (float)camera.Z);
+        var cameraForward = DirectionFromEuler(camera.RotationX, camera.RotationY, camera.RotationZ);
+        var rightVector = Rotate(1, 0, 0, camera.RotationX, camera.RotationY, camera.RotationZ);
+        var upVector = Rotate(0, 1, 0, camera.RotationX, camera.RotationY, camera.RotationZ);
+        return new CameraPose(
+            cameraEye,
+            cameraForward,
+            Vector3.Normalize(new Vector3(rightVector.X, rightVector.Y, rightVector.Z)),
+            Vector3.Normalize(new Vector3(upVector.X, upVector.Y, upVector.Z)));
     }
 
     private static bool IsDefaultCamera(RekallAgeRuntimeViewportCamera camera)
@@ -271,4 +329,6 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
     private readonly record struct SceneBounds(float MinX, float MaxX, float MinY, float MaxY, float MinZ, float MaxZ);
 
     private readonly record struct SceneLight(Vector3 Direction, Vector4 Position, Vector4 Color);
+
+    private readonly record struct CameraPose(Vector3 Eye, Vector3 Forward, Vector3 Right, Vector3 Up);
 }

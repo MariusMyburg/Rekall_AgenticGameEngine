@@ -46,7 +46,11 @@ public sealed class ModuleMetadataTests
         var inputActionMap = Assert.Single(module.Components, component => component.DisplayName == "Input Action Map");
         Assert.Contains(inputActionMap.Properties, property => property.Name == "Actions" && property.Kind == "inputActions");
         Assert.Contains(module.Components, component => component.DisplayName == "Camera 2D");
-        Assert.Contains(module.Components, component => component.DisplayName == "Camera 3D");
+        var camera3D = Assert.Single(module.Components, component => component.DisplayName == "Camera 3D");
+        Assert.Contains(camera3D.Properties, property => property.Name == "StereoMode" && property.Kind == "string");
+        Assert.Contains(camera3D.Properties, property => property.Name == "StereoRenderMode" && property.Kind == "string");
+        Assert.Contains(camera3D.Properties, property => property.Name == "InterpupillaryDistance" && property.Minimum == 0);
+        Assert.Contains(camera3D.Properties, property => property.Name == "FoveatedRendering" && property.Kind == "boolean");
         var cameraZoomInput = Assert.Single(module.Components, component => component.DisplayName == "Camera Zoom Input");
         Assert.Contains(cameraZoomInput.Properties, property => property.Name == "WheelZoomSpeed" && property.Kind == "number");
         Assert.Contains(cameraZoomInput.Properties, property => property.Name == "MinimumOrthographicSize" && property.Minimum == 0.001);

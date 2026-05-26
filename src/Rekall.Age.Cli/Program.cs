@@ -55,6 +55,20 @@ internal static class RekallAgeCli
                 ["templates", "verify-mvp"] => await VerifyMvpTemplatesAsync(registry, context, null, cleanup: true),
                 ["templates", "verify-mvp", var workRoot] => await VerifyMvpTemplatesAsync(registry, context, workRoot, cleanup: false),
                 ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
+                ["render", "stereo", "inspect", var root, var scene] =>
+                    await InspectStereoRenderPlanAsync(registry, context, root, scene, "0", "1920", "1080"),
+                ["render", "stereo", "inspect", var root, var scene, var frames] =>
+                    await InspectStereoRenderPlanAsync(registry, context, root, scene, frames, "1920", "1080"),
+                ["render", "stereo", "inspect", var root, var scene, var frames, var width, var height] =>
+                    await InspectStereoRenderPlanAsync(registry, context, root, scene, frames, width, height),
+                ["render", "openxr", "probe"] => await ProbeOpenXrRuntimeAsync(registry, context),
+                ["render", "openxr", "bootstrap-session"] => await BootstrapOpenXrSessionAsync(registry, context),
+                ["render", "openxr", "frame-plan", var root, var scene] =>
+                    await InspectOpenXrHeadsetFramePlanAsync(registry, context, root, scene, "0", "1920", "1080"),
+                ["render", "openxr", "frame-plan", var root, var scene, var frames] =>
+                    await InspectOpenXrHeadsetFramePlanAsync(registry, context, root, scene, frames, "1920", "1080"),
+                ["render", "openxr", "frame-plan", var root, var scene, var frames, var width, var height] =>
+                    await InspectOpenXrHeadsetFramePlanAsync(registry, context, root, scene, frames, width, height),
                 ["render", "vulkan", "probe"] => await ProbeVulkanBackendAsync(registry, context),
                 ["render", "vulkan", "device", "bootstrap"] =>
                     await BootstrapVulkanLogicalDeviceAsync(registry, context, null),
@@ -372,6 +386,10 @@ internal static class RekallAgeCli
         registry.Register(new ScaffoldRuntimeSystemModuleCommand());
         registry.Register(new WriteModuleSourceCommand());
         registry.Register(new ListRenderBackendsCommand());
+        registry.Register(new InspectStereoRenderPlanCommand());
+        registry.Register(new ProbeOpenXrRuntimeCommand());
+        registry.Register(new BootstrapOpenXrSessionCommand());
+        registry.Register(new InspectOpenXrHeadsetFramePlanCommand());
         registry.Register(new ProbeVulkanBackendCommand());
         registry.Register(new BootstrapVulkanLogicalDeviceCommand());
         registry.Register(new SubmitEmptyVulkanCommandBufferCommand());
@@ -533,6 +551,172 @@ internal static class RekallAgeCli
         {
             Console.WriteLine($"{backend.Id}: {backend.DisplayName} [{backend.Status}]");
             Console.WriteLine($"  {string.Join(", ", backend.AgentExposedCapabilities)}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectStereoRenderPlanAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string frames,
+        string width,
+        string height)
+    {
+        var frameCount = int.Parse(frames, CultureInfo.InvariantCulture);
+        var viewportWidth = int.Parse(width, CultureInfo.InvariantCulture);
+        var viewportHeight = int.Parse(height, CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<InspectStereoRenderPlanRequest, InspectStereoRenderPlanResult>(
+            "rekall.render.stereo.inspect_plan",
+            new InspectStereoRenderPlanRequest(root, scene, frameCount, viewportWidth, viewportHeight),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Active camera: {result.Value.ActiveCamera ?? "<none>"}");
+        Console.WriteLine($"Stereo enabled: {result.Value.StereoEnabled}");
+        Console.WriteLine($"Render mode: {result.Value.RenderMode}");
+        Console.WriteLine($"Eyes: {result.Value.EyeCount}; eye uniforms: {result.Value.EyeUniformCount}");
+        Console.WriteLine($"Shared geometry buffers: {result.Value.SharedGeometryBuffers}");
+        Console.WriteLine($"Vertices: {result.Value.VertexCount}; indices: {result.Value.IndexCount}; draws: {result.Value.DrawCount}");
+        Console.WriteLine($"Preview submissions: {result.Value.CurrentPreviewDrawSubmissions}; target multiview submissions: {result.Value.TargetMultiviewDrawSubmissions}");
+        foreach (var eye in result.Value.Eyes)
+        {
+            Console.WriteLine($"  {eye.Name}: offsetX={eye.OffsetX:F4}, viewport={eye.ViewportX:F0},{eye.ViewportY:F0} {eye.ViewportWidth:F0}x{eye.ViewportHeight:F0}");
+        }
+
+        foreach (var recommendation in result.Value.Recommendations)
+        {
+            Console.WriteLine($"Recommendation: {recommendation}");
+        }
+
+        foreach (var warning in result.Value.Warnings)
+        {
+            Console.WriteLine($"Warning: {warning}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ProbeOpenXrRuntimeAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context)
+    {
+        var result = await registry.ExecuteAsync<ProbeOpenXrRuntimeRequest, ProbeOpenXrRuntimeResult>(
+            "rekall.render.openxr.probe",
+            new ProbeOpenXrRuntimeRequest(),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Loader available: {result.Value.LoaderAvailable}");
+        Console.WriteLine($"Runtime available: {result.Value.RuntimeAvailable}");
+        Console.WriteLine($"Loader: {result.Value.LoaderName ?? "<none>"}");
+        Console.WriteLine($"Extensions: {result.Value.ExtensionCount}");
+        Console.WriteLine($"XR_KHR_vulkan_enable2: {result.Value.VulkanEnable2Available}");
+        Console.WriteLine($"Primary stereo ready: {result.Value.PrimaryStereoReady}");
+        Console.WriteLine($"Headset launch ready: {result.Value.HeadsetLaunchReady}");
+        foreach (var extension in result.Value.InstanceExtensions.Take(12))
+        {
+            Console.WriteLine($"  {extension.Name} v{extension.Version}");
+        }
+
+        foreach (var step in result.Value.RequiredNextSteps)
+        {
+            Console.WriteLine($"Next: {step}");
+        }
+
+        foreach (var error in result.Value.Errors)
+        {
+            Console.WriteLine($"Error: {error}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> BootstrapOpenXrSessionAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context)
+    {
+        var result = await registry.ExecuteAsync<BootstrapOpenXrSessionRequest, BootstrapOpenXrSessionResult>(
+            "rekall.render.openxr.bootstrap_session",
+            new BootstrapOpenXrSessionRequest(),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Loader available: {result.Value.LoaderAvailable}");
+        Console.WriteLine($"Runtime available: {result.Value.RuntimeAvailable}");
+        Console.WriteLine($"Instance created: {result.Value.InstanceCreated}");
+        Console.WriteLine($"HMD system available: {result.Value.HmdSystemAvailable}");
+        Console.WriteLine($"System id: {result.Value.SystemId?.ToString(CultureInfo.InvariantCulture) ?? "<none>"}");
+        Console.WriteLine($"XR_KHR_vulkan_enable2: {result.Value.VulkanEnable2Available}");
+        Console.WriteLine($"Headset session ready: {result.Value.HeadsetSessionReady}");
+        foreach (var extension in result.Value.EnabledExtensions)
+        {
+            Console.WriteLine($"Enabled extension: {extension}");
+        }
+
+        foreach (var extension in result.Value.MissingExtensions)
+        {
+            Console.WriteLine($"Missing extension: {extension}");
+        }
+
+        foreach (var step in result.Value.NextRenderSteps)
+        {
+            Console.WriteLine($"Next: {step}");
+        }
+
+        foreach (var error in result.Value.Errors)
+        {
+            Console.WriteLine($"Error: {error}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectOpenXrHeadsetFramePlanAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string frames,
+        string width,
+        string height)
+    {
+        var frameCount = int.Parse(frames, CultureInfo.InvariantCulture);
+        var viewportWidth = int.Parse(width, CultureInfo.InvariantCulture);
+        var viewportHeight = int.Parse(height, CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<InspectOpenXrHeadsetFramePlanRequest, InspectOpenXrHeadsetFramePlanResult>(
+            "rekall.render.openxr.inspect_headset_frame_plan",
+            new InspectOpenXrHeadsetFramePlanRequest(root, scene, frameCount, viewportWidth, viewportHeight),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Headset session ready: {result.Value.HeadsetSessionReady}");
+        Console.WriteLine($"HMD system available: {result.Value.HmdSystemAvailable}");
+        Console.WriteLine($"System id: {result.Value.SystemId?.ToString(CultureInfo.InvariantCulture) ?? "<none>"}");
+        Console.WriteLine($"Active camera: {result.Value.ActiveCamera ?? "<none>"}");
+        Console.WriteLine($"Stereo enabled: {result.Value.StereoEnabled}");
+        Console.WriteLine($"View configuration: {result.Value.ViewConfiguration}");
+        Console.WriteLine($"Render mode: {result.Value.StereoRenderMode}");
+        Console.WriteLine($"Eyes: {result.Value.EyeCount}; multiview: {result.Value.UsesMultiview}");
+        Console.WriteLine($"Color swapchains: {result.Value.ColorSwapchainCount}; depth swapchains: {result.Value.DepthSwapchainCount}; array size: {result.Value.SwapchainArraySize}");
+        Console.WriteLine($"Recommended eye size: {result.Value.RecommendedEyeWidth}x{result.Value.RecommendedEyeHeight}");
+        Console.WriteLine($"Geometry: {result.Value.VertexCount} vertices, {result.Value.IndexCount} indices, {result.Value.DrawCount} draws");
+        foreach (var call in result.Value.RequiredOpenXrCalls)
+        {
+            Console.WriteLine($"Call: {call}");
+        }
+
+        foreach (var step in result.Value.FrameLoopSteps)
+        {
+            Console.WriteLine($"Frame: {step}");
+        }
+
+        foreach (var blocker in result.Value.Blockers)
+        {
+            Console.WriteLine($"Blocker: {blocker}");
+        }
+
+        foreach (var warning in result.Value.Warnings)
+        {
+            Console.WriteLine($"Warning: {warning}");
         }
 
         return result.Ok ? 0 : 1;

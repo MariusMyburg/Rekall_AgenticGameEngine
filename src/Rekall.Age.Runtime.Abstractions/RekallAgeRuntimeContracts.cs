@@ -202,7 +202,13 @@ public sealed record RekallAgeRuntimeRenderCamera(
     double OrthographicSize = 10,
     double NearClip = 0.05,
     double FarClip = 1000,
-    string ClearColor = "#101820");
+    string ClearColor = "#101820",
+    string StereoMode = "mono",
+    string StereoRenderMode = "single-pass-multiview",
+    double InterpupillaryDistance = 0.064,
+    double StereoConvergenceDistance = 10,
+    string XrViewConfiguration = "primary-stereo",
+    bool FoveatedRendering = false);
 
 public sealed record RekallAgeRuntimeRenderSprite(
     string EntityId,

@@ -61,6 +61,16 @@ public sealed class ModuleMetadataTests
         var pointLight = Assert.Single(module.Components, component => component.DisplayName == "Point Light");
         Assert.Contains(pointLight.Properties, property => property.Name == "Intensity" && property.Minimum == 0);
         Assert.Contains(pointLight.Properties, property => property.Name == "Color" && property.Kind == "color");
+        var multiplayerSession = Assert.Single(module.Components, component => component.DisplayName == "Multiplayer Session");
+        Assert.Contains(multiplayerSession.Properties, property => property.Name == "TickRate" && property.Minimum == 1);
+        Assert.Contains(multiplayerSession.Properties, property => property.Name == "SnapshotRate" && property.Minimum == 1);
+        Assert.Contains(multiplayerSession.Properties, property => property.Name == "ClientPrediction" && property.Kind == "boolean");
+        var networkIdentity = Assert.Single(module.Components, component => component.DisplayName == "Network Identity");
+        Assert.Contains(networkIdentity.Properties, property => property.Name == "NetworkId" && property.Kind == "string");
+        Assert.Contains(networkIdentity.Properties, property => property.Name == "OwnerClientId" && property.Kind == "string");
+        var networkTransform = Assert.Single(module.Components, component => component.DisplayName == "Network Transform");
+        Assert.Contains(networkTransform.Properties, property => property.Name == "ReplicatePosition" && property.Kind == "boolean");
+        Assert.Contains(networkTransform.Properties, property => property.Name == "Priority" && property.Minimum == 0);
         var geometry = Assert.Single(module.Components, component => component.DisplayName == "Geometry Primitive");
         Assert.Contains(geometry.Properties, property => property.Name == "Primitive" && property.Kind == "string");
         Assert.Contains(geometry.Properties, property => property.Name == "Color" && property.Kind == "color");
@@ -68,6 +78,10 @@ public sealed class ModuleMetadataTests
         Assert.Contains(mesh.Properties, property => property.Name == "Vertices" && property.Kind == "geometryVertices");
         Assert.Contains(mesh.Properties, property => property.Name == "Indices" && property.Kind == "geometryIndices");
         Assert.Contains(mesh.Properties, property => property.Name == "Color" && property.Kind == "color");
+        var lines = Assert.Single(module.Components, component => component.DisplayName == "Line Segments");
+        Assert.Contains(lines.Properties, property => property.Name == "Segments" && property.Kind == "lineSegments");
+        Assert.Contains(lines.Properties, property => property.Name == "Thickness" && property.Minimum == 0.0001);
+        Assert.Contains(lines.Properties, property => property.Name == "Color" && property.Kind == "color");
         var extrusion = Assert.Single(module.Components, component => component.DisplayName == "Geometry Extrusion");
         Assert.Contains(extrusion.Properties, property => property.Name == "Profile" && property.Kind == "geometryProfile");
         Assert.Contains(extrusion.Properties, property => property.Name == "Depth" && property.Kind == "number");

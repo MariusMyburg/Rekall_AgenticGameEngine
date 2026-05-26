@@ -67,6 +67,11 @@ internal static class RekallAgeMcpToolClassifier
             return "live";
         }
 
+        if (name.StartsWith("rekall.multiplayer.", StringComparison.Ordinal))
+        {
+            return "multiplayer";
+        }
+
         if (name.StartsWith("rekall.play", StringComparison.Ordinal))
         {
             return "playtesting";
@@ -100,6 +105,10 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.live.reload_assets" or
             "rekall.live.apply_scene_blueprint" or
             "rekall.live.apply_scene_diff" or
+            "rekall.multiplayer.status" or
+            "rekall.multiplayer.connect" or
+            "rekall.multiplayer.submit_input" or
+            "rekall.multiplayer.snapshot" or
             "rekall.solar.import_ksa_system" or
             "rekall.templates.inspect" or
             "rekall.workflow.create_playable_package_from_template" or
@@ -119,7 +128,12 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.live.apply_scene_diff" => 18,
             "rekall.live.reload_scene" => 19,
             "rekall.live.reload_assets" => 20,
-            "rekall.solar.import_ksa_system" => 21,
+            "rekall.multiplayer.status" => 21,
+            "rekall.multiplayer.connect" => 22,
+            "rekall.multiplayer.submit_input" => 23,
+            "rekall.multiplayer.tick" => 24,
+            "rekall.multiplayer.snapshot" => 25,
+            "rekall.solar.import_ksa_system" => 26,
             "rekall.templates.verify_mvp" => 20,
             "rekall.scene.apply_blueprint" => 42,
             _ when name.StartsWith("rekall.workflow.", StringComparison.Ordinal) => 30,
@@ -129,6 +143,7 @@ internal static class RekallAgeMcpToolClassifier
             _ when name.StartsWith("rekall.module.", StringComparison.Ordinal) => 50,
             _ when name.StartsWith("rekall.shader.", StringComparison.Ordinal) => 60,
             _ when name.StartsWith("rekall.render.", StringComparison.Ordinal) => 70,
+            _ when name.StartsWith("rekall.multiplayer.", StringComparison.Ordinal) => 75,
             _ => 100
         };
     }

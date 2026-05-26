@@ -37,7 +37,7 @@ internal static class RekallAgeCli
         Log.Information("Rekall AGE command starting. Args={Args}", string.Join(' ', args));
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|context|transaction|capture|render|module|build|templates|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|transaction|capture|render|module|build|templates|mcp> ...");
             Log.Information("Rekall AGE command finished with usage error. LogDirectory={LogDirectory}", logDirectory);
             Log.CloseAndFlush();
             return 2;
@@ -243,6 +243,17 @@ internal static class RekallAgeCli
                 ["run", "scene", var root, var scene, var seconds, var inputsJson] => await RunSceneAsync(registry, context, root, scene, seconds, inputsJson),
                 ["runtime", "inspect", var root, var scene, var frames] => await InspectRuntimeAsync(registry, context, root, scene, frames, null),
                 ["runtime", "inspect", var root, var scene, var frames, var inputsJson] => await InspectRuntimeAsync(registry, context, root, scene, frames, inputsJson),
+                ["multiplayer", "host", var root, var scene] => await MultiplayerHostAsync(registry, context, root, scene, "30"),
+                ["multiplayer", "host", var root, var scene, var durationSeconds] => await MultiplayerHostAsync(registry, context, root, scene, durationSeconds),
+                ["multiplayer", "status", var root, var scene] => await MultiplayerStatusAsync(registry, context, root, scene),
+                ["multiplayer", "connect", var root, var scene, var clientId] => await MultiplayerConnectAsync(registry, context, root, scene, clientId, null),
+                ["multiplayer", "connect", var root, var scene, var clientId, var displayName] => await MultiplayerConnectAsync(registry, context, root, scene, clientId, displayName),
+                ["multiplayer", "disconnect", var root, var scene, var clientId] => await MultiplayerDisconnectAsync(registry, context, root, scene, clientId),
+                ["multiplayer", "input", var root, var scene, var clientId, var sequence, var networkId, var inputJson] =>
+                    await MultiplayerSubmitInputAsync(registry, context, root, scene, clientId, sequence, networkId, inputJson),
+                ["multiplayer", "tick", var root, var scene] => await MultiplayerTickAsync(registry, context, root, scene, "1"),
+                ["multiplayer", "tick", var root, var scene, var ticks] => await MultiplayerTickAsync(registry, context, root, scene, ticks),
+                ["multiplayer", "snapshot", var root, var scene] => await MultiplayerSnapshotAsync(registry, context, root, scene),
                 ["context", "engine"] => await PrintEngineStatusAsync(registry, context),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
@@ -401,6 +412,13 @@ internal static class RekallAgeCli
         registry.Register(new PlaytestSceneCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new InspectSceneRuntimeCommand());
+        registry.Register(new MultiplayerHostCommand());
+        registry.Register(new MultiplayerStatusCommand());
+        registry.Register(new MultiplayerConnectCommand());
+        registry.Register(new MultiplayerDisconnectCommand());
+        registry.Register(new MultiplayerSubmitInputCommand());
+        registry.Register(new MultiplayerTickCommand());
+        registry.Register(new MultiplayerSnapshotCommand());
         registry.Register(new LivePlayerStatusCommand());
         registry.Register(new LivePlayerReloadSceneCommand());
         registry.Register(new LivePlayerReloadAssetsCommand());
@@ -2357,6 +2375,150 @@ internal static class RekallAgeCli
         return result.Ok ? 0 : 1;
     }
 
+    private static async Task<int> MultiplayerHostAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string durationSeconds)
+    {
+        var duration = double.Parse(durationSeconds, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<MultiplayerHostRequest, MultiplayerHostResult>(
+            "rekall.multiplayer.host",
+            new MultiplayerHostRequest(root, scene, duration),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Transport: {result.Value.Transport}");
+        Console.WriteLine($"Pipe: {result.Value.PipeName}");
+        Console.WriteLine($"Endpoint: {result.Value.Endpoint}");
+        Console.WriteLine($"Session: {result.Value.SessionId}");
+        Console.WriteLine($"Scene: {result.Value.SceneName}");
+        Console.WriteLine($"Duration: {result.Value.DurationSeconds:F1}s");
+        Console.WriteLine($"Network entities: {result.Value.NetworkEntityCount}");
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> MultiplayerStatusAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene)
+    {
+        var result = await registry.ExecuteAsync<MultiplayerStatusRequest, MultiplayerCommandResult>(
+            "rekall.multiplayer.status",
+            new MultiplayerStatusRequest(root, scene),
+            context);
+        PrintMultiplayerResult(result.Value);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> MultiplayerConnectAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string clientId,
+        string? displayName)
+    {
+        var result = await registry.ExecuteAsync<MultiplayerConnectRequest, MultiplayerCommandResult>(
+            "rekall.multiplayer.connect",
+            new MultiplayerConnectRequest(root, scene, clientId, displayName),
+            context);
+        PrintMultiplayerResult(result.Value);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> MultiplayerDisconnectAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string clientId)
+    {
+        var result = await registry.ExecuteAsync<MultiplayerDisconnectRequest, MultiplayerCommandResult>(
+            "rekall.multiplayer.disconnect",
+            new MultiplayerDisconnectRequest(root, scene, clientId),
+            context);
+        PrintMultiplayerResult(result.Value);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> MultiplayerSubmitInputAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string clientId,
+        string sequence,
+        string networkId,
+        string inputJson)
+    {
+        var parsedSequence = int.Parse(sequence, System.Globalization.CultureInfo.InvariantCulture);
+        var input = await ParseRuntimeInputFrameAsync(inputJson, context.CancellationToken);
+        var result = await registry.ExecuteAsync<MultiplayerSubmitInputRequest, MultiplayerCommandResult>(
+            "rekall.multiplayer.submit_input",
+            new MultiplayerSubmitInputRequest(root, scene, clientId, parsedSequence, networkId, input),
+            context);
+        PrintMultiplayerResult(result.Value);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> MultiplayerTickAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string ticks)
+    {
+        var parsedTicks = int.Parse(ticks, System.Globalization.CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<MultiplayerTickRequest, MultiplayerCommandResult>(
+            "rekall.multiplayer.tick",
+            new MultiplayerTickRequest(root, scene, parsedTicks),
+            context);
+        PrintMultiplayerResult(result.Value);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> MultiplayerSnapshotAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene)
+    {
+        var result = await registry.ExecuteAsync<MultiplayerSnapshotRequest, MultiplayerCommandResult>(
+            "rekall.multiplayer.snapshot",
+            new MultiplayerSnapshotRequest(root, scene),
+            context);
+        PrintMultiplayerResult(result.Value);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static void PrintMultiplayerResult(MultiplayerCommandResult result)
+    {
+        Console.WriteLine(result.Message);
+        Console.WriteLine($"Transport: {result.Transport}");
+        Console.WriteLine($"Pipe: {result.PipeName}");
+        Console.WriteLine($"Endpoint: {result.Endpoint}");
+        Console.WriteLine($"Session: {result.SessionId ?? "(none)"}");
+        Console.WriteLine($"Operation: {result.Operation}");
+        Console.WriteLine($"Connected: {result.Connected}");
+        Console.WriteLine($"Applied: {result.Applied}");
+        if (result.Reason is not null)
+        {
+            Console.WriteLine($"Accepted: {result.Accepted} ({result.Reason})");
+        }
+
+        Console.WriteLine($"Server tick: {result.ServerTick}");
+        Console.WriteLine($"Server time: {result.ServerTimeSeconds:F3}s");
+        Console.WriteLine($"Clients: {result.ClientCount}");
+        Console.WriteLine($"Network entities: {result.EntityCount}");
+        if (result.Snapshot is not null)
+        {
+            Console.WriteLine($"Snapshot entities: {result.Snapshot.Entities.Count}");
+            Console.WriteLine($"Ack clients: {result.Snapshot.LastProcessedInputSequenceByClient.Count}");
+        }
+    }
+
     private static async Task<int> CaptureRuntimeViewportAsync(
         RekallAgeCommandRegistry registry,
         RekallAgeCommandContext context,
@@ -2553,6 +2715,26 @@ internal static class RekallAgeCli
         catch (System.Text.Json.JsonException ex)
         {
             throw new ArgumentException($"Runtime input frames JSON is invalid: {ex.Message}", ex);
+        }
+    }
+
+    private static async ValueTask<RekallAgeRuntimeInputFrame> ParseRuntimeInputFrameAsync(
+        string inputJson,
+        CancellationToken cancellationToken)
+    {
+        var payload = File.Exists(inputJson)
+            ? await File.ReadAllTextAsync(inputJson, cancellationToken)
+            : inputJson;
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<RekallAgeRuntimeInputFrame>(
+                payload,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? new RekallAgeRuntimeInputFrame();
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new ArgumentException($"Runtime input frame JSON is invalid: {ex.Message}", ex);
         }
     }
 

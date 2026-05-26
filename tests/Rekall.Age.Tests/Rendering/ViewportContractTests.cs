@@ -442,6 +442,55 @@ public sealed class ViewportContractTests
     }
 
     [Fact]
+    public void RuntimeFrameBuilderProjectsAgentAuthoredLineSegments()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Debug Axes", ["debug", "lines"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = 3,
+                    ["y"] = 4,
+                    ["z"] = 5,
+                    ["yaw"] = 15,
+                    ["scaleX"] = 2,
+                    ["scaleY"] = 2,
+                    ["scaleZ"] = 2
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.LineSegments", new JsonObject
+                {
+                    ["color"] = "#33ddff88",
+                    ["thickness"] = 0.04,
+                    ["segments"] = new JsonArray
+                    {
+                        new JsonObject { ["fromX"] = 0, ["fromY"] = 0, ["fromZ"] = 0, ["toX"] = 1, ["toY"] = 0, ["toZ"] = 0 },
+                        new JsonObject { ["fromX"] = 0, ["fromY"] = 0, ["fromZ"] = 0, ["toX"] = 0, ["toY"] = 1, ["toZ"] = 0 },
+                        new JsonObject { ["fromX"] = 0, ["fromY"] = 0, ["fromZ"] = 0, ["toX"] = 0, ["toY"] = 0, ["toZ"] = 1 }
+                    }
+                })));
+        var world = new RekallAgeRuntimeProjectionBuilder().Project(new RekallAgeRuntimeWorldBuilder().Build(scene));
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var renderable = Assert.Single(frame.Renderables, item => item.EntityName == "Debug Axes");
+        Assert.Equal("mesh", renderable.Kind);
+        Assert.Equal("rekall.geometry.lines", renderable.Variant);
+        Assert.Equal("#33ddff88", renderable.MaterialColor);
+        Assert.Equal(150, renderable.SortKey);
+        Assert.Equal(3, renderable.X);
+        Assert.Equal(4, renderable.Y);
+        Assert.Equal(5, renderable.Z);
+        Assert.Equal(15, renderable.RotationY);
+        Assert.Equal(2, renderable.ScaleX);
+        Assert.Null(renderable.GeometryMesh);
+        Assert.NotNull(renderable.LineSegments);
+        Assert.Equal(0.04, renderable.LineSegments!.Thickness);
+        Assert.Equal(3, renderable.LineSegments.Segments.Count);
+        Assert.Contains(renderable.LineSegments.Segments, segment =>
+            segment.FromX == 0 && segment.FromY == 0 && segment.FromZ == 0
+            && segment.ToX == 0 && segment.ToY == 0 && segment.ToZ == 1);
+    }
+
+    [Fact]
     public void RuntimeFrameBuilderAddsColliderDebugRenderablesWhenDebugOverlayIsEnabled()
     {
         var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "physics3d"])

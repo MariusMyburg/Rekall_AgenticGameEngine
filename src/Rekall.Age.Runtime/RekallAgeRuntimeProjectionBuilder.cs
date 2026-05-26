@@ -20,6 +20,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         var animationPlayers = new List<RekallAgeRuntimeAnimationPlayer>();
         var canvases = new List<RekallAgeRuntimeUiCanvas>();
         var elements = new List<RekallAgeRuntimeUiElement>();
+        var networkSessions = new List<RekallAgeRuntimeNetworkSession>();
+        var networkEntities = new List<RekallAgeRuntimeNetworkEntity>();
         var observations = new List<RekallAgeRuntimeObservation>(world.Observations);
 
         foreach (var entity in world.Entities)
@@ -96,6 +98,46 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                                 ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
                         }
 
+                        break;
+                    case "Rekall.LineSegments":
+                        meshes.Add(new RekallAgeRuntimeRenderMesh(
+                            entity.Id,
+                            entity.Name,
+                            null,
+                            Variant: "rekall.geometry.lines",
+                            MaterialColor: ReadString(component.Properties, "color"),
+                            SortKey: 150,
+                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn));
+                        break;
+                    case "Rekall.MultiplayerSession":
+                        networkSessions.Add(new RekallAgeRuntimeNetworkSession(
+                            entity.Id,
+                            entity.Name,
+                            NormalizeNetworkMode(ReadString(component.Properties, "role"), "server"),
+                            NormalizeNetworkMode(ReadString(component.Properties, "authority"), "server"),
+                            ClampInt(ReadInt32(component.Properties, "tickRate", 60), 1, 240),
+                            ClampInt(ReadInt32(component.Properties, "snapshotRate", 20), 1, 240),
+                            Math.Max(1, ReadInt32(component.Properties, "maxPlayers", 8)),
+                            NormalizeNetworkMode(ReadString(component.Properties, "transport"), "loopback"),
+                            ReadString(component.Properties, "address") ?? "127.0.0.1",
+                            ClampInt(ReadInt32(component.Properties, "port", 7777), 1, 65535),
+                            ReadBoolean(component.Properties, "clientPrediction", true),
+                            Math.Max(0, ReadInt32(component.Properties, "interpolationDelayMilliseconds", 100))));
+                        break;
+                    case "Rekall.NetworkIdentity":
+                        var networkTransform = entity.Components.FirstOrDefault(candidate =>
+                            candidate.Type.Equals("Rekall.NetworkTransform", StringComparison.Ordinal));
+                        networkEntities.Add(new RekallAgeRuntimeNetworkEntity(
+                            entity.Id,
+                            entity.Name,
+                            ReadString(component.Properties, "networkId") ?? entity.Id,
+                            EmptyToNull(ReadString(component.Properties, "ownerClientId")),
+                            NormalizeNetworkMode(ReadString(component.Properties, "authority"), "server"),
+                            ReadBooleanOptional(networkTransform?.Properties, "replicatePosition", true),
+                            ReadBooleanOptional(networkTransform?.Properties, "replicateRotation", true),
+                            ReadBooleanOptional(networkTransform?.Properties, "replicateScale", true),
+                            NormalizeNetworkMode(ReadStringOptional(networkTransform?.Properties, "prediction"), "interpolated"),
+                            Math.Max(0, ReadInt32Optional(networkTransform?.Properties, "priority", 0))));
                         break;
                     case "Rekall.PlanetRenderer":
                         meshes.Add(new RekallAgeRuntimeRenderMesh(
@@ -292,7 +334,10 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                     Sort(elements),
                     elements.Count(element => element.Interactive)))
                 {
-                    Input = world.Subsystems.Input
+                    Input = world.Subsystems.Input,
+                    Multiplayer = new RekallAgeRuntimeMultiplayerView(
+                        Sort(networkSessions),
+                        Sort(networkEntities))
                 },
             Observations = observations
                 .OrderBy(observation => observation.Severity, StringComparer.Ordinal)
@@ -381,6 +426,10 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             "Rekall.MeshSet" or
             "Rekall.GeometryPrimitive" or
             "Rekall.GeometryMesh" or
+            "Rekall.LineSegments" or
+            "Rekall.MultiplayerSession" or
+            "Rekall.NetworkIdentity" or
+            "Rekall.NetworkTransform" or
             "Rekall.PlanetRenderer" or
             "Rekall.AtmosphereRenderer" or
             "Rekall.OrbitPathRenderer" or
@@ -395,6 +444,23 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         return TryGetPropertyValue(properties, name, out var node) && node is JsonValue value
             ? value.TryGetValue<string>(out var text) ? text : null
             : null;
+    }
+
+    private static string? ReadStringOptional(JsonObject? properties, string name)
+    {
+        return properties is null ? null : ReadString(properties, name);
+    }
+
+    private static string NormalizeNetworkMode(string? value, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? fallback
+            : value.Trim().ToLowerInvariant();
+    }
+
+    private static string? EmptyToNull(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     private static bool ReadBoolean(JsonObject properties, string name, bool fallback)
@@ -417,6 +483,11 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         return fallback;
     }
 
+    private static bool ReadBooleanOptional(JsonObject? properties, string name, bool fallback)
+    {
+        return properties is null ? fallback : ReadBoolean(properties, name, fallback);
+    }
+
     private static int ReadInt32(JsonObject properties, string name, int fallback)
     {
         if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
@@ -435,6 +506,16 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         }
 
         return fallback;
+    }
+
+    private static int ReadInt32Optional(JsonObject? properties, string name, int fallback)
+    {
+        return properties is null ? fallback : ReadInt32(properties, name, fallback);
+    }
+
+    private static int ClampInt(int value, int min, int max)
+    {
+        return Math.Min(max, Math.Max(min, value));
     }
 
     private static double ReadNumber(JsonObject properties, string name, double fallback)
@@ -512,6 +593,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             RekallAgeRuntimeAnimationPlayer value => value.EntityName,
             RekallAgeRuntimeUiCanvas value => value.EntityName,
             RekallAgeRuntimeUiElement value => value.EntityName,
+            RekallAgeRuntimeNetworkSession value => value.EntityName,
+            RekallAgeRuntimeNetworkEntity value => value.EntityName,
             _ => string.Empty
         };
     }
@@ -532,6 +615,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             RekallAgeRuntimeAnimationPlayer value => value.EntityId,
             RekallAgeRuntimeUiCanvas value => value.EntityId,
             RekallAgeRuntimeUiElement value => value.EntityId,
+            RekallAgeRuntimeNetworkSession value => value.EntityId,
+            RekallAgeRuntimeNetworkEntity value => value.EntityId,
             _ => string.Empty
         };
     }

@@ -114,6 +114,9 @@ public sealed record RekallAgeRuntimeSubsystemViews(
 {
     public RekallAgeRuntimeInputView Input { get; init; } = RekallAgeRuntimeInputView.Empty;
 
+    public RekallAgeRuntimeMultiplayerView Multiplayer { get; init; } =
+        RekallAgeRuntimeMultiplayerView.Empty;
+
     public static RekallAgeRuntimeSubsystemViews Empty { get; } = new(
         RekallAgeRuntimeRenderView.Empty,
         RekallAgeRuntimePhysicsView.Empty,
@@ -137,6 +140,41 @@ public sealed record RekallAgeRuntimeInputAction(
     bool WasReleased,
     string SourceEntityId,
     string SourceEntityName);
+
+public sealed record RekallAgeRuntimeMultiplayerView(
+    IReadOnlyList<RekallAgeRuntimeNetworkSession> Sessions,
+    IReadOnlyList<RekallAgeRuntimeNetworkEntity> Entities)
+{
+    public static RekallAgeRuntimeMultiplayerView Empty { get; } = new(
+        Array.Empty<RekallAgeRuntimeNetworkSession>(),
+        Array.Empty<RekallAgeRuntimeNetworkEntity>());
+}
+
+public sealed record RekallAgeRuntimeNetworkSession(
+    string EntityId,
+    string EntityName,
+    string Role,
+    string Authority,
+    int TickRate,
+    int SnapshotRate,
+    int MaxPlayers,
+    string Transport,
+    string Address,
+    int Port,
+    bool ClientPrediction,
+    int InterpolationDelayMilliseconds);
+
+public sealed record RekallAgeRuntimeNetworkEntity(
+    string EntityId,
+    string EntityName,
+    string NetworkId,
+    string? OwnerClientId,
+    string Authority,
+    bool ReplicatePosition,
+    bool ReplicateRotation,
+    bool ReplicateScale,
+    string Prediction,
+    int Priority);
 
 public sealed record RekallAgeRuntimeRenderView(
     IReadOnlyList<RekallAgeRuntimeRenderCamera> Cameras,

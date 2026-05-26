@@ -64,6 +64,13 @@ public sealed class McpCatalogTests
         registry.Register(new LivePlayerReloadAssetsCommand());
         registry.Register(new LivePlayerApplySceneBlueprintCommand());
         registry.Register(new LivePlayerApplySceneDiffCommand());
+        registry.Register(new MultiplayerHostCommand());
+        registry.Register(new MultiplayerStatusCommand());
+        registry.Register(new MultiplayerConnectCommand());
+        registry.Register(new MultiplayerDisconnectCommand());
+        registry.Register(new MultiplayerSubmitInputCommand());
+        registry.Register(new MultiplayerTickCommand());
+        registry.Register(new MultiplayerSnapshotCommand());
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
@@ -110,6 +117,13 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.live.reload_assets");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.live.apply_scene_blueprint");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.live.apply_scene_diff");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.host");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.status");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.connect");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.disconnect");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.submit_input");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.tick");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.snapshot");
 
         var oneShot = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.create_playable_package_from_template");
         Assert.Equal("workflow", oneShot.Category);
@@ -141,6 +155,9 @@ public sealed class McpCatalogTests
         var liveTool = catalog.Tools.Single(tool => tool.Name == "rekall.live.status");
         Assert.Equal("live", liveTool.Category);
         Assert.True(liveTool.Recommended);
+        var multiplayerTool = catalog.Tools.Single(tool => tool.Name == "rekall.multiplayer.status");
+        Assert.Equal("multiplayer", multiplayerTool.Category);
+        Assert.True(multiplayerTool.Recommended);
         Assert.Equal("rekall.context.engine_status", catalog.Tools[0].Name);
         Assert.True(catalog.Tools.Index().All(item => item.Index == 0 || catalog.Tools[item.Index - 1].AgentPriority <= item.Item.AgentPriority));
     }

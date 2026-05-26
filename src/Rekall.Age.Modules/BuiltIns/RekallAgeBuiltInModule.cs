@@ -14,8 +14,12 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeCameraTarget3DComponent>();
         builder.RegisterComponent<RekallAgeDirectionalLightComponent>();
         builder.RegisterComponent<RekallAgePointLightComponent>();
+        builder.RegisterComponent<RekallAgeMultiplayerSessionComponent>();
+        builder.RegisterComponent<RekallAgeNetworkIdentityComponent>();
+        builder.RegisterComponent<RekallAgeNetworkTransformComponent>();
         builder.RegisterComponent<RekallAgeGeometryPrimitiveComponent>();
         builder.RegisterComponent<RekallAgeGeometryMeshComponent>();
+        builder.RegisterComponent<RekallAgeLineSegmentsComponent>();
         builder.RegisterComponent<RekallAgeGeometryExtrusionComponent>();
         builder.RegisterComponent<RekallAgeMaterialComponent>();
         builder.RegisterComponent<RekallAgePhysicsWorld3DComponent>();
@@ -201,6 +205,72 @@ public sealed class RekallAgePointLightComponent : RekallAgeComponent
     public string Color { get; init; } = "#ffffff";
 }
 
+[RekallAgeComponent("Multiplayer Session")]
+public sealed class RekallAgeMultiplayerSessionComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public string Role { get; init; } = "server";
+
+    [RekallAgeProperty]
+    public string Authority { get; init; } = "server";
+
+    [RekallAgeProperty(Minimum = 1, Maximum = 240)]
+    public int TickRate { get; init; } = 60;
+
+    [RekallAgeProperty(Minimum = 1, Maximum = 240)]
+    public int SnapshotRate { get; init; } = 20;
+
+    [RekallAgeProperty(Minimum = 1)]
+    public int MaxPlayers { get; init; } = 8;
+
+    [RekallAgeProperty]
+    public string Transport { get; init; } = "loopback";
+
+    [RekallAgeProperty]
+    public string Address { get; init; } = "127.0.0.1";
+
+    [RekallAgeProperty(Minimum = 1, Maximum = 65535)]
+    public int Port { get; init; } = 7777;
+
+    [RekallAgeProperty]
+    public bool ClientPrediction { get; init; } = true;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public int InterpolationDelayMilliseconds { get; init; } = 100;
+}
+
+[RekallAgeComponent("Network Identity")]
+public sealed class RekallAgeNetworkIdentityComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public string NetworkId { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public string OwnerClientId { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public string Authority { get; init; } = "server";
+}
+
+[RekallAgeComponent("Network Transform")]
+public sealed class RekallAgeNetworkTransformComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool ReplicatePosition { get; init; } = true;
+
+    [RekallAgeProperty]
+    public bool ReplicateRotation { get; init; } = true;
+
+    [RekallAgeProperty]
+    public bool ReplicateScale { get; init; } = true;
+
+    [RekallAgeProperty]
+    public string Prediction { get; init; } = "interpolated";
+
+    [RekallAgeProperty(Minimum = 0)]
+    public int Priority { get; init; } = 0;
+}
+
 [RekallAgeComponent("Geometry Primitive")]
 public sealed class RekallAgeGeometryPrimitiveComponent : RekallAgeComponent
 {
@@ -242,6 +312,30 @@ public sealed record RekallAgeGeometryMeshVertex(
     double A = double.NaN,
     double U = 0,
     double V = 0);
+
+[RekallAgeComponent("Line Segments")]
+public sealed class RekallAgeLineSegmentsComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Kind = "lineSegments")]
+    public RekallAgeLineSegment[] Segments { get; init; } =
+    [
+        new(0, 0, 0, 1, 0, 0)
+    ];
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Thickness { get; init; } = 0.02;
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#33ddff";
+}
+
+public sealed record RekallAgeLineSegment(
+    double FromX,
+    double FromY,
+    double FromZ,
+    double ToX,
+    double ToY,
+    double ToZ);
 
 [RekallAgeComponent("Geometry Extrusion")]
 public sealed class RekallAgeGeometryExtrusionComponent : RekallAgeComponent

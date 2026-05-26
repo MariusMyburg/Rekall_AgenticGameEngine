@@ -113,6 +113,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 component.Type.Equals("Rekall.GeometryPrimitive", StringComparison.Ordinal));
             var geometryMeshComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.GeometryMesh", StringComparison.Ordinal));
+            var lineSegmentsComponent = entity?.Components.FirstOrDefault(component =>
+                component.Type.Equals("Rekall.LineSegments", StringComparison.Ordinal));
             var orbitComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.KeplerOrbit", StringComparison.Ordinal));
             var orbitPathComponent = entity?.Components.FirstOrDefault(component =>
@@ -121,9 +123,11 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             var primitive = ReadString(geometry, "primitive");
             var orbitPathMesh = isOrbitPathRenderable ? ReadOrbitPathMesh(orbitComponent, orbitPathComponent) : null;
             var geometryMesh = orbitPathMesh ?? ReadGeometryMesh(geometryMeshComponent);
+            var lineSegments = ReadLineSegments(lineSegmentsComponent);
             var materialColor = ReadString(materialComponent, "baseColor")
                 ?? ReadString(materialComponent, "color")
                 ?? ReadString(orbitPathComponent, "color")
+                ?? ReadString(lineSegmentsComponent, "color")
                 ?? ReadString(geometryMeshComponent, "color")
                 ?? ReadString(geometry, "color");
             var textureAssetId = ReadString(materialComponent, "baseColorTexture")
@@ -188,7 +192,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 EmissiveStrength: orbitPathMesh is not null
                     ? ReadNumber(orbitPathComponent, "emissiveStrength", 1.4)
                     : ReadNumber(materialComponent, "emissiveStrength", ReadNumber(planetComponent, "emissiveStrength", 0)),
-                ShaderPipeline: ToViewportShaderPipeline(mesh.ShaderPipeline) ?? ReadShaderPipeline(meshRendererComponent));
+                ShaderPipeline: ToViewportShaderPipeline(mesh.ShaderPipeline) ?? ReadShaderPipeline(meshRendererComponent),
+                LineSegments: lineSegments);
         }
 
         foreach (var light in world.Subsystems.Rendering.Lights)
@@ -616,6 +621,44 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             : new RekallAgeRuntimeViewportShaderPipeline(
                 pipeline.VertexShader.Trim(),
                 pipeline.FragmentShader.Trim());
+    }
+
+    private static RekallAgeRuntimeViewportLineSegments? ReadLineSegments(RekallAgeRuntimeComponent? component)
+    {
+        if (component is null
+            || !TryGetPropertyValue(component.Properties, "segments", out var segmentsNode)
+            || segmentsNode is not JsonArray segmentsArray)
+        {
+            return null;
+        }
+
+        var segments = new List<RekallAgeRuntimeViewportLineSegment>(segmentsArray.Count);
+        foreach (var node in segmentsArray)
+        {
+            if (node is not JsonObject segment)
+            {
+                continue;
+            }
+
+            var fromX = ReadNumber(segment, "fromX", 0);
+            var fromY = ReadNumber(segment, "fromY", 0);
+            var fromZ = ReadNumber(segment, "fromZ", 0);
+            var toX = ReadNumber(segment, "toX", 0);
+            var toY = ReadNumber(segment, "toY", 0);
+            var toZ = ReadNumber(segment, "toZ", 0);
+            if (Math.Abs(toX - fromX) + Math.Abs(toY - fromY) + Math.Abs(toZ - fromZ) <= 0.000001)
+            {
+                continue;
+            }
+
+            segments.Add(new RekallAgeRuntimeViewportLineSegment(fromX, fromY, fromZ, toX, toY, toZ));
+        }
+
+        return segments.Count == 0
+            ? null
+            : new RekallAgeRuntimeViewportLineSegments(
+                segments,
+                Math.Max(0.0001, ReadNumber(component, "thickness", 0.02)));
     }
 
     private static RekallAgeRuntimeViewportGeometryMesh? ReadGeometryMesh(RekallAgeRuntimeComponent? component)

@@ -1304,7 +1304,8 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
                 width,
                 height,
                 viewProjection,
-                camera.ClearColor);
+                camera.ClearColor,
+                sceneFrame.Textures);
             var formatted = PreparePixelsForSwapchain(rgba, swapchainFormat);
             System.Buffer.BlockCopy(formatted, 0, stereo, eye * layerBytes, layerBytes);
         }

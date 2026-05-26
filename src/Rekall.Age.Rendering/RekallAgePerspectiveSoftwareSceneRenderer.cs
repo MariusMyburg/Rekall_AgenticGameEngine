@@ -11,7 +11,8 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
         int width,
         int height,
         Matrix4x4 viewProjection,
-        string? clearColor = null)
+        string? clearColor = null,
+        IReadOnlyDictionary<string, RekallAgeRgbaImage>? textures = null)
     {
         if (width <= 0)
         {
@@ -58,8 +59,24 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
                 var normal = Vector3.Normalize(Vector3.Cross(worldB - worldA, worldC - worldA));
                 var light = Vector3.Normalize(-batch.Frame.LightDirection);
                 var shade = Math.Clamp(0.35f + MathF.Max(0, Vector3.Dot(normal, light)) * 0.75f, 0.22f, 1.15f);
-                var color = Average(a.Value.Color, b.Value.Color, c.Value.Color, shade);
-                DrawTriangle(pixels, depth, width, height, screenA, screenB, screenC, color);
+                var texture = textures is not null
+                    && draw.TextureId is not null
+                    && textures.TryGetValue(draw.TextureId, out var resolvedTexture)
+                        ? resolvedTexture
+                        : null;
+                DrawTriangle(
+                    pixels,
+                    depth,
+                    width,
+                    height,
+                    screenA,
+                    screenB,
+                    screenC,
+                    a.Value,
+                    b.Value,
+                    c.Value,
+                    texture,
+                    shade);
             }
         }
 
@@ -109,7 +126,8 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
         var vertex = batch.Vertices[index];
         return new SceneVertex(
             new Vector3(vertex.X, vertex.Y, vertex.Z),
-            new Vector4(vertex.R, vertex.G, vertex.B, vertex.A));
+            new Vector4(vertex.R, vertex.G, vertex.B, vertex.A),
+            new Vector2(vertex.U, vertex.V));
     }
 
     private static bool TryProject(Vector4 clip, int width, int height, out ScreenVertex vertex)
@@ -143,7 +161,11 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
         ScreenVertex a,
         ScreenVertex b,
         ScreenVertex c,
-        Rgba color)
+        SceneVertex vertexA,
+        SceneVertex vertexB,
+        SceneVertex vertexC,
+        RekallAgeRgbaImage? texture,
+        float shade)
     {
         var area = Edge(a.X, a.Y, b.X, b.Y, c.X, c.Y);
         if (MathF.Abs(area) < 0.00001f)
@@ -182,6 +204,9 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
                 }
 
                 depth[depthIndex] = z;
+                var color = texture is not null
+                    ? Sample(texture, vertexA.Uv * alpha + vertexB.Uv * beta + vertexC.Uv * gamma, shade)
+                    : Average(vertexA.Color, vertexB.Color, vertexC.Color, shade);
                 var pixelIndex = depthIndex * 4;
                 pixels[pixelIndex + 0] = color.R;
                 pixels[pixelIndex + 1] = color.G;
@@ -203,6 +228,25 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
             ToByte((a.Y + b.Y + c.Y) / 3f * shade),
             ToByte((a.Z + b.Z + c.Z) / 3f * shade),
             255);
+    }
+
+    private static Rgba Sample(RekallAgeRgbaImage texture, Vector2 uv, float shade)
+    {
+        if (texture.Width <= 0 || texture.Height <= 0 || texture.Rgba.Length < texture.Width * texture.Height * 4)
+        {
+            return new Rgba(255, 255, 255, 255);
+        }
+
+        var u = uv.X - MathF.Floor(uv.X);
+        var v = uv.Y - MathF.Floor(uv.Y);
+        var x = Math.Clamp((int)MathF.Round(u * (texture.Width - 1)), 0, texture.Width - 1);
+        var y = Math.Clamp((int)MathF.Round(v * (texture.Height - 1)), 0, texture.Height - 1);
+        var offset = (y * texture.Width + x) * 4;
+        return new Rgba(
+            ToByte(texture.Rgba[offset + 0] / 255f * shade),
+            ToByte(texture.Rgba[offset + 1] / 255f * shade),
+            ToByte(texture.Rgba[offset + 2] / 255f * shade),
+            texture.Rgba[offset + 3]);
     }
 
     private static byte ToByte(float value)
@@ -277,7 +321,7 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
         return MathF.PI / 180f * degrees;
     }
 
-    private readonly record struct SceneVertex(Vector3 Position, Vector4 Color);
+    private readonly record struct SceneVertex(Vector3 Position, Vector4 Color, Vector2 Uv);
 
     private readonly record struct ScreenVertex(float X, float Y, float Z);
 

@@ -25,7 +25,8 @@ public sealed class RekallAgeOpenXrSoftwareSceneFrameRenderer
             plan.RenderWidth,
             plan.RenderHeight,
             viewProjection,
-            camera.ClearColor);
+            camera.ClearColor,
+            scene.Textures);
         return new RekallAgeRuntimeViewportRgbaFrame(
             plan.RenderWidth,
             plan.RenderHeight,
@@ -64,11 +65,46 @@ public sealed class RekallAgeOpenXrSoftwareSceneFrameRenderer
             .ConfigureAwait(false);
         var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets);
         var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
-        return new RekallAgeOpenXrPerspectiveSceneFrame(frame, batch, meshes.Count);
+        return new RekallAgeOpenXrPerspectiveSceneFrame(frame, batch, meshes.Count, BuildTextureLookup(meshes));
+    }
+
+    private static IReadOnlyDictionary<string, RekallAgeRgbaImage> BuildTextureLookup(
+        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
+    {
+        var textures = new Dictionary<string, RekallAgeRgbaImage>(StringComparer.Ordinal);
+        foreach (var mesh in meshes)
+        {
+            AddTexture(mesh.BaseColorTexture, textures);
+        }
+
+        return textures;
+    }
+
+    private static void AddTexture(
+        RekallAgeVulkanSceneTexture? texture,
+        Dictionary<string, RekallAgeRgbaImage> textures)
+    {
+        if (texture is null || textures.ContainsKey(texture.Id))
+        {
+            return;
+        }
+
+        if (texture.Rgba.Length == texture.Width * texture.Height * 4)
+        {
+            textures[texture.Id] = new RekallAgeRgbaImage(texture.Width, texture.Height, texture.Rgba);
+            return;
+        }
+
+        if (texture.RuntimeTexture is { } runtimeTexture
+            && RekallAgeBlockCompressedTextureDecoder.TryDecodeTopLevel(runtimeTexture) is { } decoded)
+        {
+            textures[texture.Id] = decoded;
+        }
     }
 }
 
 public sealed record RekallAgeOpenXrPerspectiveSceneFrame(
     RekallAgeRuntimeViewportFrame Frame,
     RekallAgeVulkanSceneBatch Batch,
-    int MeshCount);
+    int MeshCount,
+    IReadOnlyDictionary<string, RekallAgeRgbaImage> Textures);

@@ -29,26 +29,7 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         var pixels = new byte[frame.Width * frame.Height * 4];
         FillBackground(frame, pixels);
 
-        var assetBackedCount = 0;
-        var fallbackCount = 0;
-        foreach (var renderable in frame.Renderables)
-        {
-            if (TryDrawAssetRenderable(frame, renderable, assets, pixels))
-            {
-                assetBackedCount++;
-            }
-            else if (TryDrawEngineRenderable(frame, renderable, pixels))
-            {
-                continue;
-            }
-            else
-            {
-                DrawRenderableMarker(frame, renderable, pixels);
-                fallbackCount++;
-            }
-        }
-
-        RestorePixelsOutsideActiveCameraViewport(frame, pixels);
+        var (assetBackedCount, fallbackCount) = RenderFrameContent(frame, assets, pixels);
 
         if (frame.DebugOverlay.Enabled)
         {
@@ -78,6 +59,80 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(code => code, StringComparer.Ordinal)
                 .ToArray());
+    }
+
+    private static SoftwareRenderCounts RenderFrameContent(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
+        byte[] pixels)
+    {
+        if (frame.CameraViews.Count > 1)
+        {
+            var counts = new SoftwareRenderCounts(0, 0);
+            foreach (var view in frame.CameraViews)
+            {
+                var viewFrame = frame with
+                {
+                    ActiveCamera = view.Camera,
+                    Renderables = view.Renderables,
+                    CameraViews = [view],
+                    Culling = new RekallAgeRuntimeViewportCulling(
+                        view.CulledRenderables.Count,
+                        view.CulledRenderables)
+                };
+                var scratch = new byte[frame.Width * frame.Height * 4];
+                FillBackground(viewFrame, scratch);
+                counts += DrawRenderables(viewFrame, assets, scratch);
+                CopyCameraViewPixels(viewFrame, scratch, pixels);
+            }
+
+            return counts;
+        }
+
+        var singleCounts = DrawRenderables(frame, assets, pixels);
+        RestorePixelsOutsideActiveCameraViewport(frame, pixels);
+        return singleCounts;
+    }
+
+    private static SoftwareRenderCounts DrawRenderables(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
+        byte[] pixels)
+    {
+        var assetBackedCount = 0;
+        var fallbackCount = 0;
+        foreach (var renderable in frame.Renderables)
+        {
+            if (TryDrawAssetRenderable(frame, renderable, assets, pixels))
+            {
+                assetBackedCount++;
+            }
+            else if (TryDrawEngineRenderable(frame, renderable, pixels))
+            {
+                continue;
+            }
+            else
+            {
+                DrawRenderableMarker(frame, renderable, pixels);
+                fallbackCount++;
+            }
+        }
+
+        return new SoftwareRenderCounts(assetBackedCount, fallbackCount);
+    }
+
+    private static void CopyCameraViewPixels(
+        RekallAgeRuntimeViewportFrame viewFrame,
+        byte[] source,
+        byte[] destination)
+    {
+        var rect = RekallAgeRuntimeViewportCameraRect.FromFrame(viewFrame);
+        for (var y = rect.Y; y < rect.Y + rect.Height; y++)
+        {
+            var sourceIndex = ToIndex(viewFrame, rect.X, y);
+            var destinationIndex = sourceIndex;
+            Array.Copy(source, sourceIndex, destination, destinationIndex, rect.Width * 4);
+        }
     }
 
     private static void FillBackground(RekallAgeRuntimeViewportFrame frame, byte[] pixels)
@@ -1036,6 +1091,22 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
     ];
 
     private readonly record struct SoftwareColor(byte R, byte G, byte B);
+
+    private readonly record struct SoftwareRenderCounts(int AssetBackedCount, int FallbackCount)
+    {
+        public static SoftwareRenderCounts operator +(SoftwareRenderCounts left, SoftwareRenderCounts right)
+        {
+            return new SoftwareRenderCounts(
+                left.AssetBackedCount + right.AssetBackedCount,
+                left.FallbackCount + right.FallbackCount);
+        }
+
+        public void Deconstruct(out int assetBackedCount, out int fallbackCount)
+        {
+            assetBackedCount = AssetBackedCount;
+            fallbackCount = FallbackCount;
+        }
+    }
 
     private readonly record struct SoftwareVec3(double X, double Y, double Z);
 

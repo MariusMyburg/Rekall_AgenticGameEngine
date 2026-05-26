@@ -93,9 +93,11 @@ public sealed class RekallAgeMultiplayerWebSocketClient
             var socket = new ClientWebSocket();
             try
             {
-                using var attemptSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                attemptSource.CancelAfter(ClampConnectAttemptTimeout(remaining));
-                await socket.ConnectAsync(endpoint, attemptSource.Token).ConfigureAwait(false);
+                await ConnectAttemptAsync(
+                    socket,
+                    endpoint,
+                    ClampConnectAttemptTimeout(remaining),
+                    cancellationToken).ConfigureAwait(false);
                 return socket;
             }
             catch (Exception ex) when (IsRetryableConnectFailure(ex) && !cancellationToken.IsCancellationRequested)
@@ -123,6 +125,31 @@ public sealed class RekallAgeMultiplayerWebSocketClient
         }
 
         return TimeSpan.FromMilliseconds(Math.Min(500, remaining.TotalMilliseconds));
+    }
+
+    private static async ValueTask ConnectAttemptAsync(
+        ClientWebSocket socket,
+        Uri endpoint,
+        TimeSpan attemptTimeout,
+        CancellationToken cancellationToken)
+    {
+        using var attemptSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var connectTask = socket.ConnectAsync(endpoint, attemptSource.Token);
+        var timeoutTask = Task.Delay(attemptTimeout, cancellationToken);
+        var completed = await Task.WhenAny(connectTask, timeoutTask).ConfigureAwait(false);
+        if (completed != connectTask)
+        {
+            await attemptSource.CancelAsync().ConfigureAwait(false);
+            socket.Dispose();
+            _ = connectTask.ContinueWith(
+                task => _ = task.Exception,
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            throw new OperationCanceledException("Timed out during one WebSocket connection attempt.", cancellationToken);
+        }
+
+        await connectTask.ConfigureAwait(false);
     }
 
     private static bool IsRetryableConnectFailure(Exception ex)

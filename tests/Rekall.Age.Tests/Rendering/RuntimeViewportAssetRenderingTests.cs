@@ -57,6 +57,55 @@ public sealed class RuntimeViewportAssetRenderingTests
     }
 
     [Fact]
+    public async Task SoftwareRendererComposesActiveCameraViewsIntoTheirViewportRectangles()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"])
+            .AddEntity(RekallAgeEntityDocument.Create("WorldCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = 0,
+                    ["viewportX"] = 0,
+                    ["viewportWidth"] = 0.5,
+                    ["cullingMask"] = "world"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("UiCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = 1,
+                    ["viewportX"] = 0.5,
+                    ["viewportWidth"] = 0.5,
+                    ["cullingMask"] = "ui"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("WorldSphere", ["world"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "sphere" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Material", new JsonObject { ["baseColor"] = "#ff0000" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "world" })))
+            .AddEntity(RekallAgeEntityDocument.Create("UiSphere", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "sphere" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Material", new JsonObject { ["baseColor"] = "#00ff00" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderLayer", new JsonObject { ["layer"] = "ui" })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 120, 60, debugOverlay: false);
+
+        var capture = await new RekallAgeRuntimeSoftwareRenderer().CaptureAsync(
+            frame,
+            Path.Combine(root, "captures"),
+            "multi-camera.png",
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            CancellationToken.None);
+        var output = await RekallAgePngReader.ReadRgbaAsync(capture.ScreenshotPath, CancellationToken.None);
+
+        Assert.Equal(0, capture.FallbackRenderableCount);
+        Assert.True(CountPixels(output, 0, 60, pixel => pixel.R > 120 && pixel.G < 90 && pixel.B < 90) > 0);
+        Assert.True(CountPixels(output, 60, 120, pixel => pixel.G > 120 && pixel.R < 90 && pixel.B < 90) > 0);
+        Assert.Equal(0, CountPixels(output, 0, 60, pixel => pixel.G > 120 && pixel.R < 90 && pixel.B < 90));
+        Assert.Equal(0, CountPixels(output, 60, 120, pixel => pixel.R > 120 && pixel.G < 90 && pixel.B < 90));
+    }
+
+    [Fact]
     public async Task SoftwareRendererRasterizesPrimitiveCubeWithDirectionalLighting()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -104,6 +153,27 @@ public sealed class RuntimeViewportAssetRenderingTests
         Assert.Contains("mesh", frame.Renderables.Select(renderable => renderable.Kind));
         Assert.Contains("light", frame.Renderables.Select(renderable => renderable.Kind));
         Assert.True(shadedCubePixels.Length >= 3);
+    }
+
+    private static int CountPixels(
+        RekallAgeRgbaImage image,
+        int minX,
+        int maxX,
+        Func<RekallAgeRgbaPixel, bool> predicate)
+    {
+        var count = 0;
+        for (var y = 0; y < image.Height; y++)
+        {
+            for (var x = Math.Max(0, minX); x < Math.Min(image.Width, maxX); x++)
+            {
+                if (predicate(image.GetPixel(x, y)))
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
     }
 
     [Fact]

@@ -48,4 +48,41 @@ public sealed class StereoRenderPlanCommandTests
         Assert.Contains(result.Value.Recommendations, item => item.Contains("multiview", StringComparison.OrdinalIgnoreCase));
         Assert.Empty(result.Value.Warnings);
     }
+
+    [Fact]
+    public async Task InspectStereoRenderPlanWarnsWhenMultipleActiveStereoCamerasExist()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "vr"])
+            .AddEntity(RekallAgeEntityDocument.Create("HeadCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = 0,
+                    ["stereoMode"] = "stereo"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("SpectatorStereoCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = 10,
+                    ["stereoMode"] = "xr"
+                })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+        var context = new RekallAgeCommandContext(
+            "test",
+            RekallAgeTransaction.Begin("inspect stereo ambiguity"),
+            CancellationToken.None);
+
+        var result = await new InspectStereoRenderPlanCommand().ExecuteAsync(
+            new InspectStereoRenderPlanRequest(root, "Main"),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal("HeadCamera", result.Value.ActiveCamera);
+        Assert.Contains(result.Value.Warnings, warning =>
+            warning.Contains("multiple active stereo cameras", StringComparison.OrdinalIgnoreCase)
+            && warning.Contains("HeadCamera", StringComparison.Ordinal)
+            && warning.Contains("SpectatorStereoCamera", StringComparison.Ordinal));
+    }
 }

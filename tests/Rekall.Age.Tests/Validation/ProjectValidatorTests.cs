@@ -164,6 +164,36 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneWarnsWhenMultipleActiveStereoCamerasCanDriveHeadsetOutput()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "vr"])
+            .AddEntity(RekallAgeEntityDocument.Create("Left Rig Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["stereoMode"] = "stereo"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Debug Stereo Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["stereoMode"] = "xr"
+                })));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        var issue = Assert.Single(report.Issues, item => item.Code == "REKALL_XR_MULTIPLE_ACTIVE_STEREO_CAMERAS");
+        Assert.Equal("warning", issue.Severity);
+        Assert.Equal("Main", issue.Target);
+        Assert.Contains("Left Rig Camera", issue.Message, StringComparison.Ordinal);
+        Assert.Contains("Debug Stereo Camera", issue.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ValidateVrSceneAcceptsRigPoseSourceAndControllers()
     {
         var root = TestPaths.CreateTempDirectory();

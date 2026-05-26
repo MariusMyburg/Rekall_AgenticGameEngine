@@ -52,15 +52,38 @@ public sealed class RekallAgeProjectValidator
         {
             issues.Add(new RekallAgeValidationIssue(
                 "REKALL_CAMERA_MULTIPLE_ACTIVE",
-                $"Scene '{scene.Name}' has {activeCameras.Length} active cameras; the runtime will choose one deterministically.",
+                $"Scene '{scene.Name}' has {activeCameras.Length} active cameras; runtime rendering will compose them by renderOrder and viewport.",
                 "warning",
                 scene.Name));
         }
 
+        ValidateActiveStereoCameras(scene, activeCameras.Select(camera => (camera.Entity, camera.Component)).ToArray(), issues);
         ValidateXrScene(scene, activeCameras.Select(camera => camera.Entity).ToArray(), issues);
         ValidateRenderLayers(scene, activeCameras.Select(camera => (camera.Entity, camera.Component)).ToArray(), issues);
 
         return new RekallAgeValidationReport(issues);
+    }
+
+    private static void ValidateActiveStereoCameras(
+        RekallAgeSceneDocument scene,
+        IReadOnlyList<(RekallAgeEntityDocument Entity, RekallAgeComponentDocument Camera)> activeCameras,
+        List<RekallAgeValidationIssue> issues)
+    {
+        var stereoCameras = activeCameras
+            .Where(camera => camera.Camera.Type.Equals("Rekall.Camera3D", StringComparison.Ordinal)
+                && IsStereoMode(ReadString(camera.Camera.Properties, "stereoMode")))
+            .OrderBy(camera => camera.Entity.Name, StringComparer.Ordinal)
+            .ToArray();
+        if (stereoCameras.Length <= 1)
+        {
+            return;
+        }
+
+        issues.Add(new RekallAgeValidationIssue(
+            "REKALL_XR_MULTIPLE_ACTIVE_STEREO_CAMERAS",
+            $"Scene '{scene.Name}' has {stereoCameras.Length} active stereo cameras ({string.Join(", ", stereoCameras.Select(camera => camera.Entity.Name))}). OpenXR headset output uses one active stereo camera; disable extra stereo cameras or make non-headset cameras mono.",
+            "warning",
+            scene.Name));
     }
 
     private static void ValidateRenderLayers(
@@ -157,9 +180,7 @@ public sealed class RekallAgeProjectValidator
         foreach (var camera in active3DCameras)
         {
             var stereoMode = ReadString(camera.Camera!.Properties, "stereoMode") ?? "mono";
-            if (!stereoMode.Equals("stereo", StringComparison.OrdinalIgnoreCase)
-                && !stereoMode.Equals("vr", StringComparison.OrdinalIgnoreCase)
-                && !stereoMode.Equals("xr", StringComparison.OrdinalIgnoreCase))
+            if (!IsStereoMode(stereoMode))
             {
                 issues.Add(new RekallAgeValidationIssue(
                     "REKALL_XR_CAMERA_NOT_STEREO",
@@ -224,6 +245,14 @@ public sealed class RekallAgeProjectValidator
     {
         return type.Equals("Rekall.Camera2D", StringComparison.Ordinal)
             || type.Equals("Rekall.Camera3D", StringComparison.Ordinal);
+    }
+
+    private static bool IsStereoMode(string? stereoMode)
+    {
+        return stereoMode is not null
+            && (stereoMode.Equals("stereo", StringComparison.OrdinalIgnoreCase)
+                || stereoMode.Equals("vr", StringComparison.OrdinalIgnoreCase)
+                || stereoMode.Equals("xr", StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool IsRenderable(string type)

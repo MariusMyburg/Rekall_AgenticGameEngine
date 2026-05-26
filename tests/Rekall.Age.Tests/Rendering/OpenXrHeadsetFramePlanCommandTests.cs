@@ -78,6 +78,47 @@ public sealed class OpenXrHeadsetFramePlanCommandTests
         Assert.Contains(result.Errors, error => error.Code == "REKALL_OPENXR_FRAME_PLAN_NOT_READY");
     }
 
+    [Fact]
+    public async Task InspectHeadsetFramePlanWarnsWhenMultipleActiveStereoCamerasExist()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "vr"])
+            .AddEntity(RekallAgeEntityDocument.Create("HeadCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["stereoMode"] = "stereo",
+                    ["stereoRenderMode"] = "single-pass-multiview",
+                    ["renderOrder"] = 0
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("SpectatorStereoCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["stereoMode"] = "xr",
+                    ["stereoRenderMode"] = "single-pass-multiview",
+                    ["renderOrder"] = 10
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+        var context = new RekallAgeCommandContext(
+            "test",
+            RekallAgeTransaction.Begin("inspect ambiguous openxr frame plan"),
+            CancellationToken.None);
+
+        var result = await new InspectOpenXrHeadsetFramePlanCommand(ReadyBootstrap()).ExecuteAsync(
+            new InspectOpenXrHeadsetFramePlanRequest(root, "Main"),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal("HeadCamera", result.Value.ActiveCamera);
+        Assert.Contains(result.Value.Warnings, warning =>
+            warning.Contains("multiple active stereo cameras", StringComparison.OrdinalIgnoreCase) &&
+            warning.Contains("HeadCamera", StringComparison.Ordinal) &&
+            warning.Contains("SpectatorStereoCamera", StringComparison.Ordinal));
+    }
+
     private static IRekallAgeOpenXrSessionBootstrap ReadyBootstrap()
     {
         return new FakeOpenXrSessionBootstrap(new RekallAgeOpenXrSessionBootstrapResult(

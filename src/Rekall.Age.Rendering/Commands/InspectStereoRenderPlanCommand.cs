@@ -178,7 +178,26 @@ public sealed class InspectStereoRenderPlanCommand
             warnings.Add("Stereo multiview is enabled but no meshes were generated for the frame.");
         }
 
+        var activeStereoCameras = frame.Cameras
+            .Where(camera => camera.Active && IsStereoMode(camera.StereoMode))
+            .OrderBy(camera => camera.RenderOrder)
+            .ThenBy(camera => camera.EntityName, StringComparer.Ordinal)
+            .ToArray();
+        if (activeStereoCameras.Length > 1)
+        {
+            warnings.Add(
+                $"Scene has multiple active stereo cameras ({string.Join(", ", activeStereoCameras.Select(camera => camera.EntityName))}); OpenXR headset output uses '{frame.ActiveCamera?.EntityName ?? "none"}'. Disable extra stereo cameras or make spectator cameras mono.");
+        }
+
         return warnings;
+    }
+
+    private static bool IsStereoMode(string? stereoMode)
+    {
+        return stereoMode is not null
+            && (stereoMode.Equals("stereo", StringComparison.OrdinalIgnoreCase)
+                || stereoMode.Equals("vr", StringComparison.OrdinalIgnoreCase)
+                || stereoMode.Equals("xr", StringComparison.OrdinalIgnoreCase));
     }
 
     private static IReadOnlyList<RekallAgeCommandError> Validate(InspectStereoRenderPlanRequest request)

@@ -120,7 +120,7 @@ public sealed class InspectOpenXrHeadsetFramePlanCommand
             ? checked((int)firstRuntimeEye.RecommendedImageRectHeight)
             : request.Height;
         var blockers = BuildBlockers(session, stereoEnabled, eyeCount, usesMultiview);
-        var warnings = BuildWarnings(meshes.Count, batch.Draws.Count, usesMultiview);
+        var warnings = BuildWarnings(frame, meshes.Count, batch.Draws.Count, usesMultiview);
         var result = new InspectOpenXrHeadsetFramePlanResult(
             world.SceneName,
             world.FrameIndex,
@@ -196,7 +196,11 @@ public sealed class InspectOpenXrHeadsetFramePlanCommand
         return blockers;
     }
 
-    private static IReadOnlyList<string> BuildWarnings(int meshCount, int drawCount, bool usesMultiview)
+    private static IReadOnlyList<string> BuildWarnings(
+        Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame,
+        int meshCount,
+        int drawCount,
+        bool usesMultiview)
     {
         var warnings = new List<string>();
         if (meshCount == 0 || drawCount == 0)
@@ -209,7 +213,25 @@ public sealed class InspectOpenXrHeadsetFramePlanCommand
             warnings.Add("Non-multiview headset rendering duplicates draw submission work per eye.");
         }
 
+        var activeStereoCameras = frame.Cameras
+            .Where(camera => camera.Active && IsStereoMode(camera.StereoMode))
+            .OrderBy(camera => camera.RenderOrder)
+            .ThenBy(camera => camera.EntityName, StringComparer.Ordinal)
+            .ToArray();
+        if (activeStereoCameras.Length > 1)
+        {
+            warnings.Add(
+                $"Scene has multiple active stereo cameras ({string.Join(", ", activeStereoCameras.Select(camera => camera.EntityName))}); OpenXR headset output uses '{frame.ActiveCamera?.EntityName ?? "none"}'. Disable extra stereo cameras or make spectator cameras mono.");
+        }
+
         return warnings;
+    }
+
+    private static bool IsStereoMode(string? stereoMode)
+    {
+        return string.Equals(stereoMode, "stereo", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(stereoMode, "vr", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(stereoMode, "xr", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyList<string> BuildFrameLoopSteps(bool usesMultiview, int eyeCount)

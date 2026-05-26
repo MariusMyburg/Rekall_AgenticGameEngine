@@ -435,6 +435,36 @@ public static class RekallAgeRuntimeModuleSdk
         return world.InputActions(name).Any(action => action.WasReleased);
     }
 
+    public static RekallAgeRuntimeVector3 Forward3D(this RekallAgeRuntimeTransform transform)
+    {
+        return Normalize3D(Rotate3D(0, 0, 1, transform.Rotation3D));
+    }
+
+    public static RekallAgeRuntimeVector3 Right3D(this RekallAgeRuntimeTransform transform)
+    {
+        return Normalize3D(Rotate3D(1, 0, 0, transform.Rotation3D));
+    }
+
+    public static RekallAgeRuntimeVector3 Up3D(this RekallAgeRuntimeTransform transform)
+    {
+        return Normalize3D(Rotate3D(0, 1, 0, transform.Rotation3D));
+    }
+
+    public static RekallAgeRuntimeVector3 Offset3D(
+        this RekallAgeRuntimeTransform transform,
+        double forward = 0,
+        double right = 0,
+        double up = 0)
+    {
+        var forwardVector = transform.Forward3D();
+        var rightVector = transform.Right3D();
+        var upVector = transform.Up3D();
+        return new RekallAgeRuntimeVector3(
+            transform.Position3D.X + forwardVector.X * forward + rightVector.X * right + upVector.X * up,
+            transform.Position3D.Y + forwardVector.Y * forward + rightVector.Y * right + upVector.Y * up,
+            transform.Position3D.Z + forwardVector.Z * forward + rightVector.Z * right + upVector.Z * up);
+    }
+
     public static IReadOnlyList<RekallAgeRuntimeEvent> EventsOfType(
         this RekallAgeRuntimeWorld world,
         string type)
@@ -1058,6 +1088,38 @@ public static class RekallAgeRuntimeModuleSdk
         return length <= 0.000001
             ? new RekallAgeRuntimeVector3(0, 0, 0)
             : new RekallAgeRuntimeVector3(value.X / length, value.Y / length, value.Z / length);
+    }
+
+    private static RekallAgeRuntimeVector3 Normalize3D(RekallAgeRuntimeVector3 value)
+    {
+        var normalized = Normalize(value);
+        return LengthSquared(normalized) <= 0.000001
+            ? new RekallAgeRuntimeVector3(0, 0, 1)
+            : normalized;
+    }
+
+    private static RekallAgeRuntimeVector3 Rotate3D(
+        double x,
+        double y,
+        double z,
+        RekallAgeRuntimeVector3 rotationDegrees)
+    {
+        var rx = Math.PI / 180.0 * rotationDegrees.X;
+        var ry = Math.PI / 180.0 * rotationDegrees.Y;
+        var rz = Math.PI / 180.0 * rotationDegrees.Z;
+
+        var cos = Math.Cos(rx);
+        var sin = Math.Sin(rx);
+        (y, z) = (y * cos - z * sin, y * sin + z * cos);
+
+        cos = Math.Cos(ry);
+        sin = Math.Sin(ry);
+        (x, z) = (x * cos + z * sin, -x * sin + z * cos);
+
+        cos = Math.Cos(rz);
+        sin = Math.Sin(rz);
+        (x, y) = (x * cos - y * sin, x * sin + y * cos);
+        return new RekallAgeRuntimeVector3(x, y, z);
     }
 
     private static double LengthSquared(RekallAgeRuntimeVector3 value)

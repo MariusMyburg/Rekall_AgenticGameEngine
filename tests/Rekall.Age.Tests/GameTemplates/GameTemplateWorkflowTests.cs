@@ -12,6 +12,7 @@ using Rekall.Age.Validation;
 using Rekall.Age.World;
 using System.IO.Compression;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Rekall.Age.Tests.GameTemplates;
 
@@ -109,6 +110,7 @@ public sealed class GameTemplateWorkflowTests
             "Rekall.Transform",
             "Rekall.Transform2D",
             "Rekall.Transform3D",
+            "Rekall.InputActionMap",
             "Rekall.Camera2D",
             "Rekall.Camera3D",
             "Rekall.SpriteRenderer",
@@ -138,6 +140,39 @@ public sealed class GameTemplateWorkflowTests
                 template.Entities.SelectMany(entity => entity.Components),
                 component => component.Type.EndsWith(".GameRules", StringComparison.Ordinal));
         }
+    }
+
+    [Fact]
+    public void FirstPersonTemplatePublishesSemanticInputActionsForAgents()
+    {
+        var catalog = RekallAgeGameTemplateCatalog.CreateDefault();
+
+        var template = catalog.GetRequired("first-person-exploration");
+        var inputMap = Assert.Single(
+            template.Entities.SelectMany(entity => entity.Components),
+            component => component.Type == "Rekall.InputActionMap");
+        var actions = Assert.IsType<JsonArray>(inputMap.Properties["actions"]);
+        var actionObjects = actions.OfType<JsonObject>().ToArray();
+
+        var moveX = Assert.Single(actionObjects, action => ReadString(action, "name") == "move.x");
+        Assert.Equal("D", ReadString(moveX, "positiveKey"));
+        Assert.Equal("A", ReadString(moveX, "negativeKey"));
+
+        var moveZ = Assert.Single(actionObjects, action => ReadString(action, "name") == "move.z");
+        Assert.Equal("W", ReadString(moveZ, "positiveKey"));
+        Assert.Equal("S", ReadString(moveZ, "negativeKey"));
+
+        var lookX = Assert.Single(actionObjects, action => ReadString(action, "name") == "look.x");
+        Assert.Equal("x", ReadString(lookX, "mouseAxis"));
+        Assert.Equal(-0.13, ReadNumber(lookX, "mouseScale"), precision: 6);
+
+        var lookY = Assert.Single(actionObjects, action => ReadString(action, "name") == "look.y");
+        Assert.Equal("y", ReadString(lookY, "mouseAxis"));
+        Assert.Equal(0.09, ReadNumber(lookY, "mouseScale"), precision: 6);
+
+        Assert.Contains(actionObjects, action => ReadString(action, "name") == "fire" && ReadString(action, "button") == "Left");
+        Assert.Contains(actionObjects, action => ReadString(action, "name") == "fire" && ReadString(action, "key") == "Space");
+        Assert.Contains(actionObjects, action => ReadString(action, "name") == "move.fast" && ReadString(action, "key") == "LeftShift");
     }
 
     [Fact]
@@ -385,6 +420,79 @@ public sealed class GameTemplateWorkflowTests
     }
 
     [Fact]
+    public async Task PackagePlayableGameGraphicsLaunchesWindowsPlayerInPlayableMode()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var output = Path.Combine(root, "Builds", "GraphicsPackage");
+        Directory.CreateDirectory(output);
+        var stalePackageFile = Path.Combine(output, "stale-package-file.txt");
+        await File.WriteAllTextAsync(stalePackageFile, "old package content");
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("graphics package playable"), CancellationToken.None);
+        var create = await new CreatePlayableGameFromTemplateCommand().ExecuteAsync(
+            new CreatePlayableGameFromTemplateRequest(root, "Graphics Pong", "pong"),
+            context);
+        Assert.True(create.Ok, create.Summary);
+
+        var package = await new PackagePlayableGameCommand().ExecuteAsync(
+            new PackagePlayableGameRequest(
+                root,
+                "Main",
+                output,
+                Frames: 1,
+                Assertions: [new RekallAgeFrameAssertion(0, "PONG")],
+                Graphics: true),
+            context);
+
+        Assert.True(package.Ok, package.Summary);
+        Assert.True(package.Value.Ready);
+        Assert.EndsWith("Rekall.Age.Player.Windows.exe", package.Value.LaunchPath, StringComparison.Ordinal);
+        Assert.Contains("--graphics", package.Value.Arguments);
+        Assert.Contains("--backend", package.Value.Arguments);
+        Assert.Contains("--playable", package.Value.Arguments);
+        Assert.False(File.Exists(stalePackageFile), "Packaging should clean the output directory before publishing.");
+        using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(package.Value.ManifestPath));
+        var arguments = manifest.RootElement.GetProperty("arguments").EnumerateArray().Select(item => item.GetString()).ToArray();
+        Assert.Contains("--playable", arguments);
+    }
+
+    [Fact]
+    public async Task PackagePlayableGameAcceptsRelativeOutputDirectory()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var relativeOutput = Path.Combine(".age-test-output", Guid.NewGuid().ToString("N"), "RelativePackage");
+        var fullOutput = Path.GetFullPath(relativeOutput);
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("relative package playable"), CancellationToken.None);
+        try
+        {
+            var create = await new CreatePlayableGameFromTemplateCommand().ExecuteAsync(
+                new CreatePlayableGameFromTemplateRequest(root, "Relative Packaged Pong", "pong"),
+                context);
+            Assert.True(create.Ok, create.Summary);
+
+            var package = await new PackagePlayableGameCommand().ExecuteAsync(
+                new PackagePlayableGameRequest(
+                    root,
+                    "Main",
+                    relativeOutput,
+                    Frames: 1,
+                    Assertions: [new RekallAgeFrameAssertion(0, "PONG")]),
+                context);
+
+            Assert.True(package.Ok, package.Summary);
+            Assert.Equal(fullOutput, Path.GetFullPath(package.Value.OutputDirectory));
+            Assert.True(File.Exists(Path.Combine(fullOutput, "Rekall.Age.Player.exe")));
+            Assert.True(File.Exists(package.Value.ManifestPath), package.Value.ManifestPath);
+        }
+        finally
+        {
+            if (Directory.Exists(fullOutput))
+            {
+                Directory.Delete(fullOutput, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task CreatePlayablePackageFromTemplateBuildsRunsAndCapturesProof()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -466,5 +574,23 @@ public sealed class GameTemplateWorkflowTests
             Assert.Equal(1, template.FrameCount);
             Assert.True(template.DrawCommandCount > 0);
         });
+    }
+
+    private static string? ReadString(JsonObject obj, string key)
+    {
+        return obj.TryGetPropertyValue(key, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<string>(out var text)
+            ? text
+            : null;
+    }
+
+    private static double ReadNumber(JsonObject obj, string key)
+    {
+        return obj.TryGetPropertyValue(key, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<double>(out var number)
+            ? number
+            : double.NaN;
     }
 }

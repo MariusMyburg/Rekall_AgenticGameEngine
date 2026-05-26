@@ -91,9 +91,10 @@ public sealed class ScaffoldPlayableModuleCommand
         source.AppendLine();
         source.AppendLine("    public void Tick(RekallAgePlayableModuleState state, RekallAgePlayableModuleInput input)");
         source.AppendLine("    {");
+        source.AppendLine("        var seconds = Math.Clamp(input.DeltaSeconds, 0, 0.1);");
         source.AppendLine("        state.Numbers[\"frame\"] += 1;");
-        source.AppendLine("        state.Numbers[\"lane\"] = Math.Clamp(state.Numbers[\"lane\"] + input.VerticalAxis, -4, 4);");
-        source.AppendLine("        state.Numbers[\"phase\"] = (state.Numbers[\"phase\"] + 1) % 16;");
+        source.AppendLine("        state.Numbers[\"lane\"] = Math.Clamp(state.Numbers[\"lane\"] + (input.VerticalAxis * seconds * 60), -4, 4);");
+        source.AppendLine("        state.Numbers[\"phase\"] = (state.Numbers[\"phase\"] + (seconds * 60)) % 16;");
         source.AppendLine("        if (input.PrimaryAction)");
         source.AppendLine("        {");
         source.AppendLine("            state.Numbers[\"action\"] += 1;");

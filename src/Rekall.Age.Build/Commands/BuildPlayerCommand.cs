@@ -30,8 +30,9 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
         RekallAgeCommandContext context)
     {
         var playerProject = FindPlayerProjectPath(request.Graphics);
-        var outputDirectory = request.OutputDirectory
-            ?? Path.Combine(request.ProjectRoot, "Builds", "RekallAgePlayer");
+        var outputDirectory = Path.GetFullPath(
+            request.OutputDirectory
+                ?? Path.Combine(request.ProjectRoot, "Builds", "RekallAgePlayer"));
         Directory.CreateDirectory(outputDirectory);
 
         var startInfo = new ProcessStartInfo("dotnet")

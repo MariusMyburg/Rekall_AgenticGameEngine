@@ -71,8 +71,26 @@ public sealed class PackagePlayableGameCommand
                 verification.Errors);
         }
 
-        var outputDirectory = request.OutputDirectory
-            ?? Path.Combine(request.ProjectRoot, "Builds", "RekallAgePlayer");
+        var outputDirectory = Path.GetFullPath(
+            request.OutputDirectory
+                ?? Path.Combine(request.ProjectRoot, "Builds", "RekallAgePlayer"));
+        var outputPreparationError = PrepareOutputDirectory(request.ProjectRoot, outputDirectory);
+        if (outputPreparationError is not null)
+        {
+            return RekallAgeCommandResult<PackagePlayableGameResult>.Failure(
+                new PackagePlayableGameResult(
+                    Ready: false,
+                    OutputDirectory: outputDirectory,
+                    LaunchPath: string.Empty,
+                    ManifestPath: string.Empty,
+                    ArchivePath: string.Empty,
+                    Arguments: [],
+                    Checks: verification.Value.Checks,
+                    BuildOutput: string.Empty),
+                "Playable package output directory is unsafe.",
+                [outputPreparationError]);
+        }
+
         var player = await _buildPlayer.ExecuteAsync(
             new BuildPlayerRequest(request.ProjectRoot, request.SceneName, outputDirectory, request.Graphics),
             context);
@@ -128,8 +146,37 @@ public sealed class PackagePlayableGameCommand
     private static IReadOnlyList<string> CreateLaunchArguments(string bundledGameRoot, string sceneName, bool graphics)
     {
         return graphics
-            ? [bundledGameRoot, sceneName, "--graphics", "--backend", "vulkan"]
+            ? [bundledGameRoot, sceneName, "--graphics", "--backend", "vulkan", "--playable"]
             : [bundledGameRoot, sceneName];
+    }
+
+    private static RekallAgeCommandError? PrepareOutputDirectory(string projectRoot, string outputDirectory)
+    {
+        var sourceRoot = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var packageRoot = Path.GetFullPath(outputDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        var projectInsidePackageRoot = sourceRoot.StartsWith(packageRoot + Path.DirectorySeparatorChar, comparison);
+        var driveRoot = Path.GetPathRoot(packageRoot)?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (packageRoot.Equals(sourceRoot, comparison) ||
+            projectInsidePackageRoot ||
+            string.IsNullOrWhiteSpace(driveRoot) ||
+            packageRoot.Equals(driveRoot, comparison))
+        {
+            return new RekallAgeCommandError(
+                "REKALL_PLAYABLE_PACKAGE_OUTPUT_UNSAFE",
+                "Package output directory must not be the project root, a parent of the project root, or a drive root.",
+                outputDirectory);
+        }
+
+        if (Directory.Exists(packageRoot))
+        {
+            Directory.Delete(packageRoot, recursive: true);
+        }
+
+        Directory.CreateDirectory(packageRoot);
+        return null;
     }
 
     private static void CopyProjectToPackage(string projectRoot, string bundledGameRoot, string outputDirectory)

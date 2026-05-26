@@ -90,6 +90,23 @@ public sealed class ScaffoldPlayableModuleCommandTests
     }
 
     [Fact]
+    public async Task ScaffoldPlayableModuleGuidesAgentsToUseDeltaSeconds()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("playable scaffold delta"), CancellationToken.None);
+
+        var scaffold = await new ScaffoldPlayableModuleCommand().ExecuteAsync(
+            new ScaffoldPlayableModuleRequest(root, "module.pong", "Module Pong", "ModulePong", "pong"),
+            context);
+
+        Assert.True(scaffold.Ok, scaffold.Summary);
+        var source = await File.ReadAllTextAsync(scaffold.Value.SourcePath);
+        Assert.Contains("input.DeltaSeconds", source, StringComparison.Ordinal);
+        Assert.Contains("seconds *", source, StringComparison.Ordinal);
+        Assert.Contains("Math.Clamp(input.DeltaSeconds", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ProjectModuleLoaderCanLoadSameModuleNameFromDifferentProjects()
     {
         var firstRoot = TestPaths.CreateTempDirectory();

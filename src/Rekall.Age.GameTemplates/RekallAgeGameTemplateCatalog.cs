@@ -78,6 +78,22 @@ public sealed class RekallAgeGameTemplateCatalog
             ]),
             Create3D("first-person-exploration", "First-person Exploration", "First-person controller, interactables, objective loop.",
             [
+                Entity("InputActions", ["input", "controls"],
+                    Component("Rekall.InputActionMap", Props(
+                        ("active", true),
+                        ("actions", new JsonArray
+                        {
+                            Action("move.x", ("positiveKey", "D"), ("negativeKey", "A")),
+                            Action("move.z", ("positiveKey", "W"), ("negativeKey", "S")),
+                            Action("look.x", ("mouseAxis", "x"), ("mouseScale", -0.13)),
+                            Action("look.y", ("mouseAxis", "y"), ("mouseScale", 0.09)),
+                            Action("turn.x", ("positiveKey", "E"), ("negativeKey", "Q")),
+                            Action("move.fast", ("key", "LeftShift")),
+                            Action("fire", ("button", "Left")),
+                            Action("fire", ("key", "Space")),
+                            Action("fire", ("key", "Enter")),
+                            Action("fire", ("key", "Return"))
+                        })))),
                 Entity("Player", ["player"], TemplateComponent("first-person-exploration", "FirstPersonController", Props(("walkSpeed", 5), ("lookSensitivity", 0.8)))),
                 Entity("Environment", ["level"], Component("Rekall.MeshSet", Props(("mesh", "blockout_room")))),
                 Entity("Interactables", ["interactable"], TemplateComponent("first-person-exploration", "InteractableSet", Props(("count", 5)))),
@@ -295,7 +311,18 @@ public sealed class RekallAgeGameTemplateCatalog
         var obj = new JsonObject();
         foreach (var (key, value) in values)
         {
-            obj[key] = JsonValue.Create(value);
+            obj[key] = value is JsonNode node ? node.DeepClone() : JsonValue.Create(value);
+        }
+
+        return obj;
+    }
+
+    private static JsonObject Action(string name, params (string Key, object? Value)[] values)
+    {
+        var obj = Props(("name", name));
+        foreach (var (key, value) in values)
+        {
+            obj[key] = value is JsonNode node ? node.DeepClone() : JsonValue.Create(value);
         }
 
         return obj;

@@ -187,6 +187,68 @@ public sealed class CaptureRuntimeViewportCommandTests
     }
 
     [Fact]
+    public async Task CaptureRuntimeViewportCommandReportsGenericLayoutDiagnosticsForAgentAuthoredScenes()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["fieldOfView"] = 65
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Wide Platform", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = 0,
+                    ["y"] = 0,
+                    ["z"] = 3,
+                    ["scaleX"] = 14,
+                    ["scaleY"] = 0.05,
+                    ["scaleZ"] = 0.25
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+                {
+                    ["primitive"] = "cube",
+                    ["color"] = "#33415f"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Small Marker", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = 0,
+                    ["y"] = 0.2,
+                    ["z"] = 3,
+                    ["scaleX"] = 0.2,
+                    ["scaleY"] = 0.2,
+                    ["scaleZ"] = 0.2
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+                {
+                    ["primitive"] = "sphere",
+                    ["color"] = "#ffd166"
+                })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 0, Path.Combine(root, "Viewport"), 320, 180, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("layout diagnostics viewport"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.LayoutDiagnostics.Analyzed);
+        Assert.Equal("MainCamera", result.Value.LayoutDiagnostics.ActiveCamera?.EntityName);
+        Assert.Equal(320, result.Value.LayoutDiagnostics.ActiveCamera?.PixelRect.Width);
+        Assert.Equal(180, result.Value.LayoutDiagnostics.ActiveCamera?.PixelRect.Height);
+        Assert.Equal(2, result.Value.LayoutDiagnostics.WorldBounds.SpatialRenderableCount);
+        Assert.True(result.Value.LayoutDiagnostics.WorldBounds.SpanX >= 14);
+        Assert.True(result.Value.LayoutDiagnostics.WorldBounds.SpanY < 1);
+        Assert.Contains("REKALL_VIEWPORT_LAYOUT_X_DOMINATES", result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.Contains("REKALL_VIEWPORT_LAYOUT_FLAT_Y", result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.Contains(result.Value.LayoutDiagnostics.AuthoringHints, hint =>
+            hint.Contains("scaleX", StringComparison.Ordinal)
+            && hint.Contains("vertical", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task CaptureRuntimeViewportCommandCanUseVulkanForClearOnlyRuntimeFrames()
     {
         var root = TestPaths.CreateTempDirectory();

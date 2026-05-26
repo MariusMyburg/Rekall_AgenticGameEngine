@@ -1,4 +1,5 @@
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime;
 using System.Globalization;
 
@@ -38,7 +39,8 @@ public sealed record CaptureRuntimeViewportResult(
     bool HardwareAccelerated,
     string AccelerationStatus,
     string? SelectedDeviceName,
-    RekallAgeViewportFrameAnalysis FrameAnalysis);
+    RekallAgeViewportFrameAnalysis FrameAnalysis,
+    CaptureRuntimeViewportLayoutDiagnostics LayoutDiagnostics);
 
 public sealed record CaptureRuntimeViewportCulledRenderable(
     string EntityId,
@@ -48,6 +50,50 @@ public sealed record CaptureRuntimeViewportCulledRenderable(
     string Reason,
     string? CameraEntityName,
     string CullingMask);
+
+public sealed record CaptureRuntimeViewportLayoutDiagnostics(
+    bool Analyzed,
+    CaptureRuntimeViewportCameraDiagnostics? ActiveCamera,
+    CaptureRuntimeViewportWorldBounds WorldBounds,
+    IReadOnlyList<string> WarningCodes,
+    IReadOnlyList<string> AuthoringHints);
+
+public sealed record CaptureRuntimeViewportCameraDiagnostics(
+    string EntityId,
+    string EntityName,
+    string Kind,
+    string ProjectionMode,
+    CaptureRuntimeViewportPixelRect PixelRect,
+    double X,
+    double Y,
+    double Z,
+    double RotationX,
+    double RotationY,
+    double RotationZ,
+    double FieldOfViewDegrees,
+    double OrthographicSize,
+    string CullingMask);
+
+public sealed record CaptureRuntimeViewportPixelRect(
+    int X,
+    int Y,
+    int Width,
+    int Height);
+
+public sealed record CaptureRuntimeViewportWorldBounds(
+    int SpatialRenderableCount,
+    double MinX,
+    double MaxX,
+    double SpanX,
+    double MinY,
+    double MaxY,
+    double SpanY,
+    double MinZ,
+    double MaxZ,
+    double SpanZ,
+    double MaxScaleX,
+    double MaxScaleY,
+    double MaxScaleZ);
 
 public sealed class CaptureRuntimeViewportCommand
     : IRekallAgeCommand<CaptureRuntimeViewportRequest, CaptureRuntimeViewportResult>
@@ -152,7 +198,8 @@ public sealed class CaptureRuntimeViewportCommand
             false,
             "software-rasterized",
             null,
-            frameAnalysis);
+            frameAnalysis,
+            BuildLayoutDiagnostics(frame));
 
         context.Transaction.RecordChangedResource(capture.ScreenshotPath);
         return RekallAgeCommandResult<CaptureRuntimeViewportResult>.Success(
@@ -215,7 +262,8 @@ public sealed class CaptureRuntimeViewportCommand
             capture.Captured && capture.SelectedDevice is not null,
             capture.Captured ? "vulkan-scene-rendered" : "vulkan-scene-failed",
             capture.SelectedDevice?.Name,
-            frameAnalysis);
+            frameAnalysis,
+            BuildLayoutDiagnostics(frame));
 
         if (capture.Captured)
         {
@@ -277,7 +325,8 @@ public sealed class CaptureRuntimeViewportCommand
             capture.Captured && capture.SelectedDevice is not null,
             capture.Captured ? "vulkan-clear-pass" : "vulkan-unavailable",
             capture.SelectedDevice?.Name,
-            frameAnalysis);
+            frameAnalysis,
+            BuildLayoutDiagnostics(frame));
 
         if (capture.Captured)
         {
@@ -357,6 +406,154 @@ public sealed class CaptureRuntimeViewportCommand
             .ToArray();
     }
 
+    private static CaptureRuntimeViewportLayoutDiagnostics BuildLayoutDiagnostics(
+        RekallAgeRuntimeViewportFrame frame)
+    {
+        var camera = frame.ActiveCamera;
+        var bounds = BuildWorldBounds(frame.Renderables);
+        var warnings = new List<string>();
+        var hints = new List<string>();
+
+        if (camera is null)
+        {
+            warnings.Add("REKALL_VIEWPORT_NO_ACTIVE_CAMERA");
+            hints.Add("Add or activate a generic Rekall.Camera2D or Rekall.Camera3D entity before capturing the viewport.");
+        }
+
+        if (bounds.SpatialRenderableCount == 0)
+        {
+            warnings.Add("REKALL_VIEWPORT_NO_SPATIAL_RENDERABLES");
+            hints.Add("Add visible renderable entities with generic transform and renderer components before judging composition.");
+        }
+        else
+        {
+            AddAxisDiagnostics(bounds, warnings, hints);
+        }
+
+        return new CaptureRuntimeViewportLayoutDiagnostics(
+            true,
+            camera is null ? null : BuildCameraDiagnostics(frame, camera),
+            bounds,
+            warnings.Distinct(StringComparer.Ordinal).ToArray(),
+            hints.Distinct(StringComparer.Ordinal).ToArray());
+    }
+
+    private static CaptureRuntimeViewportCameraDiagnostics BuildCameraDiagnostics(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportCamera camera)
+    {
+        var rect = RekallAgeRuntimeViewportCameraRect.FromCamera(frame.Width, frame.Height, camera);
+        return new CaptureRuntimeViewportCameraDiagnostics(
+            camera.EntityId,
+            camera.EntityName,
+            camera.Kind,
+            camera.ProjectionMode,
+            new CaptureRuntimeViewportPixelRect(rect.X, rect.Y, rect.Width, rect.Height),
+            camera.X,
+            camera.Y,
+            camera.Z,
+            camera.RotationX,
+            camera.RotationY,
+            camera.RotationZ,
+            camera.FieldOfViewDegrees,
+            camera.OrthographicSize,
+            camera.CullingMask);
+    }
+
+    private static CaptureRuntimeViewportWorldBounds BuildWorldBounds(
+        IReadOnlyList<RekallAgeRuntimeViewportRenderable> renderables)
+    {
+        var spatial = renderables
+            .Where(renderable => !renderable.Kind.Equals("light", StringComparison.Ordinal))
+            .ToArray();
+        if (spatial.Length == 0)
+        {
+            return EmptyWorldBounds();
+        }
+
+        var minX = spatial.Min(renderable => renderable.X - Math.Abs(renderable.ScaleX) * 0.5);
+        var maxX = spatial.Max(renderable => renderable.X + Math.Abs(renderable.ScaleX) * 0.5);
+        var minY = spatial.Min(renderable => renderable.Y - Math.Abs(renderable.ScaleY) * 0.5);
+        var maxY = spatial.Max(renderable => renderable.Y + Math.Abs(renderable.ScaleY) * 0.5);
+        var minZ = spatial.Min(renderable => renderable.Z - Math.Abs(renderable.ScaleZ) * 0.5);
+        var maxZ = spatial.Max(renderable => renderable.Z + Math.Abs(renderable.ScaleZ) * 0.5);
+
+        return new CaptureRuntimeViewportWorldBounds(
+            spatial.Length,
+            minX,
+            maxX,
+            maxX - minX,
+            minY,
+            maxY,
+            maxY - minY,
+            minZ,
+            maxZ,
+            maxZ - minZ,
+            spatial.Max(renderable => Math.Abs(renderable.ScaleX)),
+            spatial.Max(renderable => Math.Abs(renderable.ScaleY)),
+            spatial.Max(renderable => Math.Abs(renderable.ScaleZ)));
+    }
+
+    private static void AddAxisDiagnostics(
+        CaptureRuntimeViewportWorldBounds bounds,
+        List<string> warnings,
+        List<string> hints)
+    {
+        var spans = new[]
+        {
+            ("X", bounds.SpanX),
+            ("Y", bounds.SpanY),
+            ("Z", bounds.SpanZ)
+        };
+        var dominant = spans.OrderByDescending(item => item.Item2).First();
+        var second = spans.OrderByDescending(item => item.Item2).Skip(1).First();
+        if (dominant.Item2 >= 1 && dominant.Item2 >= Math.Max(0.001, second.Item2) * 4)
+        {
+            warnings.Add($"REKALL_VIEWPORT_LAYOUT_{dominant.Item1}_DOMINATES");
+            hints.Add($"The authored bounds are dominated by the {dominant.Item1} axis; reduce scale{dominant.Item1} or add variation on the other axes before recapturing.");
+        }
+
+        if (bounds.SpanX >= 2 && bounds.SpanY <= 0.5)
+        {
+            warnings.Add("REKALL_VIEWPORT_LAYOUT_FLAT_Y");
+            hints.Add("The authored spatial bounds are nearly flat vertically; add vertical variation or reduce scaleX for clearer viewport composition.");
+        }
+
+        if (bounds.SpanX >= 2 && bounds.SpanZ <= 0.5)
+        {
+            warnings.Add("REKALL_VIEWPORT_LAYOUT_FLAT_Z");
+            hints.Add("The authored spatial bounds have little depth variation; add z separation or reduce the dominant horizontal span.");
+        }
+    }
+
+    private static CaptureRuntimeViewportLayoutDiagnostics EmptyLayoutDiagnostics()
+    {
+        return new CaptureRuntimeViewportLayoutDiagnostics(
+            false,
+            null,
+            EmptyWorldBounds(),
+            Array.Empty<string>(),
+            Array.Empty<string>());
+    }
+
+    private static CaptureRuntimeViewportWorldBounds EmptyWorldBounds()
+    {
+        return new CaptureRuntimeViewportWorldBounds(
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+    }
+
     private static RekallAgeVulkanClearColor ParseClearColor(string? clearColor)
     {
         if (clearColor is { Length: 7 }
@@ -410,6 +607,7 @@ public sealed class CaptureRuntimeViewportCommand
             false,
             "not-captured",
             null,
-            RekallAgeViewportFrameAnalysis.NotAnalyzed);
+            RekallAgeViewportFrameAnalysis.NotAnalyzed,
+            EmptyLayoutDiagnostics());
     }
 }

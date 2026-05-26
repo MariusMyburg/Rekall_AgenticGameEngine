@@ -47,7 +47,9 @@ public sealed class RekallAgeModulePlayableGame : IRekallAgePlayableGame
 
     public void Tick(RekallAgePlaybackInput input)
     {
-        _module.Tick(_state, new RekallAgePlayableModuleInput(input.VerticalAxis, input.PrimaryAction));
+        _module.Tick(
+            _state,
+            new RekallAgePlayableModuleInput(input.VerticalAxis, input.PrimaryAction, input.DeltaSeconds));
     }
 
     public string RenderAscii()

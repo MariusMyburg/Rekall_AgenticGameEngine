@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Playback;
 using Rekall.Age.Runtime;
 using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.Runtime.Live;
@@ -52,6 +53,7 @@ internal static class Program
         var openXrRequested = HasOption(args, "--xr") || HasOption(args, "--vr");
         var simulateXrInput = HasOption(args, "--simulate-xr") || HasOption(args, "--xr-sim");
         var probeOpenXrCompositor = HasOption(args, "--openxr-compositor-probe");
+        var playableMode = HasOption(args, "--playable");
         await using var player = await RekallAgeVeldridPlayer.CreateAsync(
             Path.GetFullPath(args[0]),
             args[1],
@@ -59,6 +61,7 @@ internal static class Program
             openXrRequested,
             simulateXrInput,
             probeOpenXrCompositor,
+            playableMode,
             CancellationToken.None);
         PlayerLog.Write("Player entering render loop.");
         player.Run();
@@ -93,6 +96,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private const int HudHeight = 224;
     private const int HudMargin = 16;
     private const int SceneSupersampleFactor = 2;
+    private const int PlayableWidth = 960;
+    private const int PlayableHeight = 540;
 
     private static readonly JsonSerializerOptions LiveJsonOptions = new()
     {
@@ -102,6 +107,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     private readonly string _projectRoot;
     private readonly string _sceneName;
+    private readonly bool _playableMode;
+    private readonly IRekallAgePlayableGame? _playableGame;
+    private readonly RekallAgePlayableFrameRasterizer _playableRasterizer = new();
     private readonly string _sessionId = Guid.NewGuid().ToString("N");
     private readonly string _livePipeName;
     private readonly ConcurrentQueue<LiveEditWorkItem> _liveEditQueue = new();
@@ -153,10 +161,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly uint _drawUniformStrideBytes;
     private uint _drawUniformBufferCapacityBytes;
     private int _frameIndex;
+    private double _lastPlayableTickSeconds;
     private Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeWorld _runtimeWorld;
     private double _pendingMouseWheelDelta;
+    private double _pendingMouseDeltaX;
+    private double _pendingMouseDeltaY;
     private Vector2 _lastMousePosition;
     private Vector2 _previousMousePosition;
+    private bool _hasMousePosition;
+    private bool _mouseCaptured;
     private readonly HashSet<string> _pressedKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _pressedKeysThisFrame = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _releasedKeysThisFrame = new(StringComparer.OrdinalIgnoreCase);
@@ -178,6 +191,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private RekallAgeVeldridPlayer(
         string projectRoot,
         string sceneName,
+        bool playableMode,
+        IRekallAgePlayableGame? playableGame,
         RekallAgeSceneDocument sceneDocument,
         Sdl2Window window,
         GraphicsDevice device,
@@ -213,6 +228,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     {
         _projectRoot = projectRoot;
         _sceneName = sceneName;
+        _playableMode = playableMode;
+        _playableGame = playableGame;
         _sceneDocument = sceneDocument;
         _livePipeName = RekallAgeLivePlayerEndpoint.ResolvePipeName(projectRoot, sceneName);
         _liveServer = new RekallAgeLivePlayerNamedPipeServer(_livePipeName, EnqueueLiveEditAsync);
@@ -258,6 +275,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _openXrCompositorSession = openXrCompositorSession;
         _simulateXrInput = simulateXrInput;
         _sceneTarget = CreateSceneRenderTarget(_factory, InitialWidth, InitialHeight, _presentTextureLayout);
+        if (!_playableMode)
+        {
+            SetMouseCapture(true);
+        }
     }
 
     public static async ValueTask<RekallAgeVeldridPlayer> CreateAsync(
@@ -267,11 +288,20 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         bool openXrRequested,
         bool simulateXrInput,
         bool probeOpenXrCompositor,
+        bool playableMode,
         CancellationToken cancellationToken)
     {
         PlayerLog.Write("Loading runtime scene.");
         var scene = await new Rekall.Age.World.RekallAgeSceneStore()
             .LoadAsync(projectRoot, sceneName, cancellationToken);
+        var playableGame = playableMode
+            ? RekallAgePlayableGameFactory.Create(projectRoot, scene)
+            : null;
+        if (playableGame is not null)
+        {
+            PlayerLog.Write($"Loaded playable module kind={playableGame.Kind}.");
+        }
+
         var initialWorld = new RekallAgeRuntimeWorldBuilder().Build(scene);
         var runtimeLoop = RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
         var runResult = await runtimeLoop.RunAsync(initialWorld, 1, cancellationToken);
@@ -315,7 +345,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             InitialWidth,
             InitialHeight,
             WindowState.Normal,
-            BuildWindowTitle(sceneName, openXrRequested, simulateXrInput));
+            BuildWindowTitle(sceneName, openXrRequested, simulateXrInput, playableMode));
         PlayerLog.Write("Creating SDL window.");
         var window = VeldridStartup.CreateWindow(ref windowInfo);
         var options = new GraphicsDeviceOptions(
@@ -509,6 +539,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var player = new RekallAgeVeldridPlayer(
             projectRoot,
             sceneName,
+            playableMode,
+            playableGame,
             scene,
             window,
             device,
@@ -670,11 +702,33 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     {
         _previousMousePosition = _lastMousePosition;
         _lastMousePosition = snapshot.MousePosition;
+        if (!_hasMousePosition)
+        {
+            _previousMousePosition = _lastMousePosition;
+            _hasMousePosition = true;
+        }
+
+        var mouseDelta = _mouseCaptured
+            ? _window.MouseDelta
+            : _lastMousePosition - _previousMousePosition;
+        _pendingMouseDeltaX += mouseDelta.X;
+        _pendingMouseDeltaY += mouseDelta.Y;
+
+        if (!_playableMode && !_window.Focused && _mouseCaptured)
+        {
+            SetMouseCapture(false);
+        }
+
         foreach (var keyEvent in snapshot.KeyEvents)
         {
             var key = keyEvent.Key.ToString();
             if (keyEvent.Down)
             {
+                if (!_playableMode && key.Equals("Escape", StringComparison.OrdinalIgnoreCase))
+                {
+                    SetMouseCapture(false);
+                }
+
                 if (_pressedKeys.Add(key))
                 {
                     _pressedKeysThisFrame.Add(key);
@@ -691,6 +745,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             var button = mouseEvent.MouseButton.ToString();
             if (mouseEvent.Down)
             {
+                if (!_playableMode && !_mouseCaptured)
+                {
+                    SetMouseCapture(true);
+                }
+
                 if (_pressedButtons.Add(button))
                 {
                     _pressedButtonsThisFrame.Add(button);
@@ -714,9 +773,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private static string BuildWindowTitle(
         string sceneName,
         bool openXrRequested,
-        bool simulateXrInput)
+        bool simulateXrInput,
+        bool playableMode)
     {
-        var suffixes = new List<string> { "Vulkan swapchain" };
+        var suffixes = new List<string> { playableMode ? "Playable" : "Vulkan swapchain" };
         if (openXrRequested)
         {
             suffixes.Add("OpenXR mirror");
@@ -730,9 +790,35 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         return $"Rekall AGE Player - {sceneName} | {string.Join(" | ", suffixes)}";
     }
 
+    private void SetMouseCapture(bool captured)
+    {
+        if (_mouseCaptured == captured)
+        {
+            return;
+        }
+
+        var window = new SDL_Window(_window.SdlWindowHandle);
+        Sdl2Native.SDL_SetWindowGrab(window, captured);
+        Sdl2Native.SDL_CaptureMouse(captured);
+        Sdl2Native.SDL_SetRelativeMouseMode(captured);
+        _window.CursorVisible = !captured;
+        _mouseCaptured = captured;
+        _pendingMouseDeltaX = 0;
+        _pendingMouseDeltaY = 0;
+        _previousMousePosition = _lastMousePosition;
+        PlayerLog.Write(captured
+            ? "Runtime mouse capture enabled; press Escape to release."
+            : "Runtime mouse capture released; click the window to recapture.");
+    }
+
     public async ValueTask DisposeAsync()
     {
         _device.WaitForIdle();
+        if (_mouseCaptured)
+        {
+            SetMouseCapture(false);
+        }
+
         _assetWatcher?.Dispose();
         await _liveServer.DisposeAsync();
         _sceneTarget.Dispose();
@@ -785,6 +871,24 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _sceneTarget = CreateSceneRenderTarget(_factory, displayWidth, displayHeight, _presentTextureLayout);
         _cachedStaticGeometry = null;
         PlayerLog.Write($"Recreated supersampled scene target {_sceneTarget.Width}x{_sceneTarget.Height} for window {displayWidth}x{displayHeight}.");
+    }
+
+    private void EnsurePlayableRenderTarget()
+    {
+        if (_sceneTarget.Width == PlayableWidth && _sceneTarget.Height == PlayableHeight)
+        {
+            return;
+        }
+
+        _device.WaitForIdle();
+        _sceneTarget.Dispose();
+        _sceneTarget = CreateSceneRenderTarget(
+            _factory,
+            PlayableWidth / SceneSupersampleFactor,
+            PlayableHeight / SceneSupersampleFactor,
+            _presentTextureLayout);
+        _cachedStaticGeometry = null;
+        PlayerLog.Write($"Recreated playable frame target {_sceneTarget.Width}x{_sceneTarget.Height}.");
     }
 
     private void MarkAssetHotReloadPending()
@@ -1157,6 +1261,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     private void RenderFrame()
     {
+        if (_playableMode)
+        {
+            RenderPlayableFrame();
+            return;
+        }
+
         ProcessLiveEditQueue();
         ProcessAssetHotReload();
         var frameNumber = Interlocked.Increment(ref _frameIndex);
@@ -1267,6 +1377,46 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _device.SwapBuffers();
     }
 
+    private void RenderPlayableFrame()
+    {
+        var game = _playableGame
+            ?? throw new InvalidOperationException("Playable mode requires a loaded playable module.");
+        var frameNumber = Interlocked.Increment(ref _frameIndex);
+        var now = _clock.Elapsed.TotalSeconds;
+        var deltaSeconds = _lastPlayableTickSeconds <= 0
+            ? 1.0 / 60.0
+            : Math.Clamp(now - _lastPlayableTickSeconds, 0, 1.0 / 15.0);
+        _lastPlayableTickSeconds = now;
+        game.Tick(ConsumePlayableInput(deltaSeconds));
+        var renderFrame = game.RenderFrame(frameNumber);
+        EnsurePlayableRenderTarget();
+        var raster = _playableRasterizer.Rasterize(renderFrame, _sceneTarget.Width, _sceneTarget.Height);
+        _device.UpdateTexture(
+            _sceneTarget.Color,
+            raster.Pixels,
+            0,
+            0,
+            0,
+            (uint)_sceneTarget.Width,
+            (uint)_sceneTarget.Height,
+            1,
+            0,
+            0);
+        UpdateTitle(frameNumber, _clock.Elapsed.TotalSeconds, raster.NonBackgroundPixels);
+
+        _commands.Begin();
+        _commands.SetFramebuffer(_device.SwapchainFramebuffer);
+        _commands.SetFullViewports();
+        _commands.SetFullScissorRects();
+        _commands.ClearColorTarget(0, new RgbaFloat(0.02f, 0.04f, 0.08f, 1f));
+        _commands.SetPipeline(_presentPipeline);
+        _commands.SetGraphicsResourceSet(0, _sceneTarget.ResourceSet);
+        _commands.Draw(3);
+        _commands.End();
+        _device.SubmitCommands(_commands);
+        _device.SwapBuffers();
+    }
+
     private void DrawScenePacket(RenderPacket packet)
     {
         for (var i = 0; i < packet.Draws.Length; i++)
@@ -1296,8 +1446,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private RekallAgeRuntimeInputState ConsumeRuntimeInput()
     {
         var wheelDelta = _pendingMouseWheelDelta;
-        var mouseDeltaX = _lastMousePosition.X - _previousMousePosition.X;
-        var mouseDeltaY = _lastMousePosition.Y - _previousMousePosition.Y;
+        var mouseDeltaX = _pendingMouseDeltaX;
+        var mouseDeltaY = _pendingMouseDeltaY;
         if (wheelDelta == 0
             && mouseDeltaX == 0
             && mouseDeltaY == 0
@@ -1324,6 +1474,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _releasedKeysThisFrame.Clear();
         _pressedButtonsThisFrame.Clear();
         _releasedButtonsThisFrame.Clear();
+        _pendingMouseDeltaX = 0;
+        _pendingMouseDeltaY = 0;
         var input = new RekallAgeRuntimeInputState(
             MouseX: _lastMousePosition.X,
             MouseY: _lastMousePosition.Y,
@@ -1339,6 +1491,40 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         return _simulateXrInput
             ? RekallAgeXrInputSimulator.CreateFrame(input, _clock.Elapsed)
             : input;
+    }
+
+    private RekallAgePlaybackInput ConsumePlayableInput(double deltaSeconds)
+    {
+        var verticalAxis = 0;
+        if (IsPressed("W") || IsPressed("Up"))
+        {
+            verticalAxis -= 1;
+        }
+
+        if (IsPressed("S") || IsPressed("Down"))
+        {
+            verticalAxis += 1;
+        }
+
+        var primaryAction = IsPressedThisFrame("Space") ||
+            IsPressedThisFrame("Enter") ||
+            IsPressedThisFrame("Return");
+        _pendingMouseWheelDelta = 0;
+        _pressedKeysThisFrame.Clear();
+        _releasedKeysThisFrame.Clear();
+        _pressedButtonsThisFrame.Clear();
+        _releasedButtonsThisFrame.Clear();
+        return new RekallAgePlaybackInput(Math.Clamp(verticalAxis, -1, 1), primaryAction, deltaSeconds);
+    }
+
+    private bool IsPressed(string key)
+    {
+        return _pressedKeys.Contains(key);
+    }
+
+    private bool IsPressedThisFrame(string key)
+    {
+        return _pressedKeysThisFrame.Contains(key);
     }
 
     private static IReadOnlySet<string>? SnapshotSetOrNull(HashSet<string> source)

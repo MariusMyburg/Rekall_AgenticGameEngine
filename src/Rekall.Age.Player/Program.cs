@@ -57,9 +57,14 @@ if (useGraphics)
 Console.CursorVisible = false;
 try
 {
+    var clock = System.Diagnostics.Stopwatch.StartNew();
+    var lastTickSeconds = clock.Elapsed.TotalSeconds;
     while (true)
     {
-        var input = ReadInput();
+        var now = clock.Elapsed.TotalSeconds;
+        var deltaSeconds = Math.Clamp(now - lastTickSeconds, 0, 1.0 / 15.0);
+        lastTickSeconds = now;
+        var input = ReadInput(deltaSeconds <= 0 ? 1.0 / 30.0 : deltaSeconds);
         if (input is null)
         {
             break;
@@ -135,19 +140,19 @@ static string? TryReadRenderJsonPath(string[] args)
     return null;
 }
 
-static RekallAgePlaybackInput? ReadInput()
+static RekallAgePlaybackInput? ReadInput(double deltaSeconds)
 {
     if (!Console.KeyAvailable)
     {
-        return RekallAgePlaybackInput.None;
+        return new RekallAgePlaybackInput(0, DeltaSeconds: deltaSeconds);
     }
 
     var key = Console.ReadKey(intercept: true).Key;
     return key switch
     {
         ConsoleKey.Q or ConsoleKey.Escape => null,
-        ConsoleKey.W or ConsoleKey.UpArrow => RekallAgePlaybackInput.Up,
-        ConsoleKey.S or ConsoleKey.DownArrow => RekallAgePlaybackInput.Down,
-        _ => RekallAgePlaybackInput.None
+        ConsoleKey.W or ConsoleKey.UpArrow => new RekallAgePlaybackInput(-1, DeltaSeconds: deltaSeconds),
+        ConsoleKey.S or ConsoleKey.DownArrow => new RekallAgePlaybackInput(1, DeltaSeconds: deltaSeconds),
+        _ => new RekallAgePlaybackInput(0, DeltaSeconds: deltaSeconds)
     };
 }

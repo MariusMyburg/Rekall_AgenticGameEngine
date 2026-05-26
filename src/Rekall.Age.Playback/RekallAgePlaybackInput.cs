@@ -1,6 +1,9 @@
 namespace Rekall.Age.Playback;
 
-public readonly record struct RekallAgePlaybackInput(int VerticalAxis, bool PrimaryAction = false)
+public readonly record struct RekallAgePlaybackInput(
+    int VerticalAxis,
+    bool PrimaryAction = false,
+    double DeltaSeconds = 1.0 / 60.0)
 {
     public static RekallAgePlaybackInput None { get; } = new(0);
 

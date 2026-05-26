@@ -3125,6 +3125,18 @@ internal static class RekallAgeCli
 
         Console.WriteLine($"Renderable: {result.Value.RenderableCount}");
         Console.WriteLine($"Renderable kinds: {string.Join(", ", result.Value.RenderableKinds)}");
+        Console.WriteLine(
+            $"Layout bounds: spatial={result.Value.LayoutDiagnostics.WorldBounds.SpatialRenderableCount}, x={result.Value.LayoutDiagnostics.WorldBounds.SpanX:F2}, y={result.Value.LayoutDiagnostics.WorldBounds.SpanY:F2}, z={result.Value.LayoutDiagnostics.WorldBounds.SpanZ:F2}");
+        foreach (var code in result.Value.LayoutDiagnostics.WarningCodes)
+        {
+            Console.WriteLine($"Layout warning: {code}");
+        }
+
+        foreach (var hint in result.Value.LayoutDiagnostics.AuthoringHints)
+        {
+            Console.WriteLine($"Layout hint: {hint}");
+        }
+
         Console.WriteLine($"Culled renderables: {result.Value.CulledRenderableCount}");
         foreach (var renderable in result.Value.CulledRenderables)
         {

@@ -119,8 +119,8 @@ public sealed class RekallAgeCameraTarget3DSystem : IRekallAgeRuntimeWorldSystem
         var x = direction.X / length;
         var y = direction.Y / length;
         var z = direction.Z / length;
-        var pitch = Math.Asin(Math.Clamp(y, -1, 1)) * 180.0 / Math.PI;
-        var yaw = Math.Atan2(-x, -z) * 180.0 / Math.PI;
+        var pitch = -Math.Asin(Math.Clamp(y, -1, 1)) * 180.0 / Math.PI;
+        var yaw = Math.Atan2(x, z) * 180.0 / Math.PI;
         return new RekallAgeRuntimeVector3(pitch, yaw, rollDegrees);
     }
 

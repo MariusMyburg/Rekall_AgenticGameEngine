@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Numerics;
 using Silk.NET.Core;
 using Silk.NET.Core.Native;
 using Silk.NET.OpenXR;
@@ -638,21 +639,20 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
                                             vkDevice,
                                             physicalDevice,
                                             queueFamilyIndex.Value,
-                                            checked((ulong)plan.RenderWidth * (ulong)plan.RenderHeight * 4),
+                                            checked((ulong)plan.RenderWidth * (ulong)plan.RenderHeight * 4 * 2),
                                             errors);
                                         if (vkFrameResources is null)
                                         {
                                             return SoftwareSceneResult(false);
                                         }
 
-                                        var rendered = new RekallAgeOpenXrSoftwareSceneFrameRenderer()
-                                            .RenderAsync(plan, cancellationToken)
+                                        var sceneFrame = new RekallAgeOpenXrSoftwareSceneFrameRenderer()
+                                            .BuildSceneAsync(plan, cancellationToken)
                                             .AsTask()
                                             .GetAwaiter()
                                             .GetResult();
-                                        renderableCount = rendered.RenderableCount;
-                                        activeCamera = rendered.ActiveCamera;
-                                        var pixels = PreparePixelsForSwapchain(rendered.Rgba, format.Value);
+                                        renderableCount = sceneFrame.Frame.Renderables.Count;
+                                        activeCamera = sceneFrame.Frame.ActiveCamera?.EntityName;
 
                                         if (!BeginSessionWhenReady(xr, xrInstance, session, errors))
                                         {
@@ -669,7 +669,8 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
                                             locateViews,
                                             queue,
                                             vkFrameResources,
-                                            pixels,
+                                            sceneFrame,
+                                            format.Value,
                                             plan,
                                             cancellationToken,
                                             errors);
@@ -882,12 +883,14 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
         XrLocateViewsDelegate locateViews,
         Queue queue,
         VulkanSoftwareSceneFrameResources vkFrameResources,
-        byte[] pixels,
+        RekallAgeOpenXrPerspectiveSceneFrame sceneFrame,
+        long swapchainFormat,
         RekallAgeOpenXrHeadsetSoftwareSceneSubmitPlan plan,
         CancellationToken cancellationToken,
         List<string> errors)
     {
         var submitted = 0;
+        var perspectiveRenderer = new RekallAgePerspectiveSoftwareSceneRenderer();
         var views = stackalloc View[2];
         var projectionViews = stackalloc CompositionLayerProjectionView[2];
         var layerPointers = stackalloc CompositionLayerBaseHeader*[1];
@@ -948,7 +951,14 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
             else
             {
                 var selectedImage = images[Math.Min((int)imageIndex, images.Length - 1)];
-                UploadSoftwareSceneImage(vk, queue, vkFrameResources, selectedImage, pixels, plan.RenderWidth, plan.RenderHeight);
+                var stereoPixels = RenderStereoScenePixels(
+                    perspectiveRenderer,
+                    sceneFrame,
+                    views,
+                    plan.RenderWidth,
+                    plan.RenderHeight,
+                    swapchainFormat);
+                UploadSoftwareSceneImage(vk, queue, vkFrameResources, selectedImage, stereoPixels, plan.RenderWidth, plan.RenderHeight);
             }
 
             var releaseInfo = new SwapchainImageReleaseInfo { Type = XrStructureType.SwapchainImageReleaseInfo };
@@ -1267,6 +1277,51 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
         return bgra;
     }
 
+    private static byte[] RenderStereoScenePixels(
+        RekallAgePerspectiveSoftwareSceneRenderer renderer,
+        RekallAgeOpenXrPerspectiveSceneFrame sceneFrame,
+        View* views,
+        int width,
+        int height,
+        long swapchainFormat)
+    {
+        var camera = sceneFrame.Frame.ActiveCamera
+            ?? throw new InvalidOperationException("OpenXR scene rendering requires an active camera.");
+        var layerBytes = checked(width * height * 4);
+        var stereo = new byte[checked(layerBytes * 2)];
+        for (var eye = 0; eye < 2; eye++)
+        {
+            var orientation = ToNumerics(views[eye].Pose.Orientation);
+            var position = ToNumerics(views[eye].Pose.Position);
+            var viewProjection = renderer.CreateCameraViewProjection(
+                camera,
+                width,
+                height,
+                orientation,
+                position);
+            var rgba = renderer.Render(
+                sceneFrame.Batch,
+                width,
+                height,
+                viewProjection,
+                camera.ClearColor);
+            var formatted = PreparePixelsForSwapchain(rgba, swapchainFormat);
+            System.Buffer.BlockCopy(formatted, 0, stereo, eye * layerBytes, layerBytes);
+        }
+
+        return stereo;
+    }
+
+    private static Quaternion ToNumerics(Quaternionf value)
+    {
+        return Quaternion.Normalize(new Quaternion(value.X, value.Y, value.Z, value.W));
+    }
+
+    private static Vector3 ToNumerics(Vector3f value)
+    {
+        return new Vector3(value.X, value.Y, value.Z);
+    }
+
     private static void UploadSoftwareSceneImage(
         Vk vk,
         Queue queue,
@@ -1315,11 +1370,12 @@ public sealed unsafe class RekallAgeSilkOpenXrHeadsetClearSubmitter
             1,
             &toTransfer);
         var copies = stackalloc BufferImageCopy[2];
+        var layerBytes = checked((ulong)width * (ulong)height * 4);
         for (uint eye = 0; eye < 2; eye++)
         {
             copies[eye] = new BufferImageCopy
             {
-                BufferOffset = 0,
+                BufferOffset = layerBytes * eye,
                 BufferRowLength = 0,
                 BufferImageHeight = 0,
                 ImageSubresource = new ImageSubresourceLayers(ImageAspectFlags.ColorBit, 0, eye, 1),

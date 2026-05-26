@@ -56,8 +56,8 @@ public sealed class CameraTargetSystemTests
         Assert.Equal(0, updatedCamera.Transform.Position3D.X, precision: 3);
         Assert.Equal(2, updatedCamera.Transform.Position3D.Y, precision: 3);
         Assert.Equal(6, updatedCamera.Transform.Position3D.Z, precision: 3);
-        Assert.Equal(-18.435, updatedCamera.Transform.Rotation3D.X, precision: 2);
-        Assert.Equal(0, updatedCamera.Transform.Rotation3D.Y, precision: 2);
+        Assert.Equal(18.435, updatedCamera.Transform.Rotation3D.X, precision: 2);
+        Assert.Equal(180, updatedCamera.Transform.Rotation3D.Y, precision: 2);
         Assert.Contains("runtime.camera.target3d", result.World.SystemsRun);
     }
 }

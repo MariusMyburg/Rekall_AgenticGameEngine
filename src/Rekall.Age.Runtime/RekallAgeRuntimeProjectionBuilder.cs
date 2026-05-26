@@ -68,7 +68,12 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             Math.Max(0.001, ReadNumber(component.Properties, "stereoConvergenceDistance", 10)),
                             NormalizeXrViewConfiguration(ReadString(component.Properties, "xrViewConfiguration")),
                             ReadBoolean(component.Properties, "foveatedRendering", false),
-                            RekallAgeRenderLayerMask.NormalizeCullingMask(ReadString(component.Properties, "cullingMask"))));
+                            RekallAgeRenderLayerMask.NormalizeCullingMask(ReadString(component.Properties, "cullingMask")),
+                            ReadNumber(component.Properties, "renderOrder", 0),
+                            Math.Clamp(ReadNumber(component.Properties, "viewportX", 0), 0, 1),
+                            Math.Clamp(ReadNumber(component.Properties, "viewportY", 0), 0, 1),
+                            Math.Clamp(ReadNumber(component.Properties, "viewportWidth", 1), 0.001, 1),
+                            Math.Clamp(ReadNumber(component.Properties, "viewportHeight", 1), 0.001, 1)));
                         break;
                     case "Rekall.SpriteRenderer":
                         sprites.Add(new RekallAgeRuntimeRenderSprite(

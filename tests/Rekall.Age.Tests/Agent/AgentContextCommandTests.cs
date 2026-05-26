@@ -39,6 +39,9 @@ public sealed class AgentContextCommandTests
                 .AddComponent(Rekall.Age.World.RekallAgeComponentDocument.Create("Rekall.Camera3D", new System.Text.Json.Nodes.JsonObject
                 {
                     ["active"] = true,
+                    ["renderOrder"] = 10,
+                    ["viewportX"] = 0.5,
+                    ["viewportWidth"] = 0.5,
                     ["cullingMask"] = "world, helpers"
                 })))
             .AddEntity(Rekall.Age.World.RekallAgeEntityDocument.Create("World Cube", ["prop"])
@@ -58,6 +61,9 @@ public sealed class AgentContextCommandTests
             camera.EntityName == "Camera"
             && camera.Kind == "Camera3D"
             && camera.Active
+            && camera.RenderOrder == 10
+            && camera.ViewportX == 0.5
+            && camera.ViewportWidth == 0.5
             && camera.CullingMask == "world, helpers");
         Assert.Contains(result.Value.Summary.RenderLayers, layer => layer.Layer == "world" && layer.RenderableCount == 1);
         Assert.Contains(result.Value.Summary.RenderLayers, layer => layer.Layer == "helpers" && layer.RenderableCount == 1);
@@ -137,6 +143,8 @@ public sealed class AgentContextCommandTests
         Assert.Contains(result.Value.AuthoringContracts, contract =>
             contract.Name == "xr-camera-contract"
             && contract.PrimaryType == "Rekall.Camera3D"
+            && contract.Capabilities.Contains("render-order")
+            && contract.Capabilities.Contains("normalized-viewport")
             && contract.Capabilities.Contains("single-pass-multiview"));
         Assert.Contains(result.Value.AuthoringContracts, contract =>
             contract.Name == "xr-runtime-input"

@@ -229,9 +229,10 @@ public sealed class GetEngineStatusCommand
                     "xr-camera-contract",
                     "Rekall.Camera3D",
                     "Camera entities can opt into primary-stereo OpenXR rendering without game-specific engine code.",
-                    ["active-camera", "stereo-mode", "single-pass-multiview", "primary-stereo-view-configuration"],
+                    ["active-camera", "render-order", "normalized-viewport", "stereo-mode", "single-pass-multiview", "primary-stereo-view-configuration"],
                     [
                         "rekall.render.stereo.inspect_plan",
+                        "rekall.render.visibility.inspect_scene",
                         "rekall.render.openxr.bootstrap_session",
                         "rekall.render.openxr.inspect_headset_frame_plan"
                     ]),

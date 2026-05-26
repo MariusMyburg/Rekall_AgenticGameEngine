@@ -54,7 +54,12 @@ public sealed record RekallAgeScenePerformanceCameraMask(
     string EntityId,
     string EntityName,
     bool Active,
-    string CullingMask);
+    string CullingMask,
+    double RenderOrder = 0,
+    double ViewportX = 0,
+    double ViewportY = 0,
+    double ViewportWidth = 1,
+    double ViewportHeight = 1);
 
 public sealed record RekallAgeScenePerformanceCulledRenderable(
     string EntityId,
@@ -340,8 +345,14 @@ public sealed class InspectScenePerformanceBudgetCommand
                 camera.EntityId,
                 camera.EntityName,
                 camera.Active,
-                RekallAgeRenderLayerMask.NormalizeCullingMask(camera.CullingMask)))
+                RekallAgeRenderLayerMask.NormalizeCullingMask(camera.CullingMask),
+                camera.RenderOrder,
+                camera.ViewportX,
+                camera.ViewportY,
+                camera.ViewportWidth,
+                camera.ViewportHeight))
             .OrderByDescending(camera => camera.Active)
+            .ThenBy(camera => camera.RenderOrder)
             .ThenBy(camera => camera.EntityName, StringComparer.Ordinal)
             .ToArray();
     }

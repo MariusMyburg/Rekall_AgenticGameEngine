@@ -51,9 +51,15 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     camera.StereoConvergenceDistance,
                     camera.XrViewConfiguration,
                     camera.FoveatedRendering,
-                    camera.CullingMask);
+                    camera.CullingMask,
+                    camera.RenderOrder,
+                    camera.ViewportX,
+                    camera.ViewportY,
+                    camera.ViewportWidth,
+                    camera.ViewportHeight);
             })
             .OrderByDescending(camera => camera.Active)
+            .ThenBy(camera => camera.RenderOrder)
             .ThenBy(camera => camera.EntityName, StringComparer.Ordinal)
             .ThenBy(camera => camera.EntityId, StringComparer.Ordinal)
             .ToArray();
@@ -136,19 +142,23 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 ? "dual-pass"
                 : "single-pass-multiview";
         var preferMultiview = renderMode.Equals("single-pass-multiview", StringComparison.Ordinal);
+        var cameraViewportX = Math.Clamp(activeCamera.ViewportX, 0, 1) * width;
+        var cameraViewportY = Math.Clamp(activeCamera.ViewportY, 0, 1) * height;
+        var cameraViewportWidth = Math.Max(1, Math.Clamp(activeCamera.ViewportWidth, 0.001, 1) * width);
+        var cameraViewportHeight = Math.Max(1, Math.Clamp(activeCamera.ViewportHeight, 0.001, 1) * height);
         var eyeWidth = renderMode.Equals("side-by-side", StringComparison.Ordinal)
-            ? Math.Max(1, width / 2.0)
-            : Math.Max(1, width);
+            ? Math.Max(1, cameraViewportWidth / 2.0)
+            : Math.Max(1, cameraViewportWidth);
         var eyes = renderMode.Equals("side-by-side", StringComparison.Ordinal)
             ? new[]
             {
-                new RekallAgeRuntimeViewportEye("left", 0, -halfSeparation, 0, 0, 0, 0, eyeWidth, height),
-                new RekallAgeRuntimeViewportEye("right", 1, halfSeparation, 0, 0, eyeWidth, 0, eyeWidth, height)
+                new RekallAgeRuntimeViewportEye("left", 0, -halfSeparation, 0, 0, cameraViewportX, cameraViewportY, eyeWidth, cameraViewportHeight),
+                new RekallAgeRuntimeViewportEye("right", 1, halfSeparation, 0, 0, cameraViewportX + eyeWidth, cameraViewportY, eyeWidth, cameraViewportHeight)
             }
             : new[]
             {
-                new RekallAgeRuntimeViewportEye("left", 0, -halfSeparation, 0, 0, 0, 0, width, height),
-                new RekallAgeRuntimeViewportEye("right", 1, halfSeparation, 0, 0, 0, 0, width, height)
+                new RekallAgeRuntimeViewportEye("left", 0, -halfSeparation, 0, 0, cameraViewportX, cameraViewportY, eyeWidth, cameraViewportHeight),
+                new RekallAgeRuntimeViewportEye("right", 1, halfSeparation, 0, 0, cameraViewportX, cameraViewportY, eyeWidth, cameraViewportHeight)
             };
         return new RekallAgeRuntimeViewportStereoSettings(
             true,

@@ -274,7 +274,12 @@ public sealed record RekallAgeRuntimeRenderCamera(
     double StereoConvergenceDistance = 10,
     string XrViewConfiguration = "primary-stereo",
     bool FoveatedRendering = false,
-    string CullingMask = "*");
+    string CullingMask = "*",
+    double RenderOrder = 0,
+    double ViewportX = 0,
+    double ViewportY = 0,
+    double ViewportWidth = 1,
+    double ViewportHeight = 1);
 
 public sealed record RekallAgeRuntimeRenderSprite(
     string EntityId,

@@ -23,6 +23,11 @@ public sealed record InspectSceneVisibilityCamera(
     string EntityName,
     bool Active,
     string CullingMask,
+    double RenderOrder,
+    double ViewportX,
+    double ViewportY,
+    double ViewportWidth,
+    double ViewportHeight,
     int VisibleRenderableCount,
     IReadOnlyList<InspectSceneVisibilityRenderable> VisibleRenderables,
     int CulledRenderableCount,
@@ -83,6 +88,7 @@ public sealed class InspectSceneVisibilityCommand
             .ToArray();
         var cameras = rendering.Cameras
             .OrderByDescending(camera => camera.Active)
+            .ThenBy(camera => camera.RenderOrder)
             .ThenBy(camera => camera.EntityName, StringComparer.Ordinal)
             .ThenBy(camera => camera.EntityId, StringComparer.Ordinal)
             .Select(camera => BuildCameraVisibility(camera, renderables))
@@ -127,6 +133,11 @@ public sealed class InspectSceneVisibilityCommand
             camera.EntityName,
             camera.Active,
             RekallAgeRenderLayerMask.NormalizeCullingMask(camera.CullingMask),
+            camera.RenderOrder,
+            camera.ViewportX,
+            camera.ViewportY,
+            camera.ViewportWidth,
+            camera.ViewportHeight,
             visible.Length,
             visible,
             culled.Length,

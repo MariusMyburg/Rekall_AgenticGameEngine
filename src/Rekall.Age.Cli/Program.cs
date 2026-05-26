@@ -644,7 +644,7 @@ internal static class RekallAgeCli
         Console.WriteLine($"Budget: draws {result.Value.Limits.MaxDrawInvocations}, triangles {result.Value.Limits.MaxTriangles}, vertices {result.Value.Limits.MaxVertices}, textures {result.Value.Limits.MaxTextures}, pixels {result.Value.Limits.MaxRenderTargetPixels}");
         foreach (var camera in result.Value.CameraMasks)
         {
-            Console.WriteLine($"Camera: {camera.EntityName}; active: {camera.Active}; culling mask: {camera.CullingMask}");
+            Console.WriteLine($"Camera: {camera.EntityName}; active: {camera.Active}; order: {camera.RenderOrder}; viewport: {camera.ViewportX},{camera.ViewportY} {camera.ViewportWidth}x{camera.ViewportHeight}; culling mask: {camera.CullingMask}");
         }
 
         foreach (var layer in result.Value.LayerBreakdown)
@@ -778,7 +778,7 @@ internal static class RekallAgeCli
         Console.WriteLine($"Renderables: {result.Value.TotalRenderableCount}");
         foreach (var camera in result.Value.Cameras)
         {
-            Console.WriteLine($"Camera: {camera.EntityName}; active: {camera.Active}; culling mask: {camera.CullingMask}; visible: {camera.VisibleRenderableCount}; culled: {camera.CulledRenderableCount}");
+            Console.WriteLine($"Camera: {camera.EntityName}; active: {camera.Active}; order: {camera.RenderOrder}; viewport: {camera.ViewportX},{camera.ViewportY} {camera.ViewportWidth}x{camera.ViewportHeight}; culling mask: {camera.CullingMask}; visible: {camera.VisibleRenderableCount}; culled: {camera.CulledRenderableCount}");
             foreach (var renderable in camera.VisibleRenderables)
             {
                 Console.WriteLine($"  Visible: {renderable.EntityName}; kind: {renderable.Kind}; layer: {renderable.Layer}");
@@ -2601,7 +2601,7 @@ internal static class RekallAgeCli
         Console.WriteLine($"Components: {string.Join(", ", summary.ComponentTypes)}");
         foreach (var camera in summary.Cameras)
         {
-            Console.WriteLine($"Camera: {camera.EntityName}; kind: {camera.Kind}; active: {camera.Active}; culling mask: {camera.CullingMask}");
+            Console.WriteLine($"Camera: {camera.EntityName}; kind: {camera.Kind}; active: {camera.Active}; order: {camera.RenderOrder}; viewport: {camera.ViewportX},{camera.ViewportY} {camera.ViewportWidth}x{camera.ViewportHeight}; culling mask: {camera.CullingMask}");
         }
 
         foreach (var layer in summary.RenderLayers)

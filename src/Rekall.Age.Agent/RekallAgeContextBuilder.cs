@@ -2,6 +2,7 @@ using Rekall.Age.Core.Rendering;
 using Rekall.Age.Project;
 using Rekall.Age.Validation;
 using Rekall.Age.World;
+using System.Globalization;
 using System.Text.Json.Nodes;
 
 namespace Rekall.Age.Agent;
@@ -93,8 +94,14 @@ public sealed class RekallAgeContextBuilder
                     entity.Name,
                     SimplifyComponentType(component.Type),
                     ReadBoolean(component.Properties, "active", true),
-                    RekallAgeRenderLayerMask.NormalizeCullingMask(ReadString(component.Properties, "cullingMask")))))
+                    RekallAgeRenderLayerMask.NormalizeCullingMask(ReadString(component.Properties, "cullingMask")),
+                    ReadNumber(component.Properties, "renderOrder", 0),
+                    Math.Clamp(ReadNumber(component.Properties, "viewportX", 0), 0, 1),
+                    Math.Clamp(ReadNumber(component.Properties, "viewportY", 0), 0, 1),
+                    Math.Clamp(ReadNumber(component.Properties, "viewportWidth", 1), 0.001, 1),
+                    Math.Clamp(ReadNumber(component.Properties, "viewportHeight", 1), 0.001, 1))))
             .OrderByDescending(camera => camera.Active)
+            .ThenBy(camera => camera.RenderOrder)
             .ThenBy(camera => camera.EntityName, StringComparer.Ordinal)
             .ThenBy(camera => camera.EntityId, StringComparer.Ordinal)
             .ToArray();
@@ -164,6 +171,34 @@ public sealed class RekallAgeContextBuilder
             && value.TryGetValue<string>(out var text)
             ? text
             : null;
+    }
+
+    private static double ReadNumber(JsonObject properties, string name, double fallback)
+    {
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
+        {
+            return fallback;
+        }
+
+        if (value.TryGetValue<double>(out var doubleValue))
+        {
+            return doubleValue;
+        }
+
+        if (value.TryGetValue<int>(out var intValue))
+        {
+            return intValue;
+        }
+
+        if (value.TryGetValue<long>(out var longValue))
+        {
+            return longValue;
+        }
+
+        return value.TryGetValue<string>(out var text)
+            && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : fallback;
     }
 
     private static bool TryGetPropertyValue(JsonObject properties, string name, out JsonNode? node)

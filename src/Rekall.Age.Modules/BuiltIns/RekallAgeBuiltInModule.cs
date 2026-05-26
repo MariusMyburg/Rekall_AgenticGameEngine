@@ -93,6 +93,21 @@ public sealed class RekallAgeCamera2DComponent : RekallAgeComponent
     [RekallAgeProperty]
     public string CullingMask { get; init; } = "*";
 
+    [RekallAgeProperty]
+    public double RenderOrder { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double ViewportX { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double ViewportY { get; init; }
+
+    [RekallAgeProperty(Minimum = 0.001, Maximum = 1)]
+    public double ViewportWidth { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.001, Maximum = 1)]
+    public double ViewportHeight { get; init; } = 1;
+
     [RekallAgeProperty(Minimum = 0.001)]
     public double OrthographicSize { get; init; } = 10;
 
@@ -129,6 +144,21 @@ public sealed class RekallAgeCamera3DComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public bool Active { get; init; } = true;
+
+    [RekallAgeProperty]
+    public double RenderOrder { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double ViewportX { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double ViewportY { get; init; }
+
+    [RekallAgeProperty(Minimum = 0.001, Maximum = 1)]
+    public double ViewportWidth { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.001, Maximum = 1)]
+    public double ViewportHeight { get; init; } = 1;
 
     [RekallAgeProperty]
     public string StereoMode { get; init; } = "mono";

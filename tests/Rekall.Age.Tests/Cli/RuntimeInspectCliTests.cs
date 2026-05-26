@@ -248,7 +248,7 @@ public sealed class RuntimeInspectCliTests
         var result = await RunAsync(FindCliAssemblyPath(), "context", "scene", root, "Main");
 
         Assert.Equal(0, result.ExitCode);
-        Assert.Contains("Camera: Camera; kind: Camera3D; active: True; culling mask: world", result.Output);
+        Assert.Contains("Camera: Camera; kind: Camera3D; active: True; order: 0; viewport: 0,0 1x1; culling mask: world", result.Output);
         Assert.Contains("Render layer: world; renderables: 1; entities: World Cube", result.Output);
     }
 
@@ -281,7 +281,7 @@ public sealed class RuntimeInspectCliTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("visibility: 2 renderables across 1 camera", result.Output);
-        Assert.Contains("Camera: Camera; active: True; culling mask: world; visible: 1; culled: 1", result.Output);
+        Assert.Contains("Camera: Camera; active: True; order: 0; viewport: 0,0 1x1; culling mask: world; visible: 1; culled: 1", result.Output);
         Assert.Contains("Visible: World Cube; kind: mesh; layer: world", result.Output);
         Assert.Contains("Culled: Hidden Helper; kind: mesh; layer: helpers; reason: camera-culling-mask", result.Output);
         Assert.Contains("Unseen by active camera: Hidden Helper; kind: mesh; layer: helpers", result.Output);

@@ -46,6 +46,11 @@ public sealed class SceneVisibilityCommandTests
         var worldCamera = Assert.Single(result.Value.Cameras, camera => camera.EntityName == "World Camera");
         Assert.True(worldCamera.Active);
         Assert.Equal("world", worldCamera.CullingMask);
+        Assert.Equal(0, worldCamera.RenderOrder);
+        Assert.Equal(0, worldCamera.ViewportX);
+        Assert.Equal(0, worldCamera.ViewportY);
+        Assert.Equal(1, worldCamera.ViewportWidth);
+        Assert.Equal(1, worldCamera.ViewportHeight);
         Assert.Contains(worldCamera.VisibleRenderables, renderable => renderable.EntityName == "World Cube");
         Assert.Contains(worldCamera.CulledRenderables, renderable => renderable.EntityName == "Ui Panel" && renderable.Layer == "ui");
         Assert.Contains(worldCamera.CulledRenderables, renderable => renderable.EntityName == "Debug Gizmo" && renderable.Layer == "debug");

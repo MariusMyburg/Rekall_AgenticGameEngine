@@ -76,5 +76,60 @@ public sealed class RenderLayerCullingTests
 
         Assert.Contains(layer.Properties, property => property.Name == "Layer" && property.Kind == "string");
         Assert.Contains(camera.Properties, property => property.Name == "CullingMask" && property.Kind == "string");
+        Assert.Contains(camera.Properties, property => property.Name == "RenderOrder" && property.Kind == "number");
+        Assert.Contains(camera.Properties, property => property.Name == "ViewportWidth" && property.Kind == "number");
+    }
+
+    [Fact]
+    public void RuntimeRenderFrameOrdersCamerasAndPreservesViewportRectangles()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Ui Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = 100,
+                    ["viewportX"] = 0.75,
+                    ["viewportY"] = 0,
+                    ["viewportWidth"] = 0.25,
+                    ["viewportHeight"] = 0.25,
+                    ["cullingMask"] = "ui"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("World Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["renderOrder"] = -10,
+                    ["viewportX"] = 0,
+                    ["viewportY"] = 0,
+                    ["viewportWidth"] = 1,
+                    ["viewportHeight"] = 1,
+                    ["cullingMask"] = "world"
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 1280, 720, debugOverlay: false);
+
+        Assert.Equal("World Camera", frame.ActiveCamera?.EntityName);
+        Assert.Collection(
+            frame.Cameras,
+            camera =>
+            {
+                Assert.Equal("World Camera", camera.EntityName);
+                Assert.Equal(-10, camera.RenderOrder);
+                Assert.Equal(0, camera.ViewportX);
+                Assert.Equal(0, camera.ViewportY);
+                Assert.Equal(1, camera.ViewportWidth);
+                Assert.Equal(1, camera.ViewportHeight);
+            },
+            camera =>
+            {
+                Assert.Equal("Ui Camera", camera.EntityName);
+                Assert.Equal(100, camera.RenderOrder);
+                Assert.Equal(0.75, camera.ViewportX);
+                Assert.Equal(0, camera.ViewportY);
+                Assert.Equal(0.25, camera.ViewportWidth);
+                Assert.Equal(0.25, camera.ViewportHeight);
+            });
     }
 }

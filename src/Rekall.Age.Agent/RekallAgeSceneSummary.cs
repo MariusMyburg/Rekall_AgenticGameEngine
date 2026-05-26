@@ -22,7 +22,12 @@ public sealed record RekallAgeSceneCameraSummary(
     string EntityName,
     string Kind,
     bool Active,
-    string CullingMask);
+    string CullingMask,
+    double RenderOrder = 0,
+    double ViewportX = 0,
+    double ViewportY = 0,
+    double ViewportWidth = 1,
+    double ViewportHeight = 1);
 
 public sealed record RekallAgeSceneRenderLayerSummary(
     string Layer,

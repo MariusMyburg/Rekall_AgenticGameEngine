@@ -923,8 +923,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     SType = StructureType.PipelineInputAssemblyStateCreateInfo,
                     Topology = PrimitiveTopology.TriangleList
                 };
-                var viewport = new Viewport(0, 0, frame.Width, frame.Height, 0, 1);
-                var scissor = new Rect2D(new Offset2D(0, 0), new Extent2D((uint)frame.Width, (uint)frame.Height));
+                var cameraRect = RekallAgeRuntimeViewportCameraRect.FromFrame(frame);
+                var viewport = new Viewport(cameraRect.X, cameraRect.Y, cameraRect.Width, cameraRect.Height, 0, 1);
+                var scissor = new Rect2D(new Offset2D(cameraRect.X, cameraRect.Y), new Extent2D((uint)cameraRect.Width, (uint)cameraRect.Height));
                 var viewportState = new PipelineViewportStateCreateInfo
                 {
                     SType = StructureType.PipelineViewportStateCreateInfo,

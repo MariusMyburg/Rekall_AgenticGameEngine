@@ -48,6 +48,8 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
             }
         }
 
+        RestorePixelsOutsideActiveCameraViewport(frame, pixels);
+
         if (frame.DebugOverlay.Enabled)
         {
             DrawDebugOverlay(frame, pixels);
@@ -85,6 +87,34 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         {
             for (var x = 0; x < frame.Width; x++)
             {
+                var index = ToIndex(frame, x, y);
+                pixels[index + 0] = color.R;
+                pixels[index + 1] = color.G;
+                pixels[index + 2] = color.B;
+                pixels[index + 3] = 255;
+            }
+        }
+    }
+
+    private static void RestorePixelsOutsideActiveCameraViewport(RekallAgeRuntimeViewportFrame frame, byte[] pixels)
+    {
+        var rect = RekallAgeRuntimeViewportCameraRect.FromFrame(frame);
+        if (rect.X == 0 && rect.Y == 0 && rect.Width == frame.Width && rect.Height == frame.Height)
+        {
+            return;
+        }
+
+        var color = ParseHexColor(frame.ActiveCamera?.ClearColor, new SoftwareColor(18, 46, 86));
+        for (var y = 0; y < frame.Height; y++)
+        {
+            for (var x = 0; x < frame.Width; x++)
+            {
+                if (x >= rect.X && x < rect.X + rect.Width
+                    && y >= rect.Y && y < rect.Y + rect.Height)
+                {
+                    continue;
+                }
+
                 var index = ToIndex(frame, x, y);
                 pixels[index + 0] = color.R;
                 pixels[index + 1] = color.G;

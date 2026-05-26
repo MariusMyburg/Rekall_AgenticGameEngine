@@ -203,8 +203,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         return new CameraPose(
             cameraEye,
             cameraForward,
-            Vector3.Normalize(new Vector3(rightVector.X, rightVector.Y, rightVector.Z)),
-            Vector3.Normalize(new Vector3(upVector.X, upVector.Y, upVector.Z)));
+            NormalizeOrFallback(new Vector3(rightVector.X, rightVector.Y, rightVector.Z), Vector3.UnitX),
+            NormalizeOrFallback(new Vector3(upVector.X, upVector.Y, upVector.Z), Vector3.UnitY));
     }
 
     private static bool IsDefaultCamera(RekallAgeRuntimeViewportCamera camera)
@@ -318,8 +318,15 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
 
     private static Vector3 DirectionFromEuler(double degreesX, double degreesY, double degreesZ)
     {
-        var vector = Rotate(0, 0, -1, degreesX, degreesY, degreesZ);
+        var vector = Rotate(0, 0, 1, degreesX, degreesY, degreesZ);
         return Vector3.Normalize(new Vector3(vector.X, vector.Y, vector.Z));
+    }
+
+    private static Vector3 NormalizeOrFallback(Vector3 vector, Vector3 fallback)
+    {
+        return vector.LengthSquared() < 0.000001f
+            ? fallback
+            : Vector3.Normalize(vector);
     }
 
     private static (float X, float Y, float Z) Rotate(float x, float y, float z, double degreesX, double degreesY, double degreesZ)

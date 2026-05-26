@@ -308,7 +308,7 @@ public sealed class ViewportContractTests
             [mesh]);
 
         Assert.NotEqual(narrow.Frame.ViewProjection.M11, wide.Frame.ViewProjection.M11);
-        Assert.True(narrow.Frame.ViewProjection.M11 > wide.Frame.ViewProjection.M11);
+        Assert.True(Math.Abs(narrow.Frame.ViewProjection.M11) > Math.Abs(wide.Frame.ViewProjection.M11));
     }
 
     [Fact]

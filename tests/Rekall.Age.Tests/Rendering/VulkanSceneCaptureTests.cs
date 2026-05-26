@@ -118,6 +118,53 @@ public sealed class VulkanSceneCaptureTests
     }
 
     [Fact]
+    public async Task NativeSceneCaptureDrawsPrimitiveMeshesFromAuthoredCameraWhenVulkanIsAvailable()
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera-1",
+            "Player Camera",
+            "Camera3D",
+            true,
+            0,
+            1.2,
+            -5,
+            RotationX: 0,
+            RotationY: 0,
+            ProjectionMode: "perspective",
+            FieldOfViewDegrees: 70);
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "cube-1",
+            "Cube",
+            "mesh",
+            "rekall.primitive.cube",
+            0,
+            1.2,
+            0,
+            1,
+            Variant: "rekall.geometry.cube")) with
+        {
+            ActiveCamera = camera,
+            Cameras = [camera]
+        };
+
+        var result = await new RekallAgeNativeVulkanSceneCapture(new FakeClearCapture()).CaptureSceneAsync(
+            frame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            TestPaths.CreateTempDirectory(),
+            "discrete-gpu",
+            CancellationToken.None);
+
+        if (!result.Captured)
+        {
+            Assert.NotEmpty(result.Errors);
+            return;
+        }
+
+        var image = await RekallAgePngReader.ReadRgbaAsync(result.OutputPath, CancellationToken.None);
+        Assert.True(CountPixelsDifferentFromClear(image) > 0);
+    }
+
+    [Fact]
     public async Task NativeSceneCaptureSamplesGpuCompressedRuntimeTexturesWhenVulkanIsAvailable()
     {
         var textureId = "asset_red_bc1";

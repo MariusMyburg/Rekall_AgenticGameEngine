@@ -32,6 +32,8 @@ public sealed class McpJsonRpcServerTests
         var instructions = document.RootElement.GetProperty("result").GetProperty("instructions").GetString();
         Assert.Contains("rekall.templates.inspect", instructions, StringComparison.Ordinal);
         Assert.Contains("rekall.templates.verify_mvp", instructions, StringComparison.Ordinal);
+        Assert.Contains("rekall.workflow.agent_authoring_gauntlet", instructions, StringComparison.Ordinal);
+        Assert.Contains("preferred closed-loop proof", instructions, StringComparison.Ordinal);
         Assert.Contains("rekall.workflow.create_playable_package_from_template", instructions, StringComparison.Ordinal);
         Assert.Contains("rekall.context.engine_status", instructions, StringComparison.Ordinal);
         Assert.Contains("rekall.module.scaffold_runtime_system", instructions, StringComparison.Ordinal);

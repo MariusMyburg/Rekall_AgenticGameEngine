@@ -1106,6 +1106,7 @@ Asset import:
 ```text
 rekall.asset.import
 rekall.asset.import_report
+rekall.asset.tripo.generate_model
 rekall.asset.list
 ```
 
@@ -1126,6 +1127,15 @@ dotnet run --project src/Rekall.Age.Cli -- asset import-report .age-sandbox .\ro
 dotnet run --project src/Rekall.Age.Cli -- asset import .age-sandbox .\robot.glb model "Robot"
 dotnet run --project src/Rekall.Age.Cli -- asset list .age-sandbox
 ```
+
+Tripo3D text-to-model generation:
+
+```powershell
+$env:TRIPO_API_KEY = '<your Tripo API key>'
+dotnet run --project src/Rekall.Age.Cli -- asset tripo generate .age-sandbox "a modular sci-fi crate" "Sci-Fi Crate"
+```
+
+The Tripo command uses the official task flow: create a `text_to_model` task, poll until the task reaches `success`, download the returned model URL, then import the GLB through Rekall AGE's normal model asset pipeline. The default Tripo model version is `Turbo-v1.0-20250506`; pass a model version as the final CLI argument to override it.
 
 Scene export:
 

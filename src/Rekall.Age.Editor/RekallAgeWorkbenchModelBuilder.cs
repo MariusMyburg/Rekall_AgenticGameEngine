@@ -219,6 +219,13 @@ public sealed class RekallAgeWorkbenchModelBuilder
                 "Preview asset import results before committing imported content.",
                 Recommended: true),
             new(
+                "tripo-generate-model",
+                "Generate Tripo Model",
+                "Assets",
+                "rekall.asset.tripo.generate_model",
+                "Generate a Tripo3D text-to-model task and import the completed model as a generic asset.",
+                Recommended: true),
+            new(
                 "agent-authoring-gauntlet",
                 "Agent Authoring Gauntlet",
                 "Workflow",

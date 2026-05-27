@@ -73,6 +73,7 @@ public sealed class WorkbenchReadModelTests
         Assert.Contains(model.SceneSummary.ComponentTypes, component => component.Type == "Rekall.SpriteRenderer" && component.Count == 1);
         Assert.Contains(model.Actions.Actions, action => action.Tool == "rekall.validation.scene" && action.Recommended);
         Assert.Contains(model.Actions.Actions, action => action.Tool == "rekall.render.capture_runtime_viewport" && action.Recommended);
+        Assert.Contains(model.Actions.Actions, action => action.Tool == "rekall.asset.tripo.generate_model" && action.Recommended);
     }
 
     [Fact]

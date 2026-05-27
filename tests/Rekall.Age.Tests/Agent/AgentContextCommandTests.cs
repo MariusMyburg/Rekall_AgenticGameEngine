@@ -151,7 +151,7 @@ public sealed class AgentContextCommandTests
         Assert.True(result.Value.AgentFirst);
         Assert.DoesNotContain(result.Value.WorkflowTools, workflow => workflow.Tool.StartsWith("rekall.templates.", StringComparison.Ordinal));
         Assert.DoesNotContain(result.Value.WorkflowTools, workflow => workflow.Tool.Contains("template", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(result.Value.WorkflowTools, workflow => workflow.Tool.Contains("gauntlet", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.workflow.agent_authoring_gauntlet" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.geometry.create_primitive");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.scene.apply_blueprint" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.validation.scene" && workflow.Recommended);

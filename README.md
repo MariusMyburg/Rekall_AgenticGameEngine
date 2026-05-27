@@ -116,6 +116,7 @@ Implemented foundations:
 - OpenXR probing, stereo planning, and headset frame planning
 - generic multiplayer session, snapshot, delta, and reconciliation contracts
 - live player editing over local IPC
+- generic agent authoring gauntlet for create-author-verify-package-audit proof loops
 - package verification, package inspection, package run, proof-frame capture, and package audit
 - Windows graphics player
 - WPF Studio workbench foundation
@@ -433,6 +434,7 @@ rekall.render.capture_runtime_viewport
 rekall.render.performance.inspect_scene_budget
 rekall.render.visibility.inspect_scene
 rekall.render.virtual_geometry.inspect_scene
+rekall.workflow.agent_authoring_gauntlet
 rekall.workflow.verify_playable_game
 rekall.workflow.package_playable_game
 rekall.workflow.audit_playable_package
@@ -481,6 +483,7 @@ dotnet run --project src/Rekall.Age.Cli -- module schemas project .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- validation scene .age-sandbox Main
 dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
 dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport 640 360 vulkan
+dotnet run --project src/Rekall.Age.Cli -- game gauntlet .age-sandbox "Agentic Game" .age-sandbox/Builds/AgentAuthoringGauntlet
 dotnet run --project src/Rekall.Age.Cli -- game verify-playable .age-sandbox Main 2
 dotnet run --project src/Rekall.Age.Cli -- game package-playable .age-sandbox Main .age-sandbox/Builds/RekallAgePlayer
 ```
@@ -539,6 +542,7 @@ Use observations instead of silent failure when:
 Use closed-loop checks:
 
 ```powershell
+dotnet run --project src/Rekall.Age.Cli -- game gauntlet .age-sandbox "Agentic Game" .age-sandbox/Builds/AgentAuthoringGauntlet
 dotnet run --project src/Rekall.Age.Cli -- validation scene .age-sandbox Main
 dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
 dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport 640 360 vulkan
@@ -1544,6 +1548,7 @@ They verify and package an authored project. They do not create a game for the u
 Commands:
 
 ```text
+rekall.workflow.agent_authoring_gauntlet
 rekall.workflow.verify_playable_game
 rekall.workflow.package_playable_game
 rekall.workflow.inspect_playable_package
@@ -1555,6 +1560,7 @@ rekall.workflow.audit_playable_package
 CLI:
 
 ```powershell
+dotnet run --project src/Rekall.Age.Cli -- game gauntlet .age-sandbox "Agentic Game" .age-sandbox/Builds/AgentAuthoringGauntlet
 dotnet run --project src/Rekall.Age.Cli -- game verify-playable .age-sandbox Main 2
 dotnet run --project src/Rekall.Age.Cli -- game package-playable .age-sandbox Main .age-sandbox/Builds/RekallAgePlayer
 dotnet run --project src/Rekall.Age.Cli -- game inspect-package .age-sandbox/Builds/RekallAgePlayer.zip
@@ -1581,6 +1587,8 @@ Audit checks:
 - proof frame captured
 - key artifacts present
 - verification checks passed
+
+The agent authoring gauntlet is the preferred broad proof loop when validating a user-facing playable path. It creates a project, authors a generic scene blueprint, writes an agent-owned playable module, verifies the result, packages it, audits the package, captures a proof frame, and returns next actions. It is not a game template system: the authored behavior lives in project data and project module source.
 
 ## Studio Workbench
 

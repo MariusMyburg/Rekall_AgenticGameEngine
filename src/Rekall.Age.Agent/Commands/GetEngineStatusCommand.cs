@@ -45,6 +45,10 @@ public sealed class GetEngineStatusCommand
             WorkflowTools:
             [
                 new RekallAgeAgentWorkflowTool(
+                    "rekall.workflow.agent_authoring_gauntlet",
+                    "Create, author, verify, package, audit, and capture a proof frame for a generic agent-authored playable project.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
                     "rekall.workflow.audit_playable_package",
                     "Inspect a package, run deterministic frames, and capture a proof PNG for deliverable validation.",
                     Recommended: true),

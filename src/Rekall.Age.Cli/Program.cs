@@ -199,6 +199,11 @@ internal static class RekallAgeCli
                 ["build", "modules", var root] => await BuildModulesAsync(registry, context, root),
                 ["build", "player", var root, var scene] => await BuildPlayerAsync(registry, context, root, scene, graphics: false),
                 ["build", "player", var root, var scene, "--graphics"] => await BuildPlayerAsync(registry, context, root, scene, graphics: true),
+                ["game", "gauntlet", var root, var name] => await RunAgentAuthoringGauntletAsync(registry, context, root, name, "Main", null),
+                ["game", "gauntlet", var root, var name, var outputDirectory] =>
+                    await RunAgentAuthoringGauntletAsync(registry, context, root, name, "Main", outputDirectory),
+                ["game", "gauntlet", var root, var name, var scene, var outputDirectory] =>
+                    await RunAgentAuthoringGauntletAsync(registry, context, root, name, scene, outputDirectory),
                 ["game", "verify-playable", var root] => await VerifyPlayableGameAsync(registry, context, root, "Main", "2", null, null, null),
                 ["game", "verify-playable", var root, var scene] => await VerifyPlayableGameAsync(registry, context, root, scene, "2", null, null, null),
                 ["game", "verify-playable", var root, var scene, var frames] => await VerifyPlayableGameAsync(registry, context, root, scene, frames, null, null, null),
@@ -408,6 +413,7 @@ internal static class RekallAgeCli
         registry.Register(new RunPlayablePackageCommand());
         registry.Register(new CapturePlayablePackageFrameCommand());
         registry.Register(new AuditPlayablePackageCommand());
+        registry.Register(new RunAgentAuthoringGauntletCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new GetEngineStatusCommand());
@@ -2293,6 +2299,54 @@ internal static class RekallAgeCli
         }
 
         return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> RunAgentAuthoringGauntletAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string name,
+        string scene,
+        string? outputDirectory)
+    {
+        var result = await registry.ExecuteAsync<RunAgentAuthoringGauntletRequest, RunAgentAuthoringGauntletResult>(
+            "rekall.workflow.agent_authoring_gauntlet",
+            new RunAgentAuthoringGauntletRequest(root, name, scene, outputDirectory),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Agent authoring gauntlet ready: {result.Value.Ready}");
+        Console.WriteLine($"Authoring mode: {result.Value.AuthoringMode}");
+        Console.WriteLine($"Project: {result.Value.ProjectRoot}");
+        Console.WriteLine($"Scene: {result.Value.SceneName}");
+        foreach (var check in result.Value.Checks)
+        {
+            Console.WriteLine($"{check.Name}: {check.Passed} - {check.Summary}");
+        }
+
+        if (result.Value.Package is not null)
+        {
+            Console.WriteLine($"Package archive: {result.Value.Package.ArchivePath}");
+            Console.WriteLine($"Package manifest: {result.Value.Package.ManifestPath}");
+        }
+
+        if (result.Value.Audit is not null)
+        {
+            Console.WriteLine($"Proof frame: {result.Value.Audit.Capture.OutputPath}");
+            Console.WriteLine($"Proof frame non-blank: {result.Value.Audit.Capture.NonBlank}");
+        }
+
+        Console.WriteLine("Next actions:");
+        foreach (var action in result.Value.NextActions)
+        {
+            Console.WriteLine($"  {action}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.Ready ? 0 : 1;
     }
 
     private static async Task<int> VerifyPlayableGameAsync(

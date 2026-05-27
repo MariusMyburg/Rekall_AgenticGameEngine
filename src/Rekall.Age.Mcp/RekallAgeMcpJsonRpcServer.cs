@@ -199,7 +199,7 @@ public sealed class RekallAgeMcpJsonRpcServer
                 title = "Rekall AGE",
                 version = "0.1.0"
             },
-            instructions = "Use Rekall AGE tools to create, inspect, validate, run, and capture agent-authored games from generic engine primitives. Start with rekall.context.engine_status to discover workflow tools and authoring contracts. For custom components, behavior, or render vocabulary, use rekall.module.scaffold_runtime_system, rekall.module.read_source, rekall.module.write_source, and rekall.build.modules; runtime systems can project arbitrary renderables with RekallAgeRuntimeRenderMesh. For deliverable proof, use rekall.workflow.package_playable_game, rekall.workflow.run_playable_package, rekall.workflow.capture_playable_package_frame, and rekall.workflow.audit_playable_package."
+            instructions = "Use Rekall AGE tools to create, inspect, validate, run, and capture agent-authored games from generic engine primitives. Start with rekall.context.engine_status to discover workflow tools and authoring contracts. For custom components, behavior, or render vocabulary, use rekall.module.scaffold_runtime_system, rekall.module.read_source, rekall.module.write_source, and rekall.build.modules; runtime systems can project arbitrary renderables with RekallAgeRuntimeRenderMesh. For closed-loop deliverable proof, prefer rekall.workflow.agent_authoring_gauntlet, then use rekall.workflow.package_playable_game, rekall.workflow.run_playable_package, rekall.workflow.capture_playable_package_frame, and rekall.workflow.audit_playable_package for narrower repair loops."
         };
     }
 

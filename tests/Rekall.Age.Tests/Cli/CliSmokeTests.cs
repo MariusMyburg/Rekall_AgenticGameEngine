@@ -23,7 +23,7 @@ public sealed class CliSmokeTests
         Assert.Contains("Rekall AGE", engine.Output);
         Assert.Contains("Agent-first: True", engine.Output);
         Assert.DoesNotContain("template", engine.Output, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("gauntlet", engine.Output, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("rekall.workflow.agent_authoring_gauntlet", engine.Output);
         Assert.Contains("Authoring contracts:", engine.Output);
         Assert.Contains("IRekallAgeRuntimeModuleSystem", engine.Output);
         Assert.Contains("RekallAgeRuntimeRenderMesh", engine.Output);
@@ -99,8 +99,12 @@ public sealed class CliSmokeTests
         var oneShot = await RunAsync(cliAssembly, "game", "create-package-playable", root, "CLI Game", "demo", Path.Combine(root, "Package"));
         Assert.Equal(2, oneShot.ExitCode);
 
-        var gauntlet = await RunAsync(cliAssembly, "game", "gauntlet", root, "CLI Game", "demo", Path.Combine(root, "Package"));
-        Assert.Equal(2, gauntlet.ExitCode);
+        var gauntlet = await RunAsync(cliAssembly, "game", "gauntlet", root, "CLI Game", Path.Combine(root, "Package"));
+        Assert.Equal(0, gauntlet.ExitCode);
+        Assert.Contains("Agent authoring gauntlet ready: True", gauntlet.Output);
+        Assert.Contains("Package archive:", gauntlet.Output);
+        Assert.Contains("Proof frame:", gauntlet.Output);
+        Assert.DoesNotContain("template", gauntlet.Output, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

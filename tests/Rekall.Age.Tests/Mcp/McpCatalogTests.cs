@@ -33,6 +33,7 @@ public sealed class McpCatalogTests
         registry.Register(new RunPlayablePackageCommand());
         registry.Register(new CapturePlayablePackageFrameCommand());
         registry.Register(new AuditPlayablePackageCommand());
+        registry.Register(new RunAgentAuthoringGauntletCommand());
         registry.Register(new PlaytestSceneCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
@@ -87,13 +88,14 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.project.create");
         Assert.DoesNotContain(catalog.Tools, tool => tool.Name.StartsWith("rekall.templates.", StringComparison.Ordinal));
         Assert.DoesNotContain(catalog.Tools, tool => tool.Name.Contains("template", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(catalog.Tools, tool => tool.Name.Contains("gauntlet", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.agent_authoring_gauntlet");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.verify_playable_game");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.package_playable_game");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.inspect_playable_package");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.run_playable_package");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.capture_playable_package_frame");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.audit_playable_package");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.agent_authoring_gauntlet");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.playtest.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.run.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.capture.screenshot");
@@ -139,10 +141,15 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.snapshot");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.delta");
 
+        var gauntlet = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.agent_authoring_gauntlet");
+        Assert.Equal("workflow", gauntlet.Category);
+        Assert.True(gauntlet.Recommended);
+        Assert.Equal(10, gauntlet.AgentPriority);
+
         var package = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.package_playable_game");
         Assert.Equal("workflow", package.Category);
         Assert.True(package.Recommended);
-        Assert.Equal(10, package.AgentPriority);
+        Assert.True(package.AgentPriority > gauntlet.AgentPriority);
 
         var audit = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.audit_playable_package");
         Assert.Equal("workflow", audit.Category);

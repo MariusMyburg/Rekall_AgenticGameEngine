@@ -107,6 +107,7 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.multiplayer.delta" or
             "rekall.render.visibility.inspect_scene" or
             "rekall.solar.import_ksa_system" or
+            "rekall.workflow.agent_authoring_gauntlet" or
             "rekall.workflow.package_playable_game" or
             "rekall.workflow.audit_playable_package";
     }
@@ -116,7 +117,8 @@ internal static class RekallAgeMcpToolClassifier
         return name switch
         {
             "rekall.context.engine_status" => 5,
-            "rekall.workflow.package_playable_game" => 10,
+            "rekall.workflow.agent_authoring_gauntlet" => 10,
+            "rekall.workflow.package_playable_game" => 11,
             "rekall.workflow.audit_playable_package" => 15,
             "rekall.live.status" => 16,
             "rekall.live.apply_scene_blueprint" => 17,

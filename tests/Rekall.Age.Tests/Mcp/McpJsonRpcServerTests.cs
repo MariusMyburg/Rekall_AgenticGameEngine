@@ -27,7 +27,7 @@ public sealed class McpJsonRpcServerTests
         Assert.Contains("rekall.workflow.package_playable_game", instructions, StringComparison.Ordinal);
         Assert.DoesNotContain("rekall.templates", instructions, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("template", instructions, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("gauntlet", instructions, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("rekall.workflow.agent_authoring_gauntlet", instructions, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -53,6 +53,7 @@ public sealed class McpJsonRpcServerTests
     {
         var registry = new RekallAgeCommandRegistry();
         registry.Register(new GetEngineStatusCommand());
+        registry.Register(new RunAgentAuthoringGauntletCommand());
         registry.Register(new PackagePlayableGameCommand());
         registry.Register(new AuditPlayablePackageCommand());
         registry.Register(new CreateRenderPlanCommand());
@@ -65,12 +66,16 @@ public sealed class McpJsonRpcServerTests
         using var document = JsonDocument.Parse(response!);
         var tools = document.RootElement.GetProperty("result").GetProperty("tools").EnumerateArray().ToArray();
         var engineStatus = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.context.engine_status");
+        var gauntlet = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.workflow.agent_authoring_gauntlet");
         var package = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.workflow.package_playable_game");
         var audit = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.workflow.audit_playable_package");
         var render = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.render.plan.create");
         Assert.Equal("rekall.context.engine_status", tools[0].GetProperty("name").GetString());
         Assert.Equal("context", engineStatus.GetProperty("rekallCategory").GetString());
         Assert.True(engineStatus.GetProperty("rekallRecommended").GetBoolean());
+        Assert.Equal("workflow", gauntlet.GetProperty("rekallCategory").GetString());
+        Assert.True(gauntlet.GetProperty("rekallRecommended").GetBoolean());
+        Assert.True(package.GetProperty("rekallAgentPriority").GetInt32() > gauntlet.GetProperty("rekallAgentPriority").GetInt32());
         Assert.Equal("workflow", package.GetProperty("rekallCategory").GetString());
         Assert.True(package.GetProperty("rekallRecommended").GetBoolean());
         Assert.True(audit.GetProperty("rekallAgentPriority").GetInt32() > package.GetProperty("rekallAgentPriority").GetInt32());

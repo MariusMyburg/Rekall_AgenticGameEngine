@@ -536,29 +536,38 @@ vec4 renderCloudLayer()
         discard;
     }
 
-    vec4 textureColor = texture(baseColorTexture, fragUv);
-    float textureCoverage = cloudAlphaFromTextureOnly()
-        ? textureColor.a
-        : max(max(textureColor.r, textureColor.g), textureColor.b) * textureColor.a;
-    float alpha = clamp(textureCoverage * max(draw.cloudFactors.y, 0.0) * draw.cloudColor.a, 0.0, 1.0);
-    if (alpha < 0.01)
-    {
-        discard;
-    }
-
-    vec3 cloudBase = cloudAlphaFromTextureOnly() ? vec3(1.0) : pow(max(textureColor.rgb, vec3(0.0)), vec3(2.2));
     vec3 normal = normalize(fragWorldPosition - planetCenter);
+    vec3 view = normalize(rayOrigin - fragWorldPosition);
     vec3 light = frame.lightPosition.w > 0.5
         ? normalize(frame.lightPosition.xyz - fragWorldPosition)
         : normalize(-frame.lightDirection.xyz);
     float lambertian = max(dot(normal, light), 0.0);
     float skyVisibility = cloudSkyVisibility(fragWorldPosition, light, planetCenter);
+
+    vec4 textureColor = texture(baseColorTexture, fragUv);
+    float textureCoverage = cloudAlphaFromTextureOnly()
+        ? textureColor.a
+        : max(max(textureColor.r, textureColor.g), textureColor.b) * textureColor.a;
+    float slantPath = clamp(1.0 / max(abs(dot(normal, view)), 0.22), 1.0, 3.25);
+    float opticalDepth = textureCoverage * max(draw.cloudFactors.y, 0.0) * max(draw.cloudColor.a, 0.0) * slantPath;
+    float alpha = clamp((1.0 - exp(-opticalDepth)) * mix(0.32, 1.0, skyVisibility), 0.0, 0.72);
+    if (alpha < 0.01)
+    {
+        discard;
+    }
+
+    vec3 cloudBase = cloudAlphaFromTextureOnly()
+        ? vec3(0.92, 0.95, 1.0)
+        : mix(vec3(0.88, 0.91, 0.96), pow(max(textureColor.rgb, vec3(0.0)), vec3(2.2)), 0.82);
     float lightTerm = mix(1.0, lambertian, clamp(draw.cloudFactors.z, 0.0, 1.0));
     vec3 directTransmittance = surfaceAtmosphereTransmittance(fragWorldPosition, light);
     float ambientTerm = max(draw.cloudFactors.w, 0.0) * mix(0.04, 1.0, skyVisibility);
+    float sunView = clamp(dot(light, view), 0.0, 1.0);
+    float silverLining = pow(sunView, 12.0) * smoothstep(0.0, 0.35, lambertian) * skyVisibility;
     vec3 color = cloudBase
         * pow(max(draw.cloudColor.rgb, vec3(0.0)), vec3(2.2))
-        * (frame.lightColor.rgb * directTransmittance * lightTerm * skyVisibility * 3.2 + vec3(ambientTerm));
+        * (frame.lightColor.rgb * directTransmittance * lightTerm * skyVisibility * 2.65 + vec3(ambientTerm));
+    color += frame.lightColor.rgb * directTransmittance * silverLining * 0.75;
     color = applySurfaceAerialPerspective(color, fragWorldPosition, light);
     return vec4(pow(max(color, vec3(0.0)), vec3(1.0 / 2.2)), alpha);
 }

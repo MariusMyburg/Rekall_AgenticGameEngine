@@ -269,11 +269,11 @@ public sealed class ImportKsaSolarSystemCommand
                         ["texture"] = cloudTextureId,
                         ["color"] = cloudLayer.Color,
                         ["alphaFromTextureOnly"] = cloudLayer.AlphaFromTextureOnly,
-                        ["coverage"] = cloudLayerIndex == 0 ? 1.05 : 1.35,
-                        ["lambertianStrength"] = cloudLayer.LambertianStrength,
-                        ["ambientStrength"] = cloudLayerIndex == 0 ? 0.12 : 0.16,
+                        ["coverage"] = cloudLayerIndex == 0 ? 0.32 : 0.22,
+                        ["lambertianStrength"] = Math.Min(cloudLayer.LambertianStrength, cloudLayerIndex == 0 ? 0.72 : 0.68),
+                        ["ambientStrength"] = cloudLayerIndex == 0 ? 0.035 : 0.045,
                         ["castShadows"] = cloudLayerIndex == body.CloudLayers.Count - 1,
-                        ["shadowStrength"] = cloudLayerIndex == body.CloudLayers.Count - 1 ? 0.35 : 0
+                        ["shadowStrength"] = cloudLayerIndex == body.CloudLayers.Count - 1 ? 0.12 : 0
                     });
                 }
             }

@@ -3203,29 +3203,38 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 discard;
             }
         
-            vec4 textureColor = texture(sampler2D(BaseColorTexture, BaseColorSampler), fsin_UV);
-            float textureCoverage = cloudAlphaFromTextureOnly()
-                ? textureColor.a
-                : max(max(textureColor.r, textureColor.g), textureColor.b) * textureColor.a;
-            float alpha = clamp(textureCoverage * max(Draw.CloudFactors.y, 0.0) * Draw.CloudColor.a, 0.0, 1.0);
-            if (alpha < 0.01)
-            {
-                discard;
-            }
-        
-            vec3 cloudBase = cloudAlphaFromTextureOnly() ? vec3(1.0) : pow(max(textureColor.rgb, vec3(0.0)), vec3(2.2));
             vec3 normal = normalize(fsin_WorldPosition - planetCenter);
+            vec3 view = normalize(rayOrigin - fsin_WorldPosition);
             vec3 light = Frame.LightPosition.w > 0.5
                 ? normalize(Frame.LightPosition.xyz - fsin_WorldPosition)
                 : normalize(-Frame.LightDirection.xyz);
             float lambertian = max(dot(normal, light), 0.0);
             float skyVisibility = cloudSkyVisibility(fsin_WorldPosition, light, planetCenter);
+        
+            vec4 textureColor = texture(sampler2D(BaseColorTexture, BaseColorSampler), fsin_UV);
+            float textureCoverage = cloudAlphaFromTextureOnly()
+                ? textureColor.a
+                : max(max(textureColor.r, textureColor.g), textureColor.b) * textureColor.a;
+            float slantPath = clamp(1.0 / max(abs(dot(normal, view)), 0.22), 1.0, 3.25);
+            float opticalDepth = textureCoverage * max(Draw.CloudFactors.y, 0.0) * max(Draw.CloudColor.a, 0.0) * slantPath;
+            float alpha = clamp((1.0 - exp(-opticalDepth)) * mix(0.32, 1.0, skyVisibility), 0.0, 0.72);
+            if (alpha < 0.01)
+            {
+                discard;
+            }
+        
+            vec3 cloudBase = cloudAlphaFromTextureOnly()
+                ? vec3(0.92, 0.95, 1.0)
+                : mix(vec3(0.88, 0.91, 0.96), pow(max(textureColor.rgb, vec3(0.0)), vec3(2.2)), 0.82);
             float lightTerm = mix(1.0, lambertian, clamp(Draw.CloudFactors.z, 0.0, 1.0));
             vec3 directTransmittance = surfaceAtmosphereTransmittance(fsin_WorldPosition, light);
             float ambientTerm = max(Draw.CloudFactors.w, 0.0) * mix(0.04, 1.0, skyVisibility);
+            float sunView = clamp(dot(light, view), 0.0, 1.0);
+            float silverLining = pow(sunView, 12.0) * smoothstep(0.0, 0.35, lambertian) * skyVisibility;
             vec3 color = cloudBase
                 * pow(max(Draw.CloudColor.rgb, vec3(0.0)), vec3(2.2))
-                * (Frame.LightColor.rgb * directTransmittance * lightTerm * skyVisibility * 3.2 + vec3(ambientTerm));
+                * (Frame.LightColor.rgb * directTransmittance * lightTerm * skyVisibility * 2.65 + vec3(ambientTerm));
+            color += Frame.LightColor.rgb * directTransmittance * silverLining * 0.75;
             color = applySurfaceAerialPerspective(color, fsin_WorldPosition, light);
             return vec4(pow(max(color, vec3(0.0)), vec3(1.0 / 2.2)), alpha);
         }

@@ -648,13 +648,18 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             openXrEyeHeight);
         player.StartLiveEditServer();
         player.StartAssetHotReloadWatcher();
-        if (openXrRequested && openXrStatus?.HeadsetSessionReady == true && !playableMode)
+        var windowedVrPlan = RekallAgeWindowedPlayableVrSessionPlanner.Plan(
+            openXrRequested,
+            openXrStatus?.HeadsetSessionReady == true,
+            playableMode);
+        if (openXrRequested)
+        {
+            PlayerLog.Write(windowedVrPlan.Reason);
+        }
+
+        if (windowedVrPlan.ShouldStartHeadsetSubmit)
         {
             player.StartOpenXrHeadsetSubmit();
-        }
-        else if (openXrRequested && playableMode)
-        {
-            PlayerLog.Write("OpenXR headset scene submission is skipped for legacy playable-module mode.");
         }
 
         PlayerLog.Write("Player initialization complete.");
@@ -833,7 +838,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _pendingMouseDeltaX += mouseDelta.X;
         _pendingMouseDeltaY += mouseDelta.Y;
 
-        if (!_playableMode && !_window.Focused && _mouseCaptured)
+        if (!_window.Focused && _mouseCaptured)
         {
             SetMouseCapture(false);
         }
@@ -843,7 +848,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             var key = keyEvent.Key.ToString();
             if (keyEvent.Down)
             {
-                if (!_playableMode && key.Equals("Escape", StringComparison.OrdinalIgnoreCase))
+                if (key.Equals("Escape", StringComparison.OrdinalIgnoreCase))
                 {
                     SetMouseCapture(false);
                 }
@@ -864,7 +869,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             var button = mouseEvent.MouseButton.ToString();
             if (mouseEvent.Down)
             {
-                if (!_playableMode && !_mouseCaptured)
+                if (!_mouseCaptured)
                 {
                     SetMouseCapture(true);
                 }
@@ -1555,7 +1560,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             ? 1.0 / 60.0
             : Math.Clamp(now - _lastPlayableTickSeconds, 0, 1.0 / 15.0);
         _lastPlayableTickSeconds = now;
-        game.Tick(ConsumePlayableInput(deltaSeconds));
+        var playableInput = BuildPlayableInput(deltaSeconds);
+        ConsumeRuntimeInput();
+        game.Tick(playableInput);
         var renderFrame = game.RenderFrame(frameNumber);
         EnsurePlayableRenderTarget();
         var raster = _playableRasterizer.Rasterize(renderFrame, _sceneTarget.Width, _sceneTarget.Height);
@@ -1716,7 +1723,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             PressedButtons: input.PressedButtons);
     }
 
-    private RekallAgePlaybackInput ConsumePlayableInput(double deltaSeconds)
+    private RekallAgePlaybackInput BuildPlayableInput(double deltaSeconds)
     {
         var verticalAxis = 0;
         if (IsPressed("W") || IsPressed("Up"))
@@ -1732,11 +1739,6 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var primaryAction = IsPressedThisFrame("Space") ||
             IsPressedThisFrame("Enter") ||
             IsPressedThisFrame("Return");
-        _pendingMouseWheelDelta = 0;
-        _pressedKeysThisFrame.Clear();
-        _releasedKeysThisFrame.Clear();
-        _pressedButtonsThisFrame.Clear();
-        _releasedButtonsThisFrame.Clear();
         return new RekallAgePlaybackInput(Math.Clamp(verticalAxis, -1, 1), primaryAction, deltaSeconds);
     }
 

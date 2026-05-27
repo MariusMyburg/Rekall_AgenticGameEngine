@@ -180,6 +180,10 @@ internal static class RekallAgeCli
                     await ImportAssetAsync(registry, context, root, source, kind, displayName),
                 ["asset", "import-report", var root, var source, var kind, var displayName] =>
                     await ImportAssetReportAsync(registry, context, root, source, kind, displayName),
+                ["asset", "tripo", "generate", var root, var prompt, var displayName] =>
+                    await GenerateTripoModelAsync(registry, context, root, prompt, displayName, null),
+                ["asset", "tripo", "generate", var root, var prompt, var displayName, var modelVersion] =>
+                    await GenerateTripoModelAsync(registry, context, root, prompt, displayName, modelVersion),
                 ["asset", "list", var root] => await ListAssetsAsync(registry, context, root, null),
                 ["asset", "list", var root, var kind] => await ListAssetsAsync(registry, context, root, kind),
                 ["module", "schemas"] => await ListSchemasAsync(registry, context, null),
@@ -460,6 +464,7 @@ internal static class RekallAgeCli
         registry.Register(new BuildPlayerCommand());
         registry.Register(new ImportAssetCommand());
         registry.Register(new ImportAssetWithReportCommand());
+        registry.Register(new GenerateTripoModelCommand());
         registry.Register(new ListAssetsCommand());
         registry.Register(new DuplicateEntityCommand());
         registry.Register(new CreateGeometryPrimitiveCommand());
@@ -1467,6 +1472,13 @@ internal static class RekallAgeCli
         Console.WriteLine($"Assets: {model.Assets.Assets.Count}");
         Console.WriteLine($"Diagnostics: {model.Diagnostics.Issues.Count}");
         Console.WriteLine($"Transactions: {model.Transactions.Transactions.Count}");
+        Console.WriteLine($"Components: {model.SceneSummary.ComponentCount}");
+        Console.WriteLine($"Actions: {model.Actions.Actions.Count}");
+        foreach (var action in model.Actions.Actions.Where(action => action.Recommended))
+        {
+            Console.WriteLine($"- {action.Tool}: {action.Label}");
+        }
+
         return 0;
     }
 
@@ -1485,6 +1497,43 @@ internal static class RekallAgeCli
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Imported: {result.Value.Report.Imported}");
         Console.WriteLine($"Asset: {result.Value.Report.AssetId}");
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> GenerateTripoModelAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string prompt,
+        string displayName,
+        string? modelVersion)
+    {
+        var result = await registry.ExecuteAsync<GenerateTripoModelRequest, GenerateTripoModelResult>(
+            "rekall.asset.tripo.generate_model",
+            new GenerateTripoModelRequest(
+                root,
+                prompt,
+                displayName,
+                ModelVersion: modelVersion),
+            context);
+        Console.WriteLine(result.Summary);
+        if (result.Value.TaskId is not null)
+        {
+            Console.WriteLine($"Task: {result.Value.TaskId}");
+            Console.WriteLine($"Status: {result.Value.Status}");
+        }
+
+        if (result.Value.Asset is not null)
+        {
+            Console.WriteLine($"Asset: {result.Value.Asset.Id}");
+            Console.WriteLine($"Imported: {result.Value.Asset.ImportedPath}");
+        }
+
+        foreach (var nextAction in result.Value.NextActions)
+        {
+            Console.WriteLine($"Next: {nextAction}");
+        }
+
         return result.Ok ? 0 : 1;
     }
 

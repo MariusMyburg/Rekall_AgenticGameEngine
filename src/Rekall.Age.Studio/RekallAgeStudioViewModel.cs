@@ -38,6 +38,15 @@ public sealed class RekallAgeStudioViewModel
             model?.Transactions.Transactions.Select(transaction => $"{transaction.Name}: {transaction.ChangedResources.Count} changes") ?? []);
         ImportLines = new ObservableCollection<string>(
             model?.ImportQueue.Jobs.Select(job => $"{job.Status}: {job.SourcePath}") ?? []);
+        SceneSummaryLines = new ObservableCollection<string>(
+            model is null
+                ? []
+                : BuildSceneSummaryLines(model.SceneSummary));
+        ActionLines = new ObservableCollection<string>(
+            model?.Actions.Actions.Select(action => $"{action.Category}: {action.Label} ({action.Tool})") ?? []);
+        RuntimeObservationLines = new ObservableCollection<string>(
+            model?.Runtime.Observations.Select(observation =>
+                $"{observation.Severity}: {observation.Code} - {observation.Message}") ?? []);
         ViewportTitle = model is null ? "Viewport" : $"{model.Scene.Name} Viewport";
         ViewportSummary = model is null
             ? viewportFallbackSummary ?? "Open a Rekall AGE project to begin."
@@ -67,6 +76,12 @@ public sealed class RekallAgeStudioViewModel
 
     public ObservableCollection<string> ImportLines { get; }
 
+    public ObservableCollection<string> SceneSummaryLines { get; }
+
+    public ObservableCollection<string> ActionLines { get; }
+
+    public ObservableCollection<string> RuntimeObservationLines { get; }
+
     public string ViewportTitle { get; }
 
     public string ViewportSummary { get; }
@@ -78,5 +93,21 @@ public sealed class RekallAgeStudioViewModel
         return node.Children.Count == 0
             ? node.Name
             : $"{node.Name} ({node.Children.Count})";
+    }
+
+    private static IEnumerable<string> BuildSceneSummaryLines(RekallAgeWorkbenchSceneSummaryModel summary)
+    {
+        yield return $"Entities: {summary.EntityCount}";
+        yield return $"Root entities: {summary.RootEntityCount}";
+        yield return $"Components: {summary.ComponentCount}";
+        if (summary.Tags.Count > 0)
+        {
+            yield return $"Tags: {string.Join(", ", summary.Tags)}";
+        }
+
+        foreach (var component in summary.ComponentTypes)
+        {
+            yield return $"{component.Type}: {component.Count}";
+        }
     }
 }

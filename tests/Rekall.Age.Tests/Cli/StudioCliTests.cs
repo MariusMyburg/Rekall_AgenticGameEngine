@@ -25,6 +25,8 @@ public sealed class StudioCliTests
         Assert.Contains("Studio Test", result.Output);
         Assert.Contains("Main", result.Output);
         Assert.Contains("Transactions: 0", result.Output);
+        Assert.Contains("Actions:", result.Output);
+        Assert.Contains("rekall.validation.scene", result.Output);
     }
 
     private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)

@@ -99,7 +99,9 @@ public sealed class RekallAgeWorkbenchModelBuilder
                         transaction.ChangedResources))
                     .ToArray()),
             new RekallAgeImportQueueModel(Array.Empty<RekallAgeImportQueueItem>()),
-            BuildRuntimePanel(runtimeWorld));
+            BuildRuntimePanel(runtimeWorld),
+            BuildSceneSummary(scene),
+            BuildActionPalette(manifest.Capabilities));
     }
 
     private static RekallAgeSceneGraphModel BuildSceneGraph(RekallAgeSceneDocument scene)
@@ -157,6 +159,97 @@ public sealed class RekallAgeWorkbenchModelBuilder
                             ToDisplayValue(property.Value),
                             property.Value?.GetValueKind().ToString() ?? "Null"))
                         .ToArray()))
+                .ToArray());
+    }
+
+    private static RekallAgeWorkbenchSceneSummaryModel BuildSceneSummary(RekallAgeSceneDocument scene)
+    {
+        var componentTypes = scene.Entities
+            .SelectMany(entity => entity.Components)
+            .GroupBy(component => component.Type, StringComparer.Ordinal)
+            .Select(group => new RekallAgeWorkbenchComponentTypeSummary(group.Key, group.Count()))
+            .OrderBy(summary => summary.Type, StringComparer.Ordinal)
+            .ToArray();
+        var tags = scene.Entities
+            .SelectMany(entity => entity.Tags)
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(tag => tag, StringComparer.Ordinal)
+            .ToArray();
+
+        return new RekallAgeWorkbenchSceneSummaryModel(
+            scene.Entities.Count,
+            scene.Entities.Count(entity => string.IsNullOrWhiteSpace(entity.ParentId)),
+            componentTypes.Sum(component => component.Count),
+            tags,
+            componentTypes);
+    }
+
+    private static RekallAgeWorkbenchActionPaletteModel BuildActionPalette(IReadOnlyList<string> capabilities)
+    {
+        var hasModules = capabilities.Any(capability => capability.Equals("modules", StringComparison.OrdinalIgnoreCase));
+        var actions = new List<RekallAgeWorkbenchActionItem>
+        {
+            new(
+                "validate-scene",
+                "Validate Scene",
+                "Diagnostics",
+                "rekall.validation.scene",
+                "Run generic scene validation and surface suggested engine tools.",
+                Recommended: true),
+            new(
+                "inspect-runtime",
+                "Inspect Runtime",
+                "Runtime",
+                "rekall.runtime.inspect_scene",
+                "Build an inspectable runtime snapshot for the active scene.",
+                Recommended: true),
+            new(
+                "capture-viewport",
+                "Capture Viewport",
+                "Rendering",
+                "rekall.render.capture_runtime_viewport",
+                "Capture a generic runtime viewport frame for visual diagnostics.",
+                Recommended: true),
+            new(
+                "import-asset-report",
+                "Import Asset Report",
+                "Assets",
+                "rekall.asset.import_report",
+                "Preview asset import results before committing imported content.",
+                Recommended: true),
+            new(
+                "tripo-generate-model",
+                "Generate Tripo Model",
+                "Assets",
+                "rekall.asset.tripo.generate_model",
+                "Generate a Tripo3D text-to-model task and import the completed model as a generic asset.",
+                Recommended: true),
+            new(
+                "agent-authoring-gauntlet",
+                "Agent Authoring Gauntlet",
+                "Workflow",
+                "rekall.workflow.agent_authoring_gauntlet",
+                "Run the generic create, verify, package, audit, and proof-frame workflow.",
+                Recommended: true)
+        };
+
+        if (hasModules)
+        {
+            actions.Add(new RekallAgeWorkbenchActionItem(
+                "build-modules",
+                "Build Modules",
+                "Modules",
+                "rekall.build.modules",
+                "Build agent-authored project modules before runtime inspection or playtesting.",
+                Recommended: true));
+        }
+
+        return new RekallAgeWorkbenchActionPaletteModel(
+            actions
+                .OrderByDescending(action => action.Recommended)
+                .ThenBy(action => action.Category, StringComparer.Ordinal)
+                .ThenBy(action => action.Label, StringComparer.Ordinal)
                 .ToArray());
     }
 

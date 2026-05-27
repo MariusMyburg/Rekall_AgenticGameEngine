@@ -58,6 +58,15 @@
                 <TabItem Header="Assets">
                     <ListBox ItemsSource="{Binding AssetLines}" />
                 </TabItem>
+                <TabItem Header="Overview">
+                    <ListBox ItemsSource="{Binding SceneSummaryLines}" />
+                </TabItem>
+                <TabItem Header="Actions">
+                    <ListBox ItemsSource="{Binding ActionLines}" />
+                </TabItem>
+                <TabItem Header="Runtime">
+                    <ListBox ItemsSource="{Binding RuntimeObservationLines}" />
+                </TabItem>
                 <TabItem Header="Validation">
                     <ListBox ItemsSource="{Binding ValidationLines}" />
                 </TabItem>

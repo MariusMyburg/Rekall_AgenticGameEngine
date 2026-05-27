@@ -30,7 +30,7 @@ This README is intended to be the broad public entry point and the practical tec
 - [Physics and Interaction](#physics-and-interaction)
 - [Multiplayer](#multiplayer)
 - [Live Player Editing](#live-player-editing)
-- [Optional Templates and Packaging Workflows](#optional-templates-and-packaging-workflows)
+- [Packaging Workflows](#packaging-workflows)
 - [Studio and Workbench Foundation](#studio-and-workbench-foundation)
 - [Testing and Verification](#testing-and-verification)
 - [Design Principles for Contributors](#design-principles-for-contributors)
@@ -39,7 +39,7 @@ This README is intended to be the broad public entry point and the practical tec
 
 Rekall AGE is built around a simple rule:
 
-> Engine core should provide generic authoring primitives. Game-specific behavior belongs in agent-authored modules, templates, examples, or user projects.
+> Engine core should provide generic authoring primitives. Game-specific behavior belongs in agent-authored modules, examples, or user projects.
 
 That has several practical consequences:
 
@@ -75,7 +75,7 @@ Rekall AGE is an active engine prototype with a substantial vertical slice:
 - CPU-side virtual geometry LOD for dense meshes
 - KSA planet and solar-system import workflows
 - procedural planet, cloud, atmosphere, orbit, ring, starfield, marker, halo, and label renderables
-- starter game templates and closed-loop playable package workflows
+- generic playable verification and package workflows
 - live player editing over local IPC
 - generic runtime events, timers, pointer rays, collision facts, trigger facts, observations, semantic input, camera helpers, and multiplayer helpers
 - Windows player and WPF Studio foundation
@@ -102,14 +102,16 @@ Inspect the engine:
 
 ```powershell
 dotnet run --project src/Rekall.Age.Cli -- context engine
-dotnet run --project src/Rekall.Age.Cli -- templates list
 dotnet run --project src/Rekall.Age.Cli -- module schemas
 ```
 
-Create and prove a starter playable game:
+Create a blank project and author a first generic scene object:
 
 ```powershell
-dotnet run --project src/Rekall.Age.Cli -- game gauntlet .age-sandbox "Gauntlet Pong" pong .age-sandbox/Builds/GauntletPong .age-sandbox/Artifacts/GauntletAudit
+dotnet run --project src/Rekall.Age.Cli -- project create .age-sandbox "Agentic Game" world,rendering3d
+dotnet run --project src/Rekall.Age.Cli -- scene create .age-sandbox Main world,rendering3d
+dotnet run --project src/Rekall.Age.Cli -- geometry primitive create .age-sandbox Main "First Cube" cube 0 0 0 "#8ab4f8"
+dotnet run --project src/Rekall.Age.Cli -- validation scene .age-sandbox Main
 ```
 
 Run the MCP server:
@@ -152,7 +154,6 @@ dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main --frames 2 --inp
 | `src/Rekall.Age.AssetPipeline` | asset import reports and metadata inspection |
 | `src/Rekall.Age.Assets` | deterministic asset catalog and asset import commands |
 | `src/Rekall.Age.LevelDesign` | level editing, geometry creation, KSA planet/solar import, prefabs |
-| `src/Rekall.Age.GameTemplates` | starter templates and playable workflow commands |
 | `src/Rekall.Age.Playback` | terminal/player-facing playback and playtest workflows |
 | `src/Rekall.Age.Validation` | generic scene validation |
 | `src/Rekall.Age.Agent` | engine status and agent context commands |
@@ -206,7 +207,7 @@ Rendering consumes `RekallAgeRuntimeViewportFrame`: active camera, cameras, rend
 
 Core authoring concepts:
 
-- A project declares capabilities such as `world`, `rendering3d`, `planet`, or template-specific needs.
+- A project declares capabilities such as `world`, `rendering3d`, or `planet`.
 - A scene declares scene capabilities and owns entity documents.
 - Entities are generic data records, not engine-owned game classes.
 - Components are JSON-backed records with typed schemas discovered from built-in modules and compiled project modules.
@@ -329,7 +330,6 @@ The MCP server supports:
 The MCP tool catalog is generated from the command registry. Tools are categorized by name prefix:
 
 - `rekall.context.*`
-- `rekall.templates.*`
 - `rekall.workflow.*`
 - `rekall.transaction.*`
 - `rekall.render.*`
@@ -350,9 +350,6 @@ The MCP tool catalog is generated from the command registry. Tools are categoriz
 Recommended agent entry points include:
 
 - `rekall.context.engine_status`
-- `rekall.templates.inspect`
-- `rekall.workflow.agent_authoring_gauntlet`
-- `rekall.workflow.create_playable_package_from_template`
 - `rekall.workflow.audit_playable_package`
 - `rekall.scene.apply_blueprint`
 - `rekall.validation.scene`
@@ -386,12 +383,6 @@ dotnet run --project src/Rekall.Age.Cli -- <area> <command> ...
 Common command groups:
 
 ```powershell
-dotnet run --project src/Rekall.Age.Cli -- templates list
-dotnet run --project src/Rekall.Age.Cli -- templates inspect pong
-dotnet run --project src/Rekall.Age.Cli -- templates verify-mvp
-
-dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" pong
-dotnet run --project src/Rekall.Age.Cli -- game create-playable .age-sandbox "Playable Pong" pong
 dotnet run --project src/Rekall.Age.Cli -- game verify-playable .age-sandbox Main 2
 dotnet run --project src/Rekall.Age.Cli -- game package-playable .age-sandbox Main .age-sandbox/Builds/RekallAgePlayer
 dotnet run --project src/Rekall.Age.Cli -- game audit-package .age-sandbox/Builds/RekallAgePlayer.zip .age-sandbox/Artifacts/PackageAudit
@@ -483,10 +474,13 @@ dotnet run --project src/Rekall.Age.Cli -- render performance budget <projectRoo
 dotnet run --project src/Rekall.Age.Cli -- game verify-playable <projectRoot> <sceneName> 2
 ```
 
-For user-facing playable delivery, prefer:
+For user-facing playable delivery, prove the authored project directly:
 
 ```powershell
-dotnet run --project src/Rekall.Age.Cli -- game gauntlet <projectRoot> "Game Name" <template> <buildDir> <auditDir>
+dotnet run --project src/Rekall.Age.Cli -- validation scene <projectRoot> <sceneName>
+dotnet run --project src/Rekall.Age.Cli -- game verify-playable <projectRoot> <sceneName> 2
+dotnet run --project src/Rekall.Age.Cli -- game package-playable <projectRoot> <sceneName> <buildDir>
+dotnet run --project src/Rekall.Age.Cli -- game audit-package <buildDir>.zip <auditDir>
 ```
 
 ### 5. Emit Observations Instead of Failing Silently
@@ -1146,35 +1140,16 @@ Live editing can:
 
 Mutations are queued onto the player render thread so runtime-world swaps and GPU resource replacement are serialized with rendering.
 
-## Optional Templates and Packaging Workflows
+## Packaging Workflows
 
-Rekall AGE is not limited to the templates below. They are optional scaffolds and regression fixtures: small, known-good projects that exercise the same generic engine contracts an agent would use to build any other game. A project can start from a blank scene, a KSA solar import, a live-edited blueprint, imported GLB assets, generated geometry, project-authored modules, or one of these templates.
+Rekall AGE packages authored projects directly. A game can begin as a blank scene, a KSA solar import, a live-edited blueprint, imported GLB assets, generated geometry, project-authored modules, or any combination of generic engine primitives.
 
-The template catalog exists for convenience, onboarding, and closed-loop verification. It is not a genre list, product boundary, or privileged set of engine-supported games.
-
-Current optional template ids:
-
-- `pong`
-- `breakout`
-- `asteroids`
-- `top-down-shooter`
-- `platformer-2d`
-- `tower-defense`
-- `visual-novel`
-- `first-person-exploration`
-- `collectathon-3d`
-- `puzzle`
-
-Each template creates a project manifest, `Main` scene, active camera, starter render primitives, and template-owned example entities/components under `Game.Templates.*`. Those components are examples of authored content, not engine-owned genre behavior. Real game behavior belongs in project-authored modules and ordinary scene data.
-
-For arbitrary games, agents should compose the general primitives documented above: entities, tags, components, semantic input maps, event bindings, timers, colliders, triggers, renderables, materials, runtime modules, observations, validation, viewport capture, performance budgets, and packaging workflows.
+The packaging loop is intentionally content-agnostic: validate the scene, run deterministic playable frames, build a package, inspect the package, capture proof frames, and audit the deliverable. The engine should not need genre-specific knowledge to package and prove a project.
 
 Workflow commands:
 
 ```powershell
-dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" pong
-dotnet run --project src/Rekall.Age.Cli -- game create-playable .age-sandbox "Playable Pong" pong
-dotnet run --project src/Rekall.Age.Cli -- game create-package-playable .age-sandbox "Packaged Pong" pong .age-sandbox/Builds/RekallAgePlayer .age-sandbox/Artifacts/PackageFrames
+dotnet run --project src/Rekall.Age.Cli -- validation scene .age-sandbox Main
 dotnet run --project src/Rekall.Age.Cli -- game verify-playable .age-sandbox Main 2
 dotnet run --project src/Rekall.Age.Cli -- game package-playable .age-sandbox Main .age-sandbox/Builds/RekallAgePlayer
 dotnet run --project src/Rekall.Age.Cli -- game inspect-package .age-sandbox/Builds/RekallAgePlayer.zip
@@ -1183,7 +1158,7 @@ dotnet run --project src/Rekall.Age.Cli -- game capture-package-frame .age-sandb
 dotnet run --project src/Rekall.Age.Cli -- game audit-package .age-sandbox/Builds/RekallAgePlayer.zip .age-sandbox/Artifacts/PackageAudit
 ```
 
-The preferred closed loop is `rekall.workflow.agent_authoring_gauntlet` / `game gauntlet`: create, verify, package, audit, capture a proof frame, and report next actions.
+Agents should use this loop after authoring their own scene data and modules through the generic contracts documented above.
 
 ## Studio and Workbench Foundation
 
@@ -1233,7 +1208,11 @@ dotnet run --project src/Rekall.Age.Cli -- render performance budget Examples\Vu
 Recommended manual verification for agent-authored games:
 
 ```powershell
-dotnet run --project src/Rekall.Age.Cli -- game gauntlet .age-sandbox "Gauntlet Pong" pong .age-sandbox/Builds/GauntletPong .age-sandbox/Artifacts/GauntletAudit
+dotnet run --project src/Rekall.Age.Cli -- validation scene .age-sandbox Main
+dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
+dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport 640 360 vulkan
+dotnet run --project src/Rekall.Age.Cli -- game verify-playable .age-sandbox Main 2
+dotnet run --project src/Rekall.Age.Cli -- game package-playable .age-sandbox Main .age-sandbox/Builds/RekallAgePlayer
 ```
 
 ## Design Principles for Contributors
@@ -1242,7 +1221,7 @@ These rules are architectural, not stylistic:
 
 - Prefer generic authoring primitives over genre-specific built-ins.
 - Do not add a built-in runtime behavior if an agent can author it cleanly from existing primitives.
-- Put game behavior in project modules, templates, or examples unless it is truly engine-general.
+- Put game behavior in project modules, examples, or user project data unless it is truly engine-general.
 - Expose inspectable data, diagnostics, and SDK helpers before adding hidden behavior.
 - Keep input generic: capture raw input, normalize it, project semantic actions, and let modules consume action helpers.
 - Keep events generic: emit facts, do not execute genre behavior.
@@ -1253,7 +1232,7 @@ These rules are architectural, not stylistic:
 - Use engine frame time for realtime gameplay, animation, timers, cooldowns, and simulation.
 - Use camera/vector SDK helpers instead of guessing Euler signs or rebuilding basis math.
 - Preserve generic replication metadata in multiplayer snapshots.
-- Prefer the closed-loop gauntlet when proving a playable user-facing path.
+- Prefer closed-loop validation, runtime inspection, viewport capture, playable verification, packaging, and package audit when proving a playable user-facing path.
 - When visual output is weak, improve diagnostics and authored scene data before adding a showcase-specific engine path.
 
 Rekall AGE should feel like an engine that AI agents can understand, inspect, repair, extend, and use to make arbitrary games.

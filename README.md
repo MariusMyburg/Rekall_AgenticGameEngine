@@ -106,6 +106,7 @@ Implemented foundations:
 - Vulkan low-level diagnostics
 - shader authoring and validation
 - GLB import reports and scene export
+- Tripo3D text-to-model generation and GLB import through the generic asset pipeline
 - generated primitives, meshes, recipes, and extrusions
 - render layers and camera culling masks
 - runtime viewport capture
@@ -113,20 +114,21 @@ Implemented foundations:
 - CPU-side virtual geometry LOD
 - KSA planet and solar-system import
 - procedural planet, atmosphere, clouds, orbit, marker, label, and starfield renderables
-- OpenXR probing, stereo planning, and headset frame planning
+- OpenXR probing, stereo planning, headset frame planning, and windowed playable VR input/headset bridging
 - generic multiplayer session, snapshot, delta, and reconciliation contracts
 - live player editing over local IPC
 - generic agent authoring gauntlet for create-author-verify-package-audit proof loops
 - package verification, package inspection, package run, proof-frame capture, and package audit
 - Windows graphics player
-- WPF Studio workbench foundation
+- WPF Studio workbench with scene summaries, diagnostics, runtime observations, and a generic action palette
 
 Important scope note:
 
 - The current virtual geometry system is CPU-side clustered LOD for dense meshes in the Vulkan path. It is inspired by Nanite's goal of making dense scenes practical, but it is not yet GPU mesh-shader virtualized geometry with disk-page streaming and hierarchical occlusion.
 - The renderer is Vulkan-first today. Backend-neutral render plans and abstraction boundaries keep room for other backends.
 - Multiplayer is a generic authoritative-session foundation, not a finished matchmaking or internet transport product.
-- VR has OpenXR diagnostics and headset output planning. Playable VR should run through the windowed player so desktop input and OpenXR input share the same runtime input stream.
+- VR uses the windowed player as the playable path. Desktop keyboard/mouse input and OpenXR poses/actions share the same generic runtime input stream, while the direct OpenXR submitter remains a diagnostic path.
+- Tripo3D integration is an asset-pipeline bridge: it can request text-to-model generation, poll the provider task, download the returned GLB, and import it as an ordinary model asset. The engine does not use Tripo to author game behavior.
 
 ## Quick Start
 
@@ -1350,7 +1352,7 @@ Recommended planet workflow:
 
 ## VR And OpenXR
 
-OpenXR support is diagnostic and planning-heavy, with a Vulkan headset-output path under development.
+OpenXR support includes diagnostics, stereo planning, headset frame planning, and a hardened windowed playable VR path.
 
 Commands:
 
@@ -1395,7 +1397,7 @@ OpenXR diagnostics report:
 
 Playable VR rule:
 
-Use the windowed player for playable sessions. It keeps SDL keyboard/mouse input and OpenXR poses/actions in one generic runtime input stream.
+Use the windowed player for playable sessions. It keeps the desktop window alive and publishes SDL keyboard/mouse input plus OpenXR poses/actions into one generic runtime input stream.
 The `--vr` and `--xr` flags start headset scene submission from the windowed player when the OpenXR headset session is ready, including legacy `--playable` module runs.
 The desktop window remains the keyboard/mouse capture surface; click it to capture mouse input and press Escape to release capture.
 
@@ -1625,6 +1627,8 @@ Current foundation:
 - asset reports
 - generic Studio action palette for validation, runtime inspection, viewport capture, asset import reports, module builds, and gauntlet workflows
 - logging
+
+Studio Workbench 2 keeps Studio as an inspectable authoring surface over engine primitives. It summarizes scene structure, component usage, tags, runtime observations, diagnostics, assets, imports, and transaction history, then exposes generic `rekall.*` actions rather than embedding genre-specific game creation behavior.
 
 Run:
 

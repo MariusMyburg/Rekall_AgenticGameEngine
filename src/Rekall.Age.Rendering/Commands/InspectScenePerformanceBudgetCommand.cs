@@ -29,6 +29,10 @@ public sealed record InspectScenePerformanceBudgetResult(
     int TextureCount,
     int RuntimeTextureCount,
     int AssetIssueCount,
+    int VirtualGeometryRenderableCount,
+    int VirtualGeometrySourceTriangles,
+    int VirtualGeometrySelectedTriangles,
+    int VirtualGeometryReducedTriangles,
     bool StereoEnabled,
     bool UsesSinglePassMultiview,
     int EyeCount,
@@ -128,6 +132,13 @@ public sealed class InspectScenePerformanceBudgetCommand
             : profile.DefaultEyeCount;
         var drawInvocations = batch.Draws.Count * (usesSinglePassMultiview ? 1 : Math.Max(1, eyeCount));
         var triangles = checked(batch.Indices.Count / 3);
+        var virtualGeometryRenderableCount = renderFrame.Renderables.Count(renderable => renderable.VirtualGeometry is { Enabled: true });
+        var virtualGeometryMeshes = meshes
+            .Where(mesh => mesh.VirtualGeometrySourceTriangleCount is not null)
+            .ToArray();
+        var virtualGeometrySourceTriangles = virtualGeometryMeshes.Sum(mesh => mesh.VirtualGeometrySourceTriangleCount!.Value);
+        var virtualGeometrySelectedTriangles = virtualGeometryMeshes.Sum(mesh => mesh.Indices.Count / 3);
+        var virtualGeometryReducedTriangles = Math.Max(0, virtualGeometrySourceTriangles - virtualGeometrySelectedTriangles);
         var textureIds = batch.Draws
             .SelectMany(draw => new[]
             {
@@ -159,6 +170,10 @@ public sealed class InspectScenePerformanceBudgetCommand
             textureIds,
             assets.Textures.Count,
             assets.Issues.Count,
+            virtualGeometryRenderableCount,
+            virtualGeometrySourceTriangles,
+            virtualGeometrySelectedTriangles,
+            virtualGeometryReducedTriangles,
             stereoEnabled,
             usesSinglePassMultiview,
             eyeCount,
@@ -170,7 +185,15 @@ public sealed class InspectScenePerformanceBudgetCommand
             profile.Limits,
             blockers,
             warnings,
-            BuildRecommendations(profile, blockers, warnings, usesSinglePassMultiview, eyeCount));
+            BuildRecommendations(
+                profile,
+                blockers,
+                warnings,
+                usesSinglePassMultiview,
+                eyeCount,
+                virtualGeometryRenderableCount,
+                virtualGeometrySourceTriangles,
+                virtualGeometrySelectedTriangles));
 
         if (blockers.Count == 0)
         {
@@ -257,9 +280,17 @@ public sealed class InspectScenePerformanceBudgetCommand
         IReadOnlyList<string> blockers,
         IReadOnlyList<string> warnings,
         bool usesSinglePassMultiview,
-        int eyeCount)
+        int eyeCount,
+        int virtualGeometryRenderableCount,
+        int virtualGeometrySourceTriangles,
+        int virtualGeometrySelectedTriangles)
     {
         var recommendations = new List<string>();
+        if (virtualGeometryRenderableCount > 0)
+        {
+            recommendations.Add($"Virtual geometry selected {virtualGeometrySelectedTriangles} of {virtualGeometrySourceTriangles} source triangle(s) across {virtualGeometryRenderableCount} renderable(s).");
+        }
+
         if (blockers.Any(item => item.Contains("draw", StringComparison.OrdinalIgnoreCase))
             || warnings.Any(item => item.Contains("draw", StringComparison.OrdinalIgnoreCase)))
         {
@@ -426,6 +457,10 @@ public sealed class InspectScenePerformanceBudgetCommand
             Math.Max(0, request.Frames),
             profile.Id,
             profile.TargetFramesPerSecond,
+            0,
+            0,
+            0,
+            0,
             0,
             0,
             0,

@@ -215,6 +215,7 @@ public sealed class SceneRuntimeFoundationTests
                 "runtime.events.collision",
                 "runtime.events.trigger",
                 "runtime.input.camera",
+                "runtime.input.camera_target_cycle",
                 "runtime.camera.target3d"
             ],
             result.SystemsRun);

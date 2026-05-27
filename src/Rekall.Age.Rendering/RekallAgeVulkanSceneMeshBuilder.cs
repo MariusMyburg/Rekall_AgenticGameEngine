@@ -17,7 +17,7 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
     {
         return frame.Renderables
             .Where(renderable => renderable.Kind.Equals("mesh", StringComparison.Ordinal))
-            .SelectMany(renderable => BuildMeshes(renderable, assets))
+            .SelectMany(renderable => BuildMeshes(renderable, assets, frame.ActiveCamera))
             .ToArray();
     }
 
@@ -62,17 +62,18 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
 
     private static IEnumerable<RekallAgeVulkanSceneMesh> BuildMeshes(
         RekallAgeRuntimeViewportRenderable renderable,
-        RekallAgeRuntimeViewportAssetSet assets)
+        RekallAgeRuntimeViewportAssetSet assets,
+        RekallAgeRuntimeViewportCamera? activeCamera)
     {
         if (HasValidViewportLineSegments(renderable))
         {
-            yield return BindRenderableMaterial(BuildViewportLineSegments(renderable), renderable, assets);
+            yield return ApplyVirtualGeometry(BindRenderableMaterial(BuildViewportLineSegments(renderable), renderable, assets), renderable, activeCamera);
             yield break;
         }
 
         if (HasValidAuthoredGeometryMesh(renderable))
         {
-            yield return BindRenderableMaterial(BuildAuthoredGeometryMesh(renderable), renderable, assets);
+            yield return ApplyVirtualGeometry(BindRenderableMaterial(BuildAuthoredGeometryMesh(renderable), renderable, assets), renderable, activeCamera);
             yield break;
         }
 
@@ -91,7 +92,7 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
                 "cone" => BuildCone(renderable, primitive, 16),
                 _ => throw new InvalidOperationException($"Unsupported primitive '{primitive}'.")
             };
-            yield return BindRenderableMaterial(mesh, renderable, assets);
+            yield return ApplyVirtualGeometry(BindRenderableMaterial(mesh, renderable, assets), renderable, activeCamera);
             yield break;
         }
 
@@ -103,12 +104,20 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
 
         foreach (var mesh in modelMeshes)
         {
-            yield return BindRenderableMaterial(mesh with
+            yield return ApplyVirtualGeometry(BindRenderableMaterial(mesh with
             {
                 EntityId = renderable.EntityId,
                 EntityName = renderable.EntityName
-            }, renderable, assets);
+            }, renderable, assets), renderable, activeCamera);
         }
+    }
+
+    private static RekallAgeVulkanSceneMesh ApplyVirtualGeometry(
+        RekallAgeVulkanSceneMesh mesh,
+        RekallAgeRuntimeViewportRenderable renderable,
+        RekallAgeRuntimeViewportCamera? activeCamera)
+    {
+        return RekallAgeVirtualGeometryReducer.Reduce(mesh, renderable, activeCamera);
     }
 
     private static int ResolveSlices(RekallAgeRuntimeViewportRenderable renderable, int fallback)

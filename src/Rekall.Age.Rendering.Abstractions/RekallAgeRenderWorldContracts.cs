@@ -258,7 +258,16 @@ public sealed record RekallAgeRuntimeViewportRenderable(
     RekallAgeRuntimeViewportSurfaceWaterMaterial? SurfaceWater = null,
     int MeshSlices = 0,
     int MeshStacks = 0,
-    string FacingMode = "world");
+    string FacingMode = "world",
+    RekallAgeRuntimeViewportVirtualGeometry? VirtualGeometry = null);
+
+public sealed record RekallAgeRuntimeViewportVirtualGeometry(
+    bool Enabled = true,
+    double TargetPixelError = 1,
+    int ClusterTriangleCount = 128,
+    int MaxSelectedTriangles = 0,
+    int MaxLodLevel = 8,
+    string DebugMode = "off");
 
 public sealed record RekallAgeRuntimeViewportAtmosphereMaterial(
     double PlanetRadius,

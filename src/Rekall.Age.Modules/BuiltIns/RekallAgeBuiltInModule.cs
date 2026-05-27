@@ -32,6 +32,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeMaterialComponent>();
         builder.RegisterComponent<RekallAgeProceduralMaterialComponent>();
         builder.RegisterComponent<RekallAgeLodGroupComponent>();
+        builder.RegisterComponent<RekallAgeVirtualGeometryComponent>();
         builder.RegisterComponent<RekallAgePhysicsWorld3DComponent>();
         builder.RegisterComponent<RekallAgePhysicsMaterial3DComponent>();
         builder.RegisterComponent<RekallAgeRigidbody3DComponent>();
@@ -695,6 +696,28 @@ public sealed record RekallAgeLodLevel(
     string? TextureAssetId = null,
     string? MaterialColor = null,
     double ScaleMultiplier = 1);
+
+[RekallAgeComponent("Virtual Geometry")]
+public sealed class RekallAgeVirtualGeometryComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool Enabled { get; init; } = true;
+
+    [RekallAgeProperty(Minimum = 0.001)]
+    public double TargetPixelError { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 1)]
+    public int ClusterTriangleCount { get; init; } = 128;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public int MaxSelectedTriangles { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public int MaxLodLevel { get; init; } = 8;
+
+    [RekallAgeProperty]
+    public string DebugMode { get; init; } = "off";
+}
 
 [RekallAgeComponent("Physics World 3D")]
 public sealed class RekallAgePhysicsWorld3DComponent : RekallAgeComponent

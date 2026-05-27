@@ -301,6 +301,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 component.Type.Equals("Rekall.Material", StringComparison.Ordinal));
             var proceduralMaterialComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.ProceduralMaterial", StringComparison.Ordinal));
+            var virtualGeometryComponent = entity?.Components.FirstOrDefault(component =>
+                component.Type.Equals("Rekall.VirtualGeometry", StringComparison.Ordinal));
             var geometry = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.GeometryPrimitive", StringComparison.Ordinal));
             var geometryMeshComponent = entity?.Components.FirstOrDefault(component =>
@@ -505,7 +507,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     ? ReadString(haloComponent, "facingMode") ?? ReadString(haloComponent, "FacingMode") ?? "world"
                     : isTextLabelRenderable
                     ? ReadString(textLabelComponent, "facingMode") ?? ReadString(textLabelComponent, "FacingMode") ?? "world"
-                    : "world");
+                    : "world",
+                VirtualGeometry: ReadVirtualGeometry(virtualGeometryComponent));
 
             if (planetComponent is not null
                 && atmosphereComponent is not null
@@ -1144,6 +1147,22 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             Math.Clamp(ReadNumber(component, "roughnessB", 1), 0.04, 1),
             Math.Clamp(ReadNumber(component, "normalStrength", 0), 0, 4),
             Math.Max(0, ReadNumber(component, "emissiveStrength", 0)));
+    }
+
+    private static RekallAgeRuntimeViewportVirtualGeometry? ReadVirtualGeometry(RekallAgeRuntimeComponent? component)
+    {
+        if (component is null)
+        {
+            return null;
+        }
+
+        return new RekallAgeRuntimeViewportVirtualGeometry(
+            ReadBoolean(component, "enabled", true),
+            Math.Max(0.001, ReadNumber(component, "targetPixelError", 1)),
+            Math.Clamp((int)Math.Round(ReadNumber(component, "clusterTriangleCount", 128)), 1, 65_536),
+            Math.Max(0, (int)Math.Round(ReadNumber(component, "maxSelectedTriangles", 0))),
+            Math.Clamp((int)Math.Round(ReadNumber(component, "maxLodLevel", 8)), 0, 16),
+            EmptyToNull(ReadString(component, "debugMode")) ?? "off");
     }
 
     private static RekallAgeRuntimeViewportAtmosphereMaterial ReadAtmosphereMaterial(

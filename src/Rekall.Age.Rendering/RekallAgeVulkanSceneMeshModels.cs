@@ -22,7 +22,9 @@ public sealed record RekallAgeVulkanSceneMesh(
     RekallAgeVulkanSceneAtmosphereMaterial? Atmosphere = null,
     RekallAgeVulkanSceneCloudLayerMaterial? CloudLayer = null,
     RekallAgeVulkanSceneCloudShadowMaterial? CloudShadow = null,
-    RekallAgeVulkanSceneSurfaceWaterMaterial? SurfaceWater = null);
+    RekallAgeVulkanSceneSurfaceWaterMaterial? SurfaceWater = null,
+    int? VirtualGeometrySourceTriangleCount = null,
+    int VirtualGeometryLodLevel = 0);
 
 public sealed record RekallAgeVulkanSceneAtmosphereMaterial(
     float PlanetRadius,

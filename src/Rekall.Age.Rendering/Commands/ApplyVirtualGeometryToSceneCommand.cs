@@ -18,7 +18,8 @@ public sealed record ApplyVirtualGeometryToSceneRequest(
     int MaxSelectedTriangles = 12000,
     int MaxLodLevel = 8,
     string DebugMode = "off",
-    bool DryRun = false);
+    bool DryRun = false,
+    string? EntityName = null);
 
 public sealed record ApplyVirtualGeometryToSceneResult(
     string SceneName,
@@ -70,6 +71,7 @@ public sealed class ApplyVirtualGeometryToSceneCommand
                 Entity = entity,
                 SourceTriangles = sourceTrianglesByEntityId.TryGetValue(entity.Id, out var triangles) ? triangles : 0
             })
+            .Where(item => MatchesEntityName(item.Entity.Name, request.EntityName))
             .Where(item => item.SourceTriangles >= request.MinSourceTriangles)
             .OrderBy(item => item.Entity.Name, StringComparer.Ordinal)
             .ThenBy(item => item.Entity.Id, StringComparer.Ordinal)
@@ -144,6 +146,12 @@ public sealed class ApplyVirtualGeometryToSceneCommand
     {
         var suffix = entityId.IndexOf(':', StringComparison.Ordinal);
         return suffix < 0 ? entityId : entityId[..suffix];
+    }
+
+    private static bool MatchesEntityName(string entityName, string? requestedName)
+    {
+        return string.IsNullOrWhiteSpace(requestedName)
+            || entityName.Equals(requestedName.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     private static RekallAgeComponentDocument CreateVirtualGeometryComponent(ApplyVirtualGeometryToSceneRequest request)

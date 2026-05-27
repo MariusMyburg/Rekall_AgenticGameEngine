@@ -88,6 +88,18 @@ internal static class RekallAgeCli
                     await ApplyVirtualGeometryToSceneAsync(registry, context, root, scene, minSourceTriangles, width, height, dryRun: false),
                 ["render", "virtual-geometry", "apply", var root, var scene, var minSourceTriangles, var width, var height, "--dry-run"] =>
                     await ApplyVirtualGeometryToSceneAsync(registry, context, root, scene, minSourceTriangles, width, height, dryRun: true),
+                ["render", "virtual-geometry", "apply-entity", var root, var scene, var entityName] =>
+                    await ApplyVirtualGeometryToSceneAsync(registry, context, root, scene, "10000", "1920", "1080", dryRun: false, entityName),
+                ["render", "virtual-geometry", "apply-entity", var root, var scene, var entityName, "--dry-run"] =>
+                    await ApplyVirtualGeometryToSceneAsync(registry, context, root, scene, "10000", "1920", "1080", dryRun: true, entityName),
+                ["render", "virtual-geometry", "apply-entity", var root, var scene, var entityName, var minSourceTriangles] =>
+                    await ApplyVirtualGeometryToSceneAsync(registry, context, root, scene, minSourceTriangles, "1920", "1080", dryRun: false, entityName),
+                ["render", "virtual-geometry", "apply-entity", var root, var scene, var entityName, var minSourceTriangles, "--dry-run"] =>
+                    await ApplyVirtualGeometryToSceneAsync(registry, context, root, scene, minSourceTriangles, "1920", "1080", dryRun: true, entityName),
+                ["render", "virtual-geometry", "apply-entity", var root, var scene, var entityName, var minSourceTriangles, var width, var height] =>
+                    await ApplyVirtualGeometryToSceneAsync(registry, context, root, scene, minSourceTriangles, width, height, dryRun: false, entityName),
+                ["render", "virtual-geometry", "apply-entity", var root, var scene, var entityName, var minSourceTriangles, var width, var height, "--dry-run"] =>
+                    await ApplyVirtualGeometryToSceneAsync(registry, context, root, scene, minSourceTriangles, width, height, dryRun: true, entityName),
                 ["render", "visibility", "inspect", var root, var scene] =>
                     await InspectSceneVisibilityAsync(registry, context, root, scene, "0"),
                 ["render", "visibility", "inspect", var root, var scene, var frames] =>
@@ -793,18 +805,24 @@ internal static class RekallAgeCli
         string minSourceTriangles,
         string width,
         string height,
-        bool dryRun)
+        bool dryRun,
+        string? entityName = null)
     {
         var minimum = int.Parse(minSourceTriangles, CultureInfo.InvariantCulture);
         var viewportWidth = int.Parse(width, CultureInfo.InvariantCulture);
         var viewportHeight = int.Parse(height, CultureInfo.InvariantCulture);
         var result = await registry.ExecuteAsync<ApplyVirtualGeometryToSceneRequest, ApplyVirtualGeometryToSceneResult>(
             "rekall.render.virtual_geometry.apply_scene",
-            new ApplyVirtualGeometryToSceneRequest(root, scene, minimum, viewportWidth, viewportHeight, DryRun: dryRun),
+            new ApplyVirtualGeometryToSceneRequest(root, scene, minimum, viewportWidth, viewportHeight, DryRun: dryRun, EntityName: entityName),
             context);
 
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Dry run: {result.Value.DryRun}");
+        if (!string.IsNullOrWhiteSpace(entityName))
+        {
+            Console.WriteLine($"Entity: {entityName}");
+        }
+
         Console.WriteLine($"Candidates: {result.Value.CandidateEntityCount}; applied: {result.Value.AppliedEntityCount}; skipped existing: {result.Value.SkippedExistingEntityCount}");
         foreach (var applied in result.Value.AppliedEntities)
         {

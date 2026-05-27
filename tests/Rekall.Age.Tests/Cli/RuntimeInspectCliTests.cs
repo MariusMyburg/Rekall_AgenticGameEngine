@@ -394,6 +394,49 @@ public sealed class RuntimeInspectCliTests
         Assert.DoesNotContain(planet.Components, component => component.Type == "Rekall.VirtualGeometry");
     }
 
+    [Fact]
+    public async Task RenderVirtualGeometryApplyEntityTargetsOneDenseEntity()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "planet"])
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+                .AddEntity(RekallAgeEntityDocument.Create("Earth", ["planet"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                    {
+                        ["radius"] = 6,
+                        ["meshSlices"] = 192,
+                        ["meshStacks"] = 96
+                    })))
+                .AddEntity(RekallAgeEntityDocument.Create("Jupiter", ["planet"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                    {
+                        ["radius"] = 8,
+                        ["meshSlices"] = 192,
+                        ["meshStacks"] = 96
+                    }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            "render",
+            "virtual-geometry",
+            "apply-entity",
+            root,
+            "Main",
+            "Earth",
+            "30000");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Applied: Earth", result.Output);
+        Assert.DoesNotContain("Applied: Jupiter", result.Output);
+        var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        Assert.Contains(scene.Entities.Single(entity => entity.Name == "Earth").Components, component => component.Type == "Rekall.VirtualGeometry");
+        Assert.DoesNotContain(scene.Entities.Single(entity => entity.Name == "Jupiter").Components, component => component.Type == "Rekall.VirtualGeometry");
+    }
+
     private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)
     {
         var startInfo = new ProcessStartInfo("dotnet")

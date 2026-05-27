@@ -313,6 +313,47 @@ public sealed class VirtualGeometryTests
     }
 
     [Fact]
+    public async Task ApplyVirtualGeometryToSceneCanTargetEntityName()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "planet"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Earth", ["planet"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                {
+                    ["radius"] = 6,
+                    ["meshSlices"] = 192,
+                    ["meshStacks"] = 96
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Jupiter", ["planet"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                {
+                    ["radius"] = 8,
+                    ["meshSlices"] = 192,
+                    ["meshStacks"] = 96
+                })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new ApplyVirtualGeometryToSceneCommand().ExecuteAsync(
+            new ApplyVirtualGeometryToSceneRequest(
+                root,
+                "Main",
+                MinSourceTriangles: 30000,
+                EntityName: "Earth"),
+            new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("apply earth virtual geometry"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        var applied = Assert.Single(result.Value.AppliedEntities);
+        Assert.Equal("Earth", applied.EntityName);
+        var updated = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        var earth = updated.Entities.Single(entity => entity.Name == "Earth");
+        var jupiter = updated.Entities.Single(entity => entity.Name == "Jupiter");
+        Assert.Contains(earth.Components, component => component.Type == "Rekall.VirtualGeometry");
+        Assert.DoesNotContain(jupiter.Components, component => component.Type == "Rekall.VirtualGeometry");
+    }
+
+    [Fact]
     public async Task InspectVirtualGeometrySceneRejectsNegativeFrames()
     {
         var context = new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("virtual geometry invalid"), CancellationToken.None);

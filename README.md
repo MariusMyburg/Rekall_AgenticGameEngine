@@ -1599,11 +1599,13 @@ Current foundation:
 - startup project/scene loading
 - workbench model construction
 - scene summary
+- scene entity, component, and tag summaries
 - validation status
 - renderable counts
 - camera counts
 - physics body counts
 - asset reports
+- generic Studio action palette for validation, runtime inspection, viewport capture, asset import reports, module builds, and gauntlet workflows
 - logging
 
 Run:

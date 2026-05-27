@@ -1467,6 +1467,13 @@ internal static class RekallAgeCli
         Console.WriteLine($"Assets: {model.Assets.Assets.Count}");
         Console.WriteLine($"Diagnostics: {model.Diagnostics.Issues.Count}");
         Console.WriteLine($"Transactions: {model.Transactions.Transactions.Count}");
+        Console.WriteLine($"Components: {model.SceneSummary.ComponentCount}");
+        Console.WriteLine($"Actions: {model.Actions.Actions.Count}");
+        foreach (var action in model.Actions.Actions.Where(action => action.Recommended))
+        {
+            Console.WriteLine($"- {action.Tool}: {action.Label}");
+        }
+
         return 0;
     }
 

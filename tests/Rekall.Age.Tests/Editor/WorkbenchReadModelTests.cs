@@ -68,6 +68,11 @@ public sealed class WorkbenchReadModelTests
         Assert.Null(model.Runtime.ActiveCameraName);
         Assert.Equal("rekall.render.capture_runtime_viewport", model.Runtime.ViewportCaptureTool);
         Assert.DoesNotContain(model.Runtime.Observations, observation => observation.Severity == "blocking");
+        Assert.Equal(1, model.SceneSummary.EntityCount);
+        Assert.Equal(2, model.SceneSummary.ComponentCount);
+        Assert.Contains(model.SceneSummary.ComponentTypes, component => component.Type == "Rekall.SpriteRenderer" && component.Count == 1);
+        Assert.Contains(model.Actions.Actions, action => action.Tool == "rekall.validation.scene" && action.Recommended);
+        Assert.Contains(model.Actions.Actions, action => action.Tool == "rekall.render.capture_runtime_viewport" && action.Recommended);
     }
 
     [Fact]
@@ -95,6 +100,38 @@ public sealed class WorkbenchReadModelTests
         Assert.Equal("rekall.render.capture_runtime_viewport", model.Runtime.ViewportCaptureTool);
         Assert.Equal(2, model.Runtime.EntityCount);
         Assert.Equal(2, model.Runtime.RenderableCount);
+    }
+
+    [Fact]
+    public async Task WorkbenchModelBuildsGenericSceneSummaryAndActionPalette()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Workbench 2", ["world", "rendering3d", "modules"]),
+            CancellationToken.None);
+
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+                .AddEntity(RekallAgeEntityDocument.Create("Generated Mesh", ["model", "generated"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject()))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer", new JsonObject { ["mesh"] = "mesh-1" }))),
+            CancellationToken.None);
+
+        var model = await new RekallAgeWorkbenchModelBuilder().BuildAsync(root, "Main", CancellationToken.None);
+
+        Assert.Equal(2, model.SceneSummary.EntityCount);
+        Assert.Equal(2, model.SceneSummary.RootEntityCount);
+        Assert.Equal(3, model.SceneSummary.ComponentCount);
+        Assert.Contains(model.SceneSummary.Tags, tag => tag == "generated");
+        Assert.Equal("Rekall.Camera3D", model.SceneSummary.ComponentTypes[0].Type);
+        Assert.All(model.Actions.Actions, action => Assert.StartsWith("rekall.", action.Tool, StringComparison.Ordinal));
+        Assert.Contains(model.Actions.Actions, action => action.Id == "inspect-runtime" && action.Tool == "rekall.runtime.inspect_scene");
+        Assert.Contains(model.Actions.Actions, action => action.Id == "build-modules" && action.Tool == "rekall.build.modules");
+        Assert.Contains(model.Actions.Actions, action => action.Id == "agent-authoring-gauntlet" && action.Tool == "rekall.workflow.agent_authoring_gauntlet");
     }
 
     [Fact]

@@ -185,6 +185,18 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
                             Layer: renderLayer));
                         break;
+                    case "Rekall.CloudLayerRenderer":
+                        if (!HasPlanetRenderer(entity))
+                        {
+                            meshes.Add(new RekallAgeRuntimeRenderMesh(
+                                entity.Id,
+                                entity.Name,
+                                "rekall.planet.cloud-layer",
+                                ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
+                                Layer: renderLayer));
+                        }
+
+                        break;
                     case "Rekall.OrbitPathRenderer":
                         meshes.Add(new RekallAgeRuntimeRenderMesh(
                             entity.Id,
@@ -194,7 +206,67 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             MaterialColor: ReadString(component.Properties, "color"),
                             SortKey: 180,
                             ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
+                            Layer: RekallAgeRenderLayerMask.NormalizeLayer(
+                                ReadString(component.Properties, "layer") ?? renderLayer)));
+                        break;
+                    case "Rekall.RingRenderer":
+                        meshes.Add(new RekallAgeRuntimeRenderMesh(
+                            entity.Id,
+                            entity.Name,
+                            null,
+                            Variant: "rekall.planet.ring",
+                            TextureAssetId: ReadString(component.Properties, "texture"),
+                            MaterialColor: ReadString(component.Properties, "color"),
+                            SortKey: 185,
+                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
                             Layer: renderLayer));
+                        break;
+                    case "Rekall.StarfieldRenderer":
+                        meshes.Add(new RekallAgeRuntimeRenderMesh(
+                            entity.Id,
+                            entity.Name,
+                            null,
+                            Variant: "rekall.space.starfield",
+                            MaterialColor: ReadString(component.Properties, "color"),
+                            SortKey: -100,
+                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
+                            Layer: renderLayer));
+                        break;
+                    case "Rekall.MarkerRenderer":
+                        meshes.Add(new RekallAgeRuntimeRenderMesh(
+                            entity.Id,
+                            entity.Name,
+                            null,
+                            Variant: "rekall.marker",
+                            MaterialColor: ReadString(component.Properties, "color"),
+                            SortKey: 190,
+                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
+                            Layer: RekallAgeRenderLayerMask.NormalizeLayer(
+                                ReadString(component.Properties, "layer") ?? renderLayer)));
+                        break;
+                    case "Rekall.HaloRenderer":
+                        meshes.Add(new RekallAgeRuntimeRenderMesh(
+                            entity.Id,
+                            entity.Name,
+                            null,
+                            Variant: "rekall.halo",
+                            MaterialColor: ReadString(component.Properties, "color"),
+                            SortKey: 188,
+                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
+                            Layer: RekallAgeRenderLayerMask.NormalizeLayer(
+                                ReadString(component.Properties, "layer") ?? renderLayer)));
+                        break;
+                    case "Rekall.TextLabelRenderer":
+                        meshes.Add(new RekallAgeRuntimeRenderMesh(
+                            entity.Id,
+                            entity.Name,
+                            null,
+                            Variant: "rekall.text.label",
+                            MaterialColor: ReadString(component.Properties, "color"),
+                            SortKey: 195,
+                            ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
+                            Layer: RekallAgeRenderLayerMask.NormalizeLayer(
+                                ReadString(component.Properties, "layer") ?? renderLayer)));
                         break;
                     case "Rekall.Rigidbody2D":
                     case "Rekall.Rigidbody3D":
@@ -470,6 +542,12 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             component.Type is "Rekall.MeshRenderer" or "Rekall.MeshSet");
     }
 
+    private static bool HasPlanetRenderer(RekallAgeRuntimeEntity entity)
+    {
+        return entity.Components.Any(component =>
+            component.Type.Equals("Rekall.PlanetRenderer", StringComparison.Ordinal));
+    }
+
     private static bool IsVisibilityGatedComponent(string componentType)
     {
         return componentType is
@@ -489,8 +567,14 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             "Rekall.XrController" or
             "Rekall.XrPoseSource" or
             "Rekall.PlanetRenderer" or
+            "Rekall.CloudLayerRenderer" or
             "Rekall.AtmosphereRenderer" or
             "Rekall.OrbitPathRenderer" or
+            "Rekall.RingRenderer" or
+            "Rekall.StarfieldRenderer" or
+            "Rekall.MarkerRenderer" or
+            "Rekall.HaloRenderer" or
+            "Rekall.TextLabelRenderer" or
             "Rekall.PointLight" or
             "Rekall.DirectionalLight" or
             "Rekall.UiCanvas" or

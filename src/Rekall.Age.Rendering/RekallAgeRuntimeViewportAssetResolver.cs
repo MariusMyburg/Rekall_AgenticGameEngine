@@ -33,7 +33,16 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
             .ToArray();
         var textureAssetIds = frame.Renderables
             .Where(renderable => renderable.Kind.Equals("mesh", StringComparison.Ordinal))
-            .Select(renderable => renderable.TextureAssetId)
+            .SelectMany(renderable => new[]
+            {
+                renderable.TextureAssetId,
+                renderable.MetallicRoughnessTextureAssetId,
+                renderable.NormalTextureAssetId,
+                renderable.OcclusionTextureAssetId,
+                renderable.EmissiveTextureAssetId,
+                renderable.CloudShadow?.TextureAssetId,
+                renderable.SurfaceWater?.TextureAssetId
+            })
             .Where(assetId => !string.IsNullOrWhiteSpace(assetId))
             .Select(assetId => assetId!)
             .Distinct(StringComparer.Ordinal)

@@ -20,14 +20,27 @@ public sealed record RekallAgeVulkanSceneDraw(
     string? NormalTextureId = null,
     string? OcclusionTextureId = null,
     string? EmissiveTextureId = null,
+    string? CloudShadowTextureId = null,
+    string? SurfaceWaterTextureId = null,
     Vector4 MaterialFactors = default,
-    Vector4 EmissiveFactors = default);
+    Vector4 EmissiveFactors = default,
+    Vector4 AtmosphereFactors0 = default,
+    Vector4 AtmosphereFactors1 = default,
+    Vector4 AtmosphereColor0 = default,
+    Vector4 AtmosphereColor1 = default,
+    Vector4 AtmosphereColor2 = default,
+    Vector4 CloudFactors = default,
+    Vector4 CloudColor = default,
+    Vector4 CloudShadowFactors = default,
+    Vector4 SurfaceWaterFactors = default,
+    bool Transparent = false);
 
 public sealed record RekallAgeVulkanSceneFrameUniform(
     Matrix4x4 ViewProjection,
     Vector3 LightDirection,
     Vector4 LightColor,
-    Vector4 LightPosition);
+    Vector4 LightPosition,
+    Vector4 CameraPosition = default);
 
 public sealed record RekallAgeVulkanSceneStereoFrame(
     bool Enabled,

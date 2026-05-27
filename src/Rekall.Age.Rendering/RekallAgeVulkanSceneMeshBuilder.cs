@@ -48,7 +48,7 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             normalized = normalized["rekall.primitive.".Length..];
         }
 
-        return normalized is "cube" or "sphere" or "cylinder" or "cone" or "plane" or "surface"
+        return normalized is "cube" or "sphere" or "cylinder" or "cone" or "plane" or "surface" or "atmosphere" or "cloud-layer"
             ? normalized
             : null;
     }
@@ -84,7 +84,9 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
                 "cube" => BuildCube(renderable, primitive),
                 "plane" => BuildPlane(renderable, primitive),
                 "sphere" => BuildSphere(renderable, primitive, 12, 8),
-                "surface" => BuildSphere(renderable, "planet", 64, 32),
+                "surface" => BuildSphere(renderable, "planet", ResolveSlices(renderable, 192), ResolveStacks(renderable, 96)),
+                "atmosphere" => BuildSphere(renderable, "atmosphere", ResolveSlices(renderable, 384), ResolveStacks(renderable, 192)),
+                "cloud-layer" => BuildSphere(renderable, "cloud-layer", ResolveSlices(renderable, 384), ResolveStacks(renderable, 192)),
                 "cylinder" => BuildCylinder(renderable, primitive, 16),
                 "cone" => BuildCone(renderable, primitive, 16),
                 _ => throw new InvalidOperationException($"Unsupported primitive '{primitive}'.")
@@ -109,6 +111,16 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
         }
     }
 
+    private static int ResolveSlices(RekallAgeRuntimeViewportRenderable renderable, int fallback)
+    {
+        return Math.Clamp(renderable.MeshSlices > 0 ? renderable.MeshSlices : fallback, 12, 512);
+    }
+
+    private static int ResolveStacks(RekallAgeRuntimeViewportRenderable renderable, int fallback)
+    {
+        return Math.Clamp(renderable.MeshStacks > 0 ? renderable.MeshStacks : fallback, 8, 256);
+    }
+
     private static RekallAgeVulkanSceneMesh BindRenderableMaterial(
         RekallAgeVulkanSceneMesh mesh,
         RekallAgeRuntimeViewportRenderable renderable,
@@ -124,6 +136,7 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             NormalTexture = ResolveTexture(renderable.NormalTextureAssetId, assets) ?? mesh.NormalTexture ?? procedural?.NormalTexture,
             OcclusionTexture = ResolveTexture(renderable.OcclusionTextureAssetId, assets) ?? mesh.OcclusionTexture,
             EmissiveTexture = ResolveTexture(renderable.EmissiveTextureAssetId, assets) ?? mesh.EmissiveTexture ?? procedural?.EmissiveTexture,
+            SurfaceWaterTexture = ResolveTexture(renderable.SurfaceWater?.TextureAssetId, assets) ?? mesh.SurfaceWaterTexture,
             MetallicFactor = renderable.MetallicFactor != 0
                 ? (float)Math.Clamp(renderable.MetallicFactor, 0, 1)
                 : procedural is not null
@@ -134,8 +147,97 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             OcclusionStrength = renderable.OcclusionStrength == 1 ? mesh.OcclusionStrength : (float)Math.Clamp(renderable.OcclusionStrength, 0, 1),
             EmissiveFactor = renderable.EmissiveStrength > 0
                 ? ResolveEmissiveFactor(renderable)
-                : procedural?.EmissiveFactor ?? mesh.EmissiveFactor
+                : procedural?.EmissiveFactor ?? mesh.EmissiveFactor,
+            Atmosphere = ResolveAtmosphere(renderable),
+            CloudLayer = ResolveCloudLayer(renderable),
+            CloudShadow = ResolveCloudShadow(renderable),
+            SurfaceWater = ResolveSurfaceWater(renderable)
         };
+    }
+
+    private static RekallAgeVulkanSceneAtmosphereMaterial? ResolveAtmosphere(RekallAgeRuntimeViewportRenderable renderable)
+    {
+        if (renderable.Atmosphere is not { } atmosphere)
+        {
+            return null;
+        }
+
+        var rayleigh = ParseColor(atmosphere.RayleighColor);
+        var mie = ParseColor(atmosphere.MieColor);
+        var ozone = ParseColor(atmosphere.OzoneAbsorptionColor);
+        return new RekallAgeVulkanSceneAtmosphereMaterial(
+            (float)Math.Max(0.0001, atmosphere.PlanetRadius),
+            (float)Math.Max(atmosphere.PlanetRadius + 0.0001, atmosphere.AtmosphereRadius),
+            new Vector4(rayleigh.R, rayleigh.G, rayleigh.B, rayleigh.A),
+            new Vector4(mie.R, mie.G, mie.B, mie.A),
+            new Vector4(ozone.R, ozone.G, ozone.B, ozone.A),
+            new Vector4(
+                (float)Math.Max(0.0001, atmosphere.PlanetRadius),
+                (float)Math.Max(atmosphere.PlanetRadius + 0.0001, atmosphere.AtmosphereRadius),
+                (float)Math.Max(0, atmosphere.Density),
+                (float)Math.Max(0.001, atmosphere.DensityFalloff)),
+            new Vector4(
+                (float)Math.Max(0, atmosphere.RayleighScattering),
+                (float)Math.Max(0, atmosphere.MieScattering),
+                (float)Math.Clamp(atmosphere.MieAnisotropy, -0.99, 0.99),
+                (float)Math.Max(0, atmosphere.SunIntensity)),
+            new Vector4(
+                ozone.R,
+                ozone.G,
+                ozone.B,
+                (float)Math.Max(0, atmosphere.OzoneAbsorption)),
+            (float)Math.Clamp(atmosphere.AerialPerspectiveStrength, 0, 2),
+            Math.Clamp(atmosphere.ViewSampleCount, 4, 32),
+            Math.Clamp(atmosphere.LightSampleCount, 2, 16));
+    }
+
+    private static RekallAgeVulkanSceneCloudLayerMaterial? ResolveCloudLayer(RekallAgeRuntimeViewportRenderable renderable)
+    {
+        if (renderable.CloudLayer is not { } cloud)
+        {
+            return null;
+        }
+
+        var color = ParseColor(cloud.Color);
+        return new RekallAgeVulkanSceneCloudLayerMaterial(
+            new Vector4(
+                cloud.AlphaFromTextureOnly ? 1 : 0,
+                (float)Math.Clamp(cloud.Coverage, 0, 4),
+                (float)Math.Clamp(cloud.LambertianStrength, 0, 1),
+                (float)Math.Clamp(cloud.AmbientStrength, 0, 2)),
+            new Vector4(color.R, color.G, color.B, color.A));
+    }
+
+    private static RekallAgeVulkanSceneCloudShadowMaterial? ResolveCloudShadow(RekallAgeRuntimeViewportRenderable renderable)
+    {
+        if (renderable.CloudShadow is not { } shadow)
+        {
+            return null;
+        }
+
+        return new RekallAgeVulkanSceneCloudShadowMaterial(
+            shadow.TextureAssetId,
+            new Vector4(
+                1,
+                (float)Math.Max(0.0001, shadow.CloudRadius),
+                (float)Math.Clamp(shadow.Strength, 0, 1),
+                0));
+    }
+
+    private static RekallAgeVulkanSceneSurfaceWaterMaterial? ResolveSurfaceWater(RekallAgeRuntimeViewportRenderable renderable)
+    {
+        if (renderable.SurfaceWater is not { } water)
+        {
+            return null;
+        }
+
+        return new RekallAgeVulkanSceneSurfaceWaterMaterial(
+            water.TextureAssetId,
+            new Vector4(
+                1,
+                (float)Math.Clamp(water.Coverage, 0, 4),
+                (float)Math.Clamp(water.SpecularStrength, 0, 8),
+                (float)Math.Clamp(water.Roughness, 0.01, 1)));
     }
 
     private static RekallAgeVulkanSceneTexture? ResolveTexture(
@@ -356,7 +458,9 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
         var color = ParseColor(renderable.MaterialColor);
         var vertices = new List<RekallAgeVulkanSceneVertex>();
         var indices = new List<uint>();
-        for (var stack = 0; stack <= stacks; stack++)
+
+        vertices.Add(Vertex((0, 0.5f, 0), (0, 1, 0), color, 0.5f, 0));
+        for (var stack = 1; stack < stacks; stack++)
         {
             var v = stack / (float)stacks;
             var phi = MathF.PI * v;
@@ -373,11 +477,22 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             }
         }
 
-        for (var stack = 0; stack < stacks; stack++)
+        var bottomIndex = (uint)vertices.Count;
+        vertices.Add(Vertex((0, -0.5f, 0), (0, -1, 0), color, 0.5f, 1));
+
+        for (var slice = 0; slice < slices; slice++)
+        {
+            var current = (uint)(1 + slice);
+            indices.Add(0);
+            indices.Add(current + 1);
+            indices.Add(current);
+        }
+
+        for (var stack = 0; stack < stacks - 2; stack++)
         {
             for (var slice = 0; slice < slices; slice++)
             {
-                var a = (uint)(stack * (slices + 1) + slice);
+                var a = (uint)(1 + stack * (slices + 1) + slice);
                 var b = (uint)(a + slices + 1);
                 indices.Add(a);
                 indices.Add(a + 1);
@@ -386,6 +501,15 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
                 indices.Add(b + 1);
                 indices.Add(b);
             }
+        }
+
+        var bottomRingStart = (uint)(1 + (stacks - 2) * (slices + 1));
+        for (var slice = 0; slice < slices; slice++)
+        {
+            var current = bottomRingStart + (uint)slice;
+            indices.Add(bottomIndex);
+            indices.Add(current);
+            indices.Add(current + 1);
         }
 
         return new RekallAgeVulkanSceneMesh(renderable.EntityId, renderable.EntityName, primitive, vertices, indices);

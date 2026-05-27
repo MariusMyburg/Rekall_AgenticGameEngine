@@ -231,7 +231,51 @@ public sealed record RekallAgeRuntimeViewportRenderable(
     RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null,
     RekallAgeRuntimeViewportLineSegments? LineSegments = null,
     string Layer = "default",
-    RekallAgeRuntimeViewportProceduralMaterial? ProceduralMaterial = null);
+    RekallAgeRuntimeViewportProceduralMaterial? ProceduralMaterial = null,
+    RekallAgeRuntimeViewportAtmosphereMaterial? Atmosphere = null,
+    RekallAgeRuntimeViewportCloudLayerMaterial? CloudLayer = null,
+    RekallAgeRuntimeViewportCloudShadowMaterial? CloudShadow = null,
+    RekallAgeRuntimeViewportSurfaceWaterMaterial? SurfaceWater = null,
+    int MeshSlices = 0,
+    int MeshStacks = 0,
+    string FacingMode = "world");
+
+public sealed record RekallAgeRuntimeViewportAtmosphereMaterial(
+    double PlanetRadius,
+    double AtmosphereRadius,
+    string RayleighColor = "#7fb6ff",
+    string MieColor = "#ffffff",
+    double Density = 1,
+    double DensityFalloff = 0.18,
+    double RayleighScattering = 0.006,
+    double MieScattering = 0.002,
+    double MieAnisotropy = 0.76,
+    double SunIntensity = 22,
+    double Exposure = 1.2,
+    int ViewSampleCount = 16,
+    int LightSampleCount = 8,
+    string OzoneAbsorptionColor = "#ffd199",
+    double OzoneAbsorption = 0,
+    double AerialPerspectiveStrength = 0.38);
+
+public sealed record RekallAgeRuntimeViewportCloudLayerMaterial(
+    double Radius,
+    string Color = "#ffffff",
+    bool AlphaFromTextureOnly = true,
+    double Coverage = 1,
+    double LambertianStrength = 0.45,
+    double AmbientStrength = 0.18);
+
+public sealed record RekallAgeRuntimeViewportCloudShadowMaterial(
+    string TextureAssetId,
+    double CloudRadius,
+    double Strength = 0.35);
+
+public sealed record RekallAgeRuntimeViewportSurfaceWaterMaterial(
+    string TextureAssetId,
+    double Coverage = 1,
+    double SpecularStrength = 2.5,
+    double Roughness = 0.06);
 
 public sealed record RekallAgeRuntimeViewportProceduralMaterial(
     string Generator = "checker",

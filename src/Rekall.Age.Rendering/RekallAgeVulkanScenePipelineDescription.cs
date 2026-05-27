@@ -7,7 +7,8 @@ public sealed record RekallAgeVulkanScenePipelineDescription(
     IReadOnlyList<RekallAgeVulkanDescriptorBindingDescription> DescriptorBindings,
     uint PushConstantBytes,
     bool DepthTestEnabled,
-    bool TextureSamplingEnabled)
+    bool TextureSamplingEnabled,
+    bool AlphaBlendingEnabled)
 {
     public static RekallAgeVulkanScenePipelineDescription Default { get; } = new(
         Path.Combine("Shaders", "rekall_scene.vert"),
@@ -24,11 +25,14 @@ public sealed record RekallAgeVulkanScenePipelineDescription(
             new RekallAgeVulkanDescriptorBindingDescription("NormalTexture", 2, "combined-image-sampler", "fragment"),
             new RekallAgeVulkanDescriptorBindingDescription("MetallicRoughnessTexture", 3, "combined-image-sampler", "fragment"),
             new RekallAgeVulkanDescriptorBindingDescription("OcclusionTexture", 4, "combined-image-sampler", "fragment"),
-            new RekallAgeVulkanDescriptorBindingDescription("EmissiveTexture", 5, "combined-image-sampler", "fragment")
+            new RekallAgeVulkanDescriptorBindingDescription("EmissiveTexture", 5, "combined-image-sampler", "fragment"),
+            new RekallAgeVulkanDescriptorBindingDescription("CloudShadowTexture", 6, "combined-image-sampler", "fragment"),
+            new RekallAgeVulkanDescriptorBindingDescription("SurfaceWaterTexture", 7, "combined-image-sampler", "fragment")
         ],
-        PushConstantBytes: 96,
+        PushConstantBytes: 240,
         DepthTestEnabled: true,
-        TextureSamplingEnabled: true);
+        TextureSamplingEnabled: true,
+        AlphaBlendingEnabled: true);
 }
 
 public sealed record RekallAgeVulkanVertexAttributeDescription(

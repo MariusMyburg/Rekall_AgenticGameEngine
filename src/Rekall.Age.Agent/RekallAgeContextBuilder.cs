@@ -190,6 +190,11 @@ public sealed class RekallAgeContextBuilder
             or "Rekall.LineSegments"
             or "Rekall.PlanetRenderer"
             or "Rekall.OrbitPathRenderer"
+            or "Rekall.RingRenderer"
+            or "Rekall.StarfieldRenderer"
+            or "Rekall.MarkerRenderer"
+            or "Rekall.HaloRenderer"
+            or "Rekall.TextLabelRenderer"
             or "Rekall.RenderLight"
             or "Rekall.DirectionalLight"
             or "Rekall.PointLight";

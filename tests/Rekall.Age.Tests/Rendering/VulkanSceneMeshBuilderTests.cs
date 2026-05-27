@@ -9,7 +9,7 @@ public sealed class VulkanSceneMeshBuilderTests
     [Theory]
     [InlineData("cube", 24, 36)]
     [InlineData("plane", 4, 6)]
-    [InlineData("sphere", 117, 576)]
+    [InlineData("sphere", 93, 504)]
     [InlineData("cylinder", 70, 192)]
     [InlineData("cone", 52, 96)]
     public void BuildMeshesCreatesPrimitiveVertexAndIndexData(string primitive, int expectedVertices, int expectedIndices)
@@ -58,14 +58,62 @@ public sealed class VulkanSceneMeshBuilderTests
         var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame));
 
         Assert.Equal("planet", mesh.Primitive);
-        Assert.True(mesh.Vertices.Count > 1500);
-        Assert.True(mesh.Indices.Count > 9000);
+        Assert.True(mesh.Vertices.Count > 18000);
+        Assert.True(mesh.Indices.Count > 100000);
         Assert.All(mesh.Vertices, vertex =>
         {
             Assert.InRange(MathF.Sqrt(vertex.NormalX * vertex.NormalX + vertex.NormalY * vertex.NormalY + vertex.NormalZ * vertex.NormalZ), 0.99f, 1.01f);
             Assert.InRange(vertex.U, 0, 1);
             Assert.InRange(vertex.V, 0, 1);
         });
+    }
+
+    [Fact]
+    public void BuildMeshesCreatesHighResolutionAtmosphereShellMesh()
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "planet-1:atmosphere",
+            "Gaia",
+            "mesh",
+            "rekall.planet.atmosphere",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.planet.atmosphere",
+            MaterialColor: "#7fb6ff",
+            Atmosphere: new RekallAgeRuntimeViewportAtmosphereMaterial(
+                PlanetRadius: 6,
+                AtmosphereRadius: 6.5,
+                RayleighColor: "#7fb6ff",
+                MieColor: "#ffffff",
+                Density: 0.5,
+                DensityFalloff: 0.18,
+                RayleighScattering: 0.006,
+                MieScattering: 0.002,
+                MieAnisotropy: 0.76,
+                SunIntensity: 22,
+                Exposure: 1.2,
+                ViewSampleCount: 16,
+                LightSampleCount: 8)));
+
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame));
+
+        Assert.Equal("atmosphere", mesh.Primitive);
+        Assert.True(mesh.Vertices.Count > 70000);
+        Assert.True(mesh.Indices.Count > 400000);
+        Assert.All(mesh.Vertices, vertex =>
+        {
+            Assert.Equal(1, vertex.A);
+            Assert.InRange(vertex.U, 0, 1);
+            Assert.InRange(vertex.V, 0, 1);
+        });
+        Assert.NotNull(mesh.Atmosphere);
+        Assert.Equal(6, mesh.Atmosphere.PlanetRadius);
+        Assert.Equal(6.5, mesh.Atmosphere.AtmosphereRadius);
+        Assert.Equal(new Vector4(0.006f, 0.002f, 0.76f, 22f), mesh.Atmosphere.ScatteringFactors);
+        Assert.Equal(16, mesh.Atmosphere.ViewSampleCount);
+        Assert.Equal(8, mesh.Atmosphere.LightSampleCount);
     }
 
     [Fact]
@@ -131,7 +179,7 @@ public sealed class VulkanSceneMeshBuilderTests
             var pb = new Vector3(b.X, b.Y, b.Z);
             var pc = new Vector3(c.X, c.Y, c.Z);
             var normal = Vector3.Cross(pb - pa, pc - pa);
-            if (normal.LengthSquared() < 0.000001f)
+            if (normal.LengthSquared() < 0.000000000001f)
             {
                 continue;
             }
@@ -178,7 +226,7 @@ public sealed class VulkanSceneMeshBuilderTests
             var pb = new Vector3(b.X, b.Y, b.Z);
             var pc = new Vector3(c.X, c.Y, c.Z);
             var faceNormal = Vector3.Cross(pb - pa, pc - pa);
-            if (faceNormal.LengthSquared() < 0.000001f)
+            if (faceNormal.LengthSquared() < 0.000000000001f)
             {
                 continue;
             }
@@ -377,6 +425,34 @@ public sealed class VulkanSceneMeshBuilderTests
         Assert.Empty(mesh.BaseColorTexture.Rgba);
         Assert.Same(gpuTexture, mesh.BaseColorTexture.RuntimeTexture);
         Assert.Equal("asset_earth", mesh.BaseColorTexture.Id);
+    }
+
+    [Fact]
+    public void BuildMeshesBindsSurfaceWaterTextureToGeneratedPlanetSurface()
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "planet-1",
+            "Gaia",
+            "mesh",
+            "rekall.planet.surface",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.planet.surface",
+            SurfaceWater: new RekallAgeRuntimeViewportSurfaceWaterMaterial(
+                "asset_ocean",
+                Coverage: 1.4,
+                SpecularStrength: 3.5,
+                Roughness: 0.06)));
+        var assets = CreateAssetsWithTexture("asset_ocean", 1, 1, [10, 80, 120, 255]);
+
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets));
+
+        Assert.NotNull(mesh.SurfaceWater);
+        Assert.Equal("asset_ocean", mesh.SurfaceWater.TextureAssetId);
+        Assert.NotNull(mesh.SurfaceWaterTexture);
+        Assert.Equal("asset_ocean", mesh.SurfaceWaterTexture.Id);
     }
 
     [Fact]

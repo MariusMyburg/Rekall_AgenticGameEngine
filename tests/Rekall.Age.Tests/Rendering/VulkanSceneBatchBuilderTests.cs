@@ -43,6 +43,92 @@ public sealed class VulkanSceneBatchBuilderTests
     }
 
     [Fact]
+    public void BuildOrientsCameraFacingRenderablesFromActiveCameraPlane()
+    {
+        var renderable = new RekallAgeRuntimeViewportRenderable(
+            "label-1",
+            "Label",
+            "mesh",
+            null,
+            10,
+            20,
+            30,
+            1,
+            Variant: "rekall.text.label",
+            ScaleX: 2,
+            ScaleY: 3,
+            ScaleZ: 4,
+            FacingMode: "camera-plane");
+        var camera = new RekallAgeRuntimeViewportCamera("camera-1", "Camera", "Rekall.Camera3D", true, 0, 0, 10, 0, 90, 0);
+        var frame = CreateFrame(renderable) with { ActiveCamera = camera, Cameras = [camera] };
+        var mesh = new RekallAgeVulkanSceneMesh(
+            "label-1",
+            "Label",
+            "line-segments",
+            [
+                new RekallAgeVulkanSceneVertex(0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0),
+                new RekallAgeVulkanSceneVertex(1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0),
+                new RekallAgeVulkanSceneVertex(0, 0, -1, 0, 1, 0, 1, 1, 1, 1, 0, 0)
+            ],
+            [0, 1, 2]);
+
+        var draw = Assert.Single(new RekallAgeVulkanSceneBatchBuilder().Build(frame, [mesh]).Draws);
+
+        Assert.Equal(0, draw.Model.M11, precision: 4);
+        Assert.Equal(0, draw.Model.M12, precision: 4);
+        Assert.Equal(2, draw.Model.M13, precision: 4);
+        Assert.Equal(0, draw.Model.M31, precision: 4);
+        Assert.Equal(-4, draw.Model.M32, precision: 4);
+        Assert.Equal(0, draw.Model.M33, precision: 4);
+        Assert.Equal(10, draw.Model.M41, precision: 4);
+        Assert.Equal(20, draw.Model.M42, precision: 4);
+        Assert.Equal(30, draw.Model.M43, precision: 4);
+    }
+
+    [Fact]
+    public void BuildKeepsCameraPlaneRenderableTextDirectionReadableForTopDownTargetCamera()
+    {
+        var renderable = new RekallAgeRuntimeViewportRenderable(
+            "label-1",
+            "Label",
+            "mesh",
+            null,
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.text.label",
+            ScaleX: 1,
+            FacingMode: "camera-plane");
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera-1",
+            "Camera",
+            "Rekall.Camera3D",
+            true,
+            0,
+            20000,
+            1600,
+            85.42607874009913,
+            180,
+            0);
+        var frame = CreateFrame(renderable) with { ActiveCamera = camera, Cameras = [camera] };
+        var mesh = new RekallAgeVulkanSceneMesh(
+            "label-1",
+            "Label",
+            "line-segments",
+            [
+                new RekallAgeVulkanSceneVertex(0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0),
+                new RekallAgeVulkanSceneVertex(1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0),
+                new RekallAgeVulkanSceneVertex(0, 0, -1, 0, 1, 0, 1, 1, 1, 1, 0, 0)
+            ],
+            [0, 1, 2]);
+
+        var draw = Assert.Single(new RekallAgeVulkanSceneBatchBuilder().Build(frame, [mesh]).Draws);
+
+        Assert.True(draw.Model.M11 > 0);
+    }
+
+    [Fact]
     public void BuildUsesActiveCameraAndLightInFrameUniform()
     {
         var frame = CreateFrame(
@@ -296,6 +382,164 @@ public sealed class VulkanSceneBatchBuilderTests
 
         Assert.Equal("asset_lamp/emissive", draw.EmissiveTextureId);
         Assert.Equal(new Vector4(1, 0.5f, 0.1f, 4), draw.EmissiveFactors);
+    }
+
+    [Fact]
+    public void BuildPreservesSurfaceMaterialFactorsWhenAtmosphereIsBoundForLighting()
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "planet",
+            "Planet",
+            "mesh",
+            "rekall.planet.surface",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.planet.surface",
+            MetallicFactor: 0.2,
+            RoughnessFactor: 0.7,
+            Atmosphere: new RekallAgeRuntimeViewportAtmosphereMaterial(
+                PlanetRadius: 1,
+                AtmosphereRadius: 1.05,
+                RayleighColor: "#3366ff",
+                MieColor: "#ffe0aa",
+                Density: 0.75,
+                SunIntensity: 18,
+                OzoneAbsorptionColor: "#ffd199",
+                OzoneAbsorption: 0.012,
+                AerialPerspectiveStrength: 0.65)));
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame));
+
+        var draw = Assert.Single(new RekallAgeVulkanSceneBatchBuilder().Build(frame, [mesh]).Draws);
+
+        Assert.Equal(new Vector4(0.2f, 0.7f, 0, 0), draw.MaterialFactors);
+        Assert.Equal(1, draw.AtmosphereFactors0.X);
+        Assert.Equal(1.05f, draw.AtmosphereFactors0.Y);
+        Assert.True(draw.AtmosphereFactors1.W < 0);
+        Assert.Equal(new Vector4(0.2f, 0.4f, 1, 1), draw.AtmosphereColor0);
+        Assert.Equal(1, draw.AtmosphereColor1.X);
+        Assert.Equal(0.65f, draw.AtmosphereColor1.W);
+        Assert.Equal(1, draw.AtmosphereColor2.X);
+        Assert.Equal(0.012f, draw.AtmosphereColor2.W);
+    }
+
+    [Fact]
+    public void BuildUsesAtmosphereSampleCountsOnlyForAtmosphereShellDraws()
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "planet:atmosphere",
+            "Planet",
+            "mesh",
+            "rekall.planet.atmosphere",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.planet.atmosphere",
+            Atmosphere: new RekallAgeRuntimeViewportAtmosphereMaterial(
+                PlanetRadius: 1,
+                AtmosphereRadius: 1.05,
+                RayleighColor: "#3366ff",
+                MieColor: "#ffe0aa",
+                ViewSampleCount: 20,
+                LightSampleCount: 10,
+                SunIntensity: 18,
+                OzoneAbsorptionColor: "#ffd199",
+                OzoneAbsorption: 0.012,
+                AerialPerspectiveStrength: 0.65)));
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame));
+
+        var draw = Assert.Single(new RekallAgeVulkanSceneBatchBuilder().Build(frame, [mesh]).Draws);
+
+        Assert.Equal(new Vector4(20, 10, 0, 0), draw.MaterialFactors);
+        Assert.True(draw.AtmosphereFactors1.W > 0);
+        Assert.Equal(new Vector4(0.2f, 0.4f, 1, 1), draw.AtmosphereColor0);
+        Assert.Equal(0.65f, draw.AtmosphereColor1.W);
+        Assert.Equal(0.012f, draw.AtmosphereColor2.W);
+    }
+
+    [Fact]
+    public void BuildPreservesCloudLayerMaterialControls()
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "planet:clouds",
+            "Planet",
+            "mesh",
+            "rekall.planet.cloud-layer",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.planet.cloud-layer",
+            MaterialColor: "#fff4ddcc",
+            CloudLayer: new RekallAgeRuntimeViewportCloudLayerMaterial(
+                Radius: 1.02,
+                Color: "#fff4ddcc",
+                AlphaFromTextureOnly: true,
+                Coverage: 1.4,
+                LambertianStrength: 0.35,
+                AmbientStrength: 0.22)));
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame));
+
+        var draw = Assert.Single(new RekallAgeVulkanSceneBatchBuilder().Build(frame, [mesh]).Draws);
+
+        Assert.Equal(new Vector4(1, 1.4f, 0.35f, 0.22f), draw.CloudFactors);
+        Assert.Equal(1, draw.CloudColor.X);
+        Assert.Equal(0.8f, draw.CloudColor.W, 2);
+    }
+
+    [Fact]
+    public void BuildPreservesCloudShadowMaterialControls()
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "planet",
+            "Planet",
+            "mesh",
+            "rekall.planet.surface",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.planet.surface",
+            TextureAssetId: "earth",
+            CloudShadow: new RekallAgeRuntimeViewportCloudShadowMaterial(
+                "clouds",
+                CloudRadius: 1.08,
+                Strength: 0.42)));
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame));
+
+        var draw = Assert.Single(new RekallAgeVulkanSceneBatchBuilder().Build(frame, [mesh]).Draws);
+
+        Assert.Equal("clouds", draw.CloudShadowTextureId);
+        Assert.Equal(new Vector4(1, 1.08f, 0.42f, 0), draw.CloudShadowFactors);
+    }
+
+    [Fact]
+    public void BuildPreservesSurfaceWaterMaterialControls()
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "planet",
+            "Planet",
+            "mesh",
+            "rekall.planet.surface",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.planet.surface",
+            TextureAssetId: "earth",
+            SurfaceWater: new RekallAgeRuntimeViewportSurfaceWaterMaterial(
+                "earth_ocean",
+                Coverage: 1.35,
+                SpecularStrength: 3.2,
+                Roughness: 0.08)));
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame));
+
+        var draw = Assert.Single(new RekallAgeVulkanSceneBatchBuilder().Build(frame, [mesh]).Draws);
+
+        Assert.Equal("earth_ocean", draw.SurfaceWaterTextureId);
+        Assert.Equal(new Vector4(1, 1.35f, 3.2f, 0.08f), draw.SurfaceWaterFactors);
     }
 
     private static RekallAgeVulkanSceneMesh CreateLargeMesh(string entityId, int vertexCount)

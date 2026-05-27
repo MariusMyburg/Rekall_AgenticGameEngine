@@ -323,11 +323,11 @@ public sealed class RekallAgeGlbMeshLoader
                 material.NormalTexture,
                 material.OcclusionTexture,
                 material.EmissiveTexture,
-                material.MetallicFactor,
-                material.RoughnessFactor,
-                material.NormalScale,
-                material.OcclusionStrength,
-                material.EmissiveFactor));
+                MetallicFactor: material.MetallicFactor,
+                RoughnessFactor: material.RoughnessFactor,
+                NormalScale: material.NormalScale,
+                OcclusionStrength: material.OcclusionStrength,
+                EmissiveFactor: material.EmissiveFactor));
             vertices.Clear();
             indices.Clear();
             remap.Clear();

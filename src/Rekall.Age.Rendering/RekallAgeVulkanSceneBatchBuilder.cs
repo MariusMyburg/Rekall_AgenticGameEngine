@@ -12,7 +12,7 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
     {
         var renderablesByEntityId = BuildRenderableLookup(frame);
         var vertices = BuildLocalVertices(meshes);
-        var indices = FlattenIndices(renderablesByEntityId, meshes, out var draws, out var bounds);
+        var indices = FlattenIndices(renderablesByEntityId, frame.ActiveCamera, meshes, out var draws, out var bounds);
         return new RekallAgeVulkanSceneBatch(
             vertices,
             indices,
@@ -41,6 +41,7 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
 
     private static IReadOnlyList<uint> FlattenIndices(
         IReadOnlyDictionary<string, RekallAgeRuntimeViewportRenderable> renderablesByEntityId,
+        RekallAgeRuntimeViewportCamera? activeCamera,
         IReadOnlyList<RekallAgeVulkanSceneMesh> meshes,
         out IReadOnlyList<RekallAgeVulkanSceneDraw> draws,
         out SceneBounds bounds)
@@ -58,7 +59,12 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         foreach (var mesh in meshes)
         {
             renderablesByEntityId.TryGetValue(mesh.EntityId, out var renderable);
-            var model = CreateModelMatrix(renderable);
+            var model = CreateModelMatrix(renderable, activeCamera);
+            var isAtmosphereShell = mesh.Atmosphere is not null
+                && mesh.Primitive.Equals("atmosphere", StringComparison.Ordinal);
+            var isTransparent = isAtmosphereShell
+                || mesh.CloudLayer is not null
+                || mesh.Primitive.Equals("halo", StringComparison.Ordinal);
             ranges.Add(new RekallAgeVulkanSceneDraw(
                 (uint)indices.Count,
                 (uint)mesh.Indices.Count,
@@ -70,16 +76,48 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
                 mesh.NormalTexture?.Id,
                 mesh.OcclusionTexture?.Id,
                 mesh.EmissiveTexture?.Id,
-                new Vector4(
-                    Math.Clamp(mesh.MetallicFactor, 0, 1),
-                    Math.Clamp(mesh.RoughnessFactor, 0.04f, 1),
-                    mesh.NormalTexture is null ? 0 : Math.Clamp(mesh.NormalScale, 0, 4),
-                    mesh.OcclusionTexture is null ? 0 : Math.Clamp(mesh.OcclusionStrength, 0, 1)),
+                mesh.CloudShadow?.TextureAssetId,
+                mesh.SurfaceWater?.TextureAssetId,
+                isAtmosphereShell
+                    ? new Vector4(
+                        Math.Clamp(mesh.Atmosphere!.ViewSampleCount, 4, 32),
+                        Math.Clamp(mesh.Atmosphere.LightSampleCount, 2, 16),
+                        0,
+                        0)
+                    : new Vector4(
+                        Math.Clamp(mesh.MetallicFactor, 0, 1),
+                        Math.Clamp(mesh.RoughnessFactor, 0.04f, 1),
+                        mesh.NormalTexture is null ? 0 : Math.Clamp(mesh.NormalScale, 0, 4),
+                        mesh.OcclusionTexture is null ? 0 : Math.Clamp(mesh.OcclusionStrength, 0, 1)),
                 new Vector4(
                     Math.Clamp(mesh.EmissiveFactor.X, 0, 16),
                     Math.Clamp(mesh.EmissiveFactor.Y, 0, 16),
                     Math.Clamp(mesh.EmissiveFactor.Z, 0, 16),
-                    Math.Clamp(mesh.EmissiveFactor.W, 0, 64))));
+                    Math.Clamp(mesh.EmissiveFactor.W, 0, 64)),
+                mesh.Atmosphere?.AtmosphereFactors ?? Vector4.Zero,
+                mesh.Atmosphere is null
+                    ? Vector4.Zero
+                    : isAtmosphereShell
+                        ? mesh.Atmosphere.ScatteringFactors
+                        : new Vector4(
+                            mesh.Atmosphere.ScatteringFactors.X,
+                            mesh.Atmosphere.ScatteringFactors.Y,
+                            mesh.Atmosphere.ScatteringFactors.Z,
+                            -MathF.Max(mesh.Atmosphere.ScatteringFactors.W, 0.0001f)),
+                mesh.Atmosphere?.RayleighColor ?? Vector4.Zero,
+                mesh.Atmosphere is null
+                    ? Vector4.Zero
+                    : new Vector4(
+                        mesh.Atmosphere.MieColor.X,
+                        mesh.Atmosphere.MieColor.Y,
+                        mesh.Atmosphere.MieColor.Z,
+                        mesh.Atmosphere.AerialPerspectiveStrength),
+                mesh.Atmosphere?.OzoneFactors ?? Vector4.Zero,
+                mesh.CloudLayer?.Factors ?? Vector4.Zero,
+                mesh.CloudLayer?.Color ?? Vector4.Zero,
+                mesh.CloudShadow?.Factors ?? Vector4.Zero,
+                mesh.SurfaceWater?.Factors ?? Vector4.Zero,
+                isTransparent));
             foreach (var vertex in mesh.Vertices)
             {
                 var world = Vector3.Transform(new Vector3(vertex.X, vertex.Y, vertex.Z), model);
@@ -116,7 +154,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             view * projection,
             light.Direction,
             light.Color,
-            light.Position);
+            light.Position,
+            new Vector4(pose.Eye, 1));
     }
 
     private static RekallAgeVulkanSceneStereoFrame? BuildStereoFrame(
@@ -239,11 +278,18 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             farClip);
     }
 
-    private static Matrix4x4 CreateModelMatrix(RekallAgeRuntimeViewportRenderable? renderable)
+    private static Matrix4x4 CreateModelMatrix(
+        RekallAgeRuntimeViewportRenderable? renderable,
+        RekallAgeRuntimeViewportCamera? activeCamera)
     {
         if (renderable is null)
         {
             return Matrix4x4.Identity;
+        }
+
+        if (IsCameraPlaneFacing(renderable) && activeCamera is not null)
+        {
+            return CreateCameraPlaneModelMatrix(renderable, activeCamera);
         }
 
         return Matrix4x4.CreateScale(
@@ -256,6 +302,47 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             * Matrix4x4.CreateTranslation((float)renderable.X, (float)renderable.Y, (float)renderable.Z);
     }
 
+    private static bool IsCameraPlaneFacing(RekallAgeRuntimeViewportRenderable renderable)
+    {
+        return renderable.FacingMode.Equals("camera-plane", StringComparison.OrdinalIgnoreCase)
+            || renderable.FacingMode.Equals("camera", StringComparison.OrdinalIgnoreCase)
+            || renderable.FacingMode.Equals("billboard", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Matrix4x4 CreateCameraPlaneModelMatrix(
+        RekallAgeRuntimeViewportRenderable renderable,
+        RekallAgeRuntimeViewportCamera camera)
+    {
+        var rightTuple = Rotate(1, 0, 0, camera.RotationX, camera.RotationY, camera.RotationZ);
+        var upTuple = Rotate(0, 1, 0, camera.RotationX, camera.RotationY, camera.RotationZ);
+        var right = -NormalizeOrFallback(new Vector3(rightTuple.X, rightTuple.Y, rightTuple.Z), Vector3.UnitX);
+        var up = NormalizeOrFallback(new Vector3(upTuple.X, upTuple.Y, upTuple.Z), Vector3.UnitY);
+        var forward = DirectionFromEuler(camera.RotationX, camera.RotationY, camera.RotationZ);
+        var scaleX = (float)Math.Max(0.001, renderable.ScaleX);
+        var scaleY = (float)Math.Max(0.001, renderable.ScaleY);
+        var scaleZ = (float)Math.Max(0.001, renderable.ScaleZ);
+        var normal = -forward;
+        var vertical = -up;
+
+        return new Matrix4x4(
+            right.X * scaleX,
+            right.Y * scaleX,
+            right.Z * scaleX,
+            0,
+            normal.X * scaleY,
+            normal.Y * scaleY,
+            normal.Z * scaleY,
+            0,
+            vertical.X * scaleZ,
+            vertical.Y * scaleZ,
+            vertical.Z * scaleZ,
+            0,
+            (float)renderable.X,
+            (float)renderable.Y,
+            (float)renderable.Z,
+            1);
+    }
+
     private static SceneLight ResolvePrimaryLight(RekallAgeRuntimeViewportFrame frame)
     {
         RekallAgeRuntimeViewportRenderable? firstLight = null;
@@ -263,6 +350,11 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         foreach (var renderable in frame.Renderables)
         {
             if (!renderable.Kind.Equals("light", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (renderable.Intensity <= 0.0001)
             {
                 continue;
             }
@@ -313,7 +405,7 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
 
     private static bool IsPointLight(RekallAgeRuntimeViewportRenderable renderable)
     {
-        return renderable.Variant?.Contains("PointLight", StringComparison.OrdinalIgnoreCase) == true;
+        return renderable.Variant?.Contains("point", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private static Vector3 DirectionFromEuler(double degreesX, double degreesY, double degreesZ)

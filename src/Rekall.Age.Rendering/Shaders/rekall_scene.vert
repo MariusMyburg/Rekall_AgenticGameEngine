@@ -11,12 +11,23 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 lightDirection;
     vec4 lightColor;
     vec4 lightPosition;
+    vec4 cameraPosition;
 } frame;
 
 layout(push_constant) uniform DrawPushConstants
 {
     mat4 model;
     vec4 materialFactors;
+    vec4 emissiveFactors;
+    vec4 atmosphereFactors0;
+    vec4 atmosphereFactors1;
+    vec4 atmosphereColor0;
+    vec4 atmosphereColor1;
+    vec4 atmosphereColor2;
+    vec4 cloudFactors;
+    vec4 cloudColor;
+    vec4 cloudShadowFactors;
+    vec4 surfaceWaterFactors;
 } draw;
 
 layout(location = 0) out vec3 fragNormal;

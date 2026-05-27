@@ -64,7 +64,13 @@ public sealed class RekallAgeGameplayInterpreter
             "GeometryMesh" or
             "GeometryExtrusion" or
             "PlanetRenderer" or
+            "CloudLayerRenderer" or
             "AtmosphereRenderer" or
+            "RingRenderer" or
+            "StarfieldRenderer" or
+            "MarkerRenderer" or
+            "HaloRenderer" or
+            "TextLabelRenderer" or
             "DirectionalLight" or
             "PointLight" or
             "SpotLight" or
@@ -105,7 +111,7 @@ public sealed class RekallAgeGameplayInterpreter
     {
         return system switch
         {
-            "Camera2D" or "Camera3D" or "SpriteRenderer" or "MeshRenderer" or "MeshSet" or "PlanetRenderer" or "AtmosphereRenderer" => "rendering",
+            "Camera2D" or "Camera3D" or "SpriteRenderer" or "MeshRenderer" or "MeshSet" or "PlanetRenderer" or "CloudLayerRenderer" or "AtmosphereRenderer" or "RingRenderer" or "StarfieldRenderer" or "MarkerRenderer" or "HaloRenderer" or "TextLabelRenderer" => "rendering",
             "Rigidbody2D" or "Rigidbody3D" or "BoxCollider2D" or "CircleCollider2D" or "BoxCollider3D" or "SphereCollider3D" or "CapsuleCollider3D" or "MeshCollider" or "Trigger" => "physics",
             "AudioListener" or "AudioEmitter" => "audio",
             "AnimationPlayer" or "SpriteAnimator" => "animation",

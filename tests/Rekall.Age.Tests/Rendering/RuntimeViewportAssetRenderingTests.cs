@@ -155,6 +155,38 @@ public sealed class RuntimeViewportAssetRenderingTests
         Assert.True(shadedCubePixels.Length >= 3);
     }
 
+    [Fact]
+    public async Task SoftwareRendererRecognizesPointLightRenderablesWithoutFallbackMarkers()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Sphere", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "sphere" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Material", new JsonObject { ["baseColor"] = "#3477d6" })))
+            .AddEntity(RekallAgeEntityDocument.Create("PointLight", ["light"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = 2, ["y"] = 3, ["z"] = 4 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PointLight",
+                    new JsonObject { ["intensity"] = 1.5, ["range"] = 25 })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 180, 120, debugOverlay: false);
+
+        var capture = await new RekallAgeRuntimeSoftwareRenderer().CaptureAsync(
+            frame,
+            Path.Combine(root, "captures"),
+            "Main_runtime_000.png",
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            CancellationToken.None);
+
+        Assert.True(capture.NonBlank);
+        Assert.Equal(0, capture.FallbackRenderableCount);
+        Assert.Contains(frame.Renderables, renderable => renderable.Kind == "light" && renderable.Variant == "PointLight");
+    }
+
     private static int CountPixels(
         RekallAgeRgbaImage image,
         int minX,
@@ -497,6 +529,108 @@ public sealed class RuntimeViewportAssetRenderingTests
         }
     }
 
+    [Theory]
+    [InlineData("BC3_UNorm")]
+    [InlineData("VK_FORMAT_BC3_UNORM_BLOCK")]
+    [InlineData("VK_FORMAT_BC3_SRGB_BLOCK")]
+    public void BlockCompressedDecoderExpandsBc3TextureToRgbaPixels(string format)
+    {
+        var block = new byte[]
+        {
+            0x40, 0x10, 0, 0, 0, 0, 0, 0,
+            0x00, 0xf8, 0x00, 0x00, 0, 0, 0, 0
+        };
+        var texture = new RekallAgeRuntimeTextureAsset(
+            "asset_clouds",
+            "dds",
+            4,
+            4,
+            1,
+            format,
+            null,
+            true,
+            [new RekallAgeRuntimeTextureMipLevel(0, 4, 4, block)]);
+
+        var image = RekallAgeBlockCompressedTextureDecoder.TryDecodeTopLevel(texture);
+
+        Assert.NotNull(image);
+        Assert.Equal(4, image.Width);
+        Assert.Equal(4, image.Height);
+        for (var y = 0; y < image.Height; y++)
+        {
+            for (var x = 0; x < image.Width; x++)
+            {
+                Assert.Equal(new RekallAgeRgbaPixel(255, 0, 0, 64), image.GetPixel(x, y));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("BC4_UNorm")]
+    [InlineData("VK_FORMAT_BC4_UNORM_BLOCK")]
+    public void BlockCompressedDecoderExpandsBc4TextureToAlphaMaskPixels(string format)
+    {
+        var block = new byte[] { 0x20, 0xe0, 0, 0, 0, 0, 0, 0 };
+        var texture = new RekallAgeRuntimeTextureAsset(
+            "asset_cloud_mask",
+            "dds",
+            4,
+            4,
+            1,
+            format,
+            null,
+            true,
+            [new RekallAgeRuntimeTextureMipLevel(0, 4, 4, block)]);
+
+        var image = RekallAgeBlockCompressedTextureDecoder.TryDecodeTopLevel(texture);
+
+        Assert.NotNull(image);
+        Assert.Equal(4, image.Width);
+        Assert.Equal(4, image.Height);
+        for (var y = 0; y < image.Height; y++)
+        {
+            for (var x = 0; x < image.Width; x++)
+            {
+                Assert.Equal(new RekallAgeRgbaPixel(255, 255, 255, 32), image.GetPixel(x, y));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("BC5_UNorm")]
+    [InlineData("VK_FORMAT_BC5_UNORM_BLOCK")]
+    public void BlockCompressedDecoderExpandsBc5TextureToNormalLikePixels(string format)
+    {
+        var block = new byte[]
+        {
+            0x80, 0x40, 0, 0, 0, 0, 0, 0,
+            0x80, 0x40, 0, 0, 0, 0, 0, 0
+        };
+        var texture = new RekallAgeRuntimeTextureAsset(
+            "asset_normal",
+            "ktx2",
+            4,
+            4,
+            1,
+            format,
+            "Zstandard",
+            true,
+            [new RekallAgeRuntimeTextureMipLevel(0, 4, 4, block)]);
+
+        var image = RekallAgeBlockCompressedTextureDecoder.TryDecodeTopLevel(texture);
+
+        Assert.NotNull(image);
+        Assert.Equal(4, image.Width);
+        Assert.Equal(4, image.Height);
+        for (var y = 0; y < image.Height; y++)
+        {
+            for (var x = 0; x < image.Width; x++)
+            {
+                Assert.Equal(new RekallAgeRgbaPixel(128, 128, 255, 255), image.GetPixel(x, y));
+            }
+        }
+    }
+
     [Fact]
     public void BatchBuilderDisablesNormalPerturbationWhenMeshHasNoNormalTexture()
     {
@@ -576,6 +710,52 @@ public sealed class RuntimeViewportAssetRenderingTests
     }
 
     [Fact]
+    public async Task AssetResolverExtractsGpuReadyDdsDx10TexturePayloads()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var texturePath = Path.Combine(root, "cloud-mask.dds");
+        var mipBytes = Enumerable.Range(0, 32).Select(value => (byte)(value + 7)).ToArray();
+        await File.WriteAllBytesAsync(texturePath, CreateDdsDx10Texture(8, 8, 1, 80, mipBytes), CancellationToken.None);
+        await new RekallAgeAssetCatalogStore().SaveAsync(
+            root,
+            new RekallAgeAssetCatalogDocument(
+            [
+                new RekallAgeAssetDocument(
+                    "asset_cloud_mask",
+                    "cloud-mask",
+                    "Cloud Mask",
+                    "texture",
+                    texturePath,
+                    texturePath,
+                    "hash")
+                {
+                    TextureMetadata = new RekallAgeTextureMetadata(
+                        "dds",
+                        8,
+                        8,
+                        1,
+                        "BC4_UNorm",
+                        null,
+                        true)
+                }
+            ]),
+            CancellationToken.None);
+
+        var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(
+            root,
+            CreateTexturedPlanetFrame("asset_cloud_mask"),
+            CancellationToken.None);
+
+        var texture = Assert.Single(assets.Textures.Values);
+        Assert.Equal("asset_cloud_mask", texture.AssetId);
+        Assert.Equal("dds", texture.Container);
+        Assert.Equal("BC4_UNorm", texture.Format);
+        Assert.Equal(mipBytes, Assert.Single(texture.MipLevels).Bytes);
+        Assert.Empty(assets.Issues);
+    }
+
+
+    [Fact]
     public async Task SoftwareRendererRasterizesGeometryPrimitiveVariantsWithMaterialColors()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -619,6 +799,83 @@ public sealed class RuntimeViewportAssetRenderingTests
         {
             var index = pixel * 4;
             return output.Rgba[index + 2] > 150 && output.Rgba[index] > 100 && output.Rgba[index + 1] < 130;
+        });
+    }
+
+    [Fact]
+    public async Task SoftwareRendererRasterizesPlanetShellVariantsWithoutFallback()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main",
+            0,
+            0,
+            180,
+            120,
+            new RekallAgeRuntimeViewportCamera("camera", "Camera", "camera", true, ClearColor: "#05070a"),
+            [],
+            [
+                new RekallAgeRuntimeViewportRenderable(
+                    "earth",
+                    "Earth",
+                    "mesh",
+                    "rekall.planet.surface",
+                    0,
+                    0,
+                    0,
+                    10,
+                    Variant: "rekall.planet.surface",
+                    ScaleX: 2,
+                    ScaleY: 2,
+                    ScaleZ: 2,
+                    MaterialColor: "#2d77c8"),
+                new RekallAgeRuntimeViewportRenderable(
+                    "earth:clouds",
+                    "Earth",
+                    "mesh",
+                    "rekall.planet.cloud-layer",
+                    0,
+                    0,
+                    0,
+                    20,
+                    Variant: "rekall.planet.cloud-layer",
+                    ScaleX: 2.1,
+                    ScaleY: 2.1,
+                    ScaleZ: 2.1,
+                    MaterialColor: "#ffffff"),
+                new RekallAgeRuntimeViewportRenderable(
+                    "earth:atmosphere",
+                    "Earth",
+                    "mesh",
+                    "rekall.planet.atmosphere",
+                    0,
+                    0,
+                    0,
+                    30,
+                    Variant: "rekall.planet.atmosphere",
+                    ScaleX: 2.2,
+                    ScaleY: 2.2,
+                    ScaleZ: 2.2,
+                    MaterialColor: "#6fb6ff")
+            ],
+            0,
+            new RekallAgeRuntimeViewportOverlay(false, 0),
+            []);
+
+        var capture = await new RekallAgeRuntimeSoftwareRenderer().CaptureAsync(
+            frame,
+            Path.Combine(root, "captures"),
+            "Main_runtime_000.png",
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            CancellationToken.None);
+        var output = await RekallAgePngReader.ReadRgbaAsync(capture.ScreenshotPath, CancellationToken.None);
+
+        Assert.True(capture.NonBlank);
+        Assert.Equal(0, capture.FallbackRenderableCount);
+        Assert.Contains(Enumerable.Range(0, output.Rgba.Length / 4), pixel =>
+        {
+            var index = pixel * 4;
+            return output.Rgba[index + 2] > 120 && output.Rgba[index] < 160;
         });
     }
 
@@ -794,6 +1051,17 @@ public sealed class RuntimeViewportAssetRenderingTests
         var fourCcBytes = System.Text.Encoding.ASCII.GetBytes(fourCc);
         Array.Copy(fourCcBytes, 0, bytes, 84, Math.Min(4, fourCcBytes.Length));
         Array.Copy(mipBytes, 0, bytes, 128, mipBytes.Length);
+        return bytes;
+    }
+
+    private static byte[] CreateDdsDx10Texture(uint width, uint height, uint mipLevels, uint dxgiFormat, byte[] mipBytes)
+    {
+        var bytes = new byte[148 + mipBytes.Length];
+        Array.Copy(CreateDdsTexture(width, height, mipLevels, "DX10", []), bytes, 128);
+        WriteUInt32(bytes, 128, dxgiFormat);
+        WriteUInt32(bytes, 132, 3);
+        WriteUInt32(bytes, 140, 1);
+        Array.Copy(mipBytes, 0, bytes, 148, mipBytes.Length);
         return bytes;
     }
 

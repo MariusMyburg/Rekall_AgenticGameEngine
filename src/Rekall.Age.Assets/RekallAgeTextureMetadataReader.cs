@@ -91,6 +91,10 @@ public static class RekallAgeTextureMetadataReader
         var width = BinaryPrimitives.ReadUInt32LittleEndian(bytes[16..20]);
         var mipLevels = BinaryPrimitives.ReadUInt32LittleEndian(bytes[28..32]);
         var fourCc = Encoding.ASCII.GetString(bytes[84..88]).TrimEnd('\0', ' ');
+        var dxgiFormat = fourCc.Equals("DX10", StringComparison.Ordinal)
+            && bytes.Length >= 148
+            ? BinaryPrimitives.ReadUInt32LittleEndian(bytes[128..132])
+            : 0;
         if (width == 0 || height == 0)
         {
             return false;
@@ -101,9 +105,9 @@ public static class RekallAgeTextureMetadataReader
             checked((int)width),
             checked((int)height),
             checked((int)Math.Max(1, mipLevels)),
-            ToDdsFormatName(fourCc),
+            fourCc.Equals("DX10", StringComparison.Ordinal) ? ToDxgiFormatName(dxgiFormat) : ToDdsFormatName(fourCc),
             null,
-            IsGpuCompressedDdsFormat(fourCc));
+            fourCc.Equals("DX10", StringComparison.Ordinal) ? IsGpuCompressedDxgiFormat(dxgiFormat) : IsGpuCompressedDdsFormat(fourCc));
         return true;
     }
 
@@ -198,8 +202,34 @@ public static class RekallAgeTextureMetadataReader
         };
     }
 
+    private static string? ToDxgiFormatName(uint dxgiFormat)
+    {
+        return dxgiFormat switch
+        {
+            71 => "BC1_UNorm",
+            72 => "BC1_UNorm_SRgb",
+            74 => "BC2_UNorm",
+            75 => "BC2_UNorm_SRgb",
+            77 => "BC3_UNorm",
+            78 => "BC3_UNorm_SRgb",
+            80 => "BC4_UNorm",
+            81 => "BC4_SNorm",
+            83 => "BC5_UNorm",
+            84 => "BC5_SNorm",
+            98 => "BC7_UNorm",
+            99 => "BC7_UNorm_SRgb",
+            0 => null,
+            _ => $"DXGI_FORMAT_{dxgiFormat}"
+        };
+    }
+
     private static bool IsGpuCompressedDdsFormat(string fourCc)
     {
         return fourCc is "DXT1" or "DXT3" or "DXT5" or "ATI1" or "ATI2" or "BC4U" or "BC5U" or "DX10";
+    }
+
+    private static bool IsGpuCompressedDxgiFormat(uint dxgiFormat)
+    {
+        return dxgiFormat is >= 70 and <= 84 or >= 94 and <= 99;
     }
 }

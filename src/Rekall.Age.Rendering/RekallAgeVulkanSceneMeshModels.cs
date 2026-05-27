@@ -13,11 +13,41 @@ public sealed record RekallAgeVulkanSceneMesh(
     RekallAgeVulkanSceneTexture? NormalTexture = null,
     RekallAgeVulkanSceneTexture? OcclusionTexture = null,
     RekallAgeVulkanSceneTexture? EmissiveTexture = null,
+    RekallAgeVulkanSceneTexture? SurfaceWaterTexture = null,
     float MetallicFactor = 0,
     float RoughnessFactor = 1,
     float NormalScale = 1,
     float OcclusionStrength = 1,
-    Vector4 EmissiveFactor = default);
+    Vector4 EmissiveFactor = default,
+    RekallAgeVulkanSceneAtmosphereMaterial? Atmosphere = null,
+    RekallAgeVulkanSceneCloudLayerMaterial? CloudLayer = null,
+    RekallAgeVulkanSceneCloudShadowMaterial? CloudShadow = null,
+    RekallAgeVulkanSceneSurfaceWaterMaterial? SurfaceWater = null);
+
+public sealed record RekallAgeVulkanSceneAtmosphereMaterial(
+    float PlanetRadius,
+    float AtmosphereRadius,
+    Vector4 RayleighColor,
+    Vector4 MieColor,
+    Vector4 OzoneAbsorptionColor,
+    Vector4 AtmosphereFactors,
+    Vector4 ScatteringFactors,
+    Vector4 OzoneFactors,
+    float AerialPerspectiveStrength,
+    int ViewSampleCount,
+    int LightSampleCount);
+
+public sealed record RekallAgeVulkanSceneCloudLayerMaterial(
+    Vector4 Factors,
+    Vector4 Color);
+
+public sealed record RekallAgeVulkanSceneCloudShadowMaterial(
+    string TextureAssetId,
+    Vector4 Factors);
+
+public sealed record RekallAgeVulkanSceneSurfaceWaterMaterial(
+    string TextureAssetId,
+    Vector4 Factors);
 
 public sealed record RekallAgeVulkanSceneTexture(
     string Id,

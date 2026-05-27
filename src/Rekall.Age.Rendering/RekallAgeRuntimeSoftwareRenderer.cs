@@ -245,7 +245,7 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
 
         if (renderable.Kind.Equals("light", StringComparison.Ordinal))
         {
-            return renderable.Variant?.Contains("DirectionalLight", StringComparison.Ordinal) == true;
+            return true;
         }
 
         return false;
@@ -278,7 +278,7 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
             normalized = normalized["rekall.primitive.".Length..];
         }
 
-        return normalized is "cube" or "sphere" or "cylinder" or "cone" or "plane" or "surface"
+        return normalized is "cube" or "sphere" or "cylinder" or "cone" or "plane" or "surface" or "atmosphere" or "cloud-layer"
             ? normalized
             : null;
     }
@@ -297,6 +297,8 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
                 break;
             case "sphere":
             case "surface":
+            case "atmosphere":
+            case "cloud-layer":
                 DrawPrimitiveSphere(frame, renderable, pixels, material);
                 break;
             case "cylinder":

@@ -115,7 +115,7 @@ public sealed class VulkanScenePreparedFrameTests
         Assert.Equal("normal", draw.NormalTextureId);
         Assert.Equal("occ", draw.OcclusionTextureId);
         Assert.Equal("emissive", draw.EmissiveTextureId);
-        Assert.Contains(new RekallAgeVulkanSceneMaterialKey("base", "normal", "mr", "occ", "emissive"), plan.MaterialKeys);
+        Assert.Contains(new RekallAgeVulkanSceneMaterialKey("base", "normal", "mr", "occ", "emissive", null, null), plan.MaterialKeys);
         Assert.Contains(RekallAgeVulkanSceneMaterialKey.Default, plan.MaterialKeys);
     }
 
@@ -156,7 +156,14 @@ public sealed class VulkanScenePreparedFrameTests
         var push = RekallAgeVulkanSceneUniformUploadBuilder.BuildDrawPushConstants(
             System.Numerics.Matrix4x4.Identity,
             new System.Numerics.Vector4(0.2f, 0.8f, 1.1f, 0.6f),
-            new System.Numerics.Vector4(1, 0.5f, 0.25f, 3));
+            new System.Numerics.Vector4(1, 0.5f, 0.25f, 3),
+            atmosphereColor0: new System.Numerics.Vector4(0.1f, 0.2f, 0.3f, 0.4f),
+            atmosphereColor1: new System.Numerics.Vector4(0.5f, 0.6f, 0.7f, 0.8f),
+            atmosphereColor2: new System.Numerics.Vector4(0.9f, 1.0f, 1.1f, 1.2f),
+            cloudFactors: new System.Numerics.Vector4(1.3f, 1.4f, 1.5f, 1.6f),
+            cloudColor: new System.Numerics.Vector4(0.7f, 0.8f, 0.9f, 1.0f),
+            cloudShadowFactors: new System.Numerics.Vector4(2.1f, 2.2f, 2.3f, 2.4f),
+            surfaceWaterFactors: new System.Numerics.Vector4(3.1f, 3.2f, 3.3f, 3.4f));
 
         Assert.Equal(1, uniform.ViewProjection.M41);
         Assert.Equal(2, uniform.ViewProjection.M42);
@@ -166,6 +173,17 @@ public sealed class VulkanScenePreparedFrameTests
         Assert.Equal(10, uniform.LightPositionZ);
         Assert.Equal(0.8f, push.RoughnessFactor);
         Assert.Equal(3, push.EmissiveStrength);
+        Assert.Equal(0.1f, push.AtmosphereRayleighR);
+        Assert.Equal(0.8f, push.AtmosphereAerialPerspectiveStrength);
+        Assert.Equal(0.9f, push.AtmosphereOzoneR);
+        Assert.Equal(1.2f, push.AtmosphereOzoneAbsorption);
+        Assert.Equal(1.4f, push.CloudCoverage);
+        Assert.Equal(0.8f, push.CloudColorG);
+        Assert.Equal(2.2f, push.CloudShadowRadius);
+        Assert.Equal(2.3f, push.CloudShadowStrength);
+        Assert.Equal(3.2f, push.SurfaceWaterCoverage);
+        Assert.Equal(3.3f, push.SurfaceWaterSpecularStrength);
+        Assert.Equal(3.4f, push.SurfaceWaterRoughness);
         Assert.True(System.Runtime.InteropServices.Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>() > System.Runtime.InteropServices.Marshal.SizeOf<RekallAgeVulkanSceneGpuMatrix4x4>());
     }
 }

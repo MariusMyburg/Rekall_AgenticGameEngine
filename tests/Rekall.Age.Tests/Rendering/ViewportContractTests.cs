@@ -480,6 +480,10 @@ public sealed class ViewportContractTests
                 {
                     ["Radius"] = 6,
                     ["SurfaceTexture"] = "earth_diffuse",
+                    ["WaterTexture"] = "earth_ocean",
+                    ["WaterCoverage"] = 1.35,
+                    ["WaterSpecularStrength"] = 3.2,
+                    ["WaterRoughness"] = 0.08,
                     ["Color"] = "#4b86d8"
                 }))
                 .AddComponent(RekallAgeComponentDocument.Create("Rekall.AtmosphereRenderer", new JsonObject
@@ -491,10 +495,15 @@ public sealed class ViewportContractTests
 
         var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
 
-        var planet = Assert.Single(frame.Renderables, item => item.EntityName == "Gaia");
+        var planet = Assert.Single(frame.Renderables, item => item.EntityName == "Gaia" && item.Variant == "rekall.planet.surface");
         Assert.Equal("mesh", planet.Kind);
         Assert.Equal("rekall.planet.surface", planet.Variant);
         Assert.Equal("earth_diffuse", planet.TextureAssetId);
+        Assert.NotNull(planet.SurfaceWater);
+        Assert.Equal("earth_ocean", planet.SurfaceWater.TextureAssetId);
+        Assert.Equal(1.35, planet.SurfaceWater.Coverage);
+        Assert.Equal(3.2, planet.SurfaceWater.SpecularStrength);
+        Assert.Equal(0.08, planet.SurfaceWater.Roughness);
         Assert.Equal("#4b86d8", planet.MaterialColor);
         Assert.Equal(12, planet.X);
         Assert.Equal(-3, planet.Y);
@@ -502,6 +511,232 @@ public sealed class ViewportContractTests
         Assert.Equal(24, planet.ScaleX);
         Assert.Equal(24, planet.ScaleY);
         Assert.Equal(24, planet.ScaleZ);
+        Assert.NotNull(planet.Atmosphere);
+        Assert.Equal(6, planet.Atmosphere.PlanetRadius);
+        Assert.Equal(6.18, planet.Atmosphere.AtmosphereRadius);
+        Assert.Equal("#7fb6ff", planet.Atmosphere.RayleighColor);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderProjectsAtmosphereRendererAsScatteringShell()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "planet"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Gaia", ["planet"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = 12,
+                    ["y"] = -3,
+                    ["z"] = 4,
+                    ["scaleX"] = 2,
+                    ["scaleY"] = 2,
+                    ["scaleZ"] = 2
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                {
+                    ["Radius"] = 6,
+                    ["Color"] = "#4b86d8"
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.AtmosphereRenderer", new JsonObject
+                {
+                    ["Height"] = 0.5,
+                    ["RayleighColor"] = "#7fb6ff",
+                    ["Density"] = 0.5,
+                    ["OzoneAbsorption"] = 0.012,
+                    ["OzoneAbsorptionColor"] = "#ffd199",
+                    ["AerialPerspectiveStrength"] = 0.65
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var atmosphere = Assert.Single(frame.Renderables, item => item.EntityName == "Gaia" && item.Variant == "rekall.planet.atmosphere");
+        var surface = Assert.Single(frame.Renderables, item => item.EntityName == "Gaia" && item.Variant == "rekall.planet.surface");
+        Assert.Equal("mesh", atmosphere.Kind);
+        Assert.Equal($"{surface.EntityId}:atmosphere", atmosphere.EntityId);
+        Assert.Equal("#7fb6ff", atmosphere.MaterialColor);
+        Assert.Equal(12, atmosphere.X);
+        Assert.Equal(-3, atmosphere.Y);
+        Assert.Equal(4, atmosphere.Z);
+        Assert.Equal(26, atmosphere.ScaleX);
+        Assert.Equal(26, atmosphere.ScaleY);
+        Assert.Equal(26, atmosphere.ScaleZ);
+        Assert.NotNull(atmosphere.Atmosphere);
+        Assert.Equal(6, atmosphere.Atmosphere.PlanetRadius);
+        Assert.Equal(6.5, atmosphere.Atmosphere.AtmosphereRadius);
+        Assert.Equal(0.5, atmosphere.Atmosphere.Density);
+        Assert.Equal("#7fb6ff", atmosphere.Atmosphere.RayleighColor);
+        Assert.Equal(0.012, atmosphere.Atmosphere.OzoneAbsorption);
+        Assert.Equal("#ffd199", atmosphere.Atmosphere.OzoneAbsorptionColor);
+        Assert.Equal(0.65, atmosphere.Atmosphere.AerialPerspectiveStrength);
+        Assert.True(atmosphere.SortKey > surface.SortKey);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderProjectsCloudLayerRendererAsAlphaCoverageShell()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "planet"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Gaia", ["planet"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = 12,
+                    ["y"] = -3,
+                    ["z"] = 4,
+                    ["scaleX"] = 2,
+                    ["scaleY"] = 2,
+                    ["scaleZ"] = 2
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                {
+                    ["Radius"] = 6,
+                    ["Color"] = "#4b86d8"
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.CloudLayerRenderer", new JsonObject
+                {
+                    ["Height"] = 0.08,
+                    ["Texture"] = "earth_clouds",
+                    ["Color"] = "#fff4ddcc",
+                    ["Coverage"] = 1.4,
+                    ["LambertianStrength"] = 0.35,
+                    ["AmbientStrength"] = 0.22,
+                    ["CastShadows"] = true,
+                    ["ShadowStrength"] = 0.42,
+                    ["AlphaFromTextureOnly"] = true
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.AtmosphereRenderer", new JsonObject
+                {
+                    ["Height"] = 0.5,
+                    ["RayleighColor"] = "#7fb6ff"
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var cloud = Assert.Single(frame.Renderables, item => item.EntityName == "Gaia" && item.Variant == "rekall.planet.cloud-layer");
+        var surface = Assert.Single(frame.Renderables, item => item.EntityName == "Gaia" && item.Variant == "rekall.planet.surface");
+        var atmosphere = Assert.Single(frame.Renderables, item => item.EntityName == "Gaia" && item.Variant == "rekall.planet.atmosphere");
+        Assert.Equal($"{surface.EntityId}:clouds", cloud.EntityId);
+        Assert.Equal("mesh", cloud.Kind);
+        Assert.Equal("earth_clouds", cloud.TextureAssetId);
+        Assert.Equal("#fff4ddcc", cloud.MaterialColor);
+        Assert.Equal(24.32, cloud.ScaleX, 2);
+        Assert.Equal(24.32, cloud.ScaleY, 2);
+        Assert.Equal(24.32, cloud.ScaleZ, 2);
+        Assert.NotNull(cloud.CloudLayer);
+        Assert.True(cloud.CloudLayer.AlphaFromTextureOnly);
+        Assert.Equal(1.4, cloud.CloudLayer.Coverage);
+        Assert.Equal(0.35, cloud.CloudLayer.LambertianStrength);
+        Assert.Equal(0.22, cloud.CloudLayer.AmbientStrength);
+        Assert.NotNull(surface.CloudShadow);
+        Assert.Equal("earth_clouds", surface.CloudShadow.TextureAssetId);
+        Assert.Equal(6.08, surface.CloudShadow.CloudRadius);
+        Assert.Equal(0.42, surface.CloudShadow.Strength);
+        Assert.NotNull(cloud.Atmosphere);
+        Assert.True(cloud.SortKey > surface.SortKey);
+        Assert.True(cloud.SortKey < atmosphere.SortKey);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderProjectsMultipleCloudLayerRenderersAsStackedShells()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "planet"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Gaia", ["planet"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["scaleX"] = 2,
+                    ["scaleY"] = 2,
+                    ["scaleZ"] = 2
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                {
+                    ["Radius"] = 6,
+                    ["Color"] = "#4b86d8"
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.CloudLayerRenderer", new JsonObject
+                {
+                    ["Layers"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["Height"] = 0.04,
+                            ["Texture"] = "earth_clouds_base",
+                            ["Color"] = "#d8e8ffff",
+                            ["CastShadows"] = false,
+                            ["Coverage"] = 0.9
+                        },
+                        new JsonObject
+                        {
+                            ["Height"] = 0.09,
+                            ["Texture"] = "earth_clouds_top",
+                            ["Color"] = "#fff4ddcc",
+                            ["CastShadows"] = true,
+                            ["ShadowStrength"] = 0.5,
+                            ["Coverage"] = 1.5
+                        }
+                    }
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.AtmosphereRenderer", new JsonObject
+                {
+                    ["Height"] = 0.5,
+                    ["RayleighColor"] = "#7fb6ff"
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var surface = Assert.Single(frame.Renderables, item => item.EntityName == "Gaia" && item.Variant == "rekall.planet.surface");
+        var clouds = frame.Renderables
+            .Where(item => item.EntityName == "Gaia" && item.Variant == "rekall.planet.cloud-layer")
+            .OrderBy(item => item.SortKey)
+            .ToArray();
+        Assert.Equal(2, clouds.Length);
+        Assert.Equal($"{surface.EntityId}:clouds", clouds[0].EntityId);
+        Assert.Equal($"{surface.EntityId}:clouds:1", clouds[1].EntityId);
+        Assert.Equal("earth_clouds_base", clouds[0].TextureAssetId);
+        Assert.Equal("earth_clouds_top", clouds[1].TextureAssetId);
+        Assert.Equal(24.16, clouds[0].ScaleX, 2);
+        Assert.Equal(24.36, clouds[1].ScaleX, 2);
+        Assert.Equal(0.9, clouds[0].CloudLayer!.Coverage);
+        Assert.Equal(1.5, clouds[1].CloudLayer!.Coverage);
+        Assert.NotNull(surface.CloudShadow);
+        Assert.Equal("earth_clouds_top", surface.CloudShadow.TextureAssetId);
+        Assert.Equal(6.09, surface.CloudShadow.CloudRadius);
+        Assert.Equal(0.5, surface.CloudShadow.Strength);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderCanBindAtmosphereToPlanetSurfaceWithoutScatteringShell()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "planet"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Cloud Layer", ["planet-shell"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                {
+                    ["Radius"] = 6.05,
+                    ["SurfaceTexture"] = "clouds"
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.AtmosphereRenderer", new JsonObject
+                {
+                    ["Height"] = 0.45,
+                    ["RenderShell"] = false,
+                    ["Density"] = 0.35
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var surface = Assert.Single(frame.Renderables, item => item.EntityName == "Cloud Layer" && item.Variant == "rekall.planet.surface");
+        Assert.NotNull(surface.Atmosphere);
+        Assert.Equal(6.05, surface.Atmosphere.PlanetRadius);
+        Assert.Equal(6.5, surface.Atmosphere.AtmosphereRadius);
+        Assert.Equal(0.35, surface.Atmosphere.Density);
+        Assert.DoesNotContain(frame.Renderables, item => item.EntityName == "Cloud Layer" && item.Variant == "rekall.planet.atmosphere");
     }
 
     [Fact]
@@ -596,6 +831,289 @@ public sealed class ViewportContractTests
         var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
 
         Assert.DoesNotContain(frame.Renderables, item => item.Variant == "rekall.orbit.path");
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderProjectsRingRendererAsTexturedAnnulusMesh()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "celestial"])
+            .AddEntity(RekallAgeEntityDocument.Create("Saturn", ["celestial"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = 5,
+                    ["y"] = 1,
+                    ["z"] = -2
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                {
+                    ["radius"] = 3,
+                    ["color"] = "#d6bd7a"
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RingRenderer", new JsonObject
+                {
+                    ["innerRadius"] = 4.1,
+                    ["outerRadius"] = 7.8,
+                    ["texture"] = "saturn_rings",
+                    ["color"] = "#fff0cacc",
+                    ["segments"] = 32
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var ring = Assert.Single(frame.Renderables, item => item.EntityName == "Saturn" && item.Variant == "rekall.planet.ring");
+        Assert.Equal("mesh", ring.Kind);
+        Assert.Equal("saturn_rings", ring.TextureAssetId);
+        Assert.Equal("#fff0cacc", ring.MaterialColor);
+        Assert.Equal(5, ring.X);
+        Assert.Equal(1, ring.Y);
+        Assert.Equal(-2, ring.Z);
+        Assert.NotNull(ring.GeometryMesh);
+        Assert.Equal(64, ring.GeometryMesh.Vertices.Count);
+        Assert.Equal(192, ring.GeometryMesh.Indices.Count);
+        Assert.True(ring.GeometryMesh.Vertices.Max(vertex => Math.Abs(vertex.X)) > 7);
+        Assert.Equal(1, ring.GeometryMesh.Vertices[0].U, precision: 6);
+        Assert.Equal(0, ring.GeometryMesh.Vertices[1].U, precision: 6);
+        Assert.Equal(1, ring.GeometryMesh.Vertices[2].U, precision: 6);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderProjectsStarfieldRendererAsDeterministicMesh()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Backdrop", ["space"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.StarfieldRenderer", new JsonObject
+                {
+                    ["count"] = 32,
+                    ["radius"] = 500,
+                    ["size"] = 1.5,
+                    ["seed"] = 42,
+                    ["color"] = "#dbe9ffff",
+                    ["brightness"] = 1.8
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 640, 360, debugOverlay: false);
+
+        var starfield = Assert.Single(frame.Renderables, item => item.EntityName == "Backdrop" && item.Variant == "rekall.space.starfield");
+        Assert.Equal("mesh", starfield.Kind);
+        Assert.Equal("#dbe9ffff", starfield.MaterialColor);
+        Assert.Equal(1.8, starfield.EmissiveStrength, precision: 6);
+        Assert.NotNull(starfield.GeometryMesh);
+        Assert.Equal(32 * 4, starfield.GeometryMesh.Vertices.Count);
+        Assert.Equal(32 * 6, starfield.GeometryMesh.Indices.Count);
+        Assert.Equal(starfield.GeometryMesh.Vertices[0].X, frame.Renderables.Single(item => item.EntityName == "Backdrop").GeometryMesh!.Vertices[0].X);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderProjectsMarkerRendererAsLayeredEmissiveMesh()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Distant Body", ["celestial"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = 10,
+                    ["y"] = 2,
+                    ["z"] = -5
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                {
+                    ["radius"] = 1,
+                    ["color"] = "#445566"
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.AtmosphereRenderer", new JsonObject
+                {
+                    ["height"] = 0.1
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.MarkerRenderer", new JsonObject
+                {
+                    ["size"] = 3,
+                    ["color"] = "#ffdd88cc",
+                    ["emissiveStrength"] = 2.5,
+                    ["layer"] = "overview-markers"
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 640, 360, debugOverlay: false);
+
+        var marker = Assert.Single(frame.Renderables, item => item.EntityName == "Distant Body" && item.Variant == "rekall.marker");
+        Assert.Single(frame.Renderables, item => item.Layer == "overview-markers");
+        Assert.Equal("mesh", marker.Kind);
+        Assert.Equal("overview-markers", marker.Layer);
+        Assert.Equal("#ffdd88cc", marker.MaterialColor);
+        Assert.Equal("#ffdd88cc", marker.EmissiveColor);
+        Assert.Equal(2.5, marker.EmissiveStrength, precision: 6);
+        Assert.NotNull(marker.GeometryMesh);
+        Assert.Equal(4, marker.GeometryMesh.Vertices.Count);
+        Assert.Equal(6, marker.GeometryMesh.Indices.Count);
+        Assert.Equal([0, 2, 1, 0, 3, 2], marker.GeometryMesh.Indices);
+        Assert.True(marker.GeometryMesh.Vertices.Max(vertex => Math.Abs(vertex.X)) >= 3);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderProjectsHaloRendererAsLayeredRadialGlowMesh()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Sun", ["star"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = 1,
+                    ["y"] = 2,
+                    ["z"] = 3
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.HaloRenderer", new JsonObject
+                {
+                    ["radius"] = 8,
+                    ["color"] = "#ffd27acc",
+                    ["intensity"] = 5,
+                    ["segments"] = 32,
+                    ["facingMode"] = "camera-plane",
+                    ["layer"] = "stellar-glow"
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 640, 360, debugOverlay: false);
+
+        var halo = Assert.Single(frame.Renderables, item => item.EntityName == "Sun" && item.Variant == "rekall.halo");
+        Assert.Equal("stellar-glow", halo.Layer);
+        Assert.Equal("#ffd27acc", halo.MaterialColor);
+        Assert.Equal("#ffd27acc", halo.EmissiveColor);
+        Assert.Equal(5, halo.EmissiveStrength, precision: 6);
+        Assert.Equal("camera-plane", halo.FacingMode);
+        Assert.NotNull(halo.GeometryMesh);
+        Assert.Equal(33, halo.GeometryMesh!.Vertices.Count);
+        Assert.Equal(96, halo.GeometryMesh.Indices.Count);
+        Assert.True(halo.GeometryMesh.Vertices.Max(vertex => Math.Abs(vertex.X)) >= 8);
+        Assert.Contains(halo.GeometryMesh.Vertices, vertex => vertex.A <= 0.001);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderProjectsHaloRendererWithConcentricFalloffRings()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Glow", ["star"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.HaloRenderer", new JsonObject
+                {
+                    ["radius"] = 10,
+                    ["color"] = "#ffffffcc",
+                    ["segments"] = 8,
+                    ["rings"] = 4,
+                    ["falloff"] = 2
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 640, 360, debugOverlay: false);
+
+        var halo = Assert.Single(frame.Renderables, item => item.EntityName == "Glow" && item.Variant == "rekall.halo");
+        Assert.NotNull(halo.GeometryMesh);
+        Assert.Equal(33, halo.GeometryMesh!.Vertices.Count);
+        Assert.Equal(168, halo.GeometryMesh.Indices.Count);
+        var firstRingAlpha = halo.GeometryMesh.Vertices[1].A;
+        var middleRingAlpha = halo.GeometryMesh.Vertices[1 + 8].A;
+        var outerRingAlpha = halo.GeometryMesh.Vertices[^1].A;
+        Assert.True(firstRingAlpha > middleRingAlpha);
+        Assert.True(middleRingAlpha > outerRingAlpha);
+        Assert.Equal(0, outerRingAlpha, precision: 6);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderProjectsTextLabelRendererAsLayeredLineSegments()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Earth", ["celestial"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = 4,
+                    ["z"] = 8
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.TextLabelRenderer", new JsonObject
+                {
+                    ["text"] = "Earth",
+                    ["size"] = 2,
+                    ["offsetX"] = 1,
+                    ["offsetZ"] = -3,
+                    ["color"] = "#dce8ffff",
+                    ["thickness"] = 0.05,
+                    ["facingMode"] = "camera-plane",
+                    ["layer"] = "overview-labels"
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 640, 360, debugOverlay: false);
+
+        var label = Assert.Single(frame.Renderables, item => item.EntityName == "Earth" && item.Variant == "rekall.text.label");
+        Assert.Equal("overview-labels", label.Layer);
+        Assert.Equal("#dce8ffff", label.MaterialColor);
+        Assert.Equal("camera-plane", label.FacingMode);
+        Assert.NotNull(label.LineSegments);
+        Assert.True(label.LineSegments!.Segments.Count >= 12);
+        Assert.Equal(0.05, label.LineSegments.Thickness, precision: 6);
+        Assert.Contains(label.LineSegments.Segments, segment => segment.FromX >= 1 && segment.FromZ <= -3);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderProjectsTextLabelRendererWithLetterSpecificStrokeGlyphs()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Label", ["text"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.TextLabelRenderer", new JsonObject
+                {
+                    ["text"] = "K",
+                    ["size"] = 10,
+                    ["color"] = "#ffffff",
+                    ["layer"] = "overview-labels"
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 640, 360, debugOverlay: false);
+
+        var label = Assert.Single(frame.Renderables, item => item.EntityName == "Label" && item.Variant == "rekall.text.label");
+        Assert.NotNull(label.LineSegments);
+        Assert.Contains(label.LineSegments!.Segments, segment =>
+            Math.Abs(segment.ToX - segment.FromX) > 0.001
+            && Math.Abs(segment.ToZ - segment.FromZ) > 0.001);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderScalesTextLabelRendererToMinimumOrthographicScreenHeight()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["projectionMode"] = "orthographic",
+                    ["orthographicSize"] = 120
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Tiny Label", ["text"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.TextLabelRenderer", new JsonObject
+                {
+                    ["text"] = "A",
+                    ["size"] = 1,
+                    ["minimumScreenHeightPixels"] = 24,
+                    ["color"] = "#ffffff",
+                    ["layer"] = "overview-labels"
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 120, 60, debugOverlay: false);
+
+        var label = Assert.Single(frame.Renderables, item => item.EntityName == "Tiny Label" && item.Variant == "rekall.text.label");
+        var minZ = label.LineSegments!.Segments.Min(segment => Math.Min(segment.FromZ, segment.ToZ));
+        var maxZ = label.LineSegments.Segments.Max(segment => Math.Max(segment.FromZ, segment.ToZ));
+        Assert.Equal(48, maxZ - minZ, precision: 6);
     }
 
     [Fact]

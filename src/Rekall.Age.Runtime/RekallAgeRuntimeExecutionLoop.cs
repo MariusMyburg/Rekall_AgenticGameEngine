@@ -51,6 +51,7 @@ public sealed class RekallAgeRuntimeExecutionLoop
             new RekallAgeCollisionEventSystem(),
             new RekallAgeTriggerEventSystem(),
             new RekallAgeCameraInputSystem(),
+            new RekallAgeCameraTargetCycleInputSystem(),
             new RekallAgeCameraTarget3DSystem()
         ]);
 

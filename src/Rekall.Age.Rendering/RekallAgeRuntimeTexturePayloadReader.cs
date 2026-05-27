@@ -116,7 +116,7 @@ public static class RekallAgeRuntimeTexturePayloadReader
             return false;
         }
 
-        var offset = 128;
+        var offset = IsDdsDx10(bytes) ? 148 : 128;
         var levels = new List<RekallAgeRuntimeTextureMipLevel>(metadata.MipLevelCount);
         for (var level = 0; level < Math.Max(1, metadata.MipLevelCount); level++)
         {
@@ -144,12 +144,13 @@ public static class RekallAgeRuntimeTexturePayloadReader
     {
         var blockBytes = format switch
         {
-            "BC1_UNorm" or "VK_FORMAT_BC1_RGB_UNORM_BLOCK" or "VK_FORMAT_BC1_RGB_SRGB_BLOCK"
-                or "VK_FORMAT_BC1_RGBA_UNORM_BLOCK" or "VK_FORMAT_BC1_RGBA_SRGB_BLOCK" => 8,
-            "BC2_UNorm" or "BC3_UNorm" or "BC4_UNorm" or "BC5_UNorm" or "VK_FORMAT_BC2_UNORM_BLOCK"
+            "BC1_UNorm" or "BC1_UNorm_SRgb" or "VK_FORMAT_BC1_RGB_UNORM_BLOCK" or "VK_FORMAT_BC1_RGB_SRGB_BLOCK"
+                or "VK_FORMAT_BC1_RGBA_UNORM_BLOCK" or "VK_FORMAT_BC1_RGBA_SRGB_BLOCK"
+                or "BC4_UNorm" or "BC4_SNorm" or "VK_FORMAT_BC4_UNORM_BLOCK" or "VK_FORMAT_BC4_SNORM_BLOCK" => 8,
+            "BC2_UNorm" or "BC2_UNorm_SRgb" or "BC3_UNorm" or "BC3_UNorm_SRgb" or "BC5_UNorm" or "BC5_SNorm" or "BC7_UNorm" or "BC7_UNorm_SRgb" or "VK_FORMAT_BC2_UNORM_BLOCK"
                 or "VK_FORMAT_BC2_SRGB_BLOCK" or "VK_FORMAT_BC3_UNORM_BLOCK" or "VK_FORMAT_BC3_SRGB_BLOCK"
-                or "VK_FORMAT_BC4_UNORM_BLOCK" or "VK_FORMAT_BC4_SNORM_BLOCK" or "VK_FORMAT_BC5_UNORM_BLOCK"
-                or "VK_FORMAT_BC5_SNORM_BLOCK" or "VK_FORMAT_BC7_UNORM_BLOCK" or "VK_FORMAT_BC7_SRGB_BLOCK" => 16,
+                or "VK_FORMAT_BC5_UNORM_BLOCK" or "VK_FORMAT_BC5_SNORM_BLOCK"
+                or "VK_FORMAT_BC7_UNORM_BLOCK" or "VK_FORMAT_BC7_SRGB_BLOCK" => 16,
             _ => 0
         };
         if (blockBytes == 0)
@@ -158,6 +159,15 @@ public static class RekallAgeRuntimeTexturePayloadReader
         }
 
         return checked(Math.Max(1, (width + 3) / 4) * Math.Max(1, (height + 3) / 4) * blockBytes);
+    }
+
+    private static bool IsDdsDx10(byte[] bytes)
+    {
+        return bytes.Length >= 148
+            && bytes[84] == (byte)'D'
+            && bytes[85] == (byte)'X'
+            && bytes[86] == (byte)'1'
+            && bytes[87] == (byte)'0';
     }
 
     private static RekallAgeRuntimeTextureAsset CreateTexture(

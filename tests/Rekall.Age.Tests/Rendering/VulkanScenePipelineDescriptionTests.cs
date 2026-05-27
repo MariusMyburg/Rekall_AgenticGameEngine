@@ -13,6 +13,7 @@ public sealed class VulkanScenePipelineDescriptionTests
         Assert.EndsWith("rekall_scene.frag", pipeline.FragmentShaderPath, StringComparison.Ordinal);
         Assert.True(pipeline.DepthTestEnabled);
         Assert.True(pipeline.TextureSamplingEnabled);
+        Assert.True(pipeline.AlphaBlendingEnabled);
         Assert.Equal(["position", "normal", "color", "uv"], pipeline.VertexAttributes.Select(attribute => attribute.Name));
         Assert.Contains(pipeline.DescriptorBindings, binding =>
             binding.Name == "FrameUniform"
@@ -29,7 +30,17 @@ public sealed class VulkanScenePipelineDescriptionTests
             && binding.Binding == 5
             && binding.DescriptorType == "combined-image-sampler"
             && binding.ShaderStage == "fragment");
-        Assert.True(pipeline.PushConstantBytes >= 64);
+        Assert.Contains(pipeline.DescriptorBindings, binding =>
+            binding.Name == "CloudShadowTexture"
+            && binding.Binding == 6
+            && binding.DescriptorType == "combined-image-sampler"
+            && binding.ShaderStage == "fragment");
+        Assert.Contains(pipeline.DescriptorBindings, binding =>
+            binding.Name == "SurfaceWaterTexture"
+            && binding.Binding == 7
+            && binding.DescriptorType == "combined-image-sampler"
+            && binding.ShaderStage == "fragment");
+        Assert.True(pipeline.PushConstantBytes >= 240);
     }
 
     [Fact]
@@ -51,9 +62,37 @@ public sealed class VulkanScenePipelineDescriptionTests
         Assert.Contains("layout(set = 0, binding = 0) uniform FrameUniform", fragment);
         Assert.Contains("layout(set = 0, binding = 1) uniform sampler2D baseColorTexture;", fragment);
         Assert.Contains("layout(set = 0, binding = 5) uniform sampler2D emissiveTexture;", fragment);
+        Assert.Contains("layout(set = 0, binding = 6) uniform sampler2D cloudShadowTexture;", fragment);
+        Assert.Contains("layout(set = 0, binding = 7) uniform sampler2D surfaceWaterTexture;", fragment);
         Assert.Contains("vec4 lightPosition;", fragment);
         Assert.Contains("frame.lightPosition.w > 0.5", fragment);
         Assert.Contains("vec4 emissiveFactors;", fragment);
+        Assert.Contains("vec4 atmosphereFactors0;", fragment);
+        Assert.Contains("vec4 atmosphereColor0;", fragment);
+        Assert.Contains("vec4 atmosphereColor1;", fragment);
+        Assert.Contains("vec4 atmosphereColor2;", fragment);
+        Assert.Contains("vec4 cloudFactors;", fragment);
+        Assert.Contains("vec4 cloudColor;", fragment);
+        Assert.Contains("renderCloudLayer", fragment);
+        Assert.Contains("cloudAlphaFromTextureOnly", fragment);
+        Assert.Contains("cloudSkyVisibility", fragment);
+        Assert.Contains("vec4 cloudShadowFactors;", fragment);
+        Assert.Contains("vec4 surfaceWaterFactors;", fragment);
+        Assert.Contains("sampleCloudShadow", fragment);
+        Assert.Contains("sampleSurfaceWaterCoverage", fragment);
+        Assert.Contains("surfaceWaterSpecularStrength", fragment);
+        Assert.Contains("phaseRayleigh", fragment);
+        Assert.Contains("integrateOpticalDepth", fragment);
+        Assert.Contains("surfaceAtmosphereTransmittance", fragment);
+        Assert.Contains("applySurfaceAerialPerspective", fragment);
+        Assert.Contains("surfaceAerialPerspectiveScattering", fragment);
+        Assert.Contains("aerialPerspectiveStrength", fragment);
+        Assert.Contains("spaceAmbientFloor", fragment);
+        Assert.Contains("atmosphereLightColor", fragment);
+        Assert.Contains("planetShadowFactor", fragment);
+        Assert.Contains("ozoneAbsorption", fragment);
+        Assert.Contains("shouldDiscardAtmosphereBackHemisphere", fragment);
+        Assert.Contains("discard;", fragment);
         Assert.Contains("vec3 emissive =", fragment);
         Assert.Contains("mat4 viewProjection;", fragment);
         Assert.Contains("layout(location = 0) out vec4 outColor;", fragment);

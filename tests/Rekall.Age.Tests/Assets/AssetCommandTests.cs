@@ -122,6 +122,28 @@ public sealed class AssetCommandTests
         Assert.True(result.Value.Asset.TextureMetadata.GpuCompressed);
     }
 
+    [Fact]
+    public async Task ImportAssetResolvesDdsDx10TextureMetadataInCatalog()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var source = Path.Combine(root, "cloud-mask.dds");
+        await File.WriteAllBytesAsync(source, CreateDdsDx10Header(8192, 4096, 1, 80));
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("import dds dx10"), CancellationToken.None);
+
+        var result = await new ImportAssetCommand().ExecuteAsync(
+            new ImportAssetRequest(root, source, "texture", "Cloud Mask"),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.NotNull(result.Value.Asset.TextureMetadata);
+        Assert.Equal("dds", result.Value.Asset.TextureMetadata.Container);
+        Assert.Equal(8192, result.Value.Asset.TextureMetadata.Width);
+        Assert.Equal(4096, result.Value.Asset.TextureMetadata.Height);
+        Assert.Equal(1, result.Value.Asset.TextureMetadata.MipLevelCount);
+        Assert.Equal("BC4_UNorm", result.Value.Asset.TextureMetadata.Format);
+        Assert.True(result.Value.Asset.TextureMetadata.GpuCompressed);
+    }
+
     private static byte[] CreateMinimalGlb(string meshName)
     {
         var json = $$"""
@@ -174,6 +196,16 @@ public sealed class AssetCommandTests
         WriteUInt32(bytes, 80, 0x4);
         var fourCcBytes = System.Text.Encoding.ASCII.GetBytes(fourCc);
         Array.Copy(fourCcBytes, 0, bytes, 84, Math.Min(4, fourCcBytes.Length));
+        return bytes;
+    }
+
+    private static byte[] CreateDdsDx10Header(uint width, uint height, uint mipLevels, uint dxgiFormat)
+    {
+        var bytes = new byte[148];
+        Array.Copy(CreateDdsHeader(width, height, mipLevels, "DX10"), bytes, 128);
+        WriteUInt32(bytes, 128, dxgiFormat);
+        WriteUInt32(bytes, 132, 3);
+        WriteUInt32(bytes, 140, 1);
         return bytes;
     }
 

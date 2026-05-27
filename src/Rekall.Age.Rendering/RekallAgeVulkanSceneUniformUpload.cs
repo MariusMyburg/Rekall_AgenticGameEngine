@@ -20,13 +20,26 @@ public static class RekallAgeVulkanSceneUniformUploadBuilder
             frame.LightPosition.X,
             frame.LightPosition.Y,
             frame.LightPosition.Z,
-            frame.LightPosition.W);
+            frame.LightPosition.W,
+            frame.CameraPosition.X,
+            frame.CameraPosition.Y,
+            frame.CameraPosition.Z,
+            frame.CameraPosition.W);
     }
 
     public static RekallAgeVulkanSceneGpuDrawPushConstants BuildDrawPushConstants(
         Matrix4x4 model,
         Vector4 materialFactors,
-        Vector4 emissiveFactors)
+        Vector4 emissiveFactors,
+        Vector4 atmosphereFactors0 = default,
+        Vector4 atmosphereFactors1 = default,
+        Vector4 atmosphereColor0 = default,
+        Vector4 atmosphereColor1 = default,
+        Vector4 atmosphereColor2 = default,
+        Vector4 cloudFactors = default,
+        Vector4 cloudColor = default,
+        Vector4 cloudShadowFactors = default,
+        Vector4 surfaceWaterFactors = default)
     {
         return new RekallAgeVulkanSceneGpuDrawPushConstants(
             ToGpuMatrix(model),
@@ -37,7 +50,43 @@ public static class RekallAgeVulkanSceneUniformUploadBuilder
             emissiveFactors.X,
             emissiveFactors.Y,
             emissiveFactors.Z,
-            emissiveFactors.W);
+            emissiveFactors.W,
+            atmosphereFactors0.X,
+            atmosphereFactors0.Y,
+            atmosphereFactors0.Z,
+            atmosphereFactors0.W,
+            atmosphereFactors1.X,
+            atmosphereFactors1.Y,
+            atmosphereFactors1.Z,
+            atmosphereFactors1.W,
+            atmosphereColor0.X,
+            atmosphereColor0.Y,
+            atmosphereColor0.Z,
+            atmosphereColor0.W,
+            atmosphereColor1.X,
+            atmosphereColor1.Y,
+            atmosphereColor1.Z,
+            atmosphereColor1.W,
+            atmosphereColor2.X,
+            atmosphereColor2.Y,
+            atmosphereColor2.Z,
+            atmosphereColor2.W,
+            cloudFactors.X,
+            cloudFactors.Y,
+            cloudFactors.Z,
+            cloudFactors.W,
+            cloudColor.X,
+            cloudColor.Y,
+            cloudColor.Z,
+            cloudColor.W,
+            cloudShadowFactors.X,
+            cloudShadowFactors.Y,
+            cloudShadowFactors.Z,
+            cloudShadowFactors.W,
+            surfaceWaterFactors.X,
+            surfaceWaterFactors.Y,
+            surfaceWaterFactors.Z,
+            surfaceWaterFactors.W);
     }
 
     public static RekallAgeVulkanSceneGpuMatrix4x4 ToGpuMatrix(Matrix4x4 matrix)
@@ -95,7 +144,11 @@ public readonly record struct RekallAgeVulkanSceneGpuFrameUniform(
     float LightPositionX,
     float LightPositionY,
     float LightPositionZ,
-    float LightPositionW);
+    float LightPositionW,
+    float CameraPositionX,
+    float CameraPositionY,
+    float CameraPositionZ,
+    float CameraPositionW);
 
 [StructLayout(LayoutKind.Sequential)]
 public readonly record struct RekallAgeVulkanSceneGpuDrawPushConstants(
@@ -107,4 +160,40 @@ public readonly record struct RekallAgeVulkanSceneGpuDrawPushConstants(
     float EmissiveR,
     float EmissiveG,
     float EmissiveB,
-    float EmissiveStrength);
+    float EmissiveStrength,
+    float AtmospherePlanetRadius,
+    float AtmosphereRadius,
+    float AtmosphereDensity,
+    float AtmosphereDensityFalloff,
+    float AtmosphereRayleighScattering,
+    float AtmosphereMieScattering,
+    float AtmosphereMieAnisotropy,
+    float AtmosphereSunIntensity,
+    float AtmosphereRayleighR,
+    float AtmosphereRayleighG,
+    float AtmosphereRayleighB,
+    float AtmosphereRayleighA,
+    float AtmosphereMieR,
+    float AtmosphereMieG,
+    float AtmosphereMieB,
+    float AtmosphereAerialPerspectiveStrength,
+    float AtmosphereOzoneR,
+    float AtmosphereOzoneG,
+    float AtmosphereOzoneB,
+    float AtmosphereOzoneAbsorption,
+    float CloudAlphaFromTextureOnly,
+    float CloudCoverage,
+    float CloudLambertianStrength,
+    float CloudAmbientStrength,
+    float CloudColorR,
+    float CloudColorG,
+    float CloudColorB,
+    float CloudColorA,
+    float CloudShadowEnabled,
+    float CloudShadowRadius,
+    float CloudShadowStrength,
+    float CloudShadowPad,
+    float SurfaceWaterEnabled,
+    float SurfaceWaterCoverage,
+    float SurfaceWaterSpecularStrength,
+    float SurfaceWaterRoughness);

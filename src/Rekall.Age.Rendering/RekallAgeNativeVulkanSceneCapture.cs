@@ -931,7 +931,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     mesh.MetallicRoughnessTexture,
                     mesh.NormalTexture,
                     mesh.OcclusionTexture,
-                    mesh.EmissiveTexture
+                    mesh.EmissiveTexture,
+                    mesh.SurfaceWaterTexture
                 })
                 .OfType<RekallAgeVulkanSceneTexture>()
                 .GroupBy(texture => texture.Id, StringComparer.Ordinal)
@@ -1098,7 +1099,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             VulkanState state,
             IReadOnlyList<RekallAgeVulkanSceneMaterialKey> materialKeys)
         {
-            var bindings = stackalloc DescriptorSetLayoutBinding[6];
+            var bindings = stackalloc DescriptorSetLayoutBinding[8];
             bindings[0] = new DescriptorSetLayoutBinding
             {
                 Binding = 0,
@@ -1106,7 +1107,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 DescriptorType = DescriptorType.UniformBuffer,
                 StageFlags = ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit
             };
-            for (var i = 1u; i <= 5; i++)
+            for (var i = 1u; i <= 7; i++)
             {
                 bindings[i] = new DescriptorSetLayoutBinding
                 {
@@ -1120,7 +1121,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             var layoutInfo = new DescriptorSetLayoutCreateInfo
             {
                 SType = StructureType.DescriptorSetLayoutCreateInfo,
-                BindingCount = 6,
+                BindingCount = 8,
                 PBindings = bindings
             };
             ThrowIfFailed(state.Vk.CreateDescriptorSetLayout(state.Device, &layoutInfo, null, out state.DescriptorSetLayout), "vkCreateDescriptorSetLayout");
@@ -1129,7 +1130,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             var poolSizes = stackalloc DescriptorPoolSize[]
             {
                 new(DescriptorType.UniformBuffer, descriptorSetCount),
-                new(DescriptorType.CombinedImageSampler, checked(descriptorSetCount * 5))
+                new(DescriptorType.CombinedImageSampler, checked(descriptorSetCount * 7))
             };
             var poolInfo = new DescriptorPoolCreateInfo
             {
@@ -1160,12 +1161,16 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     var metallicRoughness = ResolveTextureResource(state, key.MetallicRoughnessTextureId, state.DefaultMetallicRoughnessTexture!);
                     var occlusion = ResolveTextureResource(state, key.OcclusionTextureId, state.WhiteTexture!);
                     var emissive = ResolveTextureResource(state, key.EmissiveTextureId, state.WhiteTexture!);
+                    var cloudShadow = ResolveTextureResource(state, key.CloudShadowTextureId, state.WhiteTexture!);
+                    var surfaceWater = ResolveTextureResource(state, key.SurfaceWaterTextureId, state.WhiteTexture!);
                     var baseColorInfo = new DescriptorImageInfo(baseColor.Sampler, baseColor.View, ImageLayout.ShaderReadOnlyOptimal);
                     var normalInfo = new DescriptorImageInfo(normal.Sampler, normal.View, ImageLayout.ShaderReadOnlyOptimal);
                     var metallicRoughnessInfo = new DescriptorImageInfo(metallicRoughness.Sampler, metallicRoughness.View, ImageLayout.ShaderReadOnlyOptimal);
                     var occlusionInfo = new DescriptorImageInfo(occlusion.Sampler, occlusion.View, ImageLayout.ShaderReadOnlyOptimal);
                     var emissiveInfo = new DescriptorImageInfo(emissive.Sampler, emissive.View, ImageLayout.ShaderReadOnlyOptimal);
-                    var writes = new WriteDescriptorSet[6];
+                    var cloudShadowInfo = new DescriptorImageInfo(cloudShadow.Sampler, cloudShadow.View, ImageLayout.ShaderReadOnlyOptimal);
+                    var surfaceWaterInfo = new DescriptorImageInfo(surfaceWater.Sampler, surfaceWater.View, ImageLayout.ShaderReadOnlyOptimal);
+                    var writes = new WriteDescriptorSet[8];
                     writes[0] = new WriteDescriptorSet
                     {
                         SType = StructureType.WriteDescriptorSet,
@@ -1180,9 +1185,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     writes[3] = ImageWrite(descriptorSet, 3, &metallicRoughnessInfo);
                     writes[4] = ImageWrite(descriptorSet, 4, &occlusionInfo);
                     writes[5] = ImageWrite(descriptorSet, 5, &emissiveInfo);
+                    writes[6] = ImageWrite(descriptorSet, 6, &cloudShadowInfo);
+                    writes[7] = ImageWrite(descriptorSet, 7, &surfaceWaterInfo);
                     fixed (WriteDescriptorSet* writesPtr = writes)
                     {
-                        state.Vk.UpdateDescriptorSets(state.Device, 6, writesPtr, 0, null);
+                        state.Vk.UpdateDescriptorSets(state.Device, 8, writesPtr, 0, null);
                     }
 
                     state.MaterialDescriptorSets[(uniformIndex, key)] = descriptorSet;
@@ -1330,6 +1337,13 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 };
                 var colorBlendAttachment = new PipelineColorBlendAttachmentState
                 {
+                    BlendEnable = true,
+                    SrcColorBlendFactor = BlendFactor.SrcAlpha,
+                    DstColorBlendFactor = BlendFactor.OneMinusSrcAlpha,
+                    ColorBlendOp = BlendOp.Add,
+                    SrcAlphaBlendFactor = BlendFactor.One,
+                    DstAlphaBlendFactor = BlendFactor.OneMinusSrcAlpha,
+                    AlphaBlendOp = BlendOp.Add,
                     ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit | ColorComponentFlags.ABit
                 };
                 var colorBlend = new PipelineColorBlendStateCreateInfo
@@ -1371,6 +1385,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     RenderPass = state.RenderPass
                 };
                 ThrowIfFailed(state.Vk.CreateGraphicsPipelines(state.Device, default, 1, &pipelineInfo, null, out state.Pipeline), "vkCreateGraphicsPipelines");
+                depth.DepthWriteEnable = false;
+                ThrowIfFailed(state.Vk.CreateGraphicsPipelines(state.Device, default, 1, &pipelineInfo, null, out state.TransparentPipeline), "vkCreateGraphicsPipelines transparent");
             }
         }
 
@@ -1473,25 +1489,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 };
 
                 state.Vk.CmdBeginRenderPass(state.CommandBuffer, &renderPassBegin, SubpassContents.Inline);
-                state.Vk.CmdBindPipeline(state.CommandBuffer, PipelineBindPoint.Graphics, state.Pipeline);
                 var vertexBuffer = state.VertexBuffer;
                 var offset = 0UL;
                 state.Vk.CmdBindVertexBuffers(state.CommandBuffer, 0, 1, &vertexBuffer, &offset);
                 state.Vk.CmdBindIndexBuffer(state.CommandBuffer, state.IndexBuffer, 0, IndexType.Uint32);
-                foreach (var range in pass.Draws)
-                {
-                    var descriptorSet = ResolveDescriptorSet(state, passIndex, range.MaterialKey);
-                    state.Vk.CmdBindDescriptorSets(state.CommandBuffer, PipelineBindPoint.Graphics, state.PipelineLayout, 0, 1, &descriptorSet, 0, null);
-                    var draw = range.PushConstants;
-                    state.Vk.CmdPushConstants(
-                        state.CommandBuffer,
-                        state.PipelineLayout,
-                        ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
-                        0,
-                        (uint)Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>(),
-                        &draw);
-                    state.Vk.CmdDrawIndexed(state.CommandBuffer, range.IndexCount, 1, range.FirstIndex, range.VertexOffset, 0);
-                }
+                DrawPassRanges(state, passIndex, pass.Draws, transparent: false);
+                DrawPassRanges(state, passIndex, pass.Draws, transparent: true);
 
                 state.Vk.CmdEndRenderPass(state.CommandBuffer);
             }
@@ -1511,6 +1514,38 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             }
 
             ThrowIfFailed(state.Vk.EndCommandBuffer(state.CommandBuffer), "vkEndCommandBuffer");
+        }
+
+        private static void DrawPassRanges(
+            VulkanState state,
+            int passIndex,
+            IReadOnlyList<RekallAgeVulkanSceneCommandDraw> ranges,
+            bool transparent)
+        {
+            state.Vk.CmdBindPipeline(
+                state.CommandBuffer,
+                PipelineBindPoint.Graphics,
+                transparent ? state.TransparentPipeline : state.Pipeline);
+
+            foreach (var range in ranges)
+            {
+                if (range.Transparent != transparent)
+                {
+                    continue;
+                }
+
+                var descriptorSet = ResolveDescriptorSet(state, passIndex, range.MaterialKey);
+                state.Vk.CmdBindDescriptorSets(state.CommandBuffer, PipelineBindPoint.Graphics, state.PipelineLayout, 0, 1, &descriptorSet, 0, null);
+                var draw = range.PushConstants;
+                state.Vk.CmdPushConstants(
+                    state.CommandBuffer,
+                    state.PipelineLayout,
+                    ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
+                    0,
+                    (uint)Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>(),
+                    &draw);
+                state.Vk.CmdDrawIndexed(state.CommandBuffer, range.IndexCount, 1, range.FirstIndex, range.VertexOffset, 0);
+            }
         }
 
         private static DescriptorSet ResolveDescriptorSet(VulkanState state, int uniformIndex, RekallAgeVulkanSceneMaterialKey key)
@@ -1885,6 +1920,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public VulkanTextureResource? DefaultMetallicRoughnessTexture;
             public PipelineLayout PipelineLayout;
             public Pipeline Pipeline;
+            public Pipeline TransparentPipeline;
             public ShaderModule VertexShader;
             public ShaderModule FragmentShader;
             public CommandPool CommandPool;
@@ -1913,6 +1949,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     if (Pipeline.Handle != 0)
                     {
                         Vk.DestroyPipeline(Device, Pipeline, null);
+                    }
+
+                    if (TransparentPipeline.Handle != 0)
+                    {
+                        Vk.DestroyPipeline(Device, TransparentPipeline, null);
                     }
 
                     if (PipelineLayout.Handle != 0)

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Numerics;
@@ -54,6 +54,7 @@ internal static class Program
         var simulateXrInput = HasOption(args, "--simulate-xr") || HasOption(args, "--xr-sim");
         var probeOpenXrCompositor = HasOption(args, "--openxr-compositor-probe");
         var playableMode = HasOption(args, "--playable");
+        var sceneSupersampleFactor = ReadPositiveIntOption(args, "--ssaa") ?? RekallAgeVeldridPlayer.DefaultSceneSupersampleFactor;
         var openXrEyeWidth = ReadPositiveIntOption(args, "--vr-eye-width") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeWidth;
         var openXrEyeHeight = ReadPositiveIntOption(args, "--vr-eye-height") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeHeight;
         await using var player = await RekallAgeVeldridPlayer.CreateAsync(
@@ -64,6 +65,7 @@ internal static class Program
             simulateXrInput,
             probeOpenXrCompositor,
             playableMode,
+            sceneSupersampleFactor,
             openXrEyeWidth,
             openXrEyeHeight,
             CancellationToken.None);
@@ -107,9 +109,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private const int HudWidth = 360;
     private const int HudHeight = 224;
     private const int HudMargin = 16;
-    private const int SceneSupersampleFactor = 2;
     private const int PlayableWidth = 960;
     private const int PlayableHeight = 540;
+    public const int DefaultSceneSupersampleFactor = 1;
     public const int DefaultOpenXrPlayableEyeWidth = 1600;
     public const int DefaultOpenXrPlayableEyeHeight = 1600;
 
@@ -134,6 +136,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly ResourceFactory _factory;
     private readonly CommandList _commands;
     private readonly Pipeline _scenePipeline;
+    private readonly Pipeline _sceneTransparentPipeline;
     private readonly Pipeline _presentPipeline;
     private readonly Pipeline _hudPipeline;
     private readonly ResourceLayout _frameLayout;
@@ -159,6 +162,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly RekallAgeOpenXrVulkanInteropInspection? _openXrVulkanInterop;
     private readonly RekallAgeOpenXrCompositorSessionBootstrapResult? _openXrCompositorSession;
     private readonly bool _simulateXrInput;
+    private readonly int _sceneSupersampleFactor;
     private readonly int _openXrEyeWidth;
     private readonly int _openXrEyeHeight;
     private SceneRenderTarget _sceneTarget;
@@ -220,6 +224,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         GraphicsDevice device,
         CommandList commands,
         Pipeline scenePipeline,
+        Pipeline sceneTransparentPipeline,
         Pipeline presentPipeline,
         Pipeline hudPipeline,
         ResourceLayout frameLayout,
@@ -247,6 +252,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         RekallAgeOpenXrVulkanInteropInspection? openXrVulkanInterop,
         RekallAgeOpenXrCompositorSessionBootstrapResult? openXrCompositorSession,
         bool simulateXrInput,
+        int sceneSupersampleFactor,
         int openXrEyeWidth,
         int openXrEyeHeight)
     {
@@ -262,6 +268,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _factory = device.ResourceFactory;
         _commands = commands;
         _scenePipeline = scenePipeline;
+        _sceneTransparentPipeline = sceneTransparentPipeline;
         _presentPipeline = presentPipeline;
         _hudPipeline = hudPipeline;
         _frameLayout = frameLayout;
@@ -298,9 +305,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _openXrVulkanInterop = openXrVulkanInterop;
         _openXrCompositorSession = openXrCompositorSession;
         _simulateXrInput = simulateXrInput;
+        _sceneSupersampleFactor = Math.Clamp(sceneSupersampleFactor, 1, 4);
         _openXrEyeWidth = Math.Clamp(openXrEyeWidth, 64, RekallAgeOpenXrHeadsetSubmitPlanner.MaxSceneEyeExtent);
         _openXrEyeHeight = Math.Clamp(openXrEyeHeight, 64, RekallAgeOpenXrHeadsetSubmitPlanner.MaxSceneEyeExtent);
-        _sceneTarget = CreateSceneRenderTarget(_factory, InitialWidth, InitialHeight, _presentTextureLayout);
+        _sceneTarget = CreateSceneRenderTarget(_factory, InitialWidth, InitialHeight, _sceneSupersampleFactor, _presentTextureLayout);
         if (!_playableMode)
         {
             SetMouseCapture(true);
@@ -315,10 +323,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         bool simulateXrInput,
         bool probeOpenXrCompositor,
         bool playableMode,
+        int sceneSupersampleFactor,
         int openXrEyeWidth,
         int openXrEyeHeight,
         CancellationToken cancellationToken)
     {
+        sceneSupersampleFactor = Math.Clamp(sceneSupersampleFactor, 1, 4);
         PlayerLog.Write("Loading runtime scene.");
         var scene = await new Rekall.Age.World.RekallAgeSceneStore()
             .LoadAsync(projectRoot, sceneName, cancellationToken);
@@ -441,18 +451,30 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             new ResourceLayoutElementDescription("OcclusionTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("OcclusionSampler", ResourceKind.Sampler, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("EmissiveTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
-            new ResourceLayoutElementDescription("EmissiveSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
+            new ResourceLayoutElementDescription("EmissiveSampler", ResourceKind.Sampler, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("CloudShadowTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("CloudShadowSampler", ResourceKind.Sampler, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("SurfaceWaterTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("SurfaceWaterSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
         var presentTextureLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
             new ResourceLayoutElementDescription("SceneTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("SceneSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
         var hudTextureLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
             new ResourceLayoutElementDescription("SurfaceTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("SurfaceSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
-        using var initialSceneTarget = CreateSceneRenderTarget(factory, InitialWidth, InitialHeight, presentTextureLayout);
+        using var initialSceneTarget = CreateSceneRenderTarget(factory, InitialWidth, InitialHeight, sceneSupersampleFactor, presentTextureLayout);
         var sceneShaderSet = new ShaderSetDescription([sceneVertexLayout], sceneShaders);
         var scenePipelineDescription = new GraphicsPipelineDescription(
-            BlendStateDescription.SingleOverrideBlend,
+            BlendStateDescription.SingleAlphaBlend,
             DepthStencilStateDescription.DepthOnlyLessEqual,
+            RasterizerStateDescription.CullNone,
+            PrimitiveTopology.TriangleList,
+            sceneShaderSet,
+            [frameLayout, drawLayout, materialLayout],
+            initialSceneTarget.Framebuffer.OutputDescription);
+        var sceneTransparentPipelineDescription = new GraphicsPipelineDescription(
+            BlendStateDescription.SingleAlphaBlend,
+            new DepthStencilStateDescription(true, false, ComparisonKind.LessEqual),
             RasterizerStateDescription.CullNone,
             PrimitiveTopology.TriangleList,
             sceneShaderSet,
@@ -478,6 +500,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             device.SwapchainFramebuffer.OutputDescription);
         PlayerLog.Write("Creating graphics pipelines.");
         var scenePipeline = factory.CreateGraphicsPipeline(scenePipelineDescription);
+        var sceneTransparentPipeline = factory.CreateGraphicsPipeline(sceneTransparentPipelineDescription);
         var presentPipeline = factory.CreateGraphicsPipeline(presentPipelineDescription);
         var hudPipeline = factory.CreateGraphicsPipeline(hudPipelineDescription);
         foreach (var shader in sceneShaders.Concat(presentShaders).Concat(hudShaders))
@@ -574,6 +597,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             device,
             commands,
             scenePipeline,
+            sceneTransparentPipeline,
             presentPipeline,
             hudPipeline,
             frameLayout,
@@ -601,6 +625,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             openXrVulkanInterop,
             openXrCompositorSession,
             simulateXrInput,
+            sceneSupersampleFactor,
             openXrEyeWidth,
             openXrEyeHeight);
         player.StartLiveEditServer();
@@ -922,6 +947,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _defaultMetallicRoughnessTexture.Dispose();
         _hudTexture.Dispose();
         _scenePipeline.Dispose();
+        _sceneTransparentPipeline.Dispose();
         _presentPipeline.Dispose();
         _hudPipeline.Dispose();
         _frameLayout.Dispose();
@@ -975,7 +1001,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
         _device.WaitForIdle();
         _sceneTarget.Dispose();
-        _sceneTarget = CreateSceneRenderTarget(_factory, displayWidth, displayHeight, _presentTextureLayout);
+        _sceneTarget = CreateSceneRenderTarget(_factory, displayWidth, displayHeight, _sceneSupersampleFactor, _presentTextureLayout);
         _cachedStaticGeometry = null;
         PlayerLog.Write($"Recreated supersampled scene target {_sceneTarget.Width}x{_sceneTarget.Height} for window {displayWidth}x{displayHeight}.");
     }
@@ -991,8 +1017,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _sceneTarget.Dispose();
         _sceneTarget = CreateSceneRenderTarget(
             _factory,
-            PlayableWidth / SceneSupersampleFactor,
-            PlayableHeight / SceneSupersampleFactor,
+            PlayableWidth / _sceneSupersampleFactor,
+            PlayableHeight / _sceneSupersampleFactor,
+            _sceneSupersampleFactor,
             _presentTextureLayout);
         _cachedStaticGeometry = null;
         PlayerLog.Write($"Recreated playable frame target {_sceneTarget.Width}x{_sceneTarget.Height}.");
@@ -1411,7 +1438,19 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 _device.UpdateBuffer(
                     _drawUniformBuffer,
                     checked(_drawUniformStrideBytes * (uint)i),
-                    new DrawUniform(draw.Model, draw.MaterialFactors, draw.EmissiveFactors));
+                    new DrawUniform(
+                        draw.Model,
+                        draw.MaterialFactors,
+                        draw.EmissiveFactors,
+                        draw.AtmosphereFactors0,
+                        draw.AtmosphereFactors1,
+                        draw.AtmosphereColor0,
+                        draw.AtmosphereColor1,
+                        draw.AtmosphereColor2,
+                        draw.CloudFactors,
+                        draw.CloudColor,
+                        draw.CloudShadowFactors,
+                        draw.SurfaceWaterFactors));
             }
         }
 
@@ -1437,10 +1476,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _commands.ClearDepthStencil(1f);
         if (packet.Vertices.Length > 0)
         {
-            _commands.SetPipeline(_scenePipeline);
             _commands.SetVertexBuffer(0, _vertexBuffer);
             _commands.SetIndexBuffer(_indexBuffer, IndexFormat.UInt32);
-            _commands.SetGraphicsResourceSet(0, _frameSet);
             if (packet.StereoFrameUniforms.Count >= 2)
             {
                 foreach (var stereoUniform in packet.StereoFrameUniforms)
@@ -1526,9 +1563,24 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     private void DrawScenePacket(RenderPacket packet)
     {
+        _commands.SetPipeline(_scenePipeline);
+        _commands.SetGraphicsResourceSet(0, _frameSet);
+        DrawScenePacketPass(packet, transparent: false);
+        _commands.SetPipeline(_sceneTransparentPipeline);
+        _commands.SetGraphicsResourceSet(0, _frameSet);
+        DrawScenePacketPass(packet, transparent: true);
+    }
+
+    private void DrawScenePacketPass(RenderPacket packet, bool transparent)
+    {
         for (var i = 0; i < packet.Draws.Length; i++)
         {
             var draw = packet.Draws[i];
+            if (draw.Transparent != transparent)
+            {
+                continue;
+            }
+
             var drawUniformOffset = checked(_drawUniformStrideBytes * (uint)i);
             _drawUniformDynamicOffsets[0] = drawUniformOffset;
             _commands.SetGraphicsResourceSet(1, _drawSet, _drawUniformDynamicOffsets);
@@ -1767,8 +1819,20 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 draw.NormalTextureId,
                 draw.OcclusionTextureId,
                 draw.EmissiveTextureId,
+                draw.CloudShadowTextureId,
+                draw.SurfaceWaterTextureId,
                 draw.MaterialFactors,
-                draw.EmissiveFactors));
+                draw.EmissiveFactors,
+                draw.AtmosphereFactors0,
+                draw.AtmosphereFactors1,
+                draw.AtmosphereColor0,
+                draw.AtmosphereColor1,
+                draw.AtmosphereColor2,
+                draw.CloudFactors,
+                draw.CloudColor,
+                draw.CloudShadowFactors,
+                draw.SurfaceWaterFactors,
+                draw.Transparent));
         }
 
         var indices = cachedGeometry?.Indices;
@@ -1796,6 +1860,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 AddTextureId(textureIds, mesh.NormalTexture?.Id);
                 AddTextureId(textureIds, mesh.OcclusionTexture?.Id);
                 AddTextureId(textureIds, mesh.EmissiveTexture?.Id);
+                AddTextureId(textureIds, mesh.SurfaceWaterTexture?.Id);
             }
 
             triangleCount = triangles;
@@ -1822,7 +1887,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 batch.Frame.ViewProjection,
                 new Vector4(batch.Frame.LightDirection, 0),
                 batch.Frame.LightColor,
-                batch.Frame.LightPosition),
+                batch.Frame.LightPosition,
+                batch.Frame.CameraPosition),
             BuildStereoUniforms(batch),
             meshCount,
             triangleCount.Value,
@@ -1851,6 +1917,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             hash.Add(renderable.OcclusionTextureAssetId, StringComparer.Ordinal);
             hash.Add(renderable.EmissiveColor, StringComparer.Ordinal);
             hash.Add(renderable.EmissiveTextureAssetId, StringComparer.Ordinal);
+            hash.Add(renderable.SurfaceWater?.TextureAssetId, StringComparer.Ordinal);
+            hash.Add(renderable.SurfaceWater?.Coverage ?? 0);
+            hash.Add(renderable.SurfaceWater?.SpecularStrength ?? 0);
+            hash.Add(renderable.SurfaceWater?.Roughness ?? 0);
+            hash.Add(renderable.MeshSlices);
+            hash.Add(renderable.MeshStacks);
             hash.Add(renderable.MetallicFactor);
             hash.Add(renderable.RoughnessFactor);
             hash.Add(renderable.NormalScale);
@@ -1891,7 +1963,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                     view.ViewProjection,
                     new Vector4(batch.Frame.LightDirection, 0),
                     batch.Frame.LightColor,
-                    batch.Frame.LightPosition),
+                    batch.Frame.LightPosition,
+                    view.EyePosition),
                 view.Viewport);
         }
 
@@ -2020,7 +2093,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     private string BuildBackendHudLine()
     {
-        var baseLine = $"{_device.BackendType} {SceneSupersampleFactor}xSSAA";
+        var baseLine = $"{_device.BackendType} {_sceneSupersampleFactor}xSSAA";
         var suffixes = new List<string>();
         if (_simulateXrInput)
         {
@@ -2180,7 +2253,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             draw.NormalTextureId,
             draw.MetallicRoughnessTextureId,
             draw.OcclusionTextureId,
-            draw.EmissiveTextureId);
+            draw.EmissiveTextureId,
+            draw.CloudShadowTextureId,
+            draw.SurfaceWaterTextureId);
         if (_materialSets.TryGetValue(key, out var existing))
         {
             return existing;
@@ -2191,6 +2266,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var metallicRoughness = ResolveTexture(draw.MetallicRoughnessTextureId, _defaultMetallicRoughnessTexture);
         var occlusion = ResolveTexture(draw.OcclusionTextureId, _whiteTexture);
         var emissive = ResolveTexture(draw.EmissiveTextureId, _whiteTexture);
+        var cloudShadow = ResolveTexture(draw.CloudShadowTextureId, _whiteTexture);
+        var surfaceWater = ResolveTexture(draw.SurfaceWaterTextureId, _whiteTexture);
         var resourceSet = _factory.CreateResourceSet(new ResourceSetDescription(
             _materialLayout,
             baseColor.Texture,
@@ -2202,7 +2279,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             occlusion.Texture,
             occlusion.Sampler,
             emissive.Texture,
-            emissive.Sampler));
+            emissive.Sampler,
+            cloudShadow.Texture,
+            cloudShadow.Sampler,
+            surfaceWater.Texture,
+            surfaceWater.Sampler));
         _materialSets[key] = resourceSet;
         return resourceSet;
     }
@@ -2218,10 +2299,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         ResourceFactory factory,
         int displayWidth,
         int displayHeight,
+        int sceneSupersampleFactor,
         ResourceLayout presentTextureLayout)
     {
-        var width = checked((uint)Math.Max(1, displayWidth * SceneSupersampleFactor));
-        var height = checked((uint)Math.Max(1, displayHeight * SceneSupersampleFactor));
+        sceneSupersampleFactor = Math.Clamp(sceneSupersampleFactor, 1, 4);
+        var width = checked((uint)Math.Max(1, displayWidth * sceneSupersampleFactor));
+        var height = checked((uint)Math.Max(1, displayHeight * sceneSupersampleFactor));
         var color = factory.CreateTexture(TextureDescription.Texture2D(
             width,
             height,
@@ -2322,7 +2405,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 mesh.MetallicRoughnessTexture,
                 mesh.NormalTexture,
                 mesh.OcclusionTexture,
-                mesh.EmissiveTexture
+                mesh.EmissiveTexture,
+                mesh.SurfaceWaterTexture
             })
             .OfType<RekallAgeVulkanSceneTexture>()
             .GroupBy(texture => texture.Id, StringComparer.Ordinal)
@@ -2540,6 +2624,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec4 LightDirection;
             vec4 LightColor;
             vec4 LightPosition;
+            vec4 CameraPosition;
         } Frame;
 
         layout(set = 1, binding = 0) uniform DrawUniformBuffer
@@ -2547,6 +2632,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             mat4 Model;
             vec4 MaterialFactors;
             vec4 EmissiveFactors;
+            vec4 AtmosphereFactors0;
+            vec4 AtmosphereFactors1;
+            vec4 AtmosphereColor0;
+            vec4 AtmosphereColor1;
+            vec4 AtmosphereColor2;
+            vec4 CloudFactors;
+            vec4 CloudColor;
+            vec4 CloudShadowFactors;
+            vec4 SurfaceWaterFactors;
         } Draw;
 
         layout(location = 0) out vec3 fsin_Normal;
@@ -2567,27 +2661,37 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     private const string SceneFragmentShader = """
         #version 450
-
+        
         layout(location = 0) in vec3 fsin_Normal;
         layout(location = 1) in vec4 fsin_Color;
         layout(location = 2) in vec2 fsin_UV;
         layout(location = 3) in vec3 fsin_WorldPosition;
-
+        
         layout(set = 0, binding = 0) uniform FrameUniformBuffer
         {
             mat4 ViewProjection;
             vec4 LightDirection;
             vec4 LightColor;
             vec4 LightPosition;
+            vec4 CameraPosition;
         } Frame;
-
+        
         layout(set = 1, binding = 0) uniform DrawUniformBuffer
         {
             mat4 Model;
             vec4 MaterialFactors;
             vec4 EmissiveFactors;
+            vec4 AtmosphereFactors0;
+            vec4 AtmosphereFactors1;
+            vec4 AtmosphereColor0;
+            vec4 AtmosphereColor1;
+            vec4 AtmosphereColor2;
+            vec4 CloudFactors;
+            vec4 CloudColor;
+            vec4 CloudShadowFactors;
+            vec4 SurfaceWaterFactors;
         } Draw;
-
+        
         layout(set = 2, binding = 0) uniform texture2D BaseColorTexture;
         layout(set = 2, binding = 1) uniform sampler BaseColorSampler;
         layout(set = 2, binding = 2) uniform texture2D NormalTexture;
@@ -2598,11 +2702,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         layout(set = 2, binding = 7) uniform sampler OcclusionSampler;
         layout(set = 2, binding = 8) uniform texture2D EmissiveTexture;
         layout(set = 2, binding = 9) uniform sampler EmissiveSampler;
-
-        layout(location = 0) out vec4 fsout_Color;
-
-        const float PI = 3.14159265359;
-
+        layout(set = 2, binding = 10) uniform texture2D CloudShadowTexture;
+        layout(set = 2, binding = 11) uniform sampler CloudShadowSampler;
+        layout(set = 2, binding = 12) uniform texture2D SurfaceWaterTexture;
+        layout(set = 2, binding = 13) uniform sampler SurfaceWaterSampler;
+        
+        layout(location = 0) out vec4 fsout_Color;const float PI = 3.14159265359;
+        const int MAX_VIEW_SAMPLE_COUNT = 32;
+        const int MAX_LIGHT_SAMPLE_COUNT = 16;
+        
         vec3 perturbNormal(vec3 normal)
         {
             vec3 tangentNormal = texture(sampler2D(NormalTexture, NormalSampler), fsin_UV).xyz * 2.0 - 1.0;
@@ -2616,7 +2724,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             mat3 tbn = mat3(tangent, bitangent, normal);
             return normalize(tbn * tangentNormal);
         }
-
+        
         float distributionGgx(vec3 normal, vec3 halfVector, float roughness)
         {
             float a = roughness * roughness;
@@ -2625,54 +2733,575 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             float denom = ndoth * ndoth * (a2 - 1.0) + 1.0;
             return a2 / max(PI * denom * denom, 0.0001);
         }
-
+        
         float geometrySchlickGgx(float ndotv, float roughness)
         {
             float r = roughness + 1.0;
             float k = (r * r) / 8.0;
             return ndotv / max(ndotv * (1.0 - k) + k, 0.0001);
         }
-
+        
         vec3 fresnelSchlick(float cosTheta, vec3 f0)
         {
             return f0 + (1.0 - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
         }
-
+        
+        float phaseRayleigh(float cosTheta)
+        {
+            return 3.0 / (16.0 * PI) * (1.0 + cosTheta * cosTheta);
+        }
+        
+        float phaseMie(float cosTheta, float anisotropy)
+        {
+            float g = clamp(anisotropy, -0.99, 0.99);
+            float g2 = g * g;
+            float denom = pow(max(1.0 + g2 - 2.0 * g * cosTheta, 0.0001), 1.5);
+            return 3.0 / (8.0 * PI) * ((1.0 - g2) * (1.0 + cosTheta * cosTheta)) / max((2.0 + g2) * denom, 0.0001);
+        }
+        
+        bool intersectSphere(vec3 origin, vec3 direction, vec3 center, float radius, out vec2 hit)
+        {
+            vec3 local = origin - center;
+            float b = dot(local, direction);
+            float c = dot(local, local) - radius * radius;
+            float discriminant = b * b - c;
+            if (discriminant < 0.0)
+            {
+                hit = vec2(0.0);
+                return false;
+            }
+        
+            float root = sqrt(discriminant);
+            hit = vec2(-b - root, -b + root);
+            return hit.y >= 0.0;
+        }
+        
+        float atmosphereDensityAtPoint(vec3 point, vec3 center, float planetRadius, float atmosphereRadius, float density, float falloff)
+        {
+            float height = max(0.0, length(point - center) - planetRadius);
+            float normalizedHeight = clamp(height / max(atmosphereRadius - planetRadius, 0.0001), 0.0, 1.0);
+            return max(density, 0.0) * exp(-normalizedHeight / max(falloff, 0.001));
+        }
+        
+        float integrateOpticalDepth(vec3 origin, vec3 direction, float rayLength, vec3 center, float planetRadius, float atmosphereRadius, float density, float falloff, int sampleCount)
+        {
+            float stepSize = rayLength / float(sampleCount);
+            float opticalDepth = 0.0;
+            for (int i = 0; i < MAX_LIGHT_SAMPLE_COUNT; i++)
+            {
+                if (i >= sampleCount)
+                {
+                    break;
+                }
+        
+                float t = (float(i) + 0.5) * stepSize;
+                vec3 samplePoint = origin + direction * t;
+                opticalDepth += atmosphereDensityAtPoint(samplePoint, center, planetRadius, atmosphereRadius, density, falloff) * stepSize;
+            }
+        
+            return opticalDepth;
+        }
+        
+        bool hasAtmosphereData()
+        {
+            return Draw.AtmosphereFactors0.y > 0.0;
+        }
+        
+        bool isAtmosphereShell()
+        {
+            return hasAtmosphereData() && Draw.AtmosphereFactors1.w >= 0.0;
+        }
+        
+        float atmosphereSunIntensity()
+        {
+            return abs(Draw.AtmosphereFactors1.w);
+        }
+        
+        vec3 atmosphereLightColor()
+        {
+            return max(Frame.LightColor.rgb, vec3(0.0));
+        }
+        
+        float ozoneAbsorption()
+        {
+            return max(Draw.AtmosphereColor2.w, 0.0);
+        }
+        
+        bool shouldDiscardAtmosphereBackHemisphere(vec3 rayOrigin, vec3 rayDirection, vec3 planetCenter, float atmosphereRadius)
+        {
+            float cameraRadius = length(rayOrigin - planetCenter);
+            if (cameraRadius <= atmosphereRadius)
+            {
+                return false;
+            }
+        
+            vec3 shellNormal = normalize(fsin_WorldPosition - planetCenter);
+            return dot(shellNormal, rayDirection) > 0.0;
+        }
+        
+        vec3 atmosphereExtinction()
+        {
+            float rayleighStrength = max(Draw.AtmosphereFactors1.x, 0.0);
+            float mieStrength = max(Draw.AtmosphereFactors1.y, 0.0);
+            return Draw.AtmosphereColor0.rgb * rayleighStrength
+                + Draw.AtmosphereColor1.rgb * mieStrength
+                + Draw.AtmosphereColor2.rgb * ozoneAbsorption();
+        }
+        
+        vec3 surfaceAtmosphereExtinction()
+        {
+            float rayleighStrength = max(Draw.AtmosphereFactors1.x, 0.0);
+            float mieStrength = max(Draw.AtmosphereFactors1.y, 0.0);
+            vec3 rayleighWavelengthWeight = vec3(0.45, 0.95, 1.85);
+            return rayleighWavelengthWeight * rayleighStrength
+                + vec3(mieStrength)
+                + Draw.AtmosphereColor2.rgb * ozoneAbsorption();
+        }
+        
+        float planetShadowFactor(vec3 samplePoint, vec3 sunDirection, vec3 planetCenter)
+        {
+            vec3 localUp = normalize(samplePoint - planetCenter);
+            return smoothstep(-0.03, 0.08, dot(localUp, sunDirection));
+        }
+        
+        float spaceAmbientFloor()
+        {
+            return 0.0;
+        }
+        
+        float aerialPerspectiveStrength()
+        {
+            return clamp(Draw.AtmosphereColor1.w, 0.0, 2.0);
+        }
+        
+        vec3 surfaceAtmosphereTransmittance(vec3 surfacePosition, vec3 lightDirection)
+        {
+            if (!hasAtmosphereData())
+            {
+                return vec3(1.0);
+            }
+        
+            float planetRadius = max(Draw.AtmosphereFactors0.x, 0.0001);
+            float atmosphereRadius = max(Draw.AtmosphereFactors0.y, planetRadius + 0.0001);
+            float density = max(Draw.AtmosphereFactors0.z, 0.0);
+            float densityFalloff = max(Draw.AtmosphereFactors0.w, 0.001);
+            vec3 planetCenter = Draw.Model[3].xyz;
+            vec3 surfaceNormal = normalize(surfacePosition - planetCenter);
+            vec3 rayOrigin = surfacePosition + surfaceNormal * max(planetRadius * 0.001, 0.0001);
+            vec3 rayDirection = normalize(lightDirection);
+        
+            vec2 groundHit;
+            if (intersectSphere(rayOrigin, rayDirection, planetCenter, planetRadius, groundHit) && groundHit.x > 0.0)
+            {
+                return vec3(0.0);
+            }
+        
+            vec2 atmosphereHit;
+            if (!intersectSphere(rayOrigin, rayDirection, planetCenter, atmosphereRadius, atmosphereHit))
+            {
+                return vec3(1.0);
+            }
+        
+            float rayLength = max(atmosphereHit.y, 0.0);
+            float opticalDepth = integrateOpticalDepth(
+                rayOrigin,
+                rayDirection,
+                rayLength,
+                planetCenter,
+                planetRadius,
+                atmosphereRadius,
+                density,
+                densityFalloff,
+                8);
+            return exp(-opticalDepth * surfaceAtmosphereExtinction());
+        }
+        
+        vec2 sphericalUv(vec3 direction)
+        {
+            vec3 n = normalize(direction);
+            float u = atan(n.z, n.x) / (2.0 * PI) + 0.5;
+            float v = acos(clamp(n.y, -1.0, 1.0)) / PI;
+            return vec2(u, v);
+        }
+        
+        float sampleCloudShadow(vec3 surfacePosition, vec3 lightDirection)
+        {
+            if (Draw.CloudShadowFactors.x <= 0.5)
+            {
+                return 1.0;
+            }
+        
+            vec3 planetCenter = Draw.Model[3].xyz;
+            float cloudRadius = max(Draw.CloudShadowFactors.y, 0.0001);
+            vec3 surfaceNormal = normalize(surfacePosition - planetCenter);
+            vec3 rayOrigin = surfacePosition + surfaceNormal * max(cloudRadius * 0.0001, 0.0001);
+            vec2 cloudHit;
+            if (!intersectSphere(rayOrigin, normalize(lightDirection), planetCenter, cloudRadius, cloudHit) || cloudHit.y <= 0.0)
+            {
+                return 1.0;
+            }
+        
+            float hitDistance = cloudHit.x > 0.0 ? cloudHit.x : cloudHit.y;
+            vec3 cloudPoint = rayOrigin + normalize(lightDirection) * hitDistance;
+            float coverage = texture(sampler2D(CloudShadowTexture, CloudShadowSampler), sphericalUv(cloudPoint - planetCenter)).a;
+            float strength = clamp(Draw.CloudShadowFactors.z, 0.0, 1.0);
+            float daylight = planetShadowFactor(surfacePosition, normalize(lightDirection), planetCenter);
+            return clamp(1.0 - coverage * strength * daylight, 0.0, 1.0);
+        }
+        
+        bool hasSurfaceWater()
+        {
+            return Draw.SurfaceWaterFactors.x > 0.5;
+        }
+        
+        float surfaceWaterSpecularStrength()
+        {
+            return clamp(Draw.SurfaceWaterFactors.z, 0.0, 8.0);
+        }
+        
+        float sampleSurfaceWaterCoverage(vec2 uv, vec3 baseTextureColor, out vec3 waterTint)
+        {
+            vec4 water = texture(sampler2D(SurfaceWaterTexture, SurfaceWaterSampler), uv);
+            waterTint = mix(vec3(0.006, 0.075, 0.34), pow(max(water.rgb, vec3(0.0)), vec3(2.2)), 0.35);
+            float waterColorPresence = max(max(water.r, water.g), water.b) * water.a;
+            float baseBlueDominance = baseTextureColor.b - max(baseTextureColor.r, baseTextureColor.g);
+            float baseSaturation = max(max(baseTextureColor.r, baseTextureColor.g), baseTextureColor.b)
+                - min(min(baseTextureColor.r, baseTextureColor.g), baseTextureColor.b);
+            float authoredWaterRegion = smoothstep(0.015, 0.12, baseBlueDominance)
+                * smoothstep(0.03, 0.18, baseSaturation);
+            float mask = max(waterColorPresence * authoredWaterRegion, waterColorPresence * 0.65);
+            return clamp(mask * clamp(Draw.SurfaceWaterFactors.y, 0.0, 4.0), 0.0, 1.0);
+        }
+        
+        vec3 surfaceAerialPerspectiveScattering(vec3 rayOrigin, vec3 rayDirection, float rayStart, float rayEnd, vec3 sunDirection)
+        {
+            float planetRadius = max(Draw.AtmosphereFactors0.x, 0.0001);
+            float atmosphereRadius = max(Draw.AtmosphereFactors0.y, planetRadius + 0.0001);
+            float density = max(Draw.AtmosphereFactors0.z, 0.0);
+            float densityFalloff = max(Draw.AtmosphereFactors0.w, 0.001);
+            float rayleighStrength = max(Draw.AtmosphereFactors1.x, 0.0);
+            float mieStrength = max(Draw.AtmosphereFactors1.y, 0.0);
+            float mieAnisotropy = clamp(Draw.AtmosphereFactors1.z, -0.99, 0.99);
+            vec3 planetCenter = Draw.Model[3].xyz;
+            vec3 beta = surfaceAtmosphereExtinction();
+            float rayLength = max(rayEnd - rayStart, 0.0);
+            if (rayLength <= 0.0001)
+            {
+                return vec3(0.0);
+            }
+        
+            const int aerialSampleCount = 10;
+            float stepSize = rayLength / float(aerialSampleCount);
+            float viewOpticalDepth = 0.0;
+            vec3 scattered = vec3(0.0);
+            for (int i = 0; i < aerialSampleCount; i++)
+            {
+                float t = rayStart + (float(i) + 0.5) * stepSize;
+                vec3 samplePoint = rayOrigin + rayDirection * t;
+                float localDensity = atmosphereDensityAtPoint(samplePoint, planetCenter, planetRadius, atmosphereRadius, density, densityFalloff);
+                viewOpticalDepth += localDensity * stepSize;
+        
+                float horizonLight = planetShadowFactor(samplePoint, sunDirection, planetCenter);
+                if (horizonLight <= 0.0001)
+                {
+                    continue;
+                }
+        
+                vec2 lightHit;
+                if (!intersectSphere(samplePoint, sunDirection, planetCenter, atmosphereRadius, lightHit))
+                {
+                    continue;
+                }
+        
+                vec2 lightGroundHit;
+                bool hitsPlanetOnLightRay = intersectSphere(samplePoint, sunDirection, planetCenter, planetRadius, lightGroundHit);
+                if (hitsPlanetOnLightRay && lightGroundHit.y > 0.0)
+                {
+                    continue;
+                }
+        
+                float lightDepth = integrateOpticalDepth(samplePoint, sunDirection, max(lightHit.y, 0.0), planetCenter, planetRadius, atmosphereRadius, density, densityFalloff, 6);
+                vec3 transmittance = exp(-(viewOpticalDepth + lightDepth) * beta);
+                scattered += localDensity * horizonLight * transmittance * stepSize;
+            }
+        
+            float mu = dot(rayDirection, sunDirection);
+            vec3 rayleigh = Draw.AtmosphereColor0.rgb * rayleighStrength * phaseRayleigh(mu);
+            vec3 mie = Draw.AtmosphereColor1.rgb * mieStrength * phaseMie(mu, mieAnisotropy);
+            return (rayleigh + mie) * scattered * atmosphereSunIntensity() * atmosphereLightColor();
+        }
+        
+        vec3 applySurfaceAerialPerspective(vec3 surfaceColor, vec3 surfacePosition, vec3 lightDirection)
+        {
+            if (!hasAtmosphereData())
+            {
+                return surfaceColor;
+            }
+        
+            float planetRadius = max(Draw.AtmosphereFactors0.x, 0.0001);
+            float atmosphereRadius = max(Draw.AtmosphereFactors0.y, planetRadius + 0.0001);
+            float density = max(Draw.AtmosphereFactors0.z, 0.0);
+            float densityFalloff = max(Draw.AtmosphereFactors0.w, 0.001);
+            vec3 planetCenter = Draw.Model[3].xyz;
+            vec3 rayOrigin = Frame.CameraPosition.xyz;
+            vec3 rayDirection = normalize(surfacePosition - rayOrigin);
+            float surfaceDistance = length(surfacePosition - rayOrigin);
+        
+            vec2 atmosphereHit;
+            if (!intersectSphere(rayOrigin, rayDirection, planetCenter, atmosphereRadius, atmosphereHit))
+            {
+                return surfaceColor;
+            }
+        
+            float rayStart = max(atmosphereHit.x, 0.0);
+            float rayEnd = min(surfaceDistance, atmosphereHit.y);
+            if (rayEnd <= rayStart)
+            {
+                return surfaceColor;
+            }
+        
+            float opticalDepth = integrateOpticalDepth(
+                rayOrigin + rayDirection * rayStart,
+                rayDirection,
+                rayEnd - rayStart,
+                planetCenter,
+                planetRadius,
+                atmosphereRadius,
+                density,
+                densityFalloff,
+                10);
+            float strength = aerialPerspectiveStrength();
+            float cameraAtmosphereRatio = length(rayOrigin - planetCenter) / atmosphereRadius;
+            float lowAltitudeView = 1.0 - smoothstep(1.0, 1.35, cameraAtmosphereRatio);
+            float effectiveStrength = strength * mix(1.0, 0.32, lowAltitudeView);
+            vec3 transmittance = exp(-opticalDepth * surfaceAtmosphereExtinction() * effectiveStrength);
+            vec3 scattering = surfaceAerialPerspectiveScattering(rayOrigin, rayDirection, rayStart, rayEnd, normalize(lightDirection));
+            vec3 surfaceNormal = normalize(surfacePosition - planetCenter);
+            float surfaceSun = smoothstep(-0.08, 0.18, dot(surfaceNormal, normalize(lightDirection)));
+            vec3 scatteringTint = mix(vec3(1.0), vec3(0.55, 0.78, 1.35), lowAltitudeView);
+            return surfaceColor * transmittance + scattering * scatteringTint * effectiveStrength * surfaceSun;
+        }
+        
+        vec4 renderAtmosphere()
+        {
+            float planetRadius = max(Draw.AtmosphereFactors0.x, 0.0001);
+            float atmosphereRadius = max(Draw.AtmosphereFactors0.y, planetRadius + 0.0001);
+            float density = max(Draw.AtmosphereFactors0.z, 0.0);
+            float densityFalloff = max(Draw.AtmosphereFactors0.w, 0.001);
+            float rayleighStrength = max(Draw.AtmosphereFactors1.x, 0.0);
+            float mieStrength = max(Draw.AtmosphereFactors1.y, 0.0);
+            float mieAnisotropy = clamp(Draw.AtmosphereFactors1.z, -0.99, 0.99);
+            float sunIntensity = atmosphereSunIntensity();
+            int viewSampleCount = int(clamp(Draw.MaterialFactors.x, 4.0, float(MAX_VIEW_SAMPLE_COUNT)));
+            int lightSampleCount = int(clamp(Draw.MaterialFactors.y, 2.0, float(MAX_LIGHT_SAMPLE_COUNT)));
+            vec3 planetCenter = Draw.Model[3].xyz;
+            vec3 rayOrigin = Frame.CameraPosition.xyz;
+            vec3 rayDirection = normalize(fsin_WorldPosition - rayOrigin);
+            vec3 sunDirection = Frame.LightPosition.w > 0.5
+                ? normalize(Frame.LightPosition.xyz - fsin_WorldPosition)
+                : normalize(-Frame.LightDirection.xyz);
+            if (shouldDiscardAtmosphereBackHemisphere(rayOrigin, rayDirection, planetCenter, atmosphereRadius))
+            {
+                discard;
+            }
+        
+            vec2 atmosphereHit;
+            if (!intersectSphere(rayOrigin, rayDirection, planetCenter, atmosphereRadius, atmosphereHit))
+            {
+                return vec4(0.0);
+            }
+        
+            vec2 groundHit;
+            float rayStart = max(atmosphereHit.x, 0.0);
+            float rayEnd = atmosphereHit.y;
+            bool hitsGround = intersectSphere(rayOrigin, rayDirection, planetCenter, planetRadius, groundHit);
+            if (hitsGround && groundHit.x > 0.0)
+            {
+                discard;
+            }
+        
+            float rayLength = max(rayEnd - rayStart, 0.0);
+            if (rayLength <= 0.0001)
+            {
+                return vec4(0.0);
+            }
+        
+            float stepSize = rayLength / float(viewSampleCount);
+            float viewOpticalDepth = 0.0;
+            vec3 scattered = vec3(0.0);
+            vec3 beta = atmosphereExtinction();
+            for (int i = 0; i < MAX_VIEW_SAMPLE_COUNT; i++)
+            {
+                if (i >= viewSampleCount)
+                {
+                    break;
+                }
+        
+                float t = rayStart + (float(i) + 0.5) * stepSize;
+                vec3 samplePoint = rayOrigin + rayDirection * t;
+                float localDensity = atmosphereDensityAtPoint(samplePoint, planetCenter, planetRadius, atmosphereRadius, density, densityFalloff);
+                float horizonLight = planetShadowFactor(samplePoint, sunDirection, planetCenter);
+                if (horizonLight <= 0.0001)
+                {
+                    continue;
+                }
+        
+                viewOpticalDepth += localDensity * stepSize;
+        
+                vec2 lightHit;
+                bool exitsAtmosphere = intersectSphere(samplePoint, sunDirection, planetCenter, atmosphereRadius, lightHit);
+                vec2 lightGroundHit;
+                bool hitsPlanetOnLightRay = intersectSphere(samplePoint, sunDirection, planetCenter, planetRadius, lightGroundHit);
+                bool shadowed = hitsPlanetOnLightRay && lightGroundHit.y > 0.0;
+                if (!exitsAtmosphere || shadowed)
+                {
+                    continue;
+                }
+        
+                float lightDepth = integrateOpticalDepth(samplePoint, sunDirection, max(lightHit.y, 0.0), planetCenter, planetRadius, atmosphereRadius, density, densityFalloff, lightSampleCount);
+                vec3 transmittance = exp(-(viewOpticalDepth + lightDepth) * beta);
+                scattered += localDensity * horizonLight * transmittance * stepSize;
+            }
+        
+            float mu = dot(rayDirection, sunDirection);
+            vec3 rayleigh = Draw.AtmosphereColor0.rgb * rayleighStrength * phaseRayleigh(mu);
+            vec3 mie = Draw.AtmosphereColor1.rgb * mieStrength * phaseMie(mu, mieAnisotropy);
+            vec3 color = (rayleigh + mie) * scattered * sunIntensity * atmosphereLightColor();
+            vec3 shellNormal = normalize(fsin_WorldPosition - planetCenter);
+            vec3 viewDirection = normalize(rayOrigin - fsin_WorldPosition);
+            float limb = pow(clamp(1.0 - abs(dot(shellNormal, viewDirection)), 0.0, 1.0), 3.5);
+            float sunlitRim = smoothstep(-0.22, 0.18, dot(shellNormal, sunDirection));
+            color += Draw.AtmosphereColor0.rgb * atmosphereLightColor() * limb * sunlitRim * rayleighStrength * sunIntensity * 0.18;
+            vec3 mapped = vec3(1.0) - exp(-color * max(Draw.EmissiveFactors.a, 0.0));
+            float alpha = clamp(max(max(mapped.r, mapped.g), mapped.b) * 1.8, 0.0, 0.9);
+            return vec4(pow(mapped, vec3(1.0 / 2.2)), alpha);
+        }
+        
+        bool isCloudLayer()
+        {
+            return Draw.CloudFactors.y > 0.0;
+        }
+        
+        bool cloudAlphaFromTextureOnly()
+        {
+            return Draw.CloudFactors.x > 0.5;
+        }
+        
+        float cloudSkyVisibility(vec3 cloudPosition, vec3 sunDirection, vec3 planetCenter)
+        {
+            return planetShadowFactor(cloudPosition, sunDirection, planetCenter);
+        }
+        
+        vec4 renderCloudLayer()
+        {
+            vec3 rayOrigin = Frame.CameraPosition.xyz;
+            vec3 rayDirection = normalize(fsin_WorldPosition - rayOrigin);
+            vec3 planetCenter = Draw.Model[3].xyz;
+            float shellRadius = max(length(fsin_WorldPosition - planetCenter), 0.0001);
+            if (shouldDiscardAtmosphereBackHemisphere(rayOrigin, rayDirection, planetCenter, shellRadius))
+            {
+                discard;
+            }
+        
+            vec4 textureColor = texture(sampler2D(BaseColorTexture, BaseColorSampler), fsin_UV);
+            float textureCoverage = cloudAlphaFromTextureOnly()
+                ? textureColor.a
+                : max(max(textureColor.r, textureColor.g), textureColor.b) * textureColor.a;
+            float alpha = clamp(textureCoverage * max(Draw.CloudFactors.y, 0.0) * Draw.CloudColor.a, 0.0, 1.0);
+            if (alpha < 0.01)
+            {
+                discard;
+            }
+        
+            vec3 cloudBase = cloudAlphaFromTextureOnly() ? vec3(1.0) : pow(max(textureColor.rgb, vec3(0.0)), vec3(2.2));
+            vec3 normal = normalize(fsin_WorldPosition - planetCenter);
+            vec3 light = Frame.LightPosition.w > 0.5
+                ? normalize(Frame.LightPosition.xyz - fsin_WorldPosition)
+                : normalize(-Frame.LightDirection.xyz);
+            float lambertian = max(dot(normal, light), 0.0);
+            float skyVisibility = cloudSkyVisibility(fsin_WorldPosition, light, planetCenter);
+            float lightTerm = mix(1.0, lambertian, clamp(Draw.CloudFactors.z, 0.0, 1.0));
+            vec3 directTransmittance = surfaceAtmosphereTransmittance(fsin_WorldPosition, light);
+            float ambientTerm = max(Draw.CloudFactors.w, 0.0) * mix(0.04, 1.0, skyVisibility);
+            vec3 color = cloudBase
+                * pow(max(Draw.CloudColor.rgb, vec3(0.0)), vec3(2.2))
+                * (Frame.LightColor.rgb * directTransmittance * lightTerm * skyVisibility * 3.2 + vec3(ambientTerm));
+            color = applySurfaceAerialPerspective(color, fsin_WorldPosition, light);
+            return vec4(pow(max(color, vec3(0.0)), vec3(1.0 / 2.2)), alpha);
+        }
+        
         void main()
         {
+            if (isAtmosphereShell())
+            {
+                fsout_Color = renderAtmosphere();
+                return;
+            }
+        
+            if (isCloudLayer())
+            {
+                fsout_Color = renderCloudLayer();
+                return;
+            }
+        
             vec4 textureColor = texture(sampler2D(BaseColorTexture, BaseColorSampler), fsin_UV);
             vec3 albedo = pow(max(fsin_Color.rgb * textureColor.rgb, vec3(0.0)), vec3(2.2));
             vec4 metalRough = texture(sampler2D(MetallicRoughnessTexture, MetallicRoughnessSampler), fsin_UV);
             float metallic = clamp(metalRough.b * Draw.MaterialFactors.x, 0.0, 1.0);
             float roughness = clamp(metalRough.g * Draw.MaterialFactors.y, 0.04, 1.0);
+            vec3 waterTint = vec3(0.0);
+            float waterCoverage = hasSurfaceWater() ? sampleSurfaceWaterCoverage(fsin_UV, textureColor.rgb, waterTint) : 0.0;
+            if (waterCoverage > 0.0001)
+            {
+                albedo = mix(albedo, waterTint, waterCoverage * 0.78);
+                roughness = mix(roughness, clamp(Draw.SurfaceWaterFactors.w, 0.01, 1.0), waterCoverage);
+                metallic = mix(metallic, 0.0, waterCoverage);
+            }
             float occlusion = 1.0;
             if (Draw.MaterialFactors.w > 0.0001)
             {
                 occlusion = mix(1.0, texture(sampler2D(OcclusionTexture, OcclusionSampler), fsin_UV).r, Draw.MaterialFactors.w);
             }
-            vec3 normal = normalize(fsin_Normal);
             vec3 light = Frame.LightPosition.w > 0.5
                 ? normalize(Frame.LightPosition.xyz - fsin_WorldPosition)
                 : normalize(-Frame.LightDirection.xyz);
+            vec3 view = normalize(Frame.CameraPosition.xyz - fsin_WorldPosition);
+            vec3 normal = hasAtmosphereData()
+                ? normalize(fsin_WorldPosition - Draw.Model[3].xyz)
+                : normalize(fsin_Normal);
+            if (dot(normal, view) < 0.0)
+            {
+                normal = -normal;
+            }
+        
             if (Draw.MaterialFactors.z > 0.0001)
             {
                 normal = perturbNormal(normal);
             }
-            vec3 view = normalize(vec3(0.0, 0.0, 1.0));
             vec3 halfVector = normalize(view + light);
             float ndotl = max(dot(normal, light), 0.0);
             float ndotv = max(dot(normal, view), 0.0);
-            vec3 f0 = mix(vec3(0.04), albedo, metallic);
+            vec3 f0 = mix(mix(vec3(0.04), albedo, metallic), vec3(0.02), waterCoverage);
             float d = distributionGgx(normal, halfVector, roughness);
             float g = geometrySchlickGgx(ndotv, roughness) * geometrySchlickGgx(ndotl, roughness);
             vec3 f = fresnelSchlick(max(dot(halfVector, view), 0.0), f0);
             vec3 specular = d * g * f / max(4.0 * ndotv * ndotl, 0.0001);
+            specular *= mix(1.0, surfaceWaterSpecularStrength(), waterCoverage);
             vec3 diffuse = (1.0 - f) * (1.0 - metallic) * albedo / PI;
-            vec3 ambient = albedo * 0.035 * occlusion;
+            diffuse *= mix(1.0, 0.42, waterCoverage);
+            vec3 directTransmittance = surfaceAtmosphereTransmittance(fsin_WorldPosition, light);
+            float ambientStrength = hasAtmosphereData() ? spaceAmbientFloor() : 0.035;
+            vec3 ambient = albedo * ambientStrength * occlusion;
+            vec3 waterFresnel = fresnelSchlick(ndotv, vec3(0.02));
+            ambient += waterFresnel * Frame.LightColor.rgb * directTransmittance * waterCoverage * 0.018;
             vec3 emissive = pow(max(texture(sampler2D(EmissiveTexture, EmissiveSampler), fsin_UV).rgb * Draw.EmissiveFactors.rgb, vec3(0.0)), vec3(2.2)) * Draw.EmissiveFactors.a;
-            vec3 color = emissive + ambient + (diffuse + specular) * Frame.LightColor.rgb * ndotl * 2.4;
-            vec3 lit = pow(color, vec3(1.0 / 2.2));
-            fsout_Color = vec4(lit, fsin_Color.a * textureColor.a);
+            float cloudShadow = sampleCloudShadow(fsin_WorldPosition, light);
+            vec3 color = emissive + ambient + (diffuse + specular) * Frame.LightColor.rgb * directTransmittance * cloudShadow * ndotl * 1.8;
+            color = applySurfaceAerialPerspective(color, fsin_WorldPosition, light);
+            vec3 mapped = vec3(1.0) - exp(-max(color, vec3(0.0)) * 1.15);
+            vec3 lit = pow(mapped, vec3(1.0 / 2.2));
+            float surfaceAlpha = hasAtmosphereData() ? fsin_Color.a : fsin_Color.a * textureColor.a;
+            fsout_Color = vec4(lit, surfaceAlpha);
         }
         """;
 
@@ -2703,9 +3332,48 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
         layout(location = 0) out vec4 fsout_Color;
 
+        float luma(vec3 color)
+        {
+            return dot(color, vec3(0.299, 0.587, 0.114));
+        }
+
         void main()
         {
-            fsout_Color = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV);
+            vec2 texel = 1.0 / vec2(textureSize(sampler2D(SceneTexture, SceneSampler), 0));
+            vec4 center = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV);
+            vec3 nw = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(-1.0, -1.0)).rgb;
+            vec3 ne = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(1.0, -1.0)).rgb;
+            vec3 sw = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(-1.0, 1.0)).rgb;
+            vec3 se = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(1.0, 1.0)).rgb;
+            float lumaCenter = luma(center.rgb);
+            float lumaNw = luma(nw);
+            float lumaNe = luma(ne);
+            float lumaSw = luma(sw);
+            float lumaSe = luma(se);
+            float lumaMin = min(lumaCenter, min(min(lumaNw, lumaNe), min(lumaSw, lumaSe)));
+            float lumaMax = max(lumaCenter, max(max(lumaNw, lumaNe), max(lumaSw, lumaSe)));
+            float edgeContrast = lumaMax - lumaMin;
+            if (edgeContrast < max(0.0312, lumaMax * 0.125))
+            {
+                fsout_Color = center;
+                return;
+            }
+
+            vec2 direction = vec2(
+                -((lumaNw + lumaNe) - (lumaSw + lumaSe)),
+                 ((lumaNw + lumaSw) - (lumaNe + lumaSe)));
+            float directionReduce = max((lumaNw + lumaNe + lumaSw + lumaSe) * 0.0078125, 0.0009765625);
+            float directionScale = 1.0 / (min(abs(direction.x), abs(direction.y)) + directionReduce);
+            direction = clamp(direction * directionScale, vec2(-8.0), vec2(8.0)) * texel;
+
+            vec3 rgbA = 0.5 * (
+                texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * (1.0 / 3.0 - 0.5)).rgb +
+                texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * (2.0 / 3.0 - 0.5)).rgb);
+            vec3 rgbB = rgbA * 0.5 + 0.25 * (
+                texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * -0.5).rgb +
+                texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * 0.5).rgb);
+            float lumaB = luma(rgbB);
+            fsout_Color = vec4((lumaB < lumaMin || lumaB > lumaMax) ? rgbA : rgbB, center.a);
         }
         """;
 
@@ -2750,10 +3418,27 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly record struct HudVertex(Vector3 Position, Vector4 Color, Vector2 UV);
 
     [StructLayout(LayoutKind.Sequential)]
-    private readonly record struct FrameUniform(Matrix4x4 ViewProjection, Vector4 LightDirection, Vector4 LightColor, Vector4 LightPosition);
+    private readonly record struct FrameUniform(
+        Matrix4x4 ViewProjection,
+        Vector4 LightDirection,
+        Vector4 LightColor,
+        Vector4 LightPosition,
+        Vector4 CameraPosition);
 
     [StructLayout(LayoutKind.Sequential)]
-    private readonly record struct DrawUniform(Matrix4x4 Model, Vector4 MaterialFactors, Vector4 EmissiveFactors);
+    private readonly record struct DrawUniform(
+        Matrix4x4 Model,
+        Vector4 MaterialFactors,
+        Vector4 EmissiveFactors,
+        Vector4 AtmosphereFactors0,
+        Vector4 AtmosphereFactors1,
+        Vector4 AtmosphereColor0,
+        Vector4 AtmosphereColor1,
+        Vector4 AtmosphereColor2,
+        Vector4 CloudFactors,
+        Vector4 CloudColor,
+        Vector4 CloudShadowFactors,
+        Vector4 SurfaceWaterFactors);
 
     private sealed record RenderPacket(
         GpuVertex[] Vertices,
@@ -2816,15 +3501,29 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         string? NormalTextureId,
         string? OcclusionTextureId,
         string? EmissiveTextureId,
+        string? CloudShadowTextureId,
+        string? SurfaceWaterTextureId,
         Vector4 MaterialFactors,
-        Vector4 EmissiveFactors);
+        Vector4 EmissiveFactors,
+        Vector4 AtmosphereFactors0,
+        Vector4 AtmosphereFactors1,
+        Vector4 AtmosphereColor0,
+        Vector4 AtmosphereColor1,
+        Vector4 AtmosphereColor2,
+        Vector4 CloudFactors,
+        Vector4 CloudColor,
+        Vector4 CloudShadowFactors,
+        Vector4 SurfaceWaterFactors,
+        bool Transparent);
 
     private readonly record struct MaterialKey(
         string? BaseColorTextureId,
         string? NormalTextureId,
         string? MetallicRoughnessTextureId,
         string? OcclusionTextureId,
-        string? EmissiveTextureId);
+        string? EmissiveTextureId,
+        string? CloudShadowTextureId,
+        string? SurfaceWaterTextureId);
 
     private sealed record TextureBinding(Texture Texture, Sampler Sampler, ResourceSet ResourceSet) : IDisposable
     {
@@ -2877,3 +3576,4 @@ internal static class PlayerLog
         }
     }
 }
+

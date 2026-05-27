@@ -7,9 +7,12 @@ public sealed record RekallAgeVulkanSceneMaterialKey(
     string? NormalTextureId,
     string? MetallicRoughnessTextureId,
     string? OcclusionTextureId,
-    string? EmissiveTextureId)
+    string? EmissiveTextureId,
+    string? CloudShadowTextureId,
+    string? SurfaceWaterTextureId,
+    bool Atmosphere = false)
 {
-    public static RekallAgeVulkanSceneMaterialKey Default { get; } = new(null, null, null, null, null);
+    public static RekallAgeVulkanSceneMaterialKey Default { get; } = new(null, null, null, null, null, null, null, false);
 }
 
 public sealed record RekallAgeVulkanScenePreparedDraw(
@@ -23,14 +26,29 @@ public sealed record RekallAgeVulkanScenePreparedDraw(
     string? MetallicRoughnessTextureId,
     string? NormalTextureId,
     string? OcclusionTextureId,
-    string? EmissiveTextureId)
+    string? EmissiveTextureId,
+    string? CloudShadowTextureId,
+    string? SurfaceWaterTextureId,
+    Vector4 AtmosphereFactors0,
+    Vector4 AtmosphereFactors1,
+    Vector4 AtmosphereColor0,
+    Vector4 AtmosphereColor1,
+    Vector4 AtmosphereColor2,
+    Vector4 CloudFactors,
+    Vector4 CloudColor,
+    Vector4 CloudShadowFactors,
+    Vector4 SurfaceWaterFactors,
+    bool Transparent = false)
 {
     public RekallAgeVulkanSceneMaterialKey MaterialKey => new(
         BaseColorTextureId,
         NormalTextureId,
         MetallicRoughnessTextureId,
         OcclusionTextureId,
-        EmissiveTextureId);
+        EmissiveTextureId,
+        CloudShadowTextureId,
+        SurfaceWaterTextureId,
+        AtmosphereFactors0.Y > 0.0f);
 }
 
 public sealed record RekallAgeVulkanSceneDrawPlan(
@@ -58,7 +76,19 @@ public static class RekallAgeVulkanSceneDrawPlanBuilder
                 draw.MetallicRoughnessTextureId,
                 draw.NormalTextureId,
                 draw.OcclusionTextureId,
-                draw.EmissiveTextureId))
+                draw.EmissiveTextureId,
+                draw.CloudShadowTextureId,
+                draw.SurfaceWaterTextureId,
+                draw.AtmosphereFactors0,
+                draw.AtmosphereFactors1,
+                draw.AtmosphereColor0,
+                draw.AtmosphereColor1,
+                draw.AtmosphereColor2,
+                draw.CloudFactors,
+                draw.CloudColor,
+                draw.CloudShadowFactors,
+                draw.SurfaceWaterFactors,
+                draw.Transparent))
             .ToArray();
         var materialKeys = draws
             .Select(draw => draw.MaterialKey)

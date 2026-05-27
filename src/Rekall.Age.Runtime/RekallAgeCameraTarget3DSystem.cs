@@ -37,10 +37,7 @@ public sealed class RekallAgeCameraTarget3DSystem : IRekallAgeRuntimeWorldSystem
             return entity;
         }
 
-        var offset = new RekallAgeRuntimeVector3(
-            ReadNumber(cameraTarget.Properties, "offsetX", 0),
-            ReadNumber(cameraTarget.Properties, "offsetY", 0),
-            ReadNumber(cameraTarget.Properties, "offsetZ", 0));
+        var offset = ResolveOffset(cameraTarget.Properties, target, entities);
         var targetOffset = new RekallAgeRuntimeVector3(
             ReadNumber(cameraTarget.Properties, "targetOffsetX", 0),
             ReadNumber(cameraTarget.Properties, "targetOffsetY", 0),
@@ -68,6 +65,66 @@ public sealed class RekallAgeCameraTarget3DSystem : IRekallAgeRuntimeWorldSystem
                 Rotation3D = rotation
             }
         };
+    }
+
+    private static RekallAgeRuntimeVector3 ResolveOffset(
+        JsonObject properties,
+        RekallAgeRuntimeEntity target,
+        IReadOnlyList<RekallAgeRuntimeEntity> entities)
+    {
+        var reference = ResolveOffsetReference(properties, entities);
+        if (reference is not null)
+        {
+            var distance = ReadNumber(properties, "offsetDistance", 0);
+            if (distance > 0.000001)
+            {
+                var targetPosition = target.Transform.Position3D;
+                var referencePosition = reference.Transform.Position3D;
+                var direction = Subtract(referencePosition, targetPosition);
+                var mode = ReadString(properties, "offsetReferenceMode") ?? "toward";
+                if (mode.Equals("away", StringComparison.OrdinalIgnoreCase)
+                    || mode.Equals("awayFromReference", StringComparison.OrdinalIgnoreCase))
+                {
+                    direction = Subtract(targetPosition, referencePosition);
+                }
+
+                var forward = Normalize(direction, new RekallAgeRuntimeVector3(0, 0, 1));
+                var right = Normalize(Cross(new RekallAgeRuntimeVector3(0, 1, 0), forward), new RekallAgeRuntimeVector3(1, 0, 0));
+                var vertical = ReadNumber(properties, "offsetVertical", 0);
+                var lateral = ReadNumber(properties, "offsetLateral", 0);
+                return Add(
+                    Add(Scale(forward, distance), Scale(right, lateral)),
+                    new RekallAgeRuntimeVector3(0, vertical, 0));
+            }
+        }
+
+        return new RekallAgeRuntimeVector3(
+            ReadNumber(properties, "offsetX", 0),
+            ReadNumber(properties, "offsetY", 0),
+            ReadNumber(properties, "offsetZ", 0));
+    }
+
+    private static RekallAgeRuntimeEntity? ResolveOffsetReference(
+        JsonObject properties,
+        IReadOnlyList<RekallAgeRuntimeEntity> entities)
+    {
+        var reference = new JsonObject();
+        if (ReadString(properties, "offsetReferenceEntityId") is { Length: > 0 } entityId)
+        {
+            reference["targetEntityId"] = entityId;
+        }
+
+        if (ReadString(properties, "offsetReferenceName") is { Length: > 0 } name)
+        {
+            reference["targetName"] = name;
+        }
+
+        if (ReadString(properties, "offsetReferenceTag") is { Length: > 0 } tag)
+        {
+            reference["targetTag"] = tag;
+        }
+
+        return reference.Count == 0 ? null : ResolveTarget(reference, entities);
     }
 
     private static RekallAgeRuntimeEntity? ResolveTarget(
@@ -136,6 +193,31 @@ public sealed class RekallAgeCameraTarget3DSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeVector3 b)
     {
         return new RekallAgeRuntimeVector3(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
+    }
+
+    private static RekallAgeRuntimeVector3 Scale(RekallAgeRuntimeVector3 vector, double scalar)
+    {
+        return new RekallAgeRuntimeVector3(vector.X * scalar, vector.Y * scalar, vector.Z * scalar);
+    }
+
+    private static RekallAgeRuntimeVector3 Cross(
+        RekallAgeRuntimeVector3 a,
+        RekallAgeRuntimeVector3 b)
+    {
+        return new RekallAgeRuntimeVector3(
+            a.Y * b.Z - a.Z * b.Y,
+            a.Z * b.X - a.X * b.Z,
+            a.X * b.Y - a.Y * b.X);
+    }
+
+    private static RekallAgeRuntimeVector3 Normalize(
+        RekallAgeRuntimeVector3 vector,
+        RekallAgeRuntimeVector3 fallback)
+    {
+        var length = Math.Sqrt(vector.X * vector.X + vector.Y * vector.Y + vector.Z * vector.Z);
+        return length <= 0.000001
+            ? fallback
+            : new RekallAgeRuntimeVector3(vector.X / length, vector.Y / length, vector.Z / length);
     }
 
     private static string? ReadString(JsonObject properties, string name)

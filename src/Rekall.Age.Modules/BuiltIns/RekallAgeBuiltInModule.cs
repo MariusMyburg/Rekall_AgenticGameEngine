@@ -15,6 +15,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeCamera3DComponent>();
         builder.RegisterComponent<RekallAgeCameraZoomInputComponent>();
         builder.RegisterComponent<RekallAgeCameraTarget3DComponent>();
+        builder.RegisterComponent<RekallAgeCameraTargetCycleInputComponent>();
         builder.RegisterComponent<RekallAgeRenderLayerComponent>();
         builder.RegisterComponent<RekallAgeXrRigComponent>();
         builder.RegisterComponent<RekallAgeXrPoseSourceComponent>();
@@ -42,11 +43,17 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeCapsuleCollider3DComponent>();
         builder.RegisterComponent<RekallAgeMeshColliderComponent>();
         builder.RegisterComponent<RekallAgePlanetRendererComponent>();
+        builder.RegisterComponent<RekallAgeCloudLayerRendererComponent>();
         builder.RegisterComponent<RekallAgeAtmosphereRendererComponent>();
         builder.RegisterComponent<RekallAgeCelestialBodyComponent>();
         builder.RegisterComponent<RekallAgeKeplerOrbitComponent>();
         builder.RegisterComponent<RekallAgeCelestialRotationComponent>();
         builder.RegisterComponent<RekallAgeOrbitPathRendererComponent>();
+        builder.RegisterComponent<RekallAgeRingRendererComponent>();
+        builder.RegisterComponent<RekallAgeStarfieldRendererComponent>();
+        builder.RegisterComponent<RekallAgeMarkerRendererComponent>();
+        builder.RegisterComponent<RekallAgeHaloRendererComponent>();
+        builder.RegisterComponent<RekallAgeTextLabelRendererComponent>();
     }
 }
 
@@ -298,6 +305,27 @@ public sealed class RekallAgeCameraTarget3DComponent : RekallAgeComponent
     public string TargetTag { get; init; } = string.Empty;
 
     [RekallAgeProperty]
+    public string OffsetReferenceEntityId { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public string OffsetReferenceName { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public string OffsetReferenceTag { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public string OffsetReferenceMode { get; init; } = "toward";
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double OffsetDistance { get; init; }
+
+    [RekallAgeProperty]
+    public double OffsetVertical { get; init; }
+
+    [RekallAgeProperty]
+    public double OffsetLateral { get; init; }
+
+    [RekallAgeProperty]
     public double OffsetX { get; init; }
 
     [RekallAgeProperty]
@@ -323,6 +351,25 @@ public sealed class RekallAgeCameraTarget3DComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("Camera Target Cycle Input")]
+public sealed class RekallAgeCameraTargetCycleInputComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+
+    [RekallAgeProperty]
+    public string NextAction { get; init; } = "nextTarget";
+
+    [RekallAgeProperty]
+    public string PreviousAction { get; init; } = "previousTarget";
+
+    [RekallAgeProperty(Minimum = 0)]
+    public int CurrentIndex { get; init; }
+
+    [RekallAgeProperty]
+    public object[] Targets { get; init; } = [];
 }
 
 [RekallAgeComponent("Render Layer")]
@@ -787,8 +834,60 @@ public sealed class RekallAgePlanetRendererComponent : RekallAgeComponent
     [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
     public string? NormalTexture { get; init; }
 
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
+    public string? WaterTexture { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 4)]
+    public double WaterCoverage { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 8)]
+    public double WaterSpecularStrength { get; init; } = 2.5;
+
+    [RekallAgeProperty(Minimum = 0.01, Maximum = 1)]
+    public double WaterRoughness { get; init; } = 0.06;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 512)]
+    public int MeshSlices { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 256)]
+    public int MeshStacks { get; init; }
+
     [RekallAgeProperty(Kind = "color")]
     public string Color { get; init; } = "#4b86d8";
+}
+
+[RekallAgeComponent("Cloud Layer Renderer")]
+public sealed class RekallAgeCloudLayerRendererComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Kind = "cloudLayers")]
+    public object? Layers { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double Height { get; init; } = 0.02;
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
+    public string? Texture { get; init; }
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#ffffff";
+
+    [RekallAgeProperty(Kind = "boolean")]
+    public bool AlphaFromTextureOnly { get; init; } = true;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 4)]
+    public double Coverage { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double LambertianStrength { get; init; } = 0.45;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 2)]
+    public double AmbientStrength { get; init; } = 0.18;
+
+    [RekallAgeProperty(Kind = "boolean")]
+    public bool CastShadows { get; init; } = true;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double ShadowStrength { get; init; } = 0.35;
 }
 
 [RekallAgeComponent("Atmosphere Renderer")]
@@ -797,11 +896,50 @@ public sealed class RekallAgeAtmosphereRendererComponent : RekallAgeComponent
     [RekallAgeProperty(Minimum = 0)]
     public double Height { get; init; } = 0.08;
 
+    [RekallAgeProperty(Kind = "boolean")]
+    public bool RenderShell { get; init; } = true;
+
     [RekallAgeProperty(Kind = "color")]
     public string RayleighColor { get; init; } = "#7fb6ff";
 
     [RekallAgeProperty(Minimum = 0)]
     public double Density { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.001)]
+    public double DensityFalloff { get; init; } = 0.18;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double RayleighScattering { get; init; } = 0.006;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double MieScattering { get; init; } = 0.002;
+
+    [RekallAgeProperty(Minimum = -0.99, Maximum = 0.99)]
+    public double MieAnisotropy { get; init; } = 0.76;
+
+    [RekallAgeProperty(Kind = "color")]
+    public string MieColor { get; init; } = "#ffffff";
+
+    [RekallAgeProperty(Kind = "color")]
+    public string OzoneAbsorptionColor { get; init; } = "#ffd199";
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double OzoneAbsorption { get; init; } = 0;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 2)]
+    public double AerialPerspectiveStrength { get; init; } = 0.38;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double SunIntensity { get; init; } = 22;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double Exposure { get; init; } = 1.2;
+
+    [RekallAgeProperty(Minimum = 4, Maximum = 32)]
+    public int ViewSampleCount { get; init; } = 16;
+
+    [RekallAgeProperty(Minimum = 2, Maximum = 16)]
+    public int LightSampleCount { get; init; } = 8;
 }
 
 [RekallAgeComponent("Celestial Body")]
@@ -905,6 +1043,149 @@ public sealed class RekallAgeOrbitPathRendererComponent : RekallAgeComponent
 
     [RekallAgeProperty(Minimum = 0)]
     public double EmissiveStrength { get; init; } = 1.4;
+
+    [RekallAgeProperty]
+    public string Layer { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("Ring Renderer")]
+public sealed class RekallAgeRingRendererComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double InnerRadius { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double OuterRadius { get; init; } = 2;
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
+    public string? Texture { get; init; }
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#ffffffcc";
+
+    [RekallAgeProperty(Minimum = 16, Maximum = 512)]
+    public int Segments { get; init; } = 192;
+}
+
+[RekallAgeComponent("Starfield Renderer")]
+public sealed class RekallAgeStarfieldRendererComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 1, Maximum = 8000)]
+    public int Count { get; init; } = 1200;
+
+    [RekallAgeProperty(Minimum = 1)]
+    public double Radius { get; init; } = 18000;
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Size { get; init; } = 2.5;
+
+    [RekallAgeProperty]
+    public int Seed { get; init; } = 1337;
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#dce8ffff";
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 16)]
+    public double Brightness { get; init; } = 2.2;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double MilkyWayStrength { get; init; } = 0.35;
+
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("Marker Renderer")]
+public sealed class RekallAgeMarkerRendererComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Size { get; init; } = 1;
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#ffffffcc";
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double EmissiveStrength { get; init; } = 2;
+
+    [RekallAgeProperty]
+    public double VerticalOffset { get; init; }
+
+    [RekallAgeProperty]
+    public string Layer { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("Halo Renderer")]
+public sealed class RekallAgeHaloRendererComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Radius { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 8, Maximum = 256)]
+    public int Segments { get; init; } = 48;
+
+    [RekallAgeProperty(Minimum = 1, Maximum = 16)]
+    public int Rings { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.1, Maximum = 8)]
+    public double Falloff { get; init; } = 1;
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#ffffff88";
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double Intensity { get; init; } = 1;
+
+    [RekallAgeProperty]
+    public double VerticalOffset { get; init; }
+
+    [RekallAgeProperty]
+    public string FacingMode { get; init; } = "world";
+
+    [RekallAgeProperty]
+    public string Layer { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("Text Label Renderer")]
+public sealed class RekallAgeTextLabelRendererComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public string Text { get; init; } = "Label";
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Size { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Thickness { get; init; } = 0.02;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double MinimumScreenHeightPixels { get; init; }
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#dce8ffff";
+
+    [RekallAgeProperty]
+    public double OffsetX { get; init; }
+
+    [RekallAgeProperty]
+    public double OffsetY { get; init; }
+
+    [RekallAgeProperty]
+    public double OffsetZ { get; init; }
+
+    [RekallAgeProperty]
+    public string FacingMode { get; init; } = "world";
+
+    [RekallAgeProperty]
+    public string Layer { get; init; } = string.Empty;
 
     [RekallAgeProperty]
     public bool Active { get; init; } = true;

@@ -263,6 +263,11 @@ public sealed class RekallAgeProjectValidator
             or "Rekall.GeometryPrimitive"
             or "Rekall.PlanetRenderer"
             or "Rekall.OrbitPathRenderer"
+            or "Rekall.RingRenderer"
+            or "Rekall.StarfieldRenderer"
+            or "Rekall.MarkerRenderer"
+            or "Rekall.HaloRenderer"
+            or "Rekall.TextLabelRenderer"
             or "Rekall.RenderLight";
     }
 

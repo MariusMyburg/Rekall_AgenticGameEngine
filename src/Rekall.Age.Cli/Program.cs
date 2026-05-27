@@ -3114,6 +3114,12 @@ internal static class RekallAgeCli
         Console.WriteLine($"Acceleration: {result.Value.AccelerationStatus}");
         Console.WriteLine($"Selected device: {result.Value.SelectedDeviceName ?? "(none)"}");
         Console.WriteLine($"Active camera: {result.Value.ActiveCamera ?? "(none)"}");
+        if (result.Value.LayoutDiagnostics.ActiveCamera is { } camera)
+        {
+            Console.WriteLine(
+                $"Camera pose: position=({camera.X:F3}, {camera.Y:F3}, {camera.Z:F3}); rotation=({camera.RotationX:F2}, {camera.RotationY:F2}, {camera.RotationZ:F2}); fov={camera.FieldOfViewDegrees:F1}");
+        }
+
         Console.WriteLine(
             $"Frame analysis: informative={result.Value.FrameAnalysis.VisuallyInformative}, analyzed={result.Value.FrameAnalysis.Analyzed}, distinctColors={result.Value.FrameAnalysis.DistinctColorCount}");
         Console.WriteLine(

@@ -7,7 +7,8 @@ public sealed record RekallAgeVulkanSceneCommandDraw(
     uint IndexCount,
     int VertexOffset,
     RekallAgeVulkanSceneMaterialKey MaterialKey,
-    RekallAgeVulkanSceneGpuDrawPushConstants PushConstants);
+    RekallAgeVulkanSceneGpuDrawPushConstants PushConstants,
+    bool Transparent = false);
 
 public sealed record RekallAgeVulkanSceneRenderPassCommand(
     uint FramebufferIndex,
@@ -136,7 +137,17 @@ public static class RekallAgeVulkanSceneCommandPlanBuilder
                 RekallAgeVulkanSceneUniformUploadBuilder.BuildDrawPushConstants(
                     draw.Model,
                     draw.MaterialFactors,
-                    draw.EmissiveFactors)))
+                    draw.EmissiveFactors,
+                    draw.AtmosphereFactors0,
+                    draw.AtmosphereFactors1,
+                    draw.AtmosphereColor0,
+                    draw.AtmosphereColor1,
+                    draw.AtmosphereColor2,
+                    draw.CloudFactors,
+                    draw.CloudColor,
+                    draw.CloudShadowFactors,
+                    draw.SurfaceWaterFactors),
+                draw.Transparent))
             .ToArray();
     }
 }

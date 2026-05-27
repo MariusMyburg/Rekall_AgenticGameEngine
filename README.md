@@ -1,75 +1,1154 @@
 # Rekall AGE
 
-Rekall AGE is a greenfield, agent-native C# game engine.
+Rekall AGE is the Rekall Agentic Game Engine: a C#/.NET game engine designed so AI agents and humans can author complete games through inspectable, composable engine contracts.
 
-The current MVP includes:
+The central idea is deliberately different from a traditional genre-first engine. Rekall AGE does not try to become a built-in first-person controller, platformer controller, tower defense loop, or RPG rules engine. Instead, it exposes generic project files, scene entities, components, runtime facts, diagnostics, SDK helpers, command bus operations, MCP tools, rendering paths, and packaging workflows. Agents use those primitives to author the actual game.
 
-- typed command bus through `IRekallAgeCommand`
-- transaction tracking
-- project-local transaction history for Studio and agent read models
-- transaction history resource-change summaries with path, kind, existence, and size metadata
-- immediate MCP/dynamic command transaction metadata with structured resource-change summaries
-- transaction resource preimage snapshots for pre-mutation restore groundwork
-- transaction preimage restore command for reverting a changed resource from a persisted snapshot
-- project capability manifests
-- deterministic scene/entity/component files
-- C# module attributes and reflection-based component schema discovery
-- C# module scaffolding for agent-authored or human-authored gameplay modules
-- C# module source writing through the command bus for MCP-first agents
-- C# module build command for compiling scaffolded gameplay modules
-- generic C# runtime-system module scaffolding for agent-authored systems
-- project-authored C# runtime systems that participate in runtime snapshots and viewport captures
-- playable game readiness verification workflow for validation, build, and playtest checks
-- playable game packaging workflow that verifies, bundles game content, writes a package manifest, creates a zip archive, and publishes launch artifacts
-- playable package inspection with file inventory, key-artifact detection, manifest checks, and source-template metadata
-- playable package audit workflow that inspects, runs, captures a PNG proof frame, and reports one deliverable-readiness verdict
-- project module assembly loading for agent-readable schemas after build
-- module-authored playable runtime execution with `DeltaSeconds` input for frame-rate-independent agent-authored gameplay; no engine-owned fallback games
-- Vulkan-first internal rendering backend catalog with Direct3D 12 extension point
-- native Vulkan loader probing for agent-readable backend diagnostics
-- native Vulkan logical-device bootstrap validation with physical-device and graphics-queue selection
-- native Vulkan command-pool allocation, empty command-buffer recording, queue submission, and fence wait validation
-- native Vulkan mapped buffer creation with host-visible memory allocation and byte writes
-- native Vulkan 2D image creation with device-local memory allocation and binding
-- native Vulkan offscreen render target creation with image view, render pass, and framebuffer
-- native Vulkan clear render-pass submission, readback, PNG capture, and agent-controlled clear color
-- low-level render plan authoring, validation, command-buffer recording, and deterministic execution artifacts
-- Vulkan render-plan execution for clear render passes
-- deterministic asset import and catalog listing commands
-- GLB asset import metadata inspection for scenes, nodes, meshes, materials, images, and animations
-- runtime scene GLB export for engine-authored primitives, custom meshes, and extrusions with transforms, normals, UVs, vertex colors, and PBR base-color materials
-- entity inspection and single-property component mutation commands
-- MVP terminal player for module-authored projects, including deterministic playtest frames
-- structured scene playtest assertions for MCP/headless agent loops
-- structured validation
-- compact agent project summaries
-- MCP tool catalog skeleton
-- stdio MCP JSON-RPC adapter for `initialize`, `tools/list`, and `tools/call`
-- CLI adapter over the same command bus
-- headless runtime smoke execution with active gameplay-system observations
-- canonical runtime scene snapshots with render, physics, audio, animation, and UI projections
-- runtime input snapshots with keyboard, mouse button, mouse position, mouse delta, mouse wheel, and semantic action projections
-- deterministic transform animation for runtime pitch/yaw/roll rates
-- runtime scene inspection through command bus, CLI, MCP catalog, and Studio read models
-- runtime-backed viewport frame capture through command bus, CLI, MCP catalog, and Studio metadata
-- runtime viewport backend reporting with explicit software/Vulkan acceleration status
-- live player scene and asset editing over local named-pipe IPC through MCP tools
-- Serilog-backed CLI, MCP stdio, and Studio startup/exception logging with daily rolling files
-- deterministic software screenshot capture through command bus
-- software viewport rasterization for cube, sphere, cylinder, cone, and plane geometry primitives plus authored triangle meshes with material colors and directional-light shading
-- Vulkan runtime viewport clear-pass capture for empty frames, plus native offscreen Vulkan scene rendering for generated primitive meshes and authored triangle meshes
-- Vulkan scene-rendering contracts, camera/view-projection propagation, primitive/custom mesh preparation, bundled GLSL shader deployment and compilation, uniform descriptors, model push constants, depth targets, indexed draw submission, readback, and runtime viewport scene-capture routing
-- agent-authored 3D geometry primitive creation through command bus, CLI, and MCP catalog
-- agent-authored custom 3D triangle mesh payloads through `Rekall.GeometryMesh`
-- agent-authored procedural extrusions from 2D profiles through `rekall.geometry.create_extrusion`
-- agent-accessible GLB export through `rekall.render.export_scene_glb` / `render glb export`
-- built-in starter game workflows
-- one-shot playable game workflow that creates, scaffolds, and builds genre-aware C# module code
-- closed-loop agent authoring gauntlet that creates, verifies, packages, audits, and reports next actions for a playable game
+This README is intended to be the broad public entry point and the practical technical reference for the repository.
 
-## Starter Game Workflows
+## Table of Contents
 
-Agents can create these game foundations through the command bus or CLI:
+- [What Makes Rekall AGE Agentic](#what-makes-rekall-age-agentic)
+- [Status](#status)
+- [Quick Start](#quick-start)
+- [Repository Layout](#repository-layout)
+- [Core Architecture](#core-architecture)
+- [Project and Scene Model](#project-and-scene-model)
+- [Command Bus and Transactions](#command-bus-and-transactions)
+- [MCP Integration](#mcp-integration)
+- [CLI Reference](#cli-reference)
+- [Agent Authoring Guide](#agent-authoring-guide)
+- [Runtime Modules and SDK Helpers](#runtime-modules-and-sdk-helpers)
+- [Input, Events, Timers, Pointers, Collisions, and Triggers](#input-events-timers-pointers-collisions-and-triggers)
+- [Rendering Overview](#rendering-overview)
+- [Vulkan Renderer](#vulkan-renderer)
+- [Materials, Shaders, Procedural Materials, and GLB](#materials-shaders-procedural-materials-and-glb)
+- [Performance Budgets, Render Layers, and Visibility](#performance-budgets-render-layers-and-visibility)
+- [Virtual Geometry](#virtual-geometry)
+- [VR and OpenXR](#vr-and-openxr)
+- [Planet and Solar-System Rendering](#planet-and-solar-system-rendering)
+- [Physics and Interaction](#physics-and-interaction)
+- [Multiplayer](#multiplayer)
+- [Live Player Editing](#live-player-editing)
+- [Starter Templates and Packaging Workflows](#starter-templates-and-packaging-workflows)
+- [Studio and Workbench Foundation](#studio-and-workbench-foundation)
+- [Testing and Verification](#testing-and-verification)
+- [Design Principles for Contributors](#design-principles-for-contributors)
+
+## What Makes Rekall AGE Agentic
+
+Rekall AGE is built around a simple rule:
+
+> Engine core should provide generic authoring primitives. Game-specific behavior belongs in agent-authored modules, templates, examples, or user projects.
+
+That has several practical consequences:
+
+- The engine exposes scene data as deterministic entities and components.
+- AI agents can inspect engine status, command schemas, component schemas, project summaries, runtime snapshots, viewport diagnostics, transaction history, and package audits.
+- Runtime gameplay is implemented in project C# modules that use engine SDK helpers.
+- Commands are routed through a typed command bus and can be reached through CLI or MCP.
+- Mutating commands record transactions and resource changes so agents can reason about what changed.
+- Visual output is verified through viewport captures, screenshot analysis, visibility inspection, and performance budgets.
+- Generic facts such as `entity.tick`, `pointer.click`, `timer.elapsed`, `collision.begin`, and `trigger.enter` are emitted by the runtime, but the engine does not decide what they mean for a specific game.
+
+In other words: Rekall AGE gives agents the hands, eyes, memory, and diagnostic vocabulary they need to author games. It does not ask the engine to author the game for them.
+
+## Status
+
+Rekall AGE is an active engine prototype with a substantial vertical slice:
+
+- deterministic project, scene, entity, and component files
+- typed command bus
+- CLI adapter
+- MCP stdio JSON-RPC adapter
+- transaction history and preimage restore
+- C# module scaffolding, source editing, compilation, and runtime loading
+- project-authored runtime systems
+- headless runtime snapshots
+- software viewport capture
+- Vulkan-first rendering path
+- Vulkan device, command buffer, buffer, image, render target, render pass, shader, and scene-capture diagnostics
+- runtime viewport capture and frame-analysis diagnostics
+- GLB import inspection and GLB export
+- generated primitives, custom meshes, procedural extrusions, line segments, and render materials
+- render layers, camera culling masks, stereo planning, OpenXR planning, and performance budgets
+- CPU-side virtual geometry LOD for dense meshes
+- KSA planet and solar-system import workflows
+- procedural planet, cloud, atmosphere, orbit, ring, starfield, marker, halo, and label renderables
+- starter game templates and closed-loop playable package workflows
+- live player editing over local IPC
+- generic runtime events, timers, pointer rays, collision facts, trigger facts, observations, semantic input, camera helpers, and multiplayer helpers
+- Windows player and WPF Studio foundation
+
+The renderer is Vulkan-first, but the engine architecture keeps backend-neutral render plans and a Direct3D 12 extension point. The current virtual geometry implementation is a near-term CPU-side clustered LOD system; it is not a full GPU Nanite clone yet.
+
+## Quick Start
+
+Prerequisites:
+
+- A .NET SDK capable of building `net10.0` projects.
+- Windows for the current desktop player and WPF Studio shell.
+- A Vulkan-capable GPU and driver for native Vulkan rendering.
+- Optional: SteamVR/OpenXR runtime for headset testing.
+
+Build and test:
+
+```powershell
+dotnet build Rekall.AGE.sln
+dotnet test Rekall.AGE.sln
+```
+
+Inspect the engine:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- context engine
+dotnet run --project src/Rekall.Age.Cli -- templates list
+dotnet run --project src/Rekall.Age.Cli -- module schemas
+```
+
+Create and prove a starter playable game:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- game gauntlet .age-sandbox "Gauntlet Pong" pong .age-sandbox/Builds/GauntletPong .age-sandbox/Artifacts/GauntletAudit
+```
+
+Run the MCP server:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- mcp stdio
+```
+
+Open Studio:
+
+```powershell
+dotnet run --project src/Rekall.Age.Studio -- --project .age-sandbox --scene Main
+```
+
+Capture a runtime viewport:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport 640 360 vulkan
+```
+
+Launch the player:
+
+```powershell
+dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main
+dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main --frames 2 --inputs '[{"verticalAxis":1,"primaryAction":true},{"verticalAxis":-1}]'
+```
+
+## Repository Layout
+
+| Path | Purpose |
+| --- | --- |
+| `src/Rekall.Age.Core` | command bus, command schemas, command results, transactions |
+| `src/Rekall.Age.Project` | project manifests and capabilities |
+| `src/Rekall.Age.World` | scene, entity, component, prefab, and blueprint storage |
+| `src/Rekall.Age.Modules` | built-in component schemas, module attributes, runtime module SDK helpers |
+| `src/Rekall.Age.Runtime.Abstractions` | runtime world, entity, subsystem, input, event, multiplayer, and render contracts |
+| `src/Rekall.Age.Runtime` | runtime snapshot builder, built-in runtime systems, multiplayer commands |
+| `src/Rekall.Age.Rendering.Abstractions` | viewport frame, renderable, camera, material, stereo, and virtual geometry contracts |
+| `src/Rekall.Age.Rendering` | software viewport, Vulkan renderer, GLB export, OpenXR planning, virtual geometry, render commands |
+| `src/Rekall.Age.AssetPipeline` | asset import reports and metadata inspection |
+| `src/Rekall.Age.Assets` | deterministic asset catalog and asset import commands |
+| `src/Rekall.Age.LevelDesign` | level editing, geometry creation, KSA planet/solar import, prefabs |
+| `src/Rekall.Age.GameTemplates` | starter templates and playable workflow commands |
+| `src/Rekall.Age.Playback` | terminal/player-facing playback and playtest workflows |
+| `src/Rekall.Age.Validation` | generic scene validation |
+| `src/Rekall.Age.Agent` | engine status and agent context commands |
+| `src/Rekall.Age.Mcp` | MCP tool catalog and stdio JSON-RPC adapter |
+| `src/Rekall.Age.Cli` | CLI adapter over the command registry |
+| `src/Rekall.Age.Player` | player runtime |
+| `src/Rekall.Age.Player.Windows` | Windows graphics player and live-edit server |
+| `src/Rekall.Age.Studio` | WPF workbench shell |
+| `tests/Rekall.Age.Tests` | engine, CLI, runtime, rendering, workflow, and regression tests |
+| `Examples` | example Rekall projects and captures |
+| `docs/superpowers` | implementation specs and plans used during development |
+
+## Core Architecture
+
+Rekall AGE is organized around a few stable contracts.
+
+### Typed Commands
+
+Engine operations implement `IRekallAgeCommand<TRequest, TResult>`. Each command exposes:
+
+- a stable command name such as `rekall.render.capture_runtime_viewport`
+- a human-readable description
+- request/result CLR type names
+- structured success or failure output
+- zero or more structured command errors
+
+The same command registry is used by CLI and MCP, which keeps agent tooling and human terminal usage aligned.
+
+### Deterministic Authoring Files
+
+Projects contain:
+
+- `rekall.project.json`
+- `Scenes/<scene>.age.scene.json`
+- `Assets/assets.age.catalog.json`
+- `Modules/<ModuleName>/...`
+- `Transactions/transactions.age.json`
+- optional transaction snapshots under `Transactions/Snapshots/<transaction-id>/`
+
+Scenes are made of entities. Entities have ids, names, tags, visibility, transforms, hierarchy, and arbitrary typed components.
+
+### Runtime Snapshot
+
+The runtime builds immutable frame snapshots from scene data and compiled project modules. Runtime systems consume an input frame, advance generic subsystems, emit observations/events, mutate runtime entities, and project renderable records into the viewport contract.
+
+### Rendering Frame
+
+Rendering consumes `RekallAgeRuntimeViewportFrame`: active camera, cameras, renderables, observations, culling diagnostics, stereo settings, post-process stack, and material/mesh/texture metadata. Software capture, Vulkan capture, OpenXR planning, performance budgets, GLB export, and virtual geometry all read from this same projected frame.
+
+## Project and Scene Model
+
+Core authoring concepts:
+
+- A project declares capabilities such as `world`, `rendering3d`, `planet`, or template-specific needs.
+- A scene declares scene capabilities and owns entity documents.
+- Entities are generic data records, not engine-owned game classes.
+- Components are JSON-backed records with typed schemas discovered from built-in modules and compiled project modules.
+- Tags are agent-facing labels for querying and grouping.
+- Scene mutations can be applied one entity at a time or in high-throughput blueprints.
+
+Important world commands:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- project create .age-sandbox "My Game" world,rendering3d
+dotnet run --project src/Rekall.Age.Cli -- scene create .age-sandbox Main world,rendering3d
+dotnet run --project src/Rekall.Age.Cli -- entity create .age-sandbox Main "Player" player,controllable
+dotnet run --project src/Rekall.Age.Cli -- entity inspect .age-sandbox Main <entity-id>
+dotnet run --project src/Rekall.Age.Cli -- component set .age-sandbox Main <entity-id> Rekall.Transform x 42
+dotnet run --project src/Rekall.Age.Cli -- validation scene .age-sandbox Main
+dotnet run --project src/Rekall.Age.Cli -- context summary .age-sandbox
+dotnet run --project src/Rekall.Age.Cli -- context scene .age-sandbox Main
+```
+
+High-throughput agent scene editing is available through MCP command `rekall.scene.apply_blueprint`, and CLI-adjacent level tools include duplication, parenting, prefab creation, prefab instantiation, and grid snapping.
+
+## Built-In Components
+
+Built-in component schemas are provided by `rekall.builtins`. Current built-ins include:
+
+- `Rekall.Transform`
+- `Rekall.InputActionMap`
+- `Rekall.EventBindings`
+- `Rekall.PointerRay`
+- `Rekall.Timer`
+- `Rekall.Camera2D`
+- `Rekall.Camera3D`
+- `Rekall.CameraZoomInput`
+- `Rekall.CameraTarget3D`
+- `Rekall.CameraTargetCycleInput`
+- `Rekall.RenderLayer`
+- `Rekall.XrRig`
+- `Rekall.XrPoseSource`
+- `Rekall.XrController`
+- `Rekall.DirectionalLight`
+- `Rekall.PointLight`
+- `Rekall.MultiplayerSession`
+- `Rekall.NetworkIdentity`
+- `Rekall.NetworkTransform`
+- `Rekall.GeometryPrimitive`
+- `Rekall.GeometryMesh`
+- `Rekall.LineSegments`
+- `Rekall.GeometryExtrusion`
+- `Rekall.Material`
+- `Rekall.ProceduralMaterial`
+- `Rekall.LodGroup`
+- `Rekall.VirtualGeometry`
+- `Rekall.PhysicsWorld3D`
+- `Rekall.PhysicsMaterial3D`
+- `Rekall.Rigidbody3D`
+- `Rekall.Trigger`
+- `Rekall.BoxCollider2D`
+- `Rekall.CircleCollider2D`
+- `Rekall.BoxCollider3D`
+- `Rekall.SphereCollider3D`
+- `Rekall.CapsuleCollider3D`
+- `Rekall.MeshCollider`
+- `Rekall.PlanetRenderer`
+- `Rekall.CloudLayerRenderer`
+- `Rekall.AtmosphereRenderer`
+- `Rekall.CelestialBody`
+- `Rekall.KeplerOrbit`
+- `Rekall.CelestialRotation`
+- `Rekall.OrbitPathRenderer`
+- `Rekall.RingRenderer`
+- `Rekall.StarfieldRenderer`
+- `Rekall.MarkerRenderer`
+- `Rekall.HaloRenderer`
+- `Rekall.PostProcessStack`
+- `Rekall.TextLabelRenderer`
+
+Inspect schemas:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- module schemas
+dotnet run --project src/Rekall.Age.Cli -- module schemas project .age-sandbox
+```
+
+## Command Bus and Transactions
+
+Every CLI or MCP mutation runs inside a transaction. Transactions are persisted project-locally in `Transactions/transactions.age.json` and include:
+
+- transaction id
+- command label
+- source (`cli`, `mcp`, or other host)
+- resource-change summaries
+- relative paths
+- resource kind
+- existence state
+- file size metadata when available
+
+Commands that capture preimages write snapshots under `Transactions/Snapshots/<transaction-id>/`. Use preimage restore to roll back a resource:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- transaction history .age-sandbox
+dotnet run --project src/Rekall.Age.Cli -- transaction restore-preimage .age-sandbox <transaction-id> Scenes/Main.age.scene.json
+```
+
+MCP command results include transaction metadata in structured content so agents can immediately inspect command effects without rereading the whole project.
+
+## MCP Integration
+
+Rekall AGE includes a stdio MCP JSON-RPC adapter:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- mcp stdio
+```
+
+The MCP server supports:
+
+- `initialize`
+- `tools/list`
+- `tools/call`
+
+The MCP tool catalog is generated from the command registry. Tools are categorized by name prefix:
+
+- `rekall.context.*`
+- `rekall.templates.*`
+- `rekall.workflow.*`
+- `rekall.transaction.*`
+- `rekall.render.*`
+- `rekall.shader.*`
+- `rekall.module.*`
+- `rekall.live.*`
+- `rekall.multiplayer.*`
+- `rekall.play*`
+- `rekall.asset.*`
+- `rekall.project.*`
+- `rekall.scene.*`
+- `rekall.entity.*`
+- `rekall.geometry.*`
+- `rekall.planet.*`
+- `rekall.solar.*`
+- `rekall.component.*`
+
+Recommended agent entry points include:
+
+- `rekall.context.engine_status`
+- `rekall.templates.inspect`
+- `rekall.workflow.agent_authoring_gauntlet`
+- `rekall.workflow.create_playable_package_from_template`
+- `rekall.workflow.audit_playable_package`
+- `rekall.scene.apply_blueprint`
+- `rekall.validation.scene`
+- `rekall.render.capture_runtime_viewport`
+- `rekall.render.performance.inspect_scene_budget`
+- `rekall.render.visibility.inspect_scene`
+- `rekall.render.virtual_geometry.inspect_scene`
+- `rekall.render.virtual_geometry.apply_scene`
+- `rekall.render.openxr.bootstrap_session`
+- `rekall.render.openxr.inspect_headset_frame_plan`
+- `rekall.solar.import_ksa_system`
+- `rekall.live.status`
+- `rekall.live.apply_scene_blueprint`
+- `rekall.live.apply_scene_diff`
+- `rekall.module.scaffold_runtime_system`
+- `rekall.module.write_source`
+- `rekall.build.modules`
+- `rekall.multiplayer.snapshot`
+- `rekall.multiplayer.delta`
+
+MCP logging is intentionally kept away from JSON-RPC stdout. By default logs are written under `%LOCALAPPDATA%\Rekall AGE\Mcp\Logs`. Use `REKALL_AGE_MCP_LOG_DIR` or shared `REKALL_AGE_LOG_DIR` to redirect logs for automation.
+
+## CLI Reference
+
+The CLI command shape is:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- <area> <command> ...
+```
+
+Common command groups:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- templates list
+dotnet run --project src/Rekall.Age.Cli -- templates inspect pong
+dotnet run --project src/Rekall.Age.Cli -- templates verify-mvp
+
+dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" pong
+dotnet run --project src/Rekall.Age.Cli -- game create-playable .age-sandbox "Playable Pong" pong
+dotnet run --project src/Rekall.Age.Cli -- game verify-playable .age-sandbox Main 2
+dotnet run --project src/Rekall.Age.Cli -- game package-playable .age-sandbox Main .age-sandbox/Builds/RekallAgePlayer
+dotnet run --project src/Rekall.Age.Cli -- game audit-package .age-sandbox/Builds/RekallAgePlayer.zip .age-sandbox/Artifacts/PackageAudit
+
+dotnet run --project src/Rekall.Age.Cli -- asset import .age-sandbox .\player.png sprite "Player"
+dotnet run --project src/Rekall.Age.Cli -- asset import-report .age-sandbox .\robot.glb model "Robot"
+dotnet run --project src/Rekall.Age.Cli -- asset list .age-sandbox
+
+dotnet run --project src/Rekall.Age.Cli -- module scaffold-runtime-system .age-sandbox game.motion "Game Motion" GameMotion OrbitMotion OrbitMotionSystem
+dotnet run --project src/Rekall.Age.Cli -- module sources .age-sandbox
+dotnet run --project src/Rekall.Age.Cli -- module read-source .age-sandbox GameMotion GameMotionModule.cs
+dotnet run --project src/Rekall.Age.Cli -- module write-source .age-sandbox GameMotion GameMotionModule.cs .\GameMotionModule.cs
+dotnet run --project src/Rekall.Age.Cli -- build modules .age-sandbox
+
+dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
+dotnet run --project src/Rekall.Age.Cli -- play scene .age-sandbox Main 4
+dotnet run --project src/Rekall.Age.Cli -- playtest scene .age-sandbox Main 2 '[{"verticalAxis":1}]' '[{"frameIndex":0,"contains":"Score"}]'
+
+dotnet run --project src/Rekall.Age.Cli -- geometry primitive create .age-sandbox Main "Cube" cube 0 0 0 "#8ab4f8"
+dotnet run --project src/Rekall.Age.Cli -- geometry mesh create .age-sandbox Main "Triangle" '[{"x":0,"y":0,"z":0},{"x":1,"y":0,"z":0},{"x":0,"y":1,"z":0}]' '[0,1,2]'
+dotnet run --project src/Rekall.Age.Cli -- geometry extrusion create .age-sandbox Main "Block" '[{"x":-0.5,"y":-0.5},{"x":0.5,"y":-0.5},{"x":0.5,"y":0.5},{"x":-0.5,"y":0.5}]' 1
+```
+
+CLI logging defaults to `%LOCALAPPDATA%\Rekall AGE\Cli\Logs`. Use `REKALL_AGE_CLI_LOG_DIR` or `REKALL_AGE_LOG_DIR` to redirect logs.
+
+## Agent Authoring Guide
+
+This section is the practical loop for using AI agents with Rekall AGE.
+
+### 1. Inspect Before Editing
+
+Start by asking the engine what it knows:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- context engine
+dotnet run --project src/Rekall.Age.Cli -- context summary <projectRoot>
+dotnet run --project src/Rekall.Age.Cli -- context scene <projectRoot> <sceneName>
+dotnet run --project src/Rekall.Age.Cli -- module schemas
+dotnet run --project src/Rekall.Age.Cli -- validation scene <projectRoot> <sceneName>
+```
+
+Agents should read existing scene/module content before replacing it. Prefer narrow mutations, blueprints, or module source edits over wholesale scene rewrites.
+
+### 2. Author With Generic Data
+
+Good agent-authored game data uses:
+
+- entity names for readability
+- tags for stable group queries
+- generic components for engine-facing behavior
+- project components for game-specific state
+- `Rekall.InputActionMap` for semantic controls
+- `Rekall.EventBindings` for generic event facts
+- `Rekall.Timer`, `Rekall.PointerRay`, colliders, and triggers for reusable runtime facts
+- `Rekall.RenderLayer` and camera culling masks for visibility
+- `Rekall.Material`, `Rekall.ProceduralMaterial`, `Rekall.GeometryMesh`, and `Rekall.GeometryPrimitive` for visual output
+
+Avoid hard-coding one genre into engine core. A door opening, weapon firing, inventory pickup, dialogue trigger, or vehicle controller should be project module behavior.
+
+### 3. Put Game Rules in Runtime Modules
+
+Scaffold a runtime system:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- module scaffold-runtime-system <projectRoot> game.rules "Game Rules" GameRules GameState GameRulesSystem
+```
+
+Then edit module source and build:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- module sources <projectRoot>
+dotnet run --project src/Rekall.Age.Cli -- module read-source <projectRoot> GameRules GameRulesModule.cs
+dotnet run --project src/Rekall.Age.Cli -- module write-source <projectRoot> GameRules GameRulesModule.cs .\GameRulesModule.cs
+dotnet run --project src/Rekall.Age.Cli -- build modules <projectRoot>
+```
+
+Runtime modules implement `IRekallAgeRuntimeModuleSystem`, run during snapshots, and receive frame time/input. Use the engine-provided time step for movement, animation, timers, cooldowns, and simulation.
+
+### 4. Verify With Closed Loops
+
+Use increasingly strong proof loops:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- validation scene <projectRoot> <sceneName>
+dotnet run --project src/Rekall.Age.Cli -- runtime inspect <projectRoot> <sceneName> 3
+dotnet run --project src/Rekall.Age.Cli -- render viewport capture <projectRoot> <sceneName> 3 <artifactDir> 640 360 software
+dotnet run --project src/Rekall.Age.Cli -- render viewport capture <projectRoot> <sceneName> 3 <artifactDir> 640 360 vulkan
+dotnet run --project src/Rekall.Age.Cli -- render performance budget <projectRoot> <sceneName> desktop60 0 1920 1080
+dotnet run --project src/Rekall.Age.Cli -- game verify-playable <projectRoot> <sceneName> 2
+```
+
+For user-facing playable delivery, prefer:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- game gauntlet <projectRoot> "Game Name" <template> <buildDir> <auditDir>
+```
+
+### 5. Emit Observations Instead of Failing Silently
+
+Project modules should emit structured observations when content is missing or inconsistent:
+
+- blocking observation: scene cannot run correctly
+- warning observation: scene runs but likely needs author attention
+- info observation: useful state for agents
+
+Observations appear in runtime inspection, viewport diagnostics, Studio, and command output.
+
+### 6. Use Runtime Diagnostics to Improve Authored Content
+
+If a scene is technically valid but visually weak, inspect:
+
+- active camera
+- renderable counts
+- culling masks
+- render layers
+- frame-analysis warnings
+- layout bounds
+- material/texture resolution
+- performance budget pressure
+
+Then revise ordinary scene data. Do not add a built-in "make this look good" engine feature when better diagnostics and authored transforms/materials/cameras solve the problem.
+
+## Runtime Modules and SDK Helpers
+
+The module SDK is designed to keep agent-authored C# short and generic.
+
+Entity query helpers:
+
+- `FindEntity`
+- `EntitiesNamed`
+- `EntitiesWithTag`
+- `EntitiesWithComponent`
+- `EntitiesWithTagAndComponent`
+
+Mutation helpers:
+
+- `ReplaceEntity`
+- `UpdateEntity`
+- `UpdateEntitiesWithTag`
+- `UpdateEntitiesWithComponent`
+- `UpdateEntitiesWithTagAndComponent`
+- `WithTag`
+- `WithoutTag`
+- `WithVisible`
+- `WithPosition3D`
+- `WithRotation3D`
+- `WithScale3D`
+- `UpsertComponent`
+- `UpdateComponent`
+
+Input helpers:
+
+- `InputActions`
+- `InputActionValue`
+- `IsInputActionDown`
+- `WasInputActionPressed`
+- `WasInputActionReleased`
+
+Camera/vector helpers:
+
+- `Forward3D`
+- `Right3D`
+- `Up3D`
+- `Offset3D`
+
+Event helpers:
+
+- `EventsOfType`
+- `EventsFor`
+- `WasEventRaised`
+- `EmitEvent`
+- `EmitBoundEvents`
+
+Observation helpers:
+
+- `EmitObservation`
+- `EmitSceneObservation`
+- `ObservationsWithCode`
+- `ObservationsWithSeverity`
+- `ObservationsFor`
+- `ObservationsForScene`
+- `HasBlockingObservations`
+
+Multiplayer helpers:
+
+- `NetworkSessions`
+- `PrimaryNetworkSession`
+- `NetworkEntities`
+- `NetworkEntityForEntity`
+- `NetworkEntityByNetworkId`
+- `NetworkEntitiesOwnedBy`
+- `RuntimeEntitiesOwnedBy`
+- `ReplicatedRuntimeEntities`
+- `IsNetworkOwner`
+- `IsReplicated`
+
+Physics/query helpers:
+
+- `Raycast3D`
+- JSON property helpers such as `ReadNumber`, `ReadBoolean`, and `ReadString`
+
+## Input, Events, Timers, Pointers, Collisions, and Triggers
+
+### Semantic Input
+
+`Rekall.InputActionMap` projects raw input into named actions:
+
+```json
+{
+  "type": "Rekall.InputActionMap",
+  "properties": {
+    "active": true,
+    "actions": [
+      { "name": "move.x", "positiveKey": "D", "negativeKey": "A" },
+      { "name": "move.y", "positiveKey": "W", "negativeKey": "S" },
+      { "name": "fire", "button": "Left" },
+      { "name": "zoom", "mouseWheelScale": 0.5 },
+      { "name": "look.x", "mouseAxis": "x", "mouseScale": 0.12 }
+    ]
+  }
+}
+```
+
+Runtime and player input snapshots include keyboard state, mouse buttons, mouse position, mouse delta, mouse wheel, and projected action values. Gameplay modules should consume semantic actions instead of hard-coding raw key folklore.
+
+### Runtime Events
+
+`Rekall.EventBindings` stores generic event subscriptions:
+
+```json
+{
+  "type": "Rekall.EventBindings",
+  "properties": {
+    "events": [
+      { "event": "entity.begin", "handler": "spawn" },
+      { "event": "entity.tick", "handler": "update" },
+      { "event": "pointer.click", "handler": "activate" },
+      { "event": "timer.elapsed", "handler": "cooldownReady" }
+    ]
+  }
+}
+```
+
+The runtime emits facts. Project modules decide what those facts mean.
+
+### Timers
+
+`Rekall.Timer` exposes `timerId`, `durationSeconds`, and `repeat`. The runtime advances timers with frame time, emits `timer.elapsed`, and stores inspectable timer state.
+
+### Pointer Rays
+
+`Rekall.PointerRay` defines a generic ray with origin, direction, range, button, and optional target filters. It emits `pointer.enter`, `pointer.leave`, `pointer.hit`, `pointer.down`, `pointer.up`, and `pointer.click` facts against 3D colliders.
+
+### Collisions and Triggers
+
+3D colliders emit `collision.begin`, `collision.stay`, and `collision.end`. `Rekall.Trigger` emits `trigger.enter`, `trigger.stay`, and `trigger.exit` for non-physical volumes. Pickups, damage, sensors, quests, doors, zones, checkpoints, and prompts remain module-authored behavior.
+
+## Rendering Overview
+
+Rekall AGE rendering starts from runtime viewport frames. A frame contains:
+
+- scene name and frame index
+- active camera
+- all camera records
+- renderables
+- render layer/culling information
+- material and texture references
+- mesh/procedural geometry data
+- stereo settings
+- post-process stack
+- observations
+
+Supported renderable families include:
+
+- sprites
+- cube, sphere, cylinder, cone, and plane primitives
+- custom `Rekall.GeometryMesh` triangle lists
+- `Rekall.GeometryExtrusion`
+- line segments
+- imported GLB meshes
+- planet renderers
+- cloud layers
+- atmosphere shells
+- orbit paths
+- rings
+- starfields
+- markers
+- halos
+- text labels
+
+Rendering tools:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- render backends
+dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport
+dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport 640 360 vulkan
+dotnet run --project src/Rekall.Age.Cli -- render glb export .age-sandbox Main .age-sandbox/Artifacts/Main.glb 0
+```
+
+Viewport captures include frame-analysis diagnostics:
+
+- nonblank status
+- color diversity
+- dominant color ratio
+- luminance statistics
+- warnings such as flat color, one-color domination, low luminance variance, very dark, and near transparency
+
+Viewport layout diagnostics report active camera rect, camera pose, spatial renderable bounds, dominant-axis warnings, flat-axis warnings, and authoring hints.
+
+## Vulkan Renderer
+
+The Vulkan path is the primary native renderer. It includes:
+
+- native Vulkan loader probing
+- physical-device and graphics-queue selection
+- logical-device bootstrap
+- command-pool allocation
+- command-buffer recording
+- queue submission and fence waits
+- host-visible mapped buffers
+- device-local images
+- offscreen render targets
+- image views, render passes, framebuffers, and readback
+- bundled GLSL shader deployment and Shaderc compilation
+- frame uniforms
+- per-draw model push constants
+- color and depth targets
+- indexed draw submission
+- texture and material binding
+- Vulkan scene capture for generated primitives, authored meshes, imported GLB meshes, and planet renderables
+
+Low-level Vulkan diagnostics:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- render vulkan probe
+dotnet run --project src/Rekall.Age.Cli -- render vulkan device bootstrap discrete-gpu
+dotnet run --project src/Rekall.Age.Cli -- render vulkan command-buffer submit-empty discrete-gpu
+dotnet run --project src/Rekall.Age.Cli -- render vulkan buffer create-mapped 256 vertex-buffer discrete-gpu
+dotnet run --project src/Rekall.Age.Cli -- render vulkan image create-bound 64 64 R8G8B8A8_UNorm color-attachment discrete-gpu
+dotnet run --project src/Rekall.Age.Cli -- render vulkan render-target create 128 72 R8G8B8A8_UNorm discrete-gpu
+dotnet run --project src/Rekall.Age.Cli -- render vulkan render-pass read-clear 32 32 R8G8B8A8_UNorm discrete-gpu 0.25 0.5 0.75 1
+dotnet run --project src/Rekall.Age.Cli -- render vulkan render-pass capture-clear 32 32 R8G8B8A8_UNorm discrete-gpu .age-sandbox/Artifacts/Vulkan 0.25 0.5 0.75 1
+```
+
+Backend-neutral render plans:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- render plan create .age-sandbox vulkan NativePreview
+dotnet run --project src/Rekall.Age.Cli -- render resource add .age-sandbox frame-color image R8G8B8A8_UNorm color-attachment,transfer-src
+dotnet run --project src/Rekall.Age.Cli -- render command-buffer record .age-sandbox main graphics '[{"op":"begin-render-pass","label":"frame","arguments":{"target":"frame-color","width":"32","height":"16","preferredDeviceType":"discrete-gpu"}},{"op":"clear","label":"sky","arguments":{"r":"0.25","g":"0.5","b":"0.75","a":"1"}},{"op":"end-render-pass","label":"frame","arguments":{}}]'
+dotnet run --project src/Rekall.Age.Cli -- render plan validate .age-sandbox
+dotnet run --project src/Rekall.Age.Cli -- render plan execute .age-sandbox .age-sandbox/Artifacts/Render
+```
+
+## Materials, Shaders, Procedural Materials, and GLB
+
+### Materials
+
+`Rekall.Material` supports:
+
+- `baseColor`
+- `baseColorTexture`
+- `metallicFactor`
+- `roughnessFactor`
+- `metallicRoughnessTexture`
+- `normalTexture`
+- `normalScale`
+- `occlusionTexture`
+- `occlusionStrength`
+- `emissiveColor`
+- `emissiveTexture`
+- `emissiveStrength`
+
+### Procedural Materials
+
+`Rekall.ProceduralMaterial` generates deterministic PBR texture channels from scene data. Generators include:
+
+- `checker`
+- `stripes`
+- `rings`
+- `noise`
+
+Common properties include `resolution`, `scale`, `seed`, `baseColorA`, `baseColorB`, `metallicFactor`, `roughnessA`, `roughnessB`, `normalStrength`, and `emissiveStrength`.
+
+### Project Shaders
+
+Agents can author GLSL shaders through the command bus and MCP tools:
+
+- `rekall.shader.list`
+- `rekall.shader.read`
+- `rekall.shader.write`
+- `rekall.shader.validate`
+- `rekall.shader.assign_pipeline`
+
+Runtime render meshes can reference `RekallAgeRuntimeRenderShaderPipeline` without requiring new engine-specific component types.
+
+### Geometry Authoring
+
+Agents can create primitives, raw meshes, recipes, and extrusions:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- geometry primitive create .age-sandbox Main "Crystal Orb" sphere -2 1 0 "#33ff66"
+dotnet run --project src/Rekall.Age.Cli -- geometry mesh create .age-sandbox Main "Agent Triangle" '[{"x":0,"y":0,"z":0},{"x":1,"y":0,"z":0},{"x":0,"y":1,"z":0,"r":0,"g":1,"b":0}]' '[0,1,2]' 0 0 0 "#ff6633"
+dotnet run --project src/Rekall.Age.Cli -- geometry extrusion create .age-sandbox Main "Agent Block" '[{"x":-0.5,"y":-0.5},{"x":0.5,"y":-0.5},{"x":0.5,"y":0.5},{"x":-0.5,"y":0.5}]' 1 0 0 0 "#44ccff"
+```
+
+`Rekall.GeometryMesh` vertices support position, optional normals, optional vertex color, and optional UVs. If normals are omitted, the engine infers averaged normals from triangle winding.
+
+### GLB Import and Export
+
+Asset import can inspect GLB scenes, nodes, meshes, materials, images, and animations:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- asset import-report .age-sandbox .\robot.glb model "Robot"
+```
+
+Runtime-renderable scenes can be exported as binary glTF:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- render glb export .age-sandbox Main .age-sandbox/Artifacts/Main.glb 0
+```
+
+The exporter resolves the same runtime snapshot used by viewport capture, writes GLB 2.0 buffers/accessors/materials, embeds texture data when available, and can merge imported GLB nodes, meshes, materials, images, textures, samplers, cameras, skins, animations, and extension declarations into the output.
+
+## Performance Budgets, Render Layers, and Visibility
+
+Performance budget inspection reports:
+
+- entities
+- renderables
+- meshes
+- draw calls
+- estimated draw invocations
+- triangles
+- vertices
+- textures
+- runtime textures
+- asset issues
+- stereo mode
+- multiview status
+- eye count
+- render-target pixels
+- estimated geometry bytes
+- per-layer breakdown
+- camera masks
+- culled renderables
+- virtual geometry reductions
+- blockers, warnings, and recommendations
+
+Profiles:
+
+| Profile | Target | Eyes | Draw invocations | Triangles | Vertices | Textures | Pixels |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `desktop60` | 60 FPS | 1 | 3,000 | 2,000,000 | 1,250,000 | 256 | 8,500,000 |
+| `mobile60` | 60 FPS | 1 | 250 | 150,000 | 100,000 | 64 | 2,500,000 |
+| `vr90` | 90 FPS | 2 | 1,500 | 1,000,000 | 650,000 | 128 | 8,500,000 |
+
+Commands:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- render performance budget .age-sandbox Main desktop60 0 1920 1080
+dotnet run --project src/Rekall.Age.Cli -- render visibility inspect .age-sandbox Main 0
+```
+
+`Rekall.RenderLayer` lets renderables opt into named layers. `Rekall.Camera2D` and `Rekall.Camera3D` have `cullingMask` fields so cameras can include or exclude layers. Visibility inspection helps agents understand why an authored entity is hidden from a given camera.
+
+`Rekall.LodGroup` provides explicit distance LODs that can swap to simpler primitives, alternate mesh assets, alternate texture assets, color overrides, and scale multipliers before batching.
+
+## Virtual Geometry
+
+Rekall AGE includes a near-term CPU-side virtual geometry system inspired by Nanite's broad goal: dense source meshes should not require every source triangle to be submitted every frame.
+
+The current implementation is intentionally conservative:
+
+- It is CPU-side clustered LOD selection in the current Vulkan path.
+- It works on the engine mesh records before batching/upload.
+- It reduces triangle/index/vertex payloads for enabled renderables.
+- It uses source triangle budget and camera distance to choose a LOD level.
+- It preserves the generic authoring contract through `Rekall.VirtualGeometry`.
+- It is not yet GPU mesh-shader clustering, hierarchical visibility, occlusion-driven streaming, or disk-page virtualized geometry.
+
+`Rekall.VirtualGeometry` properties:
+
+```json
+{
+  "type": "Rekall.VirtualGeometry",
+  "properties": {
+    "enabled": true,
+    "targetPixelError": 1.5,
+    "clusterTriangleCount": 128,
+    "maxSelectedTriangles": 12000,
+    "maxLodLevel": 8,
+    "debugMode": "off"
+  }
+}
+```
+
+Selection logic:
+
+- `maxSelectedTriangles` computes a budget-driven LOD level.
+- `targetPixelError` and camera distance compute a distance-driven LOD level.
+- The higher of those levels is clamped by `maxLodLevel`.
+- Triangles are sampled by stride within clusters.
+- Vertex/index buffers are remapped to the selected triangles.
+- Mesh records retain source triangle count and selected LOD for diagnostics.
+
+Inspect virtual geometry:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- render virtual-geometry inspect .age-sandbox Main
+dotnet run --project src/Rekall.Age.Cli -- render virtual-geometry inspect .age-sandbox Main 0 1920 1080
+```
+
+Apply virtual geometry to dense scene entities:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- render virtual-geometry apply .age-sandbox Main 10000 --dry-run
+dotnet run --project src/Rekall.Age.Cli -- render virtual-geometry apply .age-sandbox Main 10000
+```
+
+Apply it to one named entity:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- render virtual-geometry apply-entity .age-sandbox Main Earth 30000 --dry-run
+dotnet run --project src/Rekall.Age.Cli -- render virtual-geometry apply-entity .age-sandbox Main Earth 30000
+```
+
+KSA planet and solar-system importers automatically add `Rekall.VirtualGeometry` to dense planet renderables, including generated surface/atmosphere/cloud renderables where appropriate.
+
+Example result from a detailed Earth scene:
+
+- Overall budget triangles reduced from `634,610` to `567,023`.
+- Virtualized renderables selected `5,577` of `73,164` source triangles.
+- Virtualized renderables reduced `67,587` triangles.
+- Estimated geometry bytes dropped from `23,846,616` to `21,738,564`.
+
+Longer-term direction:
+
+- GPU-first cluster hierarchy
+- mesh shader or task/mesh shader submission where available
+- persistent cluster pages
+- streaming and residency management
+- hierarchical culling
+- debug visualization for selected clusters/pages
+
+That future architecture should still keep the same agent-facing principle: dense geometry is controlled by inspectable scene components and diagnostics, not hidden genre-specific renderer behavior.
+
+## VR and OpenXR
+
+Rekall AGE has OpenXR diagnostics and a Vulkan headset-output planning path.
+
+Important camera fields:
+
+- `Camera3D.stereoMode`: `mono`, `stereo`, `vr`, or `xr`
+- `Camera3D.stereoRenderMode`: `single-pass-multiview`, side-by-side preview, or compatibility modes
+- `Camera3D.interpupillaryDistance`
+- `Camera3D.stereoConvergenceDistance`
+- `Camera3D.xrViewConfiguration`: usually `primary-stereo`
+- `Camera3D.foveatedRendering`
+
+Stereo planning:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- render stereo inspect .age-sandbox Main 0 1920 1080
+```
+
+OpenXR runtime checks:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- render openxr probe
+dotnet run --project src/Rekall.Age.Cli -- render openxr bootstrap-session
+dotnet run --project src/Rekall.Age.Cli -- render openxr frame-plan .age-sandbox Main 0 1920 1080
+```
+
+The headset frame plan checks:
+
+- OpenXR session readiness
+- HMD availability
+- active stereo camera
+- eye count
+- multiview preference
+- shared geometry buffers
+- color/depth swapchain count
+- swapchain array size
+- recommended eye dimensions
+- native Vulkan render target ownership
+- required OpenXR frame-loop calls
+- blockers and warnings
+
+The native OpenXR/Vulkan plan uses:
+
+- OpenXR-created Vulkan instance/device/queue for headset rendering
+- OpenXR color swapchain images
+- engine-owned depth images
+- per-swapchain-image, per-eye views
+- shared scene pipeline
+- compositor-compatible final color layout
+
+Operational note for local SteamVR/OpenXR sessions:
+
+```powershell
+$env:PATH = 'C:\Program Files (x86)\Steam\steamapps\common\SteamVR\bin\win64;' + $env:PATH
+dotnet run --project src\Rekall.Age.Cli -- render openxr bootstrap-session
+```
+
+A good bootstrap reports headset session ready, HMD system available, `XR_KHR_vulkan_enable2`, and two primary-stereo views.
+
+Playable VR should use the windowed player so desktop keyboard/mouse input and OpenXR poses/actions flow into the same generic runtime input stream:
+
+```powershell
+Rekall.Age.Player.Windows.exe <projectRoot> <sceneName> --graphics --backend vulkan --vr
+```
+
+On high-resolution headsets, tune eye size explicitly when needed:
+
+```powershell
+Rekall.Age.Player.Windows.exe <projectRoot> <sceneName> --graphics --backend vulkan --vr --vr-eye-width 1600 --vr-eye-height 1600
+```
+
+The direct OpenXR submitter is a diagnostic/headset-output tool, not the normal playable path:
+
+```powershell
+dotnet run --project src\Rekall.Age.Cli -- render openxr submit-scene <projectRoot> <sceneName> 0 0 0
+```
+
+The first `0` means continuous submission. Width/height `0 0` means use the OpenXR runtime's recommended eye size.
+
+## Planet and Solar-System Rendering
+
+Rekall AGE includes generic components for large astronomical scenes:
+
+- `Rekall.CelestialBody`
+- `Rekall.KeplerOrbit`
+- `Rekall.CelestialRotation`
+- `Rekall.PlanetRenderer`
+- `Rekall.CloudLayerRenderer`
+- `Rekall.AtmosphereRenderer`
+- `Rekall.OrbitPathRenderer`
+- `Rekall.RingRenderer`
+- `Rekall.StarfieldRenderer`
+- `Rekall.MarkerRenderer`
+- `Rekall.HaloRenderer`
+- `Rekall.TextLabelRenderer`
+
+KSA import commands:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- planet import-ksa .age-sandbox Planets <ksaRoot> Earth Gaia
+dotnet run --project src/Rekall.Age.Cli -- solar import-ksa-system .age-sandbox SolarSystem <ksaRoot>
+dotnet run --project src/Rekall.Age.Cli -- solar import-ksa-system .age-sandbox SolarSystem <ksaRoot> SolSystemDense.xml 0.000001 0.00002
+```
+
+The KSA solar importer reads `Content/Core/Astronomicals.xml` plus a system XML such as `SolSystem.xml` or `SolSystemDense.xml`, resolves `LoadFromLibrary` references, copies available diffuse KTX2 assets, and writes generic Rekall components.
+
+Planet rendering features:
+
+- generated sphere meshes with configurable slices/stacks
+- surface texture support
+- PBR material integration
+- emissive stellar bodies
+- automatic point-light behavior for stellar celestial bodies
+- atmosphere shells with Rayleigh/Mie scattering parameters
+- cloud-layer renderers
+- cloud shadows
+- water/specular material support
+- orbit paths for planets and moons
+- moon orbits relative to updated parent planets
+- rings, starfields, markers, halos, and labels
+- virtual geometry on dense generated planet meshes
+
+`Rekall.KeplerOrbit` supports time scale, parent-body nesting, and readable local satellite scaling. Runtime snapshots execute the built-in `runtime.celestial.kepler` system before project-authored gameplay systems.
+
+## Physics and Interaction
+
+Rekall AGE provides generic physics authoring components:
+
+- `Rekall.PhysicsWorld3D`
+- `Rekall.PhysicsMaterial3D`
+- `Rekall.Rigidbody3D`
+- `Rekall.BoxCollider2D`
+- `Rekall.CircleCollider2D`
+- `Rekall.BoxCollider3D`
+- `Rekall.SphereCollider3D`
+- `Rekall.CapsuleCollider3D`
+- `Rekall.MeshCollider`
+- `Rekall.Trigger`
+
+The engine uses physics to produce generic facts and query results. Project modules consume those facts for gameplay. This keeps damage, interaction, inventory, puzzle rules, sensors, and mission logic out of engine core.
+
+## Multiplayer
+
+Multiplayer is component-driven and inspectable.
+
+Core components:
+
+- `Rekall.MultiplayerSession`
+- `Rekall.NetworkIdentity`
+- `Rekall.NetworkTransform`
+
+Runtime helpers let project modules query sessions, network entities, ownership, replication flags, prediction mode, and priority. Authoritative snapshots preserve:
+
+- entity id
+- network id
+- owner client id
+- authority
+- position/rotation/scale values
+- replicate-position/rotation/scale flags
+- prediction mode
+- priority
+
+Snapshot utilities:
+
+- `RekallAgeMultiplayerSnapshotInterpolator`
+- `RekallAgeMultiplayerClientReconciler`
+- `RekallAgeMultiplayerSnapshotApplier`
+- `RekallAgeMultiplayerSnapshotDeltaBuilder`
+
+CLI commands:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- multiplayer host .age-sandbox Main 30
+dotnet run --project src/Rekall.Age.Cli -- multiplayer status .age-sandbox Main
+dotnet run --project src/Rekall.Age.Cli -- multiplayer connect .age-sandbox Main client-a "Client A"
+dotnet run --project src/Rekall.Age.Cli -- multiplayer input .age-sandbox Main client-a 1 ship-1 '{"moveX":1}'
+dotnet run --project src/Rekall.Age.Cli -- multiplayer tick .age-sandbox Main 1
+dotnet run --project src/Rekall.Age.Cli -- multiplayer snapshot .age-sandbox Main
+dotnet run --project src/Rekall.Age.Cli -- multiplayer delta .age-sandbox Main 0
+```
+
+The current runtime provides a tested server-authoritative substrate with local pipe and WebSocket command transports. Production-grade UDP, matchmaking, NAT traversal, interest management, and continuous client snapshot streaming are future layers over the same generic contracts.
+
+## Live Player Editing
+
+The Windows player starts a local named-pipe live-edit server for the loaded project and scene. Agents can target a running player without restarting it.
+
+Live MCP commands:
+
+- `rekall.live.status`
+- `rekall.live.apply_scene_blueprint`
+- `rekall.live.apply_scene_diff`
+- `rekall.live.reload_scene`
+- `rekall.live.reload_assets`
+
+Live editing can:
+
+- inspect session id, pipe name, frame index, entity count, renderable count, scene revision, and asset revision
+- apply generic entity/component blueprints
+- apply upsert/delete/clear scene diffs
+- persist changes to scene storage
+- reload runtime assets
+- refresh player-side GPU texture/material bindings
+
+Mutations are queued onto the player render thread so runtime-world swaps and GPU resource replacement are serialized with rendering.
+
+## Starter Templates and Packaging Workflows
+
+Starter template ids:
 
 - `pong`
 - `breakout`
@@ -82,215 +1161,93 @@ Agents can create these game foundations through the command bus or CLI:
 - `collectathon-3d`
 - `puzzle`
 
-Each template creates a project manifest, `Main` scene, active camera, core render primitives, and starter game-owned entities/components under `Game.Templates.*`; game behavior belongs in project-authored modules, not engine built-ins.
+Each template creates a project manifest, `Main` scene, active camera, starter render primitives, and template-owned example entities/components under `Game.Templates.*`. Game behavior belongs in project-authored modules.
 
-## Agent Authoring Gauntlet
-
-The preferred proof loop for agent-authored playable games is `rekall.workflow.agent_authoring_gauntlet` / `game gauntlet`. It composes existing generic workflow contracts rather than adding runtime gameplay behavior: create a playable template project, verify scene readiness, package the player, audit the package, capture a proof frame, and return recommended next actions.
+Workflow commands:
 
 ```powershell
-dotnet run --project src/Rekall.Age.Cli -- game gauntlet .age-sandbox "Gauntlet Pong" pong .age-sandbox/Builds/GauntletPong .age-sandbox/Artifacts/GauntletAudit
-```
-
-Use this before adding broader engine capability. A failure in the gauntlet should usually improve an inspectable engine contract, diagnostic, SDK helper, workflow command, or example consumer.
-
-## Build
-
-```powershell
-dotnet build Rekall.AGE.sln
-```
-
-## Test
-
-```powershell
-dotnet test Rekall.AGE.sln
-```
-
-## CLI Example
-
-```powershell
-dotnet run --project src/Rekall.Age.Cli -- templates list
-dotnet run --project src/Rekall.Age.Cli -- mcp stdio
-dotnet run --project src/Rekall.Age.Cli -- render backends
-dotnet run --project src/Rekall.Age.Cli -- render vulkan probe
-dotnet run --project src/Rekall.Age.Cli -- render vulkan device bootstrap discrete-gpu
-dotnet run --project src/Rekall.Age.Cli -- render vulkan command-buffer submit-empty discrete-gpu
-dotnet run --project src/Rekall.Age.Cli -- render vulkan buffer create-mapped 256 vertex-buffer discrete-gpu
-dotnet run --project src/Rekall.Age.Cli -- render vulkan image create-bound 64 64 R8G8B8A8_UNorm color-attachment discrete-gpu
-dotnet run --project src/Rekall.Age.Cli -- render vulkan render-target create 128 72 R8G8B8A8_UNorm discrete-gpu
-dotnet run --project src/Rekall.Age.Cli -- render vulkan render-pass read-clear 32 32 R8G8B8A8_UNorm discrete-gpu 0.25 0.5 0.75 1
-dotnet run --project src/Rekall.Age.Cli -- render vulkan render-pass capture-clear 32 32 R8G8B8A8_UNorm discrete-gpu .age-sandbox/Artifacts/Vulkan 0.25 0.5 0.75 1
-dotnet run --project src/Rekall.Age.Cli -- render plan create .age-sandbox software Preview
-dotnet run --project src/Rekall.Age.Cli -- render resource add .age-sandbox preview-color image R8G8B8A8_UNorm color-attachment
-dotnet run --project src/Rekall.Age.Cli -- render command-buffer record .age-sandbox main graphics '[{"op":"begin-render-pass","label":"preview","arguments":{"target":"preview-color"}},{"op":"draw-rect","label":"agent-rect","arguments":{"x":"8","y":"8","width":"24","height":"16","color":"#ffcc33"}},{"op":"end-render-pass","label":"preview","arguments":{}}]'
-dotnet run --project src/Rekall.Age.Cli -- render plan validate .age-sandbox
-dotnet run --project src/Rekall.Age.Cli -- render plan execute .age-sandbox .age-sandbox/Artifacts/Render
-dotnet run --project src/Rekall.Age.Cli -- render plan create .age-sandbox vulkan NativePreview
-dotnet run --project src/Rekall.Age.Cli -- render resource add .age-sandbox frame-color image R8G8B8A8_UNorm color-attachment,transfer-src
-dotnet run --project src/Rekall.Age.Cli -- render command-buffer record .age-sandbox main graphics '[{"op":"begin-render-pass","label":"frame","arguments":{"target":"frame-color","width":"32","height":"16","preferredDeviceType":"discrete-gpu"}},{"op":"clear","label":"sky","arguments":{"r":"0.25","g":"0.5","b":"0.75","a":"1"}},{"op":"end-render-pass","label":"frame","arguments":{}}]'
-dotnet run --project src/Rekall.Age.Cli -- render plan execute .age-sandbox .age-sandbox/Artifacts/Render
-dotnet run --project src/Rekall.Age.Cli -- module schemas
-dotnet run --project src/Rekall.Age.Cli -- templates inspect pong
-dotnet run --project src/Rekall.Age.Cli -- templates verify-mvp
 dotnet run --project src/Rekall.Age.Cli -- game create .age-sandbox "Crystal Mines" pong
 dotnet run --project src/Rekall.Age.Cli -- game create-playable .age-sandbox "Playable Pong" pong
 dotnet run --project src/Rekall.Age.Cli -- game create-package-playable .age-sandbox "Packaged Pong" pong .age-sandbox/Builds/RekallAgePlayer .age-sandbox/Artifacts/PackageFrames
-dotnet run --project src/Rekall.Age.Cli -- game verify-playable .age-sandbox Main 2 '[{"frameIndex":0,"contains":"PONG"}]'
+dotnet run --project src/Rekall.Age.Cli -- game verify-playable .age-sandbox Main 2
 dotnet run --project src/Rekall.Age.Cli -- game package-playable .age-sandbox Main .age-sandbox/Builds/RekallAgePlayer
 dotnet run --project src/Rekall.Age.Cli -- game inspect-package .age-sandbox/Builds/RekallAgePlayer.zip
 dotnet run --project src/Rekall.Age.Cli -- game run-package .age-sandbox/Builds/RekallAgePlayer.zip 2
 dotnet run --project src/Rekall.Age.Cli -- game capture-package-frame .age-sandbox/Builds/RekallAgePlayer.zip .age-sandbox/Artifacts/PackageFrames 1
 dotnet run --project src/Rekall.Age.Cli -- game audit-package .age-sandbox/Builds/RekallAgePlayer.zip .age-sandbox/Artifacts/PackageAudit
-dotnet run --project src/Rekall.Age.Cli -- asset import .age-sandbox .\player.png sprite "Player Ship"
-dotnet run --project src/Rekall.Age.Cli -- asset import-report .age-sandbox .\robot.glb model "Robot"
-dotnet run --project src/Rekall.Age.Cli -- asset list .age-sandbox
-dotnet run --project src/Rekall.Age.Cli -- module scaffold-playable .age-sandbox crystal.playable "Crystal Playable" CrystalPlayable crystal
-dotnet run --project src/Rekall.Age.Cli -- module scaffold-runtime-system .age-sandbox game.motion "Game Motion" GameMotion OrbitMotion OrbitMotionSystem
-dotnet run --project src/Rekall.Age.Cli -- module sources .age-sandbox
-dotnet run --project src/Rekall.Age.Cli -- module read-source .age-sandbox CrystalPlayable CrystalPlayableModule.cs
-dotnet run --project src/Rekall.Age.Cli -- module write-source .age-sandbox CrystalPlayable CrystalPlayableModule.cs .\CrystalPlayableModule.cs
-dotnet run --project src/Rekall.Age.Cli -- build modules .age-sandbox
-dotnet run --project src/Rekall.Age.Cli -- module schemas project .age-sandbox
-dotnet run --project src/Rekall.Age.Cli -- context engine
-dotnet run --project src/Rekall.Age.Cli -- context summary .age-sandbox
-dotnet run --project src/Rekall.Age.Cli -- context scene .age-sandbox Main
-dotnet run --project src/Rekall.Age.Cli -- transaction history .age-sandbox
-dotnet run --project src/Rekall.Age.Cli -- transaction restore-preimage .age-sandbox <transaction-id> Scenes/Main.age.scene.json
-dotnet run --project src/Rekall.Age.Cli -- entity inspect .age-sandbox Main <entity-id>
-dotnet run --project src/Rekall.Age.Cli -- component set .age-sandbox Main <entity-id> Rekall.Transform x 42
-dotnet run --project src/Rekall.Age.Cli -- play scene .age-sandbox Main 4
-dotnet run --project src/Rekall.Age.Cli -- play scene .age-sandbox Main 2 '[{"verticalAxis":1,"primaryAction":true},{"verticalAxis":-1}]'
-dotnet run --project src/Rekall.Age.Cli -- playtest scene .age-sandbox Main 2 '[{"verticalAxis":1,"primaryAction":true},{"verticalAxis":-1}]' '[{"frameIndex":0,"contains":"Score 10"},{"frameIndex":1,"contains":"Left paddle lane 0"}]'
-dotnet run --project src/Rekall.Age.Cli -- build player .age-sandbox Main
-dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main
-dotnet run --project src/Rekall.Age.Player -- .age-sandbox Main --frames 2 --inputs '[{"verticalAxis":1,"primaryAction":true},{"verticalAxis":-1}]'
-dotnet run --project src/Rekall.Age.Cli -- run scene .age-sandbox Main 0.1
-dotnet run --project src/Rekall.Age.Cli -- run scene .age-sandbox Main 0.016 '[{"pressedKeys":["W"],"pressedKeysThisFrame":["W"]}]'
-dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
-dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 1 '[{"pressedKeys":["W"],"pressedKeysThisFrame":["W"],"mouseWheelDelta":1}]'
-dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport
-dotnet run --project src/Rekall.Age.Cli -- capture screenshot .age-sandbox Main
 ```
 
-## Workbench Foundation
+The preferred closed loop is `rekall.workflow.agent_authoring_gauntlet` / `game gauntlet`: create, verify, package, audit, capture a proof frame, and report next actions.
 
-The production workbench slice adds editor-facing read models, level-design workflows, asset pipeline reports, and a first Windows desktop Studio shell.
+## Studio and Workbench Foundation
+
+Studio is the desktop workbench shell:
 
 ```powershell
-dotnet run --project src/Rekall.Age.Cli -- studio open .age-sandbox Main
-dotnet run --project src/Rekall.Age.Cli -- asset import-report .age-sandbox .\player.png sprite "Player"
-dotnet run --project src/Rekall.Age.Cli -- level entity duplicate .age-sandbox Main <entity-id> "Player Copy"
-dotnet run --project src/Rekall.Age.Cli -- level prefab create .age-sandbox Main <entity-id> PlayerPrefab
-dotnet run --project src/Rekall.Age.Cli -- level prefab instantiate .age-sandbox Main <prefab-id> "Prefab Player"
-dotnet run --project src/Rekall.Age.Cli -- level entity snap .age-sandbox Main <entity-id> 1
-dotnet run --project src/Rekall.Age.Cli -- geometry primitive create .age-sandbox Main "Crystal Orb" sphere -2 1 0 "#33ff66"
-dotnet run --project src/Rekall.Age.Cli -- geometry mesh create .age-sandbox Main "Agent Triangle" '[{"x":0,"y":0,"z":0},{"x":1,"y":0,"z":0},{"x":0,"y":1,"z":0,"r":0,"g":1,"b":0}]' '[0,1,2]' 0 0 0 "#ff6633"
-dotnet run --project src/Rekall.Age.Cli -- geometry extrusion create .age-sandbox Main "Agent Block" '[{"x":-0.5,"y":-0.5},{"x":0.5,"y":-0.5},{"x":0.5,"y":0.5},{"x":-0.5,"y":0.5}]' 1 0 0 0 "#44ccff"
 dotnet run --project src/Rekall.Age.Studio -- --project .age-sandbox --scene Main
 ```
 
-Studio writes Serilog diagnostics and unhandled exception details to daily rolling files under `%LOCALAPPDATA%\Rekall AGE\Studio\Logs`. Startup project-load failures are logged there and shown in the workbench as a validation status instead of a raw WPF exception dialog.
+The current workbench foundation includes editor-facing read models, level-design workflows, asset pipeline reports, validation status, and startup/error logging. Studio logs are written under `%LOCALAPPDATA%\Rekall AGE\Studio\Logs`.
 
-The CLI writes handled command failures and unexpected exceptions under `%LOCALAPPDATA%\Rekall AGE\Cli\Logs`; `mcp stdio` writes protocol and tool-call diagnostics under `%LOCALAPPDATA%\Rekall AGE\Mcp\Logs` without polluting JSON-RPC stdout. Set `REKALL_AGE_CLI_LOG_DIR`, `REKALL_AGE_MCP_LOG_DIR`, or the shared `REKALL_AGE_LOG_DIR` to redirect those logs during tests or automation.
-
-Successful CLI and MCP mutations persist project-local transaction history in `Transactions/transactions.age.json`. Studio, workbench read models, and the `rekall.transaction.history` command load that log so agents and humans can inspect recent command effects after the original command context has ended. Each persisted transaction includes structured resource-change summaries with relative paths, resource kinds, existence state, and file sizes when available. Dynamic command and MCP tool-call results include the same transaction and resource-change metadata immediately in `structuredContent.transaction`. Mutations that capture preimages write before-change snapshots under `Transactions/Snapshots/<transaction-id>/`; `rekall.transaction.restore_preimage` restores a selected resource from one of those snapshots while capturing the current file as the new transaction preimage.
-
-## Scene Runtime Foundation
-
-Inspect a deterministic runtime snapshot without mutating authoring files:
+Workbench and level design commands:
 
 ```powershell
-dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
-dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 1 '[{"pressedKeys":["W"],"pressedKeysThisFrame":["W"]}]'
+dotnet run --project src/Rekall.Age.Cli -- studio open .age-sandbox Main
+dotnet run --project src/Rekall.Age.Cli -- level entity duplicate .age-sandbox Main <entity-id> "Player Copy"
+dotnet run --project src/Rekall.Age.Cli -- level entity parent .age-sandbox Main <entity-id> <parent-id>
+dotnet run --project src/Rekall.Age.Cli -- level prefab create .age-sandbox Main <entity-id> PlayerPrefab
+dotnet run --project src/Rekall.Age.Cli -- level prefab instantiate .age-sandbox Main <prefab-id> "Prefab Player"
+dotnet run --project src/Rekall.Age.Cli -- level entity snap .age-sandbox Main <entity-id> 1
 ```
 
-The command reports entity counts, renderable counts, physics/audio/animation/UI readiness, projected input actions, and structured runtime observations for agents and Studio. The optional final JSON argument is a per-frame array of runtime input frames, with fields such as `pressedKeys`, `pressedKeysThisFrame`, `releasedKeysThisFrame`, `pressedButtons`, `mouseX`, `mouseY`, `mouseDeltaX`, `mouseDeltaY`, and `mouseWheelDelta`; the argument can also be a path to a JSON file.
+## Testing and Verification
 
-## Runtime Viewport Capture
-
-Capture a deterministic viewport PNG from the same runtime snapshot used by inspection and Studio metadata:
+Run all tests:
 
 ```powershell
-dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport
-dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport 320 180 vulkan
+dotnet test Rekall.AGE.sln
 ```
 
-The command writes `Main_runtime_003.png` and reports the active camera, frame index, renderable kinds, asset-backed renderable count, fallback renderable count, and runtime observation count.
+Useful focused runs:
 
-`Rekall.Camera2D` and `Rekall.Camera3D` are core configurable camera components. They remain plain entity components so project modules can drive them like any other authored data. Runtime rendering carries active state, projection mode, field of view, orthographic size, near/far clip distances, clear color, and transform into the viewport frame; Vulkan scene capture consumes those camera settings for view/projection, while software and Vulkan clear captures honor the active camera clear color. `Rekall.CameraTarget3D` can be added to a camera entity to follow and/or look at any target entity by id, name, or tag with configurable camera and target offsets. `Rekall.CameraZoomInput` can be added to a camera entity to opt into mouse-wheel zoom with configurable speed, orthographic/FOV clamps, and inverted-wheel behavior. The default runtime applies these after orbit, physics, and project-authored motion systems so the camera sees the final frame state.
-
-Runtime modules can use the generic camera-basis SDK helpers `Forward3D`, `Right3D`, `Up3D`, and `Offset3D` on `RekallAgeRuntimeTransform` to move cameras, weapons, reticles, and attached objects with the same Euler convention consumed by the renderer. This avoids agents guessing pitch/yaw signs or hand-rolling camera basis math.
-
-`Rekall.InputActionMap` is the core semantic input component. Its `actions` property is an array of arbitrary named bindings such as `{ "name": "thrust", "key": "W" }`, `{ "name": "move.x", "positiveKey": "D", "negativeKey": "A" }`, `{ "name": "fire", "button": "Left" }`, `{ "name": "zoom", "mouseWheelScale": 0.5 }`, or `{ "name": "look.x", "mouseAxis": "x", "mouseScale": 0.12 }`. The Windows Vulkan player captures keyboard state, mouse button state, mouse position/delta, and wheel movement from Veldrid. The default runtime projects authored action maps into `world.Subsystems.Input.Actions` with `value`, `isDown`, `wasPressed`, and `wasReleased`. Engine systems and project-authored module systems can read raw per-frame input from `RekallAgeRuntimeWorldFrameContext.Input` and `RekallAgeRuntimeModuleFrameContext.Input`, but agent-authored gameplay should prefer module SDK helpers such as `world.InputActionValue("move.x")`, `world.IsInputActionDown("fire")`, and `world.WasInputActionPressed("interact")` so key meanings remain inspectable scene data. Genre behavior belongs in agent-authored modules; the engine input layer stays generic.
-
-Runtime entities carry generic tags and components as first-class authoring data. Project-authored modules can query them through SDK helpers such as `world.FindEntity("player")`, `world.EntitiesNamed("Door")`, `world.EntitiesWithTag("enemy")`, `world.EntitiesWithComponent("Game.Health")`, and `world.EntitiesWithTagAndComponent("interactable", "Game.Locked")`. Query results are deterministic, so AI agents can coordinate arbitrary game logic around authored labels and component contracts without requiring engine-owned gameplay classes. Modules can also apply ordinary entity mutations through helpers such as `world.ReplaceEntity(entity)`, `world.UpdateEntity("player", entity => entity.WithTag("selected"))`, `world.UpdateEntitiesWithTag("enemy", entity => entity.WithVisible(false))`, and `world.UpdateEntitiesWithComponent("Game.Health", entity => entity.WithoutTag("active"))`, keeping runtime systems concise while preserving immutable world updates.
-
-Project-authored modules can emit structured runtime diagnostics with SDK helpers such as `world.EmitObservation(entity, "GAME_LOCKED_DOOR_NO_KEY", "warning", "gameplay", "DoorSystem", "Door is locked but no key entity was authored.")` and `world.EmitSceneObservation("GAME_NO_SPAWN_POINTS", "blocking", "gameplay", "SpawnSystem", "No spawn points were authored.")`. Observations flow through runtime inspection, Studio, and viewport diagnostics alongside built-in engine observations; modules can query them with `world.ObservationsWithCode(...)`, `world.ObservationsFor(entity.Id)`, `world.ObservationsWithSeverity(...)`, `world.ObservationsForScene()`, and `world.HasBlockingObservations()`. This gives agents a shared way to explain missing or inconsistent authored content without hard-coding gameplay validation into engine core.
-
-Multiplayer authoring remains component-driven and inspectable. `Rekall.MultiplayerSession`, `Rekall.NetworkIdentity`, and `Rekall.NetworkTransform` project into `world.Subsystems.Multiplayer`, while module SDK helpers such as `world.NetworkSessions()`, `world.PrimaryNetworkSession()`, `world.NetworkEntities()`, `world.NetworkEntityForEntity(entity.Id)`, `world.NetworkEntityByNetworkId("ship-1")`, `world.NetworkEntitiesOwnedBy("client-a")`, `world.RuntimeEntitiesOwnedBy("client-a")`, `world.ReplicatedRuntimeEntities()`, `world.IsNetworkOwner(entity, "client-a")`, and `networkEntity.IsReplicated()` let agents coordinate ownership, prediction, replication, and diagnostics without binding engine core to a specific multiplayer genre. Authoritative snapshots carry each network entity's transform plus authority, replicate-position/rotation/scale flags, prediction mode, and priority; interpolation keeps blended transform values while using the newer authoritative metadata. `RekallAgeMultiplayerSnapshotApplier.Apply(world, snapshot)` can apply a server snapshot to a client runtime world while respecting those replicate flags and advancing the client's frame/time to the authoritative tick. `RekallAgeMultiplayerSnapshotDeltaBuilder.Build(previous, next)` and `.Apply(previous, delta)` provide a generic changed/removed-entity delta primitive; running sessions expose the same primitive through the `rekall.multiplayer.delta` command and `multiplayer delta <root> <scene> <fromServerTick>` CLI path. The current runtime provides a tested server-authoritative substrate with local pipe and WebSocket command transports; production-grade UDP, lobbies, matchmaking, NAT traversal, interest management, and continuous client snapshot streaming are future layers over the same generic contracts.
-
-`Rekall.EventBindings` is the core runtime event component. Its `events` property is an array of generic bindings such as `{ "event": "entity.begin", "handler": "spawnEncounter" }`, `{ "event": "entity.tick", "handler": "patrol" }`, `{ "event": "timer.elapsed", "handler": "spawnWave" }`, or `{ "event": "pointer.click", "handler": "activate" }`. The runtime emits matching facts into `world.Subsystems.Events.Events` with frame, type, entity, source, handler, and payload data; project-authored modules can query them with SDK helpers such as `world.EventsOfType("entity.tick")`, `world.EventsFor(entity.Id)`, and `world.WasEventRaised(entity.Id, "entity.begin")`. Modules can also emit arbitrary custom facts with `world.EmitEvent(entity, "quest.started", "game.quest", "beginIntro")` or emit only matching authored bindings with `world.EmitBoundEvents(entity, "score.changed", "game.score", payload)`. These are agent-facing signals rather than engine-owned gameplay methods, so agents can implement arbitrary behavior behind handler names. Runtime inspection also reports `eventCount` and the current frame's events so agents can verify bindings without writing custom module code.
-
-`Rekall.PointerRay` is the core interaction-ray component. Agents can attach it to any visible entity and author a world-space ray with `pointerId`, `originX/Y/Z`, `directionX/Y/Z`, `range`, `button`, and optional `targetTag` or `targetComponentType` filters. The default runtime tests that ray against 3D colliders and emits bound target events such as `pointer.enter`, `pointer.leave`, `pointer.hit`, `pointer.down`, `pointer.up`, and `pointer.click`; it also stores inspectable `Rekall.PointerState` with the current hovered/pressed entity ids. This gives mouse, gaze, XR hand, editor tool, menu, and game-specific interaction modules a shared primitive without baking any one control scheme into the engine.
-
-`Rekall.Timer` is the core runtime clock component. Agents can author a `timerId`, `durationSeconds`, and `repeat` flag on any visible entity; the runtime advances it during fixed-step simulation, emits `timer.elapsed` when the duration is reached, and stores inspectable `Rekall.TimerState` with elapsed seconds and completion count. This covers cooldowns, spawn pacing, delayed quest beats, animation cues, periodic sensors, and other timing needs without engine-owned behavior.
-
-The default runtime also emits generic 3D collision facts after physics has updated entity transforms. Entities with 3D colliders can bind `collision.begin`, `collision.stay`, and `collision.end` through `Rekall.EventBindings`; the event payload names the other entity and collider types. The runtime stores inspectable `Rekall.CollisionState` overlap ids on collider entities so begin/stay/end can be derived deterministically across frames. Damage, pickups, triggers, landing, area rules, sensors, and puzzle behavior stay in agent-authored modules that consume those facts.
-
-`Rekall.Trigger` is the core non-physical volume component for area facts. Agents can author sphere or box trigger volumes with `shape`, `radius`, `width`, `height`, `depth`, and optional `targetTag` or `targetComponentType` filters. The runtime emits `trigger.enter`, `trigger.stay`, and `trigger.exit` on the trigger entity and stores inspectable `Rekall.TriggerState` occupant ids. This keeps zones, sensors, checkpoints, quest areas, dialogue regions, proximity prompts, and other area semantics as agent-authored behavior over generic facts.
-
-Viewport capture results include frame-analysis diagnostics so agents can distinguish a technically nonblank capture from a useful visual proof. The analysis reports color diversity, dominant-color ratio, luminance statistics, and warning codes such as `REKALL_VIEWPORT_FLAT_COLOR`, `REKALL_VIEWPORT_DOMINATED_BY_ONE_COLOR`, `REKALL_VIEWPORT_LOW_LUMINANCE_VARIANCE`, `REKALL_VIEWPORT_VERY_DARK`, and `REKALL_VIEWPORT_NEARLY_TRANSPARENT`.
-
-Viewport capture also returns generic layout diagnostics derived from the runtime frame, including the active camera pixel rect and pose, spatial renderable world bounds, dominant-axis warnings such as `REKALL_VIEWPORT_LAYOUT_X_DOMINATES`, flat-axis warnings such as `REKALL_VIEWPORT_LAYOUT_FLAT_Y`, and authoring hints. These diagnostics are intentionally content-agnostic: agents should use them to revise ordinary scene blueprints, transforms, cameras, and renderables instead of asking the engine for a game-specific composition path.
-
-The default viewport backend is `software`, which is CPU rasterized. Passing `vulkan` requests native Vulkan capture. Empty runtime frames use the native clear-pass/readback path and report the selected device. Generated primitive mesh scenes and authored `Rekall.GeometryMesh` triangle meshes use native offscreen Vulkan scene rendering: Rekall AGE ships the bundled GLSL shaders beside the rendering assembly, compiles them with Shaderc, creates color and depth targets, uploads local-space vertex/index/uniform buffers, propagates active camera transforms into the view-projection uniform, binds per-mesh model matrices through push constants, submits indexed draw calls, copies the color image to a host buffer, and writes the captured PNG. Vulkan materials support base color, normal, metallic-roughness, occlusion, and emissive texture/factor inputs. Unsupported renderable kinds, such as sprites and imported mesh assets, fail with structured diagnostics instead of falling back silently.
-
-If a sprite renderable references an imported PNG asset, the software viewport draws that PNG into the frame. Missing or unsupported sprite assets fall back to deterministic markers and are reported in the command output.
-
-Primitive mesh renderables, including `rekall.primitive.cube`, and authored `Rekall.GeometryMesh` triangle lists are projected into the software viewport as shaded geometry. `Rekall.DirectionalLight` entities contribute deterministic directional lighting from their `Rekall.Transform3D` rotation and `intensity` value. `Rekall.TransformAnimation` can apply `pitchDegreesPerSecond`, `yawDegreesPerSecond`, and `rollDegreesPerSecond` during runtime frame simulation before capture.
-
-Agents can author renderable 3D geometry through `rekall.geometry.create_primitive` / `geometry primitive create`. Supported primitives are `cube`, `sphere`, `cylinder`, `cone`, and `plane`; the command writes `Rekall.Transform3D`, `Rekall.GeometryPrimitive`, and `Rekall.MeshRenderer` components so the same runtime viewport capture path can render the object immediately.
-
-For high-throughput world creation over MCP, agents can use `rekall.scene.apply_blueprint` to apply many generic entities and components to a scene in one transaction, optionally clearing existing scene entities first. `rekall.entity.delete` removes one authored entity during iteration without requiring a full scene rewrite.
-
-Agents can import Kitten Space Agency astronomical data through `rekall.solar.import_ksa_system` / `solar import-ksa-system <projectRoot> <sceneName> <ksaRoot> [systemFileName] [distanceScale] [radiusScale]`. The importer reads `Content/Core/Astronomicals.xml` plus a KSA system XML such as `SolSystem.xml` or `SolSystemDense.xml`, resolves `LoadFromLibrary` references, copies available diffuse KTX2 texture assets, and writes generic `Rekall.CelestialBody`, `Rekall.KeplerOrbit`, `Rekall.OrbitPathRenderer`, `Rekall.PlanetRenderer`, `Rekall.AtmosphereRenderer`, `Rekall.Material`, `Rekall.Transform3D`, camera, and light entities. Stellar bodies receive emissive material settings and point-light behavior by default; runtime projection also treats visible `Rekall.CelestialBody` entities with a stellar `type` as point lights when no explicit light component exists. Sol is normalized to a warm orange-yellow display/emissive color. Runtime snapshots run the built-in `runtime.celestial.kepler` system before project-authored gameplay systems so solar-system scenes can use real orbital elements while custom launch, travel, navigation, UI, and mission logic remains project module code. `Rekall.KeplerOrbit` supports `timeScale`, parent-body nesting, and readable local satellite scaling, so moons orbit their updated planets in the same frame instead of lagging behind or collapsing into the scaled planet mesh. `Rekall.OrbitPathRenderer` generates emissive orbit-path geometry for any Kepler body, including moon orbits around planets.
-
-`Rekall.Material` is the generic render material component for mesh-like entities. It can override `baseColor`, `baseColorTexture`, `metallicFactor`, `roughnessFactor`, `metallicRoughnessTexture`, `normalTexture`, `normalScale`, `occlusionTexture`, `occlusionStrength`, `emissiveColor`, `emissiveTexture`, and `emissiveStrength`. This keeps special cases like glowing suns, lamps, engine trails, screens, and magic effects in ordinary agent-authored entity data rather than in game-specific engine code.
-
-`Rekall.ProceduralMaterial` is the generic runtime procedural material component. Agents can add it beside any mesh-like renderer to generate deterministic PBR texture channels without importing image assets. Supported generators are `checker`, `stripes`, `rings`, and `noise`, with `resolution`, `scale`, `seed`, `baseColorA`, `baseColorB`, `metallicFactor`, `roughnessA`, `roughnessB`, `normalStrength`, and `emissiveStrength` properties. Explicit texture asset references on `Rekall.Material` still win per channel, so authored content can mix imported base-color textures with procedural metallic-roughness, normal, or emissive channels.
-
-## Live Player Editing
-
-The Windows player starts a local named-pipe live-edit server for the loaded project and scene. MCP agents can target that running session without restarting the player:
-
-- `rekall.live.status` reports the session id, pipe name, frame index, entity/renderable counts, and scene/asset revisions.
-- `rekall.live.apply_scene_blueprint` applies generic entity/component blueprints to the running player, optionally persists them to scene storage, and can reload runtime assets in the same request.
-- `rekall.live.apply_scene_diff` applies generic upsert/delete/clear scene diffs to the running player, optionally persists them to scene storage, and can reload runtime assets in the same request.
-- `rekall.live.reload_scene` reloads the scene document from disk and rebuilds the runtime world.
-- `rekall.live.reload_assets` resolves the current runtime frame's assets again and recreates player-side GPU texture/material bindings.
-
-The default pipe name is deterministic for `<projectRoot, sceneName>`, so tools only need the project root and scene name while the player is open. Advanced callers can pass `pipeName` explicitly when they need to target a particular session. Mutations are queued onto the player render thread before being applied, which keeps GPU resource replacement and runtime-world swaps serialized with rendering. The player also watches the project `Assets` tree and debounces filesystem changes into an automatic asset/GPU-binding reload.
-
-Agents can also author arbitrary triangle meshes through `rekall.geometry.create_mesh` / `geometry mesh create`, or directly with a `Rekall.GeometryMesh` component. The runtime frame contract carries the parsed vertex/index payload into the Vulkan scene renderer. Vertices support `x`, `y`, `z`, optional normals through `nx`, `ny`, `nz`, optional vertex color through `r`, `g`, `b`, `a`, and optional `u`, `v` texture coordinates. Indices are 16-bit triangle-list indices. If normals are omitted, Rekall AGE infers averaged per-vertex normals from the triangle winding so simple generated meshes still light correctly.
-
-For higher-level modeling, agents can use `rekall.geometry.create_extrusion` / `geometry extrusion create` with a 2D profile and depth. The command generates a closed hard-edged mesh with front/back caps and side faces, writes editable `Rekall.GeometryExtrusion` source metadata, and emits the renderable `Rekall.GeometryMesh` payload used by both software and Vulkan viewport capture.
-
-Runtime-renderable 3D scenes can be exported as binary glTF through `rekall.render.export_scene_glb` / `render glb export <projectRoot> <sceneName> <output.glb> [frames]`. The exporter resolves the same runtime snapshot used by viewport capture, converts supported engine-authored mesh renderables through the engine mesh builder, and writes a GLB 2.0 file with embedded binary buffers, node transforms, mesh accessors for `POSITION`, `NORMAL`, `TEXCOORD_0`, and `COLOR_0`, triangle indices, PBR base-color materials, and embedded PNG/JPEG base-color textures when a mesh or primitive component references an imported image asset through `textureAssetId` or `texture`. Mesh renderables that reference imported `.glb` model assets are merged into the exported scene with their source nodes, meshes, materials, material-extension texture references, images, textures, samplers, cameras, skins, animations, and extension declarations reindexed into the output, then wrapped by the engine entity transform.
-
-```json
-{
-  "type": "Rekall.GeometryMesh",
-  "properties": {
-    "color": "#ff6633",
-    "textureAssetId": "asset_paint_0123abcd",
-    "vertices": [
-      { "x": 0, "y": 0, "z": 0, "nx": 0, "ny": 0, "nz": 1 },
-      { "x": 1, "y": 0, "z": 0 },
-      { "x": 0, "y": 1, "z": 0, "r": 0, "g": 1, "b": 0, "a": 1 }
-    ],
-    "indices": [0, 1, 2]
-  }
-}
+```powershell
+dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter VirtualGeometry
+dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter "FullyQualifiedName~Rendering|FullyQualifiedName~Cli"
+dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter "FullyQualifiedName~Runtime"
 ```
 
-Compiled project modules can also register `IRekallAgeRuntimeModuleSystem` implementations through `RekallAgeModuleBuilder.RegisterRuntimeSystem<T>()`. Runtime inspection and viewport capture load built project modules, run those systems during fixed-frame simulation, and expose the executed system IDs in runtime inspection output.
+Recommended manual verification for rendering changes:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- render vulkan probe
+dotnet run --project src/Rekall.Age.Cli -- render viewport capture Examples\VulkanCubeProbe Main 0 .age-artifacts 640 360 vulkan
+dotnet run --project src/Rekall.Age.Cli -- render performance budget Examples\VulkanCubeProbe Main desktop60 0 640 360
+```
+
+Recommended manual verification for agent-authored games:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- game gauntlet .age-sandbox "Gauntlet Pong" pong .age-sandbox/Builds/GauntletPong .age-sandbox/Artifacts/GauntletAudit
+```
+
+## Design Principles for Contributors
+
+These rules are architectural, not stylistic:
+
+- Prefer generic authoring primitives over genre-specific built-ins.
+- Do not add a built-in runtime behavior if an agent can author it cleanly from existing primitives.
+- Put game behavior in project modules, templates, or examples unless it is truly engine-general.
+- Expose inspectable data, diagnostics, and SDK helpers before adding hidden behavior.
+- Keep input generic: capture raw input, normalize it, project semantic actions, and let modules consume action helpers.
+- Keep events generic: emit facts, do not execute genre behavior.
+- Let modules emit custom facts through `EmitEvent` and `EmitBoundEvents`.
+- Use generic query helpers rather than hard-coded entity classes or scene scans.
+- Use generic mutation helpers rather than rebuilding world entity arrays manually.
+- Emit structured observations when authored content is missing, inconsistent, or worth surfacing to an agent.
+- Use engine frame time for realtime gameplay, animation, timers, cooldowns, and simulation.
+- Use camera/vector SDK helpers instead of guessing Euler signs or rebuilding basis math.
+- Preserve generic replication metadata in multiplayer snapshots.
+- Prefer the closed-loop gauntlet when proving a playable user-facing path.
+- When visual output is weak, improve diagnostics and authored scene data before adding a showcase-specific engine path.
+
+Rekall AGE should feel like an engine that AI agents can understand, inspect, repair, extend, and use to make arbitrary games.

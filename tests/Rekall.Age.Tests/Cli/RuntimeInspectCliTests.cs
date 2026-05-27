@@ -358,6 +358,42 @@ public sealed class RuntimeInspectCliTests
         Assert.Contains(planet.Components, component => component.Type == "Rekall.VirtualGeometry");
     }
 
+    [Fact]
+    public async Task RenderVirtualGeometryApplyDryRunDoesNotModifyScene()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "planet"])
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+                .AddEntity(RekallAgeEntityDocument.Create("Existing Planet", ["planet"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                    {
+                        ["radius"] = 6,
+                        ["meshSlices"] = 192,
+                        ["meshStacks"] = 96
+                    }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            "render",
+            "virtual-geometry",
+            "apply",
+            root,
+            "Main",
+            "10000",
+            "--dry-run");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Dry run: True", result.Output);
+        Assert.Contains("Applied: Existing Planet", result.Output);
+        var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        var planet = scene.Entities.Single(entity => entity.Name == "Existing Planet");
+        Assert.DoesNotContain(planet.Components, component => component.Type == "Rekall.VirtualGeometry");
+    }
+
     private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)
     {
         var startInfo = new ProcessStartInfo("dotnet")

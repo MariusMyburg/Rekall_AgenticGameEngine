@@ -17,10 +17,12 @@ public sealed record ApplyVirtualGeometryToSceneRequest(
     int ClusterTriangleCount = 128,
     int MaxSelectedTriangles = 12000,
     int MaxLodLevel = 8,
-    string DebugMode = "off");
+    string DebugMode = "off",
+    bool DryRun = false);
 
 public sealed record ApplyVirtualGeometryToSceneResult(
     string SceneName,
+    bool DryRun,
     int CandidateEntityCount,
     int AppliedEntityCount,
     int SkippedExistingEntityCount,
@@ -93,7 +95,7 @@ public sealed class ApplyVirtualGeometryToSceneCommand
             applied.Add(summary);
         }
 
-        if (applied.Count > 0)
+        if (applied.Count > 0 && !request.DryRun)
         {
             await _sceneStore.SaveAsync(request.ProjectRoot, updated, context.CancellationToken).ConfigureAwait(false);
             context.Transaction.RecordChangedResource(_sceneStore.GetScenePath(request.ProjectRoot, request.SceneName));
@@ -101,6 +103,7 @@ public sealed class ApplyVirtualGeometryToSceneCommand
 
         var result = new ApplyVirtualGeometryToSceneResult(
             scene.Name,
+            request.DryRun,
             candidates.Length,
             applied.Count,
             skippedExisting.Count,
@@ -108,7 +111,9 @@ public sealed class ApplyVirtualGeometryToSceneCommand
             skippedExisting);
         return RekallAgeCommandResult<ApplyVirtualGeometryToSceneResult>.Success(
             result,
-            $"Applied virtual geometry to {applied.Count} of {candidates.Length} dense scene entity/entities.");
+            request.DryRun
+                ? $"Dry run: virtual geometry would apply to {applied.Count} of {candidates.Length} dense scene entity/entities."
+                : $"Applied virtual geometry to {applied.Count} of {candidates.Length} dense scene entity/entities.");
     }
 
     private static async ValueTask<IReadOnlyDictionary<string, int>> InspectSourceTrianglesByEntityIdAsync(
@@ -196,6 +201,6 @@ public sealed class ApplyVirtualGeometryToSceneCommand
 
     private static ApplyVirtualGeometryToSceneResult Empty(ApplyVirtualGeometryToSceneRequest request)
     {
-        return new ApplyVirtualGeometryToSceneResult(request.SceneName, 0, 0, 0, [], []);
+        return new ApplyVirtualGeometryToSceneResult(request.SceneName, request.DryRun, 0, 0, 0, [], []);
     }
 }

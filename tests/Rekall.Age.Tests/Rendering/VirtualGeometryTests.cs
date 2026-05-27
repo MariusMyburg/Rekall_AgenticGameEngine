@@ -279,6 +279,40 @@ public sealed class VirtualGeometryTests
     }
 
     [Fact]
+    public async Task ApplyVirtualGeometryToSceneDryRunReportsCandidatesWithoutSaving()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "planet"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Existing Detailed Planet", ["planet"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                {
+                    ["radius"] = 6,
+                    ["meshSlices"] = 192,
+                    ["meshStacks"] = 96
+                })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+        var context = new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("dry run virtual geometry"), CancellationToken.None);
+
+        var result = await new ApplyVirtualGeometryToSceneCommand().ExecuteAsync(
+            new ApplyVirtualGeometryToSceneRequest(
+                root,
+                "Main",
+                MinSourceTriangles: 10000,
+                DryRun: true),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.DryRun);
+        Assert.Equal(1, result.Value.AppliedEntityCount);
+        Assert.Empty(context.Transaction.ChangedResources);
+        var unchanged = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        var planet = unchanged.Entities.Single(entity => entity.Name == "Existing Detailed Planet");
+        Assert.DoesNotContain(planet.Components, component => component.Type == "Rekall.VirtualGeometry");
+    }
+
+    [Fact]
     public async Task InspectVirtualGeometrySceneRejectsNegativeFrames()
     {
         var context = new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("virtual geometry invalid"), CancellationToken.None);

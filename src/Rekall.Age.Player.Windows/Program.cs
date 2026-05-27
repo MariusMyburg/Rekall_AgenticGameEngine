@@ -3346,9 +3346,36 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             return dot(color, vec3(0.299, 0.587, 0.114));
         }
 
-        void main()
+        vec3 brightPass(vec3 color)
         {
-            vec2 texel = 1.0 / vec2(textureSize(sampler2D(SceneTexture, SceneSampler), 0));
+            float brightness = max(max(color.r, color.g), color.b);
+            float threshold = 0.86;
+            float knee = smoothstep(threshold, 1.0, brightness);
+            return color * knee;
+        }
+
+        vec3 sampleBloom(vec2 uv, vec2 texel)
+        {
+            vec3 bloom = brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv).rgb) * 0.22;
+            vec2 radius1 = texel * 1.5;
+            vec2 radius2 = texel * 3.0;
+            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(radius1.x, 0.0)).rgb) * 0.085;
+            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv - vec2(radius1.x, 0.0)).rgb) * 0.085;
+            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(0.0, radius1.y)).rgb) * 0.085;
+            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv - vec2(0.0, radius1.y)).rgb) * 0.085;
+            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(radius1.x, radius1.y)).rgb) * 0.0525;
+            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(-radius1.x, radius1.y)).rgb) * 0.0525;
+            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(radius1.x, -radius1.y)).rgb) * 0.0525;
+            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv - vec2(radius1.x, radius1.y)).rgb) * 0.0525;
+            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(radius2.x, 0.0)).rgb) * 0.03;
+            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv - vec2(radius2.x, 0.0)).rgb) * 0.03;
+            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(0.0, radius2.y)).rgb) * 0.03;
+            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv - vec2(0.0, radius2.y)).rgb) * 0.03;
+            return bloom;
+        }
+
+        vec4 resolveFxaa(vec2 texel)
+        {
             vec4 center = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV);
             vec3 nw = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(-1.0, -1.0)).rgb;
             vec3 ne = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(1.0, -1.0)).rgb;
@@ -3364,8 +3391,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             float edgeContrast = lumaMax - lumaMin;
             if (edgeContrast < max(0.0312, lumaMax * 0.125))
             {
-                fsout_Color = center;
-                return;
+                return center;
             }
 
             vec2 direction = vec2(
@@ -3382,7 +3408,17 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * -0.5).rgb +
                 texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * 0.5).rgb);
             float lumaB = luma(rgbB);
-            fsout_Color = vec4((lumaB < lumaMin || lumaB > lumaMax) ? rgbA : rgbB, center.a);
+            return vec4((lumaB < lumaMin || lumaB > lumaMax) ? rgbA : rgbB, center.a);
+        }
+
+        void main()
+        {
+            vec2 texel = 1.0 / vec2(textureSize(sampler2D(SceneTexture, SceneSampler), 0));
+            vec4 resolved = resolveFxaa(texel);
+            vec3 bloom = sampleBloom(fsin_UV, texel);
+            vec3 color = resolved.rgb + bloom * 0.42;
+            color = color / (vec3(1.0) + color * 0.18);
+            fsout_Color = vec4(color, resolved.a);
         }
         """;
 

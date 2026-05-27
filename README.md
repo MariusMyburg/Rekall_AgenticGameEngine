@@ -30,7 +30,7 @@ This README is intended to be the broad public entry point and the practical tec
 - [Physics and Interaction](#physics-and-interaction)
 - [Multiplayer](#multiplayer)
 - [Live Player Editing](#live-player-editing)
-- [Starter Templates and Packaging Workflows](#starter-templates-and-packaging-workflows)
+- [Optional Templates and Packaging Workflows](#optional-templates-and-packaging-workflows)
 - [Studio and Workbench Foundation](#studio-and-workbench-foundation)
 - [Testing and Verification](#testing-and-verification)
 - [Design Principles for Contributors](#design-principles-for-contributors)
@@ -1146,9 +1146,13 @@ Live editing can:
 
 Mutations are queued onto the player render thread so runtime-world swaps and GPU resource replacement are serialized with rendering.
 
-## Starter Templates and Packaging Workflows
+## Optional Templates and Packaging Workflows
 
-Starter template ids:
+Rekall AGE is not limited to the templates below. They are optional scaffolds and regression fixtures: small, known-good projects that exercise the same generic engine contracts an agent would use to build any other game. A project can start from a blank scene, a KSA solar import, a live-edited blueprint, imported GLB assets, generated geometry, project-authored modules, or one of these templates.
+
+The template catalog exists for convenience, onboarding, and closed-loop verification. It is not a genre list, product boundary, or privileged set of engine-supported games.
+
+Current optional template ids:
 
 - `pong`
 - `breakout`
@@ -1161,7 +1165,9 @@ Starter template ids:
 - `collectathon-3d`
 - `puzzle`
 
-Each template creates a project manifest, `Main` scene, active camera, starter render primitives, and template-owned example entities/components under `Game.Templates.*`. Game behavior belongs in project-authored modules.
+Each template creates a project manifest, `Main` scene, active camera, starter render primitives, and template-owned example entities/components under `Game.Templates.*`. Those components are examples of authored content, not engine-owned genre behavior. Real game behavior belongs in project-authored modules and ordinary scene data.
+
+For arbitrary games, agents should compose the general primitives documented above: entities, tags, components, semantic input maps, event bindings, timers, colliders, triggers, renderables, materials, runtime modules, observations, validation, viewport capture, performance budgets, and packaging workflows.
 
 Workflow commands:
 

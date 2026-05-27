@@ -76,6 +76,12 @@ internal static class RekallAgeCli
                     await InspectVirtualGeometrySceneAsync(registry, context, root, scene, frames, "1920", "1080"),
                 ["render", "virtual-geometry", "inspect", var root, var scene, var frames, var width, var height] =>
                     await InspectVirtualGeometrySceneAsync(registry, context, root, scene, frames, width, height),
+                ["render", "virtual-geometry", "apply", var root, var scene] =>
+                    await ApplyVirtualGeometryToSceneAsync(registry, context, root, scene, "10000", "1920", "1080"),
+                ["render", "virtual-geometry", "apply", var root, var scene, var minSourceTriangles] =>
+                    await ApplyVirtualGeometryToSceneAsync(registry, context, root, scene, minSourceTriangles, "1920", "1080"),
+                ["render", "virtual-geometry", "apply", var root, var scene, var minSourceTriangles, var width, var height] =>
+                    await ApplyVirtualGeometryToSceneAsync(registry, context, root, scene, minSourceTriangles, width, height),
                 ["render", "visibility", "inspect", var root, var scene] =>
                     await InspectSceneVisibilityAsync(registry, context, root, scene, "0"),
                 ["render", "visibility", "inspect", var root, var scene, var frames] =>
@@ -426,6 +432,7 @@ internal static class RekallAgeCli
         registry.Register(new ListRenderBackendsCommand());
         registry.Register(new InspectStereoRenderPlanCommand());
         registry.Register(new InspectScenePerformanceBudgetCommand());
+        registry.Register(new ApplyVirtualGeometryToSceneCommand());
         registry.Register(new InspectVirtualGeometrySceneCommand());
         registry.Register(new InspectSceneVisibilityCommand());
         registry.Register(new ProbeOpenXrRuntimeCommand());
@@ -762,6 +769,43 @@ internal static class RekallAgeCli
         foreach (var recommendation in result.Value.Recommendations)
         {
             Console.WriteLine($"Recommendation: {recommendation}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ApplyVirtualGeometryToSceneAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string minSourceTriangles,
+        string width,
+        string height)
+    {
+        var minimum = int.Parse(minSourceTriangles, CultureInfo.InvariantCulture);
+        var viewportWidth = int.Parse(width, CultureInfo.InvariantCulture);
+        var viewportHeight = int.Parse(height, CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<ApplyVirtualGeometryToSceneRequest, ApplyVirtualGeometryToSceneResult>(
+            "rekall.render.virtual_geometry.apply_scene",
+            new ApplyVirtualGeometryToSceneRequest(root, scene, minimum, viewportWidth, viewportHeight),
+            context);
+
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Candidates: {result.Value.CandidateEntityCount}; applied: {result.Value.AppliedEntityCount}; skipped existing: {result.Value.SkippedExistingEntityCount}");
+        foreach (var applied in result.Value.AppliedEntities)
+        {
+            Console.WriteLine($"Applied: {applied.EntityName}; source triangles: {applied.SourceTriangles}");
+        }
+
+        foreach (var skipped in result.Value.SkippedExistingEntities)
+        {
+            Console.WriteLine($"Skipped existing: {skipped.EntityName}; source triangles: {skipped.SourceTriangles}");
         }
 
         foreach (var error in result.Errors)

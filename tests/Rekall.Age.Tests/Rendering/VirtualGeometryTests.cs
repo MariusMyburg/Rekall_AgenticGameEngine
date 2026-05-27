@@ -201,6 +201,84 @@ public sealed class VirtualGeometryTests
     }
 
     [Fact]
+    public async Task ApplyVirtualGeometryToSceneAddsComponentToExistingDenseRenderable()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "planet"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Existing Detailed Planet", ["planet"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                {
+                    ["radius"] = 6,
+                    ["meshSlices"] = 192,
+                    ["meshStacks"] = 96
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.AtmosphereRenderer", new JsonObject
+                {
+                    ["height"] = 0.2,
+                    ["meshSlices"] = 384,
+                    ["meshStacks"] = 192
+                })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+        var context = new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("apply virtual geometry"), CancellationToken.None);
+
+        var result = await new ApplyVirtualGeometryToSceneCommand().ExecuteAsync(
+            new ApplyVirtualGeometryToSceneRequest(
+                root,
+                "Main",
+                MinSourceTriangles: 10000,
+                MaxSelectedTriangles: 12000,
+                ClusterTriangleCount: 128),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(1, result.Value.AppliedEntityCount);
+        Assert.True(result.Value.CandidateEntityCount >= 1);
+        var applied = Assert.Single(result.Value.AppliedEntities);
+        Assert.Equal("Existing Detailed Planet", applied.EntityName);
+        Assert.True(applied.SourceTriangles >= 10000);
+        var updated = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        var planet = updated.Entities.Single(entity => entity.Name == "Existing Detailed Planet");
+        var virtualGeometry = Assert.Single(planet.Components, component => component.Type == "Rekall.VirtualGeometry");
+        Assert.Equal(12000, virtualGeometry.Properties["maxSelectedTriangles"]!.GetValue<int>());
+        Assert.Equal(128, virtualGeometry.Properties["clusterTriangleCount"]!.GetValue<int>());
+        Assert.Contains(new RekallAgeSceneStore().GetScenePath(root, "Main"), context.Transaction.ChangedResources);
+    }
+
+    [Fact]
+    public async Task ApplyVirtualGeometryToSceneSkipsExistingComponentsUnlessOverwriteRequested()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Dense Authored Mesh", ["geometry"])
+                .AddComponent(CreateAuthoredGeometryMeshComponent(triangleCount: 12))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.VirtualGeometry", new JsonObject
+                {
+                    ["maxSelectedTriangles"] = 3,
+                    ["clusterTriangleCount"] = 3
+                })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new ApplyVirtualGeometryToSceneCommand().ExecuteAsync(
+            new ApplyVirtualGeometryToSceneRequest(
+                root,
+                "Main",
+                MinSourceTriangles: 1,
+                MaxSelectedTriangles: 10,
+                ClusterTriangleCount: 5),
+            new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("skip existing virtual geometry"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(0, result.Value.AppliedEntityCount);
+        Assert.Equal(1, result.Value.SkippedExistingEntityCount);
+        var updated = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        var virtualGeometry = updated.Entities.Single().Components.Single(component => component.Type == "Rekall.VirtualGeometry");
+        Assert.Equal(3, virtualGeometry.Properties["maxSelectedTriangles"]!.GetValue<int>());
+        Assert.Equal(3, virtualGeometry.Properties["clusterTriangleCount"]!.GetValue<int>());
+    }
+
+    [Fact]
     public async Task InspectVirtualGeometrySceneRejectsNegativeFrames()
     {
         var context = new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("virtual geometry invalid"), CancellationToken.None);

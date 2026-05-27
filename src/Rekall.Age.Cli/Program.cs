@@ -70,6 +70,12 @@ internal static class RekallAgeCli
                     await InspectScenePerformanceBudgetAsync(registry, context, root, scene, frames, "1920", "1080", profile),
                 ["render", "performance", "budget", var root, var scene, var profile, var frames, var width, var height] =>
                     await InspectScenePerformanceBudgetAsync(registry, context, root, scene, frames, width, height, profile),
+                ["render", "virtual-geometry", "inspect", var root, var scene] =>
+                    await InspectVirtualGeometrySceneAsync(registry, context, root, scene, "0", "1920", "1080"),
+                ["render", "virtual-geometry", "inspect", var root, var scene, var frames] =>
+                    await InspectVirtualGeometrySceneAsync(registry, context, root, scene, frames, "1920", "1080"),
+                ["render", "virtual-geometry", "inspect", var root, var scene, var frames, var width, var height] =>
+                    await InspectVirtualGeometrySceneAsync(registry, context, root, scene, frames, width, height),
                 ["render", "visibility", "inspect", var root, var scene] =>
                     await InspectSceneVisibilityAsync(registry, context, root, scene, "0"),
                 ["render", "visibility", "inspect", var root, var scene, var frames] =>
@@ -420,6 +426,7 @@ internal static class RekallAgeCli
         registry.Register(new ListRenderBackendsCommand());
         registry.Register(new InspectStereoRenderPlanCommand());
         registry.Register(new InspectScenePerformanceBudgetCommand());
+        registry.Register(new InspectVirtualGeometrySceneCommand());
         registry.Register(new InspectSceneVisibilityCommand());
         registry.Register(new ProbeOpenXrRuntimeCommand());
         registry.Register(new BootstrapOpenXrSessionCommand());
@@ -721,6 +728,45 @@ internal static class RekallAgeCli
         foreach (var error in result.Value.Errors)
         {
             Console.WriteLine($"Error: {error}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectVirtualGeometrySceneAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string frames,
+        string width,
+        string height)
+    {
+        var frameCount = int.Parse(frames, CultureInfo.InvariantCulture);
+        var viewportWidth = int.Parse(width, CultureInfo.InvariantCulture);
+        var viewportHeight = int.Parse(height, CultureInfo.InvariantCulture);
+        var result = await registry.ExecuteAsync<InspectVirtualGeometrySceneRequest, InspectVirtualGeometrySceneResult>(
+            "rekall.render.virtual_geometry.inspect_scene",
+            new InspectVirtualGeometrySceneRequest(root, scene, frameCount, viewportWidth, viewportHeight),
+            context);
+
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Renderables: {result.Value.RenderableCount}; virtual geometry: {result.Value.VirtualGeometryRenderableCount}");
+        Console.WriteLine($"Triangles: source {result.Value.SourceTriangles}; selected {result.Value.SelectedTriangles}; reduced {result.Value.ReducedTriangles}");
+        foreach (var renderable in result.Value.Renderables)
+        {
+            Console.WriteLine(
+                $"Virtual geometry: {renderable.EntityName}; enabled: {renderable.Enabled}; meshes: {renderable.MeshCount}; source: {renderable.SourceTriangles}; selected: {renderable.SelectedTriangles}; reduced: {renderable.ReducedTriangles}; lod: {renderable.SelectedLodLevel}; max selected: {renderable.MaxSelectedTriangles}; cluster triangles: {renderable.ClusterTriangleCount}; pixel error: {renderable.TargetPixelError:F3}");
+        }
+
+        foreach (var recommendation in result.Value.Recommendations)
+        {
+            Console.WriteLine($"Recommendation: {recommendation}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
         }
 
         return result.Ok ? 0 : 1;

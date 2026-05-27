@@ -122,6 +122,60 @@ public sealed class VirtualGeometryTests
         Assert.Contains(result.Value.Recommendations, item => item.Contains("Virtual geometry", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task InspectVirtualGeometrySceneReportsPerRenderableReduction()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Dense Authored Mesh", ["geometry"])
+                .AddComponent(CreateAuthoredGeometryMeshComponent(triangleCount: 10))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.VirtualGeometry", new JsonObject
+                {
+                    ["targetPixelError"] = 1.25,
+                    ["maxSelectedTriangles"] = 4,
+                    ["clusterTriangleCount"] = 4
+                })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+        var context = new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("virtual geometry inspect"), CancellationToken.None);
+
+        var result = await new InspectVirtualGeometrySceneCommand().ExecuteAsync(
+            new InspectVirtualGeometrySceneRequest(root, "Main"),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal("Main", result.Value.SceneName);
+        Assert.Equal(1, result.Value.VirtualGeometryRenderableCount);
+        Assert.Equal(10, result.Value.SourceTriangles);
+        Assert.True(result.Value.SelectedTriangles <= 4);
+        Assert.True(result.Value.ReducedTriangles >= 6);
+        var item = Assert.Single(result.Value.Renderables);
+        Assert.Equal("Dense Authored Mesh", item.EntityName);
+        Assert.True(item.Enabled);
+        Assert.Equal(1.25, item.TargetPixelError);
+        Assert.Equal(4, item.ClusterTriangleCount);
+        Assert.Equal(4, item.MaxSelectedTriangles);
+        Assert.Equal(10, item.SourceTriangles);
+        Assert.Equal(result.Value.SelectedTriangles, item.SelectedTriangles);
+        Assert.Equal(result.Value.ReducedTriangles, item.ReducedTriangles);
+        Assert.True(item.MaxLodLevel > 0);
+        Assert.True(item.SelectedLodLevel > 0);
+    }
+
+    [Fact]
+    public async Task InspectVirtualGeometrySceneRejectsNegativeFrames()
+    {
+        var context = new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("virtual geometry invalid"), CancellationToken.None);
+
+        var result = await new InspectVirtualGeometrySceneCommand().ExecuteAsync(
+            new InspectVirtualGeometrySceneRequest("missing", "Main", Frames: -1),
+            context);
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, error => error.Code == "REKALL_VIRTUAL_GEOMETRY_INVALID_REQUEST");
+    }
+
     private static RekallAgeRuntimeViewportFrame CreateFrame(params RekallAgeRuntimeViewportRenderable[] renderables)
     {
         return new RekallAgeRuntimeViewportFrame(

@@ -1227,6 +1227,93 @@ public sealed class ViewportContractTests
     }
 
     [Fact]
+    public void RuntimeFrameBuilderProjectsAuthoredPostProcessStack()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Photographic Grade", ["post-process"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PostProcessStack", new JsonObject
+                {
+                    ["enabled"] = true,
+                    ["passes"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["name"] = "sun-threshold",
+                            ["type"] = "brightExtract",
+                            ["input"] = "sceneColor",
+                            ["output"] = "brightColor",
+                            ["threshold"] = 0.86,
+                            ["scale"] = 0.5
+                        },
+                        new JsonObject
+                        {
+                            ["name"] = "soft-composite",
+                            ["type"] = "composite",
+                            ["input"] = "sceneColor",
+                            ["source"] = "brightColor",
+                            ["output"] = "swapchain",
+                            ["intensity"] = 0.42,
+                            ["blendMode"] = "add"
+                        }
+                    }
+                })));
+        var world = new RekallAgeRuntimeProjectionBuilder().Project(new RekallAgeRuntimeWorldBuilder().Build(scene));
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        Assert.NotNull(frame.PostProcessStack);
+        Assert.True(frame.PostProcessStack!.Enabled);
+        Assert.Equal("Photographic Grade", frame.PostProcessStack.EntityName);
+        Assert.Equal(2, frame.PostProcessStack.Passes.Count);
+        Assert.Equal("brightExtract", frame.PostProcessStack.Passes[0].Type);
+        Assert.Equal("sceneColor", frame.PostProcessStack.Passes[0].Input);
+        Assert.Equal("brightColor", frame.PostProcessStack.Passes[0].Output);
+        Assert.Equal(0.86, frame.PostProcessStack.Passes[0].Threshold);
+        Assert.Equal(0.5, frame.PostProcessStack.Passes[0].Scale);
+        Assert.Equal("composite", frame.PostProcessStack.Passes[1].Type);
+        Assert.Equal("brightColor", frame.PostProcessStack.Passes[1].Source);
+        Assert.Equal(0.42, frame.PostProcessStack.Passes[1].Intensity);
+        Assert.Equal("add", frame.PostProcessStack.Passes[1].BlendMode);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderProjectsDisabledPostProcessStack()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Muted Grade", ["post-process"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PostProcessStack", new JsonObject
+                {
+                    ["enabled"] = false,
+                    ["passes"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["name"] = "no-bloom",
+                            ["type"] = "composite",
+                            ["intensity"] = 0
+                        }
+                    }
+                })));
+        var world = new RekallAgeRuntimeProjectionBuilder().Project(new RekallAgeRuntimeWorldBuilder().Build(scene));
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        Assert.NotNull(frame.PostProcessStack);
+        Assert.False(frame.PostProcessStack!.Enabled);
+        Assert.Equal("Muted Grade", frame.PostProcessStack.EntityName);
+    }
+
+    [Fact]
     public void RuntimeFrameBuilderAddsColliderDebugRenderablesWhenDebugOverlayIsEnabled()
     {
         var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "physics3d"])

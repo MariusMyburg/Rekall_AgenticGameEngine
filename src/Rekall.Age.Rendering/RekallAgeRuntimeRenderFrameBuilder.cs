@@ -97,12 +97,42 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     observation.TargetName.Length > 0 ? observation.TargetName : observation.TargetId,
                     observation.Message))
                 .ToArray(),
-            BuildStereoSettings(headsetCamera, width, height))
+            BuildStereoSettings(headsetCamera, width, height),
+            BuildPostProcessStack(world))
         {
             Culling = culling,
             CameraViews = cameraViews,
             HeadsetCamera = headsetCamera
         };
+    }
+
+    private static RekallAgeRuntimeViewportPostProcessStack? BuildPostProcessStack(RekallAgeRuntimeWorld world)
+    {
+        var stack = world.Subsystems.Rendering.PostProcessStacks
+            .OrderByDescending(item => item.Enabled && item.Passes.Count > 0)
+            .ThenBy(item => item.EntityName, StringComparer.Ordinal)
+            .ThenBy(item => item.EntityId, StringComparer.Ordinal)
+            .FirstOrDefault();
+        return stack is null
+            ? null
+            : new RekallAgeRuntimeViewportPostProcessStack(
+                stack.EntityId,
+                stack.EntityName,
+                stack.Enabled,
+                stack.Passes
+                    .Select(pass => new RekallAgeRuntimeViewportPostProcessPass(
+                        pass.Name,
+                        pass.Type,
+                        pass.Input,
+                        pass.Source,
+                        pass.Output,
+                        pass.Scale,
+                        pass.Iterations,
+                        pass.Threshold,
+                        pass.Intensity,
+                        pass.Radius,
+                        pass.BlendMode))
+                    .ToArray());
     }
 
     private static bool IsHeadsetCamera(RekallAgeRuntimeViewportCamera camera)

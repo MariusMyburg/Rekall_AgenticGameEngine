@@ -143,9 +143,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly ResourceLayout _drawLayout;
     private readonly ResourceLayout _materialLayout;
     private readonly ResourceLayout _presentTextureLayout;
+    private readonly ResourceLayout _postProcessLayout;
     private readonly ResourceLayout _hudTextureLayout;
     private readonly ResourceSet _frameSet;
     private ResourceSet _drawSet;
+    private readonly ResourceSet _postProcessSet;
     private readonly RekallAgeRuntimeExecutionLoop _runtimeLoop;
     private readonly RekallAgeRuntimeSimulationClock _simulationClock;
     private readonly RekallAgeRuntimeRenderFrameBuilder _frameBuilder = new();
@@ -175,6 +177,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private DeviceBuffer _hudVertexBuffer;
     private DeviceBuffer _frameUniformBuffer;
     private DeviceBuffer _drawUniformBuffer;
+    private DeviceBuffer _postProcessUniformBuffer;
     private uint _vertexBufferCapacityBytes;
     private uint _indexBufferCapacityBytes;
     private uint _hudVertexBufferCapacityBytes;
@@ -231,14 +234,17 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         ResourceLayout drawLayout,
         ResourceLayout materialLayout,
         ResourceLayout presentTextureLayout,
+        ResourceLayout postProcessLayout,
         ResourceLayout hudTextureLayout,
         ResourceSet frameSet,
         ResourceSet drawSet,
+        ResourceSet postProcessSet,
         DeviceBuffer vertexBuffer,
         DeviceBuffer indexBuffer,
         DeviceBuffer hudVertexBuffer,
         DeviceBuffer frameUniformBuffer,
         DeviceBuffer drawUniformBuffer,
+        DeviceBuffer postProcessUniformBuffer,
         Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeWorld runtimeWorld,
         RekallAgeRuntimeExecutionLoop runtimeLoop,
         RekallAgeRuntimeViewportAssetSet assets,
@@ -275,14 +281,17 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _drawLayout = drawLayout;
         _materialLayout = materialLayout;
         _presentTextureLayout = presentTextureLayout;
+        _postProcessLayout = postProcessLayout;
         _hudTextureLayout = hudTextureLayout;
         _frameSet = frameSet;
         _drawSet = drawSet;
+        _postProcessSet = postProcessSet;
         _vertexBuffer = vertexBuffer;
         _indexBuffer = indexBuffer;
         _hudVertexBuffer = hudVertexBuffer;
         _frameUniformBuffer = frameUniformBuffer;
         _drawUniformBuffer = drawUniformBuffer;
+        _postProcessUniformBuffer = postProcessUniformBuffer;
         _vertexBufferCapacityBytes = vertexBuffer.SizeInBytes;
         _indexBufferCapacityBytes = indexBuffer.SizeInBytes;
         _hudVertexBufferCapacityBytes = hudVertexBuffer.SizeInBytes;
@@ -459,6 +468,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var presentTextureLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
             new ResourceLayoutElementDescription("SceneTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("SceneSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
+        var postProcessLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
+            new ResourceLayoutElementDescription("PostProcessUniform", ResourceKind.UniformBuffer, ShaderStages.Fragment)));
         var hudTextureLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
             new ResourceLayoutElementDescription("SurfaceTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("SurfaceSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
@@ -487,7 +498,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             RasterizerStateDescription.CullNone,
             PrimitiveTopology.TriangleList,
             presentShaderSet,
-            [presentTextureLayout],
+            [presentTextureLayout, postProcessLayout],
             device.SwapchainFramebuffer.OutputDescription);
         var hudShaderSet = new ShaderSetDescription([hudVertexLayout], hudShaders);
         var hudPipelineDescription = new GraphicsPipelineDescription(
@@ -527,8 +538,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var drawUniformBuffer = factory.CreateBuffer(new BufferDescription(
             checked(drawUniformStrideBytes * 256),
             BufferUsage.UniformBuffer | BufferUsage.Dynamic));
+        var postProcessUniformBuffer = factory.CreateBuffer(new BufferDescription(
+            checked((uint)Marshal.SizeOf<PostProcessUniform>()),
+            BufferUsage.UniformBuffer | BufferUsage.Dynamic));
         var frameSet = factory.CreateResourceSet(new ResourceSetDescription(frameLayout, frameUniformBuffer));
         var drawSet = factory.CreateResourceSet(new ResourceSetDescription(drawLayout, drawUniformBuffer));
+        var postProcessSet = factory.CreateResourceSet(new ResourceSetDescription(postProcessLayout, postProcessUniformBuffer));
         PlayerLog.Write("Creating texture resources.");
         var whiteTexture = CreateTextureBinding(
             device,
@@ -604,14 +619,17 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             drawLayout,
             materialLayout,
             presentTextureLayout,
+            postProcessLayout,
             hudTextureLayout,
             frameSet,
             drawSet,
+            postProcessSet,
             vertexBuffer,
             indexBuffer,
             hudVertexBuffer,
             frameUniformBuffer,
             drawUniformBuffer,
+            postProcessUniformBuffer,
             world,
             runtimeLoop,
             assets,
@@ -932,11 +950,13 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _hudTextureSet.Dispose();
         _frameSet.Dispose();
         _drawSet.Dispose();
+        _postProcessSet.Dispose();
         _vertexBuffer.Dispose();
         _indexBuffer.Dispose();
         _hudVertexBuffer.Dispose();
         _frameUniformBuffer.Dispose();
         _drawUniformBuffer.Dispose();
+        _postProcessUniformBuffer.Dispose();
         foreach (var texture in _textures.Values)
         {
             texture.Dispose();
@@ -954,6 +974,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _drawLayout.Dispose();
         _materialLayout.Dispose();
         _presentTextureLayout.Dispose();
+        _postProcessLayout.Dispose();
         _hudTextureLayout.Dispose();
         _commands.Dispose();
         _device.Dispose();
@@ -1468,6 +1489,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _device.UpdateBuffer(_hudVertexBuffer, 0, hudVertices);
         }
 
+        _device.UpdateBuffer(_postProcessUniformBuffer, 0, BuildPostProcessUniform(frame.PostProcessStack));
+
         _commands.Begin();
         _commands.SetFramebuffer(_sceneTarget.Framebuffer);
         _commands.SetFullViewports();
@@ -1506,6 +1529,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _commands.ClearColorTarget(0, new RgbaFloat(0.08f, 0.10f, 0.14f, 1f));
         _commands.SetPipeline(_presentPipeline);
         _commands.SetGraphicsResourceSet(0, _sceneTarget.ResourceSet);
+        _commands.SetGraphicsResourceSet(1, _postProcessSet);
         _commands.Draw(3);
 
         if (hudVertices.Length > 0)
@@ -1553,8 +1577,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _commands.SetFullViewports();
         _commands.SetFullScissorRects();
         _commands.ClearColorTarget(0, new RgbaFloat(0.02f, 0.04f, 0.08f, 1f));
+        _device.UpdateBuffer(_postProcessUniformBuffer, 0, PostProcessUniform.Default);
         _commands.SetPipeline(_presentPipeline);
         _commands.SetGraphicsResourceSet(0, _sceneTarget.ResourceSet);
+        _commands.SetGraphicsResourceSet(1, _postProcessSet);
         _commands.Draw(3);
         _commands.End();
         _device.SubmitCommands(_commands);
@@ -1969,6 +1995,48 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         }
 
         return uniforms;
+    }
+
+    private static PostProcessUniform BuildPostProcessUniform(RekallAgeRuntimeViewportPostProcessStack? stack)
+    {
+        if (stack is null)
+        {
+            return PostProcessUniform.Default;
+        }
+
+        if (!stack.Enabled || stack.Passes.Count == 0)
+        {
+            return PostProcessUniform.Disabled;
+        }
+
+        var threshold = PostProcessUniform.Default.Parameters.X;
+        var intensity = PostProcessUniform.Default.Parameters.Y;
+        var radius = PostProcessUniform.Default.Parameters.Z;
+        var enabled = 0f;
+        foreach (var pass in stack.Passes)
+        {
+            if (pass.Type.Equals("brightExtract", StringComparison.OrdinalIgnoreCase))
+            {
+                enabled = 1f;
+                threshold = (float)Math.Clamp(pass.Threshold, 0, 64);
+                if (pass.Scale > 0)
+                {
+                    radius = (float)Math.Clamp(pass.Scale, 0.05, 32);
+                }
+            }
+            else if (pass.Type.Equals("blur", StringComparison.OrdinalIgnoreCase))
+            {
+                enabled = 1f;
+                radius = (float)Math.Clamp(pass.Radius, 0.05, 32);
+            }
+            else if (pass.Type.Equals("composite", StringComparison.OrdinalIgnoreCase))
+            {
+                enabled = 1f;
+                intensity = (float)Math.Clamp(pass.Intensity, 0, 16);
+            }
+        }
+
+        return new PostProcessUniform(new Vector4(threshold, intensity, radius, enabled));
     }
 
     private static void AddTextureId(HashSet<string> textureIds, string? textureId)
@@ -3338,6 +3406,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         layout(location = 0) in vec2 fsin_UV;
         layout(set = 0, binding = 0) uniform texture2D SceneTexture;
         layout(set = 0, binding = 1) uniform sampler SceneSampler;
+        layout(set = 1, binding = 0) uniform PostProcessUniformBuffer
+        {
+            vec4 PostProcessParameters;
+        };
 
         layout(location = 0) out vec4 fsout_Color;
 
@@ -3349,7 +3421,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         vec3 brightPass(vec3 color)
         {
             float brightness = max(max(color.r, color.g), color.b);
-            float threshold = 0.86;
+            float threshold = PostProcessParameters.x;
             float knee = smoothstep(threshold, 1.0, brightness);
             return color * knee;
         }
@@ -3357,8 +3429,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         vec3 sampleBloom(vec2 uv, vec2 texel)
         {
             vec3 bloom = brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv).rgb) * 0.22;
-            vec2 radius1 = texel * 1.5;
-            vec2 radius2 = texel * 3.0;
+            vec2 radius1 = texel * 1.5 * PostProcessParameters.z;
+            vec2 radius2 = texel * 3.0 * PostProcessParameters.z;
             bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(radius1.x, 0.0)).rgb) * 0.085;
             bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv - vec2(radius1.x, 0.0)).rgb) * 0.085;
             bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(0.0, radius1.y)).rgb) * 0.085;
@@ -3416,7 +3488,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec2 texel = 1.0 / vec2(textureSize(sampler2D(SceneTexture, SceneSampler), 0));
             vec4 resolved = resolveFxaa(texel);
             vec3 bloom = sampleBloom(fsin_UV, texel);
-            vec3 color = resolved.rgb + bloom * 0.42;
+            vec3 color = resolved.rgb + bloom * PostProcessParameters.y * PostProcessParameters.w;
             color = color / (vec3(1.0) + color * 0.18);
             fsout_Color = vec4(color, resolved.a);
         }
@@ -3484,6 +3556,13 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Vector4 CloudColor,
         Vector4 CloudShadowFactors,
         Vector4 SurfaceWaterFactors);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly record struct PostProcessUniform(Vector4 Parameters)
+    {
+        public static PostProcessUniform Default { get; } = new(new Vector4(0.86f, 0.42f, 1f, 1f));
+        public static PostProcessUniform Disabled { get; } = new(new Vector4(0.86f, 0f, 1f, 0f));
+    }
 
     private sealed record RenderPacket(
         GpuVertex[] Vertices,

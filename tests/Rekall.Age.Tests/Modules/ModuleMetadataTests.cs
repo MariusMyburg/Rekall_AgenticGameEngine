@@ -189,6 +189,9 @@ public sealed class ModuleMetadataTests
         Assert.Contains(haloRenderer.Properties, property => property.Name == "Intensity" && property.Minimum == 0);
         Assert.Contains(haloRenderer.Properties, property => property.Name == "FacingMode" && property.Kind == "string");
         Assert.Contains(haloRenderer.Properties, property => property.Name == "Layer" && property.Kind == "string");
+        var postProcessStack = Assert.Single(module.Components, component => component.DisplayName == "Post Process Stack");
+        Assert.Contains(postProcessStack.Properties, property => property.Name == "Enabled" && property.Kind == "boolean");
+        Assert.Contains(postProcessStack.Properties, property => property.Name == "Passes" && property.Kind == "postProcessPasses");
         var textLabelRenderer = Assert.Single(module.Components, component => component.DisplayName == "Text Label Renderer");
         Assert.Contains(textLabelRenderer.Properties, property => property.Name == "Text" && property.Kind == "string");
         Assert.Contains(textLabelRenderer.Properties, property => property.Name == "Size" && property.Minimum == 0.0001);

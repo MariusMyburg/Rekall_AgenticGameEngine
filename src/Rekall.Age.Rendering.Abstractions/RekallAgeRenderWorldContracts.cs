@@ -44,7 +44,8 @@ public sealed record RekallAgeRuntimeViewportFrame(
     int UiLayerCount,
     RekallAgeRuntimeViewportOverlay DebugOverlay,
     IReadOnlyList<RekallAgeRuntimeViewportObservation> Observations,
-    RekallAgeRuntimeViewportStereoSettings? Stereo = null)
+    RekallAgeRuntimeViewportStereoSettings? Stereo = null,
+    RekallAgeRuntimeViewportPostProcessStack? PostProcessStack = null)
 {
     public RekallAgeRuntimeViewportCulling Culling { get; init; } = RekallAgeRuntimeViewportCulling.Empty;
 
@@ -186,6 +187,25 @@ public sealed record RekallAgeRuntimeViewportStereoSettings(
     bool FoveatedRendering,
     bool PreferSinglePassMultiview,
     IReadOnlyList<RekallAgeRuntimeViewportEye> Eyes);
+
+public sealed record RekallAgeRuntimeViewportPostProcessStack(
+    string EntityId,
+    string EntityName,
+    bool Enabled,
+    IReadOnlyList<RekallAgeRuntimeViewportPostProcessPass> Passes);
+
+public sealed record RekallAgeRuntimeViewportPostProcessPass(
+    string Name,
+    string Type,
+    string Input = "sceneColor",
+    string? Source = null,
+    string Output = "sceneColor",
+    double Scale = 1,
+    int Iterations = 1,
+    double Threshold = 1,
+    double Intensity = 1,
+    double Radius = 1,
+    string BlendMode = "add");
 
 public sealed record RekallAgeRuntimeViewportEye(
     string Name,

@@ -53,6 +53,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeStarfieldRendererComponent>();
         builder.RegisterComponent<RekallAgeMarkerRendererComponent>();
         builder.RegisterComponent<RekallAgeHaloRendererComponent>();
+        builder.RegisterComponent<RekallAgePostProcessStackComponent>();
         builder.RegisterComponent<RekallAgeTextLabelRendererComponent>();
     }
 }
@@ -1152,6 +1153,16 @@ public sealed class RekallAgeHaloRendererComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("Post Process Stack")]
+public sealed class RekallAgePostProcessStackComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Kind = "boolean")]
+    public bool Enabled { get; init; } = true;
+
+    [RekallAgeProperty(Kind = "postProcessPasses")]
+    public object? Passes { get; init; }
 }
 
 [RekallAgeComponent("Text Label Renderer")]

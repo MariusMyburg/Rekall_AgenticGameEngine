@@ -618,8 +618,42 @@ public sealed class ImportKsaSolarSystemCommand
                         ["brightness"] = 3.2,
                         ["milkyWayStrength"] = 0.42,
                         ["active"] = true
-                    }))
+                    })),
+            RekallAgeEntityDocument.Create("Photographic Grade", ["rendering", "post-process"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PostProcessStack",
+                    CreatePostProcessStackProperties()))
         ];
+    }
+
+    private static JsonObject CreatePostProcessStackProperties()
+    {
+        return new JsonObject
+        {
+            ["enabled"] = true,
+            ["passes"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["name"] = "sun-threshold",
+                    ["type"] = "brightExtract",
+                    ["input"] = "sceneColor",
+                    ["output"] = "brightColor",
+                    ["threshold"] = 0.86,
+                    ["scale"] = 1.0
+                },
+                new JsonObject
+                {
+                    ["name"] = "soft-composite",
+                    ["type"] = "composite",
+                    ["input"] = "sceneColor",
+                    ["source"] = "brightColor",
+                    ["output"] = "swapchain",
+                    ["intensity"] = 0.42,
+                    ["blendMode"] = "add"
+                }
+            }
+        };
     }
 
     private static JsonArray CreateTourTargets(

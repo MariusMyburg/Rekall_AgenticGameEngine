@@ -264,14 +264,16 @@ public sealed record RekallAgeRuntimeRenderView(
     IReadOnlyList<RekallAgeRuntimeRenderSprite> Sprites,
     IReadOnlyList<RekallAgeRuntimeRenderMesh> Meshes,
     IReadOnlyList<RekallAgeRuntimeRenderLight> Lights,
-    IReadOnlyList<RekallAgeRuntimeRenderUiLayer> UiLayers)
+    IReadOnlyList<RekallAgeRuntimeRenderUiLayer> UiLayers,
+    IReadOnlyList<RekallAgeRuntimeRenderPostProcessStack> PostProcessStacks)
 {
     public static RekallAgeRuntimeRenderView Empty { get; } = new(
         Array.Empty<RekallAgeRuntimeRenderCamera>(),
         Array.Empty<RekallAgeRuntimeRenderSprite>(),
         Array.Empty<RekallAgeRuntimeRenderMesh>(),
         Array.Empty<RekallAgeRuntimeRenderLight>(),
-        Array.Empty<RekallAgeRuntimeRenderUiLayer>());
+        Array.Empty<RekallAgeRuntimeRenderUiLayer>(),
+        Array.Empty<RekallAgeRuntimeRenderPostProcessStack>());
 }
 
 public sealed record RekallAgeRuntimeRenderCamera(
@@ -337,6 +339,26 @@ public sealed record RekallAgeRuntimeRenderUiLayer(
     string EntityName,
     int Layer,
     string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored);
+
+public sealed record RekallAgeRuntimeRenderPostProcessStack(
+    string EntityId,
+    string EntityName,
+    bool Enabled,
+    IReadOnlyList<RekallAgeRuntimeRenderPostProcessPass> Passes,
+    string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored);
+
+public sealed record RekallAgeRuntimeRenderPostProcessPass(
+    string Name,
+    string Type,
+    string Input = "sceneColor",
+    string? Source = null,
+    string Output = "sceneColor",
+    double Scale = 1,
+    int Iterations = 1,
+    double Threshold = 1,
+    double Intensity = 1,
+    double Radius = 1,
+    string BlendMode = "add");
 
 public static class RekallAgeRuntimeProjectionSources
 {

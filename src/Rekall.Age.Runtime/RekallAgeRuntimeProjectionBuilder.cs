@@ -13,6 +13,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         var meshes = PreserveAuthored(world.Subsystems.Rendering.Meshes);
         var lights = PreserveAuthored(world.Subsystems.Rendering.Lights);
         var uiLayers = PreserveAuthored(world.Subsystems.Rendering.UiLayers);
+        var postProcessStacks = PreserveAuthored(world.Subsystems.Rendering.PostProcessStacks);
         var bodies = new List<RekallAgeRuntimePhysicsBody>();
         var colliders = new List<RekallAgeRuntimePhysicsCollider>();
         var triggers = new List<RekallAgeRuntimePhysicsCollider>();
@@ -268,6 +269,14 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             Layer: RekallAgeRenderLayerMask.NormalizeLayer(
                                 ReadString(component.Properties, "layer") ?? renderLayer)));
                         break;
+                    case "Rekall.PostProcessStack":
+                        postProcessStacks.Add(new RekallAgeRuntimeRenderPostProcessStack(
+                            entity.Id,
+                            entity.Name,
+                            ReadBoolean(component.Properties, "enabled", true),
+                            ReadPostProcessPasses(component.Properties),
+                            RekallAgeRuntimeProjectionSources.BuiltIn));
+                        break;
                     case "Rekall.Rigidbody2D":
                     case "Rekall.Rigidbody3D":
                         bodies.Add(new RekallAgeRuntimePhysicsBody(
@@ -434,7 +443,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                     Sort(sprites),
                     Sort(meshes),
                     Sort(lights),
-                    Sort(uiLayers)),
+                    Sort(uiLayers),
+                    Sort(postProcessStacks)),
                 new RekallAgeRuntimePhysicsView(
                     Sort(bodies),
                     Sort(colliders),
@@ -490,7 +500,58 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             RekallAgeRuntimeRenderMesh value => value.ProjectionSource != RekallAgeRuntimeProjectionSources.BuiltIn,
             RekallAgeRuntimeRenderLight value => value.ProjectionSource != RekallAgeRuntimeProjectionSources.BuiltIn,
             RekallAgeRuntimeRenderUiLayer value => value.ProjectionSource != RekallAgeRuntimeProjectionSources.BuiltIn,
+            RekallAgeRuntimeRenderPostProcessStack value => value.ProjectionSource != RekallAgeRuntimeProjectionSources.BuiltIn,
             _ => true
+        };
+    }
+
+    private static IReadOnlyList<RekallAgeRuntimeRenderPostProcessPass> ReadPostProcessPasses(JsonObject properties)
+    {
+        if (!TryGetPropertyValue(properties, "passes", out var node) || node is not JsonArray passes)
+        {
+            return Array.Empty<RekallAgeRuntimeRenderPostProcessPass>();
+        }
+
+        return passes
+            .OfType<JsonObject>()
+            .Select((pass, index) => new RekallAgeRuntimeRenderPostProcessPass(
+                ReadString(pass, "name") ?? $"pass-{index}",
+                NormalizePostProcessPassType(ReadString(pass, "type")),
+                ReadString(pass, "input") ?? "sceneColor",
+                ReadString(pass, "source"),
+                ReadString(pass, "output") ?? "sceneColor",
+                Clamp(ReadNumber(pass, "scale", 1), 0.03125, 1),
+                ClampInt(ReadInt32(pass, "iterations", 1), 1, 16),
+                Math.Max(0, ReadNumber(pass, "threshold", 1)),
+                Math.Max(0, ReadNumber(pass, "intensity", 1)),
+                Math.Max(0, ReadNumber(pass, "radius", 1)),
+                NormalizePostProcessBlendMode(ReadString(pass, "blendMode"))))
+            .ToArray();
+    }
+
+    private static string NormalizePostProcessPassType(string? value)
+    {
+        var normalized = value?.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "bright-extract" or "bright_extract" or "brightextract" => "brightExtract",
+            "blur-horizontal" or "blur_horizontal" or "blurh" => "blurHorizontal",
+            "blur-vertical" or "blur_vertical" or "blurv" => "blurVertical",
+            "tone-map" or "tone_map" or "tonemap" => "toneMap",
+            "composite" => "composite",
+            "blur" => "blur",
+            _ => string.IsNullOrWhiteSpace(normalized) ? "composite" : normalized
+        };
+    }
+
+    private static string NormalizePostProcessBlendMode(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "screen" => "screen",
+            "replace" => "replace",
+            "alpha" => "alpha",
+            _ => "add"
         };
     }
 
@@ -772,6 +833,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             RekallAgeRuntimeRenderMesh value => value.EntityName,
             RekallAgeRuntimeRenderLight value => value.EntityName,
             RekallAgeRuntimeRenderUiLayer value => value.EntityName,
+            RekallAgeRuntimeRenderPostProcessStack value => value.EntityName,
             RekallAgeRuntimePhysicsBody value => value.EntityName,
             RekallAgeRuntimePhysicsCollider value => value.EntityName,
             RekallAgeRuntimeAudioListener value => value.EntityName,
@@ -796,6 +858,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             RekallAgeRuntimeRenderMesh value => value.EntityId,
             RekallAgeRuntimeRenderLight value => value.EntityId,
             RekallAgeRuntimeRenderUiLayer value => value.EntityId,
+            RekallAgeRuntimeRenderPostProcessStack value => value.EntityId,
             RekallAgeRuntimePhysicsBody value => value.EntityId,
             RekallAgeRuntimePhysicsCollider value => value.EntityId,
             RekallAgeRuntimeAudioListener value => value.EntityId,

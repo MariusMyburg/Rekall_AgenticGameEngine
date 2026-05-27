@@ -12,10 +12,10 @@ public sealed class ModuleMetadataTests
     public void IndexerDiscoversModuleComponentsPropertiesAndCapabilities()
     {
         var index = RekallAgeModuleIndexer.IndexAssembly(typeof(TestPlatformerModule).Assembly);
-        var module = Assert.Single(index.Modules, item => item.Id == "test.platformer");
+        var module = Assert.Single(index.Modules, item => item.Id == "test.agentmodule");
         var component = Assert.Single(module.Components, item => item.TypeName.EndsWith(nameof(TestPlayerController), StringComparison.Ordinal));
 
-        Assert.Equal("Test Platformer", module.DisplayName);
+        Assert.Equal("Test Agent Module", module.DisplayName);
         Assert.Equal(["physics2d", "rendering2d", "world"], module.RequiredCapabilities);
         Assert.Equal("Player Controller", component.DisplayName);
         Assert.Contains(component.Properties, property => property.Name == nameof(TestPlayerController.MoveSpeed) && property.Minimum == 0 && property.Maximum == 30);
@@ -28,7 +28,7 @@ public sealed class ModuleMetadataTests
         var command = new ListComponentSchemasCommand(typeof(TestPlatformerModule).Assembly);
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("schemas"), CancellationToken.None);
 
-        var result = await command.ExecuteAsync(new ListComponentSchemasRequest("test.platformer"), context);
+        var result = await command.ExecuteAsync(new ListComponentSchemasRequest("test.agentmodule"), context);
 
         Assert.True(result.Ok);
         var schema = Assert.Single(result.Value.Components, item => item.DisplayName == "Player Controller");
@@ -201,7 +201,7 @@ public sealed class ModuleMetadataTests
         Assert.Contains(textLabelRenderer.Properties, property => property.Name == "Layer" && property.Kind == "string");
     }
 
-    [RekallAgeModule("test.platformer", "Test Platformer")]
+[RekallAgeModule("test.agentmodule", "Test Agent Module")]
     [RekallAgeRequiresCapability("world")]
     [RekallAgeRequiresCapability("rendering2d")]
     [RekallAgeRequiresCapability("physics2d")]

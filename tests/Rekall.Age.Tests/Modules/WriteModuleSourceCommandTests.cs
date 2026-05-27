@@ -1,7 +1,6 @@
 using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
-using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.Modules.Commands;
 using Rekall.Age.Playback;
 using Rekall.Age.Playback.Commands;
@@ -15,11 +14,9 @@ public sealed class WriteModuleSourceCommandTests
     {
         var root = TestPaths.CreateTempDirectory();
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("write module source"), CancellationToken.None);
-        await new CreateGameFromTemplateCommand().ExecuteAsync(
-            new CreateGameFromTemplateRequest(root, "Agent Module Game", "pong"),
-            context);
+        await TestProjectAuthoring.CreateProjectWithSceneAsync(root, context, "Agent Module Game");
         await new ScaffoldPlayableModuleCommand().ExecuteAsync(
-            new ScaffoldPlayableModuleRequest(root, "agent.playable", "Agent Playable", "AgentPlayable", "pong"),
+            new ScaffoldPlayableModuleRequest(root, "agent.playable", "Agent Playable", "AgentPlayable"),
             context);
 
         var write = await new WriteModuleSourceCommand().ExecuteAsync(
@@ -34,7 +31,7 @@ public sealed class WriteModuleSourceCommandTests
         Assert.True(File.Exists(write.Value.SourcePath));
         Assert.True(build.Ok, build.Summary);
         Assert.True(play.Ok, play.Summary);
-        Assert.Contains("AGENT CUSTOM PONG", play.Value.Frames[0], StringComparison.Ordinal);
+        Assert.Contains("AGENT CUSTOM PLAYABLE", play.Value.Frames[0], StringComparison.Ordinal);
         Assert.Contains("Score 50", play.Value.Frames[0], StringComparison.Ordinal);
     }
 
@@ -43,11 +40,9 @@ public sealed class WriteModuleSourceCommandTests
     {
         var root = TestPaths.CreateTempDirectory();
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("write module delta source"), CancellationToken.None);
-        await new CreateGameFromTemplateCommand().ExecuteAsync(
-            new CreateGameFromTemplateRequest(root, "Agent Delta Module Game", "pong"),
-            context);
+        await TestProjectAuthoring.CreateProjectWithSceneAsync(root, context, "Agent Delta Module Game");
         await new ScaffoldPlayableModuleCommand().ExecuteAsync(
-            new ScaffoldPlayableModuleRequest(root, "agent.delta", "Agent Delta", "AgentDelta", "pong"),
+            new ScaffoldPlayableModuleRequest(root, "agent.delta", "Agent Delta", "AgentDelta"),
             context);
 
         var write = await new WriteModuleSourceCommand().ExecuteAsync(
@@ -90,7 +85,7 @@ namespace Game.Modules.AgentPlayable;
 [RekallAgeRequiresCapability("world")]
 public sealed class AgentPlayableModule : RekallAgeModule, IRekallAgePlayableModule
 {
-    public string Kind => "pong";
+    public string Kind => "agent-authored";
 
     public override void Configure(RekallAgeModuleBuilder builder)
     {
@@ -117,7 +112,7 @@ public sealed class AgentPlayableModule : RekallAgeModule, IRekallAgePlayableMod
 
     public RekallAgePlayableModuleFrame Render(RekallAgePlayableModuleState state)
     {
-        return new RekallAgePlayableModuleFrame($"AGENT CUSTOM PONG\nFrame {(int)state.Numbers["frame"]}\nScore {(int)state.Numbers["score"]}\nLane {(int)state.Numbers["lane"]}");
+        return new RekallAgePlayableModuleFrame($"AGENT CUSTOM PLAYABLE\nFrame {(int)state.Numbers["frame"]}\nScore {(int)state.Numbers["score"]}\nLane {(int)state.Numbers["lane"]}");
     }
 }
 """;

@@ -1,5 +1,4 @@
 using Rekall.Age.Core.Commands;
-using Rekall.Age.GameTemplates;
 
 namespace Rekall.Age.Agent.Commands;
 
@@ -21,15 +20,12 @@ public sealed record GetEngineStatusResult(
     string EngineName,
     bool AgentFirst,
     string RenderingPosture,
-    IReadOnlyList<string> MvpTemplateIds,
     IReadOnlyList<RekallAgeAgentWorkflowTool> WorkflowTools,
     IReadOnlyList<RekallAgeAgentAuthoringContract> AuthoringContracts);
 
 public sealed class GetEngineStatusCommand
     : IRekallAgeCommand<GetEngineStatusRequest, GetEngineStatusResult>
 {
-    private readonly RekallAgeGameTemplateCatalog _templates = RekallAgeGameTemplateCatalog.CreateDefault();
-
     public string Name => "rekall.context.engine_status";
 
     public RekallAgeCommandSchema Schema => new(
@@ -46,21 +42,8 @@ public sealed class GetEngineStatusCommand
             EngineName: "Rekall AGE",
             AgentFirst: true,
             RenderingPosture: "Vulkan-first internal renderer with backend-neutral render plans, OpenXR headset readiness, and Direct3D extension point.",
-            MvpTemplateIds: _templates.Templates.Select(template => template.Id).ToArray(),
             WorkflowTools:
             [
-                new RekallAgeAgentWorkflowTool(
-                    "rekall.templates.inspect",
-                    "Inspect one MVP template, its draw contract, and suggested creation workflows.",
-                    Recommended: true),
-                new RekallAgeAgentWorkflowTool(
-                    "rekall.workflow.agent_authoring_gauntlet",
-                    "Run the preferred closed-loop proof: create, verify, package, audit, and return agent next actions for a playable game.",
-                    Recommended: true),
-                new RekallAgeAgentWorkflowTool(
-                    "rekall.workflow.create_playable_package_from_template",
-                    "Create, build, package, run, and capture a proof frame for a playable template game in one call.",
-                    Recommended: true),
                 new RekallAgeAgentWorkflowTool(
                     "rekall.workflow.audit_playable_package",
                     "Inspect a package, run deterministic frames, and capture a proof PNG for deliverable validation.",
@@ -116,10 +99,6 @@ public sealed class GetEngineStatusCommand
                 new RekallAgeAgentWorkflowTool(
                     "rekall.module.read_source",
                     "Read an existing project module source file before editing it.",
-                    Recommended: false),
-                new RekallAgeAgentWorkflowTool(
-                    "rekall.templates.verify_mvp",
-                    "Build and playtest every MVP template, returning a readiness matrix.",
                     Recommended: false),
                 new RekallAgeAgentWorkflowTool(
                     "rekall.module.write_source",

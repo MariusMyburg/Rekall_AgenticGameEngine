@@ -1,7 +1,8 @@
 using System.Diagnostics;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
-using Rekall.Age.GameTemplates.Commands;
+using Rekall.Age.Build.Commands;
+using Rekall.Age.Modules.Commands;
 
 namespace Rekall.Age.Tests.Player;
 
@@ -12,10 +13,13 @@ public sealed class PlayerSmokeTests
     {
         var root = TestPaths.CreateTempDirectory();
         var context = new RekallAgeCommandContext("player-test", RekallAgeTransaction.Begin("player input"), CancellationToken.None);
-        var create = await new CreatePlayableGameFromTemplateCommand().ExecuteAsync(
-            new CreatePlayableGameFromTemplateRequest(root, "Player Pong", "pong"),
+        await TestProjectAuthoring.CreateProjectWithSceneAsync(root, context, "Player Input");
+        var scaffold = await new ScaffoldPlayableModuleCommand().ExecuteAsync(
+            new ScaffoldPlayableModuleRequest(root, "agent.player", "Agent Player", "AgentPlayer"),
             context);
-        Assert.True(create.Ok, create.Summary);
+        var build = await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
+        Assert.True(scaffold.Ok, scaffold.Summary);
+        Assert.True(build.Ok, build.Summary);
         var playerAssembly = FindPlayerAssemblyPath();
 
         var run = await RunAsync(
@@ -29,8 +33,8 @@ public sealed class PlayerSmokeTests
 
         Assert.Equal(0, run.ExitCode);
         Assert.Contains("FRAME 1", run.Output);
-        Assert.Contains("Score 10", run.Output);
-        Assert.Contains("Left paddle lane 0", run.Output);
+        Assert.Contains("AGENT PLAYABLE MODULE", run.Output);
+        Assert.Contains("Scene Main", run.Output);
     }
 
     private static async Task<(int ExitCode, string Output)> RunAsync(string playerAssembly, params string[] args)

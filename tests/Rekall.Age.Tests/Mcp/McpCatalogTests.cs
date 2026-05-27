@@ -2,7 +2,6 @@ using Rekall.Age.Agent.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Build.Commands;
-using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.LevelDesign.Commands;
 using Rekall.Age.Mcp;
 using Rekall.Age.Modules.Commands;
@@ -12,6 +11,7 @@ using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime.Commands;
 using Rekall.Age.Validation.Commands;
+using Rekall.Age.Workflows.Commands;
 using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Tests.Mcp;
@@ -27,12 +27,6 @@ public sealed class McpCatalogTests
         registry.Register(new ListTransactionHistoryCommand());
         registry.Register(new RestoreTransactionPreimageCommand());
         registry.Register(new CreateProjectCommand());
-        registry.Register(new InspectGameTemplateCommand());
-        registry.Register(new VerifyMvpTemplatesCommand());
-        registry.Register(new CreateGameFromTemplateCommand());
-        registry.Register(new CreatePlayableGameFromTemplateCommand());
-        registry.Register(new RunAgentAuthoringGauntletCommand());
-        registry.Register(new CreatePlayablePackageFromTemplateCommand());
         registry.Register(new VerifyPlayableGameCommand());
         registry.Register(new PackagePlayableGameCommand());
         registry.Register(new InspectPlayablePackageCommand());
@@ -91,12 +85,9 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.transaction.history");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.transaction.restore_preimage");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.project.create");
-        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.templates.inspect");
-        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.templates.verify_mvp");
-        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_game_from_template");
-        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_playable_game_from_template");
-        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.agent_authoring_gauntlet");
-        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.create_playable_package_from_template");
+        Assert.DoesNotContain(catalog.Tools, tool => tool.Name.StartsWith("rekall.templates.", StringComparison.Ordinal));
+        Assert.DoesNotContain(catalog.Tools, tool => tool.Name.Contains("template", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(catalog.Tools, tool => tool.Name.Contains("gauntlet", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.verify_playable_game");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.package_playable_game");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.inspect_playable_package");
@@ -148,25 +139,20 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.snapshot");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.multiplayer.delta");
 
-        var oneShot = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.create_playable_package_from_template");
-        Assert.Equal("workflow", oneShot.Category);
-        Assert.True(oneShot.Recommended);
-        Assert.Equal(10, oneShot.AgentPriority);
-
-        var gauntlet = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.agent_authoring_gauntlet");
-        Assert.Equal("workflow", gauntlet.Category);
-        Assert.True(gauntlet.Recommended);
-        Assert.True(gauntlet.AgentPriority < oneShot.AgentPriority);
+        var package = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.package_playable_game");
+        Assert.Equal("workflow", package.Category);
+        Assert.True(package.Recommended);
+        Assert.Equal(10, package.AgentPriority);
 
         var audit = catalog.Tools.Single(tool => tool.Name == "rekall.workflow.audit_playable_package");
         Assert.Equal("workflow", audit.Category);
         Assert.True(audit.Recommended);
-        Assert.True(audit.AgentPriority > oneShot.AgentPriority);
+        Assert.True(audit.AgentPriority > package.AgentPriority);
 
         var renderTool = catalog.Tools.Single(tool => tool.Name == "rekall.render.vulkan.render_pass.capture_clear");
         Assert.Equal("rendering", renderTool.Category);
         Assert.False(renderTool.Recommended);
-        Assert.True(renderTool.AgentPriority > oneShot.AgentPriority);
+        Assert.True(renderTool.AgentPriority > package.AgentPriority);
         var shaderTool = catalog.Tools.Single(tool => tool.Name == "rekall.shader.write");
         Assert.Equal("shaders", shaderTool.Category);
         Assert.True(shaderTool.AgentPriority < renderTool.AgentPriority);

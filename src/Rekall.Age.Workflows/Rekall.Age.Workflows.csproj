@@ -1,9 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\Rekall.Age.Build\Rekall.Age.Build.csproj" />
     <ProjectReference Include="..\Rekall.Age.Core\Rekall.Age.Core.csproj" />
-    <ProjectReference Include="..\Rekall.Age.Modules\Rekall.Age.Modules.csproj" />
     <ProjectReference Include="..\Rekall.Age.Playback\Rekall.Age.Playback.csproj" />
     <ProjectReference Include="..\Rekall.Age.Project\Rekall.Age.Project.csproj" />
     <ProjectReference Include="..\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj" />

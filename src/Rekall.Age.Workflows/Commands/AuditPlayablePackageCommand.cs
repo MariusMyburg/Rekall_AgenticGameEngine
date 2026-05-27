@@ -1,7 +1,7 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
 
-namespace Rekall.Age.GameTemplates.Commands;
+namespace Rekall.Age.Workflows.Commands;
 
 public sealed record AuditPlayablePackageRequest(
     string PackagePath,

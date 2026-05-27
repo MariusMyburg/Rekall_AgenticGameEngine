@@ -47,7 +47,6 @@ public sealed class RekallAgeContextBuilder
 
         return new RekallAgeProjectSummary(
             manifest.Name,
-            manifest.SourceTemplateId,
             manifest.Capabilities,
             sceneNames,
             artifacts,

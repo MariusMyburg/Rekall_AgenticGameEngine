@@ -6,8 +6,6 @@ using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor;
-using Rekall.Age.GameTemplates;
-using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.LevelDesign.Commands;
 using Rekall.Age.Mcp;
 using Rekall.Age.Modules.Commands;
@@ -21,6 +19,7 @@ using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.Runtime.Commands;
 using Rekall.Age.Validation;
 using Rekall.Age.Validation.Commands;
+using Rekall.Age.Workflows.Commands;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
 using System.Globalization;
@@ -38,7 +37,7 @@ internal static class RekallAgeCli
         Log.Information("Rekall AGE command starting. Args={Args}", string.Join(' ', args));
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|transaction|capture|render|module|build|validation|templates|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|transaction|capture|render|module|build|validation|mcp> ...");
             Log.Information("Rekall AGE command finished with usage error. LogDirectory={LogDirectory}", logDirectory);
             Log.CloseAndFlush();
             return 2;
@@ -51,10 +50,6 @@ internal static class RekallAgeCli
             var context = new RekallAgeCommandContext(IsMcpStdio(args) ? "mcp" : "cli", transaction, cancellationToken);
             var exitCode = args switch
             {
-                ["templates", "list"] => ListTemplates(),
-                ["templates", "inspect", var templateId] => await InspectTemplateAsync(registry, context, templateId),
-                ["templates", "verify-mvp"] => await VerifyMvpTemplatesAsync(registry, context, null, cleanup: true),
-                ["templates", "verify-mvp", var workRoot] => await VerifyMvpTemplatesAsync(registry, context, workRoot, cleanup: false),
                 ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
                 ["render", "stereo", "inspect", var root, var scene] =>
                     await InspectStereoRenderPlanAsync(registry, context, root, scene, "0", "1920", "1080"),
@@ -195,8 +190,8 @@ internal static class RekallAgeCli
                     await ReadModuleSourceAsync(registry, context, root, moduleName, fileName),
                 ["module", "scaffold", var root, var moduleId, var displayName, var moduleName, var componentName] =>
                     await ScaffoldModuleAsync(registry, context, root, moduleId, displayName, moduleName, componentName),
-                ["module", "scaffold-playable", var root, var moduleId, var displayName, var moduleName, var kind] =>
-                    await ScaffoldPlayableModuleAsync(registry, context, root, moduleId, displayName, moduleName, kind),
+                ["module", "scaffold-playable", var root, var moduleId, var displayName, var moduleName] =>
+                    await ScaffoldPlayableModuleAsync(registry, context, root, moduleId, displayName, moduleName),
                 ["module", "scaffold-runtime-system", var root, var moduleId, var displayName, var moduleName, var componentName, var systemName] =>
                     await ScaffoldRuntimeSystemModuleAsync(registry, context, root, moduleId, displayName, moduleName, componentName, systemName),
                 ["module", "write-source", var root, var moduleName, var fileName, var sourceOrPath] =>
@@ -204,20 +199,6 @@ internal static class RekallAgeCli
                 ["build", "modules", var root] => await BuildModulesAsync(registry, context, root),
                 ["build", "player", var root, var scene] => await BuildPlayerAsync(registry, context, root, scene, graphics: false),
                 ["build", "player", var root, var scene, "--graphics"] => await BuildPlayerAsync(registry, context, root, scene, graphics: true),
-                ["game", "create", var root, var name, var template] => await CreateGameAsync(registry, context, root, name, template),
-                ["game", "create-playable", var root, var name, var template] => await CreatePlayableGameAsync(registry, context, root, name, template),
-                ["game", "gauntlet", var root, var name, var template] =>
-                    await RunAgentAuthoringGauntletAsync(registry, context, root, name, template, null, null),
-                ["game", "gauntlet", var root, var name, var template, var outputDirectory] =>
-                    await RunAgentAuthoringGauntletAsync(registry, context, root, name, template, outputDirectory, null),
-                ["game", "gauntlet", var root, var name, var template, var outputDirectory, var auditOutputDirectory] =>
-                    await RunAgentAuthoringGauntletAsync(registry, context, root, name, template, outputDirectory, auditOutputDirectory),
-                ["game", "create-package-playable", var root, var name, var template] =>
-                    await CreatePlayablePackageFromTemplateAsync(registry, context, root, name, template, null, null),
-                ["game", "create-package-playable", var root, var name, var template, var outputDirectory] =>
-                    await CreatePlayablePackageFromTemplateAsync(registry, context, root, name, template, outputDirectory, null),
-                ["game", "create-package-playable", var root, var name, var template, var outputDirectory, var captureOutputDirectory] =>
-                    await CreatePlayablePackageFromTemplateAsync(registry, context, root, name, template, outputDirectory, captureOutputDirectory),
                 ["game", "verify-playable", var root] => await VerifyPlayableGameAsync(registry, context, root, "Main", "2", null, null, null),
                 ["game", "verify-playable", var root, var scene] => await VerifyPlayableGameAsync(registry, context, root, scene, "2", null, null, null),
                 ["game", "verify-playable", var root, var scene, var frames] => await VerifyPlayableGameAsync(registry, context, root, scene, frames, null, null, null),
@@ -421,19 +402,12 @@ internal static class RekallAgeCli
         registry.Register(new AddComponentCommand());
         registry.Register(new SetComponentPropertyCommand());
         registry.Register(new InspectEntityCommand());
-        registry.Register(new CreateGameFromTemplateCommand());
-        registry.Register(new CreatePlayableGameFromTemplateCommand());
-        registry.Register(new RunAgentAuthoringGauntletCommand());
-        registry.Register(new CreatePlayablePackageFromTemplateCommand());
-        registry.Register(new InspectGameTemplateCommand());
-        registry.Register(new VerifyMvpTemplatesCommand());
         registry.Register(new VerifyPlayableGameCommand());
         registry.Register(new PackagePlayableGameCommand());
         registry.Register(new InspectPlayablePackageCommand());
         registry.Register(new RunPlayablePackageCommand());
         registry.Register(new CapturePlayablePackageFrameCommand());
         registry.Register(new AuditPlayablePackageCommand());
-        registry.Register(new ListGameTemplatesCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new GetEngineStatusCommand());
@@ -534,75 +508,6 @@ internal static class RekallAgeCli
             context.Transaction,
             context.Actor,
             context.CancellationToken);
-    }
-
-    private static int ListTemplates()
-    {
-        foreach (var template in RekallAgeGameTemplateCatalog.CreateDefault().Templates)
-        {
-            Console.WriteLine($"{template.Id}: {template.DisplayName} - {template.Description}");
-        }
-
-        return 0;
-    }
-
-    private static async Task<int> InspectTemplateAsync(
-        RekallAgeCommandRegistry registry,
-        RekallAgeCommandContext context,
-        string templateId)
-    {
-        var result = await registry.ExecuteAsync<InspectGameTemplateRequest, InspectGameTemplateResult>(
-            "rekall.templates.inspect",
-            new InspectGameTemplateRequest(templateId),
-            context);
-        Console.WriteLine(result.Summary);
-        Console.WriteLine($"{result.Value.Template.Id}: {result.Value.Template.DisplayName}");
-        Console.WriteLine(result.Value.Template.Description);
-        Console.WriteLine($"Capabilities: {string.Join(", ", result.Value.Template.Capabilities)}");
-        Console.WriteLine("Draw commands:");
-        foreach (var command in result.Value.Template.DrawCommands)
-        {
-            Console.WriteLine($"  {command.Id}: {command.Kind} - {command.Purpose}");
-        }
-
-        Console.WriteLine("Suggested tools:");
-        foreach (var command in result.Value.SuggestedCommands)
-        {
-            Console.WriteLine($"  {command.Tool}");
-        }
-
-        foreach (var error in result.Errors)
-        {
-            Console.WriteLine($"{error.Code}: {error.Message}");
-        }
-
-        return result.Ok ? 0 : 1;
-    }
-
-    private static async Task<int> VerifyMvpTemplatesAsync(
-        RekallAgeCommandRegistry registry,
-        RekallAgeCommandContext context,
-        string? workRoot,
-        bool cleanup)
-    {
-        var result = await registry.ExecuteAsync<VerifyMvpTemplatesRequest, VerifyMvpTemplatesResult>(
-            "rekall.templates.verify_mvp",
-            new VerifyMvpTemplatesRequest(workRoot, Cleanup: cleanup),
-            context);
-        Console.WriteLine(result.Summary);
-        Console.WriteLine($"Ready: {result.Value.Ready}");
-        foreach (var template in result.Value.Templates)
-        {
-            Console.WriteLine($"{template.TemplateId}: {template.Ready} - {template.Summary}");
-            Console.WriteLine($"  Frames: {template.FrameCount}; Draw commands: {template.DrawCommandCount}");
-        }
-
-        foreach (var error in result.Errors)
-        {
-            Console.WriteLine($"{error.Code}: {error.Message}");
-        }
-
-        return result.Ok && result.Value.Ready ? 0 : 1;
     }
 
     private static async Task<int> ListRenderBackendsAsync(
@@ -2275,12 +2180,11 @@ internal static class RekallAgeCli
         string root,
         string moduleId,
         string displayName,
-        string moduleName,
-        string kind)
+        string moduleName)
     {
         var result = await registry.ExecuteAsync<ScaffoldPlayableModuleRequest, ScaffoldPlayableModuleResult>(
             "rekall.module.scaffold_playable",
-            new ScaffoldPlayableModuleRequest(root, moduleId, displayName, moduleName, kind),
+            new ScaffoldPlayableModuleRequest(root, moduleId, displayName, moduleName),
             context);
         Console.WriteLine(result.Value.SourcePath);
         return result.Ok ? 0 : 1;
@@ -2391,126 +2295,6 @@ internal static class RekallAgeCli
         return result.Ok ? 0 : 1;
     }
 
-    private static async Task<int> CreateGameAsync(
-        RekallAgeCommandRegistry registry,
-        RekallAgeCommandContext context,
-        string root,
-        string name,
-        string template)
-    {
-        var result = await registry.ExecuteAsync<CreateGameFromTemplateRequest, CreateGameFromTemplateResult>(
-            "rekall.workflow.create_game_from_template",
-            new CreateGameFromTemplateRequest(root, name, template),
-            context);
-        Console.WriteLine(result.Summary);
-        return result.Ok ? 0 : 1;
-    }
-
-    private static async Task<int> CreatePlayableGameAsync(
-        RekallAgeCommandRegistry registry,
-        RekallAgeCommandContext context,
-        string root,
-        string name,
-        string template)
-    {
-        var result = await registry.ExecuteAsync<CreatePlayableGameFromTemplateRequest, CreatePlayableGameFromTemplateResult>(
-            "rekall.workflow.create_playable_game_from_template",
-            new CreatePlayableGameFromTemplateRequest(root, name, template),
-            context);
-        Console.WriteLine(result.Summary);
-        if (result.Ok)
-        {
-            Console.WriteLine($"Module source: {result.Value.ModuleSourcePath}");
-            Console.WriteLine($"Module assembly: {result.Value.ModuleAssemblyPath}");
-        }
-        else
-        {
-            foreach (var error in result.Errors)
-            {
-                Console.WriteLine($"{error.Code}: {error.Message}");
-            }
-        }
-
-        return result.Ok ? 0 : 1;
-    }
-
-    private static async Task<int> CreatePlayablePackageFromTemplateAsync(
-        RekallAgeCommandRegistry registry,
-        RekallAgeCommandContext context,
-        string root,
-        string name,
-        string template,
-        string? outputDirectory,
-        string? captureOutputDirectory)
-    {
-        var result = await registry.ExecuteAsync<CreatePlayablePackageFromTemplateRequest, CreatePlayablePackageFromTemplateResult>(
-            "rekall.workflow.create_playable_package_from_template",
-            new CreatePlayablePackageFromTemplateRequest(
-                root,
-                name,
-                template,
-                OutputDirectory: outputDirectory,
-                CaptureOutputDirectory: captureOutputDirectory),
-            context);
-        Console.WriteLine(result.Summary);
-        Console.WriteLine($"Ready: {result.Value.Ready}");
-        Console.WriteLine($"Template: {result.Value.TemplateId}");
-        Console.WriteLine($"Archive: {result.Value.Package.ArchivePath}");
-        Console.WriteLine($"Manifest: {result.Value.Package.ManifestPath}");
-        Console.WriteLine($"Run exit code: {result.Value.Run.ExitCode}");
-        Console.WriteLine($"Capture: {result.Value.Capture.OutputPath}");
-        foreach (var error in result.Errors)
-        {
-            Console.WriteLine($"{error.Code}: {error.Message}");
-        }
-
-        return result.Ok && result.Value.Ready ? 0 : 1;
-    }
-
-    private static async Task<int> RunAgentAuthoringGauntletAsync(
-        RekallAgeCommandRegistry registry,
-        RekallAgeCommandContext context,
-        string root,
-        string name,
-        string template,
-        string? outputDirectory,
-        string? auditOutputDirectory)
-    {
-        var result = await registry.ExecuteAsync<RunAgentAuthoringGauntletRequest, RunAgentAuthoringGauntletResult>(
-            "rekall.workflow.agent_authoring_gauntlet",
-            new RunAgentAuthoringGauntletRequest(
-                root,
-                name,
-                template,
-                OutputDirectory: outputDirectory,
-                AuditOutputDirectory: auditOutputDirectory),
-            context);
-        Console.WriteLine(result.Summary);
-        Console.WriteLine($"Ready: {result.Value.Ready}");
-        Console.WriteLine($"Template: {result.Value.TemplateId}");
-        Console.WriteLine($"Project: {result.Value.ProjectRoot}");
-        Console.WriteLine($"Scene: {result.Value.SceneName}");
-        Console.WriteLine($"Archive: {result.Value.PackageArchivePath}");
-        Console.WriteLine($"Proof frame: {result.Value.ProofFramePath}");
-        foreach (var check in result.Value.Checks)
-        {
-            Console.WriteLine($"{check.Name}: {check.Passed} - {check.Summary}");
-        }
-
-        Console.WriteLine("Next actions:");
-        foreach (var action in result.Value.RecommendedNextActions)
-        {
-            Console.WriteLine($"  {action}");
-        }
-
-        foreach (var error in result.Errors)
-        {
-            Console.WriteLine($"{error.Code}: {error.Message}");
-        }
-
-        return result.Ok && result.Value.Ready ? 0 : 1;
-    }
-
     private static async Task<int> VerifyPlayableGameAsync(
         RekallAgeCommandRegistry registry,
         RekallAgeCommandContext context,
@@ -2595,10 +2379,8 @@ internal static class RekallAgeCli
             context);
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Ready: {result.Value.Ready}");
-        Console.WriteLine($"Template: {result.Value.Manifest.SourceTemplateId ?? "<none>"}");
         Console.WriteLine($"Scene: {result.Value.Manifest.SceneName}");
         Console.WriteLine($"Launch: {result.Value.Manifest.LaunchPath}");
-        Console.WriteLine($"Draw commands: {result.Value.Manifest.DrawCommands.Count}");
         Console.WriteLine($"Draw assertions: {result.Value.Manifest.DrawAssertions.Count}");
         Console.WriteLine($"Files: {result.Value.FileCount}");
         Console.WriteLine("Key artifacts:");
@@ -2795,7 +2577,6 @@ internal static class RekallAgeCli
         Console.WriteLine(result.Value.EngineName);
         Console.WriteLine($"Agent-first: {result.Value.AgentFirst}");
         Console.WriteLine($"Rendering: {result.Value.RenderingPosture}");
-        Console.WriteLine($"MVP templates: {string.Join(", ", result.Value.MvpTemplateIds)}");
         Console.WriteLine("Workflow tools:");
         foreach (var workflow in result.Value.WorkflowTools)
         {

@@ -13,7 +13,7 @@ public sealed class ModuleSourceInspectionCommandTests
         var root = TestPaths.CreateTempDirectory();
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("list module source"), CancellationToken.None);
         var scaffold = await new ScaffoldPlayableModuleCommand().ExecuteAsync(
-            new ScaffoldPlayableModuleRequest(root, "module.pong", "Module Pong", "ModulePong", "pong"),
+            new ScaffoldPlayableModuleRequest(root, "module.agent", "Agent Module", "AgentModule"),
             context);
         var build = await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
 
@@ -25,8 +25,8 @@ public sealed class ModuleSourceInspectionCommandTests
         Assert.True(build.Ok, build.Summary);
         Assert.True(list.Ok, list.Summary);
         var source = Assert.Single(list.Value.Sources);
-        Assert.Equal("ModulePong", source.ModuleName);
-        Assert.Equal("ModulePongModule.cs", source.FileName);
+        Assert.Equal("AgentModule", source.ModuleName);
+        Assert.Equal("AgentModule.cs", source.FileName);
         Assert.Equal(scaffold.Value.SourcePath, source.SourcePath);
         Assert.True(source.Bytes > 0);
     }
@@ -37,18 +37,18 @@ public sealed class ModuleSourceInspectionCommandTests
         var root = TestPaths.CreateTempDirectory();
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("read module source"), CancellationToken.None);
         await new ScaffoldPlayableModuleCommand().ExecuteAsync(
-            new ScaffoldPlayableModuleRequest(root, "module.pong", "Module Pong", "ModulePong", "pong"),
+            new ScaffoldPlayableModuleRequest(root, "module.agent", "Agent Module", "AgentModule"),
             context);
 
         var read = await new ReadModuleSourceCommand().ExecuteAsync(
-            new ReadModuleSourceRequest(root, "ModulePong", "ModulePongModule.cs"),
+            new ReadModuleSourceRequest(root, "AgentModule", "AgentModule.cs"),
             context);
 
         Assert.True(read.Ok, read.Summary);
-        Assert.Equal("ModulePong", read.Value.ModuleName);
-        Assert.Equal("ModulePongModule.cs", read.Value.FileName);
-        Assert.Contains("public sealed class ModulePongModule", read.Value.Source, StringComparison.Ordinal);
-        Assert.Contains("PONG", read.Value.Source, StringComparison.Ordinal);
+        Assert.Equal("AgentModule", read.Value.ModuleName);
+        Assert.Equal("AgentModule.cs", read.Value.FileName);
+        Assert.Contains("public sealed class AgentModule", read.Value.Source, StringComparison.Ordinal);
+        Assert.Contains("AGENT PLAYABLE MODULE", read.Value.Source, StringComparison.Ordinal);
     }
 
     [Fact]

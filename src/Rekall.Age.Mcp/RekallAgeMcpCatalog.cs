@@ -32,11 +32,6 @@ internal static class RekallAgeMcpToolClassifier
             return "context";
         }
 
-        if (name.StartsWith("rekall.templates.", StringComparison.Ordinal))
-        {
-            return "templates";
-        }
-
         if (name.StartsWith("rekall.workflow.", StringComparison.Ordinal))
         {
             return "workflow";
@@ -112,9 +107,7 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.multiplayer.delta" or
             "rekall.render.visibility.inspect_scene" or
             "rekall.solar.import_ksa_system" or
-            "rekall.templates.inspect" or
-            "rekall.workflow.agent_authoring_gauntlet" or
-            "rekall.workflow.create_playable_package_from_template" or
+            "rekall.workflow.package_playable_game" or
             "rekall.workflow.audit_playable_package";
     }
 
@@ -123,9 +116,7 @@ internal static class RekallAgeMcpToolClassifier
         return name switch
         {
             "rekall.context.engine_status" => 5,
-            "rekall.templates.inspect" => 8,
-            "rekall.workflow.agent_authoring_gauntlet" => 9,
-            "rekall.workflow.create_playable_package_from_template" => 10,
+            "rekall.workflow.package_playable_game" => 10,
             "rekall.workflow.audit_playable_package" => 15,
             "rekall.live.status" => 16,
             "rekall.live.apply_scene_blueprint" => 17,
@@ -140,7 +131,6 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.multiplayer.delta" => 26,
             "rekall.render.visibility.inspect_scene" => 26,
             "rekall.solar.import_ksa_system" => 27,
-            "rekall.templates.verify_mvp" => 20,
             "rekall.scene.apply_blueprint" => 42,
             _ when name.StartsWith("rekall.workflow.", StringComparison.Ordinal) => 30,
             _ when name.StartsWith("rekall.transaction.", StringComparison.Ordinal) => 35,

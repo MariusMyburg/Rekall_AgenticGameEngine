@@ -1,7 +1,8 @@
 using System.Text.Json.Nodes;
+using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
-using Rekall.Age.GameTemplates.Commands;
+using Rekall.Age.Modules.Commands;
 using Rekall.Age.Playback;
 using Rekall.Age.Rendering;
 using Rekall.Age.Runtime;
@@ -17,8 +18,7 @@ public sealed class CaptureScreenshotCommandTests
     {
         var root = TestPaths.CreateTempDirectory();
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("capture"), CancellationToken.None);
-        await new CreateGameFromTemplateCommand()
-            .ExecuteAsync(new CreateGameFromTemplateRequest(root, "Puzzle Capture", "puzzle"), context);
+        await TestProjectAuthoring.CreateRenderableProjectAsync(root, context, "Renderable Capture");
         var command = new CaptureScreenshotCommand();
 
         var result = await command.ExecuteAsync(
@@ -66,8 +66,15 @@ public sealed class CaptureScreenshotCommandTests
     {
         var root = TestPaths.CreateTempDirectory();
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("play capture"), CancellationToken.None);
-        await new CreatePlayableGameFromTemplateCommand()
-            .ExecuteAsync(new CreatePlayableGameFromTemplateRequest(root, "Captured Pong", "pong"), context);
+        await TestProjectAuthoring.CreateProjectWithSceneAsync(root, context, "Captured Playable");
+        await new ScaffoldPlayableModuleCommand().ExecuteAsync(
+            new ScaffoldPlayableModuleRequest(root, "agent.capture", "Agent Capture", "AgentCapture"),
+            context);
+        await new WriteModuleSourceCommand().ExecuteAsync(
+            new WriteModuleSourceRequest(root, "AgentCapture", "AgentCaptureModule.cs", CreateCaptureModuleSource()),
+            context);
+        var build = await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
+        Assert.True(build.Ok, build.Summary);
         var command = new CapturePlayableFrameCommand();
 
         var result = await command.ExecuteAsync(
@@ -91,11 +98,59 @@ public sealed class CaptureScreenshotCommandTests
         Assert.Equal(320, result.Value.Width);
         Assert.Equal(180, result.Value.Height);
         Assert.Equal(1, result.Value.FrameIndex);
-        Assert.Equal("pong", result.Value.Kind);
-        Assert.Equal(5, result.Value.DrawCommandCount);
-        Assert.Equal(["clear", "rect", "rect", "circle", "text"], result.Value.DrawCommandKinds);
+        Assert.Equal("agent-authored", result.Value.Kind);
+        Assert.Equal(4, result.Value.DrawCommandCount);
+        Assert.Equal(["clear", "rect", "circle", "text"], result.Value.DrawCommandKinds);
         Assert.True(result.Value.NonBackgroundPixels > 0);
         Assert.Contains("Score 10", result.Value.Text, StringComparison.Ordinal);
         Assert.Contains(result.Value.OutputPath, context.Transaction.ChangedResources);
+    }
+
+    private static string CreateCaptureModuleSource()
+    {
+        return """
+using Rekall.Age.Modules;
+
+namespace Game.Modules.AgentCapture;
+
+[RekallAgeModule("agent.capture", "Agent Capture")]
+[RekallAgeRequiresCapability("world")]
+public sealed class AgentCaptureModule : RekallAgeModule, IRekallAgePlayableModule
+{
+    public string Kind => "agent-authored";
+
+    public override void Configure(RekallAgeModuleBuilder builder)
+    {
+    }
+
+    public RekallAgePlayableModuleState CreateInitialState(RekallAgePlayableModuleContext context)
+    {
+        var state = new RekallAgePlayableModuleState();
+        state.Numbers["score"] = 0;
+        return state;
+    }
+
+    public void Tick(RekallAgePlayableModuleState state, RekallAgePlayableModuleInput input)
+    {
+        if (input.PrimaryAction)
+        {
+            state.Numbers["score"] += 10;
+        }
+    }
+
+    public RekallAgePlayableModuleFrame Render(RekallAgePlayableModuleState state)
+    {
+        var score = (int)state.Numbers["score"];
+        var drawCommands = new[]
+        {
+            new RekallAgePlayableDrawCommand("clear", "background", 0, 0, 320, 180, "#101820"),
+            new RekallAgePlayableDrawCommand("rect", "agent-actor", 128, 74, 40, 40, "#f2aa4c"),
+            new RekallAgePlayableDrawCommand("circle", "agent-focus", 184, 86, 16, 16, "#f6f7f8"),
+            new RekallAgePlayableDrawCommand("text", "agent-hud", 8, 8, 0, 0, "#ffffff", $"Score {score}")
+        };
+        return new RekallAgePlayableModuleFrame($"AGENT CAPTURE\nScore {score}", drawCommands);
+    }
+}
+""";
     }
 }

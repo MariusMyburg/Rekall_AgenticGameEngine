@@ -10,29 +10,41 @@ namespace Rekall.Age.Tests.Cli;
 public sealed class CliSmokeTests
 {
     [Fact]
-    public async Task CliCreatesTemplateProjectAndPrintsSummary()
+    public async Task CliCreatesGenericProjectAndDoesNotExposeGameTemplates()
     {
         var root = TestPaths.CreateTempDirectory();
         var cliAssembly = FindCliAssemblyPath();
 
-        var template = await RunAsync(cliAssembly, "templates", "inspect", "puzzle");
-        Assert.Equal(0, template.ExitCode);
-        Assert.Contains("puzzle: Puzzle Game", template.Output);
-        Assert.Contains("rekall.workflow.create_playable_package_from_template", template.Output);
+        var templates = await RunAsync(cliAssembly, "templates", "list");
+        Assert.Equal(2, templates.ExitCode);
 
         var engine = await RunAsync(cliAssembly, "context", "engine");
         Assert.Equal(0, engine.ExitCode);
         Assert.Contains("Rekall AGE", engine.Output);
         Assert.Contains("Agent-first: True", engine.Output);
-        Assert.Contains("rekall.workflow.agent_authoring_gauntlet", engine.Output);
-        Assert.Contains("rekall.workflow.create_playable_package_from_template", engine.Output);
+        Assert.DoesNotContain("template", engine.Output, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("gauntlet", engine.Output, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Authoring contracts:", engine.Output);
         Assert.Contains("IRekallAgeRuntimeModuleSystem", engine.Output);
         Assert.Contains("RekallAgeRuntimeRenderMesh", engine.Output);
 
-        var create = await RunAsync(cliAssembly, "game", "create", root, "Crystal Mines", "puzzle");
+        var create = await RunAsync(cliAssembly, "project", "create", root, "Crystal Mines", "world,rendering3d");
         Assert.Equal(0, create.ExitCode);
-        Assert.Contains("Created puzzle game", create.Output);
+        Assert.Contains("Created Rekall AGE project", create.Output);
+
+        var scene = await RunAsync(cliAssembly, "scene", "create", root, "Main", "world,rendering3d");
+        Assert.Equal(0, scene.ExitCode);
+
+        var cube = await RunAsync(cliAssembly, "geometry", "primitive", "create", root, "Main", "PuzzleGrid", "cube", "0", "0", "0", "#8ab4f8");
+        Assert.Equal(0, cube.ExitCode);
+
+        var sceneStore = new RekallAgeSceneStore();
+        var authoredScene = await sceneStore.LoadAsync(root, "Main", CancellationToken.None);
+        await sceneStore.SaveAsync(
+            root,
+            authoredScene.AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true }))),
+            CancellationToken.None);
 
         var validation = await RunAsync(cliAssembly, "validation", "scene", root, "Main");
         Assert.Equal(0, validation.ExitCode);
@@ -45,7 +57,7 @@ public sealed class CliSmokeTests
         var run = await RunAsync(cliAssembly, "run", "scene", root, "Main", "0.1");
         Assert.Equal(0, run.ExitCode);
         Assert.Contains("Simulated Main", run.Output);
-        Assert.Contains("Camera2D", run.Output);
+        Assert.Contains("Camera3D", run.Output);
 
         var sceneSummary = await RunAsync(cliAssembly, "context", "scene", root, "Main");
         Assert.Equal(0, sceneSummary.ExitCode);
@@ -73,125 +85,22 @@ public sealed class CliSmokeTests
     }
 
     [Fact]
-    public async Task CliPlaytestsPlayableTemplateWithJsonAssertions()
+    public async Task CliDoesNotExposeTemplatePlayableCreationRoutes()
     {
         var root = TestPaths.CreateTempDirectory();
         var cliAssembly = FindCliAssemblyPath();
 
-        var create = await RunAsync(cliAssembly, "game", "create-playable", root, "CLI Pong", "pong");
-        Assert.Equal(0, create.ExitCode);
+        var createPlayable = await RunAsync(cliAssembly, "game", "create-playable", root, "CLI Game", "demo");
+        Assert.Equal(2, createPlayable.ExitCode);
 
-        var playtest = await RunAsync(
-            cliAssembly,
-            "playtest",
-            "scene",
-            root,
-            "Main",
-            "2",
-            """[{"verticalAxis":1,"primaryAction":true},{"verticalAxis":-1,"primaryAction":false}]""",
-            """[{"frameIndex":0,"contains":"Score 10"},{"frameIndex":1,"contains":"Left paddle lane 0"}]""",
-            """[{"frameIndex":0,"id":"ball","kind":"circle"},{"frameIndex":0,"kind":"text","textContains":"Score 10"}]""");
+        var createFromTemplate = await RunAsync(cliAssembly, "game", "create", root, "CLI Game", "demo");
+        Assert.Equal(2, createFromTemplate.ExitCode);
 
-        Assert.Equal(0, playtest.ExitCode);
-        Assert.Contains("Passed: True", playtest.Output);
-        Assert.Contains("Assertion frame 0 contains \"Score 10\": True", playtest.Output);
-        Assert.Contains("Draw assertion frame 0 id=ball kind=circle text=<any>: True", playtest.Output);
+        var oneShot = await RunAsync(cliAssembly, "game", "create-package-playable", root, "CLI Game", "demo", Path.Combine(root, "Package"));
+        Assert.Equal(2, oneShot.ExitCode);
 
-        var verify = await RunAsync(
-            cliAssembly,
-            "game",
-            "verify-playable",
-            root,
-            "Main",
-            "1",
-            """[{"verticalAxis":1,"primaryAction":true}]""",
-            """[{"frameIndex":0,"contains":"Score 10"}]""",
-            """[{"frameIndex":0,"id":"ball","kind":"circle"}]""");
-        Assert.Equal(0, verify.ExitCode);
-        Assert.Contains("Ready: True", verify.Output);
-        Assert.Contains("Draw assertion frame 0 id=ball kind=circle text=<any>: True", verify.Output);
-
-        var captureDirectory = Path.Combine(root, "PlayCaptures");
-        var capture = await RunAsync(cliAssembly, "play", "capture-frame", root, "Main", captureDirectory, "1");
-        Assert.Equal(0, capture.ExitCode);
-        Assert.Contains("Main_play_frame_001.png", capture.Output);
-        Assert.True(File.Exists(Path.Combine(captureDirectory, "Main_play_frame_001.png")));
-
-        var packageDirectory = Path.Combine(root, "Packaged");
-        var package = await RunAsync(cliAssembly, "game", "package-playable", root, "Main", packageDirectory);
-        Assert.Equal(0, package.ExitCode);
-
-        var inspect = await RunAsync(cliAssembly, "game", "inspect-package", $"{packageDirectory}.zip");
-        Assert.Equal(0, inspect.ExitCode);
-        Assert.Contains("Ready: True", inspect.Output);
-        Assert.Contains("Template: pong", inspect.Output);
-        Assert.Contains("Draw commands:", inspect.Output);
-        Assert.Contains("Files:", inspect.Output);
-        Assert.Contains("Key artifacts:", inspect.Output);
-        Assert.Contains("Game/rekall.project.json", inspect.Output);
-
-        var runPackage = await RunAsync(cliAssembly, "game", "run-package", $"{packageDirectory}.zip", "1");
-        Assert.Equal(0, runPackage.ExitCode);
-        Assert.Contains("Ready: True", runPackage.Output);
-        Assert.Contains("FRAME 1", runPackage.Output);
-        Assert.Contains("PONG", runPackage.Output);
-
-        var packageFrameDirectory = Path.Combine(root, "PackageFrames");
-        var capturePackageFrame = await RunAsync(cliAssembly, "game", "capture-package-frame", $"{packageDirectory}.zip", packageFrameDirectory, "1");
-        Assert.Equal(0, capturePackageFrame.ExitCode);
-        Assert.Contains("Captured: True", capturePackageFrame.Output);
-        Assert.Contains("Non-blank: True", capturePackageFrame.Output);
-        Assert.True(File.Exists(Path.Combine(packageFrameDirectory, "package_play_frame_001.png")));
-
-        var auditDirectory = Path.Combine(root, "PackageAudit");
-        var audit = await RunAsync(cliAssembly, "game", "audit-package", $"{packageDirectory}.zip", auditDirectory);
-        Assert.Equal(0, audit.ExitCode);
-        Assert.Contains("Ready: True", audit.Output);
-        Assert.Contains("Missing key artifacts: 0", audit.Output);
-        Assert.Contains("Captured: True", audit.Output);
-        Assert.True(File.Exists(Path.Combine(auditDirectory, "package_play_frame_001.png")));
-
-        var oneShotRoot = TestPaths.CreateTempDirectory();
-        var oneShotOutput = Path.Combine(oneShotRoot, "Packaged");
-        var oneShotFrames = Path.Combine(oneShotRoot, "Frames");
-        var oneShot = await RunAsync(
-            cliAssembly,
-            "game",
-            "create-package-playable",
-            oneShotRoot,
-            "CLI One Shot Pong",
-            "pong",
-            oneShotOutput,
-            oneShotFrames);
-        Assert.Equal(0, oneShot.ExitCode);
-        Assert.Contains("Ready: True", oneShot.Output);
-        Assert.Contains("Archive:", oneShot.Output);
-        Assert.Contains("Capture:", oneShot.Output);
-        Assert.True(File.Exists($"{oneShotOutput}.zip"));
-        Assert.True(File.Exists(Path.Combine(oneShotFrames, "package_play_frame_001.png")));
-
-        var gauntletRoot = TestPaths.CreateTempDirectory();
-        var gauntletOutput = Path.Combine(gauntletRoot, "GauntletPackage");
-        var gauntletAudit = Path.Combine(gauntletRoot, "GauntletAudit");
-        var gauntlet = await RunAsync(
-            cliAssembly,
-            "game",
-            "gauntlet",
-            gauntletRoot,
-            "CLI Gauntlet Pong",
-            "pong",
-            gauntletOutput,
-            gauntletAudit);
-        Assert.Equal(0, gauntlet.ExitCode);
-        Assert.Contains("Ready: True", gauntlet.Output);
-        Assert.Contains("create-playable: True", gauntlet.Output);
-        Assert.Contains("verify-playable: True", gauntlet.Output);
-        Assert.Contains("package-playable: True", gauntlet.Output);
-        Assert.Contains("audit-package: True", gauntlet.Output);
-        Assert.Contains("Next actions:", gauntlet.Output);
-        Assert.Contains("rekall.workflow.inspect_playable_package", gauntlet.Output);
-        Assert.True(File.Exists($"{gauntletOutput}.zip"));
-        Assert.True(File.Exists(Path.Combine(gauntletAudit, "package_play_frame_001.png")));
+        var gauntlet = await RunAsync(cliAssembly, "game", "gauntlet", root, "CLI Game", "demo", Path.Combine(root, "Package"));
+        Assert.Equal(2, gauntlet.ExitCode);
     }
 
     [Fact]
@@ -199,9 +108,6 @@ public sealed class CliSmokeTests
     {
         var root = TestPaths.CreateTempDirectory();
         var cliAssembly = FindCliAssemblyPath();
-
-        var create = await RunAsync(cliAssembly, "game", "create-playable", root, "CLI Pong", "pong");
-        Assert.Equal(0, create.ExitCode);
 
         var playtest = await RunAsync(cliAssembly, "playtest", "scene", root, "Main", "1", "[{verticalAxis:1}]", "[]");
 

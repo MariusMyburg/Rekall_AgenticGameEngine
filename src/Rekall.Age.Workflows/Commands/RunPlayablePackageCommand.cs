@@ -5,7 +5,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 
-namespace Rekall.Age.GameTemplates.Commands;
+namespace Rekall.Age.Workflows.Commands;
 
 public sealed record RunPlayablePackageRequest(
     string PackagePath,

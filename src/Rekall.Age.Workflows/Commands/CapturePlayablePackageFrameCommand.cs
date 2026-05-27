@@ -2,7 +2,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
 using Rekall.Age.Rendering;
 
-namespace Rekall.Age.GameTemplates.Commands;
+namespace Rekall.Age.Workflows.Commands;
 
 public sealed record CapturePlayablePackageFrameRequest(
     string PackagePath,

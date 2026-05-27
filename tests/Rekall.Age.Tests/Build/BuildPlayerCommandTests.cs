@@ -1,7 +1,6 @@
 using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
-using Rekall.Age.GameTemplates.Commands;
 
 namespace Rekall.Age.Tests.Build;
 
@@ -12,9 +11,7 @@ public sealed class BuildPlayerCommandTests
     {
         var root = TestPaths.CreateTempDirectory();
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("build player"), CancellationToken.None);
-        await new CreateGameFromTemplateCommand().ExecuteAsync(
-            new CreateGameFromTemplateRequest(root, "Playable Pong", "pong"),
-            context);
+        await TestProjectAuthoring.CreateProjectWithSceneAsync(root, context, "Playable Build");
         var command = new BuildPlayerCommand();
 
         var result = await command.ExecuteAsync(new BuildPlayerRequest(root, "Main"), context);
@@ -30,9 +27,7 @@ public sealed class BuildPlayerCommandTests
     {
         var root = TestPaths.CreateTempDirectory();
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("build graphics player"), CancellationToken.None);
-        await new CreateGameFromTemplateCommand().ExecuteAsync(
-            new CreateGameFromTemplateRequest(root, "Graphical Pong", "pong"),
-            context);
+        await TestProjectAuthoring.CreateProjectWithSceneAsync(root, context, "Graphical Build");
         var command = new BuildPlayerCommand();
 
         var result = await command.ExecuteAsync(new BuildPlayerRequest(root, "Main", Graphics: true), context);

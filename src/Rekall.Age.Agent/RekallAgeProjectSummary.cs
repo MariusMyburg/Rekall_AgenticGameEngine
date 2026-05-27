@@ -2,7 +2,6 @@ namespace Rekall.Age.Agent;
 
 public sealed record RekallAgeProjectSummary(
     string Project,
-    string? SourceTemplateId,
     IReadOnlyList<string> Capabilities,
     IReadOnlyList<string> PlayableScenes,
     IReadOnlyList<RekallAgeProjectArtifact> Artifacts,

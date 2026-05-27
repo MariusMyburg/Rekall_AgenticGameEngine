@@ -2,7 +2,7 @@
 
 Rekall AGE is the Rekall Agentic Game Engine: a C#/.NET game engine designed so AI agents and humans can author complete games through inspectable, composable engine contracts.
 
-The central idea is deliberately different from a traditional genre-first engine. Rekall AGE does not try to become a built-in first-person controller, platformer controller, tower defense loop, or RPG rules engine. Instead, it exposes generic project files, scene entities, components, runtime facts, diagnostics, SDK helpers, command bus operations, MCP tools, rendering paths, and packaging workflows. Agents use those primitives to author the actual game.
+The central idea is deliberately different from a traditional genre-first engine. Rekall AGE does not try to become a built-in controller, combat loop, level loop, camera model, or rules engine. Instead, it exposes generic project files, scene entities, components, runtime facts, diagnostics, SDK helpers, command bus operations, MCP tools, rendering paths, and packaging workflows. Agents use those primitives to author the actual game.
 
 This README is intended to be the broad public entry point and the practical technical reference for the repository.
 

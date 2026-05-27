@@ -2,11 +2,10 @@ using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
 using Rekall.Age.Playback.Commands;
-using Rekall.Age.Project;
 using Rekall.Age.Validation;
 using Rekall.Age.World;
 
-namespace Rekall.Age.GameTemplates.Commands;
+namespace Rekall.Age.Workflows.Commands;
 
 public sealed record VerifyPlayableGameRequest(
     string ProjectRoot,
@@ -36,8 +35,6 @@ public sealed class VerifyPlayableGameCommand
     private readonly BuildModulesCommand _buildModules = new();
     private readonly PlaytestSceneCommand _playtestScene = new();
     private readonly RekallAgeProjectValidator _validator = new(new RekallAgeSceneStore());
-    private readonly RekallAgeProjectStore _projectStore = new();
-    private readonly RekallAgeGameTemplateCatalog _templateCatalog = RekallAgeGameTemplateCatalog.CreateDefault();
 
     public string Name => "rekall.workflow.verify_playable_game";
 
@@ -68,7 +65,6 @@ public sealed class VerifyPlayableGameCommand
             return NotReady(checks, build.Ok, playtestPassed: false, frames: [], renderFrames: [], drawAssertions: [], request.SceneName);
         }
 
-        var drawAssertions = request.DrawAssertions ?? await CreateTemplateDrawAssertionsAsync(request.ProjectRoot, context.CancellationToken);
         var playtest = await _playtestScene.ExecuteAsync(
             new PlaytestSceneRequest(
                 request.ProjectRoot,
@@ -76,7 +72,7 @@ public sealed class VerifyPlayableGameCommand
                 request.Frames,
                 request.Inputs,
                 request.Assertions,
-                drawAssertions),
+                request.DrawAssertions),
             context);
         checks.Add(new RekallAgePlayableGameCheck("playtest", playtest.Ok && playtest.Value.Passed, playtest.Summary));
         if (!playtest.Ok || !playtest.Value.Passed)
@@ -129,19 +125,4 @@ public sealed class VerifyPlayableGameCommand
             [error]);
     }
 
-    private async ValueTask<IReadOnlyList<RekallAgeDrawCommandAssertion>?> CreateTemplateDrawAssertionsAsync(
-        string projectRoot,
-        CancellationToken cancellationToken)
-    {
-        var manifest = await _projectStore.LoadAsync(projectRoot, cancellationToken);
-        if (manifest.SourceTemplateId is null)
-        {
-            return null;
-        }
-
-        var template = _templateCatalog.GetRequired(manifest.SourceTemplateId);
-        return template.DrawCommands
-            .Select(command => new RekallAgeDrawCommandAssertion(0, command.Kind, command.Id))
-            .ToArray();
-    }
 }

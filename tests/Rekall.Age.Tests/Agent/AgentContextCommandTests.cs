@@ -1,8 +1,10 @@
 using Rekall.Age.Agent.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
-using Rekall.Age.GameTemplates.Commands;
 using Rekall.Age.Mcp;
+using Rekall.Age.Project.Commands;
+using Rekall.Age.World;
+using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Tests.Agent;
 
@@ -13,8 +15,19 @@ public sealed class AgentContextCommandTests
     {
         var root = TestPaths.CreateTempDirectory();
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("context"), CancellationToken.None);
-        await new CreateGameFromTemplateCommand()
-            .ExecuteAsync(new CreateGameFromTemplateRequest(root, "Context Puzzle", "puzzle"), context);
+        await new CreateProjectCommand()
+            .ExecuteAsync(new CreateProjectRequest(root, "Context Project", ["world", "rendering3d"]), context);
+        await new CreateSceneCommand()
+            .ExecuteAsync(new CreateSceneRequest(root, "Main", ["world", "rendering3d"]), context);
+        var sceneStore = new RekallAgeSceneStore();
+        var sceneDocument = await sceneStore.LoadAsync(root, "Main", CancellationToken.None);
+        await sceneStore.SaveAsync(
+            root,
+            sceneDocument.AddEntity(RekallAgeEntityDocument.Create("PuzzleGrid", ["board"])
+                .AddComponent(RekallAgeComponentDocument.Create("Game.GridBoard", new System.Text.Json.Nodes.JsonObject())))
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new System.Text.Json.Nodes.JsonObject { ["active"] = true }))),
+            CancellationToken.None);
 
         var project = await new GetProjectSummaryCommand()
             .ExecuteAsync(new GetProjectSummaryRequest(root), context);
@@ -23,7 +36,6 @@ public sealed class AgentContextCommandTests
 
         Assert.True(project.Ok);
         Assert.Equal("ok", project.Value.Summary.Health.Status);
-        Assert.Equal("puzzle", project.Value.Summary.SourceTemplateId);
         Assert.True(scene.Ok);
         Assert.Equal("Main", scene.Value.Summary.Scene);
         Assert.Contains(scene.Value.Summary.Entities, entity => entity.Name == "PuzzleGrid");
@@ -118,14 +130,13 @@ public sealed class AgentContextCommandTests
         registry.Register(new GetEngineStatusCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
-        registry.Register(new ListGameTemplatesCommand());
 
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.engine_status");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.project_summary");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.scene_summary");
-        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.templates.list");
+        Assert.DoesNotContain(catalog.Tools, tool => tool.Name.StartsWith("rekall.templates.", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -138,9 +149,9 @@ public sealed class AgentContextCommandTests
         Assert.True(result.Ok, result.Summary);
         Assert.Equal("Rekall AGE", result.Value.EngineName);
         Assert.True(result.Value.AgentFirst);
-        Assert.Contains("pong", result.Value.MvpTemplateIds);
-        Assert.Contains("first-person-exploration", result.Value.MvpTemplateIds);
-        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.templates.inspect" && workflow.Recommended);
+        Assert.DoesNotContain(result.Value.WorkflowTools, workflow => workflow.Tool.StartsWith("rekall.templates.", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Value.WorkflowTools, workflow => workflow.Tool.Contains("template", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(result.Value.WorkflowTools, workflow => workflow.Tool.Contains("gauntlet", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.geometry.create_primitive");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.scene.apply_blueprint" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.validation.scene" && workflow.Recommended);
@@ -154,8 +165,6 @@ public sealed class AgentContextCommandTests
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.render.visibility.inspect_scene");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.render.openxr.bootstrap_session");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.render.openxr.inspect_headset_frame_plan");
-        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.workflow.create_playable_package_from_template" && workflow.Recommended);
-        Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.templates.verify_mvp");
         Assert.Contains(result.Value.AuthoringContracts, contract =>
             contract.Name == "runtime-module-system"
             && contract.PrimaryType == "IRekallAgeRuntimeModuleSystem"

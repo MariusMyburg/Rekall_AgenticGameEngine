@@ -196,6 +196,9 @@ public sealed class KsaSolarSystemImportCommandTests
         Assert.StartsWith("asset_earth-normal_", planet.Properties["normalTexture"]!.GetValue<string>(), StringComparison.Ordinal);
         Assert.StartsWith("asset_earth-ocean-color_", planet.Properties["waterTexture"]!.GetValue<string>(), StringComparison.Ordinal);
         Assert.True(planet.Properties["waterSpecularStrength"]!.GetValue<double>() > 1);
+        var virtualGeometry = earth.Components.Single(component => component.Type == "Rekall.VirtualGeometry");
+        Assert.Equal(12000, virtualGeometry.Properties["maxSelectedTriangles"]!.GetValue<int>());
+        Assert.Equal(128, virtualGeometry.Properties["clusterTriangleCount"]!.GetValue<int>());
         var earthMarker = earth.Components.Single(component => component.Type == "Rekall.MarkerRenderer");
         Assert.Equal("overview-markers", earthMarker.Properties["layer"]!.GetValue<string>());
         Assert.True(earthMarker.Properties["size"]!.GetValue<double>() > planet.Properties["radius"]!.GetValue<double>());

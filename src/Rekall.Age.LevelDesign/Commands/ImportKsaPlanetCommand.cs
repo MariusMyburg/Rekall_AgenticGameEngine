@@ -109,7 +109,18 @@ public sealed class ImportKsaPlanetCommand
                 new JsonObject { ["z"] = -8 }))
             .AddComponent(RekallAgeComponentDocument.Create(
                 "Rekall.PlanetRenderer",
-                planetProperties));
+                planetProperties))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.VirtualGeometry",
+                new JsonObject
+                {
+                    ["enabled"] = true,
+                    ["targetPixelError"] = 1.5,
+                    ["clusterTriangleCount"] = 128,
+                    ["maxSelectedTriangles"] = 12000,
+                    ["maxLodLevel"] = 8,
+                    ["debugMode"] = "off"
+                }));
         if (body.HasAtmosphere)
         {
             entity = entity.AddComponent(RekallAgeComponentDocument.Create(

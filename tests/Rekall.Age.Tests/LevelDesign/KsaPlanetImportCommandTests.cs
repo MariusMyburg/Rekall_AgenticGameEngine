@@ -55,6 +55,9 @@ public sealed class KsaPlanetImportCommandTests
         var planet = scene.Entities.Single(entity => entity.Name == "Gaia");
         Assert.Contains(planet.Components, component => component.Type == "Rekall.PlanetRenderer");
         Assert.Contains(planet.Components, component => component.Type == "Rekall.AtmosphereRenderer");
+        var virtualGeometry = Assert.Single(planet.Components, component => component.Type == "Rekall.VirtualGeometry");
+        Assert.Equal(12000, virtualGeometry.Properties?["maxSelectedTriangles"]?.GetValue<int>());
+        Assert.Equal(128, virtualGeometry.Properties?["clusterTriangleCount"]?.GetValue<int>());
         Assert.Contains(scene.Entities, entity => entity.Components.Any(component => component.Type == "Rekall.Camera3D"));
         Assert.Contains(scene.Entities, entity => entity.Components.Any(component => component.Type == "Rekall.DirectionalLight"));
     }

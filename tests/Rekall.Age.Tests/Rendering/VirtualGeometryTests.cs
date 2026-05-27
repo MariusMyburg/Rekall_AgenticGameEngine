@@ -56,6 +56,43 @@ public sealed class VirtualGeometryTests
     }
 
     [Fact]
+    public void RuntimeFrameBuilderProjectsPlanetVirtualGeometryToGeneratedShells()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d", "planet"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Gaia", ["planet"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PlanetRenderer", new JsonObject
+                {
+                    ["Radius"] = 6,
+                    ["meshSlices"] = 192,
+                    ["meshStacks"] = 96
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.AtmosphereRenderer", new JsonObject
+                {
+                    ["height"] = 0.2,
+                    ["meshSlices"] = 384,
+                    ["meshStacks"] = 192
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.VirtualGeometry", new JsonObject
+                {
+                    ["targetPixelError"] = 1.5,
+                    ["maxSelectedTriangles"] = 12000,
+                    ["clusterTriangleCount"] = 128,
+                    ["maxLodLevel"] = 8
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 640, 360, debugOverlay: false);
+
+        var surface = Assert.Single(frame.Renderables, item => item.Variant == "rekall.planet.surface");
+        var atmosphere = Assert.Single(frame.Renderables, item => item.Variant == "rekall.planet.atmosphere");
+        Assert.NotNull(surface.VirtualGeometry);
+        Assert.NotNull(atmosphere.VirtualGeometry);
+        Assert.Equal(surface.VirtualGeometry, atmosphere.VirtualGeometry);
+    }
+
+    [Fact]
     public void VulkanMeshBuilderReducesVirtualGeometryImportedMeshTriangles()
     {
         var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(

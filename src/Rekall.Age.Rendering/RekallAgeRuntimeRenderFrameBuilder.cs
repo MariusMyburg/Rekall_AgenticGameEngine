@@ -453,6 +453,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             var atmosphereMaterial = atmosphereHeight > 0 && atmosphereComponent is not null
                 ? ReadAtmosphereMaterial(atmosphereComponent, radius, atmosphereRadius)
                 : null;
+            var virtualGeometry = ReadVirtualGeometry(virtualGeometryComponent);
             var sortKey = mesh.SortKey
                 + (entity?.Components.Any(component => component.Type.Equals("Rekall.Rigidbody3D", StringComparison.Ordinal)) == true ? 20 : 0);
             var surfaceEntityId = orbitPathMesh is not null
@@ -508,7 +509,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     : isTextLabelRenderable
                     ? ReadString(textLabelComponent, "facingMode") ?? ReadString(textLabelComponent, "FacingMode") ?? "world"
                     : "world",
-                VirtualGeometry: ReadVirtualGeometry(virtualGeometryComponent));
+                VirtualGeometry: virtualGeometry);
 
             if (planetComponent is not null
                 && atmosphereComponent is not null
@@ -559,7 +560,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                         Atmosphere: atmosphereMaterial,
                         CloudLayer: cloudLayerMaterial,
                         MeshSlices: ReadMeshSlices(cloudLayerComponent, ReadMeshSlices(planetComponent, 0)),
-                        MeshStacks: ReadMeshStacks(cloudLayerComponent, ReadMeshStacks(planetComponent, 0)));
+                        MeshStacks: ReadMeshStacks(cloudLayerComponent, ReadMeshStacks(planetComponent, 0)),
+                        VirtualGeometry: virtualGeometry);
                 }
 
                 if (atmosphereHeight > 0 && ReadBoolean(atmosphereComponent, "renderShell", ReadBoolean(atmosphereComponent, "RenderShell", true)))
@@ -593,7 +595,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                         Layer: mesh.Layer,
                         Atmosphere: atmosphereMaterial,
                         MeshSlices: ReadMeshSlices(atmosphereComponent, ReadMeshSlices(planetComponent, 0)),
-                        MeshStacks: ReadMeshStacks(atmosphereComponent, ReadMeshStacks(planetComponent, 0)));
+                        MeshStacks: ReadMeshStacks(atmosphereComponent, ReadMeshStacks(planetComponent, 0)),
+                        VirtualGeometry: virtualGeometry);
                 }
             }
         }

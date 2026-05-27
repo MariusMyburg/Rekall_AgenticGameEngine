@@ -176,6 +176,9 @@ public sealed class ImportKsaSolarSystemCommand
                 "Rekall.PlanetRenderer",
                 CreatePlanetRendererProperties(body, assetIdsByPath, radiusScale)))
             .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.VirtualGeometry",
+                CreateVirtualGeometryProperties()))
+            .AddComponent(RekallAgeComponentDocument.Create(
                 "Rekall.MarkerRenderer",
                 CreateMarkerRendererProperties(body, bodyById, radiusScale)));
         if (IsPrimaryOrbit(body, bodyById))
@@ -338,6 +341,19 @@ public sealed class ImportKsaSolarSystemCommand
         }
 
         return properties;
+    }
+
+    private static JsonObject CreateVirtualGeometryProperties()
+    {
+        return new JsonObject
+        {
+            ["enabled"] = true,
+            ["targetPixelError"] = 1.5,
+            ["clusterTriangleCount"] = 128,
+            ["maxSelectedTriangles"] = 12000,
+            ["maxLodLevel"] = 8,
+            ["debugMode"] = "off"
+        };
     }
 
     private static JsonObject CreateMarkerRendererProperties(

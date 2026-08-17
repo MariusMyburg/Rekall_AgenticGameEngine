@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-17 23:32 Africa/Johannesburg
+Last verified: 2026-08-17 23:48 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: packaged authored-scene proof passed the full product gate
+Latest milestone: relocation capacity preflight passes the Debug gate
 
 ## Product objective
 
@@ -148,6 +148,21 @@ Studio is important, but it does not define or reorder the engine foundation.
   generic gauntlet, deterministic package proof, relocated ZIP audit/run/capture,
   runtime UI, software viewport analysis, audio simulation, and Windows player
   audio-device startup. The canonical archive is 194,669,640 bytes.
+- Broad benchmark rerun 7: the original graphics package now passed audit and
+  independent inspection found a ready 468-file package plus zero validation
+  issues across two scenes. The run still failed at 36 tools (675,995 prompt;
+  7,189 completion): C: had only 67,919,872 bytes free, relocation returned a
+  generic copy exception seven times, and no relocated proof was produced.
+  Independent runtime inspection also rejected physics completion because each
+  rigid body and collider were on separate entities and transforms stayed at
+  zero. This is not an accepted pass.
+- Relocation capacity contract: the workflow now measures the verified package
+  inventory against free space on the destination volume before it creates a
+  staging directory. Insufficient capacity returns
+  `REKALL_PACKAGE_RELOCATION_SPACE_INSUFFICIENT`, reports required/available
+  bytes, explicitly prevents same-destination retries, and leaves no destination
+  or staging residue. The regression and full Debug suite pass at 569/569 with
+  test temporaries routed to F:.
 
 ## Current gaps
 
@@ -163,8 +178,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the identical 36-turn installed-only Ollama benchmark against the fresh
-canonical distribution.
+Run the clean Release/distribution gate with temporary acceptance output on F:,
+then rerun the installed benchmark on F: with state-based physics acceptance.
 
 ## Next after the current item
 

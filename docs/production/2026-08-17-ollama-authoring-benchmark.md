@@ -197,6 +197,33 @@ write when it resolves inside a mutable package directory. The next rerun remain
 the same installed-only benchmark and acceptance is still based on independent
 evidence rather than the model's final message.
 
+### Authored-scene package-proof rerun
+
+Fresh binaries with authored-scene package capture and output isolation passed
+the complete product gate before rerun 7.
+
+- Project: `rekall-age-installed-broad-benchmark-rerun7-20260817`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 675,995
+- Completion tokens: 7,189
+
+The repaired original graphics-package audit succeeded and independent installed
+inspection found a ready 468-file package plus project-wide validation with zero
+issues across both scenes. The run still failed acceptance. The C: volume had
+only 67,919,872 bytes free after accumulated benchmark evidence, so every package
+relocation attempt failed while copying the package. Staging directories were
+cleaned, but the command exposed a generic I/O exception and no actionable
+capacity diagnostic; the agent repeated relocation seven times and exhausted its
+turn budget.
+
+Independent runtime inspection also found one 3D and one 2D body, but both body
+transforms remained at zero because each rigid body and its collider were authored
+on separate entities. Counts alone therefore did not prove the requested motion.
+This remains a failed benchmark. It drives destination-capacity preflight and
+structured relocation recovery before another clean installed run; physics motion
+continues to require state-based independent acceptance.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

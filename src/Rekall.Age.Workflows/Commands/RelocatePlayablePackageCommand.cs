@@ -18,6 +18,17 @@ public sealed class RelocatePlayablePackageCommand
     : IRekallAgeCommand<RelocatePlayablePackageRequest, RelocatePlayablePackageResult>
 {
     private readonly InspectPlayablePackageCommand _inspect = new();
+    private readonly Func<string, long> _availableFreeSpace;
+
+    public RelocatePlayablePackageCommand()
+        : this(GetAvailableFreeSpace)
+    {
+    }
+
+    public RelocatePlayablePackageCommand(Func<string, long> availableFreeSpace)
+    {
+        _availableFreeSpace = availableFreeSpace ?? throw new ArgumentNullException(nameof(availableFreeSpace));
+    }
 
     public string Name => "rekall.workflow.relocate_playable_package";
 
@@ -70,6 +81,18 @@ public sealed class RelocatePlayablePackageCommand
 
         var parent = Path.GetDirectoryName(destination)
             ?? throw new InvalidOperationException($"Destination '{destination}' has no parent directory.");
+        var requiredBytes = sourceInspection.Value.Files.Sum(file => file.SizeBytes);
+        var availableBytes = _availableFreeSpace(parent);
+        if (availableBytes < requiredBytes)
+        {
+            var message = $"Package relocation requires {requiredBytes} bytes but destination volume has only {availableBytes} bytes available. Choose a destination on a volume with sufficient free space; do not retry the same destination.";
+            var error = new RekallAgeCommandError(
+                "REKALL_PACKAGE_RELOCATION_SPACE_INSUFFICIENT",
+                message,
+                destination);
+            return RekallAgeCommandResult<RelocatePlayablePackageResult>.Failure(empty, message, [error]);
+        }
+
         Directory.CreateDirectory(parent);
         var staging = Path.Combine(parent, $".rekall-relocate-{Guid.NewGuid():N}");
         try
@@ -139,5 +162,16 @@ public sealed class RelocatePlayablePackageCommand
         var prefix = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             + Path.DirectorySeparatorChar;
         return Path.GetFullPath(candidate).StartsWith(prefix, comparison);
+    }
+
+    private static long GetAvailableFreeSpace(string destinationParent)
+    {
+        var root = Path.GetPathRoot(Path.GetFullPath(destinationParent));
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            throw new InvalidOperationException($"Destination '{destinationParent}' has no storage volume root.");
+        }
+
+        return new DriveInfo(root).AvailableFreeSpace;
     }
 }

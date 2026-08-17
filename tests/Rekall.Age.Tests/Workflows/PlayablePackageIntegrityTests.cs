@@ -76,6 +76,21 @@ public sealed class PlayablePackageIntegrityTests
         Assert.True(relocatedAudit.Ok, relocatedAudit.Summary);
         Assert.True(relocatedAudit.Value.Ready);
 
+        var insufficientDestination = Path.Combine(TestPaths.CreateTempDirectory(), "InsufficientSpacePackage");
+        var insufficientSpace = await new RelocatePlayablePackageCommand(_ => 0).ExecuteAsync(
+            new RelocatePlayablePackageRequest(output, insufficientDestination),
+            context);
+        Assert.False(insufficientSpace.Ok);
+        var capacityError = Assert.Single(
+            insufficientSpace.Errors,
+            error => error.Code == "REKALL_PACKAGE_RELOCATION_SPACE_INSUFFICIENT");
+        Assert.Contains("do not retry", capacityError.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(Directory.Exists(insufficientDestination));
+        Assert.Empty(Directory.EnumerateDirectories(
+            Path.GetDirectoryName(insufficientDestination)!,
+            ".rekall-relocate-*",
+            SearchOption.TopDirectoryOnly));
+
         var unsafeAudit = await new AuditPlayablePackageCommand().ExecuteAsync(
             new AuditPlayablePackageRequest(output, output),
             context);

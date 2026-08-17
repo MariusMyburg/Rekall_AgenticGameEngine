@@ -10,6 +10,48 @@ namespace Rekall.Age.Tests.Cli;
 public sealed class CliSmokeTests
 {
     [Fact]
+    public async Task CliAssemblesVerifiedDistribution()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var inputs = Path.Combine(root, "inputs");
+        var cliInput = CreateDistributionPayload(inputs, "cli", "Rekall.Age.Cli.exe");
+        var studioInput = CreateDistributionPayload(inputs, "studio", "Rekall.Age.Studio.exe");
+        var headlessInput = CreateDistributionPayload(inputs, "headless", "Rekall.Age.Player.exe");
+        var windowsInput = CreateDistributionPayload(inputs, "windows", "Rekall.Age.Player.Windows.exe");
+        var sdkInput = Path.Combine(inputs, "sdk");
+        Directory.CreateDirectory(sdkInput);
+        foreach (var name in new[]
+        {
+            "Rekall.Age.Core.dll",
+            "Rekall.Age.World.dll",
+            "Rekall.Age.Runtime.Abstractions.dll",
+            "Rekall.Age.Modules.dll",
+            "Rekall.Age.Sdk.props",
+            "rekall.sdk.json"
+        })
+        {
+            await File.WriteAllTextAsync(Path.Combine(sdkInput, name), name);
+        }
+
+        var readme = await WriteDistributionFileAsync(inputs, "README.md", "# Rekall AGE");
+        var notice = await WriteDistributionFileAsync(inputs, "PROPRIETARY-NOTICE.md", "All rights reserved.");
+        var thirdParty = await WriteDistributionFileAsync(inputs, "THIRD-PARTY-NOTICES.txt", "Notices");
+        var output = Path.Combine(root, "output", "Rekall-AGE");
+
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            "distribution", "assemble", output, cliInput, studioInput, headlessInput,
+            windowsInput, sdkInput, readme, notice, thirdParty);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Version: 0.1.0-preview.1", result.Output);
+        Assert.Contains("Manifest:", result.Output);
+        Assert.Contains("Archive:", result.Output);
+        Assert.True(File.Exists(Path.Combine(output, "rekall.distribution.json")));
+        Assert.True(File.Exists($"{output}.zip"));
+    }
+
+    [Fact]
     public async Task CliDoctorReportsPortableSdkReadiness()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -288,6 +330,21 @@ public sealed class CliSmokeTests
         }
 
         throw new InvalidOperationException("Could not find Rekall.AGE.sln from the test output directory.");
+    }
+
+    private static string CreateDistributionPayload(string root, string name, string executable)
+    {
+        var directory = Path.Combine(root, name);
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, executable), $"payload:{name}");
+        return directory;
+    }
+
+    private static async Task<string> WriteDistributionFileAsync(string root, string name, string content)
+    {
+        var path = Path.Combine(root, name);
+        await File.WriteAllTextAsync(path, content);
+        return path;
     }
 
     private static string FindCliAssemblyPath()

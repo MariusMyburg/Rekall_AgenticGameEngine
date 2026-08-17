@@ -3,6 +3,7 @@ using Rekall.Age.Agent.Commands;
 using Rekall.Age.AssetPipeline.Commands;
 using Rekall.Age.Assets.Commands;
 using Rekall.Age.Build.Commands;
+using Rekall.Age.Build.Distribution;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor;
@@ -50,6 +51,9 @@ internal static class RekallAgeCli
             var context = new RekallAgeCommandContext(IsMcpStdio(args) ? "mcp" : "cli", transaction, cancellationToken);
             var exitCode = args switch
             {
+                ["distribution", "assemble", var output, var cli, var studio, var headless, var windows, var sdk, var readme, var notice, var thirdParty] =>
+                    await AssembleDistributionAsync(
+                        registry, context, output, cli, studio, headless, windows, sdk, readme, notice, thirdParty),
                 ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
                 ["render", "stereo", "inspect", var root, var scene] =>
                     await InspectStereoRenderPlanAsync(registry, context, root, scene, "0", "1920", "1080"),
@@ -420,6 +424,7 @@ internal static class RekallAgeCli
         registry.Register(new CapturePlayablePackageFrameCommand());
         registry.Register(new AuditPlayablePackageCommand());
         registry.Register(new RunAgentAuthoringGauntletCommand());
+        registry.Register(new AssembleDistributionCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new GetEngineStatusCommand());
@@ -2708,6 +2713,50 @@ internal static class RekallAgeCli
             Console.WriteLine($"    {contract.Purpose}");
             Console.WriteLine($"    Capabilities: {string.Join(", ", contract.Capabilities)}");
             Console.WriteLine($"    Tools: {string.Join(", ", contract.RelatedTools)}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> AssembleDistributionAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string output,
+        string cli,
+        string studio,
+        string headless,
+        string windows,
+        string sdk,
+        string readme,
+        string notice,
+        string thirdParty)
+    {
+        var result = await registry.ExecuteAsync<AssembleDistributionRequest, AssembleDistributionCommandResult>(
+            "rekall.distribution.assemble",
+            new AssembleDistributionRequest(
+                output,
+                cli,
+                studio,
+                headless,
+                windows,
+                sdk,
+                readme,
+                notice,
+                thirdParty),
+            context);
+        Console.WriteLine(result.Summary);
+        if (result.Value.Manifest is not null)
+        {
+            Console.WriteLine($"Root: {result.Value.Root}");
+            Console.WriteLine($"Manifest: {result.Value.ManifestPath}");
+            Console.WriteLine($"Archive: {result.Value.ArchivePath}");
+            Console.WriteLine($"Version: {result.Value.Manifest.ProductVersion}");
+            Console.WriteLine($"Files: {result.Value.Manifest.Files.Count}");
         }
 
         foreach (var error in result.Errors)

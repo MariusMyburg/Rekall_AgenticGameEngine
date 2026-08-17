@@ -1,0 +1,22 @@
+Rekall AGE - Third-Party Package Inventory
+Copyright © 2026 Rekall. All rights reserved.
+
+This inventory identifies direct external package dependencies. It does not replace
+the license texts or notices supplied by those projects and their transitive dependencies.
+
+BepuPhysics 2.4.0 - https://www.nuget.org/packages/BepuPhysics/2.4.0
+coverlet.collector 6.0.4 - https://www.nuget.org/packages/coverlet.collector/6.0.4
+Microsoft.NET.Test.Sdk 17.14.1 - https://www.nuget.org/packages/Microsoft.NET.Test.Sdk/17.14.1
+Serilog 4.3.1 - https://www.nuget.org/packages/Serilog/4.3.1
+Serilog.Extensions.Logging 10.0.0 - https://www.nuget.org/packages/Serilog.Extensions.Logging/10.0.0
+Serilog.Sinks.File 7.0.0 - https://www.nuget.org/packages/Serilog.Sinks.File/7.0.0
+Silk.NET.OpenXR 2.23.0 - https://www.nuget.org/packages/Silk.NET.OpenXR/2.23.0
+Silk.NET.Shaderc 2.23.0 - https://www.nuget.org/packages/Silk.NET.Shaderc/2.23.0
+Silk.NET.Vulkan 2.23.0 - https://www.nuget.org/packages/Silk.NET.Vulkan/2.23.0
+StbImageSharp 2.30.15 - https://www.nuget.org/packages/StbImageSharp/2.30.15
+System.Drawing.Common 10.0.8 - https://www.nuget.org/packages/System.Drawing.Common/10.0.8
+Veldrid.SPIRV 1.0.15 - https://www.nuget.org/packages/Veldrid.SPIRV/1.0.15
+Veldrid.StartupUtilities 4.9.0 - https://www.nuget.org/packages/Veldrid.StartupUtilities/4.9.0
+xunit 2.9.3 - https://www.nuget.org/packages/xunit/2.9.3
+xunit.runner.visualstudio 3.1.4 - https://www.nuget.org/packages/xunit.runner.visualstudio/3.1.4
+ZstdSharp.Port 0.8.8 - https://www.nuget.org/packages/ZstdSharp.Port/0.8.8

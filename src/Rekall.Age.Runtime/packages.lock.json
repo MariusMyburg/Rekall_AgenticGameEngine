@@ -16,6 +16,12 @@
         "resolved": "2.4.0",
         "contentHash": "KNMxkzKLHAvV7jRtErxs3rPv71fHToqo/WN96HlT6iomWuwL97tohEbt0B1WA8A6sO5t6PP+qF08d4T9A8k2uA=="
       },
+      "rekall.age.assets": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )"
+        }
+      },
       "rekall.age.core": {
         "type": "Project"
       },

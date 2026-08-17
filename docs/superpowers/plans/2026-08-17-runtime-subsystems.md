@@ -12,10 +12,10 @@ structured observations, and gameplay remains in agent-authored modules.
 
 ## Tranche 1: Audio foundation
 
-- [ ] Define PCM clip, voice, bus, listener, and mix-frame contracts.
-- [ ] Decode validated PCM WAV assets without platform dependencies.
-- [ ] Execute emitter lifecycle, looping, gain, pitch, bus gain, and generic 3D attenuation/pan.
-- [ ] Expose deterministic headless audio state and missing/invalid-asset observations.
+- [x] Define PCM clip, voice, bus, listener, and mix-frame contracts.
+- [x] Decode validated PCM WAV assets without platform dependencies.
+- [x] Execute emitter lifecycle, looping, gain, pitch, bus gain, and generic 3D attenuation/pan.
+- [x] Expose deterministic headless audio state and missing/invalid-asset observations.
 - [ ] Add a Windows playback adapter without coupling runtime simulation to the device.
 - [ ] Prove imported audio through scene execution, package relocation, and installed player.
 

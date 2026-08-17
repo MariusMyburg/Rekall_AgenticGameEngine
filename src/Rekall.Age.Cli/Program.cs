@@ -2982,6 +2982,7 @@ internal static class RekallAgeCli
         Console.WriteLine($"Physics bodies: {result.Value.PhysicsBodyCount}");
         Console.WriteLine($"Physics colliders: {result.Value.PhysicsColliderCount}");
         Console.WriteLine($"Audio: {result.Value.AudioListenerCount} listeners, {result.Value.AudioEmitterCount} emitters");
+        Console.WriteLine($"Audio runtime: {result.Value.ActiveAudioVoiceCount} active voices, {result.Value.AudioBusCount} buses, peak gain {result.Value.AudioPeakGain:F3}, {result.Value.AudioMixedSampleCount} mixed samples");
         Console.WriteLine($"Animation players: {result.Value.AnimationPlayerCount}");
         Console.WriteLine($"UI elements: {result.Value.UiElementCount}");
         Console.WriteLine($"Input actions: {result.Value.InputActionCount}");

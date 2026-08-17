@@ -35,7 +35,16 @@ public sealed record InspectSceneRuntimeResult(
     IReadOnlyList<RekallAgeRuntimeObservation> Observations,
     int VisibleRenderableCount,
     int CulledRenderableCount,
-    IReadOnlyList<InspectSceneRuntimeCulledRenderable> CulledRenderables);
+    IReadOnlyList<InspectSceneRuntimeCulledRenderable> CulledRenderables)
+{
+    public int ActiveAudioVoiceCount { get; init; }
+
+    public int AudioBusCount { get; init; }
+
+    public double AudioPeakGain { get; init; }
+
+    public int AudioMixedSampleCount { get; init; }
+}
 
 public sealed record InspectSceneRuntimeCulledRenderable(
     string EntityId,
@@ -146,7 +155,13 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
             world.Observations,
             culling.VisibleRenderableCount,
             culling.CulledRenderables.Count,
-            culling.CulledRenderables);
+            culling.CulledRenderables)
+        {
+            ActiveAudioVoiceCount = audio.MixFrame.ActiveVoiceCount,
+            AudioBusCount = audio.Buses.Count,
+            AudioPeakGain = audio.MixFrame.PeakGain,
+            AudioMixedSampleCount = audio.MixFrame.Samples?.Count ?? 0
+        };
     }
 
     private static RuntimeCullingSummary BuildCullingSummary(RekallAgeRuntimeRenderView rendering)

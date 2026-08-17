@@ -150,6 +150,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly ResourceSet _postProcessSet;
     private readonly RekallAgeRuntimeExecutionLoop _runtimeLoop;
     private readonly RekallAgeRuntimeSimulationClock _simulationClock;
+    private readonly RekallAgeSdlAudioOutput? _audioOutput;
     private readonly RekallAgeRuntimeRenderFrameBuilder _frameBuilder = new();
     private RekallAgeRuntimeViewportAssetSet _assets;
     private int _entityCount;
@@ -302,6 +303,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _runtimeWorld = runtimeWorld;
         _runtimeLoop = runtimeLoop;
         _simulationClock = new RekallAgeRuntimeSimulationClock(_runtimeLoop, _clock.Elapsed);
+        _audioOutput = RekallAgeSdlAudioOutput.TryCreate();
         _assets = assets;
         _entityCount = entityCount;
         _textures = textures;
@@ -945,6 +947,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         }
 
         _assetWatcher?.Dispose();
+        _audioOutput?.Dispose();
         await _liveServer.DisposeAsync();
         _sceneTarget.Dispose();
         foreach (var materialSet in _materialSets.Values)
@@ -1561,7 +1564,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             : Math.Clamp(now - _lastPlayableTickSeconds, 0, 1.0 / 15.0);
         _lastPlayableTickSeconds = now;
         var playableInput = BuildPlayableInput(deltaSeconds);
-        ConsumeRuntimeInput();
+        AdvanceSimulationToWallClock();
         game.Tick(playableInput);
         var renderFrame = game.RenderFrame(frameNumber);
         EnsurePlayableRenderTarget();
@@ -1633,6 +1636,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             .GetAwaiter()
             .GetResult();
         _runtimeWorld = result.World;
+        _audioOutput?.Submit(result.AudioFrames);
     }
 
     private RekallAgeRuntimeInputState ConsumeRuntimeInput()

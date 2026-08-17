@@ -19,6 +19,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         var triggers = new List<RekallAgeRuntimePhysicsCollider>();
         var listeners = new List<RekallAgeRuntimeAudioListener>();
         var emitters = new List<RekallAgeRuntimeAudioEmitter>();
+        var voices = new List<RekallAgeRuntimeAudioVoice>();
+        var audioBuses = new List<RekallAgeRuntimeAudioBus>();
         var animationPlayers = new List<RekallAgeRuntimeAnimationPlayer>();
         var canvases = new List<RekallAgeRuntimeUiCanvas>();
         var elements = new List<RekallAgeRuntimeUiElement>();
@@ -324,6 +326,36 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             entity.Name,
                             ReadString(component.Properties, "clip") ?? ReadString(component.Properties, "assetId"),
                             ReadString(component.Properties, "bus")));
+                        var playbackState = entity.Components.FirstOrDefault(item =>
+                            item.Type.Equals("Rekall.AudioPlaybackState", StringComparison.Ordinal));
+                        if (playbackState is not null)
+                        {
+                            voices.Add(new RekallAgeRuntimeAudioVoice(
+                                entity.Id,
+                                entity.Name,
+                                ReadString(playbackState.Properties, "clipAssetId") ?? string.Empty,
+                                ReadString(playbackState.Properties, "bus") ?? "master",
+                                ReadString(playbackState.Properties, "state") ?? "unknown",
+                                ReadBoolean(playbackState.Properties, "loop", false),
+                                ReadNumber(playbackState.Properties, "playbackSeconds", 0),
+                                ReadNumber(playbackState.Properties, "durationSeconds", 0),
+                                ReadNumber(playbackState.Properties, "gain", 1),
+                                ReadNumber(playbackState.Properties, "pitch", 1),
+                                ReadNumber(playbackState.Properties, "leftGain", 0),
+                                ReadNumber(playbackState.Properties, "rightGain", 0)));
+                        }
+
+                        break;
+                    case "Rekall.AudioBus":
+                        var busName = ReadString(component.Properties, "name");
+                        if (!string.IsNullOrWhiteSpace(busName))
+                        {
+                            audioBuses.Add(new RekallAgeRuntimeAudioBus(
+                                busName,
+                                ReadNumber(component.Properties, "gain", 1),
+                                ReadBoolean(component.Properties, "muted", false)));
+                        }
+
                         break;
                     case "Rekall.AnimationPlayer":
                     case "Rekall.SpriteAnimator":
@@ -451,7 +483,27 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                     Sort(triggers)),
                 new RekallAgeRuntimeAudioView(
                     Sort(listeners),
-                    Sort(emitters)),
+                    Sort(emitters))
+                {
+                    Voices = voices
+                        .OrderBy(voice => voice.EntityName, StringComparer.Ordinal)
+                        .ThenBy(voice => voice.EntityId, StringComparer.Ordinal)
+                        .ToArray(),
+                    Buses = audioBuses
+                        .OrderBy(bus => bus.Name, StringComparer.Ordinal)
+                        .ToArray(),
+                    MixFrame = world.Subsystems.Audio.MixFrame.FrameIndex == world.FrameIndex
+                        ? world.Subsystems.Audio.MixFrame
+                        : new RekallAgeRuntimeAudioMixFrame(
+                            world.FrameIndex,
+                            voices.Count(voice => voice.State == "playing"),
+                            voices
+                                .Where(voice => voice.State == "playing")
+                                .Select(voice => Math.Max(voice.LeftGain, voice.RightGain))
+                                .DefaultIfEmpty(0)
+                                .Max(),
+                            Samples: Array.Empty<float>())
+                },
                 new RekallAgeRuntimeAnimationView(Sort(animationPlayers)),
                 new RekallAgeRuntimeUiView(
                     Sort(canvases),

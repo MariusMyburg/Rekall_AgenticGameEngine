@@ -14,7 +14,11 @@ public sealed record RekallAgeRuntimeSimulationClockAdvanceResult(
     RekallAgeRuntimeWorld World,
     int StepsSimulated,
     double DeltaSeconds,
-    double AccumulatedSeconds);
+    double AccumulatedSeconds)
+{
+    public IReadOnlyList<RekallAgeRuntimeAudioMixFrame> AudioFrames { get; init; } =
+        Array.Empty<RekallAgeRuntimeAudioMixFrame>();
+}
 
 public sealed class RekallAgeRuntimeSimulationClock
 {
@@ -69,12 +73,17 @@ public sealed class RekallAgeRuntimeSimulationClock
             _accumulatorSeconds + deltaSeconds);
 
         var steps = 0;
+        var audioFrames = new List<RekallAgeRuntimeAudioMixFrame>();
         while (_accumulatorSeconds + 0.000001 >= _options.FixedStepSeconds
             && steps < _options.MaximumStepsPerAdvance)
         {
             var input = inputForStep?.Invoke(steps) ?? RekallAgeRuntimeInputState.Empty;
             world = (await _executionLoop.RunAsync(world, 1, cancellationToken, input)
                 .ConfigureAwait(false)).World;
+            if (world.Subsystems.Audio.MixFrame.Samples is { Count: > 0 })
+            {
+                audioFrames.Add(world.Subsystems.Audio.MixFrame);
+            }
             _accumulatorSeconds = Math.Max(0, _accumulatorSeconds - _options.FixedStepSeconds);
             steps++;
         }
@@ -83,6 +92,9 @@ public sealed class RekallAgeRuntimeSimulationClock
             world,
             steps,
             deltaSeconds,
-            _accumulatorSeconds);
+            _accumulatorSeconds)
+        {
+            AudioFrames = audioFrames
+        };
     }
 }

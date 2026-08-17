@@ -391,6 +391,15 @@ public sealed record RekallAgeRuntimeAudioView(
     IReadOnlyList<RekallAgeRuntimeAudioListener> Listeners,
     IReadOnlyList<RekallAgeRuntimeAudioEmitter> Emitters)
 {
+    public IReadOnlyList<RekallAgeRuntimeAudioVoice> Voices { get; init; } =
+        Array.Empty<RekallAgeRuntimeAudioVoice>();
+
+    public IReadOnlyList<RekallAgeRuntimeAudioBus> Buses { get; init; } =
+        Array.Empty<RekallAgeRuntimeAudioBus>();
+
+    public RekallAgeRuntimeAudioMixFrame MixFrame { get; init; } =
+        RekallAgeRuntimeAudioMixFrame.Silent;
+
     public static RekallAgeRuntimeAudioView Empty { get; } = new(
         Array.Empty<RekallAgeRuntimeAudioListener>(),
         Array.Empty<RekallAgeRuntimeAudioEmitter>());
@@ -405,6 +414,36 @@ public sealed record RekallAgeRuntimeAudioEmitter(
     string EntityName,
     string? ClipAssetId,
     string? Bus);
+
+public sealed record RekallAgeRuntimeAudioVoice(
+    string EntityId,
+    string EntityName,
+    string ClipAssetId,
+    string Bus,
+    string State,
+    bool Loop,
+    double PlaybackSeconds,
+    double DurationSeconds,
+    double Gain,
+    double Pitch,
+    double LeftGain,
+    double RightGain);
+
+public sealed record RekallAgeRuntimeAudioBus(
+    string Name,
+    double Gain,
+    bool Muted);
+
+public sealed record RekallAgeRuntimeAudioMixFrame(
+    int FrameIndex,
+    int ActiveVoiceCount,
+    double PeakGain,
+    int SampleRate = 48_000,
+    int Channels = 2,
+    IReadOnlyList<float>? Samples = null)
+{
+    public static RekallAgeRuntimeAudioMixFrame Silent { get; } = new(0, 0, 0, Samples: Array.Empty<float>());
+}
 
 public sealed record RekallAgeRuntimeAnimationView(
     IReadOnlyList<RekallAgeRuntimeAnimationPlayer> Players)

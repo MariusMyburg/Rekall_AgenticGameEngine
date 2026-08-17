@@ -50,6 +50,7 @@ public sealed class PlayablePackageIntegrityTests
             context);
         Assert.True(capture.Ok, capture.Summary);
         Assert.True(capture.Value.NonBlank);
+        Assert.Equal("package_play_frame_001.png", Path.GetFileName(capture.Value.OutputPath));
         Assert.Equal("runtime-viewport", capture.Value.Kind);
         Assert.Contains("sprite", capture.Value.DrawCommandKinds);
 

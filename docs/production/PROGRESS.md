@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-17 23:20 Africa/Johannesburg
+Last verified: 2026-08-17 23:28 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: packaged authored-scene proof and output isolation pass Debug gate
+Latest milestone: package proof keeps deterministic filename after authored-scene capture
 
 ## Product objective
 
@@ -135,6 +135,13 @@ Studio is important, but it does not define or reorder the engine foundation.
   intent in that retry. Original, relocated-directory, and ZIP scenarios pass,
   rejected output leaves integrity intact, and the full Debug suite passes
   569/569.
+- First distribution attempt: the clean build and both independent Release
+  passes completed at 569/569, but installed acceptance caught a compatibility
+  regression before relocation: authored-scene capture changed the established
+  proof filename from `package_play_frame_001.png` to `Main_runtime_001.png`.
+  The command now keeps the deterministic package-proof filename while retaining
+  the authored-scene pixels. A filename regression and the full 569/569 Debug
+  suite pass; the distribution gate must be rerun from scratch.
 
 ## Current gaps
 
@@ -150,8 +157,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the clean Release/distribution gate for the packaged authored-scene proof
-and output-isolation milestone.
+Rerun the clean Release/distribution gate after restoring the deterministic
+package-proof filename.
 
 ## Next after the current item
 

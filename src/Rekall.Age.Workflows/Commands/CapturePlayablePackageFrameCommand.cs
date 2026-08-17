@@ -105,6 +105,15 @@ public sealed class CapturePlayablePackageFrameCommand
         }
 
         var viewport = capture.Value;
+        var outputPath = Path.GetFullPath(Path.Combine(
+            request.OutputDirectory,
+            $"package_play_frame_{frameIndex:000}.png"));
+        if (!Path.GetFullPath(viewport.ScreenshotPath).Equals(outputPath, PathComparison))
+        {
+            File.Move(viewport.ScreenshotPath, outputPath, overwrite: true);
+            context.Transaction.RecordChangedResource(outputPath);
+        }
+
         var nonBackgroundPixels = viewport.FrameAnalysis.Analyzed
             ? Math.Clamp(
                 viewport.FrameAnalysis.TotalPixels - (int)Math.Round(
@@ -114,7 +123,7 @@ public sealed class CapturePlayablePackageFrameCommand
             : 0;
         var resultValue = new CapturePlayablePackageFrameResult(
             true,
-            viewport.ScreenshotPath,
+            outputPath,
             "runtime-viewport",
             viewport.FrameIndex,
             viewport.Width,

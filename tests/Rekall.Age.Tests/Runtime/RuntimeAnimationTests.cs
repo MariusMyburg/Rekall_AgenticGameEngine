@@ -88,6 +88,48 @@ public sealed class RuntimeAnimationTests
     }
 
     [Fact]
+    public async Task AnimationAssetSizeLimitIsEnforcedBeforeJsonParsing()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var assetDirectory = Path.Combine(root, "Assets", "animation");
+        Directory.CreateDirectory(assetDirectory);
+        var path = Path.Combine(assetDirectory, "oversized.age.animation.json");
+        await using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+            stream.SetLength((4 * 1024 * 1024) + 1);
+        }
+        await new RekallAgeAssetCatalogStore().SaveAsync(
+            root,
+            new RekallAgeAssetCatalogDocument(
+            [
+                new RekallAgeAssetDocument(
+                    "asset-oversized",
+                    "oversized",
+                    "Oversized",
+                    "animation",
+                    string.Empty,
+                    "Assets/animation/oversized.age.animation.json",
+                    "test")
+            ]),
+            CancellationToken.None);
+        var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["x"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationPlayer",
+                new JsonObject { ["clip"] = "asset-oversized", ["playing"] = true }));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault(root).RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            1,
+            CancellationToken.None);
+
+        var observation = Assert.Single(result.World.Observations, item =>
+            item.Code == "runtime.animation.clip_asset_invalid");
+        Assert.Contains("4194304-byte limit", observation.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task UnsupportedAnimationClipVersionProducesStructuredObservation()
     {
         var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
@@ -450,6 +492,67 @@ public sealed class RuntimeAnimationTests
         Assert.Equal(
             continuousState.Properties["completedCycles"]!.GetValue<int>(),
             resumedState.Properties["completedCycles"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task AnimationObservationsRemainBoundedToTheCurrentFrameDuringLongRuns()
+    {
+        var actor = RekallAgeEntityDocument.Create("Invalid", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationClip",
+                new JsonObject { ["version"] = 99 }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.AnimationPlayer", new JsonObject()));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault().RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            7_200,
+            CancellationToken.None);
+
+        var observation = Assert.Single(result.World.Observations);
+        Assert.Equal("runtime.animation.unsupported_clip_version", observation.Code);
+        Assert.Equal(7_200, observation.Frame);
+    }
+
+    [Fact]
+    public async Task AnimationRuntimeSurvivesDeterministicMalformedTrackCorpus()
+    {
+        var tracks = new JsonArray();
+        for (var index = 0; index < 512; index++)
+        {
+            tracks.Add((index % 6) switch
+            {
+                0 => JsonValue.Create($"invalid-{index}"),
+                1 => new JsonObject(),
+                2 => new JsonObject
+                {
+                    ["component"] = "Rekall.Transform3D", ["property"] = "x", ["keys"] = new JsonArray()
+                },
+                3 => new JsonObject
+                {
+                    ["component"] = "Rekall.Transform3D", ["property"] = "x",
+                    ["keys"] = new JsonArray { new JsonObject { ["time"] = "not-a-time" } }
+                },
+                4 => ScalarTrack("Rekall.MissingComponent", "value", 0, index, "linear"),
+                _ => ScalarTrack("Rekall.Transform3D", "x", 0, index, "smoothstep")
+            });
+        }
+        var actor = RekallAgeEntityDocument.Create("Corpus", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["x"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationClip",
+                new JsonObject { ["version"] = 1, ["durationSeconds"] = 1, ["tracks"] = tracks }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.AnimationPlayer", new JsonObject()));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault().RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            120,
+            CancellationToken.None);
+
+        Assert.Equal(120, result.World.FrameIndex);
+        Assert.InRange(result.World.Observations.Count, 1, 512);
+        Assert.True(double.IsFinite(Assert.Single(result.World.Entities).Transform.Position3D.X));
     }
 
     private static JsonObject ScalarTrack(

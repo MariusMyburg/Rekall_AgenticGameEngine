@@ -55,7 +55,7 @@ public sealed class GetEngineStatusCommand
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
                     "rekall.workflow.audit_playable_package",
-                    "Inspect a package, run deterministic frames, and capture a proof PNG for deliverable validation.",
+                    "Prove package inspection, deterministic run, and nonblank PNG capture in one operation; use it instead of separate inspect/run/capture calls when all proof is required.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
                     "rekall.workflow.package_playable_game",

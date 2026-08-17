@@ -305,6 +305,36 @@ This run drives blocking dimension-mismatch diagnostics with executable generic
 component removal/addition repairs, plus prominent module-free runtime-inspection
 guidance in engine status and the embedded-agent contract.
 
+### Canonical-component rerun
+
+Rerun 11 used the dimension-safe distribution with the unchanged 36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun11`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 490,824
+- Completion tokens: 8,646
+
+The agent used module-free deterministic inspection for both scenes, compiled a
+playable module, created a graphics package, inspected and ran it, and relocated
+it. It correctly returned `Completed=false` because neither the original nor
+relocated package had complete audit/capture evidence.
+
+Independent installed-CLI verification rejected the physics evidence. The
+agent authored `Rigidbody3D` and `Rigidbody2D` without the canonical `Rekall.`
+prefix. Runtime correctly treated those as custom component types, so both
+scenes reported zero active physics bodies and neither dynamic entity moved.
+Validation had accepted the plausible aliases because custom components are
+allowed to use arbitrary names. It also retained two camera-layer warnings, so
+the task's zero-issue condition was not met.
+
+The generic correction is intentionally narrow: exact unqualified aliases of a
+registered built-in are now blocking diagnostics with executable migration to
+the canonical type while preserving properties; namespaced agent-authored
+components remain valid. The run also showed that package proof should use the
+single audit workflow, which already consolidates inspection, run, and nonblank
+capture, instead of consuming turns on its sub-operations.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

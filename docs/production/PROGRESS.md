@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 00:41 Africa/Johannesburg
+Last verified: 2026-08-18 00:48 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: dimension-safe physics/inspection repair passed the complete product gate
+Latest milestone: built-in alias migration and consolidated audit guidance pass 577 tests
 
 ## Product objective
 
@@ -224,6 +224,19 @@ Studio is important, but it does not define or reorder the engine foundation.
   gauntlet, original and relocated package proof, runtime UI, software viewport,
   simulated audio, and Windows player audio. The canonical archive is
   194,688,256 bytes.
+- Broad benchmark rerun 11: the agent reached module-free inspection of both
+  scenes, module build, package creation/inspection/run, and relocation before
+  the 36-turn bound (36 tools, 490,824 prompt tokens, 8,646 completion tokens).
+  Independent inspection found zero active physics bodies: plausible
+  `Rigidbody3D`/`Rigidbody2D` names lacked the canonical `Rekall.` prefix and
+  were treated as custom components. Two validation warnings also remained,
+  and original/relocated audits were absent. This is not an accepted pass.
+- Alias/audit repair: validation now blocks exact unqualified aliases of
+  registered built-ins and returns executable remove/add migration commands
+  that preserve authored properties. Agent status, audit schema, and embedded
+  guidance now identify `rekall.workflow.audit_playable_package` as the
+  consolidated inspect/run/nonblank-capture proof. The full Debug suite passes
+  at 577/577.
 
 ## Current gaps
 
@@ -239,7 +252,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the unchanged installed Ollama benchmark on the dimension-safe distribution.
+Run the complete product gate for built-in alias migration and consolidated audit guidance.
 
 ## Next after the current item
 

@@ -14,6 +14,11 @@ public sealed class RekallAgeProjectValidator
     private static readonly IReadOnlyDictionary<string, RekallAgeComponentSchema> BuiltInComponentSchemas =
         RekallAgeModuleIndexer.IndexAssembly(typeof(RekallAgeBuiltInModule).Assembly)
             .Components.ToDictionary(component => component.TypeName, StringComparer.Ordinal);
+    private static readonly IReadOnlyDictionary<string, string> UnqualifiedBuiltInAliases =
+        BuiltInComponentSchemas.Keys.ToDictionary(
+            type => type["Rekall.".Length..],
+            type => type,
+            StringComparer.Ordinal);
     private readonly RekallAgeSceneStore _sceneStore;
 
     public RekallAgeProjectValidator(RekallAgeSceneStore sceneStore)
@@ -104,6 +109,7 @@ public sealed class RekallAgeProjectValidator
 
         foreach (var entity in scene.Entities)
         {
+            ValidateUnqualifiedBuiltInAliases(projectRoot, scene.Name, entity, issues);
             ValidatePhysicsBodyTransform(projectRoot, scene.Name, entity, "Rekall.Rigidbody3D", "Rekall.Transform3D", issues);
             ValidatePhysicsBodyTransform(projectRoot, scene.Name, entity, "Rekall.Rigidbody2D", "Rekall.Transform2D", issues);
             ValidatePhysicsColliderDimensions(projectRoot, scene.Name, entity, issues);
@@ -193,6 +199,48 @@ public sealed class RekallAgeProjectValidator
                         ]));
                 }
             }
+        }
+    }
+
+    private static void ValidateUnqualifiedBuiltInAliases(
+        string projectRoot,
+        string sceneName,
+        RekallAgeEntityDocument entity,
+        List<RekallAgeValidationIssue> issues)
+    {
+        foreach (var component in entity.Components)
+        {
+            if (!UnqualifiedBuiltInAliases.TryGetValue(component.Type, out var canonicalType))
+            {
+                continue;
+            }
+
+            issues.Add(new RekallAgeValidationIssue(
+                "REKALL_COMPONENT_BUILTIN_PREFIX_REQUIRED",
+                $"Entity '{entity.Name}' uses unqualified built-in alias '{component.Type}', which runtime treats as a custom component. Use canonical type '{canonicalType}', or choose a distinct namespace for an agent-authored custom component.",
+                "blocking",
+                entity.Id,
+                [
+                    new RekallAgeSuggestedCommand(
+                        "rekall.component.remove",
+                        new Dictionary<string, object?>
+                        {
+                            ["projectRoot"] = projectRoot,
+                            ["sceneName"] = sceneName,
+                            ["entityId"] = entity.Id,
+                            ["componentType"] = component.Type
+                        }),
+                    new RekallAgeSuggestedCommand(
+                        "rekall.component.add",
+                        new Dictionary<string, object?>
+                        {
+                            ["projectRoot"] = projectRoot,
+                            ["sceneName"] = sceneName,
+                            ["entityId"] = entity.Id,
+                            ["componentType"] = canonicalType,
+                            ["properties"] = component.Properties.DeepClone().AsObject()
+                        })
+                ]));
         }
     }
 

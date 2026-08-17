@@ -197,6 +197,43 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneRejectsUnqualifiedBuiltInAliasWithExecutableMigration()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var body = RekallAgeEntityDocument.Create("Body", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.BoxCollider3D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create("Rigidbody3D", new JsonObject { ["Mass"] = 3 }));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["physics3d"]).AddEntity(body),
+            CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        var issue = Assert.Single(report.Issues, item =>
+            item.Code == "REKALL_COMPONENT_BUILTIN_PREFIX_REQUIRED");
+        Assert.Equal("blocking", issue.Severity);
+        Assert.Contains("Rekall.Rigidbody3D", issue.Message, StringComparison.Ordinal);
+        Assert.Collection(
+            issue.SuggestedCommands!,
+            command =>
+            {
+                Assert.Equal("rekall.component.remove", command.Tool);
+                Assert.Equal("Rigidbody3D", command.Arguments["componentType"]);
+            },
+            command =>
+            {
+                Assert.Equal("rekall.component.add", command.Tool);
+                Assert.Equal("Rekall.Rigidbody3D", command.Arguments["componentType"]);
+                var properties = Assert.IsType<JsonObject>(command.Arguments["properties"]);
+                Assert.Equal(3, properties["Mass"]!.GetValue<int>());
+            });
+    }
+
+    [Fact]
     public async Task ValidateSceneReportsMultipleActiveCameras()
     {
         var root = TestPaths.CreateTempDirectory();

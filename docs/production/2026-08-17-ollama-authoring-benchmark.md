@@ -171,6 +171,32 @@ deterministic package proof commands. The next generic fix is a dual-mode
 graphics package: retain the Windows graphics player as the primary launch
 artifact and include a headless proof companion that capture/audit can select.
 
+### Graphics-proof rerun
+
+The dual-mode graphics package passed the full product gate before the unchanged
+benchmark ran again.
+
+- Project: `rekall-age-installed-broad-benchmark-rerun6-4dbccbd96368474c93c7a3706fdc1d8b`
+- Agent-reported result: completed in 35 turns
+- Tool calls: 34
+- Prompt tokens: 591,837
+- Completion tokens: 8,491
+- Independent acceptance: failed
+
+The agent reached authoring, validation repair, packaging, execution, inspection,
+capture, audit, and relocation within the bound. Its completion claim was not
+accepted. The package proof companion rendered the default scaffold module's
+blank frame instead of the packaged authored runtime scene. In addition, the
+agent passed the package root as `outputDirectory`; capture wrote
+`package_play_frame_001.png` into the immutable package, after which integrity
+inspection correctly reported an unexpected file and blocked further proof.
+
+This run isolates two generic package-proof contracts: evidence must be derived
+from the packaged authored scene, and proof output must be rejected before any
+write when it resolves inside a mutable package directory. The next rerun remains
+the same installed-only benchmark and acceptance is still based on independent
+evidence rather than the model's final message.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

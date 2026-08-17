@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-17 23:02 Africa/Johannesburg
+Last verified: 2026-08-17 23:20 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: graphics packages now carry relocatable deterministic proof players
+Latest milestone: packaged authored-scene proof and output isolation pass Debug gate
 
 ## Product objective
 
@@ -30,8 +30,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,666,339-byte win-x64 archive assembled.
-- Canonical verification: 568/568 Release tests passed twice independently;
+- Windows distribution: fresh 194,666,626-byte win-x64 archive assembled.
+- Canonical verification: 569/569 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
@@ -118,6 +118,23 @@ Studio is important, but it does not define or reorder the engine foundation.
   Package capture selects the proof player; primary run semantics remain
   unchanged. A real graphics package now captures nonblank evidence and passes
   audit both before and after relocation. The full Debug suite passes 569/569.
+- Graphics-proof distribution gate: both independent Release passes and the
+  complete installed black-box acceptance passed on fresh binaries.
+- Broad benchmark rerun 6: the agent reported completion after 35 turns and 34
+  tool calls (591,837 prompt tokens; 8,491 completion tokens), but independent
+  acceptance rejected that claim. Package audit captured the scaffold module's
+  blank structured frame instead of the packaged authored runtime scene. The
+  agent also supplied the package root as its proof output directory; capture
+  wrote an undeclared PNG into the immutable package, so subsequent integrity
+  checks correctly failed. This is a near-pass, not an accepted benchmark pass.
+- Package-proof contract repair: capture now first proves the packaged launch,
+  then renders the manifest scene from the packaged `Game` root through the
+  deterministic runtime viewport. Directory and manifest packages reject any
+  proof output at or beneath the immutable package root before execution or
+  writes, with an exact safe retry command; package audit preserves the audit
+  intent in that retry. Original, relocated-directory, and ZIP scenarios pass,
+  rejected output leaves integrity intact, and the full Debug suite passes
+  569/569.
 
 ## Current gaps
 
@@ -133,12 +150,12 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Commit the dual-player graphics package milestone, then run the canonical
-two-pass Release/distribution gate.
+Run the clean Release/distribution gate for the packaged authored-scene proof
+and output-isolation milestone.
 
 ## Next after the current item
 
-Rebuild, then rerun the identical installed Ollama benchmark on fresh binaries. Classify any
+Rerun the identical installed Ollama benchmark on fresh binaries. Classify any
 remaining failure by generic engine contract and fix it with regression tests.
 A genuine broad benchmark pass precedes quantified production hardening;
 Studio follows as a consumer of those results.

@@ -50,6 +50,8 @@ public sealed class PlayablePackageIntegrityTests
             context);
         Assert.True(capture.Ok, capture.Summary);
         Assert.True(capture.Value.NonBlank);
+        Assert.Equal("runtime-viewport", capture.Value.Kind);
+        Assert.Contains("sprite", capture.Value.DrawCommandKinds);
 
         var audit = await new AuditPlayablePackageCommand().ExecuteAsync(
             new AuditPlayablePackageRequest(
@@ -72,6 +74,22 @@ public sealed class PlayablePackageIntegrityTests
             context);
         Assert.True(relocatedAudit.Ok, relocatedAudit.Summary);
         Assert.True(relocatedAudit.Value.Ready);
+
+        var unsafeAudit = await new AuditPlayablePackageCommand().ExecuteAsync(
+            new AuditPlayablePackageRequest(output, output),
+            context);
+        Assert.False(unsafeAudit.Ok);
+        var unsafeOutput = Assert.Single(
+            unsafeAudit.Errors,
+            error => error.Code == "REKALL_PACKAGE_PROOF_OUTPUT_UNSAFE");
+        var retryAudit = Assert.Single(unsafeOutput.SuggestedCommands!);
+        Assert.Equal("rekall.workflow.audit_playable_package", retryAudit.Tool);
+        Assert.False(File.Exists(Path.Combine(output, "package_play_frame_001.png")));
+
+        var inspectionAfterRejectedAudit = await new InspectPlayablePackageCommand().ExecuteAsync(
+            new InspectPlayablePackageRequest(output),
+            context);
+        Assert.True(inspectionAfterRejectedAudit.Ok, inspectionAfterRejectedAudit.Summary);
     }
 
     [Fact]

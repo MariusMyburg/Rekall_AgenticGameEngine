@@ -56,6 +56,36 @@ public sealed class AuditPlayablePackageCommand
         var frameCount = Math.Clamp(request.Frames, 1, 600);
         var frameIndex = Math.Clamp(request.FrameIndex, 1, frameCount);
         var outputDirectory = request.OutputDirectory ?? ResolveDefaultOutputDirectory(request.PackagePath);
+        var captureRequest = new CapturePlayablePackageFrameRequest(
+            request.PackagePath,
+            outputDirectory,
+            frameIndex,
+            request.Width,
+            request.Height,
+            request.Inputs);
+        if (CapturePlayablePackageFrameCommand.TryCreateUnsafeOutputError(captureRequest, out var unsafeOutput))
+        {
+            var safeOutput = unsafeOutput.SuggestedCommands![0].Arguments["outputDirectory"];
+            var auditError = unsafeOutput with
+            {
+                SuggestedCommands =
+                [
+                    new RekallAgeSuggestedCommand(
+                        Name,
+                        new Dictionary<string, object?>
+                        {
+                            ["packagePath"] = request.PackagePath,
+                            ["outputDirectory"] = safeOutput,
+                            ["frames"] = request.Frames,
+                            ["frameIndex"] = request.FrameIndex,
+                            ["width"] = request.Width,
+                            ["height"] = request.Height,
+                            ["inputs"] = request.Inputs
+                        })
+                ]
+            };
+            return RejectUnsafeOutput(request, frameIndex, auditError);
+        }
 
         var inspection = await _inspectPackage.ExecuteAsync(
             new InspectPlayablePackageRequest(request.PackagePath),
@@ -66,13 +96,7 @@ public sealed class AuditPlayablePackageCommand
             new RunPlayablePackageRequest(request.PackagePath, frameCount, request.Inputs),
             context);
         var capture = await _captureFrame.ExecuteAsync(
-            new CapturePlayablePackageFrameRequest(
-                request.PackagePath,
-                outputDirectory,
-                frameIndex,
-                request.Width,
-                request.Height,
-                request.Inputs),
+            captureRequest,
             context);
 
         var checks = new[]
@@ -156,6 +180,47 @@ public sealed class AuditPlayablePackageCommand
         }
 
         return missing;
+    }
+
+    private static RekallAgeCommandResult<AuditPlayablePackageResult> RejectUnsafeOutput(
+        AuditPlayablePackageRequest request,
+        int frameIndex,
+        RekallAgeCommandError error)
+    {
+        var manifest = new RekallAgePlayablePackageManifest("", "", "", "", [], [], []);
+        var inspection = new InspectPlayablePackageResult(false, string.Empty, manifest, 0, [], []);
+        var run = new RunPlayablePackageResult(false, string.Empty, string.Empty, string.Empty, -1, [], [], string.Empty);
+        var capture = new CapturePlayablePackageFrameResult(
+            false,
+            string.Empty,
+            "unsafe-output",
+            frameIndex,
+            Math.Clamp(request.Width, 1, 4096),
+            Math.Clamp(request.Height, 1, 4096),
+            false,
+            0,
+            0,
+            [],
+            string.Empty);
+        var checks = new[]
+        {
+            new RekallAgePlayablePackageAuditCheck(
+                "proof-output-outside-package",
+                false,
+                error.Message)
+        };
+        var result = new AuditPlayablePackageResult(
+            false,
+            inspection,
+            run,
+            capture,
+            RequiredKeyArtifacts,
+            RequiredKeyArtifacts,
+            checks);
+        return RekallAgeCommandResult<AuditPlayablePackageResult>.Failure(
+            result,
+            error.Message,
+            [error]);
     }
 
     private static string ResolveDefaultOutputDirectory(string packagePath)

@@ -462,7 +462,18 @@ public sealed record RekallAgeRuntimeAnimationPlayer(
     string EntityId,
     string EntityName,
     string Kind,
-    string? ClipAssetId);
+    string? ClipAssetId)
+{
+    public bool InlineClip { get; init; }
+
+    public bool Playing { get; init; }
+
+    public double TimeSeconds { get; init; }
+
+    public double DurationSeconds { get; init; }
+
+    public string LoopMode { get; init; } = "loop";
+}
 
 public sealed record RekallAgeRuntimeUiView(
     IReadOnlyList<RekallAgeRuntimeUiCanvas> Canvases,

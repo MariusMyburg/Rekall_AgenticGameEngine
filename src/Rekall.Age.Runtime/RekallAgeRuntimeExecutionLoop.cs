@@ -93,6 +93,7 @@ public sealed class RekallAgeRuntimeExecutionLoop
 
             world = world with
             {
+                Observations = Array.Empty<RekallAgeRuntimeObservation>(),
                 Subsystems = world.Subsystems with
                 {
                     Events = RekallAgeRuntimeEventView.Empty
@@ -108,7 +109,6 @@ public sealed class RekallAgeRuntimeExecutionLoop
             {
                 FrameIndex = nextFrameIndex,
                 ElapsedTime = nextElapsed,
-                Observations = Array.Empty<RekallAgeRuntimeObservation>(),
                 SystemsRun = _systems.Select(system => system.Id).ToArray()
             });
         }

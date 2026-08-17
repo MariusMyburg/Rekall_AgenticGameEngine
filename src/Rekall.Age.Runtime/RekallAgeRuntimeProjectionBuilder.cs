@@ -363,12 +363,27 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             ?? ReadString(component.Properties, "clipId")
                             ?? ReadString(component.Properties, "animation")
                             ?? ReadString(component.Properties, "assetId");
+                        var inlineClip = entity.Components.Any(candidate =>
+                            candidate.Type.Equals("Rekall.AnimationClip", StringComparison.Ordinal));
+                        var animationState = entity.Components.FirstOrDefault(candidate =>
+                            candidate.Type.Equals("Rekall.AnimationState", StringComparison.Ordinal));
                         animationPlayers.Add(new RekallAgeRuntimeAnimationPlayer(
                             entity.Id,
                             entity.Name,
                             component.Type["Rekall.".Length..],
-                            clip));
-                        if (string.IsNullOrWhiteSpace(clip))
+                            clip)
+                        {
+                            InlineClip = inlineClip,
+                            Playing = animationState is null
+                                ? ReadBoolean(component.Properties, "playing", true)
+                                : ReadBoolean(animationState.Properties, "playing", true),
+                            TimeSeconds = animationState is null ? 0 : ReadNumber(animationState.Properties, "timeSeconds", 0),
+                            DurationSeconds = animationState is null ? 0 : ReadNumber(animationState.Properties, "durationSeconds", 0),
+                            LoopMode = animationState is null
+                                ? ReadString(component.Properties, "loopMode") ?? "loop"
+                                : ReadString(animationState.Properties, "loopMode") ?? "loop"
+                        });
+                        if (string.IsNullOrWhiteSpace(clip) && !inlineClip)
                         {
                             observations.Add(CreateObservation(
                                 world.FrameIndex,

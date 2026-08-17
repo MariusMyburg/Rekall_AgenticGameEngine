@@ -25,6 +25,7 @@ Artifacts/
 .age-*/
 .agecache/
 *.agecache
+.rekall/
 .worktrees/
 worktrees/
 

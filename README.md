@@ -2,6 +2,8 @@
 
 Rekall AGE is the Rekall Agentic Game Engine: a C#/.NET engine for AI agents to author arbitrary games through inspectable, generic, composable engine contracts.
 
+Rekall AGE is proprietary software governed by the [proprietary notice](PROPRIETARY-NOTICE.md). The current product version is `0.1.0-preview.1`, a Windows-first Developer Preview for professional developers and AI coding agents.
+
 The core idea is simple and strict: Rekall AGE is an AI-agent-first game engine. Every major system is designed so agents can inspect the current state, understand the available contracts, make targeted changes, run verification loops, and explain what changed. The engine exposes authoring primitives, diagnostics, runtime contracts, rendering infrastructure, networking primitives, package workflows, and MCP/CLI tools so agents can author arbitrary games through project data and project modules.
 
 The genre-agnostic rule follows from that agent-first premise: the engine should not provide a privileged controller, combat loop, camera loop, level loop, or rules model. Game-specific behavior belongs in authored scene data and project modules, where agents can read and change it directly.
@@ -81,7 +83,17 @@ Game behavior belongs in project scenes, project modules, examples, and user-aut
 
 ## Current Status
 
-Rekall AGE is an active engine prototype with a substantial technical vertical slice.
+Rekall AGE is a proprietary Windows-first Developer Preview with a substantial technical vertical slice. The supported core is being hardened around deterministic agent authoring, diagnostics, desktop play, and packaging; advanced integrations remain explicitly experimental.
+
+| Capability | Stability |
+| --- | --- |
+| project, scene, entity, component, transaction, and module authoring | supported |
+| Windows desktop runtime and Vulkan player | supported |
+| CLI, MCP, diagnostics, validation, capture, and packaging | supported |
+| OpenXR and windowed playable VR | experimental |
+| multiplayer sessions, snapshots, deltas, and reconciliation | experimental |
+| Tripo3D provider bridge | experimental |
+| CPU clustered virtual geometry | experimental |
 
 Implemented foundations:
 
@@ -155,6 +167,7 @@ Inspect the engine:
 
 ```powershell
 dotnet run --project src/Rekall.Age.Cli -- context engine
+dotnet run --project src/Rekall.Age.Cli -- context doctor
 dotnet run --project src/Rekall.Age.Cli -- module schemas
 ```
 
@@ -165,7 +178,10 @@ dotnet run --project src/Rekall.Age.Cli -- project create .age-sandbox "Agentic 
 dotnet run --project src/Rekall.Age.Cli -- scene create .age-sandbox Main world,rendering3d
 dotnet run --project src/Rekall.Age.Cli -- geometry primitive create .age-sandbox Main "First Cube" cube 0 0 0 "#8ab4f8"
 dotnet run --project src/Rekall.Age.Cli -- validation scene .age-sandbox Main
+dotnet run --project src/Rekall.Age.Cli -- context doctor .age-sandbox
 ```
+
+Scaffolding a C# game module installs the compatible engine SDK under `.rekall/sdk/1` in that authored project. Generated module projects import this SDK through a relative path; they do not reference the Rekall AGE source repository. The `.rekall` directory is engine-managed and should not be edited by game code.
 
 Capture a viewport:
 

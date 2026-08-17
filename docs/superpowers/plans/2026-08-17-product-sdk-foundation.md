@@ -33,7 +33,7 @@
 - Produces: `RekallAgeProductInfo.Capabilities : IReadOnlyList<RekallAgeCapabilityStatus>`
 - Produces: `RekallAgeCapabilityStability` constants
 
-- [ ] **Step 1: Write the failing metadata test**
+- [x] **Step 1: Write the failing metadata test**
 
 ```csharp
 [Fact]
@@ -53,13 +53,13 @@ public void ProductMetadataDefinesPreviewCompatibilityAndCapabilityStability()
 }
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter FullyQualifiedName~ProductInfoTests --no-restore`
 
 Expected: compilation fails because `RekallAgeProductInfo` does not exist.
 
-- [ ] **Step 3: Add centralized build metadata**
+- [x] **Step 3: Add centralized build metadata**
 
 Add to `Directory.Build.props`:
 
@@ -71,7 +71,7 @@ Add to `Directory.Build.props`:
 <Copyright>Copyright © 2026 Rekall. All rights reserved.</Copyright>
 ```
 
-- [ ] **Step 4: Implement immutable product metadata**
+- [x] **Step 4: Implement immutable product metadata**
 
 Create records and lookup logic with this public API:
 
@@ -115,11 +115,11 @@ public static class RekallAgeProductInfo
 }
 ```
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 Run the filtered test again. Expected: PASS with zero warnings.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add Directory.Build.props src/Rekall.Age.Core/Product/RekallAgeProductInfo.cs tests/Rekall.Age.Tests/Core/ProductInfoTests.cs
@@ -137,7 +137,7 @@ git commit -m "feat: add product stability metadata"
 - Consumes: `RekallAgeProductInfo.Current`, `RekallAgeProductInfo.Capabilities`
 - Produces: additional `Product` and `Capabilities` fields on `GetEngineStatusResult`
 
-- [ ] **Step 1: Add failing command assertions**
+- [x] **Step 1: Add failing command assertions**
 
 Extend the engine-status test:
 
@@ -159,13 +159,13 @@ Assert.Contains("Channel: preview", engine.Output);
 Assert.Contains("runtime.openxr [experimental]", engine.Output);
 ```
 
-- [ ] **Step 2: Run both tests and verify RED**
+- [x] **Step 2: Run both tests and verify RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter "FullyQualifiedName~EngineStatus|FullyQualifiedName~CliCreatesGenericProject" --no-restore`
 
 Expected: compilation fails because status lacks `Product` and `Capabilities`.
 
-- [ ] **Step 3: Extend the status result and CLI rendering**
+- [x] **Step 3: Extend the status result and CLI rendering**
 
 Change the result signature to:
 
@@ -182,11 +182,11 @@ public sealed record GetEngineStatusResult(
 
 Populate the new fields from `RekallAgeProductInfo`, then print version, channel, proprietary status, supported host, SDK compatibility, and one line per capability in `PrintEngineStatusAsync`.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run the filtered tests. Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/Rekall.Age.Agent/Commands/GetEngineStatusCommand.cs tests/Rekall.Age.Tests/Agent/AgentContextCommandTests.cs tests/Rekall.Age.Tests/Cli/CliSmokeTests.cs
@@ -206,7 +206,7 @@ git commit -m "feat: expose product compatibility status"
 - SDK location: `<project>/.rekall/sdk/1/`
 - SDK files: `Rekall.Age.Core.dll`, `Rekall.Age.World.dll`, `Rekall.Age.Runtime.Abstractions.dll`, `Rekall.Age.Modules.dll`, `Rekall.Age.Sdk.props`, `rekall.sdk.json`
 
-- [ ] **Step 1: Write failing SDK installation tests**
+- [x] **Step 1: Write failing SDK installation tests**
 
 ```csharp
 [Fact]
@@ -235,13 +235,13 @@ public void ProjectFileImportsProjectLocalSdkWithoutAbsolutePaths()
 }
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter FullyQualifiedName~ModuleSdkInstallerTests --no-restore`
 
 Expected: compilation fails because the installer and project writer do not exist.
 
-- [ ] **Step 3: Implement SDK assembly discovery and installation**
+- [x] **Step 3: Implement SDK assembly discovery and installation**
 
 Use `typeof(RekallAgeModule).Assembly.Location` as the anchor and resolve the four named assemblies from loaded assembly locations or the anchor directory. Copy each file only when bytes differ. Write a JSON manifest containing product version, compatibility version, and relative assembly names.
 
@@ -258,7 +258,7 @@ The generated props file must use `$(MSBuildThisFileDirectory)`:
 </Project>
 ```
 
-- [ ] **Step 4: Implement the shared project-file writer**
+- [x] **Step 4: Implement the shared project-file writer**
 
 Return a `net10.0` project containing nullable/implicit-usings settings and:
 
@@ -272,11 +272,11 @@ Return a `net10.0` project containing nullable/implicit-usings settings and:
 </Target>
 ```
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 Run the filtered tests. Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/Rekall.Age.Modules/Sdk tests/Rekall.Age.Tests/Modules/ModuleSdkInstallerTests.cs
@@ -297,7 +297,7 @@ git commit -m "feat: add portable module sdk"
 - Consumes: `RekallAgeModuleSdkInstaller.InstallAsync`, `RekallAgeModuleProjectFile.Create`
 - Produces: portable scaffold projects with SDK resources recorded in the active transaction
 
-- [ ] **Step 1: Add failing portability assertions to each scaffold test**
+- [x] **Step 1: Add failing portability assertions to each scaffold test**
 
 For each scaffold result, assert:
 
@@ -309,13 +309,13 @@ Assert.Contains(".rekall\\sdk\\1\\Rekall.Age.Sdk.props", projectFile);
 Assert.True(File.Exists(Path.Combine(root, ".rekall", "sdk", "1", "rekall.sdk.json")));
 ```
 
-- [ ] **Step 2: Run the three scaffold test classes and verify RED**
+- [x] **Step 2: Run the three scaffold test classes and verify RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter "FullyQualifiedName~ScaffoldModuleCommandTests|FullyQualifiedName~ScaffoldPlayableModuleCommandTests|FullyQualifiedName~ScaffoldRuntimeSystemModuleCommandTests" --no-restore`
 
 Expected: assertions fail because projects still contain absolute source references.
 
-- [ ] **Step 3: Replace duplicated project discovery/writing**
+- [x] **Step 3: Replace duplicated project discovery/writing**
 
 In each command, install the project-local SDK before writing the module project:
 
@@ -333,11 +333,11 @@ foreach (var resource in sdk.Resources)
 
 Delete all three `FindModulesProjectPath` methods and all three private `CreateProjectFile` copies.
 
-- [ ] **Step 4: Verify GREEN and buildability**
+- [x] **Step 4: Verify GREEN and buildability**
 
 Run the filtered tests. Expected: PASS, including the existing build assertions.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/Rekall.Age.Modules/Commands tests/Rekall.Age.Tests/Modules
@@ -355,7 +355,7 @@ git commit -m "refactor: scaffold modules against portable sdk"
 - Build isolation: `<module>/obj/rekall/` and `<module>/bin/rekall/`
 - Preserves final assembly discovery through MSBuild property `TargetPath`
 
-- [ ] **Step 1: Write a failing concurrency regression test**
+- [x] **Step 1: Write a failing concurrency regression test**
 
 ```csharp
 [Fact]
@@ -382,7 +382,7 @@ public async Task PortableModulesBuildConcurrentlyWithoutSharingEngineOutputs()
 }
 ```
 
-- [ ] **Step 2: Run the regression repeatedly and verify RED**
+- [x] **Step 2: Run the regression repeatedly and verify RED**
 
 Run three times:
 
@@ -390,7 +390,7 @@ Run three times:
 
 Expected before implementation: compile failure due to absent result fields; after adding only assertions, at least one run exposes the old shared-reference behavior if retained.
 
-- [ ] **Step 3: Add isolated MSBuild arguments and structured diagnostics**
+- [x] **Step 3: Add isolated MSBuild arguments and structured diagnostics**
 
 Invoke `dotnet build` with:
 
@@ -403,7 +403,7 @@ startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
 
 Derive the module assembly as `bin/rekall/net10.0/<ModuleName>.dll`. Read `.rekall/sdk/1/rekall.sdk.json` and record compatibility version `1`. Return the real process exit code even when the output file is missing. Preserve combined stdout/stderr in `Output` and include it unchanged in `REKALL_MODULE_BUILD_FAILED`.
 
-- [ ] **Step 4: Verify GREEN and repeatability**
+- [x] **Step 4: Verify GREEN and repeatability**
 
 Run the concurrency test three times, then all build/module/player tests:
 
@@ -411,7 +411,7 @@ Run the concurrency test three times, then all build/module/player tests:
 
 Expected: all runs PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/Rekall.Age.Build/Commands/BuildModulesCommand.cs tests/Rekall.Age.Tests/Build/BuildModulesCommandTests.cs
@@ -432,7 +432,7 @@ git commit -m "fix: isolate authored module builds"
 - Produces records: `RekallAgeDoctorCheck`, `InspectEngineDoctorRequest`, `InspectEngineDoctorResult`
 - CLI route: `context doctor [projectRoot]`
 
-- [ ] **Step 1: Write failing doctor command tests**
+- [x] **Step 1: Write failing doctor command tests**
 
 ```csharp
 [Fact]
@@ -455,13 +455,13 @@ public async Task DoctorReportsProductHostAndPortableSdkEvidence()
 
 Also test a missing SDK returns `Ok == false`, check status `blocked`, code `REKALL_SDK_MISSING`, and a suggested `rekall.module.scaffold_runtime_system` command.
 
-- [ ] **Step 2: Run doctor tests and verify RED**
+- [x] **Step 2: Run doctor tests and verify RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter FullyQualifiedName~EngineDoctorTests --no-restore`
 
 Expected: compilation fails because doctor types do not exist.
 
-- [ ] **Step 3: Implement read-only checks**
+- [x] **Step 3: Implement read-only checks**
 
 Use these records:
 
@@ -485,7 +485,7 @@ public sealed record InspectEngineDoctorResult(
 
 Implement checks for Windows host, x64 process, product metadata, and optional project SDK manifest/assemblies. Paths in evidence are project-relative labels (`.rekall/sdk/1`) rather than absolute user paths. Return failure only for blocking supported-core checks.
 
-- [ ] **Step 4: Register CLI/MCP command and add CLI output**
+- [x] **Step 4: Register CLI/MCP command and add CLI output**
 
 Register `InspectEngineDoctorCommand` in `BuildRegistry`, add routes for `context doctor` and `context doctor <root>`, and print:
 
@@ -500,11 +500,11 @@ CLI returns `1` when any blocking check exists and `0` otherwise.
 
 Register the command in the MCP catalog test registry and assert `tools/list` contains `rekall.context.doctor`; this proves the shared registry exposes the same structured command to agents.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 Run doctor and CLI smoke tests. Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/Rekall.Age.Workflows/Commands/InspectEngineDoctorCommand.cs src/Rekall.Age.Cli/Program.cs tests/Rekall.Age.Tests/Workflows/EngineDoctorTests.cs tests/Rekall.Age.Tests/Cli/CliSmokeTests.cs tests/Rekall.Age.Tests/Mcp/McpCatalogTests.cs
@@ -521,11 +521,11 @@ git commit -m "feat: add engine doctor diagnostics"
 **Interfaces:**
 - Validates all interfaces introduced by Tasks 1–6.
 
-- [ ] **Step 1: Document product status and portable SDK behavior**
+- [x] **Step 1: Document product status and portable SDK behavior**
 
 Change README wording to identify Rekall AGE as proprietary Developer Preview software. Add product version, supported/experimental table, `context doctor` command, and explain that `.rekall/sdk/1` is engine-managed project state. Do not claim an open-source or MIT license.
 
-- [ ] **Step 2: Ignore generated SDK state**
+- [x] **Step 2: Ignore generated SDK state**
 
 Add this exact entry to `.gitignore`:
 
@@ -534,7 +534,7 @@ Add this exact entry to `.gitignore`:
 .rekall/
 ```
 
-- [ ] **Step 3: Run repository policy scans**
+- [x] **Step 3: Run repository policy scans**
 
 Run:
 
@@ -546,7 +546,7 @@ git diff --check
 
 Expected: no product/open-source claim, no scaffold source reference, and no whitespace errors. Historical design documents may describe rejected alternatives but must not claim current licensing.
 
-- [ ] **Step 4: Run the complete suite twice**
+- [x] **Step 4: Run the complete suite twice**
 
 Run twice without disabling test parallelism:
 
@@ -554,17 +554,25 @@ Run twice without disabling test parallelism:
 
 Expected each time: all tests pass, zero skipped, zero warnings.
 
-- [ ] **Step 5: Run a CLI proof outside repository project data**
+- [x] **Step 5: Run a CLI proof outside repository project data**
 
 Create a temporary project through CLI, then execute `project create`, `scene create`, `module scaffold-runtime-system`, `build modules`, `context doctor`, `validation scene`, and `game gauntlet`. Verify its generated `.csproj` contains only the relative SDK import and its built module loads.
 
-- [ ] **Step 6: Mark plan tasks complete and commit**
+- [x] **Step 6: Mark plan tasks complete and commit**
 
 ```powershell
 git add README.md .gitignore docs/superpowers/plans/2026-08-17-product-sdk-foundation.md
 git commit -m "docs: establish proprietary developer preview"
 ```
 
-- [ ] **Step 7: Record verification evidence**
+- [x] **Step 7: Record verification evidence**
 
 Capture the two test totals, CLI proof result, current commit, and remaining untracked user files in the completion handoff. Do not add or modify `Hero.png`; it requires a separate branding edit because its current license text is incorrect.
+
+## Execution Notes
+
+- The portable MSBuild output path is explicitly `bin/rekall/net10.0` because setting `OutputPath` suppresses target-framework appending.
+- `RekallAgeProjectModuleAssemblyLoader` was updated to load portable SDK output while retaining the legacy Debug path for existing repository examples.
+- Portable output isolation is applied only to SDK-importing projects so legacy source-reference examples are not broken by MSBuild property propagation.
+- Release verification passed twice consecutively with 497 tests, zero failures, zero skips, and no warnings.
+- The external CLI proof created and built a runtime-system module with no repository reference; doctor reported ready and the agent-authoring gauntlet packaged, audited, ran, and captured a non-blank proof frame.

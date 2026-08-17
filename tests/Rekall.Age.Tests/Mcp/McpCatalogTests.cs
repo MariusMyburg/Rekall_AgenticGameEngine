@@ -23,6 +23,7 @@ public sealed class McpCatalogTests
     {
         var registry = new RekallAgeCommandRegistry();
         registry.Register(new GetEngineStatusCommand());
+        registry.Register(new InspectEngineDoctorCommand());
         registry.Register(new ValidateSceneCommand());
         registry.Register(new ListTransactionHistoryCommand());
         registry.Register(new RestoreTransactionPreimageCommand());
@@ -82,6 +83,7 @@ public sealed class McpCatalogTests
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.engine_status");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.doctor");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.validation.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.transaction.history");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.transaction.restore_preimage");

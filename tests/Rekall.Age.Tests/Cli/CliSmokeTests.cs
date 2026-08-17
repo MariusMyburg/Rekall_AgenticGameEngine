@@ -10,6 +10,30 @@ namespace Rekall.Age.Tests.Cli;
 public sealed class CliSmokeTests
 {
     [Fact]
+    public async Task CliDoctorReportsPortableSdkReadiness()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var cliAssembly = FindCliAssemblyPath();
+        var scaffold = await RunAsync(
+            cliAssembly,
+            "module",
+            "scaffold",
+            root,
+            "doctor.module",
+            "Doctor Module",
+            "DoctorModule",
+            "DoctorComponent");
+
+        var doctor = await RunAsync(cliAssembly, "context", "doctor", root);
+
+        Assert.Equal(0, scaffold.ExitCode);
+        Assert.Equal(0, doctor.ExitCode);
+        Assert.Contains("Rekall AGE doctor 0.1.0-preview.1 [preview]", doctor.Output);
+        Assert.Contains("host.os: ready [info]", doctor.Output);
+        Assert.Contains("sdk.module: ready [info]", doctor.Output);
+    }
+
+    [Fact]
     public async Task CliCreatesGenericProjectAndDoesNotExposeGameTemplates()
     {
         var root = TestPaths.CreateTempDirectory();

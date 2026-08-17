@@ -317,6 +317,8 @@ internal static class RekallAgeCli
                 ["multiplayer", "snapshot", var root, var scene] => await MultiplayerSnapshotAsync(registry, context, root, scene),
                 ["multiplayer", "delta", var root, var scene, var fromServerTick] => await MultiplayerDeltaAsync(registry, context, root, scene, fromServerTick),
                 ["context", "engine"] => await PrintEngineStatusAsync(registry, context),
+                ["context", "doctor"] => await PrintEngineDoctorAsync(registry, context, null),
+                ["context", "doctor", var root] => await PrintEngineDoctorAsync(registry, context, root),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
                 ["validation", "scene", var root, var scene] => await ValidateSceneAsync(registry, context, root, scene),
@@ -421,6 +423,7 @@ internal static class RekallAgeCli
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new GetEngineStatusCommand());
+        registry.Register(new InspectEngineDoctorCommand());
         registry.Register(new ValidateSceneCommand());
         registry.Register(new ListTransactionHistoryCommand());
         registry.Register(new RestoreTransactionPreimageCommand());
@@ -2705,6 +2708,39 @@ internal static class RekallAgeCli
             Console.WriteLine($"    {contract.Purpose}");
             Console.WriteLine($"    Capabilities: {string.Join(", ", contract.Capabilities)}");
             Console.WriteLine($"    Tools: {string.Join(", ", contract.RelatedTools)}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> PrintEngineDoctorAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string? projectRoot)
+    {
+        var result = await registry.ExecuteAsync<InspectEngineDoctorRequest, InspectEngineDoctorResult>(
+            "rekall.context.doctor",
+            new InspectEngineDoctorRequest(projectRoot),
+            context);
+        Console.WriteLine(
+            $"Rekall AGE doctor {result.Value.Product.Version} [{result.Value.Product.Channel}]");
+        foreach (var check in result.Value.Checks)
+        {
+            Console.WriteLine($"{check.Id}: {check.Status} [{check.Severity}] - {check.Summary}");
+            foreach (var evidence in check.Evidence)
+            {
+                Console.WriteLine($"  {evidence}");
+            }
+
+            foreach (var action in check.NextActions)
+            {
+                Console.WriteLine($"  Next: {action.Tool}");
+            }
         }
 
         foreach (var error in result.Errors)

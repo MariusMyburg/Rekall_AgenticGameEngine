@@ -2779,6 +2779,11 @@ internal static class RekallAgeCli
             execution.Name == "rekall.tools.execute"
                 ? execution.Arguments["name"]?.GetValue<string>() ?? execution.Name
                 : execution.Name)));
+        var failures = RekallAgeLanguageModelAgentDiagnostics.FormatFailures(result.ToolExecutions);
+        if (failures.Length > 0)
+        {
+            Console.WriteLine(failures);
+        }
         Console.WriteLine(
             $"Agent completed={result.Completed} stop={result.StopReason} turns={result.Turns} tools={result.ToolCallCount} promptTokens={result.Usage.PromptTokens} completionTokens={result.Usage.CompletionTokens}");
         return result.Completed ? 0 : 1;
@@ -3055,8 +3060,27 @@ internal static class RekallAgeCli
         Console.WriteLine($"Physics colliders: {result.Value.PhysicsColliderCount}");
         Console.WriteLine($"Audio: {result.Value.AudioListenerCount} listeners, {result.Value.AudioEmitterCount} emitters");
         Console.WriteLine($"Audio runtime: {result.Value.ActiveAudioVoiceCount} active voices, {result.Value.AudioBusCount} buses, peak gain {result.Value.AudioPeakGain:F3}, {result.Value.AudioMixedSampleCount} mixed samples");
+        foreach (var voice in result.Value.AudioVoices)
+        {
+            Console.WriteLine($"  Audio voice {voice.EntityName}: clip={voice.ClipAssetId} state={voice.State} loop={voice.Loop} time={voice.PlaybackSeconds:F3}/{voice.DurationSeconds:F3}");
+        }
         Console.WriteLine($"Animation players: {result.Value.AnimationPlayerCount}");
-        Console.WriteLine($"UI elements: {result.Value.UiElementCount}");
+        foreach (var player in result.Value.AnimationPlayers)
+        {
+            Console.WriteLine($"  Animation {player.EntityName}: inline={player.InlineClip} playing={player.Playing} time={player.TimeSeconds:F3}/{player.DurationSeconds:F3} loop={player.LoopMode}");
+        }
+        Console.WriteLine($"UI: {result.Value.UiCanvasCount} canvases, {result.Value.UiElementCount} elements, {result.Value.InteractiveUiElementCount} interactive");
+        foreach (var element in result.Value.UiElements)
+        {
+            var layout = element.Layout is null
+                ? "layout=(unresolved)"
+                : $"layout=({element.Layout.X:F1},{element.Layout.Y:F1},{element.Layout.Width:F1},{element.Layout.Height:F1}) canvas={element.Layout.CanvasEntityId}";
+            Console.WriteLine($"  {element.EntityName}: kind={element.Kind} interactive={element.Interactive} text=\"{element.Text}\" {layout}");
+        }
+        if (result.Value.UiElementsTruncated)
+        {
+            Console.WriteLine("  UI element inspection truncated.");
+        }
         Console.WriteLine($"Runtime entity states: {result.Value.EntityStates.Count}{(result.Value.EntityStatesTruncated ? "+ (truncated)" : string.Empty)}");
         foreach (var state in result.Value.EntityStates)
         {

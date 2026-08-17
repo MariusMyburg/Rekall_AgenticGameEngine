@@ -51,6 +51,7 @@ public sealed class ModuleMetadataTests
         var events = Assert.Single(animation.Properties, property => property.Name == "Events" && property.Kind == "animationEvents");
         Assert.Contains("4,096", events.Description, StringComparison.Ordinal);
         var player = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.AnimationPlayer");
+        Assert.Contains("separate Rekall.AnimationClip component", player.Description, StringComparison.Ordinal);
         var loopMode = Assert.Single(player.Properties, property => property.Name == "LoopMode");
         Assert.Equal(["clamp", "loop", "pingpong"], loopMode.AllowedValues);
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.AudioEmitter");
@@ -77,6 +78,20 @@ public sealed class ModuleMetadataTests
         Assert.Contains("Rekall.Transform3D", tracks.Description, StringComparison.Ordinal);
         Assert.Contains("property:\"X\"", tracks.Description, StringComparison.Ordinal);
         Assert.All(result.Value.Components, component => Assert.StartsWith("Rekall.", component.TypeName));
+    }
+
+    [Fact]
+    public async Task ComponentSchemaSearchRejectsMissingQueryWithStructuredError()
+    {
+        var command = new SearchComponentSchemasCommand(typeof(RekallAgeBuiltInModule).Assembly);
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("missing schema query"), CancellationToken.None);
+
+        var result = await command.ExecuteAsync(
+            new SearchComponentSchemasRequest(null!),
+            context);
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, error => error.Code == "REKALL_COMPONENT_SCHEMA_QUERY_REQUIRED");
     }
 
     [Fact]

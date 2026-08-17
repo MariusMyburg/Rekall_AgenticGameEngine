@@ -42,6 +42,38 @@ public sealed record RekallAgeLanguageModelToolExecution(
     bool Succeeded,
     string ResultPreview);
 
+public static class RekallAgeLanguageModelAgentDiagnostics
+{
+    public static string FormatFailures(
+        IReadOnlyList<RekallAgeLanguageModelToolExecution> executions,
+        int maxFailures = 12,
+        int maxPreviewCharacters = 1_200)
+    {
+        ArgumentNullException.ThrowIfNull(executions);
+        maxFailures = Math.Clamp(maxFailures, 1, 64);
+        maxPreviewCharacters = Math.Clamp(maxPreviewCharacters, 100, 4_000);
+        var lines = executions
+            .Where(execution => !execution.Succeeded)
+            .TakeLast(maxFailures)
+            .Select(execution =>
+            {
+                var arguments = execution.Arguments.ToJsonString();
+                if (arguments.Length > 600)
+                {
+                    arguments = arguments[..600] + "…";
+                }
+                var preview = execution.ResultPreview.Length <= maxPreviewCharacters
+                    ? execution.ResultPreview
+                    : execution.ResultPreview[..maxPreviewCharacters] + "…";
+                return $"#{execution.Sequence} {execution.Name} args={arguments}: {preview}";
+            })
+            .ToArray();
+        return lines.Length == 0
+            ? string.Empty
+            : "Failed tool execution details:\n" + string.Join('\n', lines);
+    }
+}
+
 public sealed class RekallAgeLanguageModelAgent(
     IRekallAgeLanguageModelClient modelClient,
     IRekallAgeAgentToolExecutor toolExecutor)

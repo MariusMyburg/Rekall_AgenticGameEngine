@@ -1,11 +1,39 @@
 using System.Reflection;
+using System.Text.Json.Serialization;
 using Rekall.Age.Core.Commands;
 
 namespace Rekall.Age.Modules.Commands;
 
 public sealed record SearchComponentSchemasRequest(string Query, string? ProjectRoot = null, int Limit = 12);
 
-public sealed record SearchComponentSchemasResult(IReadOnlyList<RekallAgeComponentSchema> Components);
+public sealed record SearchComponentSchemasResult(IReadOnlyList<RekallAgeCompactComponentSchema> Components);
+
+public sealed record RekallAgeCompactComponentSchema(
+    string TypeName,
+    string DisplayName,
+    IReadOnlyList<RekallAgeCompactPropertySchema> Properties)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+}
+
+public sealed record RekallAgeCompactPropertySchema(string Name, string Kind)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? AssetKind { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Minimum { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Maximum { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? AllowedValues { get; init; }
+}
 
 public sealed class SearchComponentSchemasCommand
     : IRekallAgeCommand<SearchComponentSchemasRequest, SearchComponentSchemasResult>
@@ -34,6 +62,18 @@ public sealed class SearchComponentSchemasCommand
         SearchComponentSchemasRequest request,
         RekallAgeCommandContext context)
     {
+        if (string.IsNullOrWhiteSpace(request.Query))
+        {
+            var error = new RekallAgeCommandError(
+                "REKALL_COMPONENT_SCHEMA_QUERY_REQUIRED",
+                "Component schema search requires a non-empty query containing all needed component concepts.",
+                Name);
+            return RekallAgeCommandResult<SearchComponentSchemasResult>.Failure(
+                new SearchComponentSchemasResult([]),
+                error.Message,
+                [error]);
+        }
+
         var listed = await new ListComponentSchemasCommand(_assemblies).ExecuteAsync(
             new ListComponentSchemasRequest(ProjectRoot: request.ProjectRoot),
             context);
@@ -65,10 +105,28 @@ public sealed class SearchComponentSchemasCommand
             .OrderByDescending(item => item.Score)
             .ThenBy(item => item.Component.TypeName, StringComparer.Ordinal)
             .Take(Math.Clamp(request.Limit, 1, 64))
-            .Select(item => item.Component)
+            .Select(item => Compact(item.Component))
             .ToArray();
         return RekallAgeCommandResult<SearchComponentSchemasResult>.Success(
             new SearchComponentSchemasResult(matches),
             $"Found {matches.Length} component schemas for '{request.Query}'.");
+    }
+
+    private static RekallAgeCompactComponentSchema Compact(RekallAgeComponentSchema component)
+    {
+        return new RekallAgeCompactComponentSchema(
+            component.TypeName,
+            component.DisplayName,
+            component.Properties.Select(property => new RekallAgeCompactPropertySchema(property.Name, property.Kind)
+            {
+                AssetKind = property.AssetKind,
+                Minimum = property.Minimum,
+                Maximum = property.Maximum,
+                Description = property.Description,
+                AllowedValues = property.AllowedValues.Count == 0 ? null : property.AllowedValues
+            }).ToArray())
+        {
+            Description = component.Description
+        };
     }
 }

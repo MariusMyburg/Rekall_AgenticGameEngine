@@ -1,5 +1,7 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Rendering;
+using Rekall.Age.Modules;
+using Rekall.Age.Modules.BuiltIns;
 using Rekall.Age.World;
 using System.Text.Json.Nodes;
 
@@ -7,6 +9,11 @@ namespace Rekall.Age.Validation;
 
 public sealed class RekallAgeProjectValidator
 {
+    private static readonly string[] UiComponentTypes =
+        ["Rekall.UiCanvas", "Rekall.UiElement", "Rekall.Panel", "Rekall.Label", "Rekall.Image", "Rekall.Button"];
+    private static readonly IReadOnlyDictionary<string, RekallAgeComponentSchema> BuiltInComponentSchemas =
+        RekallAgeModuleIndexer.IndexAssembly(typeof(RekallAgeBuiltInModule).Assembly)
+            .Components.ToDictionary(component => component.TypeName, StringComparer.Ordinal);
     private readonly RekallAgeSceneStore _sceneStore;
 
     public RekallAgeProjectValidator(RekallAgeSceneStore sceneStore)
@@ -21,6 +28,7 @@ public sealed class RekallAgeProjectValidator
     {
         var scene = await _sceneStore.LoadAsync(projectRoot, sceneName, cancellationToken);
         var issues = new List<RekallAgeValidationIssue>();
+        ValidateUiContracts(scene, issues);
 
         var cameras = scene.Entities
             .SelectMany(entity => entity.Components
@@ -66,6 +74,114 @@ public sealed class RekallAgeProjectValidator
         ValidateRenderLayers(scene, activeCameras.Select(camera => (camera.Entity, camera.Component)).ToArray(), issues);
 
         return new RekallAgeValidationReport(issues);
+    }
+
+    private static void ValidateUiContracts(
+        RekallAgeSceneDocument scene,
+        List<RekallAgeValidationIssue> issues)
+    {
+        var uiElements = scene.Entities
+            .Where(entity => entity.Components.Any(component =>
+                component.Type is "Rekall.UiElement" or "Rekall.Panel" or "Rekall.Label" or "Rekall.Image" or "Rekall.Button"))
+            .ToArray();
+        var hasUiCanvas = scene.Entities.Any(entity => entity.Components.Any(component =>
+            component.Type.Equals("Rekall.UiCanvas", StringComparison.Ordinal)
+            && ReadBoolean(component.Properties, "active", true)));
+        if (uiElements.Length > 0 && !hasUiCanvas)
+        {
+            issues.Add(new RekallAgeValidationIssue(
+                "REKALL_UI_ELEMENT_NO_CANVAS",
+                $"Scene '{scene.Name}' contains UI elements but no active Rekall.UiCanvas. Add Rekall.UiCanvas; similarly named components do not create a runtime canvas.",
+                "blocking",
+                scene.Name,
+                [
+                    new RekallAgeSuggestedCommand(
+                        "rekall.scene.apply_blueprint",
+                        new Dictionary<string, object?> { ["scene"] = scene.Name })
+                ]));
+        }
+
+        foreach (var entity in scene.Entities)
+        {
+            foreach (var component in entity.Components.Where(component =>
+                         component.Type.StartsWith("Rekall.", StringComparison.Ordinal)
+                         && !BuiltInComponentSchemas.ContainsKey(component.Type)))
+            {
+                var suggestion = UiComponentTypes
+                    .Select(type => (Type: type, Distance: EditDistance(component.Type, type)))
+                    .OrderBy(candidate => candidate.Distance)
+                    .ThenBy(candidate => candidate.Type, StringComparer.Ordinal)
+                    .First();
+                if (suggestion.Distance > 3)
+                {
+                    continue;
+                }
+
+                issues.Add(new RekallAgeValidationIssue(
+                    "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN",
+                    $"Entity '{entity.Name}' uses unknown reserved component '{component.Type}'. Did you mean '{suggestion.Type}'? Use the exact type returned by rekall.module.search_component_schemas.",
+                    "blocking",
+                    entity.Id,
+                    [
+                        new RekallAgeSuggestedCommand(
+                            "rekall.scene.apply_blueprint",
+                            new Dictionary<string, object?> { ["scene"] = scene.Name, ["entityId"] = entity.Id })
+                    ]));
+            }
+
+            foreach (var component in entity.Components)
+            {
+                if (!BuiltInComponentSchemas.TryGetValue(component.Type, out var schema))
+                {
+                    continue;
+                }
+
+                var allowed = schema.Properties
+                    .Select(property => property.Name)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var unknown = component.Properties
+                    .Select(property => property.Key)
+                    .Where(property => !allowed.Contains(property))
+                    .OrderBy(property => property, StringComparer.Ordinal)
+                    .ToArray();
+                if (unknown.Length == 0)
+                {
+                    continue;
+                }
+
+                issues.Add(new RekallAgeValidationIssue(
+                    "REKALL_COMPONENT_PROPERTY_UNKNOWN",
+                    $"Entity '{entity.Name}' component '{component.Type}' contains unknown properties: {string.Join(", ", unknown)}. Allowed properties: {string.Join(", ", allowed.OrderBy(name => name, StringComparer.Ordinal))}. Unknown properties are ignored at runtime; use exact names from rekall.module.search_component_schemas.",
+                    "blocking",
+                    entity.Id,
+                    [
+                        new RekallAgeSuggestedCommand(
+                            "rekall.module.search_component_schemas",
+                            new Dictionary<string, object?> { ["query"] = component.Type })
+                    ]));
+            }
+        }
+    }
+
+    private static int EditDistance(string left, string right)
+    {
+        var previous = Enumerable.Range(0, right.Length + 1).ToArray();
+        for (var leftIndex = 1; leftIndex <= left.Length; leftIndex++)
+        {
+            var current = new int[right.Length + 1];
+            current[0] = leftIndex;
+            for (var rightIndex = 1; rightIndex <= right.Length; rightIndex++)
+            {
+                var substitution = left[leftIndex - 1] == right[rightIndex - 1] ? 0 : 1;
+                current[rightIndex] = Math.Min(
+                    Math.Min(current[rightIndex - 1] + 1, previous[rightIndex] + 1),
+                    previous[rightIndex - 1] + substitution);
+            }
+
+            previous = current;
+        }
+
+        return previous[right.Length];
     }
 
     private static void ValidateActiveStereoCameras(

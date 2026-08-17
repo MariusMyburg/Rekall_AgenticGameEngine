@@ -61,10 +61,13 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
         if (_exposedTools is not null && name.Equals(ExecuteToolName, StringComparison.Ordinal))
         {
             var targetName = arguments["name"]?.GetValue<string>() ?? string.Empty;
-            var targetArguments = arguments["arguments"] as JsonObject ?? new JsonObject();
             if (!_allTools.ContainsKey(targetName))
             {
                 return UnknownTool(targetName);
+            }
+            if (!TryReadTargetArguments(arguments["arguments"], out var targetArguments, out var argumentError))
+            {
+                return argumentError;
             }
 
             return await ExecuteRegisteredToolAsync(targetName, targetArguments, cancellationToken);
@@ -167,6 +170,54 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
             ["message"] = $"Tool '{name}' is not registered or exposed."
         })
     };
+
+    private static bool TryReadTargetArguments(
+        JsonNode? node,
+        out JsonObject arguments,
+        out JsonObject error)
+    {
+        if (node is null)
+        {
+            arguments = [];
+            error = [];
+            return true;
+        }
+        if (node is JsonObject value)
+        {
+            arguments = value;
+            error = [];
+            return true;
+        }
+        if (node is JsonValue scalar && scalar.TryGetValue<string>(out var json))
+        {
+            try
+            {
+                if (JsonNode.Parse(json) is JsonObject parsed)
+                {
+                    arguments = parsed;
+                    error = [];
+                    return true;
+                }
+            }
+            catch (JsonException)
+            {
+                // Return the same bounded structured error for malformed or non-object JSON.
+            }
+        }
+
+        arguments = [];
+        error = new JsonObject
+        {
+            ["ok"] = false,
+            ["summary"] = "rekall.tools.execute arguments must be a JSON object or a JSON string encoding an object.",
+            ["errors"] = new JsonArray(new JsonObject
+            {
+                ["code"] = "REKALL_AGENT_ARGUMENTS_INVALID",
+                ["message"] = "Provide the target tool arguments as an object conforming to its discovered schema."
+            })
+        };
+        return false;
+    }
 
     private static RekallAgeLanguageModelTool SearchTool { get; } = new(
         SearchToolName,

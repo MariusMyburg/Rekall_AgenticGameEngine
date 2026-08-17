@@ -30,6 +30,60 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneRejectsUnknownReservedCanvasAndUiWithoutRealCanvas()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["ui"])
+            .AddEntity(RekallAgeEntityDocument.Create("Invented Canvas", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Canvas", new JsonObject())))
+            .AddEntity(RekallAgeEntityDocument.Create("Start", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Button",
+                    new JsonObject { ["Text"] = "Start" })));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        var unknown = Assert.Single(report.Issues, issue => issue.Code == "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN");
+        Assert.Equal("blocking", unknown.Severity);
+        Assert.Contains("Rekall.UiCanvas", unknown.Message, StringComparison.Ordinal);
+        var noCanvas = Assert.Single(report.Issues, issue => issue.Code == "REKALL_UI_ELEMENT_NO_CANVAS");
+        Assert.Equal("blocking", noCanvas.Severity);
+        Assert.Contains("Rekall.UiCanvas", noCanvas.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ValidateSceneRejectsUnknownPropertiesOnKnownBuiltInComponents()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["animation"])
+            .AddEntity(RekallAgeEntityDocument.Create("Animated", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["PositionX"] = 3, ["X"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.AnimationPlayer",
+                    new JsonObject { ["IsPlaying"] = true, ["Playing"] = true })));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        Assert.Contains(report.Issues, issue =>
+            issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN"
+            && issue.Severity == "blocking"
+            && issue.Message.Contains("PositionX", StringComparison.Ordinal)
+            && issue.Message.Contains("X", StringComparison.Ordinal));
+        Assert.Contains(report.Issues, issue =>
+            issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN"
+            && issue.Message.Contains("IsPlaying", StringComparison.Ordinal)
+            && issue.Message.Contains("Playing", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ValidateSceneReportsMultipleActiveCameras()
     {
         var root = TestPaths.CreateTempDirectory();

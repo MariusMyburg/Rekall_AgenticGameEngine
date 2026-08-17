@@ -66,10 +66,10 @@ public sealed class RekallAgeAnimationClipComponent : RekallAgeComponent
     public object[] Events { get; init; } = [];
 }
 
-[RekallAgeComponent("Animation Player", Description = "Executes an inline Rekall.AnimationClip or reusable animation catalog asset.")]
+[RekallAgeComponent("Animation Player", Description = "Executes animation timeline data. For an inline clip, add a separate Rekall.AnimationClip component to the same entity and leave Clip empty; Clip itself accepts only a reusable animation catalog id string.")]
 public sealed class RekallAgeAnimationPlayerComponent : RekallAgeComponent
 {
-    [RekallAgeProperty(Kind = "assetRef", AssetKind = "animation", Description = "Optional catalog id; omit when an inline Rekall.AnimationClip is present.")]
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "animation", Description = "Optional animation catalog id string. Never embed a clip object here; leave empty when a separate Rekall.AnimationClip component is present on the entity.")]
     public string Clip { get; init; } = string.Empty;
     [RekallAgeProperty] public bool Playing { get; init; } = true;
     [RekallAgeProperty] public double Speed { get; init; } = 1;

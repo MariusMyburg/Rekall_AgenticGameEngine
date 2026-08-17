@@ -53,6 +53,26 @@ public sealed class LanguageModelAgentTests
         Assert.Equal(2, result.Turns);
     }
 
+    [Fact]
+    public void DiagnosticsExposeBoundedFailedToolResultsInsteadOfOnlyToolNames()
+    {
+        var failures = RekallAgeLanguageModelAgentDiagnostics.FormatFailures(
+        [
+            new RekallAgeLanguageModelToolExecution(1, "ready", new JsonObject(), true, "{\"ok\":true}"),
+            new RekallAgeLanguageModelToolExecution(
+                2,
+                "rekall.workflow.create_blueprint_project",
+                new JsonObject { ["projectName"] = "Agent Project" },
+                false,
+                "{\"ok\":false,\"summary\":\"Blueprint properties were invalid.\"}")
+        ]);
+
+        Assert.DoesNotContain("#1", failures, StringComparison.Ordinal);
+        Assert.Contains("#2 rekall.workflow.create_blueprint_project", failures, StringComparison.Ordinal);
+        Assert.Contains("projectName", failures, StringComparison.Ordinal);
+        Assert.Contains("Blueprint properties were invalid", failures, StringComparison.Ordinal);
+    }
+
     private sealed class ScriptedModelClient(params RekallAgeLanguageModelResponse[] responses) : IRekallAgeLanguageModelClient
     {
         private int _index;

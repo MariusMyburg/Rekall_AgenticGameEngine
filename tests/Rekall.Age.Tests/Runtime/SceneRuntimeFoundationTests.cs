@@ -582,6 +582,46 @@ public sealed class SceneRuntimeFoundationTests
     }
 
     [Fact]
+    public async Task InspectSceneRuntimeCommandExposesBoundedUiContractsForAgentVerification()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["ReferenceWidth"] = 200, ["ReferenceHeight"] = 100 }));
+        var button = RekallAgeEntityDocument.Create("Ready", ["ui"]) with { ParentId = canvas.Id };
+        button = button.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Button",
+            new JsonObject
+            {
+                ["Text"] = "SYSTEMS READY",
+                ["Interactive"] = true,
+                ["Width"] = 120,
+                ["Height"] = 30
+            }));
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["ui"]).AddEntity(canvas).AddEntity(button),
+            CancellationToken.None);
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(root, "Main", 1),
+            new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("inspect ui"), CancellationToken.None));
+
+        Assert.Equal(1, result.Value.UiCanvasCount);
+        var inspectedCanvas = Assert.Single(result.Value.UiCanvases);
+        Assert.Equal(200, inspectedCanvas.ReferenceWidth);
+        Assert.Equal(100, inspectedCanvas.ReferenceHeight);
+        Assert.Equal(1, result.Value.InteractiveUiElementCount);
+        var inspected = Assert.Single(result.Value.UiElements);
+        Assert.Equal("SYSTEMS READY", inspected.Text);
+        Assert.Equal("Button", inspected.Kind);
+        Assert.NotNull(inspected.Layout);
+        Assert.Equal(200, inspected.Layout.ReferenceWidth);
+        Assert.False(result.Value.UiElementsTruncated);
+    }
+
+    [Fact]
     public async Task InspectSceneRuntimeCommandReportsRenderablesCulledByActiveCameraMask()
     {
         var root = TestPaths.CreateTempDirectory();

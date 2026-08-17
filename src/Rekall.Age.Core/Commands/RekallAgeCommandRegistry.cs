@@ -105,7 +105,38 @@ public sealed class RekallAgeCommandRegistry
             TRequest request;
             try
             {
-                request = JsonSerializer.Deserialize<TRequest>(argumentsJson, JsonOptions)
+                var normalizedArgumentsJson = RekallAgeCommandJsonArgumentNormalizer.Normalize(argumentsJson, typeof(TRequest));
+                using var document = JsonDocument.Parse(normalizedArgumentsJson);
+                if (document.RootElement.ValueKind != JsonValueKind.Object)
+                {
+                    throw new JsonException($"Arguments for command '{Command.Name}' must be a JSON object.");
+                }
+                var required = typeof(TRequest).GetConstructors()
+                    .OrderByDescending(constructor => constructor.GetParameters().Length)
+                    .FirstOrDefault()
+                    ?.GetParameters()
+                    .Where(parameter => !parameter.HasDefaultValue)
+                    .Select(parameter => parameter.Name ?? string.Empty)
+                    .Where(parameterName => parameterName.Length > 0)
+                    .Where(parameterName => !document.RootElement.EnumerateObject().Any(property =>
+                        property.Name.Equals(parameterName, StringComparison.OrdinalIgnoreCase)
+                        && property.Value.ValueKind is not JsonValueKind.Null))
+                    .ToArray() ?? [];
+                if (required.Length > 0)
+                {
+                    var fieldNames = string.Join(", ", required.Select(name => $"'{name}'"));
+                    var error = new RekallAgeCommandError(
+                        "REKALL_COMMAND_ARGUMENT_REQUIRED",
+                        $"Command '{Command.Name}' is missing required argument fields: {fieldNames}.",
+                        Command.Name);
+                    return new RekallAgeDynamicCommandResult(
+                        false,
+                        error.Message,
+                        null,
+                        [error],
+                        CreateTransactionSummary(context));
+                }
+                request = JsonSerializer.Deserialize<TRequest>(normalizedArgumentsJson, JsonOptions)
                     ?? throw new JsonException($"Arguments for command '{Command.Name}' were null.");
             }
             catch (JsonException ex)

@@ -45,10 +45,32 @@ public sealed record InspectSceneRuntimeResult(
 
     public int AudioMixedSampleCount { get; init; }
 
+    public IReadOnlyList<RekallAgeRuntimeAudioVoice> AudioVoices { get; init; } =
+        Array.Empty<RekallAgeRuntimeAudioVoice>();
+
+    public bool AudioVoicesTruncated { get; init; }
+
+    public IReadOnlyList<RekallAgeRuntimeAnimationPlayer> AnimationPlayers { get; init; } =
+        Array.Empty<RekallAgeRuntimeAnimationPlayer>();
+
+    public bool AnimationPlayersTruncated { get; init; }
+
     public IReadOnlyList<InspectSceneRuntimeEntityState> EntityStates { get; init; } =
         Array.Empty<InspectSceneRuntimeEntityState>();
 
     public bool EntityStatesTruncated { get; init; }
+
+    public int UiCanvasCount { get; init; }
+
+    public int InteractiveUiElementCount { get; init; }
+
+    public IReadOnlyList<RekallAgeRuntimeUiCanvas> UiCanvases { get; init; } =
+        Array.Empty<RekallAgeRuntimeUiCanvas>();
+
+    public IReadOnlyList<RekallAgeRuntimeUiElement> UiElements { get; init; } =
+        Array.Empty<RekallAgeRuntimeUiElement>();
+
+    public bool UiElementsTruncated { get; init; }
 }
 
 public sealed record InspectSceneRuntimeEntityState(
@@ -142,6 +164,8 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
         var xr = world.Subsystems.Xr;
         var culling = BuildCullingSummary(rendering);
         const int maximumEntityStates = 32;
+        const int maximumSubsystemItems = 32;
+        const int maximumUiElements = 32;
         var entityStates = world.Entities
             .OrderBy(entity => entity.Name, StringComparer.Ordinal)
             .ThenBy(entity => entity.Id, StringComparer.Ordinal)
@@ -188,8 +212,21 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
             AudioBusCount = audio.Buses.Count,
             AudioPeakGain = audio.MixFrame.PeakGain,
             AudioMixedSampleCount = audio.MixFrame.Samples?.Count ?? 0,
+            AudioVoices = audio.Voices.Take(maximumSubsystemItems).ToArray(),
+            AudioVoicesTruncated = audio.Voices.Count > maximumSubsystemItems,
+            AnimationPlayers = animation.Players.Take(maximumSubsystemItems).ToArray(),
+            AnimationPlayersTruncated = animation.Players.Count > maximumSubsystemItems,
             EntityStates = entityStates,
-            EntityStatesTruncated = world.Entities.Count > maximumEntityStates
+            EntityStatesTruncated = world.Entities.Count > maximumEntityStates,
+            UiCanvasCount = ui.Canvases.Count,
+            InteractiveUiElementCount = ui.InteractiveElementCount,
+            UiCanvases = ui.Canvases.Take(maximumSubsystemItems).ToArray(),
+            UiElements = ui.Elements
+                .OrderBy(element => element.EntityName, StringComparer.Ordinal)
+                .ThenBy(element => element.EntityId, StringComparer.Ordinal)
+                .Take(maximumUiElements)
+                .ToArray(),
+            UiElementsTruncated = ui.Elements.Count > maximumUiElements
         };
     }
 

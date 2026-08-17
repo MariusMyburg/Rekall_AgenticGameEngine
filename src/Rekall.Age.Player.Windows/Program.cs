@@ -1654,9 +1654,16 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             && _pressedButtonsThisFrame.Count == 0
             && _releasedButtonsThisFrame.Count == 0)
         {
+            var pointerInput = new RekallAgeRuntimeInputState(
+                MouseX: _lastMousePosition.X,
+                MouseY: _lastMousePosition.Y,
+                PressedKeys: SnapshotSetOrNull(_pressedKeys),
+                PressedButtons: SnapshotSetOrNull(_pressedButtons),
+                ViewportWidth: Math.Max(1, _window.Width),
+                ViewportHeight: Math.Max(1, _window.Height));
             var idleInput = _simulateXrInput
-                ? RekallAgeXrInputSimulator.CreateFrame(RekallAgeRuntimeInputState.Empty, _clock.Elapsed)
-                : RekallAgeRuntimeInputState.Empty;
+                ? RekallAgeXrInputSimulator.CreateFrame(pointerInput, _clock.Elapsed)
+                : pointerInput;
             PublishRuntimeInput(idleInput);
             return idleInput;
         }
@@ -1685,7 +1692,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             ReleasedKeysThisFrame: releasedKeysThisFrame,
             PressedButtons: pressedButtons,
             PressedButtonsThisFrame: pressedButtonsThisFrame,
-            ReleasedButtonsThisFrame: releasedButtonsThisFrame);
+            ReleasedButtonsThisFrame: releasedButtonsThisFrame,
+            ViewportWidth: Math.Max(1, _window.Width),
+            ViewportHeight: Math.Max(1, _window.Height));
         var inputFrame = _simulateXrInput
             ? RekallAgeXrInputSimulator.CreateFrame(input, _clock.Elapsed)
             : input;
@@ -1724,7 +1733,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             MouseX: input.MouseX,
             MouseY: input.MouseY,
             PressedKeys: input.PressedKeys,
-            PressedButtons: input.PressedButtons);
+            PressedButtons: input.PressedButtons,
+            ViewportWidth: input.ViewportWidth,
+            ViewportHeight: input.ViewportHeight);
     }
 
     private RekallAgePlaybackInput BuildPlayableInput(double deltaSeconds)

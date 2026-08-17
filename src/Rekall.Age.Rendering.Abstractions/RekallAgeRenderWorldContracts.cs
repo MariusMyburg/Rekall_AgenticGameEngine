@@ -259,7 +259,26 @@ public sealed record RekallAgeRuntimeViewportRenderable(
     int MeshSlices = 0,
     int MeshStacks = 0,
     string FacingMode = "world",
-    RekallAgeRuntimeViewportVirtualGeometry? VirtualGeometry = null);
+    RekallAgeRuntimeViewportVirtualGeometry? VirtualGeometry = null,
+    RekallAgeRuntimeViewportUiVisual? UiVisual = null);
+
+public sealed record RekallAgeRuntimeViewportUiVisual(
+    string Kind,
+    int X,
+    int Y,
+    int Width,
+    int Height,
+    int ClipX,
+    int ClipY,
+    int ClipWidth,
+    int ClipHeight,
+    string Text,
+    string BackgroundColor,
+    string ForegroundColor,
+    string BorderColor,
+    int BorderWidth,
+    int FontSize,
+    string? AssetId = null);
 
 public sealed record RekallAgeRuntimeViewportVirtualGeometry(
     bool Enabled = true,

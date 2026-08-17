@@ -214,6 +214,7 @@ public sealed class SceneRuntimeFoundationTests
                 "runtime.ui",
                 "runtime.events.collision",
                 "runtime.events.trigger",
+                "runtime.ui.interaction",
                 "runtime.input.camera",
                 "runtime.input.camera_target_cycle",
                 "runtime.camera.target3d"

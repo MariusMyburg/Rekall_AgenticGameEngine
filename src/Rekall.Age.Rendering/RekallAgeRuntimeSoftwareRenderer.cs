@@ -222,6 +222,12 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         RekallAgeRuntimeViewportRenderable renderable,
         byte[] pixels)
     {
+        if (renderable.UiVisual is not null)
+        {
+            DrawUiVisual(frame, renderable.UiVisual, pixels);
+            return true;
+        }
+
         if (renderable.Kind.Equals("mesh", StringComparison.Ordinal)
             && renderable.LineSegments is { Segments.Count: > 0 })
         {
@@ -249,6 +255,118 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         }
 
         return false;
+    }
+
+    private static void DrawUiVisual(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportUiVisual visual,
+        byte[] pixels)
+    {
+        var left = Math.Max(0, Math.Max(visual.X, visual.ClipX));
+        var top = Math.Max(0, Math.Max(visual.Y, visual.ClipY));
+        var right = Math.Min(frame.Width, Math.Min(visual.X + visual.Width, visual.ClipX + visual.ClipWidth));
+        var bottom = Math.Min(frame.Height, Math.Min(visual.Y + visual.Height, visual.ClipY + visual.ClipHeight));
+        if (right <= left || bottom <= top)
+        {
+            return;
+        }
+
+        var background = ParseUiColor(visual.BackgroundColor, new UiColor(0, 0, 0, 0));
+        var border = ParseUiColor(visual.BorderColor, new UiColor(0, 0, 0, 0));
+        for (var y = top; y < bottom; y++)
+        {
+            for (var x = left; x < right; x++)
+            {
+                var borderPixel = visual.BorderWidth > 0 &&
+                    (x < visual.X + visual.BorderWidth || x >= visual.X + visual.Width - visual.BorderWidth ||
+                     y < visual.Y + visual.BorderWidth || y >= visual.Y + visual.Height - visual.BorderWidth);
+                var color = borderPixel ? border : background;
+                AlphaBlend(pixels, ToIndex(frame, x, y), color.R, color.G, color.B, color.A);
+            }
+        }
+
+        DrawUiText(frame, visual, pixels, left, top, right, bottom);
+    }
+
+    private static void DrawUiText(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportUiVisual visual,
+        byte[] pixels,
+        int clipLeft,
+        int clipTop,
+        int clipRight,
+        int clipBottom)
+    {
+        if (string.IsNullOrEmpty(visual.Text))
+        {
+            return;
+        }
+
+        var color = ParseUiColor(visual.ForegroundColor, new UiColor(255, 255, 255, 255));
+        var scale = Math.Max(1, visual.FontSize / 5);
+        var cursorX = visual.X + Math.Max(2, visual.BorderWidth + 2);
+        var originY = visual.Y + Math.Max(0, (visual.Height - 5 * scale) / 2);
+        foreach (var character in visual.Text)
+        {
+            if (character == ' ')
+            {
+                cursorX += 2 * scale;
+                continue;
+            }
+
+            var rows = RekallAgeBitmapFont.Rows(character);
+            var glyphWidth = RekallAgeBitmapFont.Width(character);
+            for (var row = 0; row < rows.Count; row++)
+            {
+                for (var column = 0; column < glyphWidth; column++)
+                {
+                    if ((rows[row] & (1 << (glyphWidth - column - 1))) == 0)
+                    {
+                        continue;
+                    }
+
+                    for (var sy = 0; sy < scale; sy++)
+                    {
+                        for (var sx = 0; sx < scale; sx++)
+                        {
+                            var x = cursorX + column * scale + sx;
+                            var y = originY + row * scale + sy;
+                            if (x >= clipLeft && x < clipRight && y >= clipTop && y < clipBottom)
+                            {
+                                AlphaBlend(pixels, ToIndex(frame, x, y), color.R, color.G, color.B, color.A);
+                            }
+                        }
+                    }
+                }
+            }
+
+            cursorX += (glyphWidth + 1) * scale;
+            if (cursorX >= clipRight)
+            {
+                break;
+            }
+        }
+    }
+
+    private static UiColor ParseUiColor(string? color, UiColor fallback)
+    {
+        if (string.IsNullOrWhiteSpace(color) || color[0] != '#' || color.Length is not (7 or 9))
+        {
+            return fallback;
+        }
+
+        try
+        {
+            return new UiColor(
+                Convert.ToByte(color.Substring(1, 2), 16),
+                Convert.ToByte(color.Substring(3, 2), 16),
+                Convert.ToByte(color.Substring(5, 2), 16),
+                color.Length == 9 ? Convert.ToByte(color.Substring(7, 2), 16) : (byte)255);
+        }
+        catch (FormatException)
+        {
+            return fallback;
+        }
     }
 
     private static string? TryGetPrimitiveKind(RekallAgeRuntimeViewportRenderable renderable)
@@ -1114,6 +1232,8 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
     ];
 
     private readonly record struct SoftwareColor(byte R, byte G, byte B);
+
+    private readonly record struct UiColor(byte R, byte G, byte B, byte A);
 
     private readonly record struct SoftwareRenderCounts(int AssetBackedCount, int FallbackCount)
     {

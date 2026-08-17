@@ -390,7 +390,11 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                         break;
                     case "Rekall.UiCanvas":
                         var layer = ReadInt32(component.Properties, "layer", 0);
-                        canvases.Add(new RekallAgeRuntimeUiCanvas(entity.Id, entity.Name, layer));
+                        canvases.Add(new RekallAgeRuntimeUiCanvas(entity.Id, entity.Name, layer)
+                        {
+                            ReferenceWidth = Math.Max(1, ReadNumber(component.Properties, "referenceWidth", 1920)),
+                            ReferenceHeight = Math.Max(1, ReadNumber(component.Properties, "referenceHeight", 1080))
+                        });
                         uiLayers.Add(new RekallAgeRuntimeRenderUiLayer(
                             entity.Id,
                             entity.Name,
@@ -401,11 +405,23 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                     case "Rekall.Button":
                     case "Rekall.Label":
                     case "Rekall.Panel":
+                        var uiLayout = ReadUiLayout(entity);
                         elements.Add(new RekallAgeRuntimeUiElement(
                             entity.Id,
                             entity.Name,
                             component.Type["Rekall.".Length..],
-                            ReadBoolean(component.Properties, "interactive", component.Type == "Rekall.Button")));
+                            ReadBoolean(component.Properties, "interactive", component.Type == "Rekall.Button"))
+                        {
+                            Layout = uiLayout,
+                            Text = ReadString(component.Properties, "text") ?? string.Empty,
+                            BackgroundColor = ReadString(component.Properties, "backgroundColor") ??
+                                (component.Type == "Rekall.Button" ? "#263f5f" : "#00000000"),
+                            ForegroundColor = ReadString(component.Properties, "foregroundColor") ?? "#ffffff",
+                            BorderColor = ReadString(component.Properties, "borderColor") ?? "#00000000",
+                            BorderWidth = Math.Max(0, ReadNumber(component.Properties, "borderWidth", 0)),
+                            FontSize = Math.Max(1, ReadNumber(component.Properties, "fontSize", 16)),
+                            AssetId = ReadString(component.Properties, "assetId") ?? ReadString(component.Properties, "image")
+                        });
                         break;
                     default:
                         if (IsLight(component.Type))
@@ -534,6 +550,30 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                 .ThenBy(observation => observation.Code, StringComparer.Ordinal)
                 .ToArray()
         };
+    }
+
+    private static RekallAgeRuntimeUiLayout? ReadUiLayout(RekallAgeRuntimeEntity entity)
+    {
+        var state = entity.Components.FirstOrDefault(component =>
+            component.Type.Equals("Rekall.UiLayoutState", StringComparison.Ordinal));
+        var canvasEntityId = state is null ? null : ReadString(state.Properties, "canvasEntityId");
+        if (state is null || string.IsNullOrWhiteSpace(canvasEntityId))
+        {
+            return null;
+        }
+
+        return new RekallAgeRuntimeUiLayout(
+            canvasEntityId,
+            ReadNumber(state.Properties, "referenceWidth", 1920),
+            ReadNumber(state.Properties, "referenceHeight", 1080),
+            ReadNumber(state.Properties, "x", 0),
+            ReadNumber(state.Properties, "y", 0),
+            ReadNumber(state.Properties, "width", 0),
+            ReadNumber(state.Properties, "height", 0),
+            ReadNumber(state.Properties, "clipX", 0),
+            ReadNumber(state.Properties, "clipY", 0),
+            ReadNumber(state.Properties, "clipWidth", 0),
+            ReadNumber(state.Properties, "clipHeight", 0));
     }
 
     private static List<T> PreserveAuthored<T>(IEnumerable<T> renderItems)

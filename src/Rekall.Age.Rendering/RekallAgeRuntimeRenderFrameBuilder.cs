@@ -66,8 +66,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         var activeCamera = cameras.FirstOrDefault(camera => camera.Active) ?? cameras.FirstOrDefault();
         var headsetCamera = cameras.FirstOrDefault(IsHeadsetCamera);
         var renderableCandidates = (debugOverlay
-            ? BuildRenderables(world, activeCamera, height).Concat(BuildColliderDebugRenderables(world))
-            : BuildRenderables(world, activeCamera, height))
+            ? BuildRenderables(world, activeCamera, width, height).Concat(BuildColliderDebugRenderables(world))
+            : BuildRenderables(world, activeCamera, width, height))
             .ToArray();
         var renderables = renderableCandidates
             .Where(renderable => RekallAgeRenderLayerMask.IncludesLayer(renderable.Layer, activeCamera?.CullingMask))
@@ -263,6 +263,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
     private static IEnumerable<RekallAgeRuntimeViewportRenderable> BuildRenderables(
         RekallAgeRuntimeWorld world,
         RekallAgeRuntimeViewportCamera? activeCamera,
+        int viewportWidth,
         int viewportHeight)
     {
         foreach (var sprite in world.Subsystems.Rendering.Sprites)
@@ -622,17 +623,39 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 Layer: light.Layer);
         }
 
-        foreach (var uiLayer in world.Subsystems.Rendering.UiLayers)
+        foreach (var element in world.Subsystems.Ui.Elements.Where(element => element.Layout is not null))
         {
+            var layout = element.Layout!;
+            var scaleX = viewportWidth / Math.Max(1, layout.ReferenceWidth);
+            var scaleY = viewportHeight / Math.Max(1, layout.ReferenceHeight);
+            var canvasLayer = world.Subsystems.Ui.Canvases
+                .FirstOrDefault(canvas => canvas.EntityId == layout.CanvasEntityId)?.Layer ?? 0;
             yield return new RekallAgeRuntimeViewportRenderable(
-                uiLayer.EntityId,
-                uiLayer.EntityName,
+                element.EntityId,
+                element.EntityName,
                 "ui",
-                null,
+                element.AssetId,
                 0,
-                uiLayer.Layer,
                 0,
-                400 + uiLayer.Layer);
+                0,
+                400 + canvasLayer,
+                UiVisual: new RekallAgeRuntimeViewportUiVisual(
+                    element.Kind,
+                    (int)Math.Round(layout.X * scaleX),
+                    (int)Math.Round(layout.Y * scaleY),
+                    Math.Max(0, (int)Math.Round(layout.Width * scaleX)),
+                    Math.Max(0, (int)Math.Round(layout.Height * scaleY)),
+                    (int)Math.Round(layout.ClipX * scaleX),
+                    (int)Math.Round(layout.ClipY * scaleY),
+                    Math.Max(0, (int)Math.Round(layout.ClipWidth * scaleX)),
+                    Math.Max(0, (int)Math.Round(layout.ClipHeight * scaleY)),
+                    element.Text,
+                    element.BackgroundColor,
+                    element.ForegroundColor,
+                    element.BorderColor,
+                    Math.Max(0, (int)Math.Round(element.BorderWidth * Math.Min(scaleX, scaleY))),
+                    Math.Max(1, (int)Math.Round(element.FontSize * Math.Min(scaleX, scaleY))),
+                    element.AssetId));
         }
     }
 

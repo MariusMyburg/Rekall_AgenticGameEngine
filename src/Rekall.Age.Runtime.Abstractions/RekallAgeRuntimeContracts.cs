@@ -41,7 +41,9 @@ public sealed record RekallAgeRuntimeInputState(
     IReadOnlySet<string>? PressedButtonsThisFrame = null,
     IReadOnlySet<string>? ReleasedButtonsThisFrame = null,
     IReadOnlyList<RekallAgeRuntimeXrPose>? XrPoses = null,
-    IReadOnlyList<RekallAgeRuntimeXrAction>? XrActions = null)
+    IReadOnlyList<RekallAgeRuntimeXrAction>? XrActions = null,
+    double ViewportWidth = 0,
+    double ViewportHeight = 0)
 {
     public static RekallAgeRuntimeInputState Empty { get; } = new();
 }
@@ -59,7 +61,9 @@ public sealed record RekallAgeRuntimeInputFrame(
     IReadOnlyList<string>? PressedButtonsThisFrame = null,
     IReadOnlyList<string>? ReleasedButtonsThisFrame = null,
     IReadOnlyList<RekallAgeRuntimeXrPose>? XrPoses = null,
-    IReadOnlyList<RekallAgeRuntimeXrAction>? XrActions = null)
+    IReadOnlyList<RekallAgeRuntimeXrAction>? XrActions = null,
+    double ViewportWidth = 0,
+    double ViewportHeight = 0)
 {
     public RekallAgeRuntimeInputState ToState()
     {
@@ -76,7 +80,9 @@ public sealed record RekallAgeRuntimeInputFrame(
             ToSet(PressedButtonsThisFrame),
             ToSet(ReleasedButtonsThisFrame),
             XrPoses,
-            XrActions);
+            XrActions,
+            ViewportWidth,
+            ViewportHeight);
     }
 
     private static IReadOnlySet<string>? ToSet(IReadOnlyList<string>? values)
@@ -472,13 +478,48 @@ public sealed record RekallAgeRuntimeUiView(
 public sealed record RekallAgeRuntimeUiCanvas(
     string EntityId,
     string EntityName,
-    int Layer);
+    int Layer)
+{
+    public double ReferenceWidth { get; init; } = 1920;
+
+    public double ReferenceHeight { get; init; } = 1080;
+}
 
 public sealed record RekallAgeRuntimeUiElement(
     string EntityId,
     string EntityName,
     string Kind,
-    bool Interactive);
+    bool Interactive)
+{
+    public RekallAgeRuntimeUiLayout? Layout { get; init; }
+
+    public string Text { get; init; } = string.Empty;
+
+    public string BackgroundColor { get; init; } = "#00000000";
+
+    public string ForegroundColor { get; init; } = "#ffffff";
+
+    public string BorderColor { get; init; } = "#00000000";
+
+    public double BorderWidth { get; init; }
+
+    public double FontSize { get; init; } = 16;
+
+    public string? AssetId { get; init; }
+}
+
+public sealed record RekallAgeRuntimeUiLayout(
+    string CanvasEntityId,
+    double ReferenceWidth,
+    double ReferenceHeight,
+    double X,
+    double Y,
+    double Width,
+    double Height,
+    double ClipX,
+    double ClipY,
+    double ClipWidth,
+    double ClipHeight);
 
 public sealed record RekallAgeRuntimeObservation(
     int Frame,

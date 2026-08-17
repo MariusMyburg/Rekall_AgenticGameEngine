@@ -21,7 +21,7 @@ structured observations, and gameplay remains in agent-authored modules.
 
 ## Tranche 2: Runtime UI
 
-- [ ] Define canvas, layout rectangle, visual, text, focus, and interaction state contracts.
+- [x] Define canvas, layout rectangle, visual, text, focus, and interaction state contracts.
 - [ ] Implement deterministic anchors, offsets, stacking, padding, alignment, and clipping.
 - [ ] Project panels, labels, images, and buttons into concrete overlay draw data.
 - [ ] Render the overlay in software and Vulkan/windowed paths with deterministic text metrics.

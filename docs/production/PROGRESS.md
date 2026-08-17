@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 00:54 Africa/Johannesburg
+Last verified: 2026-08-18 01:00 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: built-in alias/audit repair passed the complete product gate
+Latest milestone: schema-cased transforms and native envelope recovery pass 578 tests
 
 ## Product objective
 
@@ -242,6 +242,18 @@ Studio is important, but it does not define or reorder the engine foundation.
   and installed acceptance passed the full SDK, authoring, package portability,
   visual proof, UI, and audio matrix. The canonical archive is 194,690,547
   bytes.
+- Broad benchmark rerun 12: the agent stopped at 36 tools (440,173 prompt;
+  6,657 completion) before module/package work. Four direct native calls carried
+  an equivalent gateway argument envelope and were rejected as missing fields.
+  Independent inspection also exposed that runtime transform extraction ignored
+  canonical schema-cased `X`/`Y` properties, so a valid 2D body initialized near
+  the origin rather than its authored Y=5 position. The project retained two
+  blocking issues and had no 3D body. This is not an accepted pass.
+- Runtime/protocol repair: runtime transform extraction is now case-insensitive
+  and proven with exact schema-cased 2D physics properties. Discovered native
+  tools safely unwrap gateway-style `name`/`arguments` envelopes, including
+  JSON-string arguments, before typed dispatch. The full Debug suite passes at
+  578/578.
 
 ## Current gaps
 
@@ -257,7 +269,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the unchanged installed Ollama benchmark on the canonical-alias distribution.
+Run the complete product gate for schema-cased runtime transforms and native-envelope recovery.
 
 ## Next after the current item
 

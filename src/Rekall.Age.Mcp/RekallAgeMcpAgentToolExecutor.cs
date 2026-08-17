@@ -78,6 +78,19 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
             return UnknownTool(name);
         }
 
+        if (arguments.ContainsKey("arguments")
+            && arguments.All(property => property.Key is "name" or "arguments")
+            && (arguments["name"] is null
+                || arguments["name"]!.GetValue<string>().Equals(name, StringComparison.Ordinal)))
+        {
+            if (!TryReadTargetArguments(arguments["arguments"], out var unwrapped, out var argumentError))
+            {
+                return argumentError;
+            }
+
+            arguments = unwrapped;
+        }
+
         return await ExecuteRegisteredToolAsync(name, arguments, cancellationToken);
     }
 

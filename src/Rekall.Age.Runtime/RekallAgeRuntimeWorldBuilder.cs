@@ -91,7 +91,14 @@ public sealed class RekallAgeRuntimeWorldBuilder
 
     private static double ReadNumber(JsonObject properties, string name, double fallback)
     {
-        if (!properties.TryGetPropertyValue(name, out var node) || node is null)
+        if (!properties.TryGetPropertyValue(name, out var node))
+        {
+            node = properties
+                .FirstOrDefault(property => property.Key.Equals(name, StringComparison.OrdinalIgnoreCase))
+                .Value;
+        }
+
+        if (node is null)
         {
             return fallback;
         }

@@ -335,6 +335,35 @@ components remain valid. The run also showed that package proof should use the
 single audit workflow, which already consolidates inspection, run, and nonblank
 capture, instead of consuming turns on its sub-operations.
 
+### Runtime-schema casing rerun
+
+Rerun 12 used the canonical-alias distribution with the unchanged 36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun12`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 440,173
+- Completion tokens: 6,657
+
+The agent stopped before module and package work. Four calls to discovered native
+tools used the progressive gateway's `name`/`arguments` envelope, sometimes with
+the inner arguments encoded as JSON. The executor passed that wrapper directly
+to the typed command and returned missing-field errors even though the intended
+request was recoverable.
+
+Independent inspection found two blocking unknown Transform3D properties in
+Main and no 3D body. Physics2D used canonical component names and reported one
+body, but the dynamic entity remained near Y zero rather than falling from its
+authored Y=5. The component schema advertises Pascal-case `X`, `Y`, `Mass`,
+`Width`, and `Height`; physics property reads supported that casing, while the
+runtime world builder extracted transforms only through lowercase JSON keys.
+Thus an agent following the exact schema could author valid but incorrectly
+initialized runtime state.
+
+The provider-neutral repair makes transform extraction case-insensitive and
+allows discovered native tools to unwrap the gateway envelope when it contains
+only the matching tool name and object/JSON-string arguments.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

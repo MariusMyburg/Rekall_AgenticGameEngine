@@ -541,13 +541,13 @@ public sealed class SceneRuntimeFoundationTests
             .AddEntity(RekallAgeEntityDocument.Create("Falling Box", ["actor"])
                 .AddComponent(RekallAgeComponentDocument.Create(
                     "Rekall.Transform2D",
-                    new JsonObject { ["x"] = 2, ["y"] = 4 }))
+                    new JsonObject { ["X"] = 2, ["Y"] = 4 }))
                 .AddComponent(RekallAgeComponentDocument.Create(
                     "Rekall.Rigidbody2D",
-                    new JsonObject { ["mass"] = 1 }))
+                    new JsonObject { ["Mass"] = 1 }))
                 .AddComponent(RekallAgeComponentDocument.Create(
                     "Rekall.BoxCollider2D",
-                    new JsonObject { ["width"] = 1, ["height"] = 1 })));
+                    new JsonObject { ["Width"] = 1, ["Height"] = 1 })));
 
         var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
             .RunAsync(new RekallAgeRuntimeWorldBuilder().Build(scene), 60, CancellationToken.None);

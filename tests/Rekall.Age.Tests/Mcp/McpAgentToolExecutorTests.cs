@@ -140,6 +140,37 @@ public sealed class McpAgentToolExecutorTests
     }
 
     [Fact]
+    public async Task DiscoveredNativeToolAcceptsEquivalentGatewayArgumentEnvelope()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CreateProjectCommand());
+        var executor = new RekallAgeMcpAgentToolExecutor(registry, progressiveDiscovery: true);
+        await executor.ExecuteAsync(
+            "rekall.tools.search",
+            new JsonObject { ["query"] = "create project" },
+            CancellationToken.None);
+        var root = TestPaths.CreateTempDirectory();
+        var encodedArguments = new JsonObject
+        {
+            ["projectRoot"] = root,
+            ["name"] = "Native Envelope",
+            ["capabilities"] = new JsonArray("world")
+        }.ToJsonString();
+
+        var result = await executor.ExecuteAsync(
+            "rekall.project.create",
+            new JsonObject
+            {
+                ["name"] = "rekall.project.create",
+                ["arguments"] = encodedArguments
+            },
+            CancellationToken.None);
+
+        Assert.True(result["ok"]!.GetValue<bool>(), result.ToJsonString());
+        Assert.True(File.Exists(Path.Combine(root, "rekall.project.json")));
+    }
+
+    [Fact]
     public async Task UnknownToolReturnsNearestRegisteredNamesForRecovery()
     {
         var registry = new RekallAgeCommandRegistry();

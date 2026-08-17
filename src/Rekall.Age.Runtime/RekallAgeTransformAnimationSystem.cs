@@ -10,12 +10,14 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
 {
     private const string ClipComponent = "Rekall.AnimationClip";
     private const string PlayerComponent = "Rekall.AnimationPlayer";
+    private const string MixerComponent = "Rekall.AnimationMixer";
     private const string StateComponent = "Rekall.AnimationState";
     private const double Epsilon = 0.00001;
     private const long MaxClipBytes = 4 * 1024 * 1024;
     private const int MaxTracksPerClip = 1_024;
     private const int MaxKeysPerTrack = 4_096;
     private const int MaxMarkersPerClip = 4_096;
+    private const int MaxMixerLayers = 32;
     private readonly string? _projectRoot;
     private readonly RekallAgeAssetCatalogStore _catalogStore = new();
     private IReadOnlyDictionary<string, RekallAgeAssetDocument>? _assets;
@@ -53,6 +55,12 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         List<RekallAgeRuntimeObservation> observations)
     {
         var updated = ApplyLegacyTransformRates(entity, context);
+        var mixer = updated.FindComponent(MixerComponent);
+        if (mixer is not null && ReadBoolean(mixer.Properties, "playing", true))
+        {
+            return ApplyMixer(updated, mixer, context, emitted, observations);
+        }
+
         var clip = updated.FindComponent(ClipComponent);
         var player = updated.FindComponent(PlayerComponent);
         if (player is null || !ReadBoolean(player.Properties, "playing", true))
@@ -144,6 +152,298 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         });
     }
 
+    private RekallAgeRuntimeEntity ApplyMixer(
+        RekallAgeRuntimeEntity entity,
+        RekallAgeRuntimeComponent mixer,
+        RekallAgeRuntimeWorldFrameContext context,
+        List<RekallAgeRuntimeEvent> emitted,
+        List<RekallAgeRuntimeObservation> observations)
+    {
+        if (!TryGetArray(mixer.Properties, "layers", out var layers))
+        {
+            observations.Add(AnimationObservation(
+                context.FrameIndex,
+                "runtime.animation.mixer_layers_missing",
+                entity,
+                "Animation mixer must define a layers array."));
+            return entity;
+        }
+        if (layers.Count > MaxMixerLayers)
+        {
+            observations.Add(AnimationObservation(
+                context.FrameIndex,
+                "runtime.animation.mixer_layer_limit_exceeded",
+                entity,
+                $"Animation mixer contains {layers.Count} layers; the per-mixer limit is {MaxMixerLayers}."));
+            return entity;
+        }
+
+        var previousState = entity.FindComponent(StateComponent)?.Properties;
+        var previousLayers = TryGetArray(previousState, "layers", out var stateLayers)
+            ? stateLayers.OfType<JsonObject>().ToArray()
+            : [];
+        var samples = new Dictionary<string, List<WeightedAnimationSample>>(StringComparer.Ordinal);
+        var layerStates = new JsonArray();
+        var maximumTime = 0d;
+        var maximumDuration = 0d;
+        var layerIndex = 0;
+        var layerNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var layerNode in layers)
+        {
+            if (layerNode is not JsonObject layer)
+            {
+                observations.Add(AnimationObservation(
+                    context.FrameIndex,
+                    "runtime.animation.mixer_layer_invalid",
+                    entity,
+                    "Animation mixer layer entries must be JSON objects."));
+                layerIndex++;
+                continue;
+            }
+
+            var name = ReadString(layer, "name") ?? $"layer-{layerIndex}";
+            if (!layerNames.Add(name))
+            {
+                observations.Add(AnimationObservation(
+                    context.FrameIndex,
+                    "runtime.animation.mixer_layer_name_duplicate",
+                    entity,
+                    $"Animation mixer layer name '{name}' is duplicated; layer names must be unique for deterministic state resume."));
+                layerIndex++;
+                continue;
+            }
+            var clipId = ReadString(layer, "clip");
+            var clip = ResolveAssetClip(entity, clipId, context.FrameIndex, observations, "mixer layer");
+            if (clip is null)
+            {
+                layerIndex++;
+                continue;
+            }
+            var version = ReadInt32(clip, "version", 1);
+            if (version != 1)
+            {
+                observations.Add(AnimationObservation(
+                    context.FrameIndex,
+                    "runtime.animation.unsupported_clip_version",
+                    entity,
+                    $"Animation mixer layer '{name}' uses clip version {version}; expected version 1."));
+                layerIndex++;
+                continue;
+            }
+
+            var prior = previousLayers.FirstOrDefault(candidate =>
+                string.Equals(ReadString(candidate, "name"), name, StringComparison.Ordinal));
+            var authoredWeight = Math.Clamp(ReadNumber(layer, "weight", 1), 0, 1);
+            var currentWeight = Math.Clamp(ReadNumber(prior, "weight", authoredWeight), 0, 1);
+            var targetWeight = Math.Clamp(ReadNumber(layer, "targetWeight", authoredWeight), 0, 1);
+            var fadeSeconds = Math.Max(0, ReadNumber(layer, "fadeSeconds", 0));
+            currentWeight = MoveTowards(
+                currentWeight,
+                targetWeight,
+                fadeSeconds <= Epsilon ? 1 : context.DeltaTime.TotalSeconds / fadeSeconds);
+
+            var duration = Math.Max(Epsilon, ReadNumber(clip, "durationSeconds", 1));
+            var speed = ReadNumber(layer, "speed", 1);
+            var loopMode = NormalizeLoopMode(ReadString(layer, "loopMode") ?? "loop");
+            var playing = ReadBoolean(layer, "playing", true);
+            var previousRawTime = ReadNumber(prior, "rawTimeSeconds", ReadNumber(layer, "startTimeSeconds", 0));
+            var nextRawTime = playing
+                ? Math.Max(0, previousRawTime + context.DeltaTime.TotalSeconds * speed)
+                : previousRawTime;
+            var sampleTime = ResolveSampleTime(nextRawTime, duration, loopMode);
+            maximumTime = Math.Max(maximumTime, sampleTime);
+            maximumDuration = Math.Max(maximumDuration, duration);
+
+            if (currentWeight > Epsilon && TryGetArray(clip, "tracks", out var tracks))
+            {
+                if (tracks.Count > MaxTracksPerClip)
+                {
+                    observations.Add(AnimationObservation(
+                        context.FrameIndex,
+                        "runtime.animation.track_limit_exceeded",
+                        entity,
+                        $"Animation mixer layer '{name}' contains {tracks.Count} tracks; the per-clip limit is {MaxTracksPerClip}."));
+                }
+                else
+                {
+                    foreach (var trackNode in tracks)
+                    {
+                        if (trackNode is not JsonObject track)
+                        {
+                            observations.Add(AnimationObservation(
+                                context.FrameIndex,
+                                "runtime.animation.track_invalid",
+                                entity,
+                                $"Animation mixer layer '{name}' contains a track entry that is not a JSON object."));
+                            continue;
+                        }
+                        CollectMixerSample(
+                            entity,
+                            track,
+                            sampleTime,
+                            currentWeight,
+                            layerIndex,
+                            context.FrameIndex,
+                            observations,
+                            samples);
+                    }
+                }
+            }
+
+            if (playing)
+            {
+                EmitMarkers(entity, clip, previousRawTime, nextRawTime, duration, loopMode, context.FrameIndex, emitted, observations);
+            }
+            layerStates.Add(new JsonObject
+            {
+                ["name"] = name,
+                ["clip"] = clipId,
+                ["weight"] = currentWeight,
+                ["targetWeight"] = targetWeight,
+                ["timeSeconds"] = sampleTime,
+                ["rawTimeSeconds"] = nextRawTime,
+                ["durationSeconds"] = duration,
+                ["loopMode"] = loopMode,
+                ["playing"] = playing
+            });
+            layerIndex++;
+        }
+
+        var updated = entity;
+        foreach (var targetSamples in samples.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Value))
+        {
+            var value = BlendSamples(targetSamples);
+            if (value is not null)
+            {
+                var target = targetSamples[0];
+                updated = ApplySampledValue(updated, target.ComponentType, target.PropertyName, value);
+            }
+        }
+
+        return updated.UpsertComponent(StateComponent, new JsonObject
+        {
+            ["version"] = 1,
+            ["mode"] = "mixer",
+            ["timeSeconds"] = maximumTime,
+            ["durationSeconds"] = maximumDuration,
+            ["loopMode"] = "mixed",
+            ["playing"] = true,
+            ["layers"] = layerStates
+        });
+    }
+
+    private static void CollectMixerSample(
+        RekallAgeRuntimeEntity entity,
+        JsonObject track,
+        double sampleTime,
+        double weight,
+        int layerIndex,
+        int frame,
+        List<RekallAgeRuntimeObservation> observations,
+        Dictionary<string, List<WeightedAnimationSample>> samples)
+    {
+        var componentType = ReadString(track, "component") ?? ReadString(track, "targetComponent");
+        var propertyName = ReadString(track, "property");
+        if (string.IsNullOrWhiteSpace(componentType) || string.IsNullOrWhiteSpace(propertyName))
+        {
+            _ = ApplyTrack(entity, track, sampleTime, frame, observations);
+            return;
+        }
+
+        var sampled = ApplyTrack(entity, track, sampleTime, frame, observations);
+        var component = sampled.FindComponent(componentType);
+        if (component is null || !TryGetProperty(component.Properties, propertyName, out var value) || value is null)
+        {
+            return;
+        }
+
+        var key = componentType + "\u001f" + propertyName.ToLowerInvariant();
+        if (!samples.TryGetValue(key, out var targetSamples))
+        {
+            targetSamples = [];
+            samples[key] = targetSamples;
+        }
+        targetSamples.Add(new WeightedAnimationSample(
+            componentType,
+            propertyName,
+            value.DeepClone(),
+            weight,
+            layerIndex));
+    }
+
+    private static JsonNode? BlendSamples(IReadOnlyList<WeightedAnimationSample> samples)
+    {
+        var active = samples.Where(sample => sample.Weight > Epsilon).ToArray();
+        var totalWeight = active.Sum(sample => sample.Weight);
+        if (active.Length == 0 || totalWeight <= Epsilon)
+        {
+            return null;
+        }
+        if (active.All(sample => TryReadNumber(sample.Value, out _)))
+        {
+            return JsonValue.Create(active.Sum(sample => ReadNodeNumber(sample.Value) * sample.Weight) / totalWeight);
+        }
+        if (active.All(sample => sample.Value is JsonArray)
+            && active.Select(sample => ((JsonArray)sample.Value).Count).Distinct().Count() == 1)
+        {
+            var result = new JsonArray();
+            var count = ((JsonArray)active[0].Value).Count;
+            for (var index = 0; index < count; index++)
+            {
+                var childSamples = active.Select(sample => sample with
+                {
+                    Value = ((JsonArray)sample.Value)[index]?.DeepClone() ?? JsonValue.Create(0)
+                }).ToArray();
+                var child = BlendSamples(childSamples);
+                if (child is null)
+                {
+                    return HighestWeightValue(active);
+                }
+                result.Add(child);
+            }
+            return result;
+        }
+        if (active.All(sample => TryReadColor(sample.Value, out _)))
+        {
+            static byte Channel(IEnumerable<(byte Value, double Weight)> values, double total) =>
+                (byte)Math.Clamp(Math.Round(values.Sum(item => item.Value * item.Weight) / total, MidpointRounding.AwayFromZero), 0, 255);
+            var colors = active.Select(sample => (Color: ReadNodeColor(sample.Value), sample.Weight)).ToArray();
+            var red = Channel(colors.Select(item => (item.Color.R, item.Weight)), totalWeight);
+            var green = Channel(colors.Select(item => (item.Color.G, item.Weight)), totalWeight);
+            var blue = Channel(colors.Select(item => (item.Color.B, item.Weight)), totalWeight);
+            var alpha = Channel(colors.Select(item => (item.Color.A, item.Weight)), totalWeight);
+            var color = $"#{red:x2}{green:x2}{blue:x2}";
+            return JsonValue.Create(alpha == 255 ? color : $"{color}{alpha:x2}");
+        }
+        return HighestWeightValue(active);
+    }
+
+    private static JsonNode HighestWeightValue(IEnumerable<WeightedAnimationSample> samples) =>
+        samples.OrderByDescending(sample => sample.Weight)
+            .ThenBy(sample => sample.LayerIndex)
+            .First().Value.DeepClone();
+
+    private static double ReadNodeNumber(JsonNode node)
+    {
+        _ = TryReadNumber(node, out var number);
+        return number;
+    }
+
+    private static AnimationColor ReadNodeColor(JsonNode node)
+    {
+        _ = TryReadColor(node, out var color);
+        return color;
+    }
+
+    private static double MoveTowards(double current, double target, double maximumDelta)
+    {
+        if (Math.Abs(target - current) <= maximumDelta)
+        {
+            return target;
+        }
+        return current + Math.Sign(target - current) * maximumDelta;
+    }
+
     private static RekallAgeRuntimeEntity ApplyTrack(
         RekallAgeRuntimeEntity entity,
         JsonObject track,
@@ -214,6 +514,20 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             return entity;
         }
 
+        return ApplySampledValue(entity, componentType, propertyName, value);
+    }
+
+    private static RekallAgeRuntimeEntity ApplySampledValue(
+        RekallAgeRuntimeEntity entity,
+        string componentType,
+        string propertyName,
+        JsonNode value)
+    {
+        var component = entity.FindComponent(componentType);
+        if (component is null)
+        {
+            return entity;
+        }
         var properties = (JsonObject)component.Properties.DeepClone();
         properties[propertyName] = value.DeepClone();
         var components = entity.Components.Select(item => ReferenceEquals(item, component)
@@ -517,6 +831,16 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             ?? ReadString(player.Properties, "clipId")
             ?? ReadString(player.Properties, "animation")
             ?? ReadString(player.Properties, "assetId");
+        return ResolveAssetClip(entity, clipId, frame, observations, "player");
+    }
+
+    private JsonObject? ResolveAssetClip(
+        RekallAgeRuntimeEntity entity,
+        string? clipId,
+        int frame,
+        List<RekallAgeRuntimeObservation> observations,
+        string owner)
+    {
         if (string.IsNullOrWhiteSpace(clipId) || _assets is null || !_assets.TryGetValue(clipId, out var asset))
         {
             observations.Add(AnimationObservation(
@@ -524,8 +848,8 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
                 "runtime.animation.clip_asset_missing",
                 entity,
                 string.IsNullOrWhiteSpace(clipId)
-                    ? "Animation player has neither an inline clip nor a clip asset reference."
-                    : $"Animation clip asset '{clipId}' is not present in the project catalog."));
+                    ? $"Animation {owner} has no clip asset reference."
+                    : $"Animation {owner} clip asset '{clipId}' is not present in the project catalog."));
             return null;
         }
 
@@ -604,9 +928,9 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             []);
     }
 
-    private static bool TryGetArray(JsonObject properties, string name, out JsonArray array)
+    private static bool TryGetArray(JsonObject? properties, string name, out JsonArray array)
     {
-        if (TryGetProperty(properties, name, out var node) && node is JsonArray value)
+        if (properties is not null && TryGetProperty(properties, name, out var node) && node is JsonArray value)
         {
             array = value;
             return true;
@@ -615,6 +939,13 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         array = [];
         return false;
     }
+
+    private sealed record WeightedAnimationSample(
+        string ComponentType,
+        string PropertyName,
+        JsonNode Value,
+        double Weight,
+        int LayerIndex);
 
     private static bool ReadBoolean(JsonObject properties, string name, bool fallback)
     {

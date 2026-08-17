@@ -439,6 +439,40 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             AssetId = ReadString(component.Properties, "assetId") ?? ReadString(component.Properties, "image")
                         });
                         break;
+                    case "Rekall.AnimationMixer":
+                        var mixerState = entity.Components.FirstOrDefault(candidate =>
+                            candidate.Type.Equals("Rekall.AnimationState", StringComparison.Ordinal));
+                        var mixerLayers = ReadArray(component.Properties, "layers");
+                        var stateLayers = mixerState is null
+                            ? null
+                            : ReadArray(mixerState.Properties, "layers");
+                        var projectedLayers = (stateLayers ?? mixerLayers)?.OfType<JsonObject>()
+                            .Select((mixerLayer, index) => new RekallAgeRuntimeAnimationLayer(
+                                ReadString(mixerLayer, "name") ?? $"layer-{index}",
+                                ReadString(mixerLayer, "clip"),
+                                ReadNumber(mixerLayer, "weight", 1),
+                                ReadNumber(mixerLayer, "targetWeight", ReadNumber(mixerLayer, "weight", 1)),
+                                ReadNumber(mixerLayer, "timeSeconds", 0),
+                                ReadNumber(mixerLayer, "durationSeconds", 0),
+                                ReadBoolean(mixerLayer, "playing", true)))
+                            .ToArray() ?? [];
+                        animationPlayers.Add(new RekallAgeRuntimeAnimationPlayer(
+                            entity.Id,
+                            entity.Name,
+                            "AnimationMixer",
+                            null)
+                        {
+                            Playing = mixerState is null
+                                ? ReadBoolean(component.Properties, "playing", true)
+                                : ReadBoolean(mixerState.Properties, "playing", true),
+                            TimeSeconds = mixerState is null ? 0 : ReadNumber(mixerState.Properties, "timeSeconds", 0),
+                            DurationSeconds = mixerState is null ? 0 : ReadNumber(mixerState.Properties, "durationSeconds", 0),
+                            LoopMode = "mixed",
+                            LayerCount = mixerLayers?.Count ?? 0,
+                            ActiveLayerCount = projectedLayers.Count(layer => layer.Weight > 0.00001),
+                            Layers = projectedLayers
+                        });
+                        break;
                     default:
                         if (IsLight(component.Type))
                         {
@@ -863,6 +897,11 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         }
 
         return fallback;
+    }
+
+    private static JsonArray? ReadArray(JsonObject properties, string name)
+    {
+        return TryGetPropertyValue(properties, name, out var node) ? node as JsonArray : null;
     }
 
     private static bool TryGetPropertyValue(JsonObject properties, string name, out JsonNode? node)

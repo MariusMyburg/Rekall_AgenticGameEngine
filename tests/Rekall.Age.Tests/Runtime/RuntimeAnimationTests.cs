@@ -54,6 +54,198 @@ public sealed class RuntimeAnimationTests
     }
 
     [Fact]
+    public async Task AnimationMixerCrossFadesGenericPropertyTracksDeterministically()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var assetDirectory = Path.Combine(root, "Assets", "animation");
+        Directory.CreateDirectory(assetDirectory);
+        await File.WriteAllTextAsync(
+            Path.Combine(assetDirectory, "source.age.animation.json"),
+            new JsonObject
+            {
+                ["version"] = 1,
+                ["durationSeconds"] = 1,
+                ["tracks"] = new JsonArray { ScalarTrack("Rekall.Transform3D", "x", 0, 0, "linear") }
+            }.ToJsonString());
+        await File.WriteAllTextAsync(
+            Path.Combine(assetDirectory, "target.age.animation.json"),
+            new JsonObject
+            {
+                ["version"] = 1,
+                ["durationSeconds"] = 1,
+                ["tracks"] = new JsonArray { ScalarTrack("Rekall.Transform3D", "x", 10, 10, "linear") }
+            }.ToJsonString());
+        await new RekallAgeAssetCatalogStore().SaveAsync(
+            root,
+            new RekallAgeAssetCatalogDocument(
+            [
+                new RekallAgeAssetDocument("asset-source", "source", "Source", "animation", string.Empty, "Assets/animation/source.age.animation.json", "test"),
+                new RekallAgeAssetDocument("asset-target", "target", "Target", "animation", string.Empty, "Assets/animation/target.age.animation.json", "test")
+            ]),
+            CancellationToken.None);
+        var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["x"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationMixer",
+                new JsonObject
+                {
+                    ["playing"] = true,
+                    ["layers"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["name"] = "source", ["clip"] = "asset-source", ["weight"] = 1,
+                            ["targetWeight"] = 0, ["fadeSeconds"] = 1, ["loopMode"] = "clamp"
+                        },
+                        new JsonObject
+                        {
+                            ["name"] = "target", ["clip"] = "asset-target", ["weight"] = 0,
+                            ["targetWeight"] = 1, ["fadeSeconds"] = 1, ["loopMode"] = "clamp"
+                        }
+                    }
+                }));
+        var loop = RekallAgeRuntimeExecutionLoop.CreateDefault(root);
+
+        var halfway = await loop.RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            30,
+            CancellationToken.None);
+
+        var halfwayActor = Assert.Single(halfway.World.Entities);
+        Assert.Equal(5, halfwayActor.Transform.Position3D.X, precision: 3);
+        var halfwayState = Assert.Single(halfwayActor.Components, component => component.Type == "Rekall.AnimationState");
+        var halfwayLayers = Assert.IsType<JsonArray>(halfwayState.Properties["layers"]);
+        Assert.Equal(0.5, halfwayLayers[0]!["weight"]!.GetValue<double>(), precision: 3);
+        Assert.Equal(0.5, halfwayLayers[1]!["weight"]!.GetValue<double>(), precision: 3);
+
+        var completed = await loop.RunAsync(halfway.World, 30, CancellationToken.None);
+
+        var continuous = await RekallAgeRuntimeExecutionLoop.CreateDefault(root).RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            60,
+            CancellationToken.None);
+
+        Assert.Equal(10, Assert.Single(completed.World.Entities).Transform.Position3D.X, precision: 3);
+        Assert.Equal(
+            Assert.Single(continuous.World.Entities).Transform.Position3D.X,
+            Assert.Single(completed.World.Entities).Transform.Position3D.X,
+            precision: 6);
+        var player = Assert.Single(completed.World.Subsystems.Animation.Players);
+        Assert.Equal("AnimationMixer", player.Kind);
+        Assert.Equal(2, player.LayerCount);
+        Assert.Equal(1, player.ActiveLayerCount);
+        Assert.Collection(
+            player.Layers,
+            source =>
+            {
+                Assert.Equal("source", source.Name);
+                Assert.Equal(0, source.Weight, precision: 3);
+            },
+            target =>
+            {
+                Assert.Equal("target", target.Name);
+                Assert.Equal(1, target.Weight, precision: 3);
+            });
+        Assert.DoesNotContain(completed.World.Observations, observation => observation.Severity == "error");
+    }
+
+    [Fact]
+    public async Task AnimationMixerRejectsUnboundedLayerWork()
+    {
+        var layers = new JsonArray();
+        for (var index = 0; index < 33; index++)
+        {
+            layers.Add(new JsonObject { ["name"] = $"layer-{index}", ["clip"] = $"asset-{index}" });
+        }
+        var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationMixer",
+                new JsonObject { ["layers"] = layers }));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault().RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            1,
+            CancellationToken.None);
+
+        var observation = Assert.Single(result.World.Observations, item =>
+            item.Code == "runtime.animation.mixer_layer_limit_exceeded");
+        Assert.Contains("32", observation.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnimationMixerBlendsVectorsColorsAndDiscreteValuesByWeight()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var assetDirectory = Path.Combine(root, "Assets", "animation");
+        Directory.CreateDirectory(assetDirectory);
+        await File.WriteAllTextAsync(
+            Path.Combine(assetDirectory, "visual-source.age.animation.json"),
+            new JsonObject
+            {
+                ["version"] = 1,
+                ["durationSeconds"] = 1,
+                ["tracks"] = new JsonArray
+                {
+                    ValueTrack("Rekall.SpriteRenderer", "offset", new JsonArray(0, 0), new JsonArray(0, 0)),
+                    ValueTrack("Rekall.SpriteRenderer", "tint", "#000000", "#000000"),
+                    ValueTrack("Rekall.SpriteRenderer", "sprite", "idle", "idle")
+                }
+            }.ToJsonString());
+        await File.WriteAllTextAsync(
+            Path.Combine(assetDirectory, "visual-target.age.animation.json"),
+            new JsonObject
+            {
+                ["version"] = 1,
+                ["durationSeconds"] = 1,
+                ["tracks"] = new JsonArray
+                {
+                    ValueTrack("Rekall.SpriteRenderer", "offset", new JsonArray(8, 4), new JsonArray(8, 4)),
+                    ValueTrack("Rekall.SpriteRenderer", "tint", "#ffffff", "#ffffff"),
+                    ValueTrack("Rekall.SpriteRenderer", "sprite", "run", "run")
+                }
+            }.ToJsonString());
+        await new RekallAgeAssetCatalogStore().SaveAsync(
+            root,
+            new RekallAgeAssetCatalogDocument(
+            [
+                new RekallAgeAssetDocument("asset-visual-source", "visual-source", "Visual Source", "animation", string.Empty, "Assets/animation/visual-source.age.animation.json", "test"),
+                new RekallAgeAssetDocument("asset-visual-target", "visual-target", "Visual Target", "animation", string.Empty, "Assets/animation/visual-target.age.animation.json", "test")
+            ]),
+            CancellationToken.None);
+        var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.SpriteRenderer",
+                new JsonObject { ["offset"] = new JsonArray(0, 0), ["tint"] = "#000000", ["sprite"] = "idle" }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationMixer",
+                new JsonObject
+                {
+                    ["layers"] = new JsonArray
+                    {
+                        new JsonObject { ["name"] = "source", ["clip"] = "asset-visual-source", ["weight"] = 0.25 },
+                        new JsonObject { ["name"] = "target", ["clip"] = "asset-visual-target", ["weight"] = 0.75 }
+                    }
+                }));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault(root).RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            1,
+            CancellationToken.None);
+
+        var sprite = Assert.Single(Assert.Single(result.World.Entities).Components, component =>
+            component.Type == "Rekall.SpriteRenderer");
+        Assert.Equal(6, sprite.Properties["offset"]![0]!.GetValue<double>(), precision: 3);
+        Assert.Equal(3, sprite.Properties["offset"]![1]!.GetValue<double>(), precision: 3);
+        Assert.Equal("#bfbfbf", sprite.Properties["tint"]!.GetValue<string>());
+        Assert.Equal("run", sprite.Properties["sprite"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task AnimationAssetCannotEscapeProjectRoot()
     {
         var root = TestPaths.CreateTempDirectory();

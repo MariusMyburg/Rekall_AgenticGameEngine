@@ -33,7 +33,7 @@ structured observations, and gameplay remains in agent-authored modules.
 - [x] Define versioned clips with scalar/vector/color/sprite tracks and interpolation modes.
 - [x] Implement deterministic sampling, loop/clamp/ping-pong time, playback speed, and events.
 - [x] Apply generic component-property and transform tracks without genre assumptions.
-- [ ] Implement sprite-frame animation and cross-fade/blend layers.
+- [x] Implement sprite-frame animation and cross-fade/blend layers.
 - [ ] Import and execute skeletal GLB tracks, skinning data, and blend diagnostics.
 - [ ] Prove animation in headless state assertions and rendered captures.
 

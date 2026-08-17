@@ -473,7 +473,23 @@ public sealed record RekallAgeRuntimeAnimationPlayer(
     public double DurationSeconds { get; init; }
 
     public string LoopMode { get; init; } = "loop";
+
+    public int LayerCount { get; init; }
+
+    public int ActiveLayerCount { get; init; }
+
+    public IReadOnlyList<RekallAgeRuntimeAnimationLayer> Layers { get; init; } =
+        Array.Empty<RekallAgeRuntimeAnimationLayer>();
 }
+
+public sealed record RekallAgeRuntimeAnimationLayer(
+    string Name,
+    string? ClipAssetId,
+    double Weight,
+    double TargetWeight,
+    double TimeSeconds,
+    double DurationSeconds,
+    bool Playing);
 
 public sealed record RekallAgeRuntimeUiView(
     IReadOnlyList<RekallAgeRuntimeUiCanvas> Canvases,

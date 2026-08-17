@@ -78,6 +78,14 @@ public sealed class RekallAgeAnimationPlayerComponent : RekallAgeComponent
     [RekallAgeProperty(Minimum = 0)] public double StartTimeSeconds { get; init; }
 }
 
+[RekallAgeComponent("Animation Mixer", Description = "Blends reusable animation clips over generic component/property tracks. Layer weights can move toward targetWeight over fadeSeconds for deterministic cross-fades.")]
+public sealed class RekallAgeAnimationMixerComponent : RekallAgeComponent
+{
+    [RekallAgeProperty] public bool Playing { get; init; } = true;
+    [RekallAgeProperty(Kind = "animationLayers", Description = "Array of {name,clip,weight,targetWeight,fadeSeconds,playing,speed,loopMode,startTimeSeconds}. Clip is a reusable animation catalog id. Override layers are normalized per targeted property; non-interpolable values use the highest-weight layer. Runtime limit is 32 layers.")]
+    public object[] Layers { get; init; } = [];
+}
+
 [RekallAgeComponent("UI Canvas", Description = "Defines a resolution-independent reference canvas and draw layer.")]
 public sealed class RekallAgeUiCanvasComponent : RekallAgeComponent
 {

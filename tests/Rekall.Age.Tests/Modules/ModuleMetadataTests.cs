@@ -54,6 +54,10 @@ public sealed class ModuleMetadataTests
         Assert.Contains("separate Rekall.AnimationClip component", player.Description, StringComparison.Ordinal);
         var loopMode = Assert.Single(player.Properties, property => property.Name == "LoopMode");
         Assert.Equal(["clamp", "loop", "pingpong"], loopMode.AllowedValues);
+        var mixer = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.AnimationMixer");
+        var layers = Assert.Single(mixer.Properties, property => property.Name == "Layers" && property.Kind == "animationLayers");
+        Assert.Contains("targetWeight", layers.Description, StringComparison.Ordinal);
+        Assert.Contains("32", layers.Description, StringComparison.Ordinal);
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.AudioEmitter");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.UiCanvas");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Button");

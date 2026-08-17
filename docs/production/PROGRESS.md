@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-17 23:28 Africa/Johannesburg
+Last verified: 2026-08-17 23:32 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: package proof keeps deterministic filename after authored-scene capture
+Latest milestone: packaged authored-scene proof passed the full product gate
 
 ## Product objective
 
@@ -142,6 +142,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   The command now keeps the deterministic package-proof filename while retaining
   the authored-scene pixels. A filename regression and the full 569/569 Debug
   suite pass; the distribution gate must be rerun from scratch.
+- Final package-proof distribution gate: a fresh clean build completed with 0
+  warnings and 0 errors; both independent Release passes completed at 569/569;
+  and installed acceptance passed project-local SDK/module authoring, the
+  generic gauntlet, deterministic package proof, relocated ZIP audit/run/capture,
+  runtime UI, software viewport analysis, audio simulation, and Windows player
+  audio-device startup. The canonical archive is 194,669,640 bytes.
 
 ## Current gaps
 
@@ -157,8 +163,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the clean Release/distribution gate after restoring the deterministic
-package-proof filename.
+Rerun the identical 36-turn installed-only Ollama benchmark against the fresh
+canonical distribution.
 
 ## Next after the current item
 

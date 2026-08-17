@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 01:34 Africa/Johannesburg
+Last verified: 2026-08-18 01:40 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: rigid-body shape validation repair passed 581/581 Debug tests
+Latest milestone: rigid-body shape validation repair passed the complete product gate
 
 ## Product objective
 
@@ -298,6 +298,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   to the untouched rerun-14 project, the repaired validator reports all four
   false bodies as blocking issues. The regression and full Debug suite pass at
   581/581.
+- Rigid-body shape distribution gate: the clean Release build completed with
+  zero warnings and zero errors; both independent Release passes completed at
+  581/581; and installed acceptance passed SDK/module authoring, the generic
+  gauntlet, original and relocated package audit/run/nonblank capture, runtime
+  UI, software viewport analysis, simulated audio, and Windows player audio.
+  The canonical 1,149-file archive is 194,703,222 bytes.
 
 ## Current gaps
 
@@ -313,7 +319,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for the rigid-body shape repair.
+Rerun the unchanged installed Ollama benchmark on the rigid-body shape distribution.
 
 ## Next after the current item
 

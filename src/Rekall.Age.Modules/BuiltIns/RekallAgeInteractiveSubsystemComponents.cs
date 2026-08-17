@@ -84,6 +84,12 @@ public sealed class RekallAgeUiCanvasComponent : RekallAgeComponent
     [RekallAgeProperty(Minimum = 1)] public double ReferenceWidth { get; init; } = 1920;
     [RekallAgeProperty(Minimum = 1)] public double ReferenceHeight { get; init; } = 1080;
     [RekallAgeProperty] public int Layer { get; init; }
+    [RekallAgeProperty(AllowedValues = ["none", "horizontal", "vertical"])] public string LayoutDirection { get; init; } = "none";
+    [RekallAgeProperty(Minimum = 0)] public double Gap { get; init; }
+    [RekallAgeProperty(Minimum = 0)] public double PaddingLeft { get; init; }
+    [RekallAgeProperty(Minimum = 0)] public double PaddingTop { get; init; }
+    [RekallAgeProperty(Minimum = 0)] public double PaddingRight { get; init; }
+    [RekallAgeProperty(Minimum = 0)] public double PaddingBottom { get; init; }
 }
 
 public abstract class RekallAgeUiElementBase : RekallAgeComponent
@@ -106,6 +112,15 @@ public abstract class RekallAgeUiElementBase : RekallAgeComponent
     [RekallAgeProperty(Minimum = 1)] public double FontSize { get; init; } = 16;
     [RekallAgeProperty(Kind = "assetRef", AssetKind = "image")] public string AssetId { get; init; } = string.Empty;
     [RekallAgeProperty] public bool Interactive { get; init; }
+    [RekallAgeProperty(AllowedValues = ["none", "horizontal", "vertical"])] public string LayoutDirection { get; init; } = "none";
+    [RekallAgeProperty] public int LayoutOrder { get; init; }
+    [RekallAgeProperty(Minimum = 0)] public double Gap { get; init; }
+    [RekallAgeProperty(Minimum = 0)] public double PaddingLeft { get; init; }
+    [RekallAgeProperty(Minimum = 0)] public double PaddingTop { get; init; }
+    [RekallAgeProperty(Minimum = 0)] public double PaddingRight { get; init; }
+    [RekallAgeProperty(Minimum = 0)] public double PaddingBottom { get; init; }
+    [RekallAgeProperty(AllowedValues = ["start", "center", "end", "stretch"])] public string HorizontalAlignment { get; init; } = "start";
+    [RekallAgeProperty(AllowedValues = ["start", "center", "end", "stretch"])] public string VerticalAlignment { get; init; } = "start";
     [RekallAgeProperty(Description = "Deterministic semantic focus order; lower values focus first.")]
     public int NavigationOrder { get; init; }
 }

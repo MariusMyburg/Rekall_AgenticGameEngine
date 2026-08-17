@@ -57,7 +57,27 @@ public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
 
             var parent = entity.ParentId is not null ? Resolve(entity.ParentId) : defaultCanvas;
             parent ??= defaultCanvas;
-            var layout = CreateElementLayout(parent, element.Properties);
+            var parentEntity = entitiesById.GetValueOrDefault(entity.ParentId ?? parent.CanvasEntityId);
+            var container = parentEntity?.Components.FirstOrDefault(component =>
+                component.Type == "Rekall.UiCanvas" || ElementTypes.Contains(component.Type, StringComparer.Ordinal));
+            var direction = container is null ? "none" : ReadString(container.Properties, "layoutDirection") ?? "none";
+            var siblings = direction is "horizontal" or "vertical"
+                ? world.Entities
+                    .Where(candidate => candidate.ParentId == entity.ParentId)
+                    .Select(candidate => new
+                    {
+                        candidate.Id,
+                        Component = candidate.Components.FirstOrDefault(component => ElementTypes.Contains(component.Type, StringComparer.Ordinal))
+                    })
+                    .Where(candidate => candidate.Component is not null)
+                    .OrderBy(candidate => ReadNumber(candidate.Component!.Properties, "layoutOrder", 0))
+                    .ThenBy(candidate => candidate.Id, StringComparer.Ordinal)
+                    .ToArray()
+                : [];
+            var preceding = siblings.TakeWhile(candidate => candidate.Id != entity.Id)
+                .Select(candidate => candidate.Component!.Properties)
+                .ToArray();
+            var layout = CreateElementLayout(parent, element.Properties, container?.Properties, direction, preceding);
             resolving.Remove(entityId);
             resolved[entityId] = layout;
             return layout;
@@ -111,7 +131,10 @@ public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
 
     private static RekallAgeRuntimeUiLayout CreateElementLayout(
         RekallAgeRuntimeUiLayout parent,
-        JsonObject properties)
+        JsonObject properties,
+        JsonObject? containerProperties,
+        string layoutDirection,
+        IReadOnlyList<JsonObject> precedingSiblings)
     {
         var width = Math.Max(0, ReadNumber(properties, "width", 100));
         var height = Math.Max(0, ReadNumber(properties, "height", 40));
@@ -138,6 +161,31 @@ public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
             height = Math.Max(0, bottom - top);
         }
 
+        if (containerProperties is not null && layoutDirection is "horizontal" or "vertical")
+        {
+            var paddingLeft = Math.Max(0, ReadNumber(containerProperties, "paddingLeft", 0));
+            var paddingTop = Math.Max(0, ReadNumber(containerProperties, "paddingTop", 0));
+            var paddingRight = Math.Max(0, ReadNumber(containerProperties, "paddingRight", 0));
+            var paddingBottom = Math.Max(0, ReadNumber(containerProperties, "paddingBottom", 0));
+            var gap = Math.Max(0, ReadNumber(containerProperties, "gap", 0));
+            var contentX = parent.X + paddingLeft;
+            var contentY = parent.Y + paddingTop;
+            var contentWidth = Math.Max(0, parent.Width - paddingLeft - paddingRight);
+            var contentHeight = Math.Max(0, parent.Height - paddingTop - paddingBottom);
+            if (layoutDirection == "vertical")
+            {
+                y = contentY + precedingSiblings.Sum(sibling => Math.Max(0, ReadNumber(sibling, "height", 40)))
+                    + gap * precedingSiblings.Count + ReadNumber(properties, "y", 0);
+                (x, width) = Align(contentX, contentWidth, width, ReadString(properties, "horizontalAlignment"), ReadNumber(properties, "x", 0));
+            }
+            else
+            {
+                x = contentX + precedingSiblings.Sum(sibling => Math.Max(0, ReadNumber(sibling, "width", 100)))
+                    + gap * precedingSiblings.Count + ReadNumber(properties, "x", 0);
+                (y, height) = Align(contentY, contentHeight, height, ReadString(properties, "verticalAlignment"), ReadNumber(properties, "y", 0));
+            }
+        }
+
         var clipX = Math.Max(x, parent.ClipX);
         var clipY = Math.Max(y, parent.ClipY);
         var clipRight = Math.Min(x + width, parent.ClipX + parent.ClipWidth);
@@ -155,6 +203,27 @@ public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
             Math.Max(0, clipRight - clipX),
             Math.Max(0, clipBottom - clipY));
     }
+
+    private static (double Position, double Size) Align(
+        double contentPosition,
+        double contentSize,
+        double size,
+        string? alignment,
+        double offset) => alignment?.ToLowerInvariant() switch
+        {
+            "center" => (contentPosition + (contentSize - size) / 2 + offset, size),
+            "end" => (contentPosition + contentSize - size + offset, size),
+            "stretch" => (contentPosition + offset, Math.Max(0, contentSize - offset)),
+            _ => (contentPosition + offset, size)
+        };
+
+    private static string? ReadString(JsonObject properties, string name) =>
+        TryGetPropertyValue(properties, name, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<string>(out var text)
+            && !string.IsNullOrWhiteSpace(text)
+                ? text.Trim().ToLowerInvariant()
+                : null;
 
     private static double ReadNumber(JsonObject properties, string name, double fallback)
     {

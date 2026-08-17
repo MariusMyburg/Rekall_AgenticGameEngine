@@ -129,6 +129,59 @@ public sealed class RuntimeUiTests
     }
 
     [Fact]
+    public async Task UiContainerAppliesDeterministicVerticalStackPaddingGapAndAlignment()
+    {
+        var canvas = RekallAgeEntityDocument.Create("Canvas", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["ReferenceWidth"] = 300, ["ReferenceHeight"] = 200 }));
+        var panel = RekallAgeEntityDocument.Create("Stack", ["ui"]) with { ParentId = canvas.Id };
+        panel = panel.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Panel",
+            new JsonObject
+            {
+                ["X"] = 10, ["Y"] = 10, ["Width"] = 200, ["Height"] = 100,
+                ["LayoutDirection"] = "vertical", ["PaddingLeft"] = 10, ["PaddingRight"] = 10,
+                ["PaddingTop"] = 5, ["PaddingBottom"] = 5, ["Gap"] = 4
+            }));
+        var first = RekallAgeEntityDocument.Create("First", ["ui"]) with { ParentId = panel.Id };
+        first = first.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Label",
+            new JsonObject
+            {
+                ["Width"] = 50, ["Height"] = 20, ["LayoutOrder"] = 10,
+                ["HorizontalAlignment"] = "center"
+            }));
+        var second = RekallAgeEntityDocument.Create("Second", ["ui"]) with { ParentId = panel.Id };
+        second = second.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Button",
+            new JsonObject
+            {
+                ["Width"] = 60, ["Height"] = 25, ["LayoutOrder"] = 20,
+                ["HorizontalAlignment"] = "end"
+            }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["ui"])
+            .AddEntity(canvas)
+            .AddEntity(second)
+            .AddEntity(panel)
+            .AddEntity(first);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault().RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(scene), 1, CancellationToken.None);
+        var firstLayout = result.World.Subsystems.Ui.Elements.Single(element => element.EntityName == "First").Layout!;
+        var secondLayout = result.World.Subsystems.Ui.Elements.Single(element => element.EntityName == "Second").Layout!;
+
+        Assert.Equal(85, firstLayout.X);
+        Assert.Equal(15, firstLayout.Y);
+        Assert.Equal(50, firstLayout.Width);
+        Assert.Equal(20, firstLayout.Height);
+        Assert.Equal(140, secondLayout.X);
+        Assert.Equal(39, secondLayout.Y);
+        Assert.Equal(60, secondLayout.Width);
+        Assert.Equal(25, secondLayout.Height);
+    }
+
+    [Fact]
     public async Task UiImageUsesResolvedAssetPixelsInSoftwareAndOverlayRendering()
     {
         var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])

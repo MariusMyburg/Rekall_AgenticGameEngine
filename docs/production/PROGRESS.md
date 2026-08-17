@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 00:48 Africa/Johannesburg
+Last verified: 2026-08-18 00:54 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: built-in alias migration and consolidated audit guidance pass 577 tests
+Latest milestone: built-in alias/audit repair passed the complete product gate
 
 ## Product objective
 
@@ -237,6 +237,11 @@ Studio is important, but it does not define or reorder the engine foundation.
   guidance now identify `rekall.workflow.audit_playable_package` as the
   consolidated inspect/run/nonblank-capture proof. The full Debug suite passes
   at 577/577.
+- Alias/audit distribution gate: the clean Release build completed with zero
+  warnings and errors, both independent Release passes completed at 577/577,
+  and installed acceptance passed the full SDK, authoring, package portability,
+  visual proof, UI, and audio matrix. The canonical archive is 194,690,547
+  bytes.
 
 ## Current gaps
 
@@ -252,7 +257,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete product gate for built-in alias migration and consolidated audit guidance.
+Rerun the unchanged installed Ollama benchmark on the canonical-alias distribution.
 
 ## Next after the current item
 

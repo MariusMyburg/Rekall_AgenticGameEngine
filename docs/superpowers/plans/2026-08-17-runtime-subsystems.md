@@ -25,7 +25,7 @@ structured observations, and gameplay remains in agent-authored modules.
 - [ ] Implement deterministic anchors, offsets, stacking, padding, alignment, and clipping.
 - [x] Project panels, labels, images, and buttons into concrete overlay draw data.
 - [x] Render the overlay in software and Vulkan/windowed paths with deterministic text metrics.
-- [ ] Execute pointer/focus/navigation state and emit generic UI event facts.
+- [x] Execute pointer/focus/navigation state and emit generic UI event facts.
 - [ ] Add viewport, packaged-game, and installed-product visual proofs.
 
 ## Tranche 3: General animation

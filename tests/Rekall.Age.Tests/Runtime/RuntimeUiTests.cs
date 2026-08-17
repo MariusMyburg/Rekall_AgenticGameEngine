@@ -8,6 +8,127 @@ namespace Rekall.Age.Tests.Runtime;
 public sealed class RuntimeUiTests
 {
     [Fact]
+    public async Task UiRuntimeReadsPublishedPascalCaseComponentProperties()
+    {
+        var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["ReferenceWidth"] = 400, ["ReferenceHeight"] = 200, ["Layer"] = 7 }));
+        var button = RekallAgeEntityDocument.Create("Confirm", ["ui"]) with { ParentId = canvas.Id };
+        button = button.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Button",
+            new JsonObject
+            {
+                ["X"] = 40,
+                ["Y"] = 20,
+                ["Width"] = 160,
+                ["Height"] = 50,
+                ["Text"] = "Confirm",
+                ["Interactive"] = true
+            }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["ui"])
+            .AddEntity(canvas)
+            .AddEntity(button);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault().RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(scene),
+            1,
+            CancellationToken.None,
+            new Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeInputState(
+                MouseX: 50,
+                MouseY: 30,
+                ViewportWidth: 400,
+                ViewportHeight: 200));
+
+        var element = Assert.Single(result.World.Subsystems.Ui.Elements);
+        Assert.Equal("Confirm", element.Text);
+        Assert.True(element.Interactive);
+        Assert.Equal(40, element.Layout!.X);
+        Assert.Equal(20, element.Layout.Y);
+        Assert.Equal(160, element.Layout.Width);
+        Assert.Equal(50, element.Layout.Height);
+        var inputState = result.World.Entities.Single(entity => entity.Name == "HUD")
+            .Components.Single(component => component.Type == "Rekall.UiInputState");
+        Assert.Equal(button.Id, inputState.Properties["hoveredEntityId"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task UiNavigationUsesSemanticActionsAndDeterministicAuthoredOrder()
+    {
+        var canvas = RekallAgeEntityDocument.Create("Menu", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.UiCanvas", new JsonObject()));
+        RekallAgeEntityDocument Button(string id, string name, int order) => new RekallAgeEntityDocument(
+            id,
+            name,
+            ["ui"],
+            [
+                RekallAgeComponentDocument.Create(
+                    "Rekall.Button",
+                    new JsonObject { ["Text"] = name, ["Interactive"] = true, ["NavigationOrder"] = order }),
+                RekallAgeComponentDocument.Create(
+                    "Rekall.EventBindings",
+                    new JsonObject
+                    {
+                        ["Events"] = new JsonArray
+                        {
+                            new JsonObject { ["Event"] = "ui.focus", ["Handler"] = $"focus-{name.ToLowerInvariant()}" },
+                            new JsonObject { ["Event"] = "ui.activate", ["Handler"] = $"activate-{name.ToLowerInvariant()}" }
+                        }
+                    })
+            ])
+        {
+            ParentId = canvas.Id
+        };
+        var first = Button("button-first", "First", 10);
+        var second = Button("button-second", "Second", 20);
+        var input = RekallAgeEntityDocument.Create("Menu Input", ["input"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.InputActionMap",
+                new JsonObject
+                {
+                    ["Actions"] = new JsonArray
+                    {
+                        new JsonObject { ["Name"] = "ui.next", ["Key"] = "Tab" },
+                        new JsonObject { ["Name"] = "ui.activate", ["Key"] = "Enter" }
+                    }
+                }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["ui", "input"])
+            .AddEntity(canvas)
+            .AddEntity(second)
+            .AddEntity(first)
+            .AddEntity(input);
+        var loop = RekallAgeRuntimeExecutionLoop.CreateDefault();
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var selectedFirst = await loop.RunAsync(
+            world,
+            1,
+            CancellationToken.None,
+            new Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeInputState(
+                PressedKeysThisFrame: new HashSet<string>(["Tab"], StringComparer.OrdinalIgnoreCase)));
+        var selectedSecond = await loop.RunAsync(
+            selectedFirst.World,
+            1,
+            CancellationToken.None,
+            new Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeInputState(
+                PressedKeysThisFrame: new HashSet<string>(["Tab"], StringComparer.OrdinalIgnoreCase)));
+        var activated = await loop.RunAsync(
+            selectedSecond.World,
+            1,
+            CancellationToken.None,
+            new Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeInputState(
+                PressedKeysThisFrame: new HashSet<string>(["Enter"], StringComparer.OrdinalIgnoreCase)));
+
+        var menuState = activated.World.Entities.Single(entity => entity.Id == canvas.Id)
+            .Components.Single(component => component.Type == "Rekall.UiInputState");
+        Assert.Equal(second.Id, menuState.Properties["focusedEntityId"]!.GetValue<string>());
+        Assert.Contains(selectedFirst.World.Subsystems.Events.Events, runtimeEvent =>
+            runtimeEvent.Type == "ui.focus" && runtimeEvent.Handler == "focus-first");
+        Assert.Contains(activated.World.Subsystems.Events.Events, runtimeEvent =>
+            runtimeEvent.Type == "ui.activate" && runtimeEvent.Handler == "activate-second");
+    }
+
+    [Fact]
     public async Task UiImageUsesResolvedAssetPixelsInSoftwareAndOverlayRendering()
     {
         var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])

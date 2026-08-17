@@ -106,6 +106,8 @@ public abstract class RekallAgeUiElementBase : RekallAgeComponent
     [RekallAgeProperty(Minimum = 1)] public double FontSize { get; init; } = 16;
     [RekallAgeProperty(Kind = "assetRef", AssetKind = "image")] public string AssetId { get; init; } = string.Empty;
     [RekallAgeProperty] public bool Interactive { get; init; }
+    [RekallAgeProperty(Description = "Deterministic semantic focus order; lower values focus first.")]
+    public int NavigationOrder { get; init; }
 }
 
 [RekallAgeComponent("UI Element", Description = "Generic layout, visual, and optional interaction primitive.")]

@@ -122,7 +122,7 @@ public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
         var x = parent.X + parent.Width * anchorX + ReadNumber(properties, "x", 0) - width * pivotX;
         var y = parent.Y + parent.Height * anchorY + ReadNumber(properties, "y", 0) - height * pivotY;
 
-        if (properties.ContainsKey("anchorMinX") || properties.ContainsKey("anchorMaxX"))
+        if (TryGetPropertyValue(properties, "anchorMinX", out _) || TryGetPropertyValue(properties, "anchorMaxX", out _))
         {
             var left = parent.X + parent.Width * Math.Clamp(ReadNumber(properties, "anchorMinX", 0), 0, 1) + ReadNumber(properties, "offsetLeft", 0);
             var right = parent.X + parent.Width * Math.Clamp(ReadNumber(properties, "anchorMaxX", 1), 0, 1) + ReadNumber(properties, "offsetRight", 0);
@@ -130,7 +130,7 @@ public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
             width = Math.Max(0, right - left);
         }
 
-        if (properties.ContainsKey("anchorMinY") || properties.ContainsKey("anchorMaxY"))
+        if (TryGetPropertyValue(properties, "anchorMinY", out _) || TryGetPropertyValue(properties, "anchorMaxY", out _))
         {
             var top = parent.Y + parent.Height * Math.Clamp(ReadNumber(properties, "anchorMinY", 0), 0, 1) + ReadNumber(properties, "offsetTop", 0);
             var bottom = parent.Y + parent.Height * Math.Clamp(ReadNumber(properties, "anchorMaxY", 1), 0, 1) + ReadNumber(properties, "offsetBottom", 0);
@@ -158,7 +158,7 @@ public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
 
     private static double ReadNumber(JsonObject properties, string name, double fallback)
     {
-        if (properties[name] is not JsonValue value)
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
         {
             return fallback;
         }
@@ -180,7 +180,22 @@ public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
 
         return value.TryGetValue<string>(out var text) &&
             double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
-                ? parsed
-                : fallback;
+            ? parsed
+            : fallback;
+    }
+
+    private static bool TryGetPropertyValue(JsonObject properties, string name, out JsonNode? value)
+    {
+        foreach (var property in properties)
+        {
+            if (property.Key.Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
     }
 }

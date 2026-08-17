@@ -18,11 +18,6 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeWorld world,
         RekallAgeRuntimeWorldFrameContext context)
     {
-        if (context.Input.ViewportWidth <= 0 || context.Input.ViewportHeight <= 0)
-        {
-            return ValueTask.FromResult(world);
-        }
-
         var canvas = world.Entities
             .Where(entity => entity.Components.Any(component => component.Type == CanvasType))
             .OrderByDescending(entity => ReadNumber(
@@ -36,33 +31,36 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
             return ValueTask.FromResult(world);
         }
 
+        var pointerAvailable = context.Input.ViewportWidth > 0 && context.Input.ViewportHeight > 0;
         var canvasComponent = canvas.Components.First(component => component.Type == CanvasType);
         var referenceWidth = Math.Max(1, ReadNumber(canvasComponent.Properties, "referenceWidth", 1920));
         var referenceHeight = Math.Max(1, ReadNumber(canvasComponent.Properties, "referenceHeight", 1080));
-        var pointerX = context.Input.MouseX * referenceWidth / context.Input.ViewportWidth;
-        var pointerY = context.Input.MouseY * referenceHeight / context.Input.ViewportHeight;
+        var pointerX = pointerAvailable ? context.Input.MouseX * referenceWidth / context.Input.ViewportWidth : 0;
+        var pointerY = pointerAvailable ? context.Input.MouseY * referenceHeight / context.Input.ViewportHeight : 0;
         var canvasLayers = world.Entities
             .Where(entity => entity.Components.Any(component => component.Type == CanvasType))
             .ToDictionary(
                 entity => entity.Id,
                 entity => ReadNumber(entity.Components.First(component => component.Type == CanvasType).Properties, "layer", 0),
                 StringComparer.Ordinal);
-        var hit = world.Entities
-            .Where(entity => entity.Visible && IsInteractive(entity))
-            .Select(entity => (Entity: entity, Layout: ReadLayout(entity)))
-            .Where(item => item.Layout is not null && Contains(item.Layout, context.Input))
-            .OrderByDescending(item => canvasLayers.GetValueOrDefault(item.Layout!.CanvasEntityId))
-            .ThenByDescending(item => Depth(world, item.Entity))
-            .ThenByDescending(item => item.Entity.Id, StringComparer.Ordinal)
-            .Select(item => item.Entity)
-            .FirstOrDefault();
+        var hit = pointerAvailable
+            ? world.Entities
+                .Where(entity => entity.Visible && IsInteractive(entity))
+                .Select(entity => (Entity: entity, Layout: ReadLayout(entity)))
+                .Where(item => item.Layout is not null && Contains(item.Layout, context.Input))
+                .OrderByDescending(item => canvasLayers.GetValueOrDefault(item.Layout!.CanvasEntityId))
+                .ThenByDescending(item => Depth(world, item.Entity))
+                .ThenByDescending(item => item.Entity.Id, StringComparer.Ordinal)
+                .Select(item => item.Entity)
+                .FirstOrDefault()
+            : null;
         var previousState = canvas.Components.FirstOrDefault(component => component.Type == InputStateType)?.Properties;
         var previousHovered = ReadString(previousState, "hoveredEntityId");
         var previousPressed = ReadString(previousState, "pressedEntityId");
         var previousFocused = ReadString(previousState, "focusedEntityId");
         var events = new List<RekallAgeRuntimeEvent>();
 
-        if (!string.Equals(previousHovered, hit?.Id, StringComparison.Ordinal))
+        if (pointerAvailable && !string.Equals(previousHovered, hit?.Id, StringComparison.Ordinal))
         {
             if (previousHovered is not null && world.Entities.FirstOrDefault(entity => entity.Id == previousHovered) is { } left)
             {
@@ -75,14 +73,14 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
             }
         }
 
-        if (hit is not null)
+        if (pointerAvailable && hit is not null)
         {
             AddBoundEvents(events, "pointer.hit", hit, context, pointerX, pointerY);
         }
 
         var pressed = previousPressed;
         var focused = previousFocused;
-        if (Contains(context.Input.PressedButtonsThisFrame, "Left"))
+        if (pointerAvailable && Contains(context.Input.PressedButtonsThisFrame, "Left"))
         {
             pressed = hit?.Id;
             if (hit is not null)
@@ -91,7 +89,7 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
             }
         }
 
-        if (Contains(context.Input.ReleasedButtonsThisFrame, "Left"))
+        if (pointerAvailable && Contains(context.Input.ReleasedButtonsThisFrame, "Left"))
         {
             if (hit is not null)
             {
@@ -110,12 +108,52 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
             pressed = null;
         }
 
+        var focusCandidates = world.Entities
+            .Where(entity => entity.Visible && IsInteractive(entity))
+            .Select(entity => new
+            {
+                Entity = entity,
+                Layout = ReadLayout(entity),
+                Component = entity.Components.First(component => ElementTypes.Contains(component.Type, StringComparer.Ordinal))
+            })
+            .Where(item => item.Layout?.CanvasEntityId == canvas.Id)
+            .OrderBy(item => ReadNumber(item.Component.Properties, "navigationOrder", 0))
+            .ThenBy(item => item.Layout!.Y)
+            .ThenBy(item => item.Layout!.X)
+            .ThenBy(item => item.Entity.Id, StringComparer.Ordinal)
+            .Select(item => item.Entity)
+            .ToArray();
+        var navigateNext = WasActionPressed(world, "ui.next");
+        var navigatePrevious = WasActionPressed(world, "ui.previous");
+        if ((navigateNext || navigatePrevious) && focusCandidates.Length > 0)
+        {
+            var currentIndex = Array.FindIndex(focusCandidates, candidate => candidate.Id == focused);
+            var nextIndex = navigatePrevious
+                ? currentIndex < 0 ? focusCandidates.Length - 1 : (currentIndex - 1 + focusCandidates.Length) % focusCandidates.Length
+                : currentIndex < 0 ? 0 : (currentIndex + 1) % focusCandidates.Length;
+            var nextFocused = focusCandidates[nextIndex];
+            if (focused is not null && focused != nextFocused.Id && world.Entities.FirstOrDefault(entity => entity.Id == focused) is { } blurred)
+            {
+                AddBoundEvents(events, "ui.blur", blurred, context, pointerX, pointerY, "semantic-action", null);
+            }
+
+            focused = nextFocused.Id;
+            AddBoundEvents(events, "ui.focus", nextFocused, context, pointerX, pointerY, "semantic-action", null);
+        }
+
+        if (WasActionPressed(world, "ui.activate")
+            && focused is not null
+            && world.Entities.FirstOrDefault(entity => entity.Id == focused) is { } activated)
+        {
+            AddBoundEvents(events, "ui.activate", activated, context, pointerX, pointerY, "semantic-action", null);
+        }
+
         var state = new JsonObject
         {
             ["pointerX"] = pointerX,
             ["pointerY"] = pointerY
         };
-        SetOptional(state, "hoveredEntityId", hit?.Id);
+        SetOptional(state, "hoveredEntityId", pointerAvailable ? hit?.Id : previousHovered);
         SetOptional(state, "pressedEntityId", pressed);
         SetOptional(state, "focusedEntityId", focused);
         var updatedCanvas = canvas with
@@ -198,11 +236,15 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeEntity entity,
         RekallAgeRuntimeWorldFrameContext context,
         double x,
-        double y)
+        double y,
+        string source = "pointer",
+        string? button = "Left")
     {
         foreach (var binding in entity.Components
                      .Where(component => component.Type == "Rekall.EventBindings")
-                     .SelectMany(component => component.Properties["events"] is JsonArray array ? array.OfType<JsonObject>() : []))
+                     .SelectMany(component => TryGetPropertyValue(component.Properties, "events", out var node) && node is JsonArray array
+                         ? array.OfType<JsonObject>()
+                         : []))
         {
             var type = ReadString(binding, "event") ?? ReadString(binding, "type");
             var handler = ReadString(binding, "handler");
@@ -218,9 +260,13 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
                 entity.Name,
                 "runtime.ui",
                 handler,
-                new JsonObject { ["x"] = x, ["y"] = y, ["button"] = "Left" }));
+                new JsonObject { ["x"] = x, ["y"] = y, ["source"] = source, ["button"] = button }));
         }
     }
+
+    private static bool WasActionPressed(RekallAgeRuntimeWorld world, string name) =>
+        world.Subsystems.Input.Actions.Any(action =>
+            action.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && action.WasPressed);
 
     private static bool Contains(IReadOnlySet<string>? values, string value) =>
         values is not null && values.Contains(value);
@@ -234,16 +280,24 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
     }
 
     private static string? ReadString(JsonObject? properties, string name) =>
-        properties?[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text)
+        properties is not null
+            && TryGetPropertyValue(properties, name, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<string>(out var text)
+            && !string.IsNullOrWhiteSpace(text)
             ? text.Trim()
             : null;
 
     private static bool ReadBoolean(JsonObject properties, string name, bool fallback) =>
-        properties[name] is JsonValue value && value.TryGetValue<bool>(out var boolean) ? boolean : fallback;
+        TryGetPropertyValue(properties, name, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<bool>(out var boolean)
+                ? boolean
+                : fallback;
 
     private static double ReadNumber(JsonObject properties, string name, double fallback)
     {
-        if (properties[name] is not JsonValue value)
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
         {
             return fallback;
         }
@@ -252,6 +306,21 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
         if (value.TryGetValue<int>(out var integer)) return integer;
         if (value.TryGetValue<long>(out var longInteger)) return longInteger;
         return fallback;
+    }
+
+    private static bool TryGetPropertyValue(JsonObject properties, string name, out JsonNode? value)
+    {
+        foreach (var property in properties)
+        {
+            if (property.Key.Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
     }
 
     private sealed record LayoutRect(

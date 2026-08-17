@@ -3,7 +3,9 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
 using Rekall.Age.Playback.Commands;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text.Json;
+using Rekall.Age.Core.Product;
 
 namespace Rekall.Age.Workflows.Commands;
 
@@ -115,12 +117,17 @@ public sealed class PackagePlayableGameCommand
         }
 
         CopyProjectToPackage(request.ProjectRoot, bundledGameRoot, outputDirectory);
+        var manifestGameRoot = "Game";
+        var manifestLaunchPath = NormalizePath(Path.GetRelativePath(outputDirectory, player.Value.LaunchPath));
+        var manifestArguments = CreateLaunchArguments(manifestGameRoot, request.SceneName, request.Graphics);
+        var files = BuildFileInventory(outputDirectory, manifestPath);
         await WriteManifestAsync(
             manifestPath,
             request.SceneName,
-            bundledGameRoot,
-            player.Value.LaunchPath,
-            arguments,
+            manifestGameRoot,
+            manifestLaunchPath,
+            manifestArguments,
+            files,
             verification.Value.Checks,
             verification.Value.DrawAssertions,
             context.CancellationToken);
@@ -181,21 +188,10 @@ public sealed class PackagePlayableGameCommand
         }
 
         Directory.CreateDirectory(destinationRoot);
-        foreach (var directory in Directory.EnumerateDirectories(sourceRoot, "*", SearchOption.AllDirectories))
-        {
-            var fullDirectory = Path.GetFullPath(directory);
-            if (ShouldSkipPath(sourceRoot, fullDirectory, packageRoot))
-            {
-                continue;
-            }
-
-            Directory.CreateDirectory(ToDestinationPath(sourceRoot, destinationRoot, fullDirectory));
-        }
-
         foreach (var file in Directory.EnumerateFiles(sourceRoot, "*", SearchOption.AllDirectories))
         {
             var fullFile = Path.GetFullPath(file);
-            if (ShouldSkipPath(sourceRoot, fullFile, packageRoot))
+            if (ShouldSkipFile(sourceRoot, fullFile, packageRoot))
             {
                 continue;
             }
@@ -211,7 +207,7 @@ public sealed class PackagePlayableGameCommand
         return Path.Combine(destinationRoot, Path.GetRelativePath(sourceRoot, path));
     }
 
-    private static bool ShouldSkipPath(string sourceRoot, string path, string packageRoot)
+    private static bool ShouldSkipFile(string sourceRoot, string path, string packageRoot)
     {
         if (IsSameOrInside(path, packageRoot))
         {
@@ -220,9 +216,57 @@ public sealed class PackagePlayableGameCommand
 
         var relative = Path.GetRelativePath(sourceRoot, path);
         var segments = relative.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries);
-        return segments.Any(segment =>
+        if (segments.Any(segment =>
             segment.Equals("Builds", StringComparison.OrdinalIgnoreCase) ||
-            segment.Equals("obj", StringComparison.OrdinalIgnoreCase));
+            segment.Equals("obj", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals(".rekall", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("Transactions", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("TestResults", StringComparison.OrdinalIgnoreCase) ||
+            segment.Equals("Artifacts", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        var fileName = Path.GetFileName(path);
+        var extension = Path.GetExtension(path);
+        if (fileName.Equals(".env", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".env", StringComparison.OrdinalIgnoreCase) ||
+            fileName.StartsWith("appsettings.", StringComparison.OrdinalIgnoreCase) &&
+            fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".cs", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".csproj", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".sln", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".user", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".pdb", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".log", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".trx", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".pfx", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".snk", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("packages.lock.json", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var modulesIndex = Array.FindIndex(segments, segment =>
+            segment.Equals("Modules", StringComparison.OrdinalIgnoreCase));
+        return modulesIndex >= 0 && !ContainsSequence(
+            segments[(modulesIndex + 1)..],
+            ["bin", "rekall", "net10.0"]);
+    }
+
+    private static bool ContainsSequence(IReadOnlyList<string> values, IReadOnlyList<string> sequence)
+    {
+        for (var start = 0; start <= values.Count - sequence.Count; start++)
+        {
+            if (Enumerable.Range(0, sequence.Count).All(offset =>
+                    values[start + offset].Equals(sequence[offset], StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsSameOrInside(string path, string directory)
@@ -253,6 +297,7 @@ public sealed class PackagePlayableGameCommand
         string bundledGameRoot,
         string launchPath,
         IReadOnlyList<string> arguments,
+        IReadOnlyList<RekallAgePlayablePackageFileIntegrity> files,
         IReadOnlyList<RekallAgePlayableGameCheck> checks,
         IReadOnlyList<RekallAgeDrawCommandAssertionResult> drawAssertions,
         CancellationToken cancellationToken)
@@ -264,7 +309,10 @@ public sealed class PackagePlayableGameCommand
             launchPath,
             arguments,
             checks,
-            drawAssertions);
+            drawAssertions,
+            SchemaVersion: 2,
+            ProductVersion: RekallAgeProductInfo.Current.Version,
+            Files: files);
         Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
         await File.WriteAllTextAsync(
             manifestPath,
@@ -278,6 +326,34 @@ public sealed class PackagePlayableGameCommand
             cancellationToken);
     }
 
+    private static IReadOnlyList<RekallAgePlayablePackageFileIntegrity> BuildFileInventory(
+        string outputDirectory,
+        string manifestPath)
+    {
+        return Directory.EnumerateFiles(outputDirectory, "*", SearchOption.AllDirectories)
+            .Where(path => !Path.GetFullPath(path).Equals(Path.GetFullPath(manifestPath), PathComparison))
+            .Select(path => new RekallAgePlayablePackageFileIntegrity(
+                NormalizePath(Path.GetRelativePath(outputDirectory, path)),
+                new FileInfo(path).Length,
+                Convert.ToHexString(HashFile(path)).ToLowerInvariant()))
+            .OrderBy(file => file.Path, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static byte[] HashFile(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return SHA256.HashData(stream);
+    }
+
+    private static string NormalizePath(string path)
+    {
+        return path.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
+    }
+
+    private static StringComparison PathComparison =>
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
 }
 
 public sealed record RekallAgePlayablePackageManifest(
@@ -287,4 +363,12 @@ public sealed record RekallAgePlayablePackageManifest(
     string LaunchPath,
     IReadOnlyList<string> Arguments,
     IReadOnlyList<RekallAgePlayableGameCheck> Checks,
-    IReadOnlyList<RekallAgeDrawCommandAssertionResult> DrawAssertions);
+    IReadOnlyList<RekallAgeDrawCommandAssertionResult> DrawAssertions,
+    int SchemaVersion = 1,
+    string ProductVersion = "",
+    IReadOnlyList<RekallAgePlayablePackageFileIntegrity>? Files = null);
+
+public sealed record RekallAgePlayablePackageFileIntegrity(
+    string Path,
+    long SizeBytes,
+    string Sha256);

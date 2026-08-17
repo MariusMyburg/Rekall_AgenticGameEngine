@@ -1,7 +1,8 @@
 # Rekall AGE Production Maturity Audit
 
-**Audit date:** 2026-08-17  
-**Product:** Rekall AGE `0.1.0-preview.1`  
+**Audit date:** 2026-08-17
+
+**Product:** Rekall AGE `0.1.0-preview.1`
 **North star:** [Rekall AGE Product Vision](../PRODUCT-VISION.md)
 
 ## Method

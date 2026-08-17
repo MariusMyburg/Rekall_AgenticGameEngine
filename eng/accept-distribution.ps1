@@ -14,6 +14,7 @@ if (-not (Test-Path -LiteralPath $cli -PathType Leaf)) {
 $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/')
 $proofRoot = Join-Path $tempRoot ('rekall-age-installed-proof-' + [Guid]::NewGuid().ToString('N'))
 $gauntletRoot = Join-Path $tempRoot ('rekall-age-installed-gauntlet-' + [Guid]::NewGuid().ToString('N'))
+$relocationRoot = Join-Path $tempRoot ('rekall-age-relocated-package-' + [Guid]::NewGuid().ToString('N'))
 $succeeded = $false
 
 function Invoke-Rekall {
@@ -52,12 +53,35 @@ try {
         throw "Installed gauntlet proof frame is missing or blank at '$proofFrame'."
     }
 
+    $manifestPath = Join-Path $packageRoot 'rekall.package.json'
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if ($manifest.schemaVersion -ne 2 -or [IO.Path]::IsPathRooted($manifest.gameRoot) -or [IO.Path]::IsPathRooted($manifest.launchPath)) {
+        throw "Installed gauntlet emitted a legacy or non-relocatable package manifest at '$manifestPath'."
+    }
+    $forbiddenPayload = Get-ChildItem -LiteralPath (Join-Path $packageRoot 'Game') -Recurse -File | Where-Object {
+        $_.Extension -in @('.cs', '.csproj', '.pdb', '.log', '.trx', '.pfx', '.snk') -or
+        $_.Name -eq '.env' -or $_.FullName -match '[\\/]\.rekall[\\/]'
+    }
+    if ($forbiddenPayload) {
+        throw "Installed gauntlet package contains authoring-only or secret-bearing payload: '$($forbiddenPayload[0].FullName)'."
+    }
+
+    New-Item -ItemType Directory -Path $relocationRoot | Out-Null
+    $relocatedArchive = Join-Path $relocationRoot 'renamed-relocated-game.zip'
+    Copy-Item -LiteralPath ($packageRoot + '.zip') -Destination $relocatedArchive
+    $relocatedProof = Join-Path $relocationRoot 'Proof'
+    Invoke-Rekall game audit-package $relocatedArchive $relocatedProof
+    $relocatedFrame = Join-Path $relocatedProof 'package_play_frame_001.png'
+    if (-not (Test-Path -LiteralPath $relocatedFrame -PathType Leaf) -or (Get-Item -LiteralPath $relocatedFrame).Length -le 100) {
+        throw "Relocated package audit did not produce a nonblank proof frame at '$relocatedFrame'."
+    }
+
     $succeeded = $true
     Write-Output "Installed distribution acceptance passed: $distribution"
 }
 finally {
     if ($succeeded) {
-        foreach ($path in @($proofRoot, $gauntletRoot)) {
+        foreach ($path in @($proofRoot, $gauntletRoot, $relocationRoot)) {
             $resolved = [IO.Path]::GetFullPath($path)
             if ($resolved.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and
                 (Test-Path -LiteralPath $resolved)) {
@@ -66,6 +90,6 @@ finally {
         }
     }
     else {
-        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot' and '$gauntletRoot'."
+        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$gauntletRoot', and '$relocationRoot'."
     }
 }

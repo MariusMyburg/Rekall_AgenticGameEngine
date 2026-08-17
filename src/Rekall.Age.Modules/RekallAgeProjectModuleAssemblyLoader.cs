@@ -14,9 +14,24 @@ public static class RekallAgeProjectModuleAssemblyLoader
         }
 
         var assemblies = new List<Assembly>();
-        foreach (var projectPath in Directory.EnumerateFiles(modulesRoot, "*.csproj", SearchOption.AllDirectories))
+        foreach (var moduleDirectory in Directory.EnumerateDirectories(modulesRoot)
+                     .OrderBy(path => path, StringComparer.Ordinal))
         {
-            var assemblyPath = GetDefaultAssemblyPath(projectPath);
+            var moduleName = Path.GetFileName(moduleDirectory);
+            var portableAssembly = Path.Combine(
+                moduleDirectory,
+                "bin",
+                "rekall",
+                "net10.0",
+                $"{moduleName}.dll");
+            var projectPath = Directory.EnumerateFiles(moduleDirectory, "*.csproj", SearchOption.TopDirectoryOnly)
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .FirstOrDefault();
+            var assemblyPath = File.Exists(portableAssembly)
+                ? portableAssembly
+                : projectPath is null
+                    ? string.Empty
+                    : GetDefaultAssemblyPath(projectPath);
             if (!File.Exists(assemblyPath))
             {
                 continue;

@@ -1,7 +1,7 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
+using Rekall.Age.Workflows;
 using System.Diagnostics;
-using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 
@@ -44,15 +44,32 @@ public sealed class RunPlayablePackageCommand
         RunPlayablePackageRequest request,
         RekallAgeCommandContext context)
     {
+        var preflight = await _inspectPackage.ExecuteAsync(
+            new InspectPlayablePackageRequest(request.PackagePath),
+            context);
+        if (!preflight.Ok)
+        {
+            return RejectPackage(preflight);
+        }
+
         var package = PreparePackage(request.PackagePath);
         try
         {
-            var inspect = await _inspectPackage.ExecuteAsync(
-                new InspectPlayablePackageRequest(package.InspectPath),
-                context);
+            var inspect = Path.GetFullPath(request.PackagePath).Equals(
+                Path.GetFullPath(package.InspectPath),
+                StringComparison.OrdinalIgnoreCase)
+                ? preflight
+                : await _inspectPackage.ExecuteAsync(
+                    new InspectPlayablePackageRequest(package.InspectPath),
+                    context);
+            if (!inspect.Ok)
+            {
+                return RejectPackage(inspect);
+            }
+
             var manifest = inspect.Value.Manifest;
-            var launchPath = ResolvePackagedLaunchPath(package.PackageRoot, manifest.LaunchPath);
-            var gameRoot = ResolvePackagedGameRoot(package.PackageRoot);
+            var launchPath = ResolvePackagedPath(package.PackageRoot, manifest.LaunchPath, "player", File.Exists);
+            var gameRoot = ResolvePackagedPath(package.PackageRoot, manifest.GameRoot, "game root", Directory.Exists);
             var frameCount = Math.Clamp(request.Frames, 1, 600);
             var run = await RunPlayerAsync(
                 launchPath,
@@ -94,6 +111,24 @@ public sealed class RunPlayablePackageCommand
         }
     }
 
+    private static RekallAgeCommandResult<RunPlayablePackageResult> RejectPackage(
+        RekallAgeCommandResult<InspectPlayablePackageResult> inspection)
+    {
+        var rejected = new RunPlayablePackageResult(
+            false,
+            inspection.Value.ManifestPath,
+            string.Empty,
+            string.Empty,
+            -1,
+            [],
+            [],
+            "Package execution was blocked because integrity verification failed.");
+        return RekallAgeCommandResult<RunPlayablePackageResult>.Failure(
+            rejected,
+            rejected.Output,
+            inspection.Errors);
+    }
+
     private static PreparedPackage PreparePackage(string packagePath)
     {
         var fullPath = Path.GetFullPath(packagePath);
@@ -106,7 +141,7 @@ public sealed class RunPlayablePackageCommand
         {
             var extractionRoot = Path.Combine(Path.GetTempPath(), "RekallAgePackageRuns", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(extractionRoot);
-            ZipFile.ExtractToDirectory(fullPath, extractionRoot);
+            RekallAgeSafePackageExtraction.Extract(fullPath, extractionRoot);
             return new PreparedPackage(extractionRoot, extractionRoot, extractionRoot);
         }
 
@@ -120,27 +155,26 @@ public sealed class RunPlayablePackageCommand
         throw new FileNotFoundException($"Playable package path '{fullPath}' does not exist.", fullPath);
     }
 
-    private static string ResolvePackagedLaunchPath(string packageRoot, string manifestLaunchPath)
+    private static string ResolvePackagedPath(
+        string packageRoot,
+        string manifestPath,
+        string description,
+        Func<string, bool> exists)
     {
-        var launchFileName = Path.GetFileName(manifestLaunchPath);
-        var launchPath = Path.Combine(packageRoot, launchFileName);
-        if (!File.Exists(launchPath))
+        if (!InspectPlayablePackageCommand.TryValidateRelativePath(manifestPath, out var normalized))
         {
-            throw new InvalidOperationException($"Package player '{launchPath}' does not exist.");
+            throw new InvalidOperationException($"Package {description} path '{manifestPath}' is unsafe.");
         }
 
-        return launchPath;
-    }
-
-    private static string ResolvePackagedGameRoot(string packageRoot)
-    {
-        var gameRoot = Path.Combine(packageRoot, "Game");
-        if (!Directory.Exists(gameRoot))
+        var root = Path.GetFullPath(packageRoot);
+        var path = Path.GetFullPath(Path.Combine(root, normalized.Replace('/', Path.DirectorySeparatorChar)));
+        var rootPrefix = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (!path.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase) || !exists(path))
         {
-            throw new InvalidOperationException($"Package game root '{gameRoot}' does not exist.");
+            throw new InvalidOperationException($"Package {description} '{path}' does not exist beneath the package root.");
         }
 
-        return gameRoot;
+        return path;
     }
 
     private static async Task<(int ExitCode, string Output, IReadOnlyList<RekallAgePlaybackRenderFrame> RenderFrames)> RunPlayerAsync(

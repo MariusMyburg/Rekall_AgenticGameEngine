@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 00:35 Africa/Johannesburg
+Last verified: 2026-08-18 00:41 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: dimension-safe physics authoring and module-free inspection pass 576 tests
+Latest milestone: dimension-safe physics/inspection repair passed the complete product gate
 
 ## Product objective
 
@@ -218,6 +218,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   embedded-agent contract now direct deterministic subsystem verification to
   `rekall.runtime.inspect_scene`, which requires no playable module. The full
   Debug suite passes at 576/576.
+- Physics/inspection distribution gate: the clean Release build completed with
+  zero warnings and errors, both independent Release passes completed at
+  576/576, and installed acceptance passed SDK/module authoring, generic
+  gauntlet, original and relocated package proof, runtime UI, software viewport,
+  simulated audio, and Windows player audio. The canonical archive is
+  194,688,256 bytes.
 
 ## Current gaps
 
@@ -233,7 +239,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete product gate for dimension-safe physics authoring and inspection guidance.
+Rerun the unchanged installed Ollama benchmark on the dimension-safe distribution.
 
 ## Next after the current item
 

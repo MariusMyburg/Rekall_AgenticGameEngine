@@ -47,6 +47,36 @@ Prove that a local provider-neutral Ollama agent can author and verify generic R
 
 The benchmark passed the functional acceptance gate. The remaining efficiency signal is that V8 still used repeated discovery and blueprint calls; future benchmark work should reduce redundant calls without weakening the generic authoring surface.
 
+## Broad installed-engine baseline
+
+A subsequent installed-only benchmark required ordinary tools to author 3D and
+2D physics scenes, deliberately introduce and repair invalid content, validate
+the whole project, capture an informative frame, and package/audit a relocatable
+game. It intentionally excluded the built-in gauntlet.
+
+- Project: `rekall-age-installed-broad-benchmark-4344e0eac0594a5eaa8a1fd112209432`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 410,197
+- Completion tokens: 11,325
+
+The run created both scenes and recovered from several malformed arguments, but
+did not reach valid packaging. The failure exposed generic engine contracts:
+
+- project-wide validation did not exist, so a project-validation search selected
+  unrelated render-plan validation;
+- `Rigidbody2D` was inspectable by name but had neither a registered authoring
+  schema nor deterministic physics execution;
+- playable verification discarded the nested executable
+  `rekall.module.scaffold_playable` repair suggestion;
+- loading a compiled project module locked its authoring output, so the same
+  long-lived agent process could not rebuild after verification.
+
+Those findings drove project validation, planar Bepu physics, repair-action
+propagation, rebuild-safe module loading, and regression coverage. This baseline
+remains a failure until the identical task passes against a newly assembled
+installed distribution.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

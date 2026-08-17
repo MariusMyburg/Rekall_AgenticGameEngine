@@ -107,7 +107,7 @@ public sealed class RekallAgeProjectValidator
                          component.Type.StartsWith("Rekall.", StringComparison.Ordinal)
                          && !BuiltInComponentSchemas.ContainsKey(component.Type)))
             {
-                var suggestion = UiComponentTypes
+                var suggestion = BuiltInComponentSchemas.Keys
                     .Select(type => (Type: type, Distance: EditDistance(component.Type, type)))
                     .OrderBy(candidate => candidate.Distance)
                     .ThenBy(candidate => candidate.Type, StringComparer.Ordinal)
@@ -119,13 +119,15 @@ public sealed class RekallAgeProjectValidator
 
                 issues.Add(new RekallAgeValidationIssue(
                     "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN",
-                    $"Entity '{entity.Name}' uses unknown reserved component '{component.Type}'. Did you mean '{suggestion.Type}'? Use the exact type returned by rekall.module.search_component_schemas.",
+                    $"Entity '{entity.Name}' uses unknown reserved component '{component.Type}'. "
+                    + (suggestion.Distance <= 3 ? $"Did you mean '{suggestion.Type}'? " : string.Empty)
+                    + "Use the exact type returned by rekall.module.search_component_schemas.",
                     "blocking",
                     entity.Id,
                     [
                         new RekallAgeSuggestedCommand(
                             "rekall.scene.apply_blueprint",
-                            new Dictionary<string, object?> { ["scene"] = scene.Name, ["entityId"] = entity.Id })
+                            new Dictionary<string, object?> { ["query"] = component.Type })
                     ]));
             }
 

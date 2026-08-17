@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-17 22:00 Africa/Johannesburg
+Last verified: 2026-08-17 22:16 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: installed Vulkan skeletal-animation proof
+Latest milestone: broad installed-agent benchmark failure converted into generic engine fixes
 
 ## Product objective
 
@@ -47,6 +47,14 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Diagnostics: runtime inspection exposes UI/audio/animation state; viewport
   analysis reports severe clipping and invisible text without irrelevant
   camera advice for UI-only scenes.
+- Broad benchmark baseline: installed `qwen3.5:35b` reached the 36-turn limit
+  after 36 tool calls, 410,197 prompt tokens, and 11,325 completion tokens. It
+  exposed project-validation discovery, playable repair propagation, and
+  in-process module rebuild defects rather than producing a false pass.
+- Benchmark-driven fixes: project-wide validation now aggregates all scenes;
+  `Rigidbody2D` is registered and executes deterministic Bepu XY-plane physics;
+  loaded project modules no longer lock authoring outputs; playable verification
+  preserves executable scaffold suggestions. The full Debug suite is 562/562.
 
 ## Current gaps
 
@@ -61,14 +69,14 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Expand the installed Ollama authoring benchmark across generic 2D, 3D,
-physics, package relocation, deliberate faults, diagnosis, and repair.
+Run the canonical two-pass Release/distribution gate for the benchmark-driven
+fixes, then rerun the identical installed Ollama benchmark on fresh binaries.
 
 ## Next after the current item
 
-Classify benchmark failures by generic engine contract, fix those contracts
-with regression tests, then begin quantified production hardening. Studio work
-follows as a consumer of those results.
+Classify any remaining rerun failures by generic engine contract and fix them
+with regression tests. A genuine broad benchmark pass precedes quantified
+production hardening; Studio follows as a consumer of those results.
 
 ## Evidence index
 

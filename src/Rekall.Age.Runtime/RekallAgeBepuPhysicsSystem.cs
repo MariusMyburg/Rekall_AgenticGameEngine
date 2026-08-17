@@ -54,7 +54,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
                 }
 
                 var description = new StaticDescription(
-                    new RigidPose(ToVector3(item.Entity.Transform.Position3D)),
+                    new RigidPose(ToPhysicsPosition(item)),
                     shape.Shape);
                 simulation.Statics.Add(description);
             }
@@ -62,8 +62,13 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
             var handles = new Dictionary<string, DynamicBodyState>(StringComparer.Ordinal);
             foreach (var item in dynamicBodies)
             {
-                var pose = new RigidPose(ToVector3(item.Entity.Transform.Position3D));
-                var velocity = new BodyVelocity(ReadVector3(FindComponent(item.Entity, "Rekall.PhysicsState3D"), "linearVelocity"));
+                var pose = new RigidPose(ToPhysicsPosition(item));
+                var stateType = item.Is2D ? "Rekall.PhysicsState2D" : "Rekall.PhysicsState3D";
+                var velocity = new BodyVelocity(ReadVector3(FindComponent(item.Entity, stateType), "linearVelocity"));
+                if (item.Is2D)
+                {
+                    velocity.Linear.Z = 0;
+                }
                 var mass = Math.Max(0.0001f, ReadSingle(item.Rigidbody!, "mass", 1));
                 if (TryCreateDynamicDescription(simulation, pool, item, pose, velocity, mass, out var created))
                 {
@@ -84,7 +89,8 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
                         entity,
                         simulation.Bodies[body.Handle],
                         body.CenterOffset,
-                        ApplyRestitution(body, simulation.Bodies[body.Handle], staticBodies))
+                        ApplyRestitution(body, simulation.Bodies[body.Handle], staticBodies),
+                        body.Entity?.Is2D == true)
                     : entity)
                 .ToArray();
 
@@ -100,7 +106,8 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeEntity entity,
         BodyReference body,
         Vector3 centerOffset,
-        RestitutionAdjustment adjustment)
+        RestitutionAdjustment adjustment,
+        bool is2D)
     {
         var pose = body.Pose;
         var velocity = body.Velocity;
@@ -115,9 +122,17 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
         {
             Transform = entity.Transform with
             {
-                Position3D = new RekallAgeRuntimeVector3(position.X, position.Y, position.Z)
+                Position2D = is2D
+                    ? new RekallAgeRuntimeVector2(position.X, position.Y)
+                    : entity.Transform.Position2D,
+                Position3D = is2D
+                    ? new RekallAgeRuntimeVector3(
+                        entity.Transform.Position3D.X,
+                        entity.Transform.Position3D.Y,
+                        entity.Transform.Position3D.Z)
+                    : new RekallAgeRuntimeVector3(position.X, position.Y, position.Z)
             },
-            Components = UpsertPhysicsState(entity.Components, velocity.Linear)
+            Components = UpsertPhysicsState(entity.Components, velocity.Linear, is2D)
         };
     }
 
@@ -180,7 +195,8 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
 
     private static IReadOnlyList<RekallAgeRuntimeComponent> UpsertPhysicsState(
         IReadOnlyList<RekallAgeRuntimeComponent> components,
-        Vector3 linearVelocity)
+        Vector3 linearVelocity,
+        bool is2D)
     {
         var state = new JsonObject
         {
@@ -192,10 +208,11 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
                 ["z"] = linearVelocity.Z
             }
         };
+        var stateType = is2D ? "Rekall.PhysicsState2D" : "Rekall.PhysicsState3D";
         var replaced = false;
         var updated = components.Select(component =>
         {
-            if (!component.Type.Equals("Rekall.PhysicsState3D", StringComparison.Ordinal))
+            if (!component.Type.Equals(stateType, StringComparison.Ordinal))
             {
                 return component;
             }
@@ -205,7 +222,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
         }).ToList();
         if (!replaced)
         {
-            updated.Add(new RekallAgeRuntimeComponent("Rekall.PhysicsState3D", state));
+            updated.Add(new RekallAgeRuntimeComponent(stateType, state));
         }
 
         return updated
@@ -217,16 +234,21 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
     {
         return new PhysicsEntity(
             entity,
-            FindComponent(entity, "Rekall.Rigidbody3D"),
+            FindComponent(entity, "Rekall.Rigidbody3D") ?? FindComponent(entity, "Rekall.Rigidbody2D"),
             FindCollider(entity),
             FindComponent(entity, "Rekall.GeometryMesh"),
-            ReadPhysicsMaterial(entity));
+            ReadPhysicsMaterial(entity),
+            FindComponent(entity, "Rekall.Rigidbody2D") is not null
+                || FindComponent(entity, "Rekall.BoxCollider2D") is not null
+                || FindComponent(entity, "Rekall.CircleCollider2D") is not null);
     }
 
     private static RekallAgeRuntimeComponent? FindCollider(RekallAgeRuntimeEntity entity)
     {
         return entity.Components.FirstOrDefault(component =>
             component.Type is
+                "Rekall.BoxCollider2D" or
+                "Rekall.CircleCollider2D" or
                 "Rekall.BoxCollider3D" or
                 "Rekall.SphereCollider3D" or
                 "Rekall.CapsuleCollider3D" or
@@ -245,6 +267,18 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
         var collider = item.Collider!;
         switch (collider.Type)
         {
+            case "Rekall.BoxCollider2D":
+                created = new DynamicBodyState(
+                    default,
+                    BodyDescription.CreateConvexDynamic(pose, velocity, mass, simulation.Shapes, CreateBox2D(collider)),
+                    Vector3.Zero);
+                return true;
+            case "Rekall.CircleCollider2D":
+                created = new DynamicBodyState(
+                    default,
+                    BodyDescription.CreateConvexDynamic(pose, velocity, mass, simulation.Shapes, CreateSphere(collider)),
+                    Vector3.Zero);
+                return true;
             case "Rekall.BoxCollider3D":
                 created = new DynamicBodyState(
                     default,
@@ -284,6 +318,8 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
     {
         return item.Collider!.Type switch
         {
+            "Rekall.BoxCollider2D" => new StaticShape(true, simulation.Shapes.Add(CreateBox2D(item.Collider))),
+            "Rekall.CircleCollider2D" => new StaticShape(true, simulation.Shapes.Add(CreateSphere(item.Collider))),
             "Rekall.BoxCollider3D" => new StaticShape(true, simulation.Shapes.Add(CreateBox(item.Collider))),
             "Rekall.SphereCollider3D" => new StaticShape(true, simulation.Shapes.Add(CreateSphere(item.Collider))),
             "Rekall.CapsuleCollider3D" => new StaticShape(true, simulation.Shapes.Add(CreateCapsule(item.Collider))),
@@ -300,6 +336,14 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
             Math.Max(0.0001f, ReadSingle(collider, "width", 1)),
             Math.Max(0.0001f, ReadSingle(collider, "height", 1)),
             Math.Max(0.0001f, ReadSingle(collider, "depth", 1)));
+    }
+
+    private static Box CreateBox2D(RekallAgeRuntimeComponent collider)
+    {
+        return new Box(
+            Math.Max(0.0001f, ReadSingle(collider, "width", 1)),
+            Math.Max(0.0001f, ReadSingle(collider, "height", 1)),
+            0.1f);
     }
 
     private static Sphere CreateSphere(RekallAgeRuntimeComponent collider)
@@ -535,6 +579,16 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
         return new Vector3((float)value.X, (float)value.Y, (float)value.Z);
     }
 
+    private static Vector3 ToPhysicsPosition(PhysicsEntity item)
+    {
+        return item.Is2D
+            ? new Vector3(
+                (float)item.Entity.Transform.Position2D.X,
+                (float)item.Entity.Transform.Position2D.Y,
+                0)
+            : ToVector3(item.Entity.Transform.Position3D);
+    }
+
     private static Vector3 ReadVector3(RekallAgeRuntimeComponent? component, string name)
     {
         if (component is null
@@ -663,7 +717,8 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeComponent? Rigidbody,
         RekallAgeRuntimeComponent? Collider,
         RekallAgeRuntimeComponent? GeometryMesh,
-        PhysicsMaterial Material);
+        PhysicsMaterial Material,
+        bool Is2D);
 
     private readonly record struct PhysicsMaterial(
         float Friction,

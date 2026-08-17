@@ -325,4 +325,39 @@ public sealed class ProjectValidatorTests
         Assert.Contains(result.Value.Issues, issue => issue.Code == "REKALL_XR_RIG_MISSING");
         Assert.Contains(result.Value.SuggestedNextActions, action => action.Tool == "rekall.scene.apply_blueprint");
     }
+
+    [Fact]
+    public async Task ValidateProjectCommandAggregatesEverySceneAndComponentSchemaIssue()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        await store.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"]),
+            CancellationToken.None);
+        await store.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Physics2D", ["world", "physics"])
+                .AddEntity(RekallAgeEntityDocument.Create("Body", ["physics"])
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.Rigidbody2D",
+                        new JsonObject { ["mass"] = 1, ["invalidProperty"] = true }))),
+            CancellationToken.None);
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("validate project"),
+            CancellationToken.None);
+
+        var result = await new ValidateProjectCommand().ExecuteAsync(
+            new ValidateProjectRequest(root),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(2, result.Value.SceneCount);
+        Assert.Equal("blocked", result.Value.Status);
+        Assert.True(result.Value.BlockingCount > 0);
+        Assert.Contains(
+            result.Value.Scenes.Single(scene => scene.SceneName == "Physics2D").Issues,
+            issue => issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN");
+    }
 }

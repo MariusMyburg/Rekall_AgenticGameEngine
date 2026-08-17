@@ -36,6 +36,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeVirtualGeometryComponent>();
         builder.RegisterComponent<RekallAgePhysicsWorld3DComponent>();
         builder.RegisterComponent<RekallAgePhysicsMaterial3DComponent>();
+        builder.RegisterComponent<RekallAgeRigidbody2DComponent>();
         builder.RegisterComponent<RekallAgeRigidbody3DComponent>();
         builder.RegisterComponent<RekallAgeTriggerComponent>();
         builder.RegisterComponent<RekallAgeBoxCollider2DComponent>();
@@ -770,6 +771,13 @@ public sealed class RekallAgePhysicsMaterial3DComponent : RekallAgeComponent
 
 [RekallAgeComponent("Rigidbody 3D")]
 public sealed class RekallAgeRigidbody3DComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double Mass { get; init; } = 1;
+}
+
+[RekallAgeComponent("Rigidbody 2D", Description = "A generic dynamic planar body simulated on the XY plane.")]
+public sealed class RekallAgeRigidbody2DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
     public double Mass { get; init; } = 1;

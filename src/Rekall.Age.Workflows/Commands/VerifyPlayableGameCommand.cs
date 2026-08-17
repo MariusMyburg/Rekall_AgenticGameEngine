@@ -62,7 +62,15 @@ public sealed class VerifyPlayableGameCommand
         checks.Add(new RekallAgePlayableGameCheck("module-build", build.Ok, build.Summary));
         if (!validationPassed || !build.Ok)
         {
-            return NotReady(checks, build.Ok, playtestPassed: false, frames: [], renderFrames: [], drawAssertions: [], request.SceneName);
+            return NotReady(
+                checks,
+                build.Ok,
+                playtestPassed: false,
+                frames: [],
+                renderFrames: [],
+                drawAssertions: [],
+                request.SceneName,
+                build.Ok ? null : build.Errors);
         }
 
         var playtest = await _playtestScene.ExecuteAsync(
@@ -84,7 +92,8 @@ public sealed class VerifyPlayableGameCommand
                 playtest.Value.Frames,
                 playtest.Value.RenderFrames,
                 playtest.Value.DrawAssertions,
-                request.SceneName);
+                request.SceneName,
+                playtest.Errors);
         }
 
         return RekallAgeCommandResult<VerifyPlayableGameResult>.Success(
@@ -106,7 +115,8 @@ public sealed class VerifyPlayableGameCommand
         IReadOnlyList<string> frames,
         IReadOnlyList<RekallAgePlaybackRenderFrame>? renderFrames,
         IReadOnlyList<RekallAgeDrawCommandAssertionResult>? drawAssertions,
-        string sceneName)
+        string sceneName,
+        IReadOnlyList<RekallAgeCommandError>? underlyingErrors = null)
     {
         var error = new RekallAgeCommandError(
             "REKALL_PLAYABLE_GAME_NOT_READY",
@@ -122,7 +132,7 @@ public sealed class VerifyPlayableGameCommand
                 RenderFrames: renderFrames ?? [],
                 DrawAssertions: drawAssertions ?? []),
             error.Message,
-            [error]);
+            underlyingErrors is { Count: > 0 } ? underlyingErrors : [error]);
     }
 
 }

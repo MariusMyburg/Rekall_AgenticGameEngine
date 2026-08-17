@@ -66,6 +66,10 @@ public sealed class GetEngineStatusCommand
                     "Apply many generic entities and components to a scene in one transaction for high-throughput agent world authoring.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
+                    "rekall.validation.project",
+                    "Validate every project scene and aggregate component-schema issues and executable repair actions.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
                     "rekall.validation.scene",
                     "Validate a scene and return blocking issues, warnings, and agent-readable next actions.",
                     Recommended: true),

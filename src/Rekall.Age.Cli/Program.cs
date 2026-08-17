@@ -331,6 +331,7 @@ internal static class RekallAgeCli
                 ["context", "doctor", var root] => await PrintEngineDoctorAsync(registry, context, root),
                 ["context", "summary", var root] => await PrintSummaryAsync(registry, context, root),
                 ["context", "scene", var root, var scene] => await PrintSceneSummaryAsync(registry, context, root, scene),
+                ["validation", "project", var root] => await ValidateProjectAsync(registry, context, root),
                 ["validation", "scene", var root, var scene] => await ValidateSceneAsync(registry, context, root, scene),
                 ["scene", "validate", var root, var scene] => await ValidateSceneAsync(registry, context, root, scene),
                 ["transaction", "history", var root] => await PrintTransactionHistoryAsync(registry, context, root, "20"),
@@ -436,6 +437,7 @@ internal static class RekallAgeCli
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new GetEngineStatusCommand());
         registry.Register(new InspectEngineDoctorCommand());
+        registry.Register(new ValidateProjectCommand());
         registry.Register(new ValidateSceneCommand());
         registry.Register(new ListTransactionHistoryCommand());
         registry.Register(new RestoreTransactionPreimageCommand());
@@ -2875,6 +2877,35 @@ internal static class RekallAgeCli
         }
 
         return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ValidateProjectAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root)
+    {
+        var result = await registry.ExecuteAsync<ValidateProjectRequest, ValidateProjectResult>(
+            "rekall.validation.project",
+            new ValidateProjectRequest(root),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Status: {result.Value.Status}");
+        Console.WriteLine(
+            $"Scenes: {result.Value.SceneCount}; issues: {result.Value.IssueCount} " +
+            $"(blocking {result.Value.BlockingCount}, warnings {result.Value.WarningCount})");
+        foreach (var scene in result.Value.Scenes)
+        {
+            Console.WriteLine($"  {scene.SceneName}: {scene.Status}, {scene.IssueCount} issue(s)");
+            foreach (var issue in scene.Issues)
+            {
+                Console.WriteLine($"    {issue.Severity} {issue.Code} {issue.Target ?? scene.SceneName}: {issue.Message}");
+            }
+        }
+        foreach (var action in result.Value.SuggestedNextActions)
+        {
+            Console.WriteLine($"Next: {action.Tool}");
+        }
+        return result.Ok && result.Value.BlockingCount == 0 ? 0 : 1;
     }
 
     private static async Task<int> ValidateSceneAsync(

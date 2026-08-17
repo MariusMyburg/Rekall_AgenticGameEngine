@@ -37,8 +37,13 @@ public static class RekallAgeProjectModuleAssemblyLoader
                 continue;
             }
 
-            assemblies.Add(new RekallAgeProjectModuleLoadContext(assemblyPath)
-                .LoadFromAssemblyPath(Path.GetFullPath(assemblyPath)));
+            var loadContext = new RekallAgeProjectModuleLoadContext(assemblyPath);
+            using var assemblyStream = new FileStream(
+                Path.GetFullPath(assemblyPath),
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            assemblies.Add(loadContext.LoadFromStream(assemblyStream));
         }
 
         return assemblies;

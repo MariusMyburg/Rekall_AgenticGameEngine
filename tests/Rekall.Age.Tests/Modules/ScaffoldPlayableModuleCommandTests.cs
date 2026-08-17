@@ -89,4 +89,33 @@ public sealed class ScaffoldPlayableModuleCommandTests
         Assert.Contains(firstAssemblies[0].GetTypes(), type => typeof(IRekallAgePlayableModule).IsAssignableFrom(type));
         Assert.Contains(secondAssemblies[0].GetTypes(), type => typeof(IRekallAgePlayableModule).IsAssignableFrom(type));
     }
+
+    [Fact]
+    public async Task LoadedProjectModuleDoesNotLockItsAuthoringBuildOutput()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("rebuild loaded module"),
+            CancellationToken.None);
+        await new ScaffoldPlayableModuleCommand().ExecuteAsync(
+            new ScaffoldPlayableModuleRequest(root, "module.agent", "Agent Module", "ReloadableModule"),
+            context);
+        var command = new BuildModulesCommand();
+        var firstBuild = await command.ExecuteAsync(new BuildModulesRequest(root), context);
+        Assert.True(firstBuild.Ok, firstBuild.Summary);
+
+        var assemblies = RekallAgeProjectModuleAssemblyLoader.LoadBuiltModuleAssemblies(root);
+        Assert.Single(assemblies);
+        Assert.Contains(assemblies[0].GetTypes(), type => typeof(IRekallAgePlayableModule).IsAssignableFrom(type));
+        await File.AppendAllTextAsync(
+            Path.Combine(root, "Modules", "ReloadableModule", "ReloadableModuleModule.cs"),
+            Environment.NewLine + "// agent-authored rebuild" + Environment.NewLine);
+
+        var secondBuild = await command.ExecuteAsync(new BuildModulesRequest(root), context);
+
+        Assert.True(
+            secondBuild.Ok,
+            string.Join(Environment.NewLine, secondBuild.Value.Modules.Select(module => module.Output)));
+    }
 }

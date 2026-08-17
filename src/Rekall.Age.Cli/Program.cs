@@ -1,5 +1,6 @@
 using Rekall.Age.Agent;
 using Rekall.Age.Agent.Commands;
+using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.AssetPipeline.Commands;
 using Rekall.Age.Assets.Commands;
 using Rekall.Age.Build.Commands;
@@ -38,7 +39,7 @@ internal static class RekallAgeCli
         Log.Information("Rekall AGE command starting. Args={Args}", string.Join(' ', args));
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|transaction|capture|render|module|build|validation|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <agent|game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|transaction|capture|render|module|build|validation|mcp> ...");
             Log.Information("Rekall AGE command finished with usage error. LogDirectory={LogDirectory}", logDirectory);
             Log.CloseAndFlush();
             return 2;
@@ -51,6 +52,11 @@ internal static class RekallAgeCli
             var context = new RekallAgeCommandContext(IsMcpStdio(args) ? "mcp" : "cli", transaction, cancellationToken);
             var exitCode = args switch
             {
+                ["agent", "models", "ollama"] => await ListOllamaModelsAsync(cancellationToken),
+                ["agent", "run", "ollama", var model, var task] =>
+                    await RunOllamaAgentAsync(registry, model, task, "24", cancellationToken),
+                ["agent", "run", "ollama", var model, var task, var maxTurns] =>
+                    await RunOllamaAgentAsync(registry, model, task, maxTurns, cancellationToken),
                 ["distribution", "assemble", var output, var cli, var studio, var headless, var windows, var sdk, var readme, var notice, var thirdParty] =>
                     await AssembleDistributionAsync(
                         registry, context, output, cli, studio, headless, windows, sdk, readme, notice, thirdParty),
@@ -2721,6 +2727,66 @@ internal static class RekallAgeCli
         }
 
         return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> ListOllamaModelsAsync(CancellationToken cancellationToken)
+    {
+        using var httpClient = CreateOllamaHttpClient();
+        var client = new RekallAgeOllamaLanguageModelClient(httpClient, ResolveOllamaBaseUri());
+        var models = await client.ListModelsAsync(cancellationToken);
+        Console.WriteLine($"Ollama models: {models.Count}");
+        foreach (var model in models)
+        {
+            Console.WriteLine($"{model.Id}\t{model.SizeBytes}");
+        }
+
+        return 0;
+    }
+
+    private static async Task<int> RunOllamaAgentAsync(
+        RekallAgeCommandRegistry registry,
+        string model,
+        string taskOrPath,
+        string maxTurnsText,
+        CancellationToken cancellationToken)
+    {
+        var task = File.Exists(taskOrPath)
+            ? await File.ReadAllTextAsync(taskOrPath, cancellationToken)
+            : taskOrPath;
+        if (!int.TryParse(maxTurnsText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var maxTurns))
+        {
+            Console.Error.WriteLine($"Invalid maximum turn count '{maxTurnsText}'.");
+            return 2;
+        }
+
+        using var httpClient = CreateOllamaHttpClient();
+        var modelClient = new RekallAgeOllamaLanguageModelClient(httpClient, ResolveOllamaBaseUri());
+        var tools = new RekallAgeMcpAgentToolExecutor(registry, "rekall-ollama-agent", progressiveDiscovery: true);
+        var agent = new RekallAgeLanguageModelAgent(modelClient, tools);
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest(
+                model,
+                "You are the Rekall AGE embedded engine agent. Author arbitrary games through the provided generic, inspectable engine tools and agent-owned C# modules. Start with engine status and schemas; inspect results, repair failures, and prove deliverables through verification, packaging, audit, and captures. Do not invent tool results or ask the engine to author game content for you.",
+                task)
+            {
+                MaxTurns = maxTurns
+            },
+            cancellationToken);
+        Console.WriteLine(result.FinalContent);
+        Console.WriteLine(
+            $"Agent completed={result.Completed} stop={result.StopReason} turns={result.Turns} tools={result.ToolCallCount} promptTokens={result.Usage.PromptTokens} completionTokens={result.Usage.CompletionTokens}");
+        return result.Completed ? 0 : 1;
+    }
+
+    private static HttpClient CreateOllamaHttpClient() => new()
+    {
+        Timeout = TimeSpan.FromMinutes(30)
+    };
+
+    private static Uri ResolveOllamaBaseUri()
+    {
+        var configured = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL");
+        return new Uri(string.IsNullOrWhiteSpace(configured) ? "http://127.0.0.1:11434" : configured, UriKind.Absolute);
     }
 
     private static async Task<int> AssembleDistributionAsync(

@@ -221,7 +221,7 @@ public sealed class RekallAgeMcpJsonRpcServer
             .ToArray();
     }
 
-    private static JsonObject CreateInputSchema(Type requestType)
+    internal static JsonObject CreateInputSchema(Type requestType)
     {
         var properties = new JsonObject();
         var required = new JsonArray();

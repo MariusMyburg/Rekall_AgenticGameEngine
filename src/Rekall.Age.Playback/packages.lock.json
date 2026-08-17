@@ -2,6 +2,25 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "BepuPhysics": {
+        "type": "Transitive",
+        "resolved": "2.4.0",
+        "contentHash": "Ck/BJgSQrBqYrj0T9jGljDdHNILBP5kTPTylc7N/hCzR1XJJc7p6ORzwtjTfjgoYkkdajvLHxEQv6BRC8kaysQ==",
+        "dependencies": {
+          "BepuUtilities": "2.4.0"
+        }
+      },
+      "BepuUtilities": {
+        "type": "Transitive",
+        "resolved": "2.4.0",
+        "contentHash": "KNMxkzKLHAvV7jRtErxs3rPv71fHToqo/WN96HlT6iomWuwL97tohEbt0B1WA8A6sO5t6PP+qF08d4T9A8k2uA=="
+      },
+      "rekall.age.assets": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )"
+        }
+      },
       "rekall.age.core": {
         "type": "Project"
       },
@@ -12,9 +31,35 @@
           "Rekall.Age.Runtime.Abstractions": "[0.1.0-preview.1, )"
         }
       },
+      "rekall.age.project": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "BepuPhysics": "[2.4.0, )",
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
+          "Rekall.Age.Runtime.Abstractions": "[0.1.0-preview.1, )",
+          "Rekall.Age.Validation": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
       "rekall.age.runtime.abstractions": {
         "type": "Project",
         "dependencies": {
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.validation": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Project": "[0.1.0-preview.1, )",
           "Rekall.Age.World": "[0.1.0-preview.1, )"
         }
       },

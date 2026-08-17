@@ -1,9 +1,11 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.IO.Compression;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Modules;
 using Rekall.Age.Workflows.Commands;
+using Rekall.Age.World;
 
 namespace Rekall.Age.Tests.Workflows;
 
@@ -51,6 +53,43 @@ public sealed class PlayablePackageIntegrityTests
                 ]
               }
               """);
+        var sceneStore = new RekallAgeSceneStore();
+        var scene = await sceneStore.LoadAsync(root, "Main", CancellationToken.None);
+        scene = scene
+            .AddEntity(RekallAgeEntityDocument.Create("HUD", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.UiCanvas",
+                    new JsonObject { ["referenceWidth"] = 320, ["referenceHeight"] = 180 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Status", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Button",
+                    new JsonObject { ["x"] = 10, ["y"] = 10, ["width"] = 100, ["height"] = 30, ["text"] = "Ready" })))
+            .AddEntity(RekallAgeEntityDocument.Create("Animated", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["x"] = 0 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.AnimationClip",
+                    new JsonObject
+                    {
+                        ["version"] = 1,
+                        ["durationSeconds"] = 1,
+                        ["tracks"] = new JsonArray
+                        {
+                            new JsonObject
+                            {
+                                ["component"] = "Rekall.Transform3D",
+                                ["property"] = "x",
+                                ["keys"] = new JsonArray
+                                {
+                                    new JsonObject { ["time"] = 0, ["value"] = 0 },
+                                    new JsonObject { ["time"] = 1, ["value"] = 10 }
+                                }
+                            }
+                        }
+                    }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.AnimationPlayer",
+                    new JsonObject { ["playing"] = true, ["loopMode"] = "clamp" })));
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
 
         var result = await new PackagePlayableGameCommand().ExecuteAsync(
             new PackagePlayableGameRequest(root, "Main", output),
@@ -95,6 +134,16 @@ public sealed class PlayablePackageIntegrityTests
         var packagedAsset = Assert.Single(catalog.RootElement.GetProperty("assets").EnumerateArray());
         Assert.Equal(string.Empty, packagedAsset.GetProperty("sourcePath").GetString());
         Assert.Equal("Assets/audio/asset-tone.wav", packagedAsset.GetProperty("importedPath").GetString());
+
+        var packagedRun = await new RunPlayablePackageCommand().ExecuteAsync(
+            new RunPlayablePackageRequest(output, Frames: 30),
+            context);
+        Assert.True(packagedRun.Ok, packagedRun.Summary);
+        var runtimeState = Assert.IsType<Rekall.Age.Playback.RekallAgePlaybackRuntimeState>(
+            packagedRun.Value.RenderFrames[^1].RuntimeState);
+        Assert.Equal(1, runtimeState.UiElementCount);
+        Assert.Equal(1, runtimeState.AnimationPlayerCount);
+        Assert.Equal(5, runtimeState.Entities.Single(entity => entity.Name == "Animated").X, precision: 3);
 
         await File.AppendAllTextAsync(Path.Combine(output, "Game", "rekall.project.json"), " ");
         await File.WriteAllTextAsync(Path.Combine(output, "unexpected.txt"), "not declared");

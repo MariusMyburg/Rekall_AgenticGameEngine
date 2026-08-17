@@ -14,7 +14,7 @@ var inputs = await TryReadInputsAsync(args, CancellationToken.None);
 var renderJsonPath = TryReadRenderJsonPath(args);
 var useGraphics = args.Any(arg => arg.Equals("--graphics", StringComparison.Ordinal));
 var scene = await new RekallAgeSceneStore().LoadAsync(projectRoot, sceneName, CancellationToken.None);
-var game = RekallAgePlayableGameFactory.Create(projectRoot, scene);
+var game = RekallAgePlayableGameFactory.CreateWithRuntime(projectRoot, scene);
 
 if (frames is not null)
 {

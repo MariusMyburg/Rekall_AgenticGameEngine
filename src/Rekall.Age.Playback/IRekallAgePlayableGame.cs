@@ -4,7 +4,34 @@ public sealed record RekallAgePlaybackRenderFrame(
     int FrameIndex,
     string Kind,
     string Text,
-    IReadOnlyList<RekallAgePlaybackDrawCommand> DrawCommands);
+    IReadOnlyList<RekallAgePlaybackDrawCommand> DrawCommands)
+{
+    public RekallAgePlaybackRuntimeState? RuntimeState { get; init; }
+}
+
+public sealed record RekallAgePlaybackRuntimeState(
+    int FrameIndex,
+    int EntityCount,
+    int AudioVoiceCount,
+    int UiElementCount,
+    int AnimationPlayerCount,
+    IReadOnlyList<RekallAgePlaybackRuntimeEntityState> Entities,
+    IReadOnlyList<RekallAgePlaybackRuntimeObservation> Observations);
+
+public sealed record RekallAgePlaybackRuntimeEntityState(
+    string Id,
+    string Name,
+    double X,
+    double Y,
+    double Z,
+    IReadOnlyList<string> ComponentTypes);
+
+public sealed record RekallAgePlaybackRuntimeObservation(
+    string Code,
+    string Severity,
+    string Subsystem,
+    string TargetId,
+    string Message);
 
 public sealed record RekallAgePlaybackDrawCommand(
     string Kind,

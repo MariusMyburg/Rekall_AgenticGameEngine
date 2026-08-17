@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 01:20 Africa/Johannesburg
+Last verified: 2026-08-18 01:26 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: agent contract discovery repair passed 580/580 Debug tests
+Latest milestone: agent contract discovery repair passed the complete product gate
 
 ## Product objective
 
@@ -276,6 +276,13 @@ Studio is important, but it does not define or reorder the engine foundation.
   strict registered schemas, and the engine-owned gauntlet no longer authors an
   ignored sprite color property. Focused regressions and the full Debug suite
   pass at 580/580.
+- Agent contract discovery distribution gate: the clean Release build completed
+  with zero warnings and zero errors; both independent Release passes completed
+  at 580/580; and fresh installed acceptance passed project-local SDK/module
+  authoring, the generic gauntlet, original and relocated package audit/run/
+  nonblank capture, runtime UI, software viewport analysis, simulated audio,
+  and Windows player audio. The canonical 1,149-file archive is 194,700,296
+  bytes.
 
 ## Current gaps
 
@@ -291,7 +298,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for the agent contract discovery repair.
+Rerun the unchanged installed Ollama benchmark on the agent-contract distribution.
 
 ## Next after the current item
 

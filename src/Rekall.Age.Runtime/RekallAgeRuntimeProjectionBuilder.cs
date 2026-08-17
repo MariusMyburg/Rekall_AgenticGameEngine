@@ -405,6 +405,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                     case "Rekall.Button":
                     case "Rekall.Label":
                     case "Rekall.Panel":
+                    case "Rekall.Image":
                         var uiLayout = ReadUiLayout(entity);
                         elements.Add(new RekallAgeRuntimeUiElement(
                             entity.Id,
@@ -731,6 +732,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             "Rekall.PointLight" or
             "Rekall.DirectionalLight" or
             "Rekall.UiCanvas" or
+            "Rekall.Image" or
             "Rekall.UiElement";
     }
 

@@ -7,7 +7,7 @@ namespace Rekall.Age.Runtime;
 public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
 {
     private const string StateType = "Rekall.UiLayoutState";
-    private static readonly string[] ElementTypes = ["Rekall.UiElement", "Rekall.Button", "Rekall.Label", "Rekall.Panel"];
+    private static readonly string[] ElementTypes = ["Rekall.UiElement", "Rekall.Button", "Rekall.Label", "Rekall.Panel", "Rekall.Image"];
 
     public string Id => "runtime.ui";
 

@@ -8,6 +8,49 @@ namespace Rekall.Age.Tests.Runtime;
 public sealed class RuntimeUiTests
 {
     [Fact]
+    public async Task UiImageUsesResolvedAssetPixelsInSoftwareAndOverlayRendering()
+    {
+        var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["referenceWidth"] = 2, ["referenceHeight"] = 2 }));
+        var image = RekallAgeEntityDocument.Create("Portrait", ["ui"])
+            with { ParentId = canvas.Id };
+        image = image.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Image",
+            new JsonObject
+            {
+                ["x"] = 0,
+                ["y"] = 0,
+                ["width"] = 2,
+                ["height"] = 2,
+                ["assetId"] = "portrait"
+            }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "ui"])
+            .AddEntity(canvas)
+            .AddEntity(image);
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(new RekallAgeRuntimeWorldBuilder().Build(scene), 1, CancellationToken.None);
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(result.World, 2, 2, debugOverlay: false);
+        var assets = new RekallAgeRuntimeViewportAssetSet(
+            new Dictionary<string, RekallAgeRgbaImage>(StringComparer.Ordinal)
+            {
+                ["portrait"] = new RekallAgeRgbaImage(1, 1, [0x11, 0x88, 0xee, 0xff])
+            },
+            new Dictionary<string, IReadOnlyList<RekallAgeVulkanSceneMesh>>(StringComparer.Ordinal),
+            []);
+
+        var renderer = new RekallAgeRuntimeSoftwareRenderer();
+        var rendered = renderer.RenderRgba(frame, assets);
+        var overlay = renderer.RenderUiOverlayRgba(frame, assets);
+
+        Assert.Equal([0x11, 0x88, 0xee, 0xff], rendered.Rgba[..4]);
+        Assert.Equal([0x11, 0x88, 0xee, 0xff], overlay[..4]);
+        Assert.Equal(1, rendered.AssetBackedRenderableCount);
+        Assert.Equal(0, rendered.FallbackRenderableCount);
+    }
+
+    [Fact]
     public async Task UiSystemLaysOutAndSoftwareRendererDrawsAuthoredButton()
     {
         var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])

@@ -4,6 +4,23 @@ namespace Rekall.Age.Rendering;
 
 public sealed class RekallAgeRuntimeSoftwareRenderer
 {
+    public byte[] RenderUiOverlayRgba(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet? assets = null)
+    {
+        var pixels = new byte[frame.Width * frame.Height * 4];
+        foreach (var renderable in frame.Renderables.Where(renderable => renderable.UiVisual is not null))
+        {
+            var image = renderable.UiVisual!.AssetId is { } assetId &&
+                assets?.Images.TryGetValue(assetId, out var resolved) == true
+                    ? resolved
+                    : null;
+            DrawUiVisual(frame, renderable.UiVisual, image, pixels);
+        }
+
+        return pixels;
+    }
+
     public RekallAgeRuntimeViewportRgbaFrame RenderRgba(
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeRuntimeViewportAssetSet assets)
@@ -124,6 +141,20 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         var fallbackCount = 0;
         foreach (var renderable in frame.Renderables)
         {
+            if (renderable.UiVisual is not null)
+            {
+                var image = renderable.UiVisual.AssetId is { } assetId && assets.Images.TryGetValue(assetId, out var resolved)
+                    ? resolved
+                    : null;
+                DrawUiVisual(frame, renderable.UiVisual, image, pixels);
+                if (image is not null)
+                {
+                    assetBackedCount++;
+                }
+
+                continue;
+            }
+
             if (TryDrawAssetRenderable(frame, renderable, assets, pixels))
             {
                 assetBackedCount++;
@@ -222,12 +253,6 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         RekallAgeRuntimeViewportRenderable renderable,
         byte[] pixels)
     {
-        if (renderable.UiVisual is not null)
-        {
-            DrawUiVisual(frame, renderable.UiVisual, pixels);
-            return true;
-        }
-
         if (renderable.Kind.Equals("mesh", StringComparison.Ordinal)
             && renderable.LineSegments is { Segments.Count: > 0 })
         {
@@ -260,6 +285,7 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
     private static void DrawUiVisual(
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeRuntimeViewportUiVisual visual,
+        RekallAgeRgbaImage? image,
         byte[] pixels)
     {
         var left = Math.Max(0, Math.Max(visual.X, visual.ClipX));
@@ -285,7 +311,40 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
             }
         }
 
+        if (image is not null)
+        {
+            DrawUiImage(frame, visual, image, pixels, left, top, right, bottom);
+        }
+
         DrawUiText(frame, visual, pixels, left, top, right, bottom);
+    }
+
+    private static void DrawUiImage(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportUiVisual visual,
+        RekallAgeRgbaImage image,
+        byte[] pixels,
+        int left,
+        int top,
+        int right,
+        int bottom)
+    {
+        for (var y = top; y < bottom; y++)
+        {
+            var sourceY = Math.Clamp((y - visual.Y) * image.Height / Math.Max(1, visual.Height), 0, image.Height - 1);
+            for (var x = left; x < right; x++)
+            {
+                var sourceX = Math.Clamp((x - visual.X) * image.Width / Math.Max(1, visual.Width), 0, image.Width - 1);
+                var source = (sourceY * image.Width + sourceX) * 4;
+                AlphaBlend(
+                    pixels,
+                    ToIndex(frame, x, y),
+                    image.Rgba[source],
+                    image.Rgba[source + 1],
+                    image.Rgba[source + 2],
+                    image.Rgba[source + 3]);
+            }
+        }
     }
 
     private static void DrawUiText(

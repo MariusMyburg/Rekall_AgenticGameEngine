@@ -57,6 +57,7 @@ internal static class Program
         var sceneSupersampleFactor = ReadPositiveIntOption(args, "--ssaa") ?? RekallAgeVeldridPlayer.DefaultSceneSupersampleFactor;
         var openXrEyeWidth = ReadPositiveIntOption(args, "--vr-eye-width") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeWidth;
         var openXrEyeHeight = ReadPositiveIntOption(args, "--vr-eye-height") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeHeight;
+        var frameLimit = ReadPositiveIntOption(args, "--frames") ?? 0;
         await using var player = await RekallAgeVeldridPlayer.CreateAsync(
             Path.GetFullPath(args[0]),
             args[1],
@@ -70,7 +71,7 @@ internal static class Program
             openXrEyeHeight,
             CancellationToken.None);
         PlayerLog.Write("Player entering render loop.");
-        player.Run();
+        player.Run(frameLimit);
         PlayerLog.Write("Player process exiting normally.");
         return 0;
     }
@@ -161,6 +162,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly TextureBinding _defaultMetallicRoughnessTexture;
     private readonly TextureBinding _hudTexture;
     private readonly ResourceSet _hudTextureSet;
+    private TextureBinding _uiTexture;
+    private readonly RekallAgeRuntimeSoftwareRenderer _softwareRenderer = new();
     private readonly RekallAgeOpenXrSessionBootstrapResult? _openXrStatus;
     private readonly RekallAgeOpenXrVulkanInteropInspection? _openXrVulkanInterop;
     private readonly RekallAgeOpenXrCompositorSessionBootstrapResult? _openXrCompositorSession;
@@ -312,6 +315,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _defaultMetallicRoughnessTexture = defaultMetallicRoughnessTexture;
         _hudTexture = hudTexture;
         _hudTextureSet = _factory.CreateResourceSet(new ResourceSetDescription(_hudTextureLayout, _hudTexture.Texture, _hudTexture.Sampler));
+        _uiTexture = CreateUiTextureBinding(InitialWidth, InitialHeight);
         _openXrStatus = openXrStatus;
         _openXrVulkanInterop = openXrVulkanInterop;
         _openXrCompositorSession = openXrCompositorSession;
@@ -504,7 +508,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             device.SwapchainFramebuffer.OutputDescription);
         var hudShaderSet = new ShaderSetDescription([hudVertexLayout], hudShaders);
         var hudPipelineDescription = new GraphicsPipelineDescription(
-            BlendStateDescription.SingleOverrideBlend,
+            BlendStateDescription.SingleAlphaBlend,
             DepthStencilStateDescription.Disabled,
             RasterizerStateDescription.CullNone,
             PrimitiveTopology.TriangleList,
@@ -771,9 +775,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         PlayerLog.Write($"Asset hot reload watching {assetsRoot}.");
     }
 
-    public void Run()
+    public void Run(int frameLimit = 0)
     {
-        while (_window.Exists)
+        var renderedFrames = 0;
+        while (_window.Exists && (frameLimit <= 0 || renderedFrames < frameLimit))
         {
             CaptureInput(_window.PumpEvents());
             if (!_window.Exists)
@@ -782,6 +787,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             }
 
             RenderFrame();
+            renderedFrames++;
         }
 
         _device.WaitForIdle();
@@ -956,6 +962,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         }
 
         _hudTextureSet.Dispose();
+        _uiTexture.Dispose();
         _frameSet.Dispose();
         _drawSet.Dispose();
         _postProcessSet.Dispose();
@@ -1484,6 +1491,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         }
 
         UpdateTitle(frameNumber, _clock.Elapsed.TotalSeconds, packet.Vertices.Length);
+        var uiVertices = BuildFullScreenOverlayVertices(frame.Renderables.Any(renderable => renderable.UiVisual is not null));
         var hudVertices = BuildHudVertices(frame.Width, frame.Height);
         if (_hudDirty)
         {
@@ -1491,10 +1499,16 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _hudDirty = false;
         }
 
-        if (hudVertices.Length > 0)
+        if (uiVertices.Length > 0)
         {
-            EnsureHudVertexBufferCapacity(hudVertices);
-            _device.UpdateBuffer(_hudVertexBuffer, 0, hudVertices);
+            UpdateUiTexture(frame);
+        }
+
+        var overlayVertices = uiVertices.Concat(hudVertices).ToArray();
+        if (overlayVertices.Length > 0)
+        {
+            EnsureHudVertexBufferCapacity(overlayVertices);
+            _device.UpdateBuffer(_hudVertexBuffer, 0, overlayVertices);
         }
 
         _device.UpdateBuffer(_postProcessUniformBuffer, 0, BuildPostProcessUniform(frame.PostProcessStack));
@@ -1540,12 +1554,22 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _commands.SetGraphicsResourceSet(1, _postProcessSet);
         _commands.Draw(3);
 
-        if (hudVertices.Length > 0)
+        if (overlayVertices.Length > 0)
         {
             _commands.SetPipeline(_hudPipeline);
             _commands.SetVertexBuffer(0, _hudVertexBuffer);
+        }
+
+        if (uiVertices.Length > 0)
+        {
+            _commands.SetGraphicsResourceSet(0, _uiTexture.ResourceSet);
+            _commands.Draw((uint)uiVertices.Length);
+        }
+
+        if (hudVertices.Length > 0)
+        {
             _commands.SetGraphicsResourceSet(0, _hudTextureSet);
-            _commands.Draw((uint)hudVertices.Length);
+            _commands.Draw((uint)hudVertices.Length, 1, (uint)uiVertices.Length, 0);
         }
 
         _commands.End();
@@ -1581,6 +1605,19 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             0,
             0);
         UpdateTitle(frameNumber, _clock.Elapsed.TotalSeconds, raster.NonBackgroundPixels);
+        var uiFrame = _frameBuilder.Build(
+            _runtimeWorld,
+            Math.Max(1, _window.Width),
+            Math.Max(1, _window.Height),
+            debugOverlay: false);
+        var uiVertices = BuildFullScreenOverlayVertices(
+            uiFrame.Renderables.Any(renderable => renderable.UiVisual is not null));
+        if (uiVertices.Length > 0)
+        {
+            UpdateUiTexture(uiFrame);
+            EnsureHudVertexBufferCapacity(uiVertices);
+            _device.UpdateBuffer(_hudVertexBuffer, 0, uiVertices);
+        }
 
         _commands.Begin();
         _commands.SetFramebuffer(_device.SwapchainFramebuffer);
@@ -1592,6 +1629,13 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _commands.SetGraphicsResourceSet(0, _sceneTarget.ResourceSet);
         _commands.SetGraphicsResourceSet(1, _postProcessSet);
         _commands.Draw(3);
+        if (uiVertices.Length > 0)
+        {
+            _commands.SetPipeline(_hudPipeline);
+            _commands.SetVertexBuffer(0, _hudVertexBuffer);
+            _commands.SetGraphicsResourceSet(0, _uiTexture.ResourceSet);
+            _commands.Draw((uint)uiVertices.Length);
+        }
         _commands.End();
         _device.SubmitCommands(_commands);
         _device.SwapBuffers();
@@ -2249,6 +2293,53 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             0);
     }
 
+    private void UpdateUiTexture(RekallAgeRuntimeViewportFrame frame)
+    {
+        if (_uiTexture.Texture.Width != (uint)frame.Width || _uiTexture.Texture.Height != (uint)frame.Height)
+        {
+            _device.WaitForIdle();
+            _uiTexture.Dispose();
+            _uiTexture = CreateUiTextureBinding(frame.Width, frame.Height);
+        }
+
+        var rgba = _softwareRenderer.RenderUiOverlayRgba(frame, _assets);
+        _device.UpdateTexture(
+            _uiTexture.Texture,
+            rgba,
+            0,
+            0,
+            0,
+            checked((uint)frame.Width),
+            checked((uint)frame.Height),
+            1,
+            0,
+            0);
+    }
+
+    private TextureBinding CreateUiTextureBinding(int width, int height)
+    {
+        var texture = _factory.CreateTexture(TextureDescription.Texture2D(
+            checked((uint)Math.Max(1, width)),
+            checked((uint)Math.Max(1, height)),
+            mipLevels: 1,
+            arrayLayers: 1,
+            PixelFormat.R8_G8_B8_A8_UNorm,
+            TextureUsage.Sampled));
+        var sampler = _factory.CreateSampler(new SamplerDescription(
+            SamplerAddressMode.Clamp,
+            SamplerAddressMode.Clamp,
+            SamplerAddressMode.Clamp,
+            SamplerFilter.MinLinear_MagLinear_MipPoint,
+            ComparisonKind.Never,
+            maximumAnisotropy: 1,
+            minimumLod: 0,
+            maximumLod: 0,
+            lodBias: 0,
+            borderColor: SamplerBorderColor.TransparentBlack));
+        var resourceSet = _factory.CreateResourceSet(new ResourceSetDescription(_hudTextureLayout, texture, sampler));
+        return new TextureBinding(texture, sampler, resourceSet);
+    }
+
     private static byte[] ReadBitmapRgba(DrawingBitmap bitmap)
     {
         var data = bitmap.LockBits(
@@ -2305,6 +2396,25 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             new HudVertex(new Vector3(left, top, 0), color, new Vector2(0, 0)),
             new HudVertex(new Vector3(right, bottom, 0), color, new Vector2(1, 1)),
             new HudVertex(new Vector3(left, bottom, 0), color, new Vector2(0, 1))
+        ];
+    }
+
+    private static HudVertex[] BuildFullScreenOverlayVertices(bool visible)
+    {
+        if (!visible)
+        {
+            return [];
+        }
+
+        var color = Vector4.One;
+        return
+        [
+            new HudVertex(new Vector3(-1, 1, 0), color, new Vector2(0, 0)),
+            new HudVertex(new Vector3(1, 1, 0), color, new Vector2(1, 0)),
+            new HudVertex(new Vector3(1, -1, 0), color, new Vector2(1, 1)),
+            new HudVertex(new Vector3(-1, 1, 0), color, new Vector2(0, 0)),
+            new HudVertex(new Vector3(1, -1, 0), color, new Vector2(1, 1)),
+            new HudVertex(new Vector3(-1, -1, 0), color, new Vector2(0, 1))
         ];
     }
 

@@ -95,7 +95,7 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Builds a deterministic runtime snapshot for a scene and reports subsystem readiness.",
+        "Inspects deterministic built-in scene simulation after a requested frame count without requiring a compiled playable module; reports physics, animation, UI, audio, events, and entity states.",
         typeof(InspectSceneRuntimeRequest).FullName!,
         typeof(InspectSceneRuntimeResult).FullName!);
 

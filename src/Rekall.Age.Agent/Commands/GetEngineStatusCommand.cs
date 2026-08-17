@@ -82,6 +82,10 @@ public sealed class GetEngineStatusCommand
                     "Validate a scene and return blocking issues, warnings, and agent-readable next actions.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
+                    "rekall.runtime.inspect_scene",
+                    "Inspect deterministic built-in scene simulation after a requested frame count without requiring a compiled playable module; use this for physics, animation, UI, audio, event, and entity-state proof.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
                     "rekall.solar.import_ksa_system",
                     "Import KSA astronomical XML into generic celestial body, Kepler orbit, and renderable planet entities.",
                     Recommended: true),

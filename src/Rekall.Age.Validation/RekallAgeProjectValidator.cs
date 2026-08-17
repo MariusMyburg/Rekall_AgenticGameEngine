@@ -106,6 +106,7 @@ public sealed class RekallAgeProjectValidator
         {
             ValidatePhysicsBodyTransform(projectRoot, scene.Name, entity, "Rekall.Rigidbody3D", "Rekall.Transform3D", issues);
             ValidatePhysicsBodyTransform(projectRoot, scene.Name, entity, "Rekall.Rigidbody2D", "Rekall.Transform2D", issues);
+            ValidatePhysicsColliderDimensions(projectRoot, scene.Name, entity, issues);
 
             foreach (var component in entity.Components.Where(component =>
                          component.Type.StartsWith("Rekall.", StringComparison.Ordinal)
@@ -226,6 +227,63 @@ public sealed class RekallAgeProjectValidator
                         ["properties"] = new JsonObject()
                     })
             ]));
+    }
+
+    private static void ValidatePhysicsColliderDimensions(
+        string projectRoot,
+        string sceneName,
+        RekallAgeEntityDocument entity,
+        List<RekallAgeValidationIssue> issues)
+    {
+        var types = entity.Components.Select(component => component.Type).ToHashSet(StringComparer.Ordinal);
+        var isOnly2D = (types.Contains("Rekall.Rigidbody2D") || types.Contains("Rekall.Transform2D"))
+            && !types.Contains("Rekall.Rigidbody3D")
+            && !types.Contains("Rekall.Transform3D");
+        var isOnly3D = (types.Contains("Rekall.Rigidbody3D") || types.Contains("Rekall.Transform3D"))
+            && !types.Contains("Rekall.Rigidbody2D")
+            && !types.Contains("Rekall.Transform2D");
+        var replacements = isOnly2D
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["Rekall.BoxCollider3D"] = "Rekall.BoxCollider2D",
+                ["Rekall.SphereCollider3D"] = "Rekall.CircleCollider2D"
+            }
+            : isOnly3D
+                ? new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["Rekall.BoxCollider2D"] = "Rekall.BoxCollider3D",
+                    ["Rekall.CircleCollider2D"] = "Rekall.SphereCollider3D"
+                }
+                : [];
+
+        foreach (var replacement in replacements.Where(item => types.Contains(item.Key)))
+        {
+            issues.Add(new RekallAgeValidationIssue(
+                "REKALL_PHYSICS_COLLIDER_DIMENSION_MISMATCH",
+                $"Entity '{entity.Name}' uses {replacement.Key} with a {(isOnly2D ? "2D" : "3D")} transform/body contract. Replace it with {replacement.Value} so runtime collision and motion use the authored dimension.",
+                "blocking",
+                entity.Id,
+                [
+                    new RekallAgeSuggestedCommand(
+                        "rekall.component.remove",
+                        new Dictionary<string, object?>
+                        {
+                            ["projectRoot"] = projectRoot,
+                            ["sceneName"] = sceneName,
+                            ["entityId"] = entity.Id,
+                            ["componentType"] = replacement.Key
+                        }),
+                    new RekallAgeSuggestedCommand(
+                        "rekall.component.add",
+                        new Dictionary<string, object?>
+                        {
+                            ["projectRoot"] = projectRoot,
+                            ["sceneName"] = sceneName,
+                            ["entityId"] = entity.Id,
+                            ["componentType"] = replacement.Value
+                        })
+                ]));
+        }
     }
 
     private static Dictionary<string, object?> ComponentPropertyArguments(

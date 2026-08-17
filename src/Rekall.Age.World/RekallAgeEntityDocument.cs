@@ -65,6 +65,19 @@ public sealed record RekallAgeEntityDocument(
         };
     }
 
+    public RekallAgeEntityDocument RemoveComponent(string componentType)
+    {
+        var components = Components
+            .Where(component => !component.Type.Equals(componentType, StringComparison.Ordinal))
+            .ToArray();
+        if (components.Length == Components.Count)
+        {
+            throw new InvalidOperationException($"Component '{componentType}' was not found on entity '{Name}'.");
+        }
+
+        return this with { Components = components };
+    }
+
     private static IReadOnlyList<string> NormalizeTags(IEnumerable<string> tags)
     {
         return tags

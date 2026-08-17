@@ -276,6 +276,35 @@ required an otherwise empty `properties` object. These findings drive complete
 blueprint preflight with structured errors and an optional empty component
 property bag before the unchanged benchmark runs again.
 
+### Dimension-safety rerun
+
+Rerun 10 used the atomic-blueprint distribution with the same 36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun10`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 405,610
+- Completion tokens: 9,633
+
+The agent correctly returned `Completed=false`. It reached a validation-clean
+two-scene project and compiled a playable module, but did not create or prove a
+package. It spent repeated calls on component-schema discovery, then selected
+`rekall.play.scene` for frame-based inspection. That operation correctly
+requires a compiled playable module, while the generic
+`rekall.runtime.inspect_scene` command supplies the requested deterministic
+subsystem state without one.
+
+Independent installed-CLI validation reported zero issues, but runtime evidence
+showed a deeper contract gap. The 3D body fell to Y -2.132 after 30 frames. The
+nominal 2D body used `Rekall.BoxCollider3D` on a `Rekall.Transform2D`/
+`Rekall.Rigidbody2D` entity and remained at approximately Y zero; its static
+floor had the same dimensional mismatch. Static validation therefore accepted
+content whose runtime physics did not match the authored dimension.
+
+This run drives blocking dimension-mismatch diagnostics with executable generic
+component removal/addition repairs, plus prominent module-free runtime-inspection
+guidance in engine status and the embedded-agent contract.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

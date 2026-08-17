@@ -164,6 +164,11 @@ public sealed class AgentContextCommandTests
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.geometry.create_primitive");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.scene.apply_blueprint" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.validation.scene" && workflow.Recommended);
+        Assert.Contains(result.Value.WorkflowTools, workflow =>
+            workflow.Tool == "rekall.runtime.inspect_scene"
+            && workflow.Recommended
+            && workflow.Purpose.Contains("without", StringComparison.OrdinalIgnoreCase)
+            && workflow.Purpose.Contains("playable module", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.entity.delete");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.module.scaffold_runtime_system" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.module.list_sources");

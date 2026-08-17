@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 00:24 Africa/Johannesburg
+Last verified: 2026-08-18 00:35 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: atomic blueprint/component repair passed the complete product gate
+Latest milestone: dimension-safe physics authoring and module-free inspection pass 576 tests
 
 ## Product objective
 
@@ -205,6 +205,19 @@ Studio is important, but it does not define or reorder the engine foundation.
   the generic gauntlet, original and relocated package proof, runtime UI,
   software viewport analysis, simulated audio, and Windows player audio. The
   canonical 1,149-file archive is 194,675,770 bytes.
+- Broad benchmark rerun 10: the agent correctly stopped at its 36-turn bound
+  (36 tools, 405,610 prompt tokens, 9,633 completion tokens) before package
+  creation. It produced two validation-clean scenes, but used playable-module
+  execution instead of module-free runtime inspection and authored 3D colliders
+  into its 2D scene. Independent inspection proved the 3D body at Y -2.132 but
+  the nominal 2D body at Y approximately zero. This is not an accepted pass.
+- Physics/inspection repair: validation now blocks colliders that conflict with
+  an entity's 2D/3D transform or body contract and returns exact component
+  removal/addition repairs. The new generic `rekall.component.remove` command
+  preserves other components and transaction preimages. Engine status and the
+  embedded-agent contract now direct deterministic subsystem verification to
+  `rekall.runtime.inspect_scene`, which requires no playable module. The full
+  Debug suite passes at 576/576.
 
 ## Current gaps
 
@@ -220,7 +233,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the unchanged installed Ollama benchmark on the fresh distribution.
+Run the complete product gate for dimension-safe physics authoring and inspection guidance.
 
 ## Next after the current item
 

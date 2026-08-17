@@ -160,6 +160,43 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneRejectsDimensionMismatchedPhysicsCollidersWithExecutableRepairs()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var body2D = RekallAgeEntityDocument.Create("Body 2D", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Rigidbody2D", new JsonObject { ["Mass"] = 1 }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.BoxCollider3D", new JsonObject()));
+        var floor2D = RekallAgeEntityDocument.Create("Floor 2D", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.BoxCollider3D", new JsonObject()));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Physics2D", ["physics2d"])
+                .AddEntity(body2D)
+                .AddEntity(floor2D),
+            CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Physics2D", CancellationToken.None);
+
+        var issues = report.Issues
+            .Where(issue => issue.Code == "REKALL_PHYSICS_COLLIDER_DIMENSION_MISMATCH")
+            .ToArray();
+        Assert.Equal(2, issues.Length);
+        Assert.All(issues, issue => Assert.Equal("blocking", issue.Severity));
+        Assert.All(issues, issue => Assert.Contains(
+            issue.SuggestedCommands!,
+            command => command.Tool == "rekall.component.remove"
+                && Equals(command.Arguments["componentType"], "Rekall.BoxCollider3D")));
+        Assert.All(issues, issue => Assert.Contains(
+            issue.SuggestedCommands!,
+            command => command.Tool == "rekall.component.add"
+                && Equals(command.Arguments["componentType"], "Rekall.BoxCollider2D")));
+    }
+
+    [Fact]
     public async Task ValidateSceneReportsMultipleActiveCameras()
     {
         var root = TestPaths.CreateTempDirectory();

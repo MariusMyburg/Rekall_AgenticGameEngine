@@ -80,6 +80,37 @@ public sealed class WorldMutationCommandTests
     }
 
     [Fact]
+    public async Task RemoveComponentRemovesExactComponentAndCapturesPreimage()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        var entity = RekallAgeEntityDocument.Create("Body", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.BoxCollider3D", new JsonObject()));
+        await store.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"]).AddEntity(entity),
+            CancellationToken.None);
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("remove component"),
+            CancellationToken.None);
+
+        var result = await new RemoveComponentCommand().ExecuteAsync(
+            new RemoveComponentRequest(root, "Main", entity.Id, "Rekall.BoxCollider3D"),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        var saved = await store.LoadAsync(root, "Main", CancellationToken.None);
+        Assert.DoesNotContain(saved.GetRequiredEntity(entity.Id).Components, component =>
+            component.Type == "Rekall.BoxCollider3D");
+        Assert.Contains(saved.GetRequiredEntity(entity.Id).Components, component =>
+            component.Type == "Rekall.Transform2D");
+        Assert.Single(context.Transaction.ResourcePreimages);
+        Assert.Single(context.Transaction.ChangedResources);
+    }
+
+    [Fact]
     public async Task InspectEntityReturnsFullComponentProperties()
     {
         var root = TestPaths.CreateTempDirectory();

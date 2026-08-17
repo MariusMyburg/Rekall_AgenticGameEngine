@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Rekall.Age.Core.Commands;
 
 namespace Rekall.Age.Build.Commands;
@@ -12,7 +13,9 @@ public sealed record BuildModuleResult(
     string ProjectPath,
     string AssemblyPath,
     bool Succeeded,
-    string Output);
+    string Output,
+    int ExitCode,
+    string SdkVersion);
 
 public sealed class BuildModulesCommand
     : IRekallAgeCommand<BuildModulesRequest, BuildModulesResult>
@@ -93,6 +96,14 @@ public sealed class BuildModulesCommand
         startInfo.ArgumentList.Add("--nologo");
         startInfo.ArgumentList.Add("-v:minimal");
         startInfo.ArgumentList.Add("/nr:false");
+        var portableSdkProject = IsPortableSdkProject(projectPath);
+        if (portableSdkProject)
+        {
+            startInfo.ArgumentList.Add("-p:BaseIntermediateOutputPath=obj/rekall/");
+            startInfo.ArgumentList.Add("-p:OutputPath=bin/rekall/net10.0/");
+        }
+
+        startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
 
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start dotnet build.");
@@ -105,15 +116,59 @@ public sealed class BuildModulesCommand
         var assemblyPath = Path.Combine(
             Path.GetDirectoryName(projectPath)!,
             "bin",
-            "Debug",
+            portableSdkProject ? "rekall" : "Debug",
             "net10.0",
             $"{moduleName}.dll");
+        var sdkVersion = ReadSdkVersion(projectPath);
 
         return new BuildModuleResult(
             moduleName,
             projectPath,
             assemblyPath,
             process.ExitCode == 0 && File.Exists(assemblyPath),
-            output);
+            output,
+            process.ExitCode,
+            sdkVersion);
+    }
+
+    private static bool IsPortableSdkProject(string projectPath)
+    {
+        return File.ReadAllText(projectPath).Contains(
+            "Rekall.Age.Sdk.props",
+            StringComparison.Ordinal);
+    }
+
+    private static string ReadSdkVersion(string projectPath)
+    {
+        var moduleDirectory = new DirectoryInfo(Path.GetDirectoryName(projectPath)!);
+        var projectRoot = moduleDirectory.Parent?.Parent;
+        if (projectRoot is null)
+        {
+            return "unknown";
+        }
+
+        var sdkRoot = Path.Combine(projectRoot.FullName, ".rekall", "sdk");
+        if (!Directory.Exists(sdkRoot))
+        {
+            return "unknown";
+        }
+
+        foreach (var manifestPath in Directory.EnumerateFiles(sdkRoot, "rekall.sdk.json", SearchOption.AllDirectories))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+                if (document.RootElement.TryGetProperty("compatibilityVersion", out var version))
+                {
+                    return version.GetInt32().ToString(System.Globalization.CultureInfo.InvariantCulture);
+                }
+            }
+            catch (JsonException)
+            {
+                return "invalid";
+            }
+        }
+
+        return "unknown";
     }
 }

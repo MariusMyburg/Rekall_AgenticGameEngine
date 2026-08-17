@@ -8,6 +8,39 @@ namespace Rekall.Age.Tests.Build;
 public sealed class BuildModulesCommandTests
 {
     [Fact]
+    public async Task PortableModulesBuildConcurrentlyWithoutSharingEngineOutputs()
+    {
+        var roots = Enumerable.Range(0, 6).Select(_ => TestPaths.CreateTempDirectory()).ToArray();
+        var tasks = roots.Select(async (root, index) =>
+        {
+            var context = new RekallAgeCommandContext(
+                "agent",
+                RekallAgeTransaction.Begin("parallel module"),
+                CancellationToken.None);
+            await new ScaffoldPlayableModuleCommand().ExecuteAsync(
+                new ScaffoldPlayableModuleRequest(
+                    root,
+                    $"parallel.{index}",
+                    $"Parallel {index}",
+                    $"Parallel{index}"),
+                context);
+            return await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
+        });
+
+        var results = await Task.WhenAll(tasks);
+
+        Assert.All(results, result => Assert.True(
+            result.Ok,
+            string.Join(Environment.NewLine, result.Value.Modules.Select(module => module.Output))));
+        Assert.All(results.SelectMany(result => result.Value.Modules), module =>
+        {
+            Assert.Equal(0, module.ExitCode);
+            Assert.Equal("1", module.SdkVersion);
+            Assert.True(File.Exists(module.AssemblyPath));
+        });
+    }
+
+    [Fact]
     public async Task BuildModulesCompilesScaffoldedModuleProject()
     {
         var root = TestPaths.CreateTempDirectory();

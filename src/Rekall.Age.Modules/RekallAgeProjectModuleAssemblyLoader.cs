@@ -33,7 +33,10 @@ public static class RekallAgeProjectModuleAssemblyLoader
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;
         var moduleName = Path.GetFileNameWithoutExtension(projectPath);
-        return Path.Combine(projectDirectory, "bin", "Debug", "net10.0", $"{moduleName}.dll");
+        var portableSdkBuild = Path.Combine(projectDirectory, "bin", "rekall", "net10.0", $"{moduleName}.dll");
+        return File.Exists(portableSdkBuild)
+            ? portableSdkBuild
+            : Path.Combine(projectDirectory, "bin", "Debug", "net10.0", $"{moduleName}.dll");
     }
 
     private sealed class RekallAgeProjectModuleLoadContext : AssemblyLoadContext

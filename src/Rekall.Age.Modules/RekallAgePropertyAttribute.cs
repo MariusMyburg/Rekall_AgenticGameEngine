@@ -10,4 +10,8 @@ public sealed class RekallAgePropertyAttribute : Attribute
     public double Minimum { get; init; } = double.NaN;
 
     public double Maximum { get; init; } = double.NaN;
+
+    public string? Description { get; init; }
+
+    public string[] AllowedValues { get; init; } = [];
 }

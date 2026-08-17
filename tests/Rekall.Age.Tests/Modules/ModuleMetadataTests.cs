@@ -36,12 +36,34 @@ public sealed class ModuleMetadataTests
     }
 
     [Fact]
+    public async Task BuiltInSchemasExposeRuntimeTypeNamesAndExecutableSubsystemContracts()
+    {
+        var command = new ListComponentSchemasCommand(typeof(RekallAgeBuiltInModule).Assembly);
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("built-in schemas"), CancellationToken.None);
+
+        var result = await command.ExecuteAsync(new ListComponentSchemasRequest("rekall.builtins"), context);
+
+        Assert.True(result.Ok);
+        var animation = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.AnimationClip");
+        Assert.Contains(animation.Properties, property => property.Name == "Tracks" && property.Kind == "animationTracks");
+        var player = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.AnimationPlayer");
+        var loopMode = Assert.Single(player.Properties, property => property.Name == "LoopMode");
+        Assert.Equal(["clamp", "loop", "pingpong"], loopMode.AllowedValues);
+        Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.AudioEmitter");
+        Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.UiCanvas");
+        Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Button");
+        Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Transform2D");
+        Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Transform3D");
+    }
+
+    [Fact]
     public void BuiltInModuleProvidesCoreSchemas()
     {
         var index = RekallAgeModuleIndexer.IndexAssembly(typeof(RekallAgeBuiltInModule).Assembly);
         var module = Assert.Single(index.Modules, item => item.Id == "rekall.builtins");
 
-        Assert.Contains(module.Components, component => component.DisplayName == "Transform");
+        Assert.Contains(module.Components, component => component.DisplayName == "Transform 2D");
+        Assert.Contains(module.Components, component => component.DisplayName == "Transform 3D");
         Assert.DoesNotContain(module.Components, component => component.DisplayName == "Playable Loop");
         var inputActionMap = Assert.Single(module.Components, component => component.DisplayName == "Input Action Map");
         Assert.Contains(inputActionMap.Properties, property => property.Name == "Actions" && property.Kind == "inputActions");

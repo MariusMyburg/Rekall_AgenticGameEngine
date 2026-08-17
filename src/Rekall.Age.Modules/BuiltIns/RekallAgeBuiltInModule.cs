@@ -6,7 +6,8 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
 {
     public override void Configure(RekallAgeModuleBuilder builder)
     {
-        builder.RegisterComponent<RekallAgeTransformComponent>();
+        builder.RegisterComponent<RekallAgeTransform2DComponent>();
+        builder.RegisterComponent<RekallAgeTransform3DComponent>();
         builder.RegisterComponent<RekallAgeInputActionMapComponent>();
         builder.RegisterComponent<RekallAgeEventBindingsComponent>();
         builder.RegisterComponent<RekallAgePointerRayComponent>();
@@ -56,6 +57,17 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeHaloRendererComponent>();
         builder.RegisterComponent<RekallAgePostProcessStackComponent>();
         builder.RegisterComponent<RekallAgeTextLabelRendererComponent>();
+        builder.RegisterComponent<RekallAgeAudioListenerComponent>();
+        builder.RegisterComponent<RekallAgeAudioEmitterComponent>();
+        builder.RegisterComponent<RekallAgeAudioBusComponent>();
+        builder.RegisterComponent<RekallAgeAnimationClipComponent>();
+        builder.RegisterComponent<RekallAgeAnimationPlayerComponent>();
+        builder.RegisterComponent<RekallAgeUiCanvasComponent>();
+        builder.RegisterComponent<RekallAgeUiElementComponent>();
+        builder.RegisterComponent<RekallAgePanelComponent>();
+        builder.RegisterComponent<RekallAgeLabelComponent>();
+        builder.RegisterComponent<RekallAgeImageComponent>();
+        builder.RegisterComponent<RekallAgeButtonComponent>();
     }
 }
 

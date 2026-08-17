@@ -69,7 +69,13 @@ public static class RekallAgeModuleIndexer
             .OrderBy(property => property.Name, StringComparer.Ordinal)
             .ToArray();
 
-        return new RekallAgeComponentSchema(type.FullName!, componentAttribute.DisplayName, properties);
+        var typeName = type.Namespace == "Rekall.Age.Modules.BuiltIns"
+            ? $"Rekall.{type.Name["RekallAge".Length..^"Component".Length]}"
+            : type.FullName!;
+        return new RekallAgeComponentSchema(typeName, componentAttribute.DisplayName, properties)
+        {
+            Description = componentAttribute.Description
+        };
     }
 
     private static RekallAgePropertySchema IndexProperty(PropertyInfo property, RekallAgePropertyAttribute attribute)
@@ -80,7 +86,11 @@ public static class RekallAgeModuleIndexer
             attribute.Kind ?? InferKind(property.PropertyType),
             attribute.AssetKind,
             double.IsNaN(attribute.Minimum) ? null : attribute.Minimum,
-            double.IsNaN(attribute.Maximum) ? null : attribute.Maximum);
+            double.IsNaN(attribute.Maximum) ? null : attribute.Maximum)
+        {
+            Description = attribute.Description,
+            AllowedValues = attribute.AllowedValues
+        };
     }
 
     private static string InferKind(Type type)

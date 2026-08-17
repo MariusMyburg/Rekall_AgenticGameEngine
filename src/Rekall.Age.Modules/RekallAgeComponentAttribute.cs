@@ -9,4 +9,6 @@ public sealed class RekallAgeComponentAttribute : Attribute
     }
 
     public string DisplayName { get; }
+
+    public string? Description { get; init; }
 }

@@ -19,7 +19,10 @@ public sealed record RekallAgeModuleMetadata(
 public sealed record RekallAgeComponentSchema(
     string TypeName,
     string DisplayName,
-    IReadOnlyList<RekallAgePropertySchema> Properties);
+    IReadOnlyList<RekallAgePropertySchema> Properties)
+{
+    public string? Description { get; init; }
+}
 
 public sealed record RekallAgePropertySchema(
     string Name,
@@ -27,4 +30,9 @@ public sealed record RekallAgePropertySchema(
     string Kind,
     string? AssetKind,
     double? Minimum,
-    double? Maximum);
+    double? Maximum)
+{
+    public string? Description { get; init; }
+
+    public IReadOnlyList<string> AllowedValues { get; init; } = Array.Empty<string>();
+}

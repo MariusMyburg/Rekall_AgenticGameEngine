@@ -6,5 +6,10 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <LangVersion>13.0</LangVersion>
     <AnalysisLevel>latest</AnalysisLevel>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionSuffix>preview.1</VersionSuffix>
+    <Product>Rekall AGE</Product>
+    <Company>Rekall</Company>
+    <Copyright>Copyright © 2026 Rekall. All rights reserved.</Copyright>
   </PropertyGroup>
 </Project>

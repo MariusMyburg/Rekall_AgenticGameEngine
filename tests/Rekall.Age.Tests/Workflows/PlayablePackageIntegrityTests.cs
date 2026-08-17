@@ -31,6 +31,26 @@ public sealed class PlayablePackageIntegrityTests
         await File.WriteAllTextAsync(Path.Combine(root, "DevOnly.cs"), "// authored source");
         await File.WriteAllTextAsync(Path.Combine(root, "DevOnly.csproj"), "<Project />");
         await File.WriteAllTextAsync(Path.Combine(root, "local.env"), "SECRET=do-not-ship");
+        var importedAudio = Path.Combine(root, "Assets", "audio", "asset-tone.wav");
+        Directory.CreateDirectory(Path.GetDirectoryName(importedAudio)!);
+        await File.WriteAllBytesAsync(importedAudio, [82, 73, 70, 70]);
+        await File.WriteAllTextAsync(
+            Path.Combine(root, "Assets", "assets.age.catalog.json"),
+            $$"""
+              {
+                "assets": [
+                  {
+                    "id": "asset-tone",
+                    "name": "tone",
+                    "displayName": "Tone",
+                    "kind": "audio",
+                    "sourcePath": "{{Path.Combine(root, "authoring", "tone.wav").Replace("\\", "\\\\")}}",
+                    "importedPath": "{{importedAudio.Replace("\\", "\\\\")}}",
+                    "contentHash": "test"
+                  }
+                ]
+              }
+              """);
 
         var result = await new PackagePlayableGameCommand().ExecuteAsync(
             new PackagePlayableGameRequest(root, "Main", output),
@@ -68,6 +88,13 @@ public sealed class PlayablePackageIntegrityTests
         Assert.DoesNotContain(packagedFiles, path => path.EndsWith(".env", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packagedFiles, path => path.EndsWith("/AgentGauntlet.dll", StringComparison.Ordinal));
         Assert.Single(RekallAgeProjectModuleAssemblyLoader.LoadBuiltModuleAssemblies(Path.Combine(output, "Game")));
+        var packagedCatalogText = await File.ReadAllTextAsync(
+            Path.Combine(output, "Game", "Assets", "assets.age.catalog.json"));
+        Assert.DoesNotContain(root, packagedCatalogText, StringComparison.OrdinalIgnoreCase);
+        using var catalog = JsonDocument.Parse(packagedCatalogText);
+        var packagedAsset = Assert.Single(catalog.RootElement.GetProperty("assets").EnumerateArray());
+        Assert.Equal(string.Empty, packagedAsset.GetProperty("sourcePath").GetString());
+        Assert.Equal("Assets/audio/asset-tone.wav", packagedAsset.GetProperty("importedPath").GetString());
 
         await File.AppendAllTextAsync(Path.Combine(output, "Game", "rekall.project.json"), " ");
         await File.WriteAllTextAsync(Path.Combine(output, "unexpected.txt"), "not declared");

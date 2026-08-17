@@ -5,6 +5,7 @@ using Rekall.Age.Playback.Commands;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Rekall.Age.Core.Product;
 
 namespace Rekall.Age.Workflows.Commands;
@@ -117,6 +118,10 @@ public sealed class PackagePlayableGameCommand
         }
 
         CopyProjectToPackage(request.ProjectRoot, bundledGameRoot, outputDirectory);
+        await SanitizePackagedAssetCatalogAsync(
+            request.ProjectRoot,
+            bundledGameRoot,
+            context.CancellationToken);
         var manifestGameRoot = "Game";
         var manifestLaunchPath = NormalizePath(Path.GetRelativePath(outputDirectory, player.Value.LaunchPath));
         var manifestArguments = CreateLaunchArguments(manifestGameRoot, request.SceneName, request.Graphics);
@@ -253,6 +258,49 @@ public sealed class PackagePlayableGameCommand
         return modulesIndex >= 0 && !ContainsSequence(
             segments[(modulesIndex + 1)..],
             ["bin", "rekall", "net10.0"]);
+    }
+
+    private static async ValueTask SanitizePackagedAssetCatalogAsync(
+        string projectRoot,
+        string bundledGameRoot,
+        CancellationToken cancellationToken)
+    {
+        var catalogPath = Path.Combine(bundledGameRoot, "Assets", "assets.age.catalog.json");
+        if (!File.Exists(catalogPath))
+        {
+            return;
+        }
+
+        var root = JsonNode.Parse(await File.ReadAllTextAsync(catalogPath, cancellationToken)) as JsonObject;
+        if (root?["assets"] is not JsonArray assets)
+        {
+            return;
+        }
+
+        var sourceRoot = Path.GetFullPath(projectRoot);
+        foreach (var asset in assets.OfType<JsonObject>())
+        {
+            asset["sourcePath"] = string.Empty;
+            var importedPath = asset["importedPath"]?.GetValue<string>();
+            if (string.IsNullOrWhiteSpace(importedPath))
+            {
+                continue;
+            }
+
+            var fullImportedPath = Path.GetFullPath(importedPath);
+            if (!IsSameOrInside(fullImportedPath, sourceRoot))
+            {
+                throw new InvalidDataException(
+                    $"Asset catalog imported path '{importedPath}' is outside the project root.");
+            }
+
+            asset["importedPath"] = NormalizePath(Path.GetRelativePath(sourceRoot, fullImportedPath));
+        }
+
+        await File.WriteAllTextAsync(
+            catalogPath,
+            root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine,
+            cancellationToken);
     }
 
     private static bool ContainsSequence(IReadOnlyList<string> values, IReadOnlyList<string> sequence)

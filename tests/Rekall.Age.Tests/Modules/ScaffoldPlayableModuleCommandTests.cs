@@ -21,6 +21,11 @@ public sealed class ScaffoldPlayableModuleCommandTests
 
         Assert.True(scaffold.Ok, scaffold.Summary);
         Assert.True(File.Exists(scaffold.Value.SourcePath));
+        var projectFile = await File.ReadAllTextAsync(scaffold.Value.ProjectPath);
+        Assert.DoesNotContain("ProjectReference", projectFile);
+        Assert.DoesNotContain(Path.GetFullPath("."), projectFile, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".rekall\\sdk\\1\\Rekall.Age.Sdk.props", projectFile);
+        Assert.True(File.Exists(Path.Combine(root, ".rekall", "sdk", "1", "rekall.sdk.json")));
         Assert.True(build.Ok, build.Summary);
         Assert.Contains(build.Value.Modules, module => module.ModuleName == "AgentModule");
     }

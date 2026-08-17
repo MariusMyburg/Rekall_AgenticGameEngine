@@ -36,6 +36,9 @@ public sealed class ScaffoldModuleCommandTests
 
         var project = await File.ReadAllTextAsync(result.Value.ProjectPath);
         Assert.Contains("<Project Sdk=\"Microsoft.NET.Sdk\">", project);
-        Assert.Contains("Rekall.Age.Modules.csproj", project);
+        Assert.DoesNotContain("ProjectReference", project);
+        Assert.DoesNotContain(Path.GetFullPath("."), project, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".rekall\\sdk\\1\\Rekall.Age.Sdk.props", project);
+        Assert.True(File.Exists(Path.Combine(root, ".rekall", "sdk", "1", "rekall.sdk.json")));
     }
 }

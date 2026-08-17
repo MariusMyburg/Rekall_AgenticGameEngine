@@ -1,5 +1,6 @@
 using System.Text;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Modules.Sdk;
 
 namespace Rekall.Age.Modules.Commands;
 
@@ -49,13 +50,18 @@ public sealed class ScaffoldRuntimeSystemModuleCommand
 
         var sourcePath = Path.Combine(directory, $"{moduleClass}.cs");
         var projectPath = Path.Combine(directory, $"{moduleName}.csproj");
+        var sdk = await new RekallAgeModuleSdkInstaller().InstallAsync(request.ProjectRoot, context.CancellationToken);
         await File.WriteAllTextAsync(
             sourcePath,
             CreateSource(request.ModuleId, request.DisplayName, namespaceName, moduleClass, componentName, systemClass),
             context.CancellationToken);
-        await File.WriteAllTextAsync(projectPath, CreateProjectFile(), context.CancellationToken);
+        await File.WriteAllTextAsync(projectPath, RekallAgeModuleProjectFile.Create(moduleName), context.CancellationToken);
         context.Transaction.RecordChangedResource(sourcePath);
         context.Transaction.RecordChangedResource(projectPath);
+        foreach (var resource in sdk.Resources)
+        {
+            context.Transaction.RecordChangedResource(resource);
+        }
 
         return RekallAgeCommandResult<ScaffoldRuntimeSystemModuleResult>.Success(
             new ScaffoldRuntimeSystemModuleResult(
@@ -135,50 +141,6 @@ public sealed class ScaffoldRuntimeSystemModuleCommand
         source.AppendLine("    }");
         source.AppendLine("}");
         return source.ToString();
-    }
-
-    private static string CreateProjectFile()
-    {
-        var modulesProjectPath = FindModulesProjectPath();
-
-        return string.Join(Environment.NewLine,
-        [
-            "<Project Sdk=\"Microsoft.NET.Sdk\">",
-            "  <PropertyGroup>",
-            "    <TargetFramework>net10.0</TargetFramework>",
-            "    <Nullable>enable</Nullable>",
-            "    <ImplicitUsings>enable</ImplicitUsings>",
-            "  </PropertyGroup>",
-            "  <ItemGroup>",
-            $"    <ProjectReference Include=\"{modulesProjectPath}\" />",
-            "  </ItemGroup>",
-            "</Project>",
-            string.Empty
-        ]);
-    }
-
-    private static string FindModulesProjectPath()
-    {
-        foreach (var start in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() })
-        {
-            var directory = new DirectoryInfo(start);
-            while (directory is not null)
-            {
-                var candidate = Path.Combine(
-                    directory.FullName,
-                    "src",
-                    "Rekall.Age.Modules",
-                    "Rekall.Age.Modules.csproj");
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-
-                directory = directory.Parent;
-            }
-        }
-
-        throw new InvalidOperationException("Could not locate src/Rekall.Age.Modules/Rekall.Age.Modules.csproj.");
     }
 
     private static string ToIdentifier(string value, string fallback)

@@ -37,6 +37,11 @@ public sealed class ScaffoldRuntimeSystemModuleCommandTests
         Assert.Contains(scaffold.Value.ProjectPath, context.Transaction.ChangedResources);
         Assert.Equal("OrbitMotion", scaffold.Value.ComponentClass);
         Assert.Equal("OrbitMotionSystem", scaffold.Value.SystemClass);
+        var projectFile = await File.ReadAllTextAsync(scaffold.Value.ProjectPath);
+        Assert.DoesNotContain("ProjectReference", projectFile);
+        Assert.DoesNotContain(Path.GetFullPath("."), projectFile, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".rekall\\sdk\\1\\Rekall.Age.Sdk.props", projectFile);
+        Assert.True(File.Exists(Path.Combine(root, ".rekall", "sdk", "1", "rekall.sdk.json")));
 
         var source = await File.ReadAllTextAsync(scaffold.Value.SourcePath);
         Assert.Contains("[RekallAgeModule(\"game.motion\", \"Game Motion\")]", source);

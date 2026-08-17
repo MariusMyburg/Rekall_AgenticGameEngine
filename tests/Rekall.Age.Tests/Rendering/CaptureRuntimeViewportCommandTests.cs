@@ -47,6 +47,60 @@ public sealed class CaptureRuntimeViewportCommandTests
     }
 
     [Fact]
+    public async Task CaptureRuntimeViewportCommandRendersDeterministicAuthoredUiContainerLayout()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["ReferenceWidth"] = 200, ["ReferenceHeight"] = 100 }));
+        var panel = RekallAgeEntityDocument.Create("Actions", ["ui"]) with { ParentId = canvas.Id };
+        panel = panel.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Panel",
+            new JsonObject
+            {
+                ["X"] = 10, ["Y"] = 10, ["Width"] = 180, ["Height"] = 80,
+                ["LayoutDirection"] = "vertical", ["PaddingLeft"] = 10, ["PaddingTop"] = 5,
+                ["PaddingRight"] = 10, ["PaddingBottom"] = 5, ["Gap"] = 4,
+                ["BackgroundColor"] = "#402060"
+            }));
+        var first = RekallAgeEntityDocument.Create("Primary", ["ui"]) with { ParentId = panel.Id };
+        first = first.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Button",
+            new JsonObject
+            {
+                ["Width"] = 50, ["Height"] = 20, ["LayoutOrder"] = 10,
+                ["HorizontalAlignment"] = "center", ["BackgroundColor"] = "#20c060"
+            }));
+        var second = RekallAgeEntityDocument.Create("Secondary", ["ui"]) with { ParentId = panel.Id };
+        second = second.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Button",
+            new JsonObject
+            {
+                ["Width"] = 60, ["Height"] = 25, ["LayoutOrder"] = 20,
+                ["HorizontalAlignment"] = "end", ["BackgroundColor"] = "#2080e0"
+            }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["ui"])
+            .AddEntity(canvas)
+            .AddEntity(second)
+            .AddEntity(panel)
+            .AddEntity(first);
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 1, Path.Combine(root, "Viewport"), 200, 100, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("authored ui viewport"), CancellationToken.None));
+        var output = await RekallAgePngReader.ReadRgbaAsync(result.Value.ScreenshotPath, CancellationToken.None);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.NonBlank);
+        AssertPixel(output, 12, 12, 0x40, 0x20, 0x60);
+        AssertPixel(output, 85, 20, 0x20, 0xc0, 0x60);
+        AssertPixel(output, 100, 37, 0x40, 0x20, 0x60);
+        AssertPixel(output, 150, 45, 0x20, 0x80, 0xe0);
+    }
+
+    [Fact]
     public async Task CaptureRuntimeViewportCommandRejectsInvalidCaptureSettings()
     {
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("runtime viewport"), CancellationToken.None);
@@ -417,6 +471,15 @@ public sealed class CaptureRuntimeViewportCommandTests
                 128,
                 []);
         }
+    }
+
+    private static void AssertPixel(RekallAgeRgbaImage image, int x, int y, byte red, byte green, byte blue)
+    {
+        var index = ((y * image.Width) + x) * 4;
+        Assert.Equal(red, image.Rgba[index]);
+        Assert.Equal(green, image.Rgba[index + 1]);
+        Assert.Equal(blue, image.Rgba[index + 2]);
+        Assert.Equal(255, image.Rgba[index + 3]);
     }
 
     private sealed class FakeVulkanSceneCapture : IRekallAgeVulkanSceneCapture

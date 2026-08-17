@@ -26,7 +26,7 @@ structured observations, and gameplay remains in agent-authored modules.
 - [x] Project panels, labels, images, and buttons into concrete overlay draw data.
 - [x] Render the overlay in software and Vulkan/windowed paths with deterministic text metrics.
 - [x] Execute pointer/focus/navigation state and emit generic UI event facts.
-- [ ] Add viewport, packaged-game, and installed-product visual proofs.
+- [x] Add viewport, packaged-game, and installed-product visual proofs.
 
 ## Tranche 3: General animation
 
@@ -43,4 +43,4 @@ structured observations, and gameplay remains in agent-authored modules.
 - [ ] Add malformed-data, limit, fuzz, determinism, and long-run tests.
 - [ ] Add audio/UI/animation tasks to the installed-engine agent benchmark.
 - [x] Run the full suite twice and canonical Windows distribution acceptance.
-- [ ] Update the maturity audit with measured evidence rather than projections.
+- [x] Update the maturity audit with measured evidence rather than projections.

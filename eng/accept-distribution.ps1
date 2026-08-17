@@ -82,8 +82,8 @@ try {
         throw "Relocated package audit did not produce a nonblank proof frame at '$relocatedFrame'."
     }
 
-    Invoke-Rekall project create $audioRoot 'Installed Audio Proof' 'audio'
-    Invoke-Rekall scene create $audioRoot Main 'audio'
+    Invoke-Rekall project create $audioRoot 'Installed Runtime Subsystems Proof' 'audio,ui'
+    Invoke-Rekall scene create $audioRoot Main 'audio,ui'
     $audioDirectory = Join-Path $audioRoot 'Assets\audio'
     New-Item -ItemType Directory -Path $audioDirectory -Force | Out-Null
     $wavePath = Join-Path $audioDirectory 'installed-tone.wav'
@@ -132,7 +132,7 @@ try {
     $catalog | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $audioRoot 'Assets\assets.age.catalog.json') -Encoding utf8
     $scenePath = Join-Path $audioRoot 'Scenes\Main.age.scene.json'
     $scene = Get-Content -LiteralPath $scenePath -Raw | ConvertFrom-Json
-    $scene.capabilities = @('audio')
+    $scene.capabilities = @('audio', 'ui')
     $scene.entities = @(
         @{
             id = 'installed-audio-listener'; name = 'Audio Listener'; tags = @('audio'); parentId = $null; prefabSourceId = $null; visible = $true; locked = $false
@@ -147,10 +147,41 @@ try {
                 @{ type = 'Rekall.Transform3D'; properties = @{} },
                 @{ type = 'Rekall.AudioEmitter'; properties = @{ Clip = 'installed-tone'; PlayOnStart = $true; Loop = $true } }
             )
+        },
+        @{
+            id = 'installed-ui-canvas'; name = 'Installed HUD'; tags = @('ui'); parentId = $null; prefabSourceId = $null; visible = $true; locked = $false
+            components = @(
+                @{ type = 'Rekall.UiCanvas'; properties = @{ ReferenceWidth = 200; ReferenceHeight = 100 } }
+            )
+        },
+        @{
+            id = 'installed-ui-secondary'; name = 'Secondary Action'; tags = @('ui'); parentId = 'installed-ui-panel'; prefabSourceId = $null; visible = $true; locked = $false
+            components = @(
+                @{ type = 'Rekall.Button'; properties = @{ Width = 60; Height = 25; LayoutOrder = 20; HorizontalAlignment = 'end'; BackgroundColor = '#2080e0'; Interactive = $true; NavigationOrder = 20 } }
+            )
+        },
+        @{
+            id = 'installed-ui-panel'; name = 'Actions'; tags = @('ui'); parentId = 'installed-ui-canvas'; prefabSourceId = $null; visible = $true; locked = $false
+            components = @(
+                @{ type = 'Rekall.Panel'; properties = @{ X = 10; Y = 10; Width = 180; Height = 80; LayoutDirection = 'vertical'; PaddingLeft = 10; PaddingTop = 5; PaddingRight = 10; PaddingBottom = 5; Gap = 4; BackgroundColor = '#402060' } }
+            )
+        },
+        @{
+            id = 'installed-ui-primary'; name = 'Primary Action'; tags = @('ui'); parentId = 'installed-ui-panel'; prefabSourceId = $null; visible = $true; locked = $false
+            components = @(
+                @{ type = 'Rekall.Button'; properties = @{ Width = 50; Height = 20; LayoutOrder = 10; HorizontalAlignment = 'center'; BackgroundColor = '#20c060'; Interactive = $true; NavigationOrder = 10 } }
+            )
         }
     )
     $scene | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $scenePath -Encoding utf8
     Invoke-Rekall runtime inspect $audioRoot Main 30
+
+    $uiCaptureDirectory = Join-Path $audioRoot 'Builds\InstalledUiProof'
+    Invoke-Rekall render viewport capture $audioRoot Main 1 $uiCaptureDirectory 200 100 software
+    $uiProofFrame = Join-Path $uiCaptureDirectory 'Main_runtime_001.png'
+    if (-not (Test-Path -LiteralPath $uiProofFrame -PathType Leaf) -or (Get-Item -LiteralPath $uiProofFrame).Length -le 100) {
+        throw "Installed runtime UI proof frame is missing or blank at '$uiProofFrame'."
+    }
 
     $env:SDL_AUDIODRIVER = 'dummy'
     $audioProcess = Start-Process -FilePath $windowsPlayer -ArgumentList @($audioRoot, 'Main', '--frames', '10', '--audio-required') -PassThru -WindowStyle Hidden

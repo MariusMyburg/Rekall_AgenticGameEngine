@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 00:03 Africa/Johannesburg
+Last verified: 2026-08-18 00:09 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: agent completion and physics diagnostics pass the Debug gate
+Latest milestone: agent completion and physics diagnostics passed the product gate
 
 ## Product objective
 
@@ -183,6 +183,10 @@ Studio is important, but it does not define or reorder the engine foundation.
   the same `REKALL_PHYSICS_BODY_NO_TRANSFORM` code as runtime observation, with
   an exact executable `rekall.component.add` repair. Both regressions and the
   full Debug suite pass at 571/571.
+- Agent/physics distribution gate: the clean build completed with zero warnings
+  and errors, both independent Release passes completed at 571/571, and fresh
+  installed acceptance passed the complete SDK, authoring, package relocation,
+  visual proof, UI, and audio checks. The canonical archive is 194,672,330 bytes.
 
 ## Current gaps
 
@@ -198,8 +202,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the clean Release/distribution gate for the agent-loop and physics-diagnostic
-milestone, then rerun the installed benchmark.
+Rerun the installed benchmark against the fresh agent/physics distribution.
 
 ## Next after the current item
 

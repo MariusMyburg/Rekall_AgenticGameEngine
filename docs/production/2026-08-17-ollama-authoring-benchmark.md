@@ -390,6 +390,36 @@ their strict contracts, ranks complete composable physics/rendering families
 for broad searches, and narrowly normalizes the two recoverable request aliases
 according to the selected command's actual request type.
 
+### Rigid-body shape rerun
+
+Rerun 14 used the agent-contract discovery distribution with the unchanged
+36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun14`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 512,928
+- Completion tokens: 6,331
+
+The agent reached validation, deterministic inspection of both scenes, module
+build, and package creation, but had no remaining calls for original-package
+audit, relocation, or relocated audit. It also spent a call on
+`rekall.module.scaffold_runtime_system` without the required runtime-system
+identity fields even though only a playable scaffold was needed.
+
+Independent installed-CLI validation reported zero issues, but runtime evidence
+rejected both physics proofs. Main and Physics2D each reported two bodies, zero
+colliders, and no dynamic movement after 30 frames. The authored rigid bodies
+had no collision shapes, so the Bepu runtime could not create simulated dynamic
+bodies. Empty transform property bags also placed all authored bodies at the
+origin; that is valid on its own, but it made the absent simulation obvious.
+
+The generic correction makes a dimension-compatible collider a blocking
+contract for every rigid body, supplies an executable default collider addition,
+and documents through component schemas that dynamic bodies combine transform,
+rigid body, and collider while static surfaces omit the rigid body. The repaired
+validator identifies all four false bodies in the untouched benchmark project.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

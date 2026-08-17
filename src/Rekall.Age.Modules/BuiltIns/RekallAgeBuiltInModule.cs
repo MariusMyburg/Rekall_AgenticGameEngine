@@ -771,7 +771,7 @@ public sealed class RekallAgePhysicsMaterial3DComponent : RekallAgeComponent
     public double DampingRatio { get; init; } = 1;
 }
 
-[RekallAgeComponent("Rigidbody 3D")]
+[RekallAgeComponent("Rigidbody 3D", Description = "Makes an entity a dynamic 3D physics body. Requires a matching Transform3D and 3D collider on the same entity. For static geometry, use a collider without a rigid body.")]
 public sealed class RekallAgeRigidbody3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
@@ -810,7 +810,7 @@ public sealed class RekallAgeMeshRendererComponent : RekallAgeComponent
     public string? FragmentShader { get; init; }
 }
 
-[RekallAgeComponent("Rigidbody 2D", Description = "A generic dynamic planar body simulated on the XY plane.")]
+[RekallAgeComponent("Rigidbody 2D", Description = "Makes an entity a dynamic planar body simulated on the XY plane. Requires Transform2D and a 2D collider on the same entity. For static geometry, use a collider without a rigid body.")]
 public sealed class RekallAgeRigidbody2DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
@@ -845,7 +845,7 @@ public sealed class RekallAgeTriggerComponent : RekallAgeComponent
     public string TargetComponentType { get; init; } = string.Empty;
 }
 
-[RekallAgeComponent("Box Collider 2D")]
+[RekallAgeComponent("Box Collider 2D", Description = "A planar box collision shape. Combine with Transform2D; add Rigidbody2D for a dynamic body or omit it for a static surface.")]
 public sealed class RekallAgeBoxCollider2DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
@@ -855,14 +855,14 @@ public sealed class RekallAgeBoxCollider2DComponent : RekallAgeComponent
     public double Height { get; init; } = 1;
 }
 
-[RekallAgeComponent("Circle Collider 2D")]
+[RekallAgeComponent("Circle Collider 2D", Description = "A planar circle collision shape. Combine with Transform2D; add Rigidbody2D for a dynamic body or omit it for a static surface.")]
 public sealed class RekallAgeCircleCollider2DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
     public double Radius { get; init; } = 0.5;
 }
 
-[RekallAgeComponent("Box Collider 3D")]
+[RekallAgeComponent("Box Collider 3D", Description = "A 3D box collision shape. Combine with Transform3D; add Rigidbody3D for a dynamic body or omit it for static geometry.")]
 public sealed class RekallAgeBoxCollider3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
@@ -875,14 +875,14 @@ public sealed class RekallAgeBoxCollider3DComponent : RekallAgeComponent
     public double Depth { get; init; } = 1;
 }
 
-[RekallAgeComponent("Sphere Collider 3D")]
+[RekallAgeComponent("Sphere Collider 3D", Description = "A 3D sphere collision shape. Combine with Transform3D; add Rigidbody3D for a dynamic body or omit it for static geometry.")]
 public sealed class RekallAgeSphereCollider3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
     public double Radius { get; init; } = 0.5;
 }
 
-[RekallAgeComponent("Capsule Collider 3D")]
+[RekallAgeComponent("Capsule Collider 3D", Description = "A 3D capsule collision shape. Combine with Transform3D; add Rigidbody3D for a dynamic body or omit it for static geometry.")]
 public sealed class RekallAgeCapsuleCollider3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]

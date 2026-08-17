@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 01:26 Africa/Johannesburg
+Last verified: 2026-08-18 01:34 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: agent contract discovery repair passed the complete product gate
+Latest milestone: rigid-body shape validation repair passed 581/581 Debug tests
 
 ## Product objective
 
@@ -283,6 +283,21 @@ Studio is important, but it does not define or reorder the engine foundation.
   nonblank capture, runtime UI, software viewport analysis, simulated audio,
   and Windows player audio. The canonical 1,149-file archive is 194,700,296
   bytes.
+- Broad benchmark rerun 14: the installed agent stopped correctly at 36 tools
+  (512,928 prompt; 6,331 completion) after clean validation, two runtime
+  inspections, module build, and a final package-creation call, but before any
+  package audit or relocation. Independent installed inspection rejected the
+  physics proof: both scenes reported two nominal bodies but zero colliders,
+  empty dynamic transforms, and no movement after 30 frames. Validation had
+  incorrectly reported zero issues because a rigid body shape was not required.
+  This is not an accepted pass.
+- Rigid-body shape repair: validation now blocks a 2D or 3D rigid body without
+  a dimension-compatible collider and returns an exact executable default
+  collider addition. Rigidbody and collider schema descriptions now explain
+  dynamic composition and that a static surface omits the rigid body. Applied
+  to the untouched rerun-14 project, the repaired validator reports all four
+  false bodies as blocking issues. The regression and full Debug suite pass at
+  581/581.
 
 ## Current gaps
 
@@ -298,7 +313,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the unchanged installed Ollama benchmark on the agent-contract distribution.
+Run the complete clean product gate for the rigid-body shape repair.
 
 ## Next after the current item
 

@@ -112,6 +112,22 @@ public sealed class RekallAgeProjectValidator
             ValidateUnqualifiedBuiltInAliases(projectRoot, scene.Name, entity, issues);
             ValidatePhysicsBodyTransform(projectRoot, scene.Name, entity, "Rekall.Rigidbody3D", "Rekall.Transform3D", issues);
             ValidatePhysicsBodyTransform(projectRoot, scene.Name, entity, "Rekall.Rigidbody2D", "Rekall.Transform2D", issues);
+            ValidatePhysicsBodyCollider(
+                projectRoot,
+                scene.Name,
+                entity,
+                "Rekall.Rigidbody3D",
+                ["Rekall.BoxCollider3D", "Rekall.SphereCollider3D", "Rekall.CapsuleCollider3D", "Rekall.MeshCollider"],
+                "Rekall.BoxCollider3D",
+                issues);
+            ValidatePhysicsBodyCollider(
+                projectRoot,
+                scene.Name,
+                entity,
+                "Rekall.Rigidbody2D",
+                ["Rekall.BoxCollider2D", "Rekall.CircleCollider2D"],
+                "Rekall.BoxCollider2D",
+                issues);
             ValidatePhysicsColliderDimensions(projectRoot, scene.Name, entity, issues);
 
             foreach (var component in entity.Components.Where(component =>
@@ -332,6 +348,40 @@ public sealed class RekallAgeProjectValidator
                         })
                 ]));
         }
+    }
+
+    private static void ValidatePhysicsBodyCollider(
+        string projectRoot,
+        string sceneName,
+        RekallAgeEntityDocument entity,
+        string bodyType,
+        IReadOnlyList<string> compatibleColliderTypes,
+        string defaultColliderType,
+        List<RekallAgeValidationIssue> issues)
+    {
+        if (!entity.Components.Any(component => component.Type.Equals(bodyType, StringComparison.Ordinal))
+            || entity.Components.Any(component => compatibleColliderTypes.Contains(component.Type, StringComparer.Ordinal)))
+        {
+            return;
+        }
+
+        issues.Add(new RekallAgeValidationIssue(
+            "REKALL_PHYSICS_BODY_NO_COLLIDER",
+            $"Entity '{entity.Name}' has {bodyType} but no compatible collider. Runtime cannot create a simulated body without a shape; add one of: {string.Join(", ", compatibleColliderTypes.OrderBy(type => type, StringComparer.Ordinal))}.",
+            "blocking",
+            entity.Id,
+            [
+                new RekallAgeSuggestedCommand(
+                    "rekall.component.add",
+                    new Dictionary<string, object?>
+                    {
+                        ["projectRoot"] = projectRoot,
+                        ["sceneName"] = sceneName,
+                        ["entityId"] = entity.Id,
+                        ["componentType"] = defaultColliderType,
+                        ["properties"] = new JsonObject()
+                    })
+            ]));
     }
 
     private static Dictionary<string, object?> ComponentPropertyArguments(

@@ -160,6 +160,43 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneRequiresDimensionMatchingColliderForPhysicsBodies()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var body3D = RekallAgeEntityDocument.Create("Body 3D", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Rigidbody3D", new JsonObject { ["Mass"] = 1 }));
+        var body2D = RekallAgeEntityDocument.Create("Body 2D", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Rigidbody2D", new JsonObject { ["Mass"] = 1 }));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["physics"]).AddEntity(body3D).AddEntity(body2D),
+            CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        var missingColliders = report.Issues
+            .Where(issue => issue.Code == "REKALL_PHYSICS_BODY_NO_COLLIDER")
+            .ToArray();
+        Assert.Equal(2, missingColliders.Length);
+        Assert.All(missingColliders, issue => Assert.Equal("blocking", issue.Severity));
+        Assert.Contains(
+            missingColliders.Single(issue => issue.Target == body3D.Id).SuggestedCommands!,
+            command => command.Tool == "rekall.component.add"
+                && Equals(command.Arguments["projectRoot"], root)
+                && Equals(command.Arguments["sceneName"], "Main")
+                && Equals(command.Arguments["entityId"], body3D.Id)
+                && Equals(command.Arguments["componentType"], "Rekall.BoxCollider3D"));
+        Assert.Contains(
+            missingColliders.Single(issue => issue.Target == body2D.Id).SuggestedCommands!,
+            command => command.Tool == "rekall.component.add"
+                && Equals(command.Arguments["componentType"], "Rekall.BoxCollider2D"));
+    }
+
+    [Fact]
     public async Task ValidateSceneRejectsDimensionMismatchedPhysicsCollidersWithExecutableRepairs()
     {
         var root = TestPaths.CreateTempDirectory();

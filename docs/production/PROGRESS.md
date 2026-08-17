@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 01:48 Africa/Johannesburg
+Last verified: 2026-08-18 01:54 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: runtime motion evidence passed 581/581 Debug tests
+Latest milestone: runtime motion evidence passed the complete product gate
 
 ## Product objective
 
@@ -318,6 +318,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   without an agent inferring the starting pose or spending calls on repeated
   inspection. Applied to rerun 15, it reports Y deltas of -1.267 for both 3D
   bodies and the 2D body. The regression and full Debug suite pass at 581/581.
+- Runtime motion-evidence distribution gate: the clean Release build completed
+  with zero warnings and zero errors; both independent Release passes completed
+  at 581/581; and installed acceptance passed SDK/module authoring, the generic
+  gauntlet, original and relocated package proof, runtime UI, software viewport,
+  simulated audio, and Windows player audio. Installed inspection printed the
+  new delta fields. The canonical 1,149-file archive is 194,706,489 bytes.
 
 ## Current gaps
 
@@ -333,7 +339,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for runtime motion evidence.
+Rerun the unchanged installed Ollama benchmark on the motion-evidence distribution.
 
 ## Next after the current item
 

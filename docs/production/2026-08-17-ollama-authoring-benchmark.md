@@ -147,6 +147,30 @@ therefore rejected those otherwise recoverable arguments. These failures drive
 encoded `JsonObject`/`JsonArray` normalization and a multi-scene atomic project
 blueprint contract. The unchanged benchmark remains the acceptance gate.
 
+### Multi-scene/normalization rerun
+
+The atomic multi-scene blueprint and encoded JSON-object recovery passed the
+installed product gate before the unchanged task ran again.
+
+- Project: `rekall-age-installed-broad-benchmark-rerun5-8298ef1cdf6e4edc951ccb27ef1cde39`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 706,921
+- Completion tokens: 6,571
+
+This run reached the full requested chain: project creation, validation repair,
+module scaffold/build, package creation, original package audit/run, relocation,
+relocated audit, and capture. Independent installed-CLI verification found zero
+issues across both scenes, an active 3D body at Y -2.137, an active 2D body with
+`Rekall.PhysicsState2D`, a ready 255-file graphics package, exit code 0 from its
+Windows player, and a valid relocated package.
+
+Both audits and the final capture still failed because the graphics package's
+Windows player does not emit the structured render-frame JSON consumed by the
+deterministic package proof commands. The next generic fix is a dual-mode
+graphics package: retain the Windows graphics player as the primary launch
+artifact and include a headless proof companion that capture/audit can select.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

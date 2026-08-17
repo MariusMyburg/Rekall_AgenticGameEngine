@@ -47,7 +47,11 @@ public sealed class CapturePlayablePackageFrameCommand
         var width = Math.Clamp(request.Width, 1, 4096);
         var height = Math.Clamp(request.Height, 1, 4096);
         var run = await _runPackage.ExecuteAsync(
-            new RunPlayablePackageRequest(request.PackagePath, frameIndex, request.Inputs),
+            new RunPlayablePackageRequest(
+                request.PackagePath,
+                frameIndex,
+                request.Inputs,
+                StructuredProof: true),
             context);
         if (!run.Ok || run.Value.RenderFrames.Count < frameIndex)
         {

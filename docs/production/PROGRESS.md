@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-17 22:50 Africa/Johannesburg
+Last verified: 2026-08-17 23:02 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: multi-scene atomic authoring and JSON-object normalization verified
+Latest milestone: graphics packages now carry relocatable deterministic proof players
 
 ## Product objective
 
@@ -30,8 +30,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,663,189-byte win-x64 archive assembled.
-- Canonical verification: 567/567 Release tests passed twice independently;
+- Windows distribution: fresh 194,666,339-byte win-x64 archive assembled.
+- Canonical verification: 568/568 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
@@ -101,6 +101,23 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Dynamic argument recovery: bounded encoded `JsonObject` and `JsonArray`
   fields now normalize to their declared types while genuine string fields stay
   unchanged. Focused regressions and the full 568/568 Debug suite pass.
+- Multi-scene/normalization distribution gate: fresh installed binaries passed
+  the complete black-box acceptance after both independent 568/568 Release
+  passes.
+- Broad benchmark rerun 5: the unchanged 36-turn run reached multi-scene
+  authoring, validation repair, module build, package creation, package run,
+  relocation, both audits, and capture after 36 tools (706,921 prompt tokens;
+  6,571 completion tokens). Independent verification proves zero validation
+  issues, active 3D/2D physics, package integrity, successful primary package
+  execution, and successful relocation. It remained a failure because a
+  graphics package contains only the Windows player, which exits successfully
+  but does not emit the structured frames consumed by deterministic package
+  capture/audit.
+- Graphics deliverable proof: graphics packages retain the Windows player as
+  primary launch and include an integrity-inventoried headless proof companion.
+  Package capture selects the proof player; primary run semantics remain
+  unchanged. A real graphics package now captures nonblank evidence and passes
+  audit both before and after relocation. The full Debug suite passes 569/569.
 
 ## Current gaps
 
@@ -116,7 +133,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Commit the multi-scene/normalization milestone, then run the canonical
+Commit the dual-player graphics package milestone, then run the canonical
 two-pass Release/distribution gate.
 
 ## Next after the current item

@@ -27,7 +27,10 @@ public sealed record PackagePlayableGameResult(
     string ArchivePath,
     IReadOnlyList<string> Arguments,
     IReadOnlyList<RekallAgePlayableGameCheck> Checks,
-    string BuildOutput);
+    string BuildOutput)
+{
+    public string? ProofLaunchPath { get; init; }
+}
 
 public sealed class PackagePlayableGameCommand
     : IRekallAgeCommand<PackagePlayableGameRequest, PackagePlayableGameResult>
@@ -94,6 +97,17 @@ public sealed class PackagePlayableGameCommand
         var player = await _buildPlayer.ExecuteAsync(
             new BuildPlayerRequest(request.ProjectRoot, request.SceneName, outputDirectory, request.Graphics),
             context);
+        RekallAgeCommandResult<BuildPlayerResult>? proofPlayer = null;
+        if (player.Ok && request.Graphics)
+        {
+            proofPlayer = await _buildPlayer.ExecuteAsync(
+                new BuildPlayerRequest(
+                    request.ProjectRoot,
+                    request.SceneName,
+                    Path.Combine(outputDirectory, "ProofPlayer"),
+                    Graphics: false),
+                context);
+        }
         var bundledGameRoot = Path.Combine(outputDirectory, "Game");
         var manifestPath = Path.Combine(outputDirectory, "rekall.package.json");
         var archivePath = $"{Path.GetFullPath(outputDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)}.zip";
@@ -101,20 +115,21 @@ public sealed class PackagePlayableGameCommand
             ? CreateLaunchArguments(bundledGameRoot, request.SceneName, request.Graphics)
             : player.Value.Arguments;
         var result = new PackagePlayableGameResult(
-            Ready: player.Ok,
+            Ready: player.Ok && (proofPlayer?.Ok ?? true),
             OutputDirectory: player.Value.OutputDirectory,
             LaunchPath: player.Value.LaunchPath,
             ManifestPath: manifestPath,
             ArchivePath: archivePath,
             Arguments: arguments,
             Checks: verification.Value.Checks,
-            BuildOutput: player.Value.Output);
-        if (!player.Ok)
+            BuildOutput: string.Join(Environment.NewLine, new[] { player.Value.Output, proofPlayer?.Value.Output }
+                .Where(output => !string.IsNullOrWhiteSpace(output))));
+        if (!player.Ok || proofPlayer is { Ok: false })
         {
             return RekallAgeCommandResult<PackagePlayableGameResult>.Failure(
                 result,
-                player.Summary,
-                player.Errors);
+                !player.Ok ? player.Summary : proofPlayer!.Summary,
+                !player.Ok ? player.Errors : proofPlayer!.Errors);
         }
 
         CopyProjectToPackage(request.ProjectRoot, bundledGameRoot, outputDirectory);
@@ -124,6 +139,9 @@ public sealed class PackagePlayableGameCommand
             context.CancellationToken);
         var manifestGameRoot = "Game";
         var manifestLaunchPath = NormalizePath(Path.GetRelativePath(outputDirectory, player.Value.LaunchPath));
+        var manifestProofLaunchPath = proofPlayer is null
+            ? null
+            : NormalizePath(Path.GetRelativePath(outputDirectory, proofPlayer.Value.LaunchPath));
         var manifestArguments = CreateLaunchArguments(manifestGameRoot, request.SceneName, request.Graphics);
         var files = BuildFileInventory(outputDirectory, manifestPath);
         await WriteManifestAsync(
@@ -131,6 +149,7 @@ public sealed class PackagePlayableGameCommand
             request.SceneName,
             manifestGameRoot,
             manifestLaunchPath,
+            manifestProofLaunchPath,
             manifestArguments,
             files,
             verification.Value.Checks,
@@ -142,7 +161,7 @@ public sealed class PackagePlayableGameCommand
         context.Transaction.RecordChangedResource(archivePath);
 
         return RekallAgeCommandResult<PackagePlayableGameResult>.Success(
-            result,
+            result with { ProofLaunchPath = manifestProofLaunchPath },
             $"Packaged playable game '{request.SceneName}' at '{player.Value.OutputDirectory}'.");
     }
 
@@ -344,6 +363,7 @@ public sealed class PackagePlayableGameCommand
         string sceneName,
         string bundledGameRoot,
         string launchPath,
+        string? proofLaunchPath,
         IReadOnlyList<string> arguments,
         IReadOnlyList<RekallAgePlayablePackageFileIntegrity> files,
         IReadOnlyList<RekallAgePlayableGameCheck> checks,
@@ -360,7 +380,10 @@ public sealed class PackagePlayableGameCommand
             drawAssertions,
             SchemaVersion: 2,
             ProductVersion: RekallAgeProductInfo.Current.Version,
-            Files: files);
+            Files: files)
+        {
+            ProofLaunchPath = proofLaunchPath
+        };
         Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
         await File.WriteAllTextAsync(
             manifestPath,
@@ -414,7 +437,10 @@ public sealed record RekallAgePlayablePackageManifest(
     IReadOnlyList<RekallAgeDrawCommandAssertionResult> DrawAssertions,
     int SchemaVersion = 1,
     string ProductVersion = "",
-    IReadOnlyList<RekallAgePlayablePackageFileIntegrity>? Files = null);
+    IReadOnlyList<RekallAgePlayablePackageFileIntegrity>? Files = null)
+{
+    public string? ProofLaunchPath { get; init; }
+}
 
 public sealed record RekallAgePlayablePackageFileIntegrity(
     string Path,

@@ -10,7 +10,8 @@ namespace Rekall.Age.Workflows.Commands;
 public sealed record RunPlayablePackageRequest(
     string PackagePath,
     int Frames = 2,
-    IReadOnlyList<RekallAgePlaybackInput>? Inputs = null);
+    IReadOnlyList<RekallAgePlaybackInput>? Inputs = null,
+    bool StructuredProof = false);
 
 public sealed record RunPlayablePackageResult(
     bool Ready,
@@ -68,7 +69,10 @@ public sealed class RunPlayablePackageCommand
             }
 
             var manifest = inspect.Value.Manifest;
-            var launchPath = ResolvePackagedPath(package.PackageRoot, manifest.LaunchPath, "player", File.Exists);
+            var launchManifestPath = request.StructuredProof && !string.IsNullOrWhiteSpace(manifest.ProofLaunchPath)
+                ? manifest.ProofLaunchPath
+                : manifest.LaunchPath;
+            var launchPath = ResolvePackagedPath(package.PackageRoot, launchManifestPath, "player", File.Exists);
             var gameRoot = ResolvePackagedPath(package.PackageRoot, manifest.GameRoot, "game root", Directory.Exists);
             var frameCount = Math.Clamp(request.Frames, 1, 600);
             var run = await RunPlayerAsync(

@@ -128,6 +128,10 @@ public sealed class InspectPlayablePackageCommand
 
         ValidateManifestPath(manifest.GameRoot, "gameRoot", errors);
         ValidateManifestPath(manifest.LaunchPath, "launchPath", errors);
+        if (!string.IsNullOrWhiteSpace(manifest.ProofLaunchPath))
+        {
+            ValidateManifestPath(manifest.ProofLaunchPath, "proofLaunchPath", errors);
+        }
         if (manifest.Arguments.Count == 0 ||
             !manifest.Arguments[0].Equals(manifest.GameRoot, StringComparison.Ordinal))
         {

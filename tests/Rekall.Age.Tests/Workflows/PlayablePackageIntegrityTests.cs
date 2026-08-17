@@ -12,6 +12,69 @@ namespace Rekall.Age.Tests.Workflows;
 public sealed class PlayablePackageIntegrityTests
 {
     [Fact]
+    public async Task GraphicsPackageIncludesDeterministicProofPlayerForCaptureAndAudit()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var output = Path.Combine(TestPaths.CreateTempDirectory(), "GraphicsPackage");
+        var context = new RekallAgeCommandContext(
+            "graphics-package-proof-test",
+            RekallAgeTransaction.Begin("graphics package proof"),
+            CancellationToken.None);
+        var authored = await new RunAgentAuthoringGauntletCommand().ExecuteAsync(
+            new RunAgentAuthoringGauntletRequest(
+                root,
+                "Graphics Proof Game",
+                "Main",
+                Path.Combine(TestPaths.CreateTempDirectory(), "InitialPackage")),
+            context);
+        Assert.True(authored.Ok, authored.Summary);
+
+        var packaged = await new PackagePlayableGameCommand().ExecuteAsync(
+            new PackagePlayableGameRequest(root, "Main", output, Graphics: true),
+            context);
+
+        Assert.True(packaged.Ok, packaged.Summary);
+        var inspection = await new InspectPlayablePackageCommand().ExecuteAsync(
+            new InspectPlayablePackageRequest(output),
+            context);
+        Assert.True(inspection.Ok, inspection.Summary);
+        Assert.EndsWith("Rekall.Age.Player.Windows.exe", inspection.Value.Manifest.LaunchPath, StringComparison.Ordinal);
+        Assert.EndsWith("Rekall.Age.Player.exe", inspection.Value.Manifest.ProofLaunchPath, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(output, inspection.Value.Manifest.ProofLaunchPath!.Replace('/', Path.DirectorySeparatorChar))));
+
+        var capture = await new CapturePlayablePackageFrameCommand().ExecuteAsync(
+            new CapturePlayablePackageFrameRequest(
+                output,
+                Path.Combine(root, "Builds", "GraphicsProof"),
+                FrameIndex: 1),
+            context);
+        Assert.True(capture.Ok, capture.Summary);
+        Assert.True(capture.Value.NonBlank);
+
+        var audit = await new AuditPlayablePackageCommand().ExecuteAsync(
+            new AuditPlayablePackageRequest(
+                output,
+                Path.Combine(root, "Builds", "GraphicsAudit")),
+            context);
+        Assert.True(audit.Ok, audit.Summary);
+        Assert.True(audit.Value.Ready);
+
+        var relocated = await new RelocatePlayablePackageCommand().ExecuteAsync(
+            new RelocatePlayablePackageRequest(
+                output,
+                Path.Combine(TestPaths.CreateTempDirectory(), "RelocatedGraphicsPackage")),
+            context);
+        Assert.True(relocated.Ok, relocated.Summary);
+        var relocatedAudit = await new AuditPlayablePackageCommand().ExecuteAsync(
+            new AuditPlayablePackageRequest(
+                relocated.Value.PackagePath,
+                Path.Combine(root, "Builds", "RelocatedGraphicsAudit")),
+            context);
+        Assert.True(relocatedAudit.Ok, relocatedAudit.Summary);
+        Assert.True(relocatedAudit.Value.Ready);
+    }
+
+    [Fact]
     public async Task PackageManifestIsRelativeHashedAndExcludesAuthoringFiles()
     {
         var root = TestPaths.CreateTempDirectory();

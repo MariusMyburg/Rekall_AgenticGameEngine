@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 01:00 Africa/Johannesburg
+Last verified: 2026-08-18 01:06 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: schema-cased transforms and native envelope recovery pass 578 tests
+Latest milestone: runtime-schema/protocol repair passed the complete product gate
 
 ## Product objective
 
@@ -254,6 +254,11 @@ Studio is important, but it does not define or reorder the engine foundation.
   tools safely unwrap gateway-style `name`/`arguments` envelopes, including
   JSON-string arguments, before typed dispatch. The full Debug suite passes at
   578/578.
+- Runtime/protocol distribution gate: the clean Release build completed with
+  zero warnings and errors, both independent Release passes completed at
+  578/578, and installed acceptance passed the complete SDK, authoring, package
+  portability, visual proof, UI, and audio matrix. The canonical archive is
+  194,691,566 bytes.
 
 ## Current gaps
 
@@ -269,7 +274,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete product gate for schema-cased runtime transforms and native-envelope recovery.
+Rerun the unchanged installed Ollama benchmark on the runtime-schema distribution.
 
 ## Next after the current item
 

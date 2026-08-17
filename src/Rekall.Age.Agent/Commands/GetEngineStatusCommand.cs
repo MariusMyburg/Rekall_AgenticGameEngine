@@ -1,4 +1,5 @@
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Product;
 
 namespace Rekall.Age.Agent.Commands;
 
@@ -20,6 +21,8 @@ public sealed record GetEngineStatusResult(
     string EngineName,
     bool AgentFirst,
     string RenderingPosture,
+    RekallAgeProductMetadata Product,
+    IReadOnlyList<RekallAgeCapabilityStatus> Capabilities,
     IReadOnlyList<RekallAgeAgentWorkflowTool> WorkflowTools,
     IReadOnlyList<RekallAgeAgentAuthoringContract> AuthoringContracts);
 
@@ -42,6 +45,8 @@ public sealed class GetEngineStatusCommand
             EngineName: "Rekall AGE",
             AgentFirst: true,
             RenderingPosture: "Vulkan-first internal renderer with backend-neutral render plans, OpenXR headset readiness, and Direct3D extension point.",
+            Product: RekallAgeProductInfo.Current,
+            Capabilities: RekallAgeProductInfo.Capabilities,
             WorkflowTools:
             [
                 new RekallAgeAgentWorkflowTool(

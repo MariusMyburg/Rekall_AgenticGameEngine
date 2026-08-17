@@ -2679,7 +2679,18 @@ internal static class RekallAgeCli
         Console.WriteLine(result.Summary);
         Console.WriteLine(result.Value.EngineName);
         Console.WriteLine($"Agent-first: {result.Value.AgentFirst}");
+        Console.WriteLine($"Version: {result.Value.Product.Version}");
+        Console.WriteLine($"Channel: {result.Value.Product.Channel}");
+        Console.WriteLine($"Proprietary: {result.Value.Product.Proprietary}");
+        Console.WriteLine($"Supported host: {result.Value.Product.SupportedHost}");
+        Console.WriteLine($"Module SDK compatibility: {result.Value.Product.ModuleSdkCompatibilityVersion}");
         Console.WriteLine($"Rendering: {result.Value.RenderingPosture}");
+        Console.WriteLine("Capabilities:");
+        foreach (var capability in result.Value.Capabilities)
+        {
+            Console.WriteLine($"  {capability.Id} [{capability.Stability}] - {capability.Summary}");
+        }
+
         Console.WriteLine("Workflow tools:");
         foreach (var workflow in result.Value.WorkflowTools)
         {

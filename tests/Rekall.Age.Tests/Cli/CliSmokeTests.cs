@@ -27,6 +27,9 @@ public sealed class CliSmokeTests
         Assert.Contains("Authoring contracts:", engine.Output);
         Assert.Contains("IRekallAgeRuntimeModuleSystem", engine.Output);
         Assert.Contains("RekallAgeRuntimeRenderMesh", engine.Output);
+        Assert.Contains("Version: 0.1.0-preview.1", engine.Output);
+        Assert.Contains("Channel: preview", engine.Output);
+        Assert.Contains("runtime.openxr [experimental]", engine.Output);
 
         var create = await RunAsync(cliAssembly, "project", "create", root, "Crystal Mines", "world,rendering3d");
         Assert.Equal(0, create.ExitCode);

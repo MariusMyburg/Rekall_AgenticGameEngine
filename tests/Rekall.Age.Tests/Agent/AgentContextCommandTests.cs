@@ -149,6 +149,13 @@ public sealed class AgentContextCommandTests
         Assert.True(result.Ok, result.Summary);
         Assert.Equal("Rekall AGE", result.Value.EngineName);
         Assert.True(result.Value.AgentFirst);
+        Assert.Equal("0.1.0-preview.1", result.Value.Product.Version);
+        Assert.Equal(1, result.Value.Product.ModuleSdkCompatibilityVersion);
+        Assert.True(result.Value.Product.Proprietary);
+        Assert.Contains(result.Value.Capabilities, item =>
+            item.Id == "authoring.core" && item.Stability == "supported");
+        Assert.Contains(result.Value.Capabilities, item =>
+            item.Id == "runtime.openxr" && item.Stability == "experimental");
         Assert.DoesNotContain(result.Value.WorkflowTools, workflow => workflow.Tool.StartsWith("rekall.templates.", StringComparison.Ordinal));
         Assert.DoesNotContain(result.Value.WorkflowTools, workflow => workflow.Tool.Contains("template", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.workflow.agent_authoring_gauntlet" && workflow.Recommended);

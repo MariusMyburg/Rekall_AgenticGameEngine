@@ -5,6 +5,23 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class GlbMeshLoaderTests
 {
     [Fact]
+    public async Task LoadAsyncPreservesGlbJointAndWeightBindingsForCpuSkinning()
+    {
+        var path = Path.Combine(TestPaths.CreateTempDirectory(), "skinned.glb");
+        await File.WriteAllBytesAsync(path, GlbTestMeshFactory.CreateSingleJointAnimatedGlb());
+
+        var mesh = Assert.Single(await new RekallAgeGlbMeshLoader().LoadAsync("asset_rig", path, CancellationToken.None));
+
+        Assert.Equal(0, mesh.SkinIndex);
+        Assert.Equal(3, mesh.SkinBindings.Count);
+        Assert.All(mesh.SkinBindings, binding =>
+        {
+            Assert.Equal(0, binding.Joint0);
+            Assert.Equal(1, binding.Weight0, precision: 4);
+        });
+    }
+
+    [Fact]
     public async Task LoadAsyncCreatesVulkanMeshesFromBinaryGlbTriangles()
     {
         var root = TestPaths.CreateTempDirectory();

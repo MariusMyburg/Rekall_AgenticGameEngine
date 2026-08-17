@@ -24,7 +24,23 @@ public sealed record RekallAgeVulkanSceneMesh(
     RekallAgeVulkanSceneCloudShadowMaterial? CloudShadow = null,
     RekallAgeVulkanSceneSurfaceWaterMaterial? SurfaceWater = null,
     int? VirtualGeometrySourceTriangleCount = null,
-    int VirtualGeometryLodLevel = 0);
+    int VirtualGeometryLodLevel = 0)
+{
+    public int? SkinIndex { get; init; }
+
+    public IReadOnlyList<RekallAgeVulkanSceneSkinBinding> SkinBindings { get; init; } =
+        Array.Empty<RekallAgeVulkanSceneSkinBinding>();
+}
+
+public readonly record struct RekallAgeVulkanSceneSkinBinding(
+    int Joint0,
+    int Joint1,
+    int Joint2,
+    int Joint3,
+    float Weight0,
+    float Weight1,
+    float Weight2,
+    float Weight3);
 
 public sealed record RekallAgeVulkanSceneAtmosphereMaterial(
     float PlanetRadius,

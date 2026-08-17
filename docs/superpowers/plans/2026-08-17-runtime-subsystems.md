@@ -34,7 +34,7 @@ structured observations, and gameplay remains in agent-authored modules.
 - [x] Implement deterministic sampling, loop/clamp/ping-pong time, playback speed, and events.
 - [x] Apply generic component-property and transform tracks without genre assumptions.
 - [x] Implement sprite-frame animation and cross-fade/blend layers.
-- [ ] Import and execute skeletal GLB tracks, skinning data, and blend diagnostics.
+- [x] Import and execute skeletal GLB tracks, skinning data, and blend diagnostics.
 - [ ] Prove animation in headless state assertions and rendered captures.
 
 ## Tranche 4: Acceptance and hardening

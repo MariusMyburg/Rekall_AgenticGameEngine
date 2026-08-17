@@ -260,7 +260,12 @@ public sealed record RekallAgeRuntimeViewportRenderable(
     int MeshStacks = 0,
     string FacingMode = "world",
     RekallAgeRuntimeViewportVirtualGeometry? VirtualGeometry = null,
-    RekallAgeRuntimeViewportUiVisual? UiVisual = null);
+    RekallAgeRuntimeViewportUiVisual? UiVisual = null,
+    RekallAgeRuntimeViewportSkin? Skin = null);
+
+public sealed record RekallAgeRuntimeViewportSkin(
+    int SkinIndex,
+    IReadOnlyList<IReadOnlyList<double>> JointMatrices);
 
 public sealed record RekallAgeRuntimeViewportUiVisual(
     string Kind,

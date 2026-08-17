@@ -104,12 +104,82 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
 
         foreach (var mesh in modelMeshes)
         {
-            yield return ApplyVirtualGeometry(BindRenderableMaterial(mesh with
+            var instance = ApplySkin(mesh with
             {
                 EntityId = renderable.EntityId,
                 EntityName = renderable.EntityName
-            }, renderable, assets), renderable, activeCamera);
+            }, renderable.Skin);
+            yield return ApplyVirtualGeometry(BindRenderableMaterial(instance, renderable, assets), renderable, activeCamera);
         }
+    }
+
+    private static RekallAgeVulkanSceneMesh ApplySkin(
+        RekallAgeVulkanSceneMesh mesh,
+        RekallAgeRuntimeViewportSkin? skin)
+    {
+        if (skin is null
+            || mesh.SkinIndex != skin.SkinIndex
+            || mesh.SkinBindings.Count != mesh.Vertices.Count
+            || skin.JointMatrices.Count == 0)
+        {
+            return mesh;
+        }
+
+        var matrices = skin.JointMatrices.Select(ReadMatrix).ToArray();
+        var vertices = new RekallAgeVulkanSceneVertex[mesh.Vertices.Count];
+        for (var index = 0; index < vertices.Length; index++)
+        {
+            var vertex = mesh.Vertices[index];
+            var binding = mesh.SkinBindings[index];
+            var position = Vector3.Zero;
+            var normal = Vector3.Zero;
+            var totalWeight = 0f;
+            Apply(binding.Joint0, binding.Weight0);
+            Apply(binding.Joint1, binding.Weight1);
+            Apply(binding.Joint2, binding.Weight2);
+            Apply(binding.Joint3, binding.Weight3);
+            if (totalWeight <= 0.000001f)
+            {
+                vertices[index] = vertex;
+                continue;
+            }
+            position /= totalWeight;
+            normal = normal.LengthSquared() <= 0.000001f ? new Vector3(vertex.NormalX, vertex.NormalY, vertex.NormalZ) : Vector3.Normalize(normal);
+            vertices[index] = vertex with
+            {
+                X = position.X,
+                Y = position.Y,
+                Z = position.Z,
+                NormalX = normal.X,
+                NormalY = normal.Y,
+                NormalZ = normal.Z
+            };
+
+            void Apply(int joint, float weight)
+            {
+                if (weight <= 0 || joint < 0 || joint >= matrices.Length)
+                {
+                    return;
+                }
+                position += Vector3.Transform(new Vector3(vertex.X, vertex.Y, vertex.Z), matrices[joint]) * weight;
+                normal += Vector3.TransformNormal(new Vector3(vertex.NormalX, vertex.NormalY, vertex.NormalZ), matrices[joint]) * weight;
+                totalWeight += weight;
+            }
+        }
+        return mesh with { Vertices = vertices };
+    }
+
+    private static Matrix4x4 ReadMatrix(IReadOnlyList<double> values)
+    {
+        if (values.Count != 16 || values.Any(value => !double.IsFinite(value)))
+        {
+            return Matrix4x4.Identity;
+        }
+        return new Matrix4x4(
+            (float)values[0], (float)values[1], (float)values[2], (float)values[3],
+            (float)values[4], (float)values[5], (float)values[6], (float)values[7],
+            (float)values[8], (float)values[9], (float)values[10], (float)values[11],
+            (float)values[12], (float)values[13], (float)values[14], (float)values[15]);
     }
 
     private static RekallAgeVulkanSceneMesh ApplyVirtualGeometry(

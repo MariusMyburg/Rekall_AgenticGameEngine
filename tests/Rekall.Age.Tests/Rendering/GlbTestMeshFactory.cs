@@ -314,6 +314,20 @@ internal static class GlbTestMeshFactory
         var translationOffset = (int)binary.Position;
         WriteSingle(binary, 0); WriteSingle(binary, 0); WriteSingle(binary, 0);
         WriteSingle(binary, 0); WriteSingle(binary, 2); WriteSingle(binary, 0);
+        var positionOffset = (int)binary.Position;
+        WriteSingle(binary, 0); WriteSingle(binary, 0); WriteSingle(binary, 0);
+        WriteSingle(binary, 1); WriteSingle(binary, 0); WriteSingle(binary, 0);
+        WriteSingle(binary, 0); WriteSingle(binary, 1); WriteSingle(binary, 0);
+        var jointOffset = (int)binary.Position;
+        for (var index = 0; index < 3; index++)
+        {
+            binary.WriteByte(0); binary.WriteByte(0); binary.WriteByte(0); binary.WriteByte(0);
+        }
+        var weightOffset = (int)binary.Position;
+        for (var index = 0; index < 3; index++)
+        {
+            WriteSingle(binary, 1); WriteSingle(binary, 0); WriteSingle(binary, 0); WriteSingle(binary, 0);
+        }
         var binaryLength = checked((int)binary.Length);
 
         var json = $$"""
@@ -323,17 +337,24 @@ internal static class GlbTestMeshFactory
               "bufferViews": [
                 { "buffer": 0, "byteOffset": 0, "byteLength": 64 },
                 { "buffer": 0, "byteOffset": {{timeOffset}}, "byteLength": 8 },
-                { "buffer": 0, "byteOffset": {{translationOffset}}, "byteLength": 24 }
+                { "buffer": 0, "byteOffset": {{translationOffset}}, "byteLength": 24 },
+                { "buffer": 0, "byteOffset": {{positionOffset}}, "byteLength": 36 },
+                { "buffer": 0, "byteOffset": {{jointOffset}}, "byteLength": 12 },
+                { "buffer": 0, "byteOffset": {{weightOffset}}, "byteLength": 48 }
               ],
               "accessors": [
                 { "bufferView": 0, "componentType": 5126, "count": 1, "type": "MAT4" },
                 { "bufferView": 1, "componentType": 5126, "count": 2, "type": "SCALAR", "min": [0], "max": [1] },
-                { "bufferView": 2, "componentType": 5126, "count": 2, "type": "VEC3" }
+                { "bufferView": 2, "componentType": 5126, "count": 2, "type": "VEC3" },
+                { "bufferView": 3, "componentType": 5126, "count": 3, "type": "VEC3" },
+                { "bufferView": 4, "componentType": 5121, "count": 3, "type": "VEC4" },
+                { "bufferView": 5, "componentType": 5126, "count": 3, "type": "VEC4" }
               ],
               "nodes": [
-                { "name": "Root", "children": [1] },
+                { "name": "Root", "children": [1], "mesh": 0, "skin": 0 },
                 { "name": "Joint", "translation": [0, 0, 0] }
               ],
+              "meshes": [{ "name": "Skinned Triangle", "primitives": [{ "attributes": { "POSITION": 3, "JOINTS_0": 4, "WEIGHTS_0": 5 } }] }],
               "skins": [{ "name": "Rig", "joints": [1], "skeleton": 0, "inverseBindMatrices": 0 }],
               "animations": [{
                 "name": "Lift",

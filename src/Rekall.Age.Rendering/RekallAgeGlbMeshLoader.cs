@@ -54,10 +54,11 @@ public sealed class RekallAgeGlbMeshLoader
             {
                 AddMeshPrimitives(
                     assetId,
-                    meshesElement[meshIndex],
-                    meshIndex,
-                    Matrix4x4.Identity,
-                    bufferViews,
+                meshesElement[meshIndex],
+                meshIndex,
+                Matrix4x4.Identity,
+                null,
+                bufferViews,
                     accessors,
                     materials,
                     glb.Bin,
@@ -98,6 +99,7 @@ public sealed class RekallAgeGlbMeshLoader
                 meshesElement[meshIndex],
                 meshIndex,
                 transform,
+                ReadNullableInt(node, "skin"),
                 bufferViews,
                 accessors,
                 materials,
@@ -132,6 +134,7 @@ public sealed class RekallAgeGlbMeshLoader
         JsonElement mesh,
         int meshIndex,
         Matrix4x4 transform,
+        int? skinIndex,
         IReadOnlyList<JsonElement> bufferViews,
         IReadOnlyList<JsonElement> accessors,
         IReadOnlyList<MaterialInfo> materials,
@@ -174,6 +177,14 @@ public sealed class RekallAgeGlbMeshLoader
                 && uvAccessorElement.TryGetInt32(out var uvAccessor)
                 ? ReadVec2Accessor(uvAccessor, accessors, bufferViews, bin)
                 : [];
+            var joints = attributes.TryGetProperty("JOINTS_0", out var jointAccessorElement)
+                && jointAccessorElement.TryGetInt32(out var jointAccessor)
+                ? ReadJointAccessor(jointAccessor, accessors, bufferViews, bin)
+                : [];
+            var weights = attributes.TryGetProperty("WEIGHTS_0", out var weightAccessorElement)
+                && weightAccessorElement.TryGetInt32(out var weightAccessor)
+                ? ReadWeightAccessor(weightAccessor, accessors, bufferViews, bin)
+                : [];
             var material = ResolveMaterial(primitive, materials);
             var indices = primitive.TryGetProperty("indices", out var indicesElement)
                 && indicesElement.TryGetInt32(out var indicesAccessor)
@@ -189,6 +200,9 @@ public sealed class RekallAgeGlbMeshLoader
                 normals,
                 colors,
                 uvs,
+                joints,
+                weights,
+                skinIndex,
                 material,
                 indices,
                 output);
@@ -205,12 +219,16 @@ public sealed class RekallAgeGlbMeshLoader
         IReadOnlyList<Vector3> normals,
         IReadOnlyList<Vector4> colors,
         IReadOnlyList<Vector2> uvs,
+        IReadOnlyList<JointIndexes> joints,
+        IReadOnlyList<Vector4> weights,
+        int? skinIndex,
         MaterialInfo material,
         IReadOnlyList<int> sourceIndices,
         List<RekallAgeVulkanSceneMesh> output)
     {
         var vertices = new List<RekallAgeVulkanSceneVertex>(Math.Min(sourceIndices.Count, MaxVerticesPerMesh));
         var indices = new List<uint>(Math.Min(sourceIndices.Count, MaxVerticesPerMesh));
+        var skinBindings = new List<RekallAgeVulkanSceneSkinBinding>(Math.Min(sourceIndices.Count, MaxVerticesPerMesh));
         var remap = new Dictionary<int, uint>();
         var chunk = 0;
         for (var i = 0; i + 2 < sourceIndices.Count; i += 3)
@@ -301,6 +319,22 @@ public sealed class RekallAgeGlbMeshLoader
                 color.W,
                 uv.X,
                 uv.Y));
+            var joint = sourceIndex < joints.Count ? joints[sourceIndex] : default;
+            var weight = sourceIndex < weights.Count ? weights[sourceIndex] : default;
+            var totalWeight = weight.X + weight.Y + weight.Z + weight.W;
+            if (totalWeight > 0.000001f)
+            {
+                weight /= totalWeight;
+            }
+            skinBindings.Add(new RekallAgeVulkanSceneSkinBinding(
+                joint.X,
+                joint.Y,
+                joint.Z,
+                joint.W,
+                weight.X,
+                weight.Y,
+                weight.Z,
+                weight.W));
             remap[sourceIndex] = vertexIndex;
             return vertexIndex;
         }
@@ -327,9 +361,17 @@ public sealed class RekallAgeGlbMeshLoader
                 RoughnessFactor: material.RoughnessFactor,
                 NormalScale: material.NormalScale,
                 OcclusionStrength: material.OcclusionStrength,
-                EmissiveFactor: material.EmissiveFactor));
+                EmissiveFactor: material.EmissiveFactor)
+            {
+                SkinIndex = skinIndex,
+                SkinBindings = skinIndex is not null && skinBindings.Any(binding =>
+                    binding.Weight0 + binding.Weight1 + binding.Weight2 + binding.Weight3 > 0.000001f)
+                    ? skinBindings.ToArray()
+                    : []
+            });
             vertices.Clear();
             indices.Clear();
+            skinBindings.Clear();
             remap.Clear();
         }
     }
@@ -437,6 +479,73 @@ public sealed class RekallAgeGlbMeshLoader
                 components == 4 ? ReadSingle(bytes.Span, offset + 12) : 1);
         }
 
+        return result;
+    }
+
+    private static IReadOnlyList<JointIndexes> ReadJointAccessor(
+        int accessorIndex,
+        IReadOnlyList<JsonElement> accessors,
+        IReadOnlyList<JsonElement> bufferViews,
+        ReadOnlyMemory<byte> bin)
+    {
+        if (!TryResolveAccessor(accessorIndex, accessors, bufferViews, bin, out var accessor, out var view, out var bytes)
+            || ReadString(accessor, "type") != "VEC4")
+        {
+            return [];
+        }
+        var componentType = ReadInt(accessor, "componentType", 0);
+        var componentBytes = componentType == 5121 ? 1 : componentType == 5123 ? 2 : 0;
+        if (componentBytes == 0)
+        {
+            return [];
+        }
+        var count = ReadInt(accessor, "count", 0);
+        var stride = ReadInt(view, "byteStride", componentBytes * 4);
+        var result = new JointIndexes[count];
+        for (var index = 0; index < count; index++)
+        {
+            var offset = index * stride;
+            if (offset + componentBytes * 4 > bytes.Length) break;
+            int Read(int component) => componentType == 5121
+                ? bytes.Span[offset + component]
+                : BinaryPrimitives.ReadUInt16LittleEndian(bytes.Span.Slice(offset + component * 2, 2));
+            result[index] = new JointIndexes(Read(0), Read(1), Read(2), Read(3));
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<Vector4> ReadWeightAccessor(
+        int accessorIndex,
+        IReadOnlyList<JsonElement> accessors,
+        IReadOnlyList<JsonElement> bufferViews,
+        ReadOnlyMemory<byte> bin)
+    {
+        if (!TryResolveAccessor(accessorIndex, accessors, bufferViews, bin, out var accessor, out var view, out var bytes)
+            || ReadString(accessor, "type") != "VEC4")
+        {
+            return [];
+        }
+        var componentType = ReadInt(accessor, "componentType", 0);
+        var componentBytes = componentType switch { 5121 => 1, 5123 => 2, 5126 => 4, _ => 0 };
+        if (componentBytes == 0)
+        {
+            return [];
+        }
+        var count = ReadInt(accessor, "count", 0);
+        var stride = ReadInt(view, "byteStride", componentBytes * 4);
+        var result = new Vector4[count];
+        for (var index = 0; index < count; index++)
+        {
+            var offset = index * stride;
+            if (offset + componentBytes * 4 > bytes.Length) break;
+            float Read(int component) => componentType switch
+            {
+                5121 => bytes.Span[offset + component] / 255f,
+                5123 => BinaryPrimitives.ReadUInt16LittleEndian(bytes.Span.Slice(offset + component * 2, 2)) / 65535f,
+                _ => ReadSingle(bytes.Span, offset + component * 4)
+            };
+            result[index] = new Vector4(Read(0), Read(1), Read(2), Read(3));
+        }
         return result;
     }
 
@@ -923,6 +1032,15 @@ public sealed class RekallAgeGlbMeshLoader
             : fallback;
     }
 
+    private static int? ReadNullableInt(JsonElement element, string name)
+    {
+        return element.TryGetProperty(name, out var value)
+            && value.ValueKind == JsonValueKind.Number
+            && value.TryGetInt32(out var result)
+            ? result
+            : null;
+    }
+
     private static float ReadFloat(JsonElement element, string name, float fallback)
     {
         return element.TryGetProperty(name, out var value)
@@ -945,6 +1063,8 @@ public sealed class RekallAgeGlbMeshLoader
     }
 
     private readonly record struct GlbPayload(ReadOnlyMemory<byte> Json, ReadOnlyMemory<byte> Bin);
+
+    private readonly record struct JointIndexes(int X, int Y, int Z, int W);
 
     private sealed record MaterialInfo(
         Vector4 BaseColor,

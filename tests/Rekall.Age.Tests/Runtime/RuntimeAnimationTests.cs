@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Assets;
+using Rekall.Age.Rendering;
 using Rekall.Age.Runtime;
 using Rekall.Age.Tests.Rendering;
 using Rekall.Age.World;
@@ -264,6 +265,12 @@ public sealed class RuntimeAnimationTests
             CancellationToken.None);
         var actor = RekallAgeEntityDocument.Create("Rigged Actor", ["actor"])
             .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["z"] = 3 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.MeshRenderer",
+                new JsonObject { ["mesh"] = asset.Id }))
+            .AddComponent(RekallAgeComponentDocument.Create(
                 "Rekall.SkeletalAnimator",
                 new JsonObject
                 {
@@ -273,14 +280,20 @@ public sealed class RuntimeAnimationTests
                     ["Playing"] = true,
                     ["LoopMode"] = "clamp"
                 }));
+        var camera = RekallAgeEntityDocument.Create("Camera", ["camera"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Camera3D",
+                new JsonObject { ["active"] = true }));
 
         var result = await RekallAgeRuntimeExecutionLoop.CreateDefault(root).RunAsync(
             new RekallAgeRuntimeWorldBuilder().Build(
-                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"])
+                    .AddEntity(actor)
+                    .AddEntity(camera)),
             30,
             CancellationToken.None);
 
-        var runtimeActor = Assert.Single(result.World.Entities);
+        var runtimeActor = Assert.Single(result.World.Entities, entity => entity.Name == "Rigged Actor");
         var pose = Assert.Single(runtimeActor.Components, component => component.Type == "Rekall.SkeletonPose");
         Assert.Equal(1, pose.Properties["jointCount"]!.GetValue<int>());
         var joint = Assert.IsType<JsonObject>(Assert.IsType<JsonArray>(pose.Properties["joints"])[0]);
@@ -293,6 +306,11 @@ public sealed class RuntimeAnimationTests
         Assert.Equal(1, player.JointCount);
         Assert.Equal(0.5, player.TimeSeconds, precision: 3);
         Assert.DoesNotContain(result.World.Observations, observation => observation.Severity == "error");
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(result.World, 160, 90, false);
+        var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(root, frame, CancellationToken.None);
+        var renderedMesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets));
+        Assert.Equal(1, renderedMesh.Vertices.Min(vertex => vertex.Y), precision: 3);
+        Assert.Equal(2, renderedMesh.Vertices.Max(vertex => vertex.Y), precision: 3);
     }
 
     [Fact]

@@ -540,6 +540,55 @@ public sealed class VulkanSceneMeshBuilderTests
     }
 
     [Fact]
+    public void BuildMeshesAppliesRuntimeJointPoseToSkinnedModelVertices()
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "entity-rig",
+            "Rigged Mesh",
+            "mesh",
+            "asset_rig",
+            0,
+            0,
+            0,
+            1,
+            Skin: new RekallAgeRuntimeViewportSkin(
+                0,
+                [
+                    new double[]
+                    {
+                        1, 0, 0, 0,
+                        0, 1, 0, 0,
+                        0, 0, 1, 0,
+                        0, 2, 0, 1
+                    }
+                ])));
+        var assetMesh = new RekallAgeVulkanSceneMesh(
+            "asset_rig",
+            "Rig Asset",
+            "glb",
+            [new RekallAgeVulkanSceneVertex(1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0)],
+            [0])
+        {
+            SkinIndex = 0,
+            SkinBindings = [new RekallAgeVulkanSceneSkinBinding(0, 0, 0, 0, 1, 0, 0, 0)]
+        };
+        var assets = new RekallAgeRuntimeViewportAssetSet(
+            new Dictionary<string, RekallAgeRgbaImage>(StringComparer.Ordinal),
+            new Dictionary<string, IReadOnlyList<RekallAgeVulkanSceneMesh>>(StringComparer.Ordinal)
+            {
+                ["asset_rig"] = [assetMesh]
+            },
+            []);
+
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets));
+
+        var vertex = Assert.Single(mesh.Vertices);
+        Assert.Equal(1, vertex.X, precision: 4);
+        Assert.Equal(2, vertex.Y, precision: 4);
+        Assert.Equal(0, vertex.Z, precision: 4);
+    }
+
+    [Fact]
     public void BuildMeshesCreatesAuthoredGeometryMeshData()
     {
         var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(

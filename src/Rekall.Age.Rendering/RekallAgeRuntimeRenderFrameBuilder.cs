@@ -510,7 +510,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     : isTextLabelRenderable
                     ? ReadString(textLabelComponent, "facingMode") ?? ReadString(textLabelComponent, "FacingMode") ?? "world"
                     : "world",
-                VirtualGeometry: virtualGeometry);
+                VirtualGeometry: virtualGeometry,
+                Skin: ReadSkin(entity));
 
             if (planetComponent is not null
                 && atmosphereComponent is not null
@@ -1190,6 +1191,88 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             Math.Clamp((int)Math.Round(ReadNumber(component, "maxLodLevel", 8)), 0, 16),
             EmptyToNull(ReadString(component, "debugMode")) ?? "off");
     }
+
+    private static RekallAgeRuntimeViewportSkin? ReadSkin(RekallAgeRuntimeEntity? entity)
+    {
+        var pose = entity?.Components.FirstOrDefault(component =>
+            component.Type.Equals("Rekall.SkeletonPose", StringComparison.Ordinal));
+        if (pose is null
+            || !TryGetPropertyValue(pose.Properties, "joints", out var node)
+            || node is not JsonArray joints
+            || joints.Count is 0 or > 4_096)
+        {
+            return null;
+        }
+
+        var indexed = joints.OfType<JsonObject>()
+            .Select(joint => (
+                Index: (int)ReadNumber(joint, "jointIndex", -1),
+                Matrix: ReadMatrix(joint)))
+            .Where(item => item.Index >= 0 && item.Matrix is not null)
+            .ToArray();
+        if (indexed.Length == 0)
+        {
+            return null;
+        }
+        var count = indexed.Max(item => item.Index) + 1;
+        if (count > 4_096)
+        {
+            return null;
+        }
+        IReadOnlyList<double>[] matrices = Enumerable.Range(0, count)
+            .Select(_ => (IReadOnlyList<double>)IdentityMatrix())
+            .ToArray();
+        foreach (var item in indexed)
+        {
+            matrices[item.Index] = item.Matrix!;
+        }
+        return new RekallAgeRuntimeViewportSkin(
+            (int)ReadNumber(pose.Properties, "skinIndex", 0),
+            matrices);
+    }
+
+    private static IReadOnlyList<double>? ReadMatrix(JsonObject joint)
+    {
+        if (!TryGetPropertyValue(joint, "matrix", out var node)
+            || node is not JsonArray values
+            || values.Count != 16)
+        {
+            return null;
+        }
+        var result = new double[16];
+        for (var index = 0; index < result.Length; index++)
+        {
+            if (values[index] is not JsonValue value)
+            {
+                return null;
+            }
+            if (value.TryGetValue<double>(out result[index]))
+            {
+                if (!double.IsFinite(result[index])) return null;
+                continue;
+            }
+            if (value.TryGetValue<float>(out var single) && float.IsFinite(single))
+            {
+                result[index] = single;
+                continue;
+            }
+            if (value.TryGetValue<int>(out var integer))
+            {
+                result[index] = integer;
+                continue;
+            }
+            return null;
+        }
+        return result;
+    }
+
+    private static double[] IdentityMatrix() =>
+    [
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    ];
 
     private static RekallAgeRuntimeViewportAtmosphereMaterial ReadAtmosphereMaterial(
         RekallAgeRuntimeComponent component,

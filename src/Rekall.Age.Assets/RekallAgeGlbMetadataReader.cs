@@ -45,7 +45,11 @@ public static class RekallAgeGlbMetadataReader
             item.TryGetProperty("nodes", out var nodes) && nodes.ValueKind == JsonValueKind.Array ? nodes.GetArrayLength() : 0));
         var nodes = ReadArray(root, "nodes", item => new RekallAgeGlbNodeMetadata(
             ReadString(item, "name"),
-            ReadInt(item, "mesh")));
+            ReadInt(item, "mesh"))
+        {
+            SkinIndex = ReadInt(item, "skin"),
+            ChildCount = ArrayLength(item, "children")
+        });
         var meshes = ReadArray(root, "meshes", item => new RekallAgeGlbMeshMetadata(
             ReadString(item, "name"),
             item.TryGetProperty("primitives", out var primitives) && primitives.ValueKind == JsonValueKind.Array
@@ -56,7 +60,17 @@ public static class RekallAgeGlbMetadataReader
             ReadString(item, "name"),
             ReadString(item, "mimeType"),
             ReadString(item, "uri")));
-        var animations = ReadArray(root, "animations", item => new RekallAgeGlbAnimationMetadata(ReadString(item, "name")));
+        var skins = ReadArray(root, "skins", item => new RekallAgeGlbSkinMetadata(
+            ReadString(item, "name"),
+            ArrayLength(item, "joints"),
+            ReadInt(item, "skeleton"),
+            ReadInt(item, "inverseBindMatrices")));
+        var animations = ReadArray(root, "animations", item => new RekallAgeGlbAnimationMetadata(ReadString(item, "name"))
+        {
+            SamplerCount = ArrayLength(item, "samplers"),
+            ChannelCount = ArrayLength(item, "channels"),
+            Targets = ReadAnimationTargets(item)
+        });
 
         return new RekallAgeGlbMetadata(
             scenes.Count,
@@ -70,7 +84,32 @@ public static class RekallAgeGlbMetadataReader
             meshes,
             materials,
             images,
-            animations);
+            animations)
+        {
+            SkinCount = skins.Count,
+            Skins = skins
+        };
+    }
+
+    private static IReadOnlyList<RekallAgeGlbAnimationTargetMetadata> ReadAnimationTargets(JsonElement animation)
+    {
+        if (!animation.TryGetProperty("channels", out var channels) || channels.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<RekallAgeGlbAnimationTargetMetadata>();
+        }
+
+        return channels.EnumerateArray()
+            .Select(channel => channel.TryGetProperty("target", out var target)
+                ? new RekallAgeGlbAnimationTargetMetadata(ReadInt(target, "node"), ReadString(target, "path"))
+                : new RekallAgeGlbAnimationTargetMetadata(null, null))
+            .ToArray();
+    }
+
+    private static int ArrayLength(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.Array
+            ? value.GetArrayLength()
+            : 0;
     }
 
     private static IReadOnlyList<T> ReadArray<T>(

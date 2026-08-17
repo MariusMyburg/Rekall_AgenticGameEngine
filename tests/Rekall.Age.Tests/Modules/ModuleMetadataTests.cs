@@ -58,6 +58,9 @@ public sealed class ModuleMetadataTests
         var layers = Assert.Single(mixer.Properties, property => property.Name == "Layers" && property.Kind == "animationLayers");
         Assert.Contains("targetWeight", layers.Description, StringComparison.Ordinal);
         Assert.Contains("32", layers.Description, StringComparison.Ordinal);
+        var skeletal = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.SkeletalAnimator");
+        Assert.Contains(skeletal.Properties, property => property.Name == "Model" && property.AssetKind == "model");
+        Assert.Contains(skeletal.Properties, property => property.Name == "Animation");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.AudioEmitter");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.UiCanvas");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Button");

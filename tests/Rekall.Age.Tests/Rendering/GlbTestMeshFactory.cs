@@ -298,6 +298,55 @@ internal static class GlbTestMeshFactory
         return CreateGlb(Encoding.UTF8.GetBytes(json), binary.ToArray());
     }
 
+    public static byte[] CreateSingleJointAnimatedGlb()
+    {
+        var binary = new MemoryStream();
+        for (var row = 0; row < 4; row++)
+        {
+            for (var column = 0; column < 4; column++)
+            {
+                WriteSingle(binary, row == column ? 1 : 0);
+            }
+        }
+        var timeOffset = (int)binary.Position;
+        WriteSingle(binary, 0);
+        WriteSingle(binary, 1);
+        var translationOffset = (int)binary.Position;
+        WriteSingle(binary, 0); WriteSingle(binary, 0); WriteSingle(binary, 0);
+        WriteSingle(binary, 0); WriteSingle(binary, 2); WriteSingle(binary, 0);
+        var binaryLength = checked((int)binary.Length);
+
+        var json = $$"""
+            {
+              "asset": { "version": "2.0" },
+              "buffers": [{ "byteLength": {{binaryLength}} }],
+              "bufferViews": [
+                { "buffer": 0, "byteOffset": 0, "byteLength": 64 },
+                { "buffer": 0, "byteOffset": {{timeOffset}}, "byteLength": 8 },
+                { "buffer": 0, "byteOffset": {{translationOffset}}, "byteLength": 24 }
+              ],
+              "accessors": [
+                { "bufferView": 0, "componentType": 5126, "count": 1, "type": "MAT4" },
+                { "bufferView": 1, "componentType": 5126, "count": 2, "type": "SCALAR", "min": [0], "max": [1] },
+                { "bufferView": 2, "componentType": 5126, "count": 2, "type": "VEC3" }
+              ],
+              "nodes": [
+                { "name": "Root", "children": [1] },
+                { "name": "Joint", "translation": [0, 0, 0] }
+              ],
+              "skins": [{ "name": "Rig", "joints": [1], "skeleton": 0, "inverseBindMatrices": 0 }],
+              "animations": [{
+                "name": "Lift",
+                "samplers": [{ "input": 1, "output": 2, "interpolation": "LINEAR" }],
+                "channels": [{ "sampler": 0, "target": { "node": 1, "path": "translation" } }]
+              }],
+              "scenes": [{ "nodes": [0] }],
+              "scene": 0
+            }
+            """;
+        return CreateGlb(Encoding.UTF8.GetBytes(json), binary.ToArray());
+    }
+
     private static byte[] Pad(byte[] bytes, byte value)
     {
         var paddedLength = (bytes.Length + 3) & ~3;

@@ -3068,6 +3068,10 @@ internal static class RekallAgeCli
         foreach (var player in result.Value.AnimationPlayers)
         {
             Console.WriteLine($"  Animation {player.EntityName}: kind={player.Kind} inline={player.InlineClip} playing={player.Playing} time={player.TimeSeconds:F3}/{player.DurationSeconds:F3} loop={player.LoopMode} layers={player.ActiveLayerCount}/{player.LayerCount}");
+            if (player.JointCount > 0)
+            {
+                Console.WriteLine($"    Skeleton: animation={player.AnimationName ?? "(none)"} skin={player.SkinName ?? "(unnamed)"} joints={player.JointCount}");
+            }
             foreach (var layer in player.Layers)
             {
                 Console.WriteLine($"    Layer {layer.Name}: clip={layer.ClipAssetId ?? "(none)"} weight={layer.Weight:F3}->{layer.TargetWeight:F3} time={layer.TimeSeconds:F3}/{layer.DurationSeconds:F3} playing={layer.Playing}");

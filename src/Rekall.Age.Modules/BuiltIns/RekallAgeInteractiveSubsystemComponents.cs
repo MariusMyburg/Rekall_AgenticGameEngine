@@ -86,6 +86,20 @@ public sealed class RekallAgeAnimationMixerComponent : RekallAgeComponent
     public object[] Layers { get; init; } = [];
 }
 
+[RekallAgeComponent("Skeletal Animator", Description = "Samples a named animation and skin from an imported GLB model into an inspectable joint pose.")]
+public sealed class RekallAgeSkeletalAnimatorComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "model", Description = "Catalog id of an imported GLB model containing a skin and animation channels.")]
+    public string Model { get; init; } = string.Empty;
+    [RekallAgeProperty(Description = "Animation name from the imported GLB metadata. Empty selects the first animation.")]
+    public string Animation { get; init; } = string.Empty;
+    [RekallAgeProperty(Minimum = 0)] public int SkinIndex { get; init; }
+    [RekallAgeProperty] public bool Playing { get; init; } = true;
+    [RekallAgeProperty] public double Speed { get; init; } = 1;
+    [RekallAgeProperty(AllowedValues = ["clamp", "loop", "pingpong"])] public string LoopMode { get; init; } = "loop";
+    [RekallAgeProperty(Minimum = 0)] public double StartTimeSeconds { get; init; }
+}
+
 [RekallAgeComponent("UI Canvas", Description = "Defines a resolution-independent reference canvas and draw layer.")]
 public sealed class RekallAgeUiCanvasComponent : RekallAgeComponent
 {

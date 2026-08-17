@@ -207,6 +207,7 @@ public sealed class SceneRuntimeFoundationTests
                 "runtime.celestial.kepler",
                 "runtime.celestial.rotation",
                 "runtime.animation",
+                "runtime.animation.skeletal",
                 "runtime.audio",
                 "runtime.physics.bepu",
                 "runtime.rendering",

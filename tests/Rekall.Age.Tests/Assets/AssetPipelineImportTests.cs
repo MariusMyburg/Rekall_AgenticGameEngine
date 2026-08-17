@@ -54,6 +54,17 @@ public sealed class AssetPipelineImportTests
         Assert.Equal(1, result.Value.Report.GlbMetadata.ImageCount);
         Assert.Equal(2, result.Value.Report.GlbMetadata.NodeCount);
         Assert.Equal(1, result.Value.Report.GlbMetadata.AnimationCount);
+        Assert.Equal(1, result.Value.Report.GlbMetadata.SkinCount);
+        var skin = Assert.Single(result.Value.Report.GlbMetadata.Skins);
+        Assert.Equal("RobotRig", skin.Name);
+        Assert.Equal(1, skin.JointCount);
+        Assert.Equal(0, skin.SkeletonNodeIndex);
+        Assert.Equal(2, skin.InverseBindMatricesAccessorIndex);
+        var animation = Assert.Single(result.Value.Report.GlbMetadata.Animations);
+        Assert.Equal("Idle", animation.Name);
+        Assert.Equal(1, animation.SamplerCount);
+        Assert.Equal(1, animation.ChannelCount);
+        Assert.Contains(animation.Targets, target => target.NodeIndex == 1 && target.Path == "rotation");
         Assert.Contains(result.Value.Report.GlbMetadata.Meshes, mesh =>
             mesh.Name == "RobotBody" && mesh.PrimitiveCount == 1);
         Assert.Contains(result.Value.Report.GlbMetadata.Materials, material => material.Name == "Paint");
@@ -95,7 +106,7 @@ public sealed class AssetPipelineImportTests
           "scene": 0,
           "scenes": [{ "name": "MainScene", "nodes": [0] }],
           "nodes": [
-            { "name": "RobotRoot", "mesh": 0 },
+            { "name": "RobotRoot", "mesh": 0, "skin": 0, "children": [1] },
             { "name": "RobotChild", "mesh": 1 }
           ],
           "meshes": [
@@ -104,7 +115,12 @@ public sealed class AssetPipelineImportTests
           ],
           "materials": [{ "name": "Paint" }],
           "images": [{ "name": "PaintTexture", "mimeType": "image/png" }],
-          "animations": [{ "name": "Idle" }]
+          "skins": [{ "name": "RobotRig", "joints": [1], "skeleton": 0, "inverseBindMatrices": 2 }],
+          "animations": [{
+            "name": "Idle",
+            "samplers": [{ "input": 3, "output": 4, "interpolation": "LINEAR" }],
+            "channels": [{ "sampler": 0, "target": { "node": 1, "path": "rotation" } }]
+          }]
         }
         """;
         var jsonBytes = System.Text.Encoding.UTF8.GetBytes(json);

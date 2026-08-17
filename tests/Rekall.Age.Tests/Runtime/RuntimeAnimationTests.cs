@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Assets;
 using Rekall.Age.Runtime;
+using Rekall.Age.Tests.Rendering;
 using Rekall.Age.World;
 
 namespace Rekall.Age.Tests.Runtime;
@@ -243,6 +244,74 @@ public sealed class RuntimeAnimationTests
         Assert.Equal(3, sprite.Properties["offset"]![1]!.GetValue<double>(), precision: 3);
         Assert.Equal("#bfbfbf", sprite.Properties["tint"]!.GetValue<string>());
         Assert.Equal("run", sprite.Properties["sprite"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task SkeletalAnimatorSamplesGlbJointPoseAtFixedTime()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var source = Path.Combine(root, "animated-source.glb");
+        await File.WriteAllBytesAsync(source, GlbTestMeshFactory.CreateSingleJointAnimatedGlb());
+        var asset = await RekallAgeAssetImporter.ImportAsync(
+            root,
+            source,
+            "model",
+            "Animated Rig",
+            CancellationToken.None);
+        await new RekallAgeAssetCatalogStore().SaveAsync(
+            root,
+            new RekallAgeAssetCatalogDocument([asset]),
+            CancellationToken.None);
+        var actor = RekallAgeEntityDocument.Create("Rigged Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.SkeletalAnimator",
+                new JsonObject
+                {
+                    ["Model"] = asset.Id,
+                    ["Animation"] = "Lift",
+                    ["SkinIndex"] = 0,
+                    ["Playing"] = true,
+                    ["LoopMode"] = "clamp"
+                }));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault(root).RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            30,
+            CancellationToken.None);
+
+        var runtimeActor = Assert.Single(result.World.Entities);
+        var pose = Assert.Single(runtimeActor.Components, component => component.Type == "Rekall.SkeletonPose");
+        Assert.Equal(1, pose.Properties["jointCount"]!.GetValue<int>());
+        var joint = Assert.IsType<JsonObject>(Assert.IsType<JsonArray>(pose.Properties["joints"])[0]);
+        Assert.Equal("Joint", joint["name"]!.GetValue<string>());
+        Assert.Equal(1, joint["translation"]![1]!.GetValue<double>(), precision: 3);
+        var player = Assert.Single(result.World.Subsystems.Animation.Players);
+        Assert.Equal("SkeletalAnimator", player.Kind);
+        Assert.Equal("Lift", player.AnimationName);
+        Assert.Equal("Rig", player.SkinName);
+        Assert.Equal(1, player.JointCount);
+        Assert.Equal(0.5, player.TimeSeconds, precision: 3);
+        Assert.DoesNotContain(result.World.Observations, observation => observation.Severity == "error");
+    }
+
+    [Fact]
+    public async Task SkeletalAnimatorReportsMissingModelAsStructuredObservation()
+    {
+        var actor = RekallAgeEntityDocument.Create("Rigged Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.SkeletalAnimator",
+                new JsonObject { ["Model"] = "asset-missing" }));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault().RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            1,
+            CancellationToken.None);
+
+        Assert.Contains(result.World.Observations, observation =>
+            observation.Code == "runtime.animation.skeletal_model_missing"
+            && observation.EntityName == "Rigged Actor");
     }
 
     [Fact]

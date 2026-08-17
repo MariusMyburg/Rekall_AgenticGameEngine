@@ -473,6 +473,30 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             Layers = projectedLayers
                         });
                         break;
+                    case "Rekall.SkeletalAnimator":
+                        var pose = entity.Components.FirstOrDefault(candidate =>
+                            candidate.Type.Equals("Rekall.SkeletonPose", StringComparison.Ordinal));
+                        animationPlayers.Add(new RekallAgeRuntimeAnimationPlayer(
+                            entity.Id,
+                            entity.Name,
+                            "SkeletalAnimator",
+                            ReadString(component.Properties, "model"))
+                        {
+                            Playing = pose is null
+                                ? ReadBoolean(component.Properties, "playing", true)
+                                : ReadBoolean(pose.Properties, "playing", true),
+                            TimeSeconds = pose is null ? 0 : ReadNumber(pose.Properties, "timeSeconds", 0),
+                            DurationSeconds = pose is null ? 0 : ReadNumber(pose.Properties, "durationSeconds", 0),
+                            LoopMode = pose is null
+                                ? ReadString(component.Properties, "loopMode") ?? "loop"
+                                : ReadString(pose.Properties, "loopMode") ?? "loop",
+                            AnimationName = pose is null
+                                ? ReadString(component.Properties, "animation")
+                                : ReadString(pose.Properties, "animation"),
+                            SkinName = pose is null ? null : ReadString(pose.Properties, "skinName"),
+                            JointCount = pose is null ? 0 : ReadInt32(pose.Properties, "jointCount", 0)
+                        });
+                        break;
                     default:
                         if (IsLight(component.Type))
                         {

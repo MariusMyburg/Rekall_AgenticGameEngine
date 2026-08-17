@@ -480,6 +480,12 @@ public sealed record RekallAgeRuntimeAnimationPlayer(
 
     public IReadOnlyList<RekallAgeRuntimeAnimationLayer> Layers { get; init; } =
         Array.Empty<RekallAgeRuntimeAnimationLayer>();
+
+    public string? AnimationName { get; init; }
+
+    public string? SkinName { get; init; }
+
+    public int JointCount { get; init; }
 }
 
 public sealed record RekallAgeRuntimeAnimationLayer(

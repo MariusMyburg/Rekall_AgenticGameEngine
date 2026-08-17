@@ -35,11 +35,22 @@ public sealed record RekallAgeGlbMetadata(
     IReadOnlyList<RekallAgeGlbMeshMetadata> Meshes,
     IReadOnlyList<RekallAgeGlbMaterialMetadata> Materials,
     IReadOnlyList<RekallAgeGlbImageMetadata> Images,
-    IReadOnlyList<RekallAgeGlbAnimationMetadata> Animations);
+    IReadOnlyList<RekallAgeGlbAnimationMetadata> Animations)
+{
+    public int SkinCount { get; init; }
+
+    public IReadOnlyList<RekallAgeGlbSkinMetadata> Skins { get; init; } =
+        Array.Empty<RekallAgeGlbSkinMetadata>();
+}
 
 public sealed record RekallAgeGlbSceneMetadata(string? Name, int NodeCount);
 
-public sealed record RekallAgeGlbNodeMetadata(string? Name, int? MeshIndex);
+public sealed record RekallAgeGlbNodeMetadata(string? Name, int? MeshIndex)
+{
+    public int? SkinIndex { get; init; }
+
+    public int ChildCount { get; init; }
+}
 
 public sealed record RekallAgeGlbMeshMetadata(string? Name, int PrimitiveCount);
 
@@ -47,4 +58,20 @@ public sealed record RekallAgeGlbMaterialMetadata(string? Name);
 
 public sealed record RekallAgeGlbImageMetadata(string? Name, string? MimeType, string? Uri);
 
-public sealed record RekallAgeGlbAnimationMetadata(string? Name);
+public sealed record RekallAgeGlbSkinMetadata(
+    string? Name,
+    int JointCount,
+    int? SkeletonNodeIndex,
+    int? InverseBindMatricesAccessorIndex);
+
+public sealed record RekallAgeGlbAnimationMetadata(string? Name)
+{
+    public int SamplerCount { get; init; }
+
+    public int ChannelCount { get; init; }
+
+    public IReadOnlyList<RekallAgeGlbAnimationTargetMetadata> Targets { get; init; } =
+        Array.Empty<RekallAgeGlbAnimationTargetMetadata>();
+}
+
+public sealed record RekallAgeGlbAnimationTargetMetadata(int? NodeIndex, string? Path);

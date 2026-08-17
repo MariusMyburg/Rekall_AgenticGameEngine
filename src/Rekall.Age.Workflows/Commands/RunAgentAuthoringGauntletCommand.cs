@@ -206,8 +206,7 @@ public sealed class RunAgentAuthoringGauntletCommand
                         "Rekall.SpriteRenderer",
                         new JsonObject
                         {
-                            ["sprite"] = "agent-authored-marker",
-                            ["color"] = "#4bd4a1"
+                            ["sprite"] = "agent-authored-marker"
                         })
                 ])
         ];

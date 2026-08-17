@@ -364,6 +364,32 @@ The provider-neutral repair makes transform extraction case-insensitive and
 allows discovered native tools to unwrap the gateway envelope when it contains
 only the matching tool name and object/JSON-string arguments.
 
+### Agent-contract discovery rerun
+
+Rerun 13 used the runtime-schema distribution with the unchanged 36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun13`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 615,017
+- Completion tokens: 6,808
+
+The agent progressed through deterministic runtime inspection, module
+scaffolding, package creation, and original-package audit, but had no remaining
+turn for relocation and relocated audit. It recovered from a malformed first
+blueprint, used `frameCount` instead of the runtime command's canonical
+`Frames`, and later used `archivePath` instead of the audit command's
+`PackagePath`. Package creation correctly returned the exact playable-scaffold
+action when no module existed, and succeeded after the agent executed it.
+
+The trace also spent many calls searching component schemas separately. Review
+of the returned catalog found a product defect rather than only a prompting
+problem: core `Rekall.MeshRenderer` and `Rekall.SpriteRenderer` runtime
+components had no registered authoring schemas. The generic correction adds
+their strict contracts, ranks complete composable physics/rendering families
+for broad searches, and narrowly normalizes the two recoverable request aliases
+according to the selected command's actual request type.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 01:06 Africa/Johannesburg
+Last verified: 2026-08-18 01:20 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: runtime-schema/protocol repair passed the complete product gate
+Latest milestone: agent contract discovery repair passed 580/580 Debug tests
 
 ## Product objective
 
@@ -259,6 +259,23 @@ Studio is important, but it does not define or reorder the engine foundation.
   578/578, and installed acceptance passed the complete SDK, authoring, package
   portability, visual proof, UI, and audio matrix. The canonical archive is
   194,691,566 bytes.
+- Broad benchmark rerun 13: the agent stopped at 36 tools (615,017 prompt;
+  6,808 completion) after deterministic runtime inspection, module scaffolding,
+  package creation, and original-package audit, but before relocation. It
+  recovered from `frameCount` instead of `Frames`, required a separate scaffold
+  retry after package creation found no module, and used `archivePath` instead
+  of the audit command's canonical `PackagePath`. Repeated component searches
+  also exposed that core `Rekall.MeshRenderer` and `Rekall.SpriteRenderer`
+  runtime contracts were absent from the registered schema catalog. This is not
+  an accepted pass.
+- Agent contract discovery repair: dynamic requests narrowly map `frameCount`
+  to `Frames` and `archivePath` to `PackagePath` only when the target command
+  declares the canonical property. Broad physics schema discovery ranks the
+  matching 2D/3D transform, rigid-body, collider, renderer, camera, and light
+  families together. `Rekall.MeshRenderer` and `Rekall.SpriteRenderer` now have
+  strict registered schemas, and the engine-owned gauntlet no longer authors an
+  ignored sprite color property. Focused regressions and the full Debug suite
+  pass at 580/580.
 
 ## Current gaps
 
@@ -274,7 +291,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the unchanged installed Ollama benchmark on the runtime-schema distribution.
+Run the complete clean product gate for the agent contract discovery repair.
 
 ## Next after the current item
 

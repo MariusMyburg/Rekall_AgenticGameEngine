@@ -88,6 +88,32 @@ public sealed class ModuleMetadataTests
     }
 
     [Fact]
+    public async Task PhysicsConceptSearchReturnsComposable2DAnd3DContractFamilies()
+    {
+        var command = new SearchComponentSchemasCommand(typeof(RekallAgeBuiltInModule).Assembly);
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("search physics family"),
+            CancellationToken.None);
+
+        var result = await command.ExecuteAsync(
+            new SearchComponentSchemasRequest("physics 2d 3d camera lighting visible", Limit: 24),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        var types = result.Value.Components.Select(component => component.TypeName).ToHashSet(StringComparer.Ordinal);
+        Assert.Contains("Rekall.Transform2D", types);
+        Assert.Contains("Rekall.Transform3D", types);
+        Assert.Contains("Rekall.Rigidbody2D", types);
+        Assert.Contains("Rekall.Rigidbody3D", types);
+        Assert.Contains("Rekall.BoxCollider2D", types);
+        Assert.Contains("Rekall.BoxCollider3D", types);
+        Assert.Contains("Rekall.Camera2D", types);
+        Assert.Contains("Rekall.Camera3D", types);
+        Assert.Contains("Rekall.MeshRenderer", types);
+    }
+
+    [Fact]
     public async Task ComponentSchemaSearchRejectsMissingQueryWithStructuredError()
     {
         var command = new SearchComponentSchemasCommand(typeof(RekallAgeBuiltInModule).Assembly);

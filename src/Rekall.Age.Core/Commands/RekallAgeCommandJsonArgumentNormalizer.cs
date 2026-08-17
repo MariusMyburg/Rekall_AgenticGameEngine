@@ -82,6 +82,7 @@ internal static class RekallAgeCommandJsonArgumentNormalizer
 
         if (node is JsonObject value && IsObjectContract(type))
         {
+            ApplyTypeDirectedAliases(value, type);
             foreach (var property in type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
                          .Where(property => property.GetMethod is not null && property.GetIndexParameters().Length == 0))
             {
@@ -102,6 +103,36 @@ internal static class RekallAgeCommandJsonArgumentNormalizer
         }
 
         return node;
+    }
+
+    private static void ApplyTypeDirectedAliases(JsonObject value, Type type)
+    {
+        var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Where(property => property.GetMethod is not null && property.GetIndexParameters().Length == 0)
+            .ToArray();
+        ApplyAlias(value, properties, "Frames", "frameCount");
+        ApplyAlias(value, properties, "PackagePath", "archivePath");
+    }
+
+    private static void ApplyAlias(
+        JsonObject value,
+        IReadOnlyList<PropertyInfo> properties,
+        string canonicalName,
+        string aliasName)
+    {
+        if (!properties.Any(property => property.Name.Equals(canonicalName, StringComparison.Ordinal))
+            || value.Any(item => item.Key.Equals(canonicalName, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        var alias = value.FirstOrDefault(item => item.Key.Equals(aliasName, StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrEmpty(alias.Key) || alias.Value is null)
+        {
+            return;
+        }
+
+        value[canonicalName] = alias.Value.DeepClone();
     }
 
     private static bool TryNormalizeScalar(string text, Type type, out JsonNode value)

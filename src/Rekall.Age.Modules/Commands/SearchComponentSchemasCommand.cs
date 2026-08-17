@@ -100,6 +100,7 @@ public sealed class SearchComponentSchemasCommand
             {
                 item.Component,
                 Score = terms.Sum(term => item.SearchText.Contains(term, StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                    + FamilyScore(item.Component.TypeName, terms)
             })
             .Where(item => terms.Length == 0 || item.Score > 0)
             .OrderByDescending(item => item.Score)
@@ -110,6 +111,44 @@ public sealed class SearchComponentSchemasCommand
         return RekallAgeCommandResult<SearchComponentSchemasResult>.Success(
             new SearchComponentSchemasResult(matches),
             $"Found {matches.Length} component schemas for '{request.Query}'.");
+    }
+
+    private static int FamilyScore(string typeName, IReadOnlyList<string> terms)
+    {
+        var physics = terms.Any(term => term.Equals("physics", StringComparison.OrdinalIgnoreCase));
+        var visible = terms.Any(term => term.Equals("visible", StringComparison.OrdinalIgnoreCase)
+            || term.StartsWith("render", StringComparison.OrdinalIgnoreCase));
+        var camera = terms.Any(term => term.StartsWith("camera", StringComparison.OrdinalIgnoreCase));
+        var lighting = terms.Any(term => term.StartsWith("light", StringComparison.OrdinalIgnoreCase));
+        var score = 0;
+        if (physics && (typeName.Contains("Rigidbody", StringComparison.Ordinal)
+            || typeName.Contains("Collider", StringComparison.Ordinal)
+            || typeName.Contains("Physics", StringComparison.Ordinal)))
+        {
+            score += 5;
+        }
+        if (physics && typeName.Contains("Transform", StringComparison.Ordinal))
+        {
+            score += 4;
+        }
+        if (visible && typeName == "Rekall.MeshRenderer")
+        {
+            score += 50;
+        }
+        else if (visible && typeName is "Rekall.SpriteRenderer" or "Rekall.GeometryPrimitive")
+        {
+            score += 15;
+        }
+        if (camera && typeName.Contains("Camera", StringComparison.Ordinal))
+        {
+            score += 4;
+        }
+        if (lighting && typeName.Contains("Light", StringComparison.Ordinal))
+        {
+            score += 4;
+        }
+
+        return score;
     }
 
     private static RekallAgeCompactComponentSchema Compact(RekallAgeComponentSchema component)

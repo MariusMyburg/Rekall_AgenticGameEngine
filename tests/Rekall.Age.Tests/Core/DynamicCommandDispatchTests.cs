@@ -79,6 +79,27 @@ public sealed class DynamicCommandDispatchTests
     }
 
     [Fact]
+    public async Task RegistryNormalizesCommonTypeDirectedArgumentAliases()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new AliasCommand());
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("normalize aliases"),
+            CancellationToken.None);
+
+        var result = await registry.ExecuteJsonAsync(
+            "rekall.test.aliases",
+            """{"frameCount":"30","archivePath":"F:\\Builds\\Game.zip"}""",
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        var value = Assert.IsType<AliasResult>(result.Value);
+        Assert.Equal(30, value.Frames);
+        Assert.Equal("F:\\Builds\\Game.zip", value.PackagePath);
+    }
+
+    [Fact]
     public async Task RegistryAllowsComponentAddToOmitEmptyProperties()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -130,6 +151,10 @@ public sealed class DynamicCommandDispatchTests
         JsonArray Points,
         string Literal);
 
+    private sealed record AliasRequest(int Frames, string PackagePath);
+
+    private sealed record AliasResult(int Frames, string PackagePath);
+
     private sealed class EchoCommand : IRekallAgeCommand<EchoRequest, EchoResult>
     {
         public string Name => "rekall.test.echo";
@@ -175,6 +200,25 @@ public sealed class DynamicCommandDispatchTests
                     request.Points,
                     request.Literal),
                 "Normalized arguments."));
+        }
+    }
+
+    private sealed class AliasCommand : IRekallAgeCommand<AliasRequest, AliasResult>
+    {
+        public string Name => "rekall.test.aliases";
+
+        public RekallAgeCommandSchema Schema => new(
+            Name,
+            "Tests type-directed aliases.",
+            typeof(AliasRequest).FullName!,
+            typeof(AliasResult).FullName!);
+
+        public ValueTask<RekallAgeCommandResult<AliasResult>> ExecuteAsync(
+            AliasRequest request,
+            RekallAgeCommandContext context)
+        {
+            return ValueTask.FromResult(RekallAgeCommandResult<AliasResult>.Success(
+                new AliasResult(request.Frames, request.PackagePath)));
         }
     }
 }

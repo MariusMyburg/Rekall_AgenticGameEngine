@@ -18,6 +18,8 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeCameraTarget3DComponent>();
         builder.RegisterComponent<RekallAgeCameraTargetCycleInputComponent>();
         builder.RegisterComponent<RekallAgeRenderLayerComponent>();
+        builder.RegisterComponent<RekallAgeSpriteRendererComponent>();
+        builder.RegisterComponent<RekallAgeMeshRendererComponent>();
         builder.RegisterComponent<RekallAgeXrRigComponent>();
         builder.RegisterComponent<RekallAgeXrPoseSourceComponent>();
         builder.RegisterComponent<RekallAgeXrControllerComponent>();
@@ -774,6 +776,38 @@ public sealed class RekallAgeRigidbody3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
     public double Mass { get; init; } = 1;
+}
+
+[RekallAgeComponent("Sprite Renderer", Description = "Projects a texture or sprite asset as visible 2D runtime content.")]
+public sealed class RekallAgeSpriteRendererComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
+    public string? Sprite { get; init; }
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
+    public string? AssetId { get; init; }
+
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("Mesh Renderer", Description = "Projects a mesh, model, or engine geometry identifier as visible 3D runtime content.")]
+public sealed class RekallAgeMeshRendererComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "model")]
+    public string? Mesh { get; init; }
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "model")]
+    public string? AssetId { get; init; }
+
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+
+    [RekallAgeProperty]
+    public string? VertexShader { get; init; }
+
+    [RekallAgeProperty]
+    public string? FragmentShader { get; init; }
 }
 
 [RekallAgeComponent("Rigidbody 2D", Description = "A generic dynamic planar body simulated on the XY plane.")]

@@ -420,6 +420,39 @@ and documents through component schemas that dynamic bodies combine transform,
 rigid body, and collider while static surfaces omit the rigid body. The repaired
 validator identifies all four false bodies in the untouched benchmark project.
 
+### Motion-evidence rerun
+
+Rerun 15 used the rigid-body shape distribution with the unchanged 36-turn
+task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun15`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 620,253
+- Completion tokens: 7,983
+
+This run reached package creation, original audit, relocation, and relocated
+audit by tool 26. It then revisited physics proof and authoring requirements,
+ending on validation after using its remaining calls for inspection and
+property mutations. Two early calls were also recoverable: one gateway payload
+was doubly encoded, and one scene blueprint was applied before the scene was
+created.
+
+Independent installed inspection proved actual deterministic motion. Main had
+two dynamic 3D bodies with matching colliders, both moving from Y=10 to Y=8.733
+after 30 frames. Physics2D had one dynamic body and matching collider, moving
+from Y=5 to Y=3.733. Original and relocated package manifests and nonblank proof
+frames existed. The final project was not acceptable: it retained one blocking
+deliberately invalid MeshRenderer property plus two camera-layer warnings, and
+the package proofs predated the late mutations.
+
+The run exposed a generic evidence problem: runtime inspection returned only
+final transforms, forcing the agent to remember or rediscover authored starting
+positions before it could prove displacement. Inspection now returns the
+initial transform and explicit 2D/3D position deltas for every bounded entity
+state. Against the untouched run, it directly reports Y delta -1.267 for the
+two 3D bodies and the 2D body.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

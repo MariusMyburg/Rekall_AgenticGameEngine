@@ -605,7 +605,10 @@ public sealed class SceneRuntimeFoundationTests
         var state = Assert.Single(json["EntityStates"]!.AsArray())!.AsObject();
 
         Assert.Equal("Animated", state["EntityName"]!.GetValue<string>());
+        Assert.Equal(0, state["InitialTransform"]!["Position3D"]!["X"]!.GetValue<double>(), precision: 3);
         Assert.Equal(3, state["Transform"]!["Position3D"]!["X"]!.GetValue<double>(), precision: 3);
+        Assert.Equal(3, state["PositionDelta3D"]!["X"]!.GetValue<double>(), precision: 3);
+        Assert.Equal(0, state["PositionDelta3D"]!["Y"]!.GetValue<double>(), precision: 3);
         Assert.False(json["EntityStatesTruncated"]!.GetValue<bool>());
     }
 

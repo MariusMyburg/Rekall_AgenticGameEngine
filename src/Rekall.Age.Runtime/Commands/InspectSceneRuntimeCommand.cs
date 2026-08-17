@@ -78,7 +78,14 @@ public sealed record InspectSceneRuntimeEntityState(
     string EntityName,
     bool Visible,
     RekallAgeRuntimeTransform Transform,
-    IReadOnlyList<string> ComponentTypes);
+    IReadOnlyList<string> ComponentTypes)
+{
+    public RekallAgeRuntimeTransform InitialTransform { get; init; } = RekallAgeRuntimeTransform.Identity;
+
+    public RekallAgeRuntimeVector2 PositionDelta2D { get; init; } = new(0, 0);
+
+    public RekallAgeRuntimeVector3 PositionDelta3D { get; init; } = new(0, 0, 0);
+}
 
 public sealed record InspectSceneRuntimeCulledRenderable(
     string EntityId,
@@ -142,19 +149,28 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
                 ]);
         }
 
-        var world = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(
+        var snapshotService = new RekallAgeRuntimeSnapshotService();
+        var initialWorld = await snapshotService.InspectSceneAsync(
+            request.ProjectRoot,
+            request.SceneName,
+            0,
+            null,
+            context.CancellationToken);
+        var world = await snapshotService.InspectSceneAsync(
             request.ProjectRoot,
             request.SceneName,
             Math.Max(0, request.Frames),
             request.Inputs,
             context.CancellationToken);
-        var result = ToResult(world);
+        var result = ToResult(world, initialWorld);
         return RekallAgeCommandResult<InspectSceneRuntimeResult>.Success(
             result,
             $"Runtime {result.SceneName} frame {result.FrameIndex}: {result.EntityCount} entities, {result.RenderableCount} renderable.");
     }
 
-    private static InspectSceneRuntimeResult ToResult(RekallAgeRuntimeWorld world)
+    private static InspectSceneRuntimeResult ToResult(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeWorld initialWorld)
     {
         var rendering = world.Subsystems.Rendering;
         var physics = world.Subsystems.Physics;
@@ -166,19 +182,36 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
         const int maximumEntityStates = 32;
         const int maximumSubsystemItems = 32;
         const int maximumUiElements = 32;
+        var initialEntities = initialWorld.Entities.ToDictionary(entity => entity.Id, StringComparer.Ordinal);
         var entityStates = world.Entities
             .OrderBy(entity => entity.Name, StringComparer.Ordinal)
             .ThenBy(entity => entity.Id, StringComparer.Ordinal)
             .Take(maximumEntityStates)
-            .Select(entity => new InspectSceneRuntimeEntityState(
-                entity.Id,
-                entity.Name,
-                entity.Visible,
-                entity.Transform,
-                entity.Components
-                    .Select(component => component.Type)
-                    .OrderBy(type => type, StringComparer.Ordinal)
-                    .ToArray()))
+            .Select(entity =>
+            {
+                var initial = initialEntities.TryGetValue(entity.Id, out var initialEntity)
+                    ? initialEntity.Transform
+                    : entity.Transform;
+                return new InspectSceneRuntimeEntityState(
+                    entity.Id,
+                    entity.Name,
+                    entity.Visible,
+                    entity.Transform,
+                    entity.Components
+                        .Select(component => component.Type)
+                        .OrderBy(type => type, StringComparer.Ordinal)
+                        .ToArray())
+                {
+                    InitialTransform = initial,
+                    PositionDelta2D = new RekallAgeRuntimeVector2(
+                        entity.Transform.Position2D.X - initial.Position2D.X,
+                        entity.Transform.Position2D.Y - initial.Position2D.Y),
+                    PositionDelta3D = new RekallAgeRuntimeVector3(
+                        entity.Transform.Position3D.X - initial.Position3D.X,
+                        entity.Transform.Position3D.Y - initial.Position3D.Y,
+                        entity.Transform.Position3D.Z - initial.Position3D.Z)
+                };
+            })
             .ToArray();
 
         return new InspectSceneRuntimeResult(

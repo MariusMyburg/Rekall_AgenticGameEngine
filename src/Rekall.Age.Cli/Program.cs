@@ -3171,7 +3171,7 @@ internal static class RekallAgeCli
         foreach (var state in result.Value.EntityStates)
         {
             Console.WriteLine(
-                $"  {state.EntityName}: position2D=({state.Transform.Position2D.X:F3},{state.Transform.Position2D.Y:F3}) position3D=({state.Transform.Position3D.X:F3},{state.Transform.Position3D.Y:F3},{state.Transform.Position3D.Z:F3}) rotation3D=({state.Transform.Rotation3D.X:F3},{state.Transform.Rotation3D.Y:F3},{state.Transform.Rotation3D.Z:F3}) components=[{string.Join(',', state.ComponentTypes)}]");
+                $"  {state.EntityName}: position2D=({state.Transform.Position2D.X:F3},{state.Transform.Position2D.Y:F3}) delta2D=({state.PositionDelta2D.X:F3},{state.PositionDelta2D.Y:F3}) position3D=({state.Transform.Position3D.X:F3},{state.Transform.Position3D.Y:F3},{state.Transform.Position3D.Z:F3}) delta3D=({state.PositionDelta3D.X:F3},{state.PositionDelta3D.Y:F3},{state.PositionDelta3D.Z:F3}) rotation3D=({state.Transform.Rotation3D.X:F3},{state.Transform.Rotation3D.Y:F3},{state.Transform.Rotation3D.Z:F3}) components=[{string.Join(',', state.ComponentTypes)}]");
         }
         Console.WriteLine($"Input actions: {result.Value.InputActionCount}");
         foreach (var action in result.Value.InputActions)

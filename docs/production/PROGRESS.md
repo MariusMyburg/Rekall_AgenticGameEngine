@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 01:40 Africa/Johannesburg
+Last verified: 2026-08-18 01:48 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: rigid-body shape validation repair passed the complete product gate
+Latest milestone: runtime motion evidence passed 581/581 Debug tests
 
 ## Product objective
 
@@ -304,6 +304,20 @@ Studio is important, but it does not define or reorder the engine foundation.
   gauntlet, original and relocated package audit/run/nonblank capture, runtime
   UI, software viewport analysis, simulated audio, and Windows player audio.
   The canonical 1,149-file archive is 194,703,222 bytes.
+- Broad benchmark rerun 15: the agent reached original package audit,
+  relocation, and relocated audit by tool 26, then stopped at 36 tools
+  (620,253 prompt; 7,983 completion) while revisiting authoring evidence. Both
+  physics scenes genuinely simulated: two 3D bodies moved from Y=10 to 8.733
+  and one 2D body moved from Y=5 to 3.733. The run nevertheless ended with one
+  deliberately introduced invalid renderer property still blocking validation
+  and two render-layer warnings; package proofs also predated those late edits.
+  This is not an accepted pass.
+- Runtime motion evidence: deterministic runtime inspection now reports each
+  entity's initial transform and exact 2D/3D position delta alongside the final
+  transform. One call therefore proves simulation or animation displacement
+  without an agent inferring the starting pose or spending calls on repeated
+  inspection. Applied to rerun 15, it reports Y deltas of -1.267 for both 3D
+  bodies and the 2D body. The regression and full Debug suite pass at 581/581.
 
 ## Current gaps
 
@@ -319,7 +333,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the unchanged installed Ollama benchmark on the rigid-body shape distribution.
+Run the complete clean product gate for runtime motion evidence.
 
 ## Next after the current item
 

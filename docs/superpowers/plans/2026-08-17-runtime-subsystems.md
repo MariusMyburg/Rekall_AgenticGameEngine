@@ -39,8 +39,8 @@ structured observations, and gameplay remains in agent-authored modules.
 
 ## Tranche 4: Acceptance and hardening
 
-- [ ] Add SDK helpers and schemas agents can discover without guessing property shapes.
-- [ ] Add malformed-data, limit, fuzz, determinism, and long-run tests.
-- [ ] Add audio/UI/animation tasks to the installed-engine agent benchmark.
+- [x] Add SDK helpers and schemas agents can discover without guessing property shapes.
+- [x] Add malformed-data, limit, fuzz, determinism, and long-run tests.
+- [x] Add audio/UI/animation tasks to the installed-engine agent benchmark.
 - [x] Run the full suite twice and canonical Windows distribution acceptance.
 - [x] Update the maturity audit with measured evidence rather than projections.

@@ -17,7 +17,7 @@ relocation.
 Evidence reviewed:
 
 - 24 engine and test projects, approximately 60,000 C# lines
-- 505 automated tests across authoring, runtime, rendering, packaging, MCP, and workflows
+- 549 automated tests across authoring, runtime, rendering, packaging, MCP, and workflows
 - the installed `win-x64` distribution and generic authoring gauntlet
 - runtime execution-system registration and subsystem projections
 - MCP schemas, transaction behavior, and agent context summaries
@@ -40,7 +40,7 @@ Maturity labels:
 | Project/world authoring | Implemented | deterministic project/scene stores; entity/component commands; blueprints; transactions | schema migration, corruption recovery, autosave, and large-project stress proof |
 | Portable C# modules | Proven | installed SDK scaffolds and builds without `src/`; isolated intermediates; runtime loading | explicit trust/sandbox policy, dependency policy, compatibility fixtures, module reload |
 | MCP command surface | Implemented | JSON-RPC tools with generated JSON schemas, structured content, priorities, transactions | richer field descriptions/constraints, pagination/filtering, capability benchmark, protocol conformance suite |
-| Agent context | Implemented | compact summaries, focused component-schema search, bounded persistent tool ledger, measured Ollama authoring benchmark | indexed queries for very large projects, more benchmark tasks, lower redundant-call rate |
+| Agent context | Implemented | compact schema contracts, type-directed model-argument normalization, bounded failure previews and persistent tool ledger, source and installed Ollama authoring benchmarks | indexed queries for very large projects, more benchmark tasks, lower redundant-call rate |
 | Desktop runtime | Implemented | fixed-step runtime, generic events/input, module systems, windowed player | save/load state, crash recovery, lifecycle soak tests, frame pacing/telemetry |
 | Input and events | Implemented | semantic action maps, pointer, timer, collision, trigger, XR pose, custom module events | rebinding persistence, device hot-plug, gamepad breadth, accessibility proof |
 | 3D physics | Implemented | BEPU simulation, bodies, shapes, materials, contacts, ray facts | character-independent query/controller primitives, joints/constraints authoring, stress/performance budgets |
@@ -58,8 +58,8 @@ Maturity labels:
 | Engine distribution | Proven | locked restore, two suites, self-contained applications, hashes, clean installed gauntlet | binary signing, installer/updater, release provenance/SBOM, clean-machine VM matrix |
 | Studio | Facade | real read models and a WPF shell | controls are unwired, viewport is text, no interactive open/edit/play workflow |
 | Security | Partial | no currently known vulnerable NuGet dependency; distribution forbidden-file checks | arbitrary-module trust boundary, fuzzing, path/archive hardening, secret scanning, signed releases, threat model |
-| Test platform | Implemented | 540 green tests; latest canonical two-pass Release acceptance covers Vulkan, relocation, SDL audio, and runtime UI visual proof | rerun canonical two-pass gate after the current animation-hardening tranche, deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
-| LLM providers/Ollama | Implemented | provider-neutral contracts, native Ollama chat/tools/model discovery, bounded loop, `qwen3.5:35b` authoring benchmark completed in 15 turns | additional models/providers, installed benchmark suite, quality/cost routing policy |
+| Test platform | Implemented | 549 green tests; latest canonical two-pass Release acceptance covers Vulkan, relocation, SDL audio, runtime UI visual proof, animation limits, malformed corpus, and long-run determinism | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
+| LLM providers/Ollama | Implemented | provider-neutral contracts, native Ollama chat/tools/model discovery, bounded loop, `qwen3.5:35b` source benchmark in 15 turns and expanded installed UI/audio/animation benchmark in 23 turns | additional models/providers and installed benchmark breadth, lower token/correction cost, quality/cost routing policy |
 
 ## Material findings
 
@@ -82,9 +82,12 @@ skeletal execution, and compressed/streaming audio remain material gaps.
 
 MCP exposes real commands, generated schemas, transactions, and the same
 workflows used by CLI. A local `qwen3.5:35b` authored and verified UI plus
-animation through engine tools within 15 bounded turns, with tokens and failures
-recorded. The benchmark must expand to representative 2D, 3D, audio, physics,
-packaging, repair, and installed-engine tasks while reducing redundant calls.
+animation through engine tools within 15 bounded turns. It also completed an
+expanded installed-distribution UI, imported-audio, and animation task in 23
+turns. Independent installed-CLI checks confirmed runtime state and capture
+evidence. The benchmark must still expand to representative 2D, 3D, physics,
+packaging, and repair tasks while reducing its 311,000-prompt-token correction
+cost and improving generic visual-composition feedback.
 
 ### 4. Studio must be described honestly
 

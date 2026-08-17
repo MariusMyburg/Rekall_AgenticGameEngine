@@ -46,3 +46,51 @@ Prove that a local provider-neutral Ollama agent can author and verify generic R
 - Runtime observations: none.
 
 The benchmark passed the functional acceptance gate. The remaining efficiency signal is that V8 still used repeated discovery and blueprint calls; future benchmark work should reduce redundant calls without weakening the generic authoring surface.
+
+## Expanded installed-engine benchmark
+
+The benchmark was then expanded to require UI, animation, imported audio, static
+validation, deterministic runtime inspection, and a software viewport proof from
+the assembled self-contained Windows distribution. The agent was forbidden from
+using `play.scene`, authored modules, or the closed-loop gauntlet so the run
+continued to measure ordinary generic authoring primitives.
+
+- Installed product: `Rekall-AGE-0.1.0-preview.1-win-x64`
+- Model: `qwen3.5:35b` through the native Ollama tool API
+- Bound: 24 model turns
+- Result: completed in 23 turns with 22 tool calls
+- Prompt tokens: 311,000
+- Completion tokens: 8,232
+
+Independent verification with the installed CLI, rather than the model's final
+message, established:
+
+- scene validation `ok`, with 0 blocking issues and 0 warnings;
+- one active 200x100 UI canvas and two resolved elements;
+- interactive button text exactly `SYSTEMS READY`;
+- inline transform animation at X `3.000` after 30 fixed frames;
+- one active looping voice for imported asset
+  `asset_benchmark-tone_46c758f0`, with 1,600 mixed samples;
+- zero structured runtime observations; and
+- a 200x100 software capture reported informative with no missing, unsupported,
+  or fallback assets.
+
+The installed run is a functional contract/runtime pass. Its capture remained
+visually weak and the agent used several corrective blueprint applications.
+Those are measured gaps: generic viewport/UI composition diagnostics and lower
+redundant discovery/correction cost remain priority work.
+
+## Additional generic changes driven by the expanded run
+
+- Component-schema search now returns compact contracts and rejects missing
+  queries with a structured error instead of failing internally.
+- Dynamic command arguments normalize bounded JSON-string encodings according
+  to the target request type while preserving genuine string fields.
+- Required command fields fail before dispatch with structured diagnostics.
+- Validation rejects misspelled reserved UI component types, UI elements without
+  a canvas, and unknown properties on registered built-in components instead of
+  allowing runtime-ignored authoring mistakes.
+- Runtime inspection exposes bounded audio voices, animation players, UI canvas
+  dimensions, resolved element layouts, interactivity, and text.
+- Failed agent tool calls include bounded argument and result previews so repair
+  remains inspectable without unbounded context growth.

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Product;
 
 namespace Rekall.Age.Build.Commands;
 
@@ -17,6 +18,13 @@ public sealed record BuildPlayerResult(
 
 public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, BuildPlayerResult>
 {
+    private readonly string? _distributionRoot;
+
+    public BuildPlayerCommand(string? distributionRoot = null)
+    {
+        _distributionRoot = distributionRoot;
+    }
+
     public string Name => "rekall.build.player";
 
     public RekallAgeCommandSchema Schema => new(
@@ -29,10 +37,16 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
         BuildPlayerRequest request,
         RekallAgeCommandContext context)
     {
-        var playerProject = FindPlayerProjectPath(request.Graphics);
         var outputDirectory = Path.GetFullPath(
             request.OutputDirectory
                 ?? Path.Combine(request.ProjectRoot, "Builds", "RekallAgePlayer"));
+        var distribution = FindDistribution();
+        if (distribution is not null)
+        {
+            return BuildFromDistribution(request, outputDirectory, distribution, context);
+        }
+
+        var playerProject = FindPlayerProjectPath(request.Graphics);
         Directory.CreateDirectory(outputDirectory);
 
         var startInfo = new ProcessStartInfo("dotnet")
@@ -83,6 +97,107 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
             $"Built playable player at '{launchPath}'.");
     }
 
+    private RekallAgeDistributionPaths? FindDistribution()
+    {
+        var configuredRoot = _distributionRoot ?? Environment.GetEnvironmentVariable("REKALL_AGE_DISTRIBUTION_ROOT");
+        if (!string.IsNullOrWhiteSpace(configuredRoot))
+        {
+            var paths = RekallAgeDistributionLayout.Create(configuredRoot);
+            return File.Exists(paths.Manifest) ? paths : null;
+        }
+
+        return RekallAgeDistributionLayout.TryFind(AppContext.BaseDirectory, out var discovered)
+            ? discovered
+            : null;
+    }
+
+    private static RekallAgeCommandResult<BuildPlayerResult> BuildFromDistribution(
+        BuildPlayerRequest request,
+        string outputDirectory,
+        RekallAgeDistributionPaths distribution,
+        RekallAgeCommandContext context)
+    {
+        var payload = request.Graphics
+            ? distribution.WindowsPlayerPayload
+            : distribution.HeadlessPlayerPayload;
+        if (!Directory.Exists(payload))
+        {
+            var missing = new BuildPlayerResult(outputDirectory, string.Empty, [], string.Empty);
+            return RekallAgeCommandResult<BuildPlayerResult>.Failure(
+                missing,
+                "Installed player payload is missing.",
+                [new RekallAgeCommandError(
+                    "REKALL_DISTRIBUTION_PLAYER_MISSING",
+                    "The installed Rekall AGE distribution does not contain the requested player payload.",
+                    request.Graphics ? "players/windows" : "players/headless")]);
+        }
+
+        if (!IsSafeOutput(outputDirectory, payload))
+        {
+            var unsafeResult = new BuildPlayerResult(outputDirectory, string.Empty, [], string.Empty);
+            return RekallAgeCommandResult<BuildPlayerResult>.Failure(
+                unsafeResult,
+                "Player output directory is unsafe.",
+                [new RekallAgeCommandError(
+                    "REKALL_PLAYER_OUTPUT_UNSAFE",
+                    "Player output cannot be a drive root or contain the installed player payload.",
+                    outputDirectory)]);
+        }
+
+        if (Directory.Exists(outputDirectory))
+        {
+            Directory.Delete(outputDirectory, recursive: true);
+        }
+
+        CopyDirectory(payload, outputDirectory);
+        var launchPath = FindLaunchPath(outputDirectory);
+        var result = new BuildPlayerResult(
+            outputDirectory,
+            launchPath,
+            request.Graphics
+                ? [request.ProjectRoot, request.SceneName, "--graphics", "--backend", "vulkan"]
+                : [request.ProjectRoot, request.SceneName],
+            $"Copied installed distribution player payload from '{(request.Graphics ? "players/windows" : "players/headless")}'.");
+        if (!File.Exists(launchPath))
+        {
+            return RekallAgeCommandResult<BuildPlayerResult>.Failure(
+                result,
+                "Installed player payload has no launch executable.",
+                [new RekallAgeCommandError(
+                    "REKALL_DISTRIBUTION_PLAYER_LAUNCH_MISSING",
+                    "The installed player payload does not contain a recognized launch executable.",
+                    request.Graphics ? "players/windows" : "players/headless")]);
+        }
+
+        context.Transaction.RecordChangedResource(outputDirectory);
+        return RekallAgeCommandResult<BuildPlayerResult>.Success(
+            result,
+            $"Built playable player at '{launchPath}' from the installed distribution.");
+    }
+
+    private static bool IsSafeOutput(string outputDirectory, string payload)
+    {
+        var output = Path.GetFullPath(outputDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var source = Path.GetFullPath(payload)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var driveRoot = Path.GetPathRoot(output)?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return !string.IsNullOrWhiteSpace(driveRoot) &&
+            !output.Equals(driveRoot, PathComparison) &&
+            !source.Equals(output, PathComparison) &&
+            !source.StartsWith(output + Path.DirectorySeparatorChar, PathComparison);
+    }
+
+    private static void CopyDirectory(string sourceRoot, string destinationRoot)
+    {
+        foreach (var file in Directory.EnumerateFiles(sourceRoot, "*", SearchOption.AllDirectories))
+        {
+            var destination = Path.Combine(destinationRoot, Path.GetRelativePath(sourceRoot, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(file, destination, overwrite: true);
+        }
+    }
+
     private static string FindPlayerProjectPath(bool graphics)
     {
         var projectDirectoryName = graphics ? "Rekall.Age.Player.Windows" : "Rekall.Age.Player";
@@ -128,4 +243,7 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
 
         return Path.Combine(outputDirectory, "Rekall.Age.Player.dll");
     }
+
+    private static StringComparison PathComparison =>
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 }

@@ -54,6 +54,29 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task AgentContinuesAfterEmptyFinalResponseInsteadOfClaimingCompletion()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "   ", "", [], "stop", new(3, 1, 10)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "All requested evidence is complete.", "", [], "stop", new(4, 2, 20)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task") { MaxTurns = 3 },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(2, result.Turns);
+        Assert.Equal("All requested evidence is complete.", result.FinalContent);
+        Assert.Contains(
+            model.Requests[1].Messages,
+            message => message.Role == "user" &&
+                message.Content.Contains("empty response cannot complete", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void DiagnosticsExposeBoundedFailedToolResultsInsteadOfOnlyToolNames()
     {
         var failures = RekallAgeLanguageModelAgentDiagnostics.FormatFailures(

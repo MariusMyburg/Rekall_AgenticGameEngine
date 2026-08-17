@@ -124,6 +124,14 @@ public sealed class RekallAgeLanguageModelAgent(
 
             if (response.ToolCalls.Count == 0)
             {
+                if (string.IsNullOrWhiteSpace(response.Content))
+                {
+                    transcript.Add(new RekallAgeLanguageModelMessage(
+                        "user",
+                        "Your empty response cannot complete the task. Continue from the tool ledger, verify every requested outcome, and return a concrete evidence-backed final response only when the work is complete."));
+                    continue;
+                }
+
                 return Result(true, response.FinishReason.Length == 0 ? "complete" : response.FinishReason, finalContent, turn);
             }
 

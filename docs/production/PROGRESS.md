@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-17 23:54 Africa/Johannesburg
+Last verified: 2026-08-18 00:03 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: relocation capacity preflight passed the full product gate
+Latest milestone: agent completion and physics diagnostics pass the Debug gate
 
 ## Product objective
 
@@ -169,6 +169,20 @@ Studio is important, but it does not define or reorder the engine foundation.
   relocated package proof, runtime UI, viewport, simulated audio, and Windows
   player audio. Acceptance temporaries ran on F:; the new canonical archive is
   194,669,627 bytes.
+- Broad benchmark rerun 8: the engine reported completion after 22 turns and 21
+  tools (285,836 prompt; 4,476 completion), but the final model response was
+  empty and the trace ended after validation. Independent acceptance found one
+  blocking mass issue, no deliverable workflow, valid 3D/2D motion, and runtime
+  warnings for missing explicit transforms. Empty no-tool responses can no
+  longer complete the embedded agent; they now trigger a bounded corrective
+  continuation. This run remains failed.
+- Agent-loop completion contract: an empty or whitespace no-tool response now
+  receives a bounded corrective user turn and cannot set `Completed=true`.
+- Physics authoring contract: any `Rekall.Rigidbody3D`/`Rigidbody2D` without its
+  dimension-matching transform is now a blocking static validation issue using
+  the same `REKALL_PHYSICS_BODY_NO_TRANSFORM` code as runtime observation, with
+  an exact executable `rekall.component.add` repair. Both regressions and the
+  full Debug suite pass at 571/571.
 
 ## Current gaps
 
@@ -184,7 +198,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the installed benchmark on F: with state-based physics acceptance.
+Run the clean Release/distribution gate for the agent-loop and physics-diagnostic
+milestone, then rerun the installed benchmark.
 
 ## Next after the current item
 

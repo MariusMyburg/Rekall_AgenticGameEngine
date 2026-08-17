@@ -123,6 +123,43 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneRequiresDimensionMatchingTransformForPhysicsBodies()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var body3D = RekallAgeEntityDocument.Create("Body 3D", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Rigidbody3D", new JsonObject { ["Mass"] = 1 }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.BoxCollider3D", new JsonObject()));
+        var body2D = RekallAgeEntityDocument.Create("Body 2D", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Rigidbody2D", new JsonObject { ["Mass"] = 1 }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.BoxCollider2D", new JsonObject()));
+        var scene = RekallAgeSceneDocument.Create("Main", ["physics"])
+            .AddEntity(body3D)
+            .AddEntity(body2D);
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        var missingTransforms = report.Issues
+            .Where(issue => issue.Code == "REKALL_PHYSICS_BODY_NO_TRANSFORM")
+            .ToArray();
+        Assert.Equal(2, missingTransforms.Length);
+        Assert.All(missingTransforms, issue => Assert.Equal("blocking", issue.Severity));
+        Assert.Contains(
+            missingTransforms.Single(issue => issue.Target == body3D.Id).SuggestedCommands!,
+            command => command.Tool == "rekall.component.add"
+                && Equals(command.Arguments["projectRoot"], root)
+                && Equals(command.Arguments["sceneName"], "Main")
+                && Equals(command.Arguments["entityId"], body3D.Id)
+                && Equals(command.Arguments["componentType"], "Rekall.Transform3D"));
+        Assert.Contains(
+            missingTransforms.Single(issue => issue.Target == body2D.Id).SuggestedCommands!,
+            command => command.Tool == "rekall.component.add"
+                && Equals(command.Arguments["componentType"], "Rekall.Transform2D"));
+    }
+
+    [Fact]
     public async Task ValidateSceneReportsMultipleActiveCameras()
     {
         var root = TestPaths.CreateTempDirectory();

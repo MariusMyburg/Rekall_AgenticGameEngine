@@ -224,6 +224,33 @@ This remains a failed benchmark. It drives destination-capacity preflight and
 structured relocation recovery before another clean installed run; physics motion
 continues to require state-based independent acceptance.
 
+### Capacity-hardened rerun
+
+Relocation capacity preflight passed the complete product gate before rerun 8,
+whose project and temporary paths were placed on F:.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun8`
+- Engine-reported result: completed in 22 turns
+- Tool calls: 21
+- Prompt tokens: 285,836
+- Completion tokens: 4,476
+- Independent acceptance: failed
+
+The model returned an empty no-tool response immediately after its second
+project-validation call. The embedded agent treated that empty response as
+successful completion even though the trace contained no runtime inspection,
+module authoring, capture, package, audit, or relocation. Independent validation
+still found one blocking zero-mass issue. Runtime inspection did prove motion for
+the combined 3D body/collider (Y -1.767) and planar body/collider (Y -1.267), but
+both scenes emitted `REKALL_PHYSICS_BODY_NO_TRANSFORM` because their physics
+entities lacked explicit transform components.
+
+This is not an accepted run. It isolates a provider-neutral loop defect: an empty
+final model response must not produce `Completed=true`. Empty finals now receive
+a bounded corrective continuation asking for every requested outcome and a
+concrete evidence-backed final response. Missing physics-transform validation
+remains a separate generic authoring diagnostic gap.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

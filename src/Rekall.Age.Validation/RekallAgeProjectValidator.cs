@@ -104,6 +104,9 @@ public sealed class RekallAgeProjectValidator
 
         foreach (var entity in scene.Entities)
         {
+            ValidatePhysicsBodyTransform(projectRoot, scene.Name, entity, "Rekall.Rigidbody3D", "Rekall.Transform3D", issues);
+            ValidatePhysicsBodyTransform(projectRoot, scene.Name, entity, "Rekall.Rigidbody2D", "Rekall.Transform2D", issues);
+
             foreach (var component in entity.Components.Where(component =>
                          component.Type.StartsWith("Rekall.", StringComparison.Ordinal)
                          && !BuiltInComponentSchemas.ContainsKey(component.Type)))
@@ -190,6 +193,39 @@ public sealed class RekallAgeProjectValidator
                 }
             }
         }
+    }
+
+    private static void ValidatePhysicsBodyTransform(
+        string projectRoot,
+        string sceneName,
+        RekallAgeEntityDocument entity,
+        string bodyType,
+        string transformType,
+        List<RekallAgeValidationIssue> issues)
+    {
+        if (!entity.Components.Any(component => component.Type.Equals(bodyType, StringComparison.Ordinal)) ||
+            entity.Components.Any(component => component.Type.Equals(transformType, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        issues.Add(new RekallAgeValidationIssue(
+            "REKALL_PHYSICS_BODY_NO_TRANSFORM",
+            $"Entity '{entity.Name}' has {bodyType} but no matching {transformType}. Add the transform so authored position and runtime physics state remain inspectable and composable.",
+            "blocking",
+            entity.Id,
+            [
+                new RekallAgeSuggestedCommand(
+                    "rekall.component.add",
+                    new Dictionary<string, object?>
+                    {
+                        ["projectRoot"] = projectRoot,
+                        ["sceneName"] = sceneName,
+                        ["entityId"] = entity.Id,
+                        ["componentType"] = transformType,
+                        ["properties"] = new JsonObject()
+                    })
+            ]));
     }
 
     private static Dictionary<string, object?> ComponentPropertyArguments(

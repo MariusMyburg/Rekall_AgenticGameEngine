@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Rekall.Age.Assets;
 using Rekall.Age.Runtime;
 using Rekall.Age.World;
 
@@ -6,6 +7,86 @@ namespace Rekall.Age.Tests.Runtime;
 
 public sealed class RuntimeAnimationTests
 {
+    [Fact]
+    public async Task AnimationPlayerLoadsReusableClipFromProjectAssetCatalog()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var assetDirectory = Path.Combine(root, "Assets", "animation");
+        Directory.CreateDirectory(assetDirectory);
+        await File.WriteAllTextAsync(
+            Path.Combine(assetDirectory, "move.age.animation.json"),
+            new JsonObject
+            {
+                ["version"] = 1,
+                ["durationSeconds"] = 1,
+                ["tracks"] = new JsonArray { ScalarTrack("Rekall.Transform3D", "x", 0, 12, "linear") }
+            }.ToJsonString());
+        await new RekallAgeAssetCatalogStore().SaveAsync(
+            root,
+            new RekallAgeAssetCatalogDocument(
+            [
+                new RekallAgeAssetDocument(
+                    "asset-move",
+                    "move",
+                    "Move",
+                    "animation",
+                    string.Empty,
+                    "Assets/animation/move.age.animation.json",
+                    "test")
+            ]),
+            CancellationToken.None);
+        var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["x"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationPlayer",
+                new JsonObject { ["clip"] = "asset-move", ["playing"] = true, ["loopMode"] = "clamp" }));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(
+            RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault(root)
+            .RunAsync(world, 30, CancellationToken.None);
+
+        Assert.Equal(6, Assert.Single(result.World.Entities).Transform.Position3D.X, precision: 3);
+        var player = Assert.Single(result.World.Subsystems.Animation.Players);
+        Assert.Equal("asset-move", player.ClipAssetId);
+        Assert.False(player.InlineClip);
+        Assert.DoesNotContain(result.World.Observations, observation => observation.Severity == "error");
+    }
+
+    [Fact]
+    public async Task AnimationAssetCannotEscapeProjectRoot()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeAssetCatalogStore().SaveAsync(
+            root,
+            new RekallAgeAssetCatalogDocument(
+            [
+                new RekallAgeAssetDocument(
+                    "asset-escape",
+                    "escape",
+                    "Escape",
+                    "animation",
+                    string.Empty,
+                    "../outside.age.animation.json",
+                    "test")
+            ]),
+            CancellationToken.None);
+        var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["x"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationPlayer",
+                new JsonObject { ["clip"] = "asset-escape", ["playing"] = true }));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(
+            RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault(root)
+            .RunAsync(world, 1, CancellationToken.None);
+
+        var observation = Assert.Single(result.World.Observations, item =>
+            item.Code == "runtime.animation.clip_asset_invalid");
+        Assert.Contains("escapes the project root", observation.Message);
+    }
+
     [Fact]
     public async Task UnsupportedAnimationClipVersionProducesStructuredObservation()
     {

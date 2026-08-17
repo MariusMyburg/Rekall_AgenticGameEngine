@@ -42,7 +42,7 @@ public sealed class RekallAgeRuntimeExecutionLoop
             new RekallAgeTimerEventSystem(),
             new RekallAgeKeplerOrbitSystem(),
             new RekallAgeCelestialRotationSystem(),
-            new RekallAgeTransformAnimationSystem(),
+            new RekallAgeTransformAnimationSystem(projectRoot),
             new RekallAgeAudioSystem(projectRoot),
             new RekallAgeBepuPhysicsSystem(),
             new NoOpRuntimeWorldSystem("runtime.rendering"),

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using Rekall.Age.Assets;
 using Rekall.Age.Modules;
 using Rekall.Age.Runtime.Abstractions;
 
@@ -11,16 +12,27 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
     private const string PlayerComponent = "Rekall.AnimationPlayer";
     private const string StateComponent = "Rekall.AnimationState";
     private const double Epsilon = 0.00001;
+    private const long MaxClipBytes = 4 * 1024 * 1024;
+    private readonly string? _projectRoot;
+    private readonly RekallAgeAssetCatalogStore _catalogStore = new();
+    private IReadOnlyDictionary<string, RekallAgeAssetDocument>? _assets;
+    private readonly Dictionary<string, JsonObject> _assetClips = new(StringComparer.Ordinal);
+
+    public RekallAgeTransformAnimationSystem(string? projectRoot = null)
+    {
+        _projectRoot = string.IsNullOrWhiteSpace(projectRoot) ? null : Path.GetFullPath(projectRoot);
+    }
 
     public string Id => "runtime.animation";
     public int Priority => 0;
 
-    public ValueTask<RekallAgeRuntimeWorld> UpdateAsync(RekallAgeRuntimeWorld world, RekallAgeRuntimeWorldFrameContext context)
+    public async ValueTask<RekallAgeRuntimeWorld> UpdateAsync(RekallAgeRuntimeWorld world, RekallAgeRuntimeWorldFrameContext context)
     {
+        await EnsureAssetsAsync(context.CancellationToken);
         var emitted = new List<RekallAgeRuntimeEvent>();
         var observations = new List<RekallAgeRuntimeObservation>();
         var entities = world.Entities.Select(entity => ApplyAnimation(entity, context, emitted, observations)).ToArray();
-        return ValueTask.FromResult(world with
+        return world with
         {
             Entities = entities,
             Observations = world.Observations.Concat(observations).ToArray(),
@@ -28,10 +40,10 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             {
                 Events = new RekallAgeRuntimeEventView(world.Subsystems.Events.Events.Concat(emitted).ToArray())
             }
-        });
+        };
     }
 
-    private static RekallAgeRuntimeEntity ApplyAnimation(
+    private RekallAgeRuntimeEntity ApplyAnimation(
         RekallAgeRuntimeEntity entity,
         RekallAgeRuntimeWorldFrameContext context,
         List<RekallAgeRuntimeEvent> emitted,
@@ -40,12 +52,18 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         var updated = ApplyLegacyTransformRates(entity, context);
         var clip = updated.FindComponent(ClipComponent);
         var player = updated.FindComponent(PlayerComponent);
-        if (clip is null || player is null || !ReadBoolean(player.Properties, "playing", true))
+        if (player is null || !ReadBoolean(player.Properties, "playing", true))
         {
             return updated;
         }
 
-        var version = ReadInt32(clip.Properties, "version", 1);
+        var clipProperties = clip?.Properties ?? ResolveAssetClip(entity, player, context.FrameIndex, observations);
+        if (clipProperties is null)
+        {
+            return updated;
+        }
+
+        var version = ReadInt32(clipProperties, "version", 1);
         if (version != 1)
         {
             observations.Add(new RekallAgeRuntimeObservation(
@@ -61,7 +79,7 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             return updated;
         }
 
-        var duration = Math.Max(Epsilon, ReadNumber(clip.Properties, "durationSeconds", 1));
+        var duration = Math.Max(Epsilon, ReadNumber(clipProperties, "durationSeconds", 1));
         var speed = ReadNumber(player.Properties, "speed", 1);
         var loopMode = NormalizeLoopMode(ReadString(player.Properties, "loopMode") ?? "loop");
         var previousRawTime = ReadNumber(
@@ -71,7 +89,7 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         var nextRawTime = Math.Max(0, previousRawTime + context.DeltaTime.TotalSeconds * speed);
         var sampleTime = ResolveSampleTime(nextRawTime, duration, loopMode);
 
-        if (TryGetArray(clip.Properties, "tracks", out var tracks))
+        if (TryGetArray(clipProperties, "tracks", out var tracks))
         {
             foreach (var track in tracks.OfType<JsonObject>())
             {
@@ -79,7 +97,7 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             }
         }
 
-        EmitMarkers(updated, clip.Properties, previousRawTime, nextRawTime, duration, loopMode, context.FrameIndex, emitted);
+        EmitMarkers(updated, clipProperties, previousRawTime, nextRawTime, duration, loopMode, context.FrameIndex, emitted);
         return updated.UpsertComponent(StateComponent, new JsonObject
         {
             ["version"] = 1,
@@ -383,6 +401,120 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
                     rotation.Z + rollRate * seconds)
             }
         };
+    }
+
+    private async ValueTask EnsureAssetsAsync(CancellationToken cancellationToken)
+    {
+        if (_assets is not null)
+        {
+            return;
+        }
+
+        if (_projectRoot is null)
+        {
+            _assets = new Dictionary<string, RekallAgeAssetDocument>(StringComparer.Ordinal);
+            return;
+        }
+
+        var catalog = await _catalogStore.LoadAsync(_projectRoot, cancellationToken);
+        _assets = catalog.Assets.ToDictionary(asset => asset.Id, StringComparer.Ordinal);
+    }
+
+    private JsonObject? ResolveAssetClip(
+        RekallAgeRuntimeEntity entity,
+        RekallAgeRuntimeComponent player,
+        int frame,
+        List<RekallAgeRuntimeObservation> observations)
+    {
+        var clipId = ReadString(player.Properties, "clip")
+            ?? ReadString(player.Properties, "clipId")
+            ?? ReadString(player.Properties, "animation")
+            ?? ReadString(player.Properties, "assetId");
+        if (string.IsNullOrWhiteSpace(clipId) || _assets is null || !_assets.TryGetValue(clipId, out var asset))
+        {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.clip_asset_missing",
+                entity,
+                string.IsNullOrWhiteSpace(clipId)
+                    ? "Animation player has neither an inline clip nor a clip asset reference."
+                    : $"Animation clip asset '{clipId}' is not present in the project catalog."));
+            return null;
+        }
+
+        if (_assetClips.TryGetValue(clipId, out var cached))
+        {
+            return cached;
+        }
+
+        try
+        {
+            if (!asset.Kind.Equals("animation", StringComparison.OrdinalIgnoreCase)
+                && !asset.Kind.Equals("animation-clip", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    $"Asset kind '{asset.Kind}' is not an animation clip kind.");
+            }
+
+            if (_projectRoot is null)
+            {
+                throw new InvalidDataException("Animation asset resolution requires a project root.");
+            }
+
+            var root = Path.GetFullPath(_projectRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var path = Path.IsPathRooted(asset.ImportedPath)
+                ? Path.GetFullPath(asset.ImportedPath)
+                : Path.GetFullPath(Path.Combine(root, asset.ImportedPath.Replace('/', Path.DirectorySeparatorChar)));
+            var rootPrefix = root + Path.DirectorySeparatorChar;
+            if (!path.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("Animation asset path escapes the project root.");
+            }
+
+            var file = new FileInfo(path);
+            if (!file.Exists)
+            {
+                throw new FileNotFoundException("Animation asset file was not found.", path);
+            }
+
+            if (file.Length > MaxClipBytes)
+            {
+                throw new InvalidDataException($"Animation clip exceeds the {MaxClipBytes}-byte limit.");
+            }
+
+            var rootNode = JsonNode.Parse(File.ReadAllText(path)) as JsonObject
+                ?? throw new InvalidDataException("Animation asset must contain a JSON object.");
+            var clip = rootNode["clip"] as JsonObject ?? rootNode;
+            _assetClips[clipId] = clip;
+            return clip;
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.clip_asset_invalid",
+                entity,
+                $"Animation clip asset '{clipId}' could not be loaded: {exception.Message}"));
+            return null;
+        }
+    }
+
+    private static RekallAgeRuntimeObservation AnimationObservation(
+        int frame,
+        string code,
+        RekallAgeRuntimeEntity entity,
+        string message)
+    {
+        return new RekallAgeRuntimeObservation(
+            frame,
+            code,
+            "error",
+            "animation",
+            entity.Id,
+            entity.Name,
+            "AnimationPlayer",
+            message,
+            []);
     }
 
     private static bool TryGetArray(JsonObject properties, string name, out JsonArray array)

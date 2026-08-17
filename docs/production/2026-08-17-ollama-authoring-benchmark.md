@@ -251,6 +251,31 @@ a bounded corrective continuation asking for every requested outcome and a
 concrete evidence-backed final response. Missing physics-transform validation
 remains a separate generic authoring diagnostic gap.
 
+### Atomic-blueprint rerun
+
+Fresh installed binaries with empty-final rejection and static transform
+diagnostics were used for rerun 9 on F:.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun9`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 462,217
+- Completion tokens: 10,135
+
+The agent reached successful project repair, module build, graphics package
+creation, original-package audit, package run, and relocation. It exhausted the
+bound before runtime-state inspection and relocated inspect/audit/capture, so
+the run is not accepted.
+
+The trace also disproved the workflow's prior atomicity claim: a malformed
+entity in a later requested scene threw after the project manifest and earlier
+scene had already been written. Standalone blueprint application surfaced the
+same malformed content as a generic exception. Finally, the exact physics
+transform repair remained fragile because `rekall.component.add` dynamically
+required an otherwise empty `properties` object. These findings drive complete
+blueprint preflight with structured errors and an optional empty component
+property bag before the unchanged benchmark runs again.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

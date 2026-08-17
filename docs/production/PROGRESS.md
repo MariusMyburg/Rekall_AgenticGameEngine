@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 00:09 Africa/Johannesburg
+Last verified: 2026-08-18 00:18 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: agent completion and physics diagnostics passed the product gate
+Latest milestone: atomic blueprint preflight and optional component properties pass 574 tests
 
 ## Product objective
 
@@ -187,6 +187,18 @@ Studio is important, but it does not define or reorder the engine foundation.
   and errors, both independent Release passes completed at 571/571, and fresh
   installed acceptance passed the complete SDK, authoring, package relocation,
   visual proof, UI, and audio checks. The canonical archive is 194,672,330 bytes.
+- Broad benchmark rerun 9: the installed agent reached valid original package
+  audit and relocation, but exhausted its 36-turn bound before relocated audit,
+  capture, and final evidence. It used 36 tools, 462,217 prompt tokens, and
+  10,135 completion tokens. The run exposed that a malformed entity in a later
+  multi-scene blueprint could leave earlier project files behind, and that an
+  empty component property object was still a dynamically required argument.
+  This is not an accepted benchmark pass.
+- Blueprint/component repair: project blueprint workflows now preflight every
+  requested scene, entity, and component before creating the project; invalid
+  standalone blueprints return structured errors without changing the scene.
+  `rekall.component.add` now defaults omitted properties to an empty object.
+  Three regressions and the full Debug suite pass at 574/574.
 
 ## Current gaps
 
@@ -202,12 +214,12 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the installed benchmark against the fresh agent/physics distribution.
+Run the complete product gate for the atomic blueprint/component repair.
 
 ## Next after the current item
 
-Rerun the identical installed Ollama benchmark on fresh binaries. Classify any
-remaining failure by generic engine contract and fix it with regression tests.
+Rerun the identical installed Ollama benchmark on the rebuilt distribution.
+Classify any remaining failure by generic engine contract and fix it with regression tests.
 A genuine broad benchmark pass precedes quantified production hardening;
 Studio follows as a consumer of those results.
 

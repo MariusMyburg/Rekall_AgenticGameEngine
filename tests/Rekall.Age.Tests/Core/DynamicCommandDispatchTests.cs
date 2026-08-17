@@ -1,5 +1,7 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
+using Rekall.Age.World;
+using Rekall.Age.World.Commands;
 using System.Text.Json.Nodes;
 
 namespace Rekall.Age.Tests.Core;
@@ -74,6 +76,34 @@ public sealed class DynamicCommandDispatchTests
         Assert.Equal(7, value.Settings["speed"]!.GetValue<int>());
         Assert.Equal(3, value.Points.Count);
         Assert.Equal("[\"must-remain-a-string\"]", value.Literal);
+    }
+
+    [Fact]
+    public async Task RegistryAllowsComponentAddToOmitEmptyProperties()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var entity = RekallAgeEntityDocument.Create("Body", []);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"]).AddEntity(entity),
+            CancellationToken.None);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new AddComponentCommand());
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("add default component"),
+            CancellationToken.None);
+
+        var result = await registry.ExecuteJsonAsync(
+            "rekall.component.add",
+            $$"""{"projectRoot":"{{root.Replace("\\", "\\\\")}}","sceneName":"Main","entityId":"{{entity.Id}}","componentType":"Rekall.Transform2D"}""",
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        var saved = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        var component = Assert.Single(saved.GetRequiredEntity(entity.Id).Components);
+        Assert.Equal("Rekall.Transform2D", component.Type);
+        Assert.Empty(component.Properties);
     }
 
     private sealed record EchoRequest(string Message);

@@ -45,13 +45,13 @@ public sealed class ApplySceneBlueprintCommand
         ApplySceneBlueprintRequest request,
         RekallAgeCommandContext context)
     {
-        if (request.Entities.Count == 0)
+        var validationErrors = ValidateBlueprint(request.SceneName, request.Entities);
+        if (validationErrors.Count > 0)
         {
-            var error = new RekallAgeCommandError(
-                "REKALL_SCENE_BLUEPRINT_EMPTY",
-                "Scene blueprint must contain at least one entity.",
-                request.SceneName);
-            return RekallAgeCommandResult<ApplySceneBlueprintResult>.Failure(Empty(), error.Message, [error]);
+            return RekallAgeCommandResult<ApplySceneBlueprintResult>.Failure(
+                Empty(),
+                $"Scene blueprint validation failed with {validationErrors.Count} error(s).",
+                validationErrors);
         }
 
         var scene = await _store.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
@@ -90,6 +90,64 @@ public sealed class ApplySceneBlueprintCommand
         return RekallAgeCommandResult<ApplySceneBlueprintResult>.Success(
             new ApplySceneBlueprintResult(updated, updated.Entities.Count, upsertedCount, removedCount),
             $"Applied scene blueprint to '{request.SceneName}': {upsertedCount} upserted, {removedCount} removed.");
+    }
+
+    public static IReadOnlyList<RekallAgeCommandError> ValidateBlueprint(
+        string sceneName,
+        IReadOnlyList<RekallAgeSceneBlueprintEntity>? entities)
+    {
+        var errors = new List<RekallAgeCommandError>();
+        var sceneTarget = string.IsNullOrWhiteSpace(sceneName) ? "sceneName" : sceneName;
+        if (string.IsNullOrWhiteSpace(sceneName))
+        {
+            errors.Add(new RekallAgeCommandError(
+                "REKALL_BLUEPRINT_SCENE_NAME_REQUIRED",
+                "Scene blueprint name is required.",
+                sceneTarget));
+        }
+
+        if (entities is not { Count: > 0 })
+        {
+            errors.Add(new RekallAgeCommandError(
+                "REKALL_SCENE_BLUEPRINT_EMPTY",
+                "Scene blueprint must contain at least one entity.",
+                sceneTarget));
+            return errors;
+        }
+
+        for (var entityIndex = 0; entityIndex < entities.Count; entityIndex++)
+        {
+            var entity = entities[entityIndex];
+            var entityTarget = $"{sceneTarget}.entities[{entityIndex}]";
+            if (entity is null || string.IsNullOrWhiteSpace(entity.Name))
+            {
+                errors.Add(new RekallAgeCommandError(
+                    "REKALL_SCENE_BLUEPRINT_ENTITY_NAME_REQUIRED",
+                    "Every scene blueprint entity requires a name.",
+                    entityTarget));
+                continue;
+            }
+
+            var components = entity.Components;
+            if (components is null)
+            {
+                continue;
+            }
+
+            for (var componentIndex = 0; componentIndex < components.Count; componentIndex++)
+            {
+                var component = components[componentIndex];
+                if (component is null || string.IsNullOrWhiteSpace(component.Type))
+                {
+                    errors.Add(new RekallAgeCommandError(
+                        "REKALL_SCENE_BLUEPRINT_COMPONENT_TYPE_REQUIRED",
+                        "Every scene blueprint component requires a type.",
+                        $"{entityTarget}.components[{componentIndex}]"));
+                }
+            }
+        }
+
+        return errors;
     }
 
     private static int FindReplacementIndex(List<RekallAgeEntityDocument> existing, RekallAgeSceneBlueprintEntity blueprint)

@@ -66,6 +66,17 @@ public sealed class CreateBlueprintProjectCommand
             return RekallAgeCommandResult<CreateBlueprintProjectResult>.Failure(default!, error.Message, [error]);
         }
 
+        var validationErrors = requestedScenes
+            .SelectMany(scene => ApplySceneBlueprintCommand.ValidateBlueprint(scene.Name, scene.Entities))
+            .ToArray();
+        if (validationErrors.Length > 0)
+        {
+            return RekallAgeCommandResult<CreateBlueprintProjectResult>.Failure(
+                default!,
+                $"Project blueprint validation failed with {validationErrors.Length} error(s); no project files were written.",
+                validationErrors);
+        }
+
         var project = await new CreateProjectCommand().ExecuteAsync(
             new CreateProjectRequest(request.ProjectRoot, request.ProjectName, request.ProjectCapabilities),
             context);

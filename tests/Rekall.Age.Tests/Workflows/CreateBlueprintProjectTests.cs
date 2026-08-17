@@ -70,4 +70,38 @@ public sealed class CreateBlueprintProjectTests
         Assert.Contains(context.Transaction.ChangedResources, path => path.EndsWith("Main.age.scene.json"));
         Assert.Contains(context.Transaction.ChangedResources, path => path.EndsWith("Physics2D.age.scene.json"));
     }
+
+    [Fact]
+    public async Task RejectsInvalidLaterSceneBeforeWritingAnyProjectFiles()
+    {
+        var parent = TestPaths.CreateTempDirectory();
+        var root = Path.Combine(parent, "AtomicProject");
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("reject invalid multi-scene blueprint"),
+            CancellationToken.None);
+
+        var result = await new CreateBlueprintProjectCommand().ExecuteAsync(
+            new CreateBlueprintProjectRequest(
+                root,
+                "Atomic Project",
+                ["world"],
+                Scenes:
+                [
+                    new RekallAgeProjectBlueprintScene(
+                        "Main",
+                        ["world"],
+                        [new RekallAgeSceneBlueprintEntity("Valid Entity")]),
+                    new RekallAgeProjectBlueprintScene(
+                        "Broken",
+                        ["world"],
+                        [new RekallAgeSceneBlueprintEntity(" ")])
+                ]),
+            context);
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, error => error.Code == "REKALL_SCENE_BLUEPRINT_ENTITY_NAME_REQUIRED");
+        Assert.False(Directory.Exists(root));
+        Assert.Empty(context.Transaction.ChangedResources);
+    }
 }

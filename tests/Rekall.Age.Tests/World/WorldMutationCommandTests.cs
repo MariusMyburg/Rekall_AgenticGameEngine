@@ -159,6 +159,43 @@ public sealed class WorldMutationCommandTests
     }
 
     [Fact]
+    public async Task ApplySceneBlueprintReturnsStructuredValidationWithoutChangingScene()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        await store.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity(RekallAgeEntityDocument.Create("Existing", ["keep"])),
+            CancellationToken.None);
+        var scenePath = store.GetScenePath(root, "Main");
+        var before = await File.ReadAllTextAsync(scenePath);
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("reject invalid blueprint"),
+            CancellationToken.None);
+
+        var result = await new ApplySceneBlueprintCommand().ExecuteAsync(
+            new ApplySceneBlueprintRequest(
+                root,
+                "Main",
+                [
+                    new RekallAgeSceneBlueprintEntity("Valid"),
+                    new RekallAgeSceneBlueprintEntity("Broken", Components:
+                    [
+                        new RekallAgeSceneBlueprintComponent(" ")
+                    ])
+                ],
+                ClearExisting: true),
+            context);
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, error => error.Code == "REKALL_SCENE_BLUEPRINT_COMPONENT_TYPE_REQUIRED");
+        Assert.Equal(before, await File.ReadAllTextAsync(scenePath));
+        Assert.Empty(context.Transaction.ChangedResources);
+    }
+
+    [Fact]
     public async Task DeleteEntityRemovesOneEntityAndCapturesPreimage()
     {
         var root = TestPaths.CreateTempDirectory();

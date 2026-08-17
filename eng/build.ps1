@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $solution = Join-Path $repoRoot 'Rekall.AGE.sln'
 $artifactRoot = Join-Path $repoRoot 'Artifacts\Distribution'
+$testResultRoot = Join-Path $repoRoot 'Artifacts\TestResults'
 $stagingRoot = Join-Path $artifactRoot 'Staging'
 $outputRoot = Join-Path $artifactRoot "Rekall-AGE-0.1.0-preview.1-$RuntimeIdentifier"
 
@@ -38,9 +39,15 @@ Push-Location $repoRoot
 try {
     Invoke-Checked dotnet @('restore', $solution, '--locked-mode', '-r', $RuntimeIdentifier)
     Invoke-Checked dotnet @('build', $solution, '-c', $Configuration, '--no-restore')
+    if (Test-Path -LiteralPath $testResultRoot) {
+        Remove-Item -LiteralPath $testResultRoot -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $testResultRoot -Force | Out-Null
     1..2 | ForEach-Object {
         Write-Output "Release test pass $_ of 2"
-        Invoke-Checked dotnet @('test', $solution, '-c', $Configuration, '--no-build', '--no-restore', '--verbosity', 'minimal')
+        Invoke-Checked dotnet @(
+            'test', $solution, '-c', $Configuration, '--no-build', '--no-restore', '--verbosity', 'minimal',
+            '--logger', "trx;LogFileName=release-pass-$_.trx", '--results-directory', $testResultRoot)
     }
 
     Reset-Directory $stagingRoot

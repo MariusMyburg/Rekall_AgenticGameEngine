@@ -27,7 +27,7 @@ public sealed class BuildPlayerCommandTests
             new BuildPlayerRequest(projectRoot, "Main", outputRoot),
             context);
 
-        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Ok, FailureDetails(result));
         Assert.Equal("installed-player", await File.ReadAllTextAsync(result.Value.LaunchPath));
         Assert.True(File.Exists(Path.Combine(outputRoot, "runtime.dll")));
         Assert.DoesNotContain("dotnet publish", result.Value.Output, StringComparison.OrdinalIgnoreCase);
@@ -45,7 +45,7 @@ public sealed class BuildPlayerCommandTests
 
         var result = await command.ExecuteAsync(new BuildPlayerRequest(root, "Main"), context);
 
-        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Ok, FailureDetails(result));
         Assert.True(File.Exists(result.Value.LaunchPath), result.Value.LaunchPath);
         Assert.Contains(root, result.Value.Arguments);
         Assert.Contains("Main", result.Value.Arguments);
@@ -61,10 +61,18 @@ public sealed class BuildPlayerCommandTests
 
         var result = await command.ExecuteAsync(new BuildPlayerRequest(root, "Main", Graphics: true), context);
 
-        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Ok, FailureDetails(result));
         Assert.Contains("--graphics", result.Value.Arguments);
         Assert.Contains("--backend", result.Value.Arguments);
         Assert.Contains("vulkan", result.Value.Arguments);
         Assert.DoesNotContain("--playable", result.Value.Arguments);
+    }
+
+    private static string FailureDetails(RekallAgeCommandResult<BuildPlayerResult> result)
+    {
+        return string.Join(
+            Environment.NewLine,
+            new[] { result.Summary, result.Value.Output }
+                .Concat(result.Errors.Select(error => $"{error.Code}: {error.Message} ({error.Target})")));
     }
 }

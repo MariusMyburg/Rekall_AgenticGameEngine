@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "rekall.age.core": {
+        "type": "Project"
+      },
+      "rekall.age.project": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.validation": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Project": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.world": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )"
+        }
+      }
+    },
+    "net10.0/win-x64": {}
+  }
+}

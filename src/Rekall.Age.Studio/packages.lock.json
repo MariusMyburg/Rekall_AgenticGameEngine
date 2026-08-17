@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0-windows7.0": {
+      "Serilog.Extensions.Logging": {
+        "type": "Direct",
+        "requested": "[10.0.0, )",
+        "resolved": "10.0.0",
+        "contentHash": "vx0kABKl2dWbBhhqAfTOk53/i8aV/5VaT3a6il9gn72Wqs2pM7EK2OB6No6xdqK2IaY6Zf9gdjLuK9BVa2rT+Q==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging": "10.0.0",
+          "Serilog": "4.2.0"
+        }
+      },
+      "Serilog.Sinks.File": {
+        "type": "Direct",
+        "requested": "[7.0.0, )",
+        "resolved": "7.0.0",
+        "contentHash": "fKL7mXv7qaiNBUC71ssvn/dU0k9t0o45+qm2XgKAlSt19xF+ijjxyA3R6HmCgfKEKwfcfkwWjayuQtRueZFkYw==",
+        "dependencies": {
+          "Serilog": "4.2.0"
+        }
+      },
+      "BepuPhysics": {
+        "type": "Transitive",
+        "resolved": "2.4.0",
+        "contentHash": "Ck/BJgSQrBqYrj0T9jGljDdHNILBP5kTPTylc7N/hCzR1XJJc7p6ORzwtjTfjgoYkkdajvLHxEQv6BRC8kaysQ==",
+        "dependencies": {
+          "BepuUtilities": "2.4.0"
+        }
+      },
+      "BepuUtilities": {
+        "type": "Transitive",
+        "resolved": "2.4.0",
+        "contentHash": "KNMxkzKLHAvV7jRtErxs3rPv71fHToqo/WN96HlT6iomWuwL97tohEbt0B1WA8A6sO5t6PP+qF08d4T9A8k2uA=="
+      },
+      "Microsoft.Extensions.DependencyInjection": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "f0RBabswJq+gRu5a+hWIobrLWiUYPKMhCD9WO3sYBAdSy3FFH14LMvLVFZc2kPSCimBLxSuitUhsd6tb0TAY6A==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.0"
+        }
+      },
+      "Microsoft.Extensions.DependencyInjection.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "L3AdmZ1WOK4XXT5YFPEwyt0ep6l8lGIPs7F5OOBZc77Zqeo01Of7XXICy47628sdVl0v/owxYJTe86DTgFwKCA=="
+      },
+      "Microsoft.Extensions.Logging": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "BStFkd5CcnEtarlcgYDBcFzGYCuuNMzPs02wN3WBsOFoYIEmYoUdAiU+au6opzoqfTYJsMTW00AeqDdnXH2CvA==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection": "10.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.0",
+          "Microsoft.Extensions.Options": "10.0.0"
+        }
+      },
+      "Microsoft.Extensions.Logging.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "FU/IfjDfwaMuKr414SSQNTIti/69bHEMb+QKrskRb26oVqpx3lNFXMjs/RC9ZUuhBhcwDM2BwOgoMw+PZ+beqQ==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.0"
+        }
+      },
+      "Microsoft.Extensions.Options": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "8oCAgXOow5XDrY9HaXX1QmH3ORsyZO/ANVHBlhLyCeWTH5Sg4UuqZeOTWJi6484M+LqSx0RqQXDJtdYy2BNiLQ==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.0",
+          "Microsoft.Extensions.Primitives": "10.0.0"
+        }
+      },
+      "Microsoft.Extensions.Primitives": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "inRnbpCS0nwO/RuoZIAqxQUuyjaknOOnCEZB55KSMMjRhl0RQDttSmLSGsUJN3RQ3ocf5NDLFd2mOQViHqMK5w=="
+      },
+      "Serilog": {
+        "type": "Transitive",
+        "resolved": "4.2.0",
+        "contentHash": "gmoWVOvKgbME8TYR+gwMf7osROiWAURterc6Rt2dQyX7wtjZYpqFiA/pY6ztjGQKKV62GGCyOcmtP1UKMHgSmA=="
+      },
+      "rekall.age.assets": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.core": {
+        "type": "Project"
+      },
+      "rekall.age.editor": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Editor.Contracts": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
+          "Rekall.Age.Project": "[0.1.0-preview.1, )",
+          "Rekall.Age.Rendering.Abstractions": "[0.1.0-preview.1, )",
+          "Rekall.Age.Runtime": "[0.1.0-preview.1, )",
+          "Rekall.Age.Validation": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.editor.contracts": {
+        "type": "Project"
+      },
+      "rekall.age.modules": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Runtime.Abstractions": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.project": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.rendering.abstractions": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "BepuPhysics": "[2.4.0, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
+          "Rekall.Age.Runtime.Abstractions": "[0.1.0-preview.1, )",
+          "Rekall.Age.Validation": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.runtime.abstractions": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.validation": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Project": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.world": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )"
+        }
+      }
+    },
+    "net10.0-windows7.0/win-x64": {}
+  }
+}

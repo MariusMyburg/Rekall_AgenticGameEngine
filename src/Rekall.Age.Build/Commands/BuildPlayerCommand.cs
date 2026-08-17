@@ -48,6 +48,7 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
 
         var playerProject = FindPlayerProjectPath(request.Graphics);
         Directory.CreateDirectory(outputDirectory);
+        var artifactsPath = Path.Combine(outputDirectory, ".rekall-publish");
 
         var startInfo = new ProcessStartInfo("dotnet")
         {
@@ -58,18 +59,34 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
         startInfo.ArgumentList.Add("publish");
         startInfo.ArgumentList.Add(playerProject);
         startInfo.ArgumentList.Add("--nologo");
+        startInfo.ArgumentList.Add("-p:RestoreLockedMode=true");
         startInfo.ArgumentList.Add("-c");
         startInfo.ArgumentList.Add("Debug");
         startInfo.ArgumentList.Add("-o");
         startInfo.ArgumentList.Add(outputDirectory);
+        startInfo.ArgumentList.Add("--artifacts-path");
+        startInfo.ArgumentList.Add(artifactsPath);
         startInfo.ArgumentList.Add("/nr:false");
 
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Could not start dotnet publish.");
-        var outputTask = process.StandardOutput.ReadToEndAsync(context.CancellationToken);
-        var errorTask = process.StandardError.ReadToEndAsync(context.CancellationToken);
-        await process.WaitForExitAsync(context.CancellationToken);
-        var output = await outputTask + await errorTask;
+        string output;
+        int exitCode;
+        try
+        {
+            using var process = Process.Start(startInfo)
+                ?? throw new InvalidOperationException("Could not start dotnet publish.");
+            var outputTask = process.StandardOutput.ReadToEndAsync(context.CancellationToken);
+            var errorTask = process.StandardError.ReadToEndAsync(context.CancellationToken);
+            await process.WaitForExitAsync(context.CancellationToken);
+            output = await outputTask + await errorTask;
+            exitCode = process.ExitCode;
+        }
+        finally
+        {
+            if (Directory.Exists(artifactsPath))
+            {
+                Directory.Delete(artifactsPath, recursive: true);
+            }
+        }
 
         var launchPath = FindLaunchPath(outputDirectory);
         var result = new BuildPlayerResult(
@@ -79,7 +96,7 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
                 ? [request.ProjectRoot, request.SceneName, "--graphics", "--backend", "vulkan"]
                 : [request.ProjectRoot, request.SceneName],
             output);
-        if (process.ExitCode != 0 || !File.Exists(launchPath))
+        if (exitCode != 0 || !File.Exists(launchPath))
         {
             var error = new RekallAgeCommandError(
                 "REKALL_PLAYER_BUILD_FAILED",

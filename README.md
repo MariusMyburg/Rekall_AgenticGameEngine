@@ -4,6 +4,8 @@ Rekall AGE is the Rekall Agentic Game Engine: a C#/.NET engine for AI agents to 
 
 Rekall AGE is proprietary software governed by the [proprietary notice](PROPRIETARY-NOTICE.md). The current product version is `0.1.0-preview.1`, a Windows-first Developer Preview for professional developers and AI coding agents.
 
+The permanent product north star is recorded in [the Rekall AGE product vision](docs/PRODUCT-VISION.md).
+
 The core idea is simple and strict: Rekall AGE is an AI-agent-first game engine. Every major system is designed so agents can inspect the current state, understand the available contracts, make targeted changes, run verification loops, and explain what changed. The engine exposes authoring primitives, diagnostics, runtime contracts, rendering infrastructure, networking primitives, package workflows, and MCP/CLI tools so agents can author arbitrary games through project data and project modules.
 
 The genre-agnostic rule follows from that agent-first premise: the engine should not provide a privileged controller, combat loop, camera loop, level loop, or rules model. Game-specific behavior belongs in authored scene data and project modules, where agents can read and change it directly.
@@ -14,6 +16,7 @@ This README is the broad public entry point and the technical reference for the 
 
 - [Engine Philosophy](#engine-philosophy)
 - [Current Status](#current-status)
+- [Production Distribution](#production-distribution)
 - [Quick Start](#quick-start)
 - [Repository Map](#repository-map)
 - [Mental Model](#mental-model)
@@ -141,6 +144,43 @@ Important scope note:
 - Multiplayer is a generic authoritative-session foundation, not a finished matchmaking or internet transport product.
 - VR uses the windowed player as the playable path. Desktop keyboard/mouse input and OpenXR poses/actions share the same generic runtime input stream, while the direct OpenXR submitter remains a diagnostic path.
 - Tripo3D integration is an asset-pipeline bridge: it can request text-to-model generation, poll the provider task, download the returned GLB, and import it as an ordinary model asset. The engine does not use Tripo to author game behavior.
+
+## Production Distribution
+
+The canonical Windows Developer Preview build is:
+
+```powershell
+pwsh ./eng/build.ps1 -Configuration Release -RuntimeIdentifier win-x64
+```
+
+This is the authoritative production gate. It performs a locked dependency
+restore, a Release build, two complete Release test passes, four self-contained
+Windows publishes, SDK staging, distribution assembly, and black-box acceptance
+using only the installed distribution.
+
+The accepted archive is written to:
+
+```text
+Artifacts/Distribution/Rekall-AGE-0.1.0-preview.1-win-x64.zip
+```
+
+Inside the archive, `rekall.distribution.json` identifies the product version,
+runtime identifier, and every shipped file with a lowercase SHA-256 digest.
+Paths are distribution-relative and never refer to the engine source tree. The
+package contains the CLI and MCP host, Studio, headless and Windows players, the
+portable module SDK, documentation, and proprietary and third-party notices.
+
+After extracting the archive, assess the installed engine with:
+
+```powershell
+.\tools\cli\Rekall.Age.Cli.exe context doctor
+```
+
+Passing distribution acceptance proves that an agent can create a project,
+author and build a portable C# runtime module, diagnose the project, and run the
+generic create/verify/package/audit/capture gauntlet without access to `src/`.
+The stability table above remains authoritative: experimental subsystems are
+shipped for evaluation but are not promoted to supported status by packaging.
 
 ## Quick Start
 

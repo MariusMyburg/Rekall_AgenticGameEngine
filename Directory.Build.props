@@ -11,5 +11,7 @@
     <Product>Rekall AGE</Product>
     <Company>Rekall</Company>
     <Copyright>Copyright © 2026 Rekall. All rights reserved.</Copyright>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
 </Project>

@@ -84,7 +84,7 @@ public sealed class RekallAgeAudioSystem(string? projectRoot) : IRekallAgeRuntim
         var playback = existing is not null && clipId.Equals(existingClip, StringComparison.Ordinal)
             ? ReadNumber(existing.Properties, "playbackSeconds", 0)
             : 0;
-        var hasExplicitPlaying = emitter.Properties.ContainsKey("playing");
+        var hasExplicitPlaying = TryGetPropertyValue(emitter.Properties, "playing", out _);
         var shouldPlay = hasExplicitPlaying
             ? ReadBoolean(emitter.Properties, "playing", false)
             : existing is null || !clipId.Equals(existingClip, StringComparison.Ordinal)
@@ -346,20 +346,23 @@ public sealed class RekallAgeAudioSystem(string? projectRoot) : IRekallAgeRuntim
     }
 
     private static string? ReadString(JsonObject properties, string name) =>
-        properties[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text)
+        TryGetPropertyValue(properties, name, out var node)
+            && node is JsonValue value
+            && value.TryGetValue<string>(out var text)
+            && !string.IsNullOrWhiteSpace(text)
             ? text.Trim()
             : null;
 
     private static bool ReadBoolean(JsonObject properties, string name, bool fallback) =>
-        properties[name] is JsonValue value &&
+        TryGetPropertyValue(properties, name, out var node) && node is JsonValue value &&
         (value.TryGetValue<bool>(out var boolean) && boolean ||
          value.TryGetValue<string>(out var text) && bool.TryParse(text, out var parsed) && parsed)
             ? true
-            : properties.ContainsKey(name) ? false : fallback;
+            : TryGetPropertyValue(properties, name, out _) ? false : fallback;
 
     private static double ReadNumber(JsonObject properties, string name, double fallback)
     {
-        if (properties[name] is not JsonValue value)
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
         {
             return fallback;
         }
@@ -371,8 +374,23 @@ public sealed class RekallAgeAudioSystem(string? projectRoot) : IRekallAgeRuntim
 
         return value.TryGetValue<string>(out var text) &&
             double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
-                ? parsed
-                : fallback;
+            ? parsed
+            : fallback;
+    }
+
+    private static bool TryGetPropertyValue(JsonObject properties, string name, out JsonNode? value)
+    {
+        foreach (var property in properties)
+        {
+            if (property.Key.Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
     }
 
     private readonly record struct BusState(double Gain, bool Muted)

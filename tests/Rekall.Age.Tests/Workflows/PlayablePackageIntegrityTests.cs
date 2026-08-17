@@ -35,7 +35,7 @@ public sealed class PlayablePackageIntegrityTests
         await File.WriteAllTextAsync(Path.Combine(root, "local.env"), "SECRET=do-not-ship");
         var importedAudio = Path.Combine(root, "Assets", "audio", "asset-tone.wav");
         Directory.CreateDirectory(Path.GetDirectoryName(importedAudio)!);
-        await File.WriteAllBytesAsync(importedAudio, [82, 73, 70, 70]);
+        await File.WriteAllBytesAsync(importedAudio, CreatePcm16Wave());
         await File.WriteAllTextAsync(
             Path.Combine(root, "Assets", "assets.age.catalog.json"),
             $$"""
@@ -56,6 +56,14 @@ public sealed class PlayablePackageIntegrityTests
         var sceneStore = new RekallAgeSceneStore();
         var scene = await sceneStore.LoadAsync(root, "Main", CancellationToken.None);
         scene = scene
+            .AddEntity(RekallAgeEntityDocument.Create("Audio Listener", ["audio"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject()))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.AudioListener", new JsonObject())))
+            .AddEntity(RekallAgeEntityDocument.Create("Tone", ["audio"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject()))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.AudioEmitter",
+                    new JsonObject { ["Clip"] = "asset-tone", ["PlayOnStart"] = true, ["Loop"] = true })))
             .AddEntity(RekallAgeEntityDocument.Create("HUD", ["ui"])
                 .AddComponent(RekallAgeComponentDocument.Create(
                     "Rekall.UiCanvas",
@@ -143,7 +151,21 @@ public sealed class PlayablePackageIntegrityTests
             packagedRun.Value.RenderFrames[^1].RuntimeState);
         Assert.Equal(1, runtimeState.UiElementCount);
         Assert.Equal(1, runtimeState.AnimationPlayerCount);
+        Assert.Equal(1, runtimeState.AudioVoiceCount);
+        Assert.DoesNotContain(runtimeState.Observations, observation => observation.Subsystem == "audio");
         Assert.Equal(5, runtimeState.Entities.Single(entity => entity.Name == "Animated").X, precision: 3);
+
+        var relocationRoot = TestPaths.CreateTempDirectory();
+        var relocatedArchive = Path.Combine(relocationRoot, "audio-game-relocated.zip");
+        ZipFile.CreateFromDirectory(output, relocatedArchive, CompressionLevel.Fastest, includeBaseDirectory: false);
+        var relocatedRun = await new RunPlayablePackageCommand().ExecuteAsync(
+            new RunPlayablePackageRequest(relocatedArchive, Frames: 30),
+            context);
+        Assert.True(relocatedRun.Ok, relocatedRun.Summary);
+        var relocatedRuntimeState = Assert.IsType<Rekall.Age.Playback.RekallAgePlaybackRuntimeState>(
+            relocatedRun.Value.RenderFrames[^1].RuntimeState);
+        Assert.Equal(1, relocatedRuntimeState.AudioVoiceCount);
+        Assert.DoesNotContain(relocatedRuntimeState.Observations, observation => observation.Subsystem == "audio");
 
         await File.AppendAllTextAsync(Path.Combine(output, "Game", "rekall.project.json"), " ");
         await File.WriteAllTextAsync(Path.Combine(output, "unexpected.txt"), "not declared");
@@ -207,5 +229,37 @@ public sealed class PlayablePackageIntegrityTests
         Assert.Empty(run.Value.RenderFrames);
         Assert.Contains(run.Errors, error => error.Code == "REKALL_PACKAGE_PATH_UNSAFE");
         Assert.False(File.Exists(Path.Combine(relocationRoot, "escaped.txt")));
+    }
+
+    private static byte[] CreatePcm16Wave()
+    {
+        const int sampleRate = 48_000;
+        const short channels = 1;
+        var samples = Enumerable.Range(0, sampleRate)
+            .Select(index => (short)(Math.Sin(2 * Math.PI * 440 * index / sampleRate) * 8_000))
+            .ToArray();
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream);
+        var dataLength = samples.Length * sizeof(short);
+        writer.Write("RIFF"u8);
+        writer.Write(36 + dataLength);
+        writer.Write("WAVE"u8);
+        writer.Write("fmt "u8);
+        writer.Write(16);
+        writer.Write((short)1);
+        writer.Write(channels);
+        writer.Write(sampleRate);
+        writer.Write(sampleRate * channels * sizeof(short));
+        writer.Write((short)(channels * sizeof(short)));
+        writer.Write((short)16);
+        writer.Write("data"u8);
+        writer.Write(dataLength);
+        foreach (var sample in samples)
+        {
+            writer.Write(sample);
+        }
+
+        writer.Flush();
+        return stream.ToArray();
     }
 }

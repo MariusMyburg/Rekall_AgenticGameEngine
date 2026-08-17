@@ -40,7 +40,7 @@ Maturity labels:
 | Project/world authoring | Implemented | deterministic project/scene stores; entity/component commands; blueprints; transactions | schema migration, corruption recovery, autosave, and large-project stress proof |
 | Portable C# modules | Proven | installed SDK scaffolds and builds without `src/`; isolated intermediates; runtime loading | explicit trust/sandbox policy, dependency policy, compatibility fixtures, module reload |
 | MCP command surface | Implemented | JSON-RPC tools with generated JSON schemas, structured content, priorities, transactions | richer field descriptions/constraints, pagination/filtering, capability benchmark, protocol conformance suite |
-| Agent context | Partial | compact project/scene summaries, diagnostics, next actions | indexed queries for large projects, token budgets, change-focused context, benchmarked efficiency |
+| Agent context | Implemented | compact summaries, focused component-schema search, bounded persistent tool ledger, measured Ollama authoring benchmark | indexed queries for very large projects, more benchmark tasks, lower redundant-call rate |
 | Desktop runtime | Implemented | fixed-step runtime, generic events/input, module systems, windowed player | save/load state, crash recovery, lifecycle soak tests, frame pacing/telemetry |
 | Input and events | Implemented | semantic action maps, pointer, timer, collision, trigger, XR pose, custom module events | rebinding persistence, device hot-plug, gamepad breadth, accessibility proof |
 | 3D physics | Implemented | BEPU simulation, bodies, shapes, materials, contacts, ray facts | character-independent query/controller primitives, joints/constraints authoring, stress/performance budgets |
@@ -48,44 +48,43 @@ Maturity labels:
 | Vulkan rendering | Implemented | native Vulkan, materials, shaders, GLB, textures, lighting, captures, visibility, budgets | broader device matrix, GPU CI/smoke lab, resize/device-loss recovery, renderer decomposition |
 | Software rendering | Implemented | deterministic viewport and proof captures | fidelity limits must remain explicit; not a shipping renderer |
 | OpenXR | Partial/experimental | real runtime probing, swapchains, stereo planning, windowed headset submission | repeatable headset acceptance, performance, controller breadth, lifecycle hardening |
-| Audio | Projection | listener/emitter contracts and WAV MIME recognition | no decoder, mixer, buses, playback device, spatialization, streaming, or runtime audio system |
-| Animation | Partial | transform animation plus animation-player projections | no general clip evaluator, sprite animation execution, skeletal skinning, blending, state graphs, import pipeline |
-| Runtime UI | Projection | canvas/element contracts, pointer facts, UI-layer placeholder renderable | no layout, typography, element rendering, focus/navigation, binding, or button behavior system |
+| Audio | Proven | validated PCM WAV decoding, deterministic voices/mix frames, buses, gain/pitch/looping, spatial attenuation/pan, SDL Windows device queue, relocated package and installed-player proof | streaming/compressed codecs, device hot-plug/recovery, effects/DSP, broader hardware matrix |
+| Animation | Implemented | versioned inline/catalog clips, scalar/vector/color/string tracks, interpolation, loop/clamp/ping-pong, events, generic property mutation, runtime-state proof | sprite-frame authoring, cross-fade/blend layers, skeletal GLB tracks/skinning, state graphs |
+| Runtime UI | Implemented | canvases, deterministic layout state, panels/labels/images/buttons, software and Vulkan overlays, text metrics, pointer interaction facts | complete anchors/stacking/padding/alignment/clipping, focus/navigation/accessibility, installed visual matrix |
 | Assets | Partial | images, DDS/KTX2, GLB metadata/meshes, WAV recognition, reports, Tripo bridge | audio cooking, animation import, dependency graph, reimport/watch pipeline, deterministic cache cleanup |
 | Multiplayer | Partial/experimental | authoritative session, ownership, snapshots/deltas, named-pipe and WebSocket transport | authentication, encryption policy, internet deployment, discovery/matchmaking, load/adversarial tests |
 | Live editing | Partial | scene/assets/blueprint/diff local IPC operations | module hot reload, conflict/revision UX, reconnect/recovery, Studio integration |
-| Playable packaging | Partial | installed players, verify/package/run/capture/audit workflows | manifest leaks absolute build paths, project-local SDK/cache can ship, no per-file game-package integrity manifest, relocation is not a required gate |
+| Playable packaging | Proven | relative hashed manifest, minimal payload, forbidden-file checks, archive safety, relocation run/audit/capture, packaged runtime UI/animation/audio state | signing, delta patching/updater integration, broader clean-machine matrix |
 | Engine distribution | Proven | locked restore, two suites, self-contained applications, hashes, clean installed gauntlet | binary signing, installer/updater, release provenance/SBOM, clean-machine VM matrix |
 | Studio | Facade | real read models and a WPF shell | controls are unwired, viewport is text, no interactive open/edit/play workflow |
 | Security | Partial | no currently known vulnerable NuGet dependency; distribution forbidden-file checks | arbitrary-module trust boundary, fuzzing, path/archive hardening, secret scanning, signed releases, threat model |
-| Test platform | Implemented | 505 green tests and installed acceptance | deprecated xUnit v2 package, limited GPU/audio/headset automation, soak/fuzz/performance regression suites |
-| LLM providers/Ollama | Missing | no provider integration or configured model | provider-neutral contract, Ollama adapter, model discovery/health, opt-in credentials, engine-specific evals |
+| Test platform | Implemented | 529 green tests in two Release passes plus canonical installed acceptance with Vulkan, relocation, and SDL audio proof | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
+| LLM providers/Ollama | Implemented | provider-neutral contracts, native Ollama chat/tools/model discovery, bounded loop, `qwen3.5:35b` authoring benchmark completed in 15 turns | additional models/providers, installed benchmark suite, quality/cost routing policy |
 
 ## Material findings
 
-### 1. The product can now ship an engine, but not yet a production game package
+### 1. Engine and game-package relocation are now proven
 
-The Windows engine archive is reproducible, self-contained, hashed, and proven
-outside the repository. Playable game packages are weaker: their manifest stores
-absolute build-machine paths, package copying can include `.rekall` SDK files,
-and relocation is handled indirectly by filename rebasing rather than expressed
-as a clean relative contract. This is the first P0 because every game produced
-by every other subsystem depends on a trustworthy deliverable.
+The Windows engine archive and playable game package are self-contained, hashed,
+minimal, and exercised after relocation. Package inspection rejects undeclared,
+tampered, and unsafe archive paths before execution. Signing, provenance, and a
+clean-machine OS/GPU matrix remain release-engineering gaps.
 
-### 2. Three expected engine pillars are substantially incomplete
+### 2. Core audio, UI, and animation now execute; advanced breadth remains
 
-Audio is a no-op runtime system. General UI is a no-op runtime system with a
-placeholder layer renderable. General animation has inspectable projections but
-only transform animation executes. These are core engine deficiencies and must
-be implemented before a “fully capable game engine” claim is credible.
+Audio now decodes, mixes, spatializes, relocates, and reaches the installed
+Windows player's SDL queue. General UI renders in software and Vulkan/windowed
+paths. Versioned animation clips mutate generic component properties and expose
+post-simulation state. Advanced UI layout/navigation, animation blending and
+skeletal execution, and compressed/streaming audio remain material gaps.
 
-### 3. The agent-native architecture is real, but not yet measured
+### 3. The agent-native architecture is measured but not yet broad enough
 
-MCP is not a fake wrapper: it exposes real command execution, generated input
-schemas, transactions, structured results, and the same workflows used by CLI.
-The portable module SDK is also real. What is missing is a repeatable agent
-effectiveness benchmark measuring discovery, tool-call count, tokens/context,
-repair loops, time, and playable outcome across representative game tasks.
+MCP exposes real commands, generated schemas, transactions, and the same
+workflows used by CLI. A local `qwen3.5:35b` authored and verified UI plus
+animation through engine tools within 15 bounded turns, with tokens and failures
+recorded. The benchmark must expand to representative 2D, 3D, audio, physics,
+packaging, repair, and installed-engine tasks while reducing redundant calls.
 
 ### 4. Studio must be described honestly
 

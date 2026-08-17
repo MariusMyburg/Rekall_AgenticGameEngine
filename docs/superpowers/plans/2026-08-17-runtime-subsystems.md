@@ -16,8 +16,8 @@ structured observations, and gameplay remains in agent-authored modules.
 - [x] Decode validated PCM WAV assets without platform dependencies.
 - [x] Execute emitter lifecycle, looping, gain, pitch, bus gain, and generic 3D attenuation/pan.
 - [x] Expose deterministic headless audio state and missing/invalid-asset observations.
-- [ ] Add a Windows playback adapter without coupling runtime simulation to the device.
-- [ ] Prove imported audio through scene execution, package relocation, and installed player.
+- [x] Add a Windows playback adapter without coupling runtime simulation to the device.
+- [x] Prove imported audio through scene execution, package relocation, and installed player.
 
 ## Tranche 2: Runtime UI
 
@@ -42,5 +42,5 @@ structured observations, and gameplay remains in agent-authored modules.
 - [ ] Add SDK helpers and schemas agents can discover without guessing property shapes.
 - [ ] Add malformed-data, limit, fuzz, determinism, and long-run tests.
 - [ ] Add audio/UI/animation tasks to the installed-engine agent benchmark.
-- [ ] Run the full suite twice and canonical Windows distribution acceptance.
+- [x] Run the full suite twice and canonical Windows distribution acceptance.
 - [ ] Update the maturity audit with measured evidence rather than projections.

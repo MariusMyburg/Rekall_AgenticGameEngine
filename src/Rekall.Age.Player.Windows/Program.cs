@@ -58,6 +58,7 @@ internal static class Program
         var openXrEyeWidth = ReadPositiveIntOption(args, "--vr-eye-width") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeWidth;
         var openXrEyeHeight = ReadPositiveIntOption(args, "--vr-eye-height") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeHeight;
         var frameLimit = ReadPositiveIntOption(args, "--frames") ?? 0;
+        var audioRequired = HasOption(args, "--audio-required");
         await using var player = await RekallAgeVeldridPlayer.CreateAsync(
             Path.GetFullPath(args[0]),
             args[1],
@@ -70,8 +71,22 @@ internal static class Program
             openXrEyeWidth,
             openXrEyeHeight,
             CancellationToken.None);
+        if (audioRequired && !player.AudioOutputAvailable)
+        {
+            PlayerLog.Write("Player process exiting: required audio output is unavailable.");
+            Console.Error.WriteLine("Required SDL audio output is unavailable. See the player log for details.");
+            return 3;
+        }
+
         PlayerLog.Write("Player entering render loop.");
         player.Run(frameLimit);
+        if (audioRequired && player.AudioSubmittedFrameCount == 0)
+        {
+            PlayerLog.Write("Player process exiting: required audio output received no runtime mix frames.");
+            Console.Error.WriteLine("Required SDL audio output received no runtime mix frames.");
+            return 4;
+        }
+
         PlayerLog.Write("Player process exiting normally.");
         return 0;
     }
@@ -220,6 +235,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private long _openXrLastConsumedInputSequence;
     private CancellationTokenSource? _openXrSubmitCts;
     private Task? _openXrSubmitTask;
+    private bool _audioSubmissionLogged;
+
+    public bool AudioOutputAvailable => _audioOutput is not null;
+
+    public int AudioSubmittedFrameCount => _audioOutput?.SubmittedFrameCount ?? 0;
 
     private RekallAgeVeldridPlayer(
         string projectRoot,
@@ -306,7 +326,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _runtimeWorld = runtimeWorld;
         _runtimeLoop = runtimeLoop;
         _simulationClock = new RekallAgeRuntimeSimulationClock(_runtimeLoop, _clock.Elapsed);
-        _audioOutput = RekallAgeSdlAudioOutput.TryCreate();
+        _audioOutput = RekallAgeSdlAudioOutput.TryCreate(out var audioStatus);
+        PlayerLog.Write(audioStatus);
         _assets = assets;
         _entityCount = entityCount;
         _textures = textures;
@@ -1681,6 +1702,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             .GetResult();
         _runtimeWorld = result.World;
         _audioOutput?.Submit(result.AudioFrames);
+        if (!_audioSubmissionLogged && _audioOutput is { SubmittedFrameCount: > 0 } audioOutput)
+        {
+            _audioSubmissionLogged = true;
+            PlayerLog.Write($"Audio output queued runtime mix frames={audioOutput.SubmittedFrameCount} bytes={audioOutput.QueuedBytes}.");
+        }
     }
 
     private RekallAgeRuntimeInputState ConsumeRuntimeInput()

@@ -10,12 +10,18 @@ $cli = Join-Path $distribution 'tools\cli\Rekall.Age.Cli.exe'
 if (-not (Test-Path -LiteralPath $cli -PathType Leaf)) {
     throw "Distributed CLI was not found at '$cli'."
 }
+$windowsPlayer = Join-Path $distribution 'players\windows\Rekall.Age.Player.Windows.exe'
+if (-not (Test-Path -LiteralPath $windowsPlayer -PathType Leaf)) {
+    throw "Distributed Windows player was not found at '$windowsPlayer'."
+}
 
 $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/')
 $proofRoot = Join-Path $tempRoot ('rekall-age-installed-proof-' + [Guid]::NewGuid().ToString('N'))
 $gauntletRoot = Join-Path $tempRoot ('rekall-age-installed-gauntlet-' + [Guid]::NewGuid().ToString('N'))
 $relocationRoot = Join-Path $tempRoot ('rekall-age-relocated-package-' + [Guid]::NewGuid().ToString('N'))
+$audioRoot = Join-Path $tempRoot ('rekall-age-installed-audio-' + [Guid]::NewGuid().ToString('N'))
 $succeeded = $false
+$previousSdlAudioDriver = $env:SDL_AUDIODRIVER
 
 function Invoke-Rekall {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
@@ -76,12 +82,90 @@ try {
         throw "Relocated package audit did not produce a nonblank proof frame at '$relocatedFrame'."
     }
 
+    Invoke-Rekall project create $audioRoot 'Installed Audio Proof' 'audio'
+    Invoke-Rekall scene create $audioRoot Main 'audio'
+    $audioDirectory = Join-Path $audioRoot 'Assets\audio'
+    New-Item -ItemType Directory -Path $audioDirectory -Force | Out-Null
+    $wavePath = Join-Path $audioDirectory 'installed-tone.wav'
+    $sampleRate = 48000
+    $samples = New-Object Int16[] $sampleRate
+    for ($index = 0; $index -lt $samples.Length; $index++) {
+        $samples[$index] = [Int16]([Math]::Sin(2 * [Math]::PI * 440 * $index / $sampleRate) * 8000)
+    }
+    $waveStream = [IO.MemoryStream]::new()
+    $waveWriter = [IO.BinaryWriter]::new($waveStream)
+    try {
+        $dataLength = $samples.Length * 2
+        $waveWriter.Write([Text.Encoding]::ASCII.GetBytes('RIFF'))
+        $waveWriter.Write(36 + $dataLength)
+        $waveWriter.Write([Text.Encoding]::ASCII.GetBytes('WAVE'))
+        $waveWriter.Write([Text.Encoding]::ASCII.GetBytes('fmt '))
+        $waveWriter.Write(16)
+        $waveWriter.Write([Int16]1)
+        $waveWriter.Write([Int16]1)
+        $waveWriter.Write($sampleRate)
+        $waveWriter.Write($sampleRate * 2)
+        $waveWriter.Write([Int16]2)
+        $waveWriter.Write([Int16]16)
+        $waveWriter.Write([Text.Encoding]::ASCII.GetBytes('data'))
+        $waveWriter.Write($dataLength)
+        foreach ($sample in $samples) { $waveWriter.Write($sample) }
+        $waveWriter.Flush()
+        [IO.File]::WriteAllBytes($wavePath, $waveStream.ToArray())
+    }
+    finally {
+        $waveWriter.Dispose()
+        $waveStream.Dispose()
+    }
+
+    $catalog = @{
+        assets = @(@{
+            id = 'installed-tone'
+            name = 'installed-tone'
+            displayName = 'Installed Tone'
+            kind = 'audio'
+            sourcePath = ''
+            importedPath = 'Assets/audio/installed-tone.wav'
+            contentHash = 'installed-audio-proof'
+        })
+    }
+    $catalog | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $audioRoot 'Assets\assets.age.catalog.json') -Encoding utf8
+    $scenePath = Join-Path $audioRoot 'Scenes\Main.age.scene.json'
+    $scene = Get-Content -LiteralPath $scenePath -Raw | ConvertFrom-Json
+    $scene.capabilities = @('audio')
+    $scene.entities = @(
+        @{
+            id = 'installed-audio-listener'; name = 'Audio Listener'; tags = @('audio'); parentId = $null; prefabSourceId = $null; visible = $true; locked = $false
+            components = @(
+                @{ type = 'Rekall.Transform3D'; properties = @{} },
+                @{ type = 'Rekall.AudioListener'; properties = @{ Active = $true } }
+            )
+        },
+        @{
+            id = 'installed-audio-emitter'; name = 'Installed Tone'; tags = @('audio'); parentId = $null; prefabSourceId = $null; visible = $true; locked = $false
+            components = @(
+                @{ type = 'Rekall.Transform3D'; properties = @{} },
+                @{ type = 'Rekall.AudioEmitter'; properties = @{ Clip = 'installed-tone'; PlayOnStart = $true; Loop = $true } }
+            )
+        }
+    )
+    $scene | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $scenePath -Encoding utf8
+    Invoke-Rekall runtime inspect $audioRoot Main 30
+
+    $env:SDL_AUDIODRIVER = 'dummy'
+    $audioProcess = Start-Process -FilePath $windowsPlayer -ArgumentList @($audioRoot, 'Main', '--frames', '10', '--audio-required') -PassThru -WindowStyle Hidden
+    $audioProcess.WaitForExit()
+    if ($audioProcess.ExitCode -ne 0) {
+        throw "Installed Windows player audio device proof failed ($($audioProcess.ExitCode))."
+    }
+
     $succeeded = $true
     Write-Output "Installed distribution acceptance passed: $distribution"
 }
 finally {
+    $env:SDL_AUDIODRIVER = $previousSdlAudioDriver
     if ($succeeded) {
-        foreach ($path in @($proofRoot, $gauntletRoot, $relocationRoot)) {
+        foreach ($path in @($proofRoot, $gauntletRoot, $relocationRoot, $audioRoot)) {
             $resolved = [IO.Path]::GetFullPath($path)
             if ($resolved.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and
                 (Test-Path -LiteralPath $resolved)) {
@@ -90,6 +174,6 @@ finally {
         }
     }
     else {
-        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$gauntletRoot', and '$relocationRoot'."
+        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$gauntletRoot', '$relocationRoot', and '$audioRoot'."
     }
 }

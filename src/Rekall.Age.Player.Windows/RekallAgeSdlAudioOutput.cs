@@ -11,19 +11,24 @@ internal sealed class RekallAgeSdlAudioOutput : IDisposable
     private uint _device;
     private bool _ownsAudioSubsystem;
 
+    public int SubmittedFrameCount { get; private set; }
+
+    public uint QueuedBytes => _device == 0 ? 0 : SdlNative.SDL_GetQueuedAudioSize(_device);
+
     private RekallAgeSdlAudioOutput(uint device, bool ownsAudioSubsystem)
     {
         _device = device;
         _ownsAudioSubsystem = ownsAudioSubsystem;
     }
 
-    public static RekallAgeSdlAudioOutput? TryCreate()
+    public static RekallAgeSdlAudioOutput? TryCreate(out string status)
     {
         try
         {
             var ownsAudioSubsystem = SdlNative.SDL_InitSubSystem(SdlInitAudio) == 0;
             if (!ownsAudioSubsystem)
             {
+                status = $"SDL audio subsystem initialization failed: {SdlNative.GetError()}";
                 return null;
             }
 
@@ -43,14 +48,19 @@ internal sealed class RekallAgeSdlAudioOutput : IDisposable
                 }
 
                 SdlNative.SDL_QuitSubSystem(SdlInitAudio);
+                status = device == 0
+                    ? $"SDL audio device open failed: {SdlNative.GetError()}"
+                    : $"SDL audio device format mismatch: obtained {obtained.Frequency} Hz, {obtained.Channels} channels, format 0x{obtained.Format:x4}.";
                 return null;
             }
 
             SdlNative.SDL_PauseAudioDevice(device, 0);
+            status = $"SDL audio device ready: {obtained.Frequency} Hz, {obtained.Channels} channels, float32.";
             return new RekallAgeSdlAudioOutput(device, ownsAudioSubsystem);
         }
-        catch (Exception exception) when (exception is DllNotFoundException or EntryPointNotFoundException)
+        catch (Exception exception) when (exception is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
         {
+            status = $"SDL audio unavailable: {exception.Message}";
             return null;
         }
     }
@@ -76,7 +86,13 @@ internal sealed class RekallAgeSdlAudioOutput : IDisposable
             var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
             try
             {
-                _ = SdlNative.SDL_QueueAudio(_device, handle.AddrOfPinnedObject(), checked((uint)(buffer.Length * sizeof(float))));
+                if (SdlNative.SDL_QueueAudio(
+                        _device,
+                        handle.AddrOfPinnedObject(),
+                        checked((uint)(buffer.Length * sizeof(float)))) == 0)
+                {
+                    SubmittedFrameCount++;
+                }
             }
             finally
             {
@@ -145,5 +161,10 @@ internal sealed class RekallAgeSdlAudioOutput : IDisposable
 
         [DllImport("SDL2.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern void SDL_ClearQueuedAudio(uint device);
+
+        [DllImport("SDL2.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr SDL_GetError();
+
+        public static string GetError() => Marshal.PtrToStringUTF8(SDL_GetError()) ?? "unknown SDL error";
     }
 }

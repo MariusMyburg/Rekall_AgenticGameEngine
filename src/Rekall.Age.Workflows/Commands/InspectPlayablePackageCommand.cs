@@ -35,7 +35,7 @@ public sealed class InspectPlayablePackageCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Inspects a packaged playable game manifest from a package directory, manifest file, or zip archive.",
+        "Inspects a packaged playable game manifest from PackagePlayableGameResult.OutputDirectory, ManifestPath, or ArchivePath. Never pass its LaunchPath executable.",
         typeof(InspectPlayablePackageRequest).FullName!,
         typeof(InspectPlayablePackageResult).FullName!);
 
@@ -43,7 +43,25 @@ public sealed class InspectPlayablePackageCommand
         InspectPlayablePackageRequest request,
         RekallAgeCommandContext context)
     {
-        var (manifestPath, manifest, files) = await ReadManifestAsync(request.PackagePath, context.CancellationToken);
+        var fullPath = Path.GetFullPath(request.PackagePath);
+        if (File.Exists(fullPath)
+            && !Path.GetExtension(fullPath).Equals(".zip", StringComparison.OrdinalIgnoreCase)
+            && !Path.GetFileName(fullPath).Equals("rekall.package.json", StringComparison.OrdinalIgnoreCase))
+        {
+            return InvalidPackagePath(fullPath);
+        }
+
+        (string manifestPath, RekallAgePlayablePackageManifest manifest, IReadOnlyList<RekallAgePlayablePackageFile> files) package;
+        try
+        {
+            package = await ReadManifestAsync(fullPath, context.CancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return InvalidPackagePath(fullPath, exception.Message);
+        }
+
+        var (manifestPath, manifest, files) = package;
         var keyArtifacts = files
             .Where(file => file.IsKeyArtifact)
             .Select(file => file.Path)
@@ -70,6 +88,20 @@ public sealed class InspectPlayablePackageCommand
         return RekallAgeCommandResult<InspectPlayablePackageResult>.Success(
             result,
             $"Inspected playable package '{manifestPath}'.");
+    }
+
+    private static RekallAgeCommandResult<InspectPlayablePackageResult> InvalidPackagePath(
+        string packagePath,
+        string? detail = null)
+    {
+        var message = "PackagePath must be a package OutputDirectory, rekall.package.json ManifestPath, or .zip ArchivePath returned by rekall.workflow.package_playable_game; do not pass its LaunchPath executable."
+            + (string.IsNullOrWhiteSpace(detail) ? string.Empty : $" {detail}");
+        var manifest = new RekallAgePlayablePackageManifest("", "", "", "", [], [], []);
+        var value = new InspectPlayablePackageResult(false, string.Empty, manifest, 0, [], []);
+        return RekallAgeCommandResult<InspectPlayablePackageResult>.Failure(
+            value,
+            message,
+            [new RekallAgeCommandError("REKALL_PACKAGE_PATH_KIND_INVALID", message, packagePath)]);
     }
 
     private static async ValueTask<IReadOnlyList<RekallAgeCommandError>> VerifyIntegrityAsync(

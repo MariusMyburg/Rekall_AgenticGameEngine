@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-17 22:27 Africa/Johannesburg
+Last verified: 2026-08-17 22:40 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: second installed benchmark isolated executable validation-repair gaps
+Latest milestone: installed benchmark completion gaps converted into deliverable contracts
 
 ## Product objective
 
@@ -30,8 +30,9 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,618,167-byte win-x64 archive assembled.
-- Canonical verification: 562/562 Release tests passed twice independently.
+- Windows distribution: fresh 194,657,246-byte win-x64 archive assembled.
+- Canonical verification: 564/564 Release tests passed twice independently;
+  Release build completed with zero warnings and zero errors.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
   paths have installed-binary proof.
@@ -67,6 +68,24 @@ Studio is important, but it does not define or reorder the engine foundation.
   arguments; and out-of-range numeric properties produce blocking diagnostics
   with an exact boundary-setting action. Five focused regressions and the full
   564/564 Debug suite pass.
+- Validation repair distribution gate: the fresh self-contained binaries passed
+  installed doctor, project/module authoring, the generic game gauntlet,
+  package audit/relocation/run/capture, runtime UI, and audio acceptance.
+- Broad benchmark rerun 3: the fixed 36-turn agent run used 36 tools,
+  477,614 prompt tokens, and 6,961 completion tokens. It still stopped at the
+  bound, but independent installed-CLI verification proves two scenes, zero
+  project validation issues, one active 3D body at Y -2.137 after 30 frames,
+  and one active 2D body with `Rekall.PhysicsState2D`. The remaining failures
+  are redundant discovery, absent no-module scaffold guidance, package-root
+  ambiguity, and no ordinary package-relocation command.
+- Benchmark-driven deliverable contracts: component search now explicitly
+  batches concepts; invented tool aliases return nearest exact registered
+  names; a missing module returns an executable playable-scaffold action;
+  package creation, executable, archive, and package-root roles are explicit;
+  invalid executable package paths return structured diagnostics; and
+  `rekall.workflow.relocate_playable_package` copies and integrity-verifies a
+  package at a fresh destination. A real relocated package runs successfully,
+  and the full Debug suite passes at 567/567.
 
 ## Current gaps
 
@@ -82,12 +101,12 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Commit the executable validation-repair milestone, then run the canonical
-two-pass Release/distribution gate.
+Commit the deliverable-contract milestone, then run the canonical two-pass
+Release/distribution gate.
 
 ## Next after the current item
 
-Rerun the identical installed Ollama benchmark on fresh binaries. Classify any
+Rebuild, then rerun the identical installed Ollama benchmark on fresh binaries. Classify any
 remaining failure by generic engine contract and fix it with regression tests.
 A genuine broad benchmark pass precedes quantified production hardening;
 Studio follows as a consumer of those results.

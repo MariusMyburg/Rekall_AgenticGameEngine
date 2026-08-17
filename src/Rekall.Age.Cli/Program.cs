@@ -234,6 +234,8 @@ internal static class RekallAgeCli
                 ["game", "package-playable", var root, var scene, var outputDirectory, "--graphics"] =>
                     await PackagePlayableGameAsync(registry, context, root, scene, outputDirectory, graphics: true),
                 ["game", "inspect-package", var packagePath] => await InspectPlayablePackageAsync(registry, context, packagePath),
+                ["game", "relocate-package", var packagePath, var destination] =>
+                    await RelocatePlayablePackageAsync(registry, context, packagePath, destination),
                 ["game", "audit-package", var packagePath] => await AuditPlayablePackageAsync(registry, context, packagePath, null),
                 ["game", "audit-package", var packagePath, var outputDirectory] =>
                     await AuditPlayablePackageAsync(registry, context, packagePath, outputDirectory),
@@ -429,6 +431,7 @@ internal static class RekallAgeCli
         registry.Register(new InspectEntityCommand());
         registry.Register(new VerifyPlayableGameCommand());
         registry.Register(new PackagePlayableGameCommand());
+        registry.Register(new RelocatePlayablePackageCommand());
         registry.Register(new InspectPlayablePackageCommand());
         registry.Register(new RunPlayablePackageCommand());
         registry.Register(new CapturePlayablePackageFrameCommand());
@@ -2521,6 +2524,29 @@ internal static class RekallAgeCli
         return result.Ok && result.Value.Ready ? 0 : 1;
     }
 
+    private static async Task<int> RelocatePlayablePackageAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string packagePath,
+        string destination)
+    {
+        var result = await registry.ExecuteAsync<RelocatePlayablePackageRequest, RelocatePlayablePackageResult>(
+            "rekall.workflow.relocate_playable_package",
+            new RelocatePlayablePackageRequest(packagePath, destination),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Ready: {result.Value.Ready}");
+        Console.WriteLine($"Package: {result.Value.PackagePath}");
+        Console.WriteLine($"Manifest: {result.Value.ManifestPath}");
+        Console.WriteLine($"Files: {result.Value.FileCount}");
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.Ready ? 0 : 1;
+    }
+
     private static async Task<int> RunPlayablePackageAsync(
         RekallAgeCommandRegistry registry,
         RekallAgeCommandContext context,
@@ -2790,7 +2816,7 @@ internal static class RekallAgeCli
         var result = await agent.RunAsync(
             new RekallAgeLanguageModelAgentRequest(
                 model,
-                "You are the Rekall AGE embedded engine agent. Author arbitrary games through generic, inspectable engine tools and agent-owned C# modules. Start with engine status. Use rekall.tools.search to discover exact command names and full argument schemas, then call them through rekall.tools.execute. Before authoring components, call rekall.module.search_component_schemas once with all component concepts needed for the task; copy its exact runtime type and property names, including exact nested contract examples. Inspect results, repair failures, and prove the requested deliverables. Honor explicitly named verification operations exactly; do not substitute interactive play, packaging, gauntlets, or unrelated workflows unless requested. For a new multi-entity project, search for rekall.workflow.create_blueprint_project and submit the complete project, scene, and entity/component blueprint in one call. For an existing scene, prefer rekall.scene.apply_blueprint in one complete declarative call instead of patching entities one at a time. Do not invent tool results or ask the engine to author game content for you.",
+                "You are the Rekall AGE embedded engine agent. Author arbitrary games through generic, inspectable engine tools and agent-owned C# modules. Start with engine status. Use rekall.tools.search to discover exact command names and full argument schemas, then call them through rekall.tools.execute. Before authoring components, call rekall.module.search_component_schemas once: put every needed concept in its single space-separated Query and set a sufficient Limit; copy exact runtime type and property names, including nested contract examples. Inspect results, execute diagnostic suggestedCommands exactly, repair failures, and prove the requested deliverables. Honor explicitly named verification operations exactly; do not substitute interactive play, packaging, gauntlets, or unrelated workflows unless requested. For a new multi-entity project, search for rekall.workflow.create_blueprint_project and submit the complete project, scene, and entity/component blueprint in one call. For an existing scene, prefer rekall.scene.apply_blueprint in one complete declarative call instead of patching entities one at a time. For deliverables, use rekall.workflow.package_playable_game first, pass its OutputDirectory or ArchivePath (never LaunchPath) to inspect/audit/relocate operations, then use the relocated command result PackagePath. Do not invent tool names or results and do not ask the engine to author game content for you.",
                 task)
             {
                 MaxTurns = maxTurns

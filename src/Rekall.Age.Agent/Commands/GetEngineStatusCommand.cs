@@ -58,6 +58,14 @@ public sealed class GetEngineStatusCommand
                     "Inspect a package, run deterministic frames, and capture a proof PNG for deliverable validation.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
+                    "rekall.workflow.package_playable_game",
+                    "Create a playable package and return its package OutputDirectory, ArchivePath, and separate LaunchPath.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
+                    "rekall.workflow.relocate_playable_package",
+                    "Copy a validated package OutputDirectory or ArchivePath to a new directory and verify the relocated copy.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
                     "rekall.geometry.create_primitive",
                     "Author renderable 3D geometry primitives for dynamic blockouts, props, and scene composition.",
                     Recommended: false),

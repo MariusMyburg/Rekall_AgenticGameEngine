@@ -160,16 +160,47 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
         };
     }
 
-    private static JsonObject UnknownTool(string name) => new()
+    private JsonObject UnknownTool(string name)
     {
-        ["ok"] = false,
-        ["summary"] = $"Unknown or unavailable Rekall AGE tool '{name}'.",
-        ["errors"] = new JsonArray(new JsonObject
+        var requestedTerms = ToolTerms(name);
+        var suggestions = _allTools.Values
+            .Select(tool => new
+            {
+                Tool = tool,
+                Score = ToolTerms(tool.Name).Sum(candidate => requestedTerms.Any(requested =>
+                    candidate.Equals(requested, StringComparison.OrdinalIgnoreCase)
+                    || candidate.Length >= 5 && requested.Length >= 5
+                    && candidate[..5].Equals(requested[..5], StringComparison.OrdinalIgnoreCase)) ? 1 : 0)
+            })
+            .Where(item => item.Score > 0)
+            .OrderByDescending(item => item.Score)
+            .ThenBy(item => item.Tool.Name, StringComparer.Ordinal)
+            .Take(3)
+            .Select(item => (JsonNode)new JsonObject
+            {
+                ["name"] = item.Tool.Name,
+                ["description"] = item.Tool.Description
+            })
+            .ToArray();
+        return new JsonObject
         {
-            ["code"] = "REKALL_AGENT_TOOL_UNKNOWN",
-            ["message"] = $"Tool '{name}' is not registered or exposed."
-        })
-    };
+            ["ok"] = false,
+            ["summary"] = $"Unknown or unavailable Rekall AGE tool '{name}'.",
+            ["errors"] = new JsonArray(new JsonObject
+            {
+                ["code"] = "REKALL_AGENT_TOOL_UNKNOWN",
+                ["message"] = $"Tool '{name}' is not registered or exposed."
+            }),
+            ["suggestedTools"] = new JsonArray(suggestions),
+            ["instruction"] = suggestions.Length == 0
+                ? "Search for the required capability with rekall.tools.search."
+                : "Retry with an exact suggested name and its discovered parameter schema; do not invent aliases."
+        };
+    }
+
+    private static string[] ToolTerms(string name) => name.Split(
+        ['.', '_', '-', '/'],
+        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private static bool TryReadTargetArguments(
         JsonNode? node,

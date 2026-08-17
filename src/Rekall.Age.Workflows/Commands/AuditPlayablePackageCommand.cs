@@ -45,7 +45,7 @@ public sealed class AuditPlayablePackageCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Audits a packaged playable game by inspecting contents, running deterministic frames, and capturing a PNG proof frame.",
+        "Audits a packaged playable game by inspecting contents, running deterministic frames, and capturing a PNG proof frame. PackagePath must be PackagePlayableGameResult.OutputDirectory or ArchivePath, never LaunchPath.",
         typeof(AuditPlayablePackageRequest).FullName!,
         typeof(AuditPlayablePackageResult).FullName!);
 

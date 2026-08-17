@@ -109,6 +109,7 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.solar.import_ksa_system" or
             "rekall.workflow.agent_authoring_gauntlet" or
             "rekall.workflow.package_playable_game" or
+            "rekall.workflow.relocate_playable_package" or
             "rekall.workflow.audit_playable_package";
     }
 
@@ -120,6 +121,7 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.workflow.create_blueprint_project" => 9,
             "rekall.workflow.agent_authoring_gauntlet" => 10,
             "rekall.workflow.package_playable_game" => 11,
+            "rekall.workflow.relocate_playable_package" => 14,
             "rekall.workflow.audit_playable_package" => 15,
             "rekall.live.status" => 16,
             "rekall.live.apply_scene_blueprint" => 17,

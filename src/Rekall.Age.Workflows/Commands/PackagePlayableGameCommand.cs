@@ -39,7 +39,7 @@ public sealed class PackagePlayableGameCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Verifies a playable game and publishes the Rekall AGE player launch artifact.",
+        "Creates and verifies a portable playable package, returning OutputDirectory and ArchivePath for package inspect/audit/relocation plus a separate LaunchPath executable. Never pass LaunchPath as PackagePath.",
         typeof(PackagePlayableGameRequest).FullName!,
         typeof(PackagePlayableGameResult).FullName!);
 

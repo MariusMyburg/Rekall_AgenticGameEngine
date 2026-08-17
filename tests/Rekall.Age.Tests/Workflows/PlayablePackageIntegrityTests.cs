@@ -155,6 +155,19 @@ public sealed class PlayablePackageIntegrityTests
         Assert.DoesNotContain(runtimeState.Observations, observation => observation.Subsystem == "audio");
         Assert.Equal(5, runtimeState.Entities.Single(entity => entity.Name == "Animated").X, precision: 3);
 
+        var relocatedDirectory = Path.Combine(TestPaths.CreateTempDirectory(), "RelocatedPackage");
+        var relocation = await new RelocatePlayablePackageCommand().ExecuteAsync(
+            new RelocatePlayablePackageRequest(output, relocatedDirectory),
+            context);
+        Assert.True(relocation.Ok, relocation.Summary);
+        Assert.True(relocation.Value.Ready);
+        Assert.Equal(Path.GetFullPath(relocatedDirectory), relocation.Value.PackagePath);
+        Assert.True(File.Exists(relocation.Value.ManifestPath));
+        var relocatedDirectoryRun = await new RunPlayablePackageCommand().ExecuteAsync(
+            new RunPlayablePackageRequest(relocation.Value.PackagePath, Frames: 30),
+            context);
+        Assert.True(relocatedDirectoryRun.Ok, relocatedDirectoryRun.Summary);
+
         var relocationRoot = TestPaths.CreateTempDirectory();
         var relocatedArchive = Path.Combine(relocationRoot, "audio-game-relocated.zip");
         ZipFile.CreateFromDirectory(output, relocatedArchive, CompressionLevel.Fastest, includeBaseDirectory: false);
@@ -176,6 +189,26 @@ public sealed class PlayablePackageIntegrityTests
         Assert.False(tampered.Ok);
         Assert.Contains(tampered.Errors, error => error.Code == "REKALL_PACKAGE_HASH_MISMATCH");
         Assert.Contains(tampered.Errors, error => error.Code == "REKALL_PACKAGE_UNEXPECTED_FILE");
+    }
+
+    [Fact]
+    public async Task InspectExecutableReturnsStructuredPackagePathDiagnostic()
+    {
+        var executable = Path.Combine(TestPaths.CreateTempDirectory(), "Player.exe");
+        await File.WriteAllBytesAsync(executable, [0x4d, 0x5a, 0x00, 0x00]);
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("inspect invalid package path"),
+            CancellationToken.None);
+
+        var result = await new InspectPlayablePackageCommand().ExecuteAsync(
+            new InspectPlayablePackageRequest(executable),
+            context);
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors, item => item.Code == "REKALL_PACKAGE_PATH_KIND_INVALID");
+        Assert.Contains("OutputDirectory", error.Message, StringComparison.Ordinal);
+        Assert.Contains("ArchivePath", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

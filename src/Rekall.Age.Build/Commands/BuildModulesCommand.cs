@@ -48,10 +48,23 @@ public sealed class BuildModulesCommand
         var value = new BuildModulesResult(results);
         if (results.Count == 0)
         {
+            var scaffold = new RekallAgeSuggestedCommand(
+                "rekall.module.scaffold_playable",
+                new Dictionary<string, object?>
+                {
+                    ["projectRoot"] = request.ProjectRoot,
+                    ["moduleId"] = "game.playable",
+                    ["displayName"] = "Agent Authored Playable",
+                    ["moduleName"] = "Playable"
+                });
             return RekallAgeCommandResult<BuildModulesResult>.Failure(
                 value,
                 "No module projects were found.",
-                [new RekallAgeCommandError("REKALL_MODULE_PROJECTS_MISSING", "No module projects were found.", request.ProjectRoot)]);
+                [new RekallAgeCommandError(
+                    "REKALL_MODULE_PROJECTS_MISSING",
+                    "No module projects were found. Execute the suggested playable scaffold, author behavior if needed, then rebuild modules.",
+                    request.ProjectRoot,
+                    [scaffold])]);
         }
 
         if (results.Any(result => !result.Succeeded))

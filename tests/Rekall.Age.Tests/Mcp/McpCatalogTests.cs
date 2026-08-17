@@ -31,6 +31,7 @@ public sealed class McpCatalogTests
         registry.Register(new CreateProjectCommand());
         registry.Register(new VerifyPlayableGameCommand());
         registry.Register(new PackagePlayableGameCommand());
+        registry.Register(new RelocatePlayablePackageCommand());
         registry.Register(new InspectPlayablePackageCommand());
         registry.Register(new RunPlayablePackageCommand());
         registry.Register(new CapturePlayablePackageFrameCommand());
@@ -96,6 +97,7 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.agent_authoring_gauntlet");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.verify_playable_game");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.package_playable_game");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.relocate_playable_package");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.inspect_playable_package");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.run_playable_package");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.capture_playable_package_frame");

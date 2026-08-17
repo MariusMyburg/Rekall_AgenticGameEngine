@@ -102,6 +102,30 @@ schema-bound validation with executable boundary-setting actions. The rerun is
 still recorded as a failure; these changes must pass the complete release gate
 and the identical installed benchmark before the acceptance claim changes.
 
+### Executable-repair rerun
+
+Fresh binaries containing executable property repair and numeric-bound
+validation passed the canonical gate, then ran the same 36-turn installed task.
+
+- Project: `rekall-age-installed-broad-benchmark-rerun2-26073df8bc1f42b487cad5e957240e09`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 477,614
+- Completion tokens: 6,961
+
+Independent installed-CLI verification established meaningful partial success:
+project validation passed across two scenes with zero issues; the 3D scene had
+one simulated body and two colliders, with the body at Y -2.137 after 30 frames;
+the 2D scene had one simulated body and two colliders and emitted
+`Rekall.PhysicsState2D`. Both deliberate invalid properties were removed.
+
+The model did not finish packaging, capture, audit, and relocation. Its trace
+showed six separate component-schema searches, a missing-module error without
+an executable scaffold action, attempts to inspect/audit a player executable
+instead of a package root, and no ordinary engine command for package
+relocation. These are generic discovery and deliverable-contract gaps, so this
+run remains a failure despite its verified physics and repair evidence.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

@@ -29,7 +29,7 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Publishes the Rekall AGE player for a project and returns launch details.",
+        "Publishes a raw Rekall AGE player and returns launch details; this does not create a playable package. For package creation, integrity inventory, and an archive, use rekall.workflow.package_playable_game.",
         typeof(BuildPlayerRequest).FullName!,
         typeof(BuildPlayerResult).FullName!);
 

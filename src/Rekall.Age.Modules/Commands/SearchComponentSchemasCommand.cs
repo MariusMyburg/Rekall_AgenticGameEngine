@@ -54,7 +54,7 @@ public sealed class SearchComponentSchemasCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Searches agent-readable built-in and project component schemas by runtime type, display name, description, or property name.",
+        "Searches agent-readable built-in and project component schemas by runtime type, display name, description, or property name. Put every needed component concept in one space-separated Query and raise Limit if needed; do not spend one call per concept.",
         typeof(SearchComponentSchemasRequest).FullName!,
         typeof(SearchComponentSchemasResult).FullName!);
 

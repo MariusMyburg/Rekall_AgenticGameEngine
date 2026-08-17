@@ -8,6 +8,27 @@ namespace Rekall.Age.Tests.Build;
 public sealed class BuildModulesCommandTests
 {
     [Fact]
+    public async Task MissingModuleProjectSuggestsExecutablePlayableScaffold()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("missing modules"),
+            CancellationToken.None);
+
+        var result = await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors, item => item.Code == "REKALL_MODULE_PROJECTS_MISSING");
+        var suggestion = Assert.Single(error.SuggestedCommands!);
+        Assert.Equal("rekall.module.scaffold_playable", suggestion.Tool);
+        Assert.Equal(root, suggestion.Arguments["projectRoot"]);
+        Assert.False(string.IsNullOrWhiteSpace((string)suggestion.Arguments["moduleId"]!));
+        Assert.False(string.IsNullOrWhiteSpace((string)suggestion.Arguments["displayName"]!));
+        Assert.False(string.IsNullOrWhiteSpace((string)suggestion.Arguments["moduleName"]!));
+    }
+
+    [Fact]
     public async Task PortableModulesBuildConcurrentlyWithoutSharingEngineOutputs()
     {
         var roots = Enumerable.Range(0, 6).Select(_ => TestPaths.CreateTempDirectory()).ToArray();

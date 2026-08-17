@@ -5,6 +5,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Mcp;
 using Rekall.Age.Modules.BuiltIns;
 using Rekall.Age.Modules.Commands;
+using Rekall.Age.Validation.Commands;
 
 namespace Rekall.Age.Tests.Mcp;
 
@@ -136,5 +137,29 @@ public sealed class McpAgentToolExecutorTests
 
         Assert.True(result["ok"]!.GetValue<bool>(), result.ToJsonString());
         Assert.True(File.Exists(Path.Combine(root, "rekall.project.json")));
+    }
+
+    [Fact]
+    public async Task UnknownToolReturnsNearestRegisteredNamesForRecovery()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new ValidateProjectCommand());
+        registry.Register(new CreateProjectCommand());
+        var executor = new RekallAgeMcpAgentToolExecutor(registry, progressiveDiscovery: true);
+
+        var result = await executor.ExecuteAsync(
+            "rekall.tools.execute",
+            new JsonObject
+            {
+                ["name"] = "rekall.project.validate",
+                ["arguments"] = new JsonObject()
+            },
+            CancellationToken.None);
+
+        Assert.False(result["ok"]!.GetValue<bool>());
+        Assert.Equal(
+            "rekall.validation.project",
+            result["suggestedTools"]![0]!["name"]!.GetValue<string>());
+        Assert.Contains("exact suggested name", result["instruction"]!.GetValue<string>(), StringComparison.Ordinal);
     }
 }

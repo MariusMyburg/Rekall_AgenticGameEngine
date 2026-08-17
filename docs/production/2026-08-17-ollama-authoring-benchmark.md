@@ -92,5 +92,7 @@ redundant discovery/correction cost remain priority work.
   allowing runtime-ignored authoring mistakes.
 - Runtime inspection exposes bounded audio voices, animation players, UI canvas
   dimensions, resolved element layouts, interactivity, and text.
+- Viewport layout diagnostics distinguish world content from camera-independent
+  UI and report severely clipped elements or text with no visible pixels.
 - Failed agent tool calls include bounded argument and result previews so repair
   remains inspectable without unbounded context growth.

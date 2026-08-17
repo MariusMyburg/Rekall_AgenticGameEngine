@@ -411,16 +411,17 @@ public sealed class CaptureRuntimeViewportCommand
     {
         var camera = frame.ActiveCamera;
         var bounds = BuildWorldBounds(frame.Renderables);
+        var hasUi = frame.Renderables.Any(renderable => renderable.UiVisual is not null);
         var warnings = new List<string>();
         var hints = new List<string>();
 
-        if (camera is null)
+        if (camera is null && bounds.SpatialRenderableCount > 0)
         {
             warnings.Add("REKALL_VIEWPORT_NO_ACTIVE_CAMERA");
             hints.Add("Add or activate a generic Rekall.Camera2D or Rekall.Camera3D entity before capturing the viewport.");
         }
 
-        if (bounds.SpatialRenderableCount == 0)
+        if (bounds.SpatialRenderableCount == 0 && !hasUi)
         {
             warnings.Add("REKALL_VIEWPORT_NO_SPATIAL_RENDERABLES");
             hints.Add("Add visible renderable entities with generic transform and renderer components before judging composition.");
@@ -429,6 +430,8 @@ public sealed class CaptureRuntimeViewportCommand
         {
             AddAxisDiagnostics(bounds, warnings, hints);
         }
+
+        AddUiDiagnostics(frame, warnings, hints);
 
         return new CaptureRuntimeViewportLayoutDiagnostics(
             true,
@@ -464,7 +467,8 @@ public sealed class CaptureRuntimeViewportCommand
         IReadOnlyList<RekallAgeRuntimeViewportRenderable> renderables)
     {
         var spatial = renderables
-            .Where(renderable => !renderable.Kind.Equals("light", StringComparison.Ordinal))
+            .Where(renderable => !renderable.Kind.Equals("light", StringComparison.Ordinal)
+                && renderable.UiVisual is null)
             .ToArray();
         if (spatial.Length == 0)
         {
@@ -492,6 +496,72 @@ public sealed class CaptureRuntimeViewportCommand
             spatial.Max(renderable => Math.Abs(renderable.ScaleX)),
             spatial.Max(renderable => Math.Abs(renderable.ScaleY)),
             spatial.Max(renderable => Math.Abs(renderable.ScaleZ)));
+    }
+
+    private static void AddUiDiagnostics(
+        RekallAgeRuntimeViewportFrame frame,
+        List<string> warnings,
+        List<string> hints)
+    {
+        const int maximumHints = 8;
+        foreach (var renderable in frame.Renderables.Where(item => item.UiVisual is not null))
+        {
+            var visual = renderable.UiVisual!;
+            var visibleWidth = IntersectionLength(
+                visual.X,
+                visual.X + visual.Width,
+                Math.Max(0, visual.ClipX),
+                Math.Min(frame.Width, visual.ClipX + visual.ClipWidth));
+            var visibleHeight = IntersectionLength(
+                visual.Y,
+                visual.Y + visual.Height,
+                Math.Max(0, visual.ClipY),
+                Math.Min(frame.Height, visual.ClipY + visual.ClipHeight));
+            var elementArea = (long)visual.Width * visual.Height;
+            var visibleArea = (long)visibleWidth * visibleHeight;
+            if (elementArea > 0 && visibleArea * 2 < elementArea)
+            {
+                warnings.Add("REKALL_VIEWPORT_UI_ELEMENT_SEVERELY_CLIPPED");
+                if (hints.Count < maximumHints)
+                {
+                    var percent = (int)Math.Round(visibleArea * 100d / elementArea);
+                    hints.Add($"UI element '{renderable.EntityName}' is only {percent}% visible because of parent clipping; resize or reposition the element or its parent, then recapture.");
+                }
+            }
+
+            if (!string.IsNullOrEmpty(visual.Text) && !HasVisibleTextPixels(frame, visual))
+            {
+                warnings.Add("REKALL_VIEWPORT_UI_TEXT_NOT_VISIBLE");
+                if (hints.Count < maximumHints)
+                {
+                    hints.Add($"UI text on '{renderable.EntityName}' is outside its effective clip rectangle; adjust element bounds or parent clipping before accepting the proof frame.");
+                }
+            }
+        }
+    }
+
+    private static bool HasVisibleTextPixels(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportUiVisual visual)
+    {
+        var scale = Math.Max(1, visual.FontSize / 5);
+        var textWidth = visual.Text!.Sum(character =>
+            character == ' '
+                ? 2 * scale
+                : (RekallAgeBitmapFont.Width(character) + 1) * scale);
+        var textX = visual.X + Math.Max(2, visual.BorderWidth + 2);
+        var textY = visual.Y + Math.Max(0, (visual.Height - 5 * scale) / 2);
+        var clipLeft = Math.Max(0, visual.ClipX);
+        var clipTop = Math.Max(0, visual.ClipY);
+        var clipRight = Math.Min(frame.Width, visual.ClipX + visual.ClipWidth);
+        var clipBottom = Math.Min(frame.Height, visual.ClipY + visual.ClipHeight);
+        return IntersectionLength(textX, textX + textWidth, clipLeft, clipRight) > 0
+            && IntersectionLength(textY, textY + 5 * scale, clipTop, clipBottom) > 0;
+    }
+
+    private static int IntersectionLength(int start, int end, int clipStart, int clipEnd)
+    {
+        return Math.Max(0, Math.Min(end, clipEnd) - Math.Max(start, clipStart));
     }
 
     private static void AddAxisDiagnostics(

@@ -17,7 +17,7 @@ relocation.
 Evidence reviewed:
 
 - 24 engine and test projects, approximately 60,000 C# lines
-- 549 automated tests across authoring, runtime, rendering, packaging, MCP, and workflows
+- 550 automated tests across authoring, runtime, rendering, packaging, MCP, and workflows
 - the installed `win-x64` distribution and generic authoring gauntlet
 - runtime execution-system registration and subsystem projections
 - MCP schemas, transaction behavior, and agent context summaries
@@ -58,7 +58,7 @@ Maturity labels:
 | Engine distribution | Proven | locked restore, two suites, self-contained applications, hashes, clean installed gauntlet | binary signing, installer/updater, release provenance/SBOM, clean-machine VM matrix |
 | Studio | Facade | real read models and a WPF shell | controls are unwired, viewport is text, no interactive open/edit/play workflow |
 | Security | Partial | no currently known vulnerable NuGet dependency; distribution forbidden-file checks | arbitrary-module trust boundary, fuzzing, path/archive hardening, secret scanning, signed releases, threat model |
-| Test platform | Implemented | 549 green tests; latest canonical two-pass Release acceptance covers Vulkan, relocation, SDL audio, runtime UI visual proof, animation limits, malformed corpus, and long-run determinism | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
+| Test platform | Implemented | 550 green tests; latest canonical two-pass Release acceptance covers Vulkan, relocation, SDL audio, runtime UI visual proof, animation limits, malformed corpus, and long-run determinism | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
 | LLM providers/Ollama | Implemented | provider-neutral contracts, native Ollama chat/tools/model discovery, bounded loop, `qwen3.5:35b` source benchmark in 15 turns and expanded installed UI/audio/animation benchmark in 23 turns | additional models/providers and installed benchmark breadth, lower token/correction cost, quality/cost routing policy |
 
 ## Material findings

@@ -303,6 +303,48 @@ public sealed class CaptureRuntimeViewportCommandTests
     }
 
     [Fact]
+    public async Task CaptureRuntimeViewportCommandReportsSeverelyClippedUiAndInvisibleText()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["ReferenceWidth"] = 200, ["ReferenceHeight"] = 100 }));
+        var panel = RekallAgeEntityDocument.Create("Small Panel", ["ui"]) with { ParentId = canvas.Id };
+        panel = panel.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Panel",
+            new JsonObject { ["Width"] = 100, ["Height"] = 40 }));
+        var button = RekallAgeEntityDocument.Create("Main Button", ["ui"]) with { ParentId = panel.Id };
+        button = button.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Button",
+            new JsonObject
+            {
+                ["X"] = 25,
+                ["Y"] = 30,
+                ["Width"] = 150,
+                ["Height"] = 40,
+                ["Text"] = "SYSTEMS READY"
+            }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["ui"])
+            .AddEntity(canvas)
+            .AddEntity(panel)
+            .AddEntity(button);
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 1, Path.Combine(root, "Viewport"), 200, 100, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("ui clipping diagnostics"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains("REKALL_VIEWPORT_UI_ELEMENT_SEVERELY_CLIPPED", result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.Contains("REKALL_VIEWPORT_UI_TEXT_NOT_VISIBLE", result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.DoesNotContain("REKALL_VIEWPORT_NO_ACTIVE_CAMERA", result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.Contains(result.Value.LayoutDiagnostics.AuthoringHints, hint =>
+            hint.Contains("Main Button", StringComparison.Ordinal)
+            && hint.Contains("parent clipping", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task CaptureRuntimeViewportCommandCanUseVulkanForClearOnlyRuntimeFrames()
     {
         var root = TestPaths.CreateTempDirectory();

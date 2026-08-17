@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-17 22:16 Africa/Johannesburg
+Last verified: 2026-08-17 22:27 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: broad installed-agent benchmark failure converted into generic engine fixes
+Latest milestone: second installed benchmark isolated executable validation-repair gaps
 
 ## Product objective
 
@@ -31,7 +31,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 ## Verified status
 
 - Windows distribution: fresh 194,618,167-byte win-x64 archive assembled.
-- Canonical verification: 558/558 Release tests passed twice independently.
+- Canonical verification: 562/562 Release tests passed twice independently.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
   paths have installed-binary proof.
@@ -55,11 +55,24 @@ Studio is important, but it does not define or reorder the engine foundation.
   `Rigidbody2D` is registered and executes deterministic Bepu XY-plane physics;
   loaded project modules no longer lock authoring outputs; playable verification
   preserves executable scaffold suggestions. The full Debug suite is 562/562.
+- Broad benchmark rerun: fresh installed binaries again reached the 36-turn
+  bound after 36 tool calls, 389,332 prompt tokens, and 9,309 completion
+  tokens. Unlike the baseline, it discovered project validation and authored
+  both 3D and 2D physics scenes. Independent inspection isolated two remaining
+  generic repair defects: no ordinary command could remove a rejected property,
+  and schema numeric bounds such as positive mass were not validated.
+- Validation repair contract (targeted verification):
+  `rekall.component.remove_property` now removes a single property
+  transactionally; unknown-property issues carry exact executable repair
+  arguments; and out-of-range numeric properties produce blocking diagnostics
+  with an exact boundary-setting action. Five focused regressions and the full
+  564/564 Debug suite pass.
 
 ## Current gaps
 
-- Expand the installed Ollama benchmark across generic 2D, 3D, physics,
-  package relocation, deliberate faults, diagnosis, and repair.
+- Make the installed Ollama benchmark complete generic 2D/3D physics,
+  deliberate-fault repair, visual proof, package audit, and relocation within
+  its fixed turn budget.
 - Add broader performance budgets, soak/device-loss recovery, security threat
   tests, compatibility fixtures, and release-operability evidence.
 - Complete advanced animation coverage such as cubic interpolation, morph
@@ -69,14 +82,15 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the canonical two-pass Release/distribution gate for the benchmark-driven
-fixes, then rerun the identical installed Ollama benchmark on fresh binaries.
+Commit the executable validation-repair milestone, then run the canonical
+two-pass Release/distribution gate.
 
 ## Next after the current item
 
-Classify any remaining rerun failures by generic engine contract and fix them
-with regression tests. A genuine broad benchmark pass precedes quantified
-production hardening; Studio follows as a consumer of those results.
+Rerun the identical installed Ollama benchmark on fresh binaries. Classify any
+remaining failure by generic engine contract and fix it with regression tests.
+A genuine broad benchmark pass precedes quantified production hardening;
+Studio follows as a consumer of those results.
 
 ## Evidence index
 

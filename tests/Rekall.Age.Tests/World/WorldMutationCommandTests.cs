@@ -44,6 +44,42 @@ public sealed class WorldMutationCommandTests
     }
 
     [Fact]
+    public async Task RemoveComponentPropertyRemovesOnePropertyWithoutReplacingComponent()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        var entity = RekallAgeEntityDocument.Create("Player", ["player"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Game.PlayerController",
+                new JsonObject { ["speed"] = 4, ["ObsoleteSetting"] = true }));
+        await store.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"]).AddEntity(entity),
+            CancellationToken.None);
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("remove component property"),
+            CancellationToken.None);
+
+        var result = await new RemoveComponentPropertyCommand().ExecuteAsync(
+            new RemoveComponentPropertyRequest(
+                root,
+                "Main",
+                entity.Id,
+                "Game.PlayerController",
+                "obsoletesetting"),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        var saved = await store.LoadAsync(root, "Main", CancellationToken.None);
+        var component = Assert.Single(saved.GetRequiredEntity(entity.Id).Components);
+        Assert.Equal(4, component.Properties["speed"]!.GetValue<int>());
+        Assert.False(component.Properties.ContainsKey("ObsoleteSetting"));
+        Assert.Single(context.Transaction.ResourcePreimages);
+        Assert.Single(context.Transaction.ChangedResources);
+    }
+
+    [Fact]
     public async Task InspectEntityReturnsFullComponentProperties()
     {
         var root = TestPaths.CreateTempDirectory();

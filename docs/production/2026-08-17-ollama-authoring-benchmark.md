@@ -77,6 +77,31 @@ propagation, rebuild-safe module loading, and regression coverage. This baseline
 remains a failure until the identical task passes against a newly assembled
 installed distribution.
 
+### Fresh-distribution rerun
+
+After the four baseline defects were fixed and the canonical Release gate
+passed twice at 562/562 tests, the identical installed-only task was rerun from
+a fresh distribution.
+
+- Project: `rekall-age-installed-broad-benchmark-rerun-1e80188b97a841aca9ace259e4007d89`
+- Result: failed at the same 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 389,332
+- Completion tokens: 9,309
+
+The rerun discovered and used project-wide validation and authored both the 3D
+and planar 2D scenes, confirming the previous fixes materially advanced the
+agent. Independent inspection found that it could add corrected properties but
+could not remove `InvalidPropertyXyz` or the obsolete `BoxCollider2D.Size`
+property through an ordinary tool. It also authored `Rigidbody3D.Mass = -5`,
+which passed validation despite violating the registered positive-mass schema.
+
+This drove a generic transactional `rekall.component.remove_property` command,
+exact executable remove actions on unknown-property diagnostics, and numeric
+schema-bound validation with executable boundary-setting actions. The rerun is
+still recorded as a failure; these changes must pass the complete release gate
+and the identical installed benchmark before the acceptance claim changes.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

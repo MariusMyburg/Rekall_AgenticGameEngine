@@ -28,7 +28,7 @@ public sealed class RekallAgeProjectValidator
     {
         var scene = await _sceneStore.LoadAsync(projectRoot, sceneName, cancellationToken);
         var issues = new List<RekallAgeValidationIssue>();
-        ValidateUiContracts(scene, issues);
+        ValidateAuthoringContracts(projectRoot, scene, issues);
 
         var cameras = scene.Entities
             .SelectMany(entity => entity.Components
@@ -76,7 +76,8 @@ public sealed class RekallAgeProjectValidator
         return new RekallAgeValidationReport(issues);
     }
 
-    private static void ValidateUiContracts(
+    private static void ValidateAuthoringContracts(
+        string projectRoot,
         RekallAgeSceneDocument scene,
         List<RekallAgeValidationIssue> issues)
     {
@@ -146,23 +147,102 @@ public sealed class RekallAgeProjectValidator
                     .Where(property => !allowed.Contains(property))
                     .OrderBy(property => property, StringComparer.Ordinal)
                     .ToArray();
-                if (unknown.Length == 0)
+                foreach (var propertyName in unknown)
                 {
-                    continue;
+                    issues.Add(new RekallAgeValidationIssue(
+                        "REKALL_COMPONENT_PROPERTY_UNKNOWN",
+                        $"Entity '{entity.Name}' component '{component.Type}' contains unknown property '{propertyName}'. Allowed properties: {string.Join(", ", allowed.OrderBy(name => name, StringComparer.Ordinal))}. Unknown properties are ignored at runtime.",
+                        "blocking",
+                        entity.Id,
+                        [
+                            new RekallAgeSuggestedCommand(
+                                "rekall.component.remove_property",
+                                ComponentPropertyArguments(projectRoot, scene.Name, entity.Id, component.Type, propertyName)),
+                            new RekallAgeSuggestedCommand(
+                                "rekall.module.search_component_schemas",
+                                new Dictionary<string, object?> { ["query"] = component.Type })
+                        ]));
                 }
 
-                issues.Add(new RekallAgeValidationIssue(
-                    "REKALL_COMPONENT_PROPERTY_UNKNOWN",
-                    $"Entity '{entity.Name}' component '{component.Type}' contains unknown properties: {string.Join(", ", unknown)}. Allowed properties: {string.Join(", ", allowed.OrderBy(name => name, StringComparer.Ordinal))}. Unknown properties are ignored at runtime; use exact names from rekall.module.search_component_schemas.",
-                    "blocking",
-                    entity.Id,
-                    [
-                        new RekallAgeSuggestedCommand(
-                            "rekall.module.search_component_schemas",
-                            new Dictionary<string, object?> { ["query"] = component.Type })
-                    ]));
+                foreach (var propertySchema in schema.Properties)
+                {
+                    if (!TryGetPropertyValue(component.Properties, propertySchema.Name, out var node)
+                        || !TryReadNumber(node, out var number)
+                        || (propertySchema.Minimum is null || number >= propertySchema.Minimum)
+                        && (propertySchema.Maximum is null || number <= propertySchema.Maximum))
+                    {
+                        continue;
+                    }
+
+                    var replacement = propertySchema.Minimum is not null && number < propertySchema.Minimum
+                        ? propertySchema.Minimum.Value
+                        : propertySchema.Maximum!.Value;
+                    issues.Add(new RekallAgeValidationIssue(
+                        "REKALL_COMPONENT_PROPERTY_OUT_OF_RANGE",
+                        $"Entity '{entity.Name}' component '{component.Type}' property '{propertySchema.Name}' value {number} is outside the allowed range {FormatRange(propertySchema)}.",
+                        "blocking",
+                        entity.Id,
+                        [
+                            new RekallAgeSuggestedCommand(
+                                "rekall.component.set_property",
+                                ComponentPropertyArguments(projectRoot, scene.Name, entity.Id, component.Type, propertySchema.Name, replacement))
+                        ]));
+                }
             }
         }
+    }
+
+    private static Dictionary<string, object?> ComponentPropertyArguments(
+        string projectRoot,
+        string sceneName,
+        string entityId,
+        string componentType,
+        string propertyName,
+        object? value = null)
+    {
+        var arguments = new Dictionary<string, object?>
+        {
+            ["projectRoot"] = projectRoot,
+            ["sceneName"] = sceneName,
+            ["entityId"] = entityId,
+            ["componentType"] = componentType,
+            ["propertyName"] = propertyName
+        };
+        if (value is not null)
+        {
+            arguments["value"] = value;
+        }
+
+        return arguments;
+    }
+
+    private static bool TryReadNumber(JsonNode? node, out double value)
+    {
+        if (node is JsonValue jsonValue)
+        {
+            if (jsonValue.TryGetValue<double>(out value))
+            {
+                return true;
+            }
+
+            if (jsonValue.TryGetValue<decimal>(out var decimalValue))
+            {
+                value = (double)decimalValue;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    private static string FormatRange(RekallAgePropertySchema schema)
+    {
+        return schema.Minimum is not null && schema.Maximum is not null
+            ? $"[{schema.Minimum}, {schema.Maximum}]"
+            : schema.Minimum is not null
+                ? $">= {schema.Minimum}"
+                : $"<= {schema.Maximum}";
     }
 
     private static int EditDistance(string left, string right)

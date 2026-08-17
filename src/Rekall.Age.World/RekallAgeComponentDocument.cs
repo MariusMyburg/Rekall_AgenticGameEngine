@@ -25,4 +25,20 @@ public sealed record RekallAgeComponentDocument(string Type, JsonObject Properti
         properties[name.Trim()] = value?.DeepClone();
         return this with { Properties = properties };
     }
+
+    public RekallAgeComponentDocument RemoveProperty(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Property name is required.", nameof(name));
+        }
+
+        var existingName = Properties
+            .Select(property => property.Key)
+            .FirstOrDefault(property => property.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException($"Property '{name.Trim()}' was not found on component '{Type}'.");
+        var properties = Properties.DeepClone().AsObject();
+        properties.Remove(existingName);
+        return this with { Properties = properties };
+    }
 }

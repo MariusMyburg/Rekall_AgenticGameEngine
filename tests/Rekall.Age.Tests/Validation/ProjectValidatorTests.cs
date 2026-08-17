@@ -75,12 +75,51 @@ public sealed class ProjectValidatorTests
         Assert.Contains(report.Issues, issue =>
             issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN"
             && issue.Severity == "blocking"
-            && issue.Message.Contains("PositionX", StringComparison.Ordinal)
-            && issue.Message.Contains("X", StringComparison.Ordinal));
+            && issue.Message.Contains("PositionX", StringComparison.Ordinal));
         Assert.Contains(report.Issues, issue =>
             issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN"
-            && issue.Message.Contains("IsPlaying", StringComparison.Ordinal)
-            && issue.Message.Contains("Playing", StringComparison.Ordinal));
+            && issue.Message.Contains("IsPlaying", StringComparison.Ordinal));
+
+        var transformIssue = Assert.Single(report.Issues, issue =>
+            issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN"
+            && issue.Message.Contains("PositionX", StringComparison.Ordinal));
+        Assert.Contains(transformIssue.SuggestedCommands!, command =>
+            command.Tool == "rekall.component.remove_property"
+            && Equals(command.Arguments["projectRoot"], root)
+            && Equals(command.Arguments["sceneName"], "Main")
+            && Equals(command.Arguments["entityId"], scene.Entities[0].Id)
+            && Equals(command.Arguments["componentType"], "Rekall.Transform3D")
+            && Equals(command.Arguments["propertyName"], "PositionX"));
+    }
+
+    [Fact]
+    public async Task ValidateSceneRejectsNumericPropertiesOutsideSchemaBounds()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var body = RekallAgeEntityDocument.Create("Body", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody3D",
+                new JsonObject { ["Mass"] = -5 }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics"])
+            .AddEntity(body);
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        var issue = Assert.Single(report.Issues, item =>
+            item.Code == "REKALL_COMPONENT_PROPERTY_OUT_OF_RANGE");
+        Assert.Equal("blocking", issue.Severity);
+        Assert.Contains("0.0001", issue.Message, StringComparison.Ordinal);
+        Assert.Contains(issue.SuggestedCommands!, command =>
+            command.Tool == "rekall.component.set_property"
+            && Equals(command.Arguments["projectRoot"], root)
+            && Equals(command.Arguments["sceneName"], "Main")
+            && Equals(command.Arguments["entityId"], body.Id)
+            && Equals(command.Arguments["componentType"], "Rekall.Rigidbody3D")
+            && Equals(command.Arguments["propertyName"], "Mass")
+            && Equals(command.Arguments["value"], 0.0001));
     }
 
     [Fact]

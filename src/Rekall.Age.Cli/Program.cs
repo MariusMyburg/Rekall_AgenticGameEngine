@@ -250,6 +250,8 @@ internal static class RekallAgeCli
                 ["entity", "inspect", var root, var scene, var entityId] => await InspectEntityAsync(registry, context, root, scene, entityId),
                 ["component", "set", var root, var scene, var entityId, var componentType, var propertyName, var value] =>
                     await SetComponentPropertyAsync(registry, context, root, scene, entityId, componentType, propertyName, value),
+                ["component", "remove-property", var root, var scene, var entityId, var componentType, var propertyName] =>
+                    await RemoveComponentPropertyAsync(registry, context, root, scene, entityId, componentType, propertyName),
                 ["level", "entity", "duplicate", var root, var scene, var entityId, var name] =>
                     await DuplicateEntityAsync(registry, context, root, scene, entityId, name),
                 ["level", "entity", "parent", var root, var scene, var entityId, var parentId] =>
@@ -423,6 +425,7 @@ internal static class RekallAgeCli
         registry.Register(new DeleteEntityCommand());
         registry.Register(new AddComponentCommand());
         registry.Register(new SetComponentPropertyCommand());
+        registry.Register(new RemoveComponentPropertyCommand());
         registry.Register(new InspectEntityCommand());
         registry.Register(new VerifyPlayableGameCommand());
         registry.Register(new PackagePlayableGameCommand());
@@ -2730,6 +2733,23 @@ internal static class RekallAgeCli
             Console.WriteLine($"{error.Code}: {error.Message}");
         }
 
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> RemoveComponentPropertyAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string entityId,
+        string componentType,
+        string propertyName)
+    {
+        var result = await registry.ExecuteAsync<RemoveComponentPropertyRequest, RemoveComponentPropertyResult>(
+            "rekall.component.remove_property",
+            new RemoveComponentPropertyRequest(root, scene, entityId, componentType, propertyName),
+            context);
+        Console.WriteLine(result.Summary);
         return result.Ok ? 0 : 1;
     }
 

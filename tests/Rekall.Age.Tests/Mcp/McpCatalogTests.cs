@@ -66,6 +66,7 @@ public sealed class McpCatalogTests
         registry.Register(new AssignShaderPipelineCommand());
         registry.Register(new ApplySceneBlueprintCommand());
         registry.Register(new DeleteEntityCommand());
+        registry.Register(new RemoveComponentPropertyCommand());
         registry.Register(new ImportKsaSolarSystemCommand());
         registry.Register(new LivePlayerStatusCommand());
         registry.Register(new LivePlayerReloadSceneCommand());
@@ -114,6 +115,7 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.openxr.inspect_headset_frame_plan");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.play.capture_frame");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.component_schemas");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.component.remove_property");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.list_sources");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.read_source");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.module.scaffold");

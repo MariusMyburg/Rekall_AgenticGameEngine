@@ -1,5 +1,6 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
+using System.Text.Json.Nodes;
 
 namespace Rekall.Age.Tests.Core;
 
@@ -61,7 +62,7 @@ public sealed class DynamicCommandDispatchTests
 
         var result = await registry.ExecuteJsonAsync(
             "rekall.test.normalize",
-            """{"limit":"50","active":"true","tags":"[\"ui\",\"audio\"]","entities":"[{\"name\":\"HUD\"}]","literal":"[\"must-remain-a-string\"]"}""",
+            """{"limit":"50","active":"true","tags":"[\"ui\",\"audio\"]","entities":"[{\"name\":\"HUD\"}]","settings":"{\"speed\":7}","points":"[1,2,3]","literal":"[\"must-remain-a-string\"]"}""",
             context);
 
         Assert.True(result.Ok, result.Summary);
@@ -70,6 +71,8 @@ public sealed class DynamicCommandDispatchTests
         Assert.True(value.Active);
         Assert.Equal(["ui", "audio"], value.Tags);
         Assert.Equal("HUD", Assert.Single(value.Entities).Name);
+        Assert.Equal(7, value.Settings["speed"]!.GetValue<int>());
+        Assert.Equal(3, value.Points.Count);
         Assert.Equal("[\"must-remain-a-string\"]", value.Literal);
     }
 
@@ -82,6 +85,8 @@ public sealed class DynamicCommandDispatchTests
         bool Active,
         IReadOnlyList<string> Tags,
         IReadOnlyList<NormalizeEntity> Entities,
+        JsonObject Settings,
+        JsonArray Points,
         string Literal);
 
     private sealed record NormalizeEntity(string Name);
@@ -91,6 +96,8 @@ public sealed class DynamicCommandDispatchTests
         bool Active,
         IReadOnlyList<string> Tags,
         IReadOnlyList<NormalizeEntity> Entities,
+        JsonObject Settings,
+        JsonArray Points,
         string Literal);
 
     private sealed class EchoCommand : IRekallAgeCommand<EchoRequest, EchoResult>
@@ -129,7 +136,14 @@ public sealed class DynamicCommandDispatchTests
             RekallAgeCommandContext context)
         {
             return ValueTask.FromResult(RekallAgeCommandResult<NormalizeResult>.Success(
-                new NormalizeResult(request.Limit, request.Active, request.Tags, request.Entities, request.Literal),
+                new NormalizeResult(
+                    request.Limit,
+                    request.Active,
+                    request.Tags,
+                    request.Entities,
+                    request.Settings,
+                    request.Points,
+                    request.Literal),
                 "Normalized arguments."));
         }
     }

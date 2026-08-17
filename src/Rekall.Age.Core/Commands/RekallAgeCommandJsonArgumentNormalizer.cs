@@ -26,7 +26,7 @@ internal static class RekallAgeCommandJsonArgumentNormalizer
         }
 
         var type = Nullable.GetUnderlyingType(expectedType) ?? expectedType;
-        if (type == typeof(string) || typeof(JsonNode).IsAssignableFrom(type))
+        if (type == typeof(string))
         {
             return node;
         }
@@ -38,8 +38,7 @@ internal static class RekallAgeCommandJsonArgumentNormalizer
                 return normalizedScalar;
             }
 
-            if (type != typeof(string)
-                && (IsEnumerable(type) || IsObjectContract(type))
+            if (ShouldDecodeEncodedJson(type)
                 && text.Length <= MaxEncodedJsonCharacters)
             {
                 try
@@ -54,6 +53,11 @@ internal static class RekallAgeCommandJsonArgumentNormalizer
                     // Preserve the original value so normal deserialization reports its exact path.
                 }
             }
+        }
+
+        if (typeof(JsonNode).IsAssignableFrom(type))
+        {
+            return node;
         }
 
         if (node is JsonArray array && IsEnumerable(type))
@@ -167,6 +171,12 @@ internal static class RekallAgeCommandJsonArgumentNormalizer
 
     private static bool IsObjectContract(Type type) =>
         type.IsClass || (type.IsValueType && !type.IsPrimitive && !type.IsEnum);
+
+    private static bool ShouldDecodeEncodedJson(Type type) =>
+        type == typeof(JsonObject)
+        || type == typeof(JsonArray)
+        || !typeof(JsonNode).IsAssignableFrom(type)
+        && (IsEnumerable(type) || IsObjectContract(type));
 
     private static Type? GetEnumerableItemType(Type type)
     {

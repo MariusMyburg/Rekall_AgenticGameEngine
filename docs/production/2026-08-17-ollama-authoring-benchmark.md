@@ -126,6 +126,27 @@ instead of a package root, and no ordinary engine command for package
 relocation. These are generic discovery and deliverable-contract gaps, so this
 run remains a failure despite its verified physics and repair evidence.
 
+### Deliverable-contract rerun
+
+After package relocation, package-path guidance, scaffold suggestions, and
+nearest-tool recovery passed the installed product gate, the unchanged task ran
+again.
+
+- Project: `rekall-age-installed-broad-benchmark-rerun4-0ef73379c9b34271a3cad92a2b8cfdb4`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 460,681
+- Completion tokens: 7,194
+
+This run did not reach packaging. The model created the first scene atomically,
+then had to author the second scene incrementally because
+`rekall.workflow.create_blueprint_project` accepted only one scene. Several
+`rekall.component.add` calls supplied the `Properties` object as an encoded JSON
+string; the generic normalizer intentionally bypassed all `JsonNode` types and
+therefore rejected those otherwise recoverable arguments. These failures drive
+encoded `JsonObject`/`JsonArray` normalization and a multi-scene atomic project
+blueprint contract. The unchanged benchmark remains the acceptance gate.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

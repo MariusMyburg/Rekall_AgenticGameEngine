@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-17 22:40 Africa/Johannesburg
+Last verified: 2026-08-17 22:50 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: installed benchmark completion gaps converted into deliverable contracts
+Latest milestone: multi-scene atomic authoring and JSON-object normalization verified
 
 ## Product objective
 
@@ -30,8 +30,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,657,246-byte win-x64 archive assembled.
-- Canonical verification: 564/564 Release tests passed twice independently;
+- Windows distribution: fresh 194,663,189-byte win-x64 archive assembled.
+- Canonical verification: 567/567 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
@@ -86,6 +86,21 @@ Studio is important, but it does not define or reorder the engine foundation.
   `rekall.workflow.relocate_playable_package` copies and integrity-verifies a
   package at a fresh destination. A real relocated package runs successfully,
   and the full Debug suite passes at 567/567.
+- Deliverable-contract distribution gate: fresh installed binaries passed the
+  complete black-box acceptance, including relocated package audit/run/capture,
+  after both independent Release passes completed at 567/567.
+- Broad benchmark rerun 4: the fixed 36-turn run again stopped at the bound
+  after 36 tool calls, 460,681 prompt tokens, and 7,194 completion tokens. It
+  exposed two generic authoring defects before packaging: encoded JSON object
+  fields such as `component.add.properties` bypass normalization, and the atomic
+  blueprint workflow supports only one scene, forcing inefficient incremental
+  authoring for multi-scene projects.
+- Multi-scene authoring contract: `rekall.workflow.create_blueprint_project`
+  now accepts an arbitrary `Scenes` list and creates every complete scene in
+  one command while retaining the existing single-scene request shape.
+- Dynamic argument recovery: bounded encoded `JsonObject` and `JsonArray`
+  fields now normalize to their declared types while genuine string fields stay
+  unchanged. Focused regressions and the full 568/568 Debug suite pass.
 
 ## Current gaps
 
@@ -101,8 +116,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Commit the deliverable-contract milestone, then run the canonical two-pass
-Release/distribution gate.
+Commit the multi-scene/normalization milestone, then run the canonical
+two-pass Release/distribution gate.
 
 ## Next after the current item
 

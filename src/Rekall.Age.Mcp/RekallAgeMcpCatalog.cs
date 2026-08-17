@@ -117,6 +117,7 @@ internal static class RekallAgeMcpToolClassifier
         return name switch
         {
             "rekall.context.engine_status" => 5,
+            "rekall.workflow.create_blueprint_project" => 9,
             "rekall.workflow.agent_authoring_gauntlet" => 10,
             "rekall.workflow.package_playable_game" => 11,
             "rekall.workflow.audit_playable_package" => 15,

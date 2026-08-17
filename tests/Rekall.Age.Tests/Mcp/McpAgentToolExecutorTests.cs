@@ -34,7 +34,9 @@ public sealed class McpAgentToolExecutorTests
         registry.Register(new CreateProjectCommand());
         var executor = new RekallAgeMcpAgentToolExecutor(registry, progressiveDiscovery: true);
 
-        Assert.Equal(["rekall.context.engine_status", "rekall.tools.search"], executor.Tools.Select(tool => tool.Name));
+        Assert.Equal(
+            ["rekall.context.engine_status", "rekall.tools.execute", "rekall.tools.search"],
+            executor.Tools.Select(tool => tool.Name));
 
         var result = await executor.ExecuteAsync(
             "rekall.tools.search",
@@ -42,7 +44,33 @@ public sealed class McpAgentToolExecutorTests
             CancellationToken.None);
 
         Assert.True(result["ok"]!.GetValue<bool>());
-        Assert.Contains(executor.Tools, tool => tool.Name == "rekall.project.create");
+        Assert.Contains("parameters", result["tools"]![0]!.AsObject());
         Assert.Equal(3, executor.Tools.Count);
+
+        var executed = await executor.ExecuteAsync(
+            "rekall.tools.execute",
+            new JsonObject
+            {
+                ["name"] = "rekall.project.create",
+                ["arguments"] = new JsonObject
+                {
+                    ["projectRoot"] = TestPaths.CreateTempDirectory(),
+                    ["name"] = "Discovered",
+                    ["capabilities"] = new JsonArray("world")
+                }
+            },
+            CancellationToken.None);
+        Assert.True(executed["ok"]!.GetValue<bool>());
+
+        var directDiscoveredCall = await executor.ExecuteAsync(
+            "rekall.project.create",
+            new JsonObject
+            {
+                ["projectRoot"] = TestPaths.CreateTempDirectory(),
+                ["name"] = "Direct discovered",
+                ["capabilities"] = new JsonArray("world")
+            },
+            CancellationToken.None);
+        Assert.True(directDiscoveredCall["ok"]!.GetValue<bool>());
     }
 }

@@ -16,7 +16,12 @@ public sealed class AgentContextTests
         var sceneStore = new RekallAgeSceneStore();
 
         await projectStore.SaveAsync(root, RekallAgeProjectManifest.Create("Crystal Mines", ["world", "rendering2d"]), CancellationToken.None);
-        await sceneStore.SaveAsync(root, RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"]), CancellationToken.None);
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Player", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.SpriteRenderer",
+                    new JsonObject { ["Sprite"] = "asset-player" })));
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
 
         var builder = new RekallAgeContextBuilder(projectStore, sceneStore, new RekallAgeProjectValidator(sceneStore));
         var summary = await builder.BuildProjectSummaryAsync(root, CancellationToken.None);

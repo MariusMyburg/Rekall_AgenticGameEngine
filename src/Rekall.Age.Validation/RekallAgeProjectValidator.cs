@@ -33,7 +33,11 @@ public sealed class RekallAgeProjectValidator
                 }))
             .ToArray();
 
-        if (cameras.Length == 0)
+        var hasActiveCameraRenderedContent = scene.Entities.Any(entity =>
+            entity.Components.Any(component =>
+                IsRenderable(component.Type)
+                && ReadBoolean(component.Properties, "active", true)));
+        if (cameras.Length == 0 && hasActiveCameraRenderedContent)
         {
             issues.Add(new RekallAgeValidationIssue(
                 "REKALL_CAMERA_MISSING",

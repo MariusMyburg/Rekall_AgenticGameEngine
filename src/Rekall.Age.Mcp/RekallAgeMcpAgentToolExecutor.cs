@@ -14,6 +14,7 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
     private readonly IReadOnlyDictionary<string, RekallAgeLanguageModelTool> _allTools;
     private readonly HashSet<string>? _exposedTools;
     private const string SearchToolName = "rekall.tools.search";
+    private const string ExecuteToolName = "rekall.tools.execute";
 
     public RekallAgeMcpAgentToolExecutor(
         RekallAgeCommandRegistry registry,
@@ -43,7 +44,7 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
     public IReadOnlyList<RekallAgeLanguageModelTool> Tools => _exposedTools is null
         ? _allTools.Values.OrderBy(tool => tool.Name, StringComparer.Ordinal).ToArray()
         : _exposedTools.Select(name => _allTools[name])
-            .Append(SearchTool)
+            .Concat([SearchTool, ExecuteTool])
             .OrderBy(tool => tool.Name, StringComparer.Ordinal)
             .ToArray();
 
@@ -57,20 +58,31 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
             return SearchTools(arguments);
         }
 
-        if (!Tools.Any(tool => tool.Name.Equals(name, StringComparison.Ordinal)))
+        if (_exposedTools is not null && name.Equals(ExecuteToolName, StringComparison.Ordinal))
         {
-            return new JsonObject
+            var targetName = arguments["name"]?.GetValue<string>() ?? string.Empty;
+            var targetArguments = arguments["arguments"] as JsonObject ?? new JsonObject();
+            if (!_allTools.ContainsKey(targetName))
             {
-                ["ok"] = false,
-                ["summary"] = $"Unknown Rekall AGE tool '{name}'.",
-                ["errors"] = new JsonArray(new JsonObject
-                {
-                    ["code"] = "REKALL_AGENT_TOOL_UNKNOWN",
-                    ["message"] = $"Tool '{name}' is not registered."
-                })
-            };
+                return UnknownTool(targetName);
+            }
+
+            return await ExecuteRegisteredToolAsync(targetName, targetArguments, cancellationToken);
         }
 
+        if (!_allTools.ContainsKey(name))
+        {
+            return UnknownTool(name);
+        }
+
+        return await ExecuteRegisteredToolAsync(name, arguments, cancellationToken);
+    }
+
+    private async ValueTask<JsonNode> ExecuteRegisteredToolAsync(
+        string name,
+        JsonObject arguments,
+        CancellationToken cancellationToken)
+    {
         var transaction = RekallAgeTransaction.Begin(name);
         var context = new RekallAgeCommandContext(_actor, transaction, cancellationToken);
         var result = await _registry.ExecuteJsonAsync(name, arguments.ToJsonString(), context);
@@ -87,8 +99,23 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
             }
         }
 
-        return JsonSerializer.SerializeToNode(result, JsonOptions)
+        var node = JsonSerializer.SerializeToNode(result, JsonOptions)
             ?? new JsonObject { ["ok"] = false, ["summary"] = "Tool result serialization failed." };
+        var serialized = node.ToJsonString();
+        if (serialized.Length <= 12_000)
+        {
+            return node;
+        }
+
+        return new JsonObject
+        {
+            ["ok"] = result.Ok,
+            ["summary"] = result.Summary,
+            ["errors"] = JsonSerializer.SerializeToNode(result.Errors, JsonOptions),
+            ["valuePreview"] = serialized[..8_000],
+            ["valueTruncated"] = true,
+            ["originalCharacters"] = serialized.Length
+        };
     }
 
     private JsonNode SearchTools(JsonObject arguments)
@@ -96,7 +123,7 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
         var query = arguments["query"]?.GetValue<string>()?.Trim() ?? string.Empty;
         var maxResults = arguments["maxResults"] is JsonValue value && value.TryGetValue<int>(out var requested)
             ? Math.Clamp(requested, 1, 32)
-            : 12;
+            : 6;
         var terms = query.Split([' ', '.', '_', '-', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var matches = _allTools.Values
             .Where(tool => !_exposedTools!.Contains(tool.Name))
@@ -112,14 +139,9 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
             .Where(item => terms.Length == 0 || item.Score > 0)
             .OrderByDescending(item => item.Score)
             .ThenBy(item => item.Tool.Name, StringComparer.Ordinal)
-            .Take(maxResults)
+            .Take(Math.Min(maxResults, Math.Max(0, 24 - _exposedTools!.Count)))
             .Select(item => item.Tool)
             .ToArray();
-        foreach (var tool in matches)
-        {
-            _exposedTools!.Add(tool.Name);
-        }
-
         return new JsonObject
         {
             ["ok"] = true,
@@ -128,15 +150,27 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
             ["tools"] = new JsonArray(matches.Select(tool => (JsonNode)new JsonObject
             {
                 ["name"] = tool.Name,
-                ["description"] = tool.Description
+                ["description"] = tool.Description,
+                ["parameters"] = tool.Parameters.DeepClone()
             }).ToArray()),
-            ["instruction"] = "Matched tools are available as native tools on the next agent turn."
+            ["instruction"] = "Call rekall.tools.execute with an exact matched name and arguments conforming to its parameters schema."
         };
     }
 
+    private static JsonObject UnknownTool(string name) => new()
+    {
+        ["ok"] = false,
+        ["summary"] = $"Unknown or unavailable Rekall AGE tool '{name}'.",
+        ["errors"] = new JsonArray(new JsonObject
+        {
+            ["code"] = "REKALL_AGENT_TOOL_UNKNOWN",
+            ["message"] = $"Tool '{name}' is not registered or exposed."
+        })
+    };
+
     private static RekallAgeLanguageModelTool SearchTool { get; } = new(
         SearchToolName,
-        "Search Rekall AGE tool schemas by capability or task words. Matching native tools become available on the next turn.",
+        "Search Rekall AGE tool schemas by capability or task words. Execute an exact match through rekall.tools.execute.",
         new JsonObject
         {
             ["type"] = "object",
@@ -146,5 +180,19 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
                 ["maxResults"] = new JsonObject { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = 32 }
             },
             ["required"] = new JsonArray("query")
+        });
+
+    private static RekallAgeLanguageModelTool ExecuteTool { get; } = new(
+        ExecuteToolName,
+        "Execute an exact Rekall AGE tool returned by rekall.tools.search using arguments that conform to the returned parameter schema.",
+        new JsonObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JsonObject
+            {
+                ["name"] = new JsonObject { ["type"] = "string" },
+                ["arguments"] = new JsonObject { ["type"] = "object" }
+            },
+            ["required"] = new JsonArray("name", "arguments")
         });
 }

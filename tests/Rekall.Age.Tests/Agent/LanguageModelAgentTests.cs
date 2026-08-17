@@ -32,6 +32,8 @@ public sealed class LanguageModelAgentTests
         Assert.Equal("game", execution.Arguments["root"]!.GetValue<string>());
         Assert.Contains(model.Requests[1].Messages, message =>
             message.Role == "tool" && message.ToolName == "inspect" && message.Content.Contains("ready"));
+        Assert.DoesNotContain(model.Requests[1].Messages, message =>
+            message.Role == "system" && message.Content.StartsWith("Persistent Rekall tool ledger", StringComparison.Ordinal));
     }
 
     [Fact]

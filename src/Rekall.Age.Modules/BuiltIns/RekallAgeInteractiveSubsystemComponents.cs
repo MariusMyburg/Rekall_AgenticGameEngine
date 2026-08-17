@@ -60,7 +60,7 @@ public sealed class RekallAgeAnimationClipComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 1, Maximum = 1)] public int Version { get; init; } = 1;
     [RekallAgeProperty(Minimum = 0.00001)] public double DurationSeconds { get; init; } = 1;
-    [RekallAgeProperty(Kind = "animationTracks", Description = "Array of {component, property, interpolation, keys:[{time,value}]} objects. Interpolation is step, linear, or smoothstep; values may be scalar, vector-array, color, or string.")]
+    [RekallAgeProperty(Kind = "animationTracks", Description = "Array of {component, property, interpolation, keys:[{time,value}]} objects. Component must be the exact fully qualified runtime type, for example {component:\"Rekall.Transform3D\", property:\"X\", interpolation:\"linear\", keys:[{time:0,value:0},{time:1,value:6}]}. Interpolation is step, linear, or smoothstep; values may be scalar, vector-array, color, or string.")]
     public object[] Tracks { get; init; } = [];
     [RekallAgeProperty(Kind = "animationEvents", Description = "Array of {time,name,payload?} marker objects emitted as animation.event facts.")]
     public object[] Events { get; init; } = [];

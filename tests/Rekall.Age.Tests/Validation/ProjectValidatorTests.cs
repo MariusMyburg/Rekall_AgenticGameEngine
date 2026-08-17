@@ -10,6 +10,26 @@ namespace Rekall.Age.Tests.Validation;
 public sealed class ProjectValidatorTests
 {
     [Fact]
+    public async Task ValidateSceneDoesNotRequireCameraForCanvasOnlyContent()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["ui"])
+            .AddEntity(RekallAgeEntityDocument.Create("Canvas", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.UiCanvas", new JsonObject())))
+            .AddEntity(RekallAgeEntityDocument.Create("Start", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Button",
+                    new JsonObject { ["Text"] = "Start" })));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        Assert.DoesNotContain(report.Issues, issue => issue.Code == "REKALL_CAMERA_MISSING");
+    }
+
+    [Fact]
     public async Task ValidateSceneReportsMultipleActiveCameras()
     {
         var root = TestPaths.CreateTempDirectory();

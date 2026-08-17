@@ -110,6 +110,30 @@ public sealed class RuntimeAnimationTests
     }
 
     [Fact]
+    public async Task MissingAnimationTrackTargetProducesStructuredObservation()
+    {
+        var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationClip",
+                new JsonObject
+                {
+                    ["version"] = 1,
+                    ["durationSeconds"] = 1,
+                    ["tracks"] = new JsonArray { ScalarTrack("Rekall.Transform3D", "x", 0, 1, "linear") }
+                }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.AnimationPlayer", new JsonObject()));
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault().RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            1,
+            CancellationToken.None);
+
+        Assert.Contains(result.World.Observations, observation =>
+            observation.Code == "runtime.animation.track_component_missing"
+            && observation.Message.Contains("Rekall.Transform3D"));
+    }
+
+    [Fact]
     public async Task AnimationClipSamplesGenericScalarAndSpriteTracksDeterministically()
     {
         var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])

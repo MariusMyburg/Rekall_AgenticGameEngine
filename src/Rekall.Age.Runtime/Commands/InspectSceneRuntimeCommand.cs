@@ -44,7 +44,19 @@ public sealed record InspectSceneRuntimeResult(
     public double AudioPeakGain { get; init; }
 
     public int AudioMixedSampleCount { get; init; }
+
+    public IReadOnlyList<InspectSceneRuntimeEntityState> EntityStates { get; init; } =
+        Array.Empty<InspectSceneRuntimeEntityState>();
+
+    public bool EntityStatesTruncated { get; init; }
 }
+
+public sealed record InspectSceneRuntimeEntityState(
+    string EntityId,
+    string EntityName,
+    bool Visible,
+    RekallAgeRuntimeTransform Transform,
+    IReadOnlyList<string> ComponentTypes);
 
 public sealed record InspectSceneRuntimeCulledRenderable(
     string EntityId,
@@ -129,6 +141,21 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
         var ui = world.Subsystems.Ui;
         var xr = world.Subsystems.Xr;
         var culling = BuildCullingSummary(rendering);
+        const int maximumEntityStates = 32;
+        var entityStates = world.Entities
+            .OrderBy(entity => entity.Name, StringComparer.Ordinal)
+            .ThenBy(entity => entity.Id, StringComparer.Ordinal)
+            .Take(maximumEntityStates)
+            .Select(entity => new InspectSceneRuntimeEntityState(
+                entity.Id,
+                entity.Name,
+                entity.Visible,
+                entity.Transform,
+                entity.Components
+                    .Select(component => component.Type)
+                    .OrderBy(type => type, StringComparer.Ordinal)
+                    .ToArray()))
+            .ToArray();
 
         return new InspectSceneRuntimeResult(
             world.SceneName,
@@ -160,7 +187,9 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
             ActiveAudioVoiceCount = audio.MixFrame.ActiveVoiceCount,
             AudioBusCount = audio.Buses.Count,
             AudioPeakGain = audio.MixFrame.PeakGain,
-            AudioMixedSampleCount = audio.MixFrame.Samples?.Count ?? 0
+            AudioMixedSampleCount = audio.MixFrame.Samples?.Count ?? 0,
+            EntityStates = entityStates,
+            EntityStatesTruncated = world.Entities.Count > maximumEntityStates
         };
     }
 

@@ -430,6 +430,7 @@ internal static class RekallAgeCli
         registry.Register(new CapturePlayablePackageFrameCommand());
         registry.Register(new AuditPlayablePackageCommand());
         registry.Register(new RunAgentAuthoringGauntletCommand());
+        registry.Register(new CreateBlueprintProjectCommand());
         registry.Register(new AssembleDistributionCommand());
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
@@ -439,6 +440,7 @@ internal static class RekallAgeCli
         registry.Register(new ListTransactionHistoryCommand());
         registry.Register(new RestoreTransactionPreimageCommand());
         registry.Register(new ListComponentSchemasCommand());
+        registry.Register(new SearchComponentSchemasCommand());
         registry.Register(new ListModuleSourcesCommand());
         registry.Register(new ReadModuleSourceCommand());
         registry.Register(new ScaffoldModuleCommand());
@@ -2766,13 +2768,17 @@ internal static class RekallAgeCli
         var result = await agent.RunAsync(
             new RekallAgeLanguageModelAgentRequest(
                 model,
-                "You are the Rekall AGE embedded engine agent. Author arbitrary games through the provided generic, inspectable engine tools and agent-owned C# modules. Start with engine status and schemas; inspect results, repair failures, and prove deliverables through verification, packaging, audit, and captures. Do not invent tool results or ask the engine to author game content for you.",
+                "You are the Rekall AGE embedded engine agent. Author arbitrary games through generic, inspectable engine tools and agent-owned C# modules. Start with engine status. Use rekall.tools.search to discover exact command names and full argument schemas, then call them through rekall.tools.execute. Before authoring components, call rekall.module.search_component_schemas once with all component concepts needed for the task; copy its exact runtime type and property names, including exact nested contract examples. Inspect results, repair failures, and prove the requested deliverables. Honor explicitly named verification operations exactly; do not substitute interactive play, packaging, gauntlets, or unrelated workflows unless requested. For a new multi-entity project, search for rekall.workflow.create_blueprint_project and submit the complete project, scene, and entity/component blueprint in one call. For an existing scene, prefer rekall.scene.apply_blueprint in one complete declarative call instead of patching entities one at a time. Do not invent tool results or ask the engine to author game content for you.",
                 task)
             {
                 MaxTurns = maxTurns
             },
             cancellationToken);
         Console.WriteLine(result.FinalContent);
+        Console.WriteLine("Tool execution trace: " + string.Join(" -> ", result.ToolExecutions.Select(execution =>
+            execution.Name == "rekall.tools.execute"
+                ? execution.Arguments["name"]?.GetValue<string>() ?? execution.Name
+                : execution.Name)));
         Console.WriteLine(
             $"Agent completed={result.Completed} stop={result.StopReason} turns={result.Turns} tools={result.ToolCallCount} promptTokens={result.Usage.PromptTokens} completionTokens={result.Usage.CompletionTokens}");
         return result.Completed ? 0 : 1;
@@ -3051,6 +3057,12 @@ internal static class RekallAgeCli
         Console.WriteLine($"Audio runtime: {result.Value.ActiveAudioVoiceCount} active voices, {result.Value.AudioBusCount} buses, peak gain {result.Value.AudioPeakGain:F3}, {result.Value.AudioMixedSampleCount} mixed samples");
         Console.WriteLine($"Animation players: {result.Value.AnimationPlayerCount}");
         Console.WriteLine($"UI elements: {result.Value.UiElementCount}");
+        Console.WriteLine($"Runtime entity states: {result.Value.EntityStates.Count}{(result.Value.EntityStatesTruncated ? "+ (truncated)" : string.Empty)}");
+        foreach (var state in result.Value.EntityStates)
+        {
+            Console.WriteLine(
+                $"  {state.EntityName}: position2D=({state.Transform.Position2D.X:F3},{state.Transform.Position2D.Y:F3}) position3D=({state.Transform.Position3D.X:F3},{state.Transform.Position3D.Y:F3},{state.Transform.Position3D.Z:F3}) rotation3D=({state.Transform.Rotation3D.X:F3},{state.Transform.Rotation3D.Y:F3},{state.Transform.Rotation3D.Z:F3}) components=[{string.Join(',', state.ComponentTypes)}]");
+        }
         Console.WriteLine($"Input actions: {result.Value.InputActionCount}");
         foreach (var action in result.Value.InputActions)
         {

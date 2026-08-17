@@ -93,7 +93,7 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         {
             foreach (var track in tracks.OfType<JsonObject>())
             {
-                updated = ApplyTrack(updated, track, sampleTime);
+                updated = ApplyTrack(updated, track, sampleTime, context.FrameIndex, observations);
             }
         }
 
@@ -110,7 +110,12 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         });
     }
 
-    private static RekallAgeRuntimeEntity ApplyTrack(RekallAgeRuntimeEntity entity, JsonObject track, double sampleTime)
+    private static RekallAgeRuntimeEntity ApplyTrack(
+        RekallAgeRuntimeEntity entity,
+        JsonObject track,
+        double sampleTime,
+        int frame,
+        List<RekallAgeRuntimeObservation> observations)
     {
         var componentType = ReadString(track, "component") ?? ReadString(track, "targetComponent");
         var propertyName = ReadString(track, "property");
@@ -126,8 +131,27 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             .Where(key => key.Value is not null)
             .OrderBy(key => key.Time)
             .ToArray();
-        if (keys.Length == 0 || entity.FindComponent(componentType) is not { } component)
+        if (keys.Length == 0)
         {
+            return entity;
+        }
+        if (entity.FindComponent(componentType) is not { } component)
+        {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.track_component_missing",
+                entity,
+                $"Animation track targets missing component '{componentType}' property '{propertyName}'."));
+            return entity;
+        }
+        if (componentType.Equals("Rekall.Transform3D", StringComparison.Ordinal)
+            && propertyName.ToLowerInvariant() is not ("x" or "y" or "z" or "pitch" or "yaw" or "roll" or "scalex" or "scaley" or "scalez"))
+        {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.transform_property_invalid",
+                entity,
+                $"Animation track property '{propertyName}' is not a supported Rekall.Transform3D property."));
             return entity;
         }
 

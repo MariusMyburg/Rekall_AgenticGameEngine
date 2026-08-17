@@ -57,6 +57,25 @@ public sealed class ModuleMetadataTests
     }
 
     [Fact]
+    public async Task ComponentSchemaSearchReturnsFocusedRuntimeContracts()
+    {
+        var command = new SearchComponentSchemasCommand(typeof(RekallAgeBuiltInModule).Assembly);
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("search schemas"), CancellationToken.None);
+
+        var result = await command.ExecuteAsync(
+            new SearchComponentSchemasRequest("ui canvas animation clip", Limit: 8),
+            context);
+
+        Assert.True(result.Ok);
+        Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.UiCanvas");
+        var animation = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.AnimationClip");
+        var tracks = Assert.Single(animation.Properties, property => property.Name == "Tracks");
+        Assert.Contains("Rekall.Transform3D", tracks.Description, StringComparison.Ordinal);
+        Assert.Contains("property:\"X\"", tracks.Description, StringComparison.Ordinal);
+        Assert.All(result.Value.Components, component => Assert.StartsWith("Rekall.", component.TypeName));
+    }
+
+    [Fact]
     public void BuiltInModuleProvidesCoreSchemas()
     {
         var index = RekallAgeModuleIndexer.IndexAssembly(typeof(RekallAgeBuiltInModule).Assembly);

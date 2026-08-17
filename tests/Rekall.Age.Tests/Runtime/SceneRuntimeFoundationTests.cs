@@ -534,6 +534,54 @@ public sealed class SceneRuntimeFoundationTests
     }
 
     [Fact]
+    public async Task InspectSceneRuntimeCommandExposesBoundedPostSimulationEntityState()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var animated = RekallAgeEntityDocument.Create("Animated", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["X"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationClip",
+                new JsonObject
+                {
+                    ["Version"] = 1,
+                    ["DurationSeconds"] = 1,
+                    ["Tracks"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["component"] = "Rekall.Transform3D",
+                            ["property"] = "X",
+                            ["interpolation"] = "linear",
+                            ["keys"] = new JsonArray
+                            {
+                                new JsonObject { ["time"] = 0, ["value"] = 0 },
+                                new JsonObject { ["time"] = 1, ["value"] = 6 }
+                            }
+                        }
+                    }
+                }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationPlayer",
+                new JsonObject { ["Playing"] = true, ["LoopMode"] = "clamp" }));
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["animation"]).AddEntity(animated),
+            CancellationToken.None);
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(root, "Main", 30),
+            new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("inspect state"), CancellationToken.None));
+        var json = System.Text.Json.JsonSerializer.SerializeToNode(result.Value)!.AsObject();
+        var state = Assert.Single(json["EntityStates"]!.AsArray())!.AsObject();
+
+        Assert.Equal("Animated", state["EntityName"]!.GetValue<string>());
+        Assert.Equal(3, state["Transform"]!["Position3D"]!["X"]!.GetValue<double>(), precision: 3);
+        Assert.False(json["EntityStatesTruncated"]!.GetValue<bool>());
+    }
+
+    [Fact]
     public async Task InspectSceneRuntimeCommandReportsRenderablesCulledByActiveCameraMask()
     {
         var root = TestPaths.CreateTempDirectory();

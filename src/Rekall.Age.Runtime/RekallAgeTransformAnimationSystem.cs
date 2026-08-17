@@ -13,6 +13,9 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
     private const string StateComponent = "Rekall.AnimationState";
     private const double Epsilon = 0.00001;
     private const long MaxClipBytes = 4 * 1024 * 1024;
+    private const int MaxTracksPerClip = 1_024;
+    private const int MaxKeysPerTrack = 4_096;
+    private const int MaxMarkersPerClip = 4_096;
     private readonly string? _projectRoot;
     private readonly RekallAgeAssetCatalogStore _catalogStore = new();
     private IReadOnlyDictionary<string, RekallAgeAssetDocument>? _assets;
@@ -91,13 +94,44 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
 
         if (TryGetArray(clipProperties, "tracks", out var tracks))
         {
-            foreach (var track in tracks.OfType<JsonObject>())
+            if (tracks.Count > MaxTracksPerClip)
             {
-                updated = ApplyTrack(updated, track, sampleTime, context.FrameIndex, observations);
+                observations.Add(AnimationObservation(
+                    context.FrameIndex,
+                    "runtime.animation.track_limit_exceeded",
+                    updated,
+                    $"Animation clip contains {tracks.Count} tracks; the per-clip limit is {MaxTracksPerClip}."));
+            }
+            else
+            {
+                foreach (var trackNode in tracks)
+                {
+                    if (trackNode is JsonObject track)
+                    {
+                        updated = ApplyTrack(updated, track, sampleTime, context.FrameIndex, observations);
+                    }
+                    else
+                    {
+                        observations.Add(AnimationObservation(
+                            context.FrameIndex,
+                            "runtime.animation.track_invalid",
+                            updated,
+                            "Animation track entries must be JSON objects."));
+                    }
+                }
             }
         }
 
-        EmitMarkers(updated, clipProperties, previousRawTime, nextRawTime, duration, loopMode, context.FrameIndex, emitted);
+        EmitMarkers(
+            updated,
+            clipProperties,
+            previousRawTime,
+            nextRawTime,
+            duration,
+            loopMode,
+            context.FrameIndex,
+            emitted,
+            observations);
         return updated.UpsertComponent(StateComponent, new JsonObject
         {
             ["version"] = 1,
@@ -123,6 +157,20 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             || string.IsNullOrWhiteSpace(propertyName)
             || !TryGetArray(track, "keys", out var keyNodes))
         {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.track_invalid",
+                entity,
+                "Animation track must define a component, property, and keys array."));
+            return entity;
+        }
+        if (keyNodes.Count > MaxKeysPerTrack)
+        {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.key_limit_exceeded",
+                entity,
+                $"Animation track '{componentType}.{propertyName}' contains {keyNodes.Count} keys; the per-track limit is {MaxKeysPerTrack}."));
             return entity;
         }
 
@@ -133,6 +181,11 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             .ToArray();
         if (keys.Length == 0)
         {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.track_no_valid_keys",
+                entity,
+                $"Animation track '{componentType}.{propertyName}' has no keys with values."));
             return entity;
         }
         if (entity.FindComponent(componentType) is not { } component)
@@ -299,10 +352,20 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         double duration,
         string loopMode,
         int frame,
-        List<RekallAgeRuntimeEvent> emitted)
+        List<RekallAgeRuntimeEvent> emitted,
+        List<RekallAgeRuntimeObservation> observations)
     {
         if (nextRawTime <= previousRawTime || !TryGetArray(clip, "events", out var markers))
         {
+            return;
+        }
+        if (markers.Count > MaxMarkersPerClip)
+        {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.marker_limit_exceeded",
+                entity,
+                $"Animation clip contains {markers.Count} markers; the per-clip limit is {MaxMarkersPerClip}."));
             return;
         }
 

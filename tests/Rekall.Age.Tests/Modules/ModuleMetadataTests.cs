@@ -45,7 +45,11 @@ public sealed class ModuleMetadataTests
 
         Assert.True(result.Ok);
         var animation = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.AnimationClip");
-        Assert.Contains(animation.Properties, property => property.Name == "Tracks" && property.Kind == "animationTracks");
+        var tracks = Assert.Single(animation.Properties, property => property.Name == "Tracks" && property.Kind == "animationTracks");
+        Assert.Contains("1,024", tracks.Description, StringComparison.Ordinal);
+        Assert.Contains("4,096", tracks.Description, StringComparison.Ordinal);
+        var events = Assert.Single(animation.Properties, property => property.Name == "Events" && property.Kind == "animationEvents");
+        Assert.Contains("4,096", events.Description, StringComparison.Ordinal);
         var player = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.AnimationPlayer");
         var loopMode = Assert.Single(player.Properties, property => property.Name == "LoopMode");
         Assert.Equal(["clamp", "loop", "pingpong"], loopMode.AllowedValues);

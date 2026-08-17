@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-17 23:48 Africa/Johannesburg
+Last verified: 2026-08-17 23:54 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: relocation capacity preflight passes the Debug gate
+Latest milestone: relocation capacity preflight passed the full product gate
 
 ## Product objective
 
@@ -163,6 +163,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   bytes, explicitly prevents same-destination retries, and leaves no destination
   or staging residue. The regression and full Debug suite pass at 569/569 with
   test temporaries routed to F:.
+- Relocation-capacity distribution gate: the clean build completed with zero
+  warnings/errors, both independent Release passes completed at 569/569, and
+  fresh installed acceptance passed SDK/module authoring, gauntlet, original and
+  relocated package proof, runtime UI, viewport, simulated audio, and Windows
+  player audio. Acceptance temporaries ran on F:; the new canonical archive is
+  194,669,627 bytes.
 
 ## Current gaps
 
@@ -178,8 +184,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the clean Release/distribution gate with temporary acceptance output on F:,
-then rerun the installed benchmark on F: with state-based physics acceptance.
+Rerun the installed benchmark on F: with state-based physics acceptance.
 
 ## Next after the current item
 

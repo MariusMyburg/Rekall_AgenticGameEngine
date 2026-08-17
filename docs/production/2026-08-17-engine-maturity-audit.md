@@ -49,9 +49,9 @@ Maturity labels:
 | Software rendering | Implemented | deterministic viewport and proof captures | fidelity limits must remain explicit; not a shipping renderer |
 | OpenXR | Partial/experimental | real runtime probing, swapchains, stereo planning, windowed headset submission | repeatable headset acceptance, performance, controller breadth, lifecycle hardening |
 | Audio | Proven | validated PCM WAV decoding, deterministic voices/mix frames, buses, gain/pitch/looping, spatial attenuation/pan, SDL Windows device queue, relocated package and installed-player proof | streaming/compressed codecs, device hot-plug/recovery, effects/DSP, broader hardware matrix |
-| Animation | Implemented | versioned inline/catalog clips, scalar/vector/color/string and sprite-frame tracks, interpolation, loop/clamp/ping-pong, bounded weighted layers and deterministic cross-fades, per-layer inspection, bounded GLB skin/hierarchy/channel import, deterministic skeletal joint-pose sampling, JOINTS_0/WEIGHTS_0 preservation, and CPU vertex/normal skinning before Vulkan submission; bounded asset/track/key/marker work with structured diagnostics, deterministic malformed corpus, 7,200-frame resume proof, events, generic property mutation | installed rendered skeletal capture, cubic-spline/morph breadth, state graphs |
+| Animation | Implemented | versioned inline/catalog clips, scalar/vector/color/string and sprite-frame tracks, interpolation, loop/clamp/ping-pong, bounded weighted layers and deterministic cross-fades, per-layer inspection, bounded GLB skin/hierarchy/channel import, deterministic skeletal joint-pose sampling, JOINTS_0/WEIGHTS_0 preservation, CPU vertex/normal skinning before Vulkan submission, and installed hardware Vulkan captures with distinct frame hashes and visible deformation; bounded asset/track/key/marker work with structured diagnostics, deterministic malformed corpus, 7,200-frame resume proof, events, generic property mutation | cubic-spline/morph breadth, complex transform fixtures, state graphs |
 | Runtime UI | Proven | canvases, anchors, deterministic container stacking/padding/gap/alignment/clipping, panels/labels/images/buttons, semantic focus/navigation, pointer interaction facts, pixel-level software proof, Vulkan overlays, and installed-distribution visual capture | accessibility semantics, richer text shaping, responsive-layout breadth, broader hardware visual matrix |
-| Assets | Partial | images, DDS/KTX2, GLB metadata/meshes, WAV recognition, reports, Tripo bridge | audio cooking, animation import, dependency graph, reimport/watch pipeline, deterministic cache cleanup |
+| Assets | Partial | images, DDS/KTX2, GLB metadata/meshes/skins/animation channels, WAV recognition, reports, Tripo bridge | audio cooking, morph and broader animation dependency import, dependency graph, reimport/watch pipeline, deterministic cache cleanup |
 | Multiplayer | Partial/experimental | authoritative session, ownership, snapshots/deltas, named-pipe and WebSocket transport | authentication, encryption policy, internet deployment, discovery/matchmaking, load/adversarial tests |
 | Live editing | Partial | scene/assets/blueprint/diff local IPC operations | module hot reload, conflict/revision UX, reconnect/recovery, Studio integration |
 | Playable packaging | Proven | relative hashed manifest, minimal payload, forbidden-file checks, archive safety, relocation run/audit/capture, packaged runtime UI/animation/audio state | signing, delta patching/updater integration, broader clean-machine matrix |
@@ -75,8 +75,10 @@ clean-machine OS/GPU matrix remain release-engineering gaps.
 Audio now decodes, mixes, spatializes, relocates, and reaches the installed
 Windows player's SDL queue. General UI renders in software and Vulkan/windowed
 paths. Versioned animation clips mutate generic component properties and expose
-post-simulation state. Advanced UI layout/navigation, animation blending and
-skeletal execution, and compressed/streaming audio remain material gaps.
+post-simulation state. Weighted cross-fades and skeletal GLB execution now reach
+the installed Vulkan renderer with visibly distinct captured frames. Richer text
+and accessibility, advanced animation graphs/morphs, and compressed/streaming
+audio remain material gaps.
 
 ### 3. The agent-native architecture is measured but not yet broad enough
 

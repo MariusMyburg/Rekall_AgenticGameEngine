@@ -35,7 +35,7 @@ structured observations, and gameplay remains in agent-authored modules.
 - [x] Apply generic component-property and transform tracks without genre assumptions.
 - [x] Implement sprite-frame animation and cross-fade/blend layers.
 - [x] Import and execute skeletal GLB tracks, skinning data, and blend diagnostics.
-- [ ] Prove animation in headless state assertions and rendered captures.
+- [x] Prove animation in headless state assertions and installed hardware-rendered captures.
 
 ## Tranche 4: Acceptance and hardening
 

@@ -4,9 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-17 21:53 Africa/Johannesburg  
-Branch: `codex/production-foundation`  
-Current commit: `e181160` (`feat: skin imported GLB meshes from runtime poses`)
+Last verified: 2026-08-17 22:00 Africa/Johannesburg
+
+Branch: `codex/production-foundation`
+
+Latest milestone: installed Vulkan skeletal-animation proof
 
 ## Product objective
 
@@ -30,22 +32,24 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 - Windows distribution: fresh 194,618,167-byte win-x64 archive assembled.
 - Canonical verification: 558/558 Release tests passed twice independently.
-- Installed acceptance: project/module workflows, packaging and relocation,
-  runtime UI, animation, and audible audio paths have installed-binary proof.
+- Installed acceptance: direct rerun exited 0; project/module workflows,
+  packaging and relocation, nonblank capture, runtime UI, and audible audio
+  paths have installed-binary proof.
 - Local agent: Ollama currently uses `qwen3.5:35b` through its native API.
 - Agent authoring: both source and installed multi-subsystem benchmarks created
   and repaired UI, animation, and audio content using tool calls.
 - Runtime animation: generic clip playback, weighted layers, crossfades,
   deterministic resume, GLB skeletal channels, runtime joint poses, imported
   JOINTS_0/WEIGHTS_0, and CPU skinning before Vulkan submission are covered.
+- Installed skeletal rendering: the shipped CLI sampled `Lift` at frame 30,
+  exposed skin `Rig` and one joint, then produced informative hardware Vulkan
+  frames at frames 1 and 30 with different SHA-256 hashes and visible movement.
 - Diagnostics: runtime inspection exposes UI/audio/animation state; viewport
   analysis reports severe clipping and invisible text without irrelevant
   camera advice for UI-only scenes.
 
 ## Current gaps
 
-- Capture installed, visibly rendered skeletal animation evidence rather than
-  relying only on state and vertex assertions.
 - Expand the installed Ollama benchmark across generic 2D, 3D, physics,
   package relocation, deliberate faults, diagnosis, and repair.
 - Add broader performance budgets, soak/device-loss recovery, security threat
@@ -57,15 +61,14 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Produce an installed-distribution skeletal-animation capture that demonstrates
-the shipped runtime reading a skinned GLB, advancing its pose, deforming its
-mesh, and presenting an informative frame with structured inspection evidence.
+Expand the installed Ollama authoring benchmark across generic 2D, 3D,
+physics, package relocation, deliberate faults, diagnosis, and repair.
 
 ## Next after the current item
 
-Run the expanded installed Ollama gauntlet, classify failures by generic engine
-contract, fix those contracts with regression tests, then begin quantified
-production hardening. Studio work follows as a consumer of those results.
+Classify benchmark failures by generic engine contract, fix those contracts
+with regression tests, then begin quantified production hardening. Studio work
+follows as a consumer of those results.
 
 ## Evidence index
 
@@ -75,6 +78,8 @@ production hardening. Studio work follows as a consumer of those results.
 - `Artifacts/TestResults/release-pass-1.trx`
 - `Artifacts/TestResults/release-pass-2.trx`
 - `Artifacts/Distribution/Rekall-AGE-0.1.0-preview.1-win-x64.zip`
+- `eng/accept-installed-skeletal-animation.ps1`
+- `Artifacts/InstalledSkeletalProof/<run-id>/evidence.json`
 
 ## Update rule
 

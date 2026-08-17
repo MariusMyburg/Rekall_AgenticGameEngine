@@ -4,7 +4,7 @@ Rekall AGE is the Rekall Agentic Game Engine: a C#/.NET engine for AI agents to 
 
 Rekall AGE is proprietary software governed by the [proprietary notice](PROPRIETARY-NOTICE.md). The current product version is `0.1.0-preview.1`, a Windows-first Developer Preview for professional developers and AI coding agents.
 
-The permanent product north star is recorded in [the Rekall AGE product vision](docs/PRODUCT-VISION.md).
+The permanent product north star is recorded in [the Rekall AGE product vision](docs/PRODUCT-VISION.md). Verified milestones, current gaps, and the stable execution order are maintained in [the production progress ledger](docs/production/PROGRESS.md).
 
 The core idea is simple and strict: Rekall AGE is an AI-agent-first game engine. Every major system is designed so agents can inspect the current state, understand the available contracts, make targeted changes, run verification loops, and explain what changed. The engine exposes authoring primitives, diagnostics, runtime contracts, rendering infrastructure, networking primitives, package workflows, and MCP/CLI tools so agents can author arbitrary games through project data and project modules.
 

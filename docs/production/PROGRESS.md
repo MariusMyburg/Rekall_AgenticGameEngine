@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 05:50 Africa/Johannesburg
+Last verified: 2026-08-18 05:56 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: durable agent evidence and camera-mask authoring guidance pass the full Debug suite
+Latest milestone: durable agent evidence and camera-mask guidance pass the complete product gate
 
 ## Product objective
 
@@ -30,8 +30,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,731,087-byte win-x64 archive assembled.
-- Canonical verification: 591/591 Release tests passed twice independently;
+- Windows distribution: fresh 194,732,792-byte win-x64 archive assembled.
+- Canonical verification: 592/592 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
 - Current Debug verification: 592/592 tests pass after durable evidence and
   camera-mask guidance changes.
@@ -602,6 +602,13 @@ Studio is important, but it does not define or reorder the engine foundation.
   reached zero free bytes from 36.4 GB of accumulated generated test/gate temp
   artifacts; after stopping the runner and clearing only those verified
   ephemeral directories, the unchanged suite passed with about 69 GB free.
+- Durable-evidence distribution gate: the clean Release build completed with
+  zero warnings and zero errors; both independent Release passes completed at
+  592/592; installed acceptance passed SDK/module authoring, the generic
+  gauntlet, original and relocated package proof, runtime UI, software
+  viewport, simulated audio, and Windows player audio. Relocated audit
+  explicitly reported `informative-frame: True` with four distinct colors.
+  The canonical 1,149-manifest-file archive is 194,732,792 bytes.
 
 ## Current gaps
 
@@ -617,12 +624,13 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete installed-product gate for the durable-evidence and
-camera-mask guidance changes.
+Run the unchanged installed Ollama benchmark on the durable-evidence and
+camera-mask guidance distribution.
 
 ## Next after the current item
 
-Rebuild the installed product and rerun the unchanged Ollama benchmark.
+Independently verify the benchmark result and classify any remaining generic
+engine contract gap before the next repair.
 A genuine broad benchmark pass precedes quantified production hardening;
 Studio follows as a consumer of those results.
 

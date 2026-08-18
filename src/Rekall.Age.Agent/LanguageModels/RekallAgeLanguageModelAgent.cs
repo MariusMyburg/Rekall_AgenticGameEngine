@@ -20,6 +20,8 @@ public sealed record RekallAgeLanguageModelAgentRequest(string Model, string Sys
     public int MaxContextMessages { get; init; } = 20;
 
     public int MaxToolResultCharacters { get; init; } = 12_000;
+
+    public bool RequireCompletionAudit { get; init; }
 }
 
 public sealed record RekallAgeLanguageModelAgentResult(
@@ -100,6 +102,7 @@ public sealed class RekallAgeLanguageModelAgent(
         var toolCallCount = 0;
         var toolExecutions = new List<RekallAgeLanguageModelToolExecution>();
         var finalContent = string.Empty;
+        var completionAuditPending = false;
         for (var turn = 1; turn <= maxTurns; turn++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -132,8 +135,19 @@ public sealed class RekallAgeLanguageModelAgent(
                     continue;
                 }
 
+                if (request.RequireCompletionAudit && !completionAuditPending)
+                {
+                    completionAuditPending = true;
+                    transcript.Add(new RekallAgeLanguageModelMessage(
+                        "user",
+                        "Completion audit required. Treat your preceding response only as a proposal, not as accepted completion. Re-read the original task and direct tool evidence, and verify every explicit requirement. Zero counts, warnings or validation issues, missing components or artifacts, stale package proof after later mutations, and evidence that proves mere existence rather than the requested behavior are failures. If any requirement is missing or contradicted, call tools now and repair or inspect it. If every requirement is directly proven, return the final evidence-backed response again. Do not rely on your prior narrative."));
+                    continue;
+                }
+
                 return Result(true, response.FinishReason.Length == 0 ? "complete" : response.FinishReason, finalContent, turn);
             }
+
+            completionAuditPending = false;
 
             foreach (var call in response.ToolCalls)
             {

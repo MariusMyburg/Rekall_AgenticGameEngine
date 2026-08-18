@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 02:20 Africa/Johannesburg
+Last verified: 2026-08-18 02:28 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: compact blueprint tool contracts passed the complete product gate
+Latest milestone: evidence-gated agent completion passed 584/584 Debug tests
 
 ## Product objective
 
@@ -364,6 +364,22 @@ Studio is important, but it does not define or reorder the engine foundation.
   the generic gauntlet, original and relocated package proof, runtime UI,
   software viewport, simulated audio, and Windows player audio. The canonical
   1,149-file archive is 194,708,844 bytes.
+- Broad benchmark rerun 18: the agent reported completion after 29 turns and 28
+  tools (475,523 prompt; 6,866 completion), with clean validation, genuine 3D/
+  2D motion, original audit, relocation, and relocated audit. Independent
+  installed verification confirmed both package audits and the motion deltas,
+  but rejected completion: the 3D dynamic body had no renderer and Physics2D
+  reported zero visible renderables. Nonblank capture proved package execution,
+  not the specifically requested visible physics content. This is a near-pass,
+  not an accepted pass.
+- Evidence-gated agent completion: the language-model agent API now supports an
+  opt-in two-phase completion audit, enabled for embedded Ollama runs. A first
+  final response is only a proposal; a dedicated audit turn must compare every
+  explicit task requirement against direct tool evidence, treating zero counts,
+  warnings/issues, missing components/artifacts, stale proofs, and mere
+  existence evidence as failures. If audit resumes tool use, the next proposed
+  completion is audited again. The regression and full Debug suite pass at
+  584/584.
 
 ## Current gaps
 
@@ -379,7 +395,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the unchanged installed Ollama benchmark on the compact-blueprint distribution.
+Run the complete clean product gate for evidence-gated agent completion.
 
 ## Next after the current item
 

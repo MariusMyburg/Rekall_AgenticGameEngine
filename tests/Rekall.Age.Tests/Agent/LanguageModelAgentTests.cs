@@ -91,6 +91,45 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task AgentRequiresEvidenceAuditBeforeAcceptingCompletion()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "", [new RekallAgeLanguageModelToolCall("inspect", new JsonObject())], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Everything is complete.", "", [], "stop", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Evidence is contradictory; repairing.", "", [new RekallAgeLanguageModelToolCall("inspect", new JsonObject { ["repair"] = true })], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Everything is now complete.", "", [], "stop", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Confirmed with direct evidence.", "", [], "stop", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+        var agent = new RekallAgeLanguageModelAgent(model, tools);
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 5,
+                RequireCompletionAudit = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(5, result.Turns);
+        Assert.Equal(2, result.ToolCallCount);
+        Assert.Equal("Confirmed with direct evidence.", result.FinalContent);
+        Assert.Contains(
+            model.Requests[2].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("Completion audit required", StringComparison.Ordinal));
+        Assert.Contains(
+            model.Requests[4].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("missing components", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void DiagnosticsExposeBoundedFailedToolResultsInsteadOfOnlyToolNames()
     {
         var failures = RekallAgeLanguageModelAgentDiagnostics.FormatFailures(

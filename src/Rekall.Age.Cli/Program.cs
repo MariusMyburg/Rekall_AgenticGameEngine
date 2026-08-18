@@ -2820,7 +2820,8 @@ internal static class RekallAgeCli
                 RekallAgeEmbeddedAgentContract.SystemPrompt,
                 task)
             {
-                MaxTurns = maxTurns
+                MaxTurns = maxTurns,
+                RequireCompletionAudit = true
             },
             cancellationToken);
         Console.WriteLine(result.FinalContent);

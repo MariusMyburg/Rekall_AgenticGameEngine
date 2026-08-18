@@ -514,6 +514,37 @@ identity, true scene/entity/component arrays, and the canonical component
 JSON strings. This complements the formal generated schema at the point where
 an LLM chooses argument structure.
 
+### Evidence-gate rerun
+
+Rerun 18 used the compact-blueprint distribution with the unchanged 36-turn
+task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun18`
+- Model result: reported completion after 29 turns
+- Tool calls: 28
+- Prompt tokens: 475,523
+- Completion tokens: 6,866
+
+The agent reached clean validation, runtime inspection of both scenes, package
+creation, original audit, relocation, and relocated audit. Independent
+installed verification confirmed zero validation issues, 3D delta
+`(0.005,-1.178,-0.998)`, 2D Y delta `-1.267`, and fresh passing audits with
+nonblank frames for both original and relocated packages.
+
+Completion was still false. The 3D dynamic body had no renderer component;
+Physics2D reported zero visible renderables and its dynamic body likewise had no
+renderer. Main's only visible runtime rendering came from unrelated atmosphere
+content. A nonblank package frame therefore proved executable rendering but not
+the explicit requirement that the dynamic physics bodies be visible.
+
+The generic correction adds an optional evidence-gated completion phase to the
+language-model agent and enables it for embedded Ollama runs. The first no-tool
+final answer becomes a proposal. A dedicated audit turn must re-read the
+original task and tool evidence, treating zero counts, warnings/issues, missing
+components or artifacts, stale package proof, and existence-only evidence as
+failures. If the audit calls tools, any later completion proposal is audited
+again before the agent can return `Completed=true`.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

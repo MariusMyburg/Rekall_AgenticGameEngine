@@ -22,6 +22,7 @@ public sealed class ModuleTrustInspectionTests
         Assert.Equal("ReceiptModule", module.ModuleName);
         Assert.Matches("^[0-9a-f]{64}$", module.SourceFingerprint);
         Assert.NotEmpty(module.OutputFiles);
+        Assert.DoesNotContain(module.OutputFiles, file => file.Path.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase));
         Assert.All(module.OutputFiles, file =>
         {
             Assert.False(Path.IsPathRooted(file.Path));

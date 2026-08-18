@@ -373,6 +373,12 @@ internal static class RekallAgeCli
             Log.Information("Rekall AGE command finished. ExitCode={ExitCode} LogDirectory={LogDirectory}", exitCode, logDirectory);
             return exitCode;
         }
+        catch (RekallAgeCodedBoundaryException ex)
+        {
+            Log.Error(ex, "CLI command rejected at a coded boundary. Code={Code} Target={Target} Args={Args} LogDirectory={LogDirectory}", ex.Code, ex.Target, string.Join(' ', args), logDirectory);
+            Console.Error.WriteLine($"{ex.Code}: {ex.Message}");
+            return 1;
+        }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
         {
             Log.Error(ex, "CLI command failed. Args={Args} LogDirectory={LogDirectory}", string.Join(' ', args), logDirectory);

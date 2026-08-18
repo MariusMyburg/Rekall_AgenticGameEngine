@@ -84,8 +84,16 @@ public sealed class RekallAgeModuleBuildReceiptService
         }
 
         var outputFiles = entries
+            .Where(IsReceiptArtifact)
             .Select(path => CreateArtifact(candidate.OutputDirectory, path, candidate.ModuleName))
             .ToArray();
+        if (!outputFiles.Any(file => file.Path.Equals($"{candidate.ModuleName}.dll", StringComparison.Ordinal)))
+        {
+            throw new RekallAgeModuleReceiptException(
+                "REKALL_MODULE_RECEIPT_OUTPUT_REJECTED",
+                "Compiler output does not contain the module's load-relevant main assembly.",
+                candidate.OutputDirectory);
+        }
         var sourcePaths = SourcePaths(candidate);
         var receipt = new RekallAgeModuleBuildReceipt(
             1,
@@ -148,6 +156,12 @@ public sealed class RekallAgeModuleBuildReceiptService
     internal static string NormalizeRelative(string root, string path) =>
         Path.GetRelativePath(Path.GetFullPath(root), Path.GetFullPath(path))
             .Replace(Path.DirectorySeparatorChar, '/');
+
+    internal static bool IsReceiptArtifact(string path)
+    {
+        var name = Path.GetFileName(path);
+        return !name.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static RekallAgeModuleArtifactIntegrity CreateArtifact(
         string outputRoot,

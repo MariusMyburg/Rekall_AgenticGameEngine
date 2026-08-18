@@ -128,23 +128,23 @@ git commit -m "feat: add module build trust receipts"
 - Modify: `tests/Rekall.Age.Tests/Playback/ModulePlayableRuntimeTests.cs`
 - Modify: `tests/Rekall.Age.Tests/Modules/ProjectModuleSchemaTests.cs`
 
-- [ ] **Step 1: Add failing load-admission tests**
+- [x] **Step 1: Add failing load-admission tests**
 
 Build then mutate the main DLL/deps receipt and prove schema discovery, runtime-system loading, and playable loading reject before `AssemblyLoadContext` sees the artifact. Prove the load resolver refuses unverified/out-of-root dependencies and same-named modules in different projects still load independently after verification.
 
-- [ ] **Step 2: Preserve exact trust errors through dynamic and CLI execution**
+- [x] **Step 2: Preserve exact trust errors through dynamic and CLI execution**
 
 Add failing tests showing MCP/dynamic execution and CLI print the module trust code instead of generic `REKALL_COMMAND_EXECUTION_FAILED` or message-only failure.
 
-- [ ] **Step 3: Verify first, then load only inventory paths**
+- [x] **Step 3: Verify first, then load only inventory paths**
 
 The loader consumes ready inspection plans, opens verified main assemblies with read/delete sharing, and constrains resolver paths to the verified output root and inventory. A coded trust exception is thrown before load for non-ready modules.
 
-- [ ] **Step 4: Add generic coded-boundary propagation**
+- [x] **Step 4: Add generic coded-boundary propagation**
 
 Introduce a narrow structured exception contract in Core or equivalent mapping so boundary exceptions retain code/target in dynamic commands and CLI without exposing unexpected exception details.
 
-- [ ] **Step 5: Run all module/runtime/playback admission tests GREEN and commit**
+- [x] **Step 5: Run all module/runtime/playback admission tests GREEN and commit**
 
 ```powershell
 git add src/Rekall.Age.Modules src/Rekall.Age.Core/Commands/RekallAgeCommandRegistry.cs src/Rekall.Age.Cli/Program.cs tests/Rekall.Age.Tests/Modules tests/Rekall.Age.Tests/Runtime/ProjectRuntimeSystemTests.cs tests/Rekall.Age.Tests/Playback/ModulePlayableRuntimeTests.cs

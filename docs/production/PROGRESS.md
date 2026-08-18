@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 07:31 Africa/Johannesburg
+Last verified: 2026-08-18 07:42 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: bounded module build receipts and read-only trust inspection pass the full Debug suite
+Latest milestone: verified admission is the only agent-authored module load path
 
 ## Product objective
 
@@ -692,6 +692,18 @@ Studio is important, but it does not define or reorder the engine foundation.
   migrated example's legacy generated sources entered portable compilation.
   Bouncing Ball now consumes the public project-local SDK instead of repository
   project references. The complete Debug suite passes at 631/631.
+- Verified-only module loading: schema discovery, runtime systems, playback,
+  CLI, and dynamic/MCP execution now share one admission path. It requires a
+  ready trust inspection, constrains dependency resolution to receipt-inventoried
+  files under the verified output root, and rehashes each stream under a
+  read/delete-safe lock immediately before `AssemblyLoadContext` consumes it.
+  Missing receipts, stale source, changed artifacts, and unverified dependencies
+  fail with their exact trust code; the generic coded-boundary contract preserves
+  that code through dynamic and CLI adapters. Packaged modules still load after
+  source and the project-local SDK are removed. PDBs remain deliberately
+  non-shipping ancillary output and are excluded from receipts, while every
+  other output remains exact. The focused loader/adapter matrix passes at 23/23
+  and the complete Debug suite at 637/637.
 
 ## Current gaps
 
@@ -714,9 +726,10 @@ points before starting `dotnet`; it also disables inherited
 `Directory.Build.props/targets` and resets only policy-verified output roots.
 Slice 2 anchors the installed SDK to an atomic inventory and the running
 engine's canonical resources. Slice 3 emits bounded receipts and inspects them
-without code loading; its focused adversarial suite passes at 11/11 and the
-complete Debug suite at 631/631. Verified-only loading, adapters/package
-preflight, and the full product gate remain in progress.
+without code loading. Slice 4 makes that inspection mandatory before every
+module load and preserves exact trust errors through CLI/dynamic adapters; the
+complete Debug suite passes at 637/637. Public trust inspection, explicit
+workflow/package preflight, and the full product gate remain in progress.
 
 ## Next after the current item
 

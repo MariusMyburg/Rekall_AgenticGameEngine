@@ -190,6 +190,39 @@ public sealed class CliSmokeTests
     }
 
     [Fact]
+    public async Task CliPreservesExactModuleTrustRejectionCode()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var cliAssembly = FindCliAssemblyPath();
+        var scaffold = await RunAsync(
+            cliAssembly,
+            "module",
+            "scaffold",
+            root,
+            "cli.trust",
+            "CLI Trust",
+            "CliTrust",
+            "CliTrustComponent");
+        var build = await RunAsync(cliAssembly, "build", "modules", root);
+        Assert.Equal(0, scaffold.ExitCode);
+        Assert.Equal(0, build.ExitCode);
+        File.Delete(Path.Combine(
+            root,
+            "Modules",
+            "CliTrust",
+            "bin",
+            "rekall",
+            "net10.0",
+            "rekall.module.build.json"));
+
+        var schemas = await RunAsync(cliAssembly, "module", "schemas", "project", root);
+
+        Assert.Equal(1, schemas.ExitCode);
+        Assert.Contains("REKALL_MODULE_RECEIPT_MISSING", schemas.Output);
+        Assert.DoesNotContain("Unexpected error", schemas.Output);
+    }
+
+    [Fact]
     public async Task CliLogsHandledCommandFailuresToSerilogFile()
     {
         var missingRoot = Path.Combine(TestPaths.CreateTempDirectory(), "missing");

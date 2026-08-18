@@ -1,5 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Security.Cryptography;
+using Rekall.Age.Modules.Security;
 
 namespace Rekall.Age.Modules;
 
@@ -7,66 +9,93 @@ public static class RekallAgeProjectModuleAssemblyLoader
 {
     public static IReadOnlyList<Assembly> LoadBuiltModuleAssemblies(string projectRoot)
     {
-        var modulesRoot = Path.Combine(projectRoot, "Modules");
-        if (!Directory.Exists(modulesRoot))
+        var inspection = new RekallAgeProjectModuleTrustInspector().Inspect(projectRoot);
+        if (!inspection.Ready)
         {
-            return Array.Empty<Assembly>();
+            var issue = inspection.Issues.FirstOrDefault()
+                ?? new RekallAgeModuleTrustIssue(
+                    "REKALL_MODULE_TRUST_NOT_READY",
+                    "Project modules are not ready for verified loading.",
+                    projectRoot);
+            throw new RekallAgeModuleTrustException(issue.Code, issue.Message, issue.Target);
         }
 
         var assemblies = new List<Assembly>();
-        foreach (var moduleDirectory in Directory.EnumerateDirectories(modulesRoot)
-                     .OrderBy(path => path, StringComparer.Ordinal))
+        foreach (var module in inspection.Modules.OrderBy(module => module.ModuleDirectory, StringComparer.Ordinal))
         {
-            var moduleName = Path.GetFileName(moduleDirectory);
-            var portableAssembly = Path.Combine(
-                moduleDirectory,
-                "bin",
-                "rekall",
-                "net10.0",
-                $"{moduleName}.dll");
-            var projectPath = Directory.EnumerateFiles(moduleDirectory, "*.csproj", SearchOption.TopDirectoryOnly)
-                .OrderBy(path => path, StringComparer.Ordinal)
-                .FirstOrDefault();
-            var assemblyPath = File.Exists(portableAssembly)
-                ? portableAssembly
-                : projectPath is null
-                    ? string.Empty
-                    : GetDefaultAssemblyPath(projectPath);
-            if (!File.Exists(assemblyPath))
+            var outputRoot = Path.Combine(module.ModuleDirectory, "bin", "rekall", "net10.0");
+            var assemblyName = $"{module.ModuleName}.dll";
+            var mainArtifact = module.OutputFiles.SingleOrDefault(file =>
+                string.Equals(file.Path, assemblyName, StringComparison.Ordinal));
+            if (mainArtifact is null)
             {
-                continue;
+                throw new RekallAgeModuleTrustException(
+                    "REKALL_MODULE_ASSEMBLY_MISSING",
+                    "Verified module output does not contain its main assembly.",
+                    outputRoot);
             }
 
-            var loadContext = new RekallAgeProjectModuleLoadContext(assemblyPath);
-            using var assemblyStream = new FileStream(
-                Path.GetFullPath(assemblyPath),
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.ReadWrite | FileShare.Delete);
+            var assemblyPath = Path.Combine(outputRoot, assemblyName);
+            var loadContext = new RekallAgeProjectModuleLoadContext(
+                assemblyPath,
+                outputRoot,
+                module.OutputFiles);
+            using var assemblyStream = OpenVerifiedStream(assemblyPath, mainArtifact);
             assemblies.Add(loadContext.LoadFromStream(assemblyStream));
         }
 
         return assemblies;
     }
 
-    private static string GetDefaultAssemblyPath(string projectPath)
+    private static FileStream OpenVerifiedStream(
+        string path,
+        RekallAgeModuleArtifactIntegrity expected)
     {
-        var projectDirectory = Path.GetDirectoryName(projectPath)!;
-        var moduleName = Path.GetFileNameWithoutExtension(projectPath);
-        var portableSdkBuild = Path.Combine(projectDirectory, "bin", "rekall", "net10.0", $"{moduleName}.dll");
-        return File.Exists(portableSdkBuild)
-            ? portableSdkBuild
-            : Path.Combine(projectDirectory, "bin", "Debug", "net10.0", $"{moduleName}.dll");
+        var stream = new FileStream(
+            Path.GetFullPath(path),
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read | FileShare.Delete);
+        try
+        {
+            var hash = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+            if (stream.Length != expected.SizeBytes
+                || !string.Equals(hash, expected.Sha256, StringComparison.Ordinal))
+            {
+                throw new RekallAgeModuleTrustException(
+                    "REKALL_MODULE_LOAD_ARTIFACT_CHANGED",
+                    "Module artifact changed after trust inspection and before loading.",
+                    path);
+            }
+
+            stream.Position = 0;
+            return stream;
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
     }
 
     private sealed class RekallAgeProjectModuleLoadContext : AssemblyLoadContext
     {
         private readonly AssemblyDependencyResolver _resolver;
+        private readonly string _outputRoot;
+        private readonly IReadOnlyDictionary<string, RekallAgeModuleArtifactIntegrity> _inventory;
 
-        public RekallAgeProjectModuleLoadContext(string mainAssemblyPath)
+        public RekallAgeProjectModuleLoadContext(
+            string mainAssemblyPath,
+            string outputRoot,
+            IReadOnlyList<RekallAgeModuleArtifactIntegrity> inventory)
             : base(isCollectible: false)
         {
             _resolver = new AssemblyDependencyResolver(Path.GetFullPath(mainAssemblyPath));
+            _outputRoot = Path.GetFullPath(outputRoot)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            _inventory = inventory.ToDictionary(
+                file => Path.GetFullPath(Path.Combine(_outputRoot, file.Path)),
+                OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         }
 
         protected override Assembly? Load(AssemblyName assemblyName)
@@ -79,7 +108,24 @@ public static class RekallAgeProjectModuleAssemblyLoader
             }
 
             var resolvedPath = _resolver.ResolveAssemblyToPath(assemblyName);
-            return resolvedPath is null ? null : LoadFromAssemblyPath(resolvedPath);
+            if (resolvedPath is null)
+            {
+                return null;
+            }
+
+            var fullPath = Path.GetFullPath(resolvedPath);
+            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if (!fullPath.StartsWith(_outputRoot + Path.DirectorySeparatorChar, comparison)
+                || !_inventory.TryGetValue(fullPath, out var expected))
+            {
+                throw new RekallAgeModuleTrustException(
+                    "REKALL_MODULE_DEPENDENCY_NOT_VERIFIED",
+                    $"Module dependency '{assemblyName.Name}' is outside the verified artifact inventory.",
+                    fullPath);
+            }
+
+            using var stream = OpenVerifiedStream(fullPath, expected);
+            return LoadFromStream(stream);
         }
     }
 }

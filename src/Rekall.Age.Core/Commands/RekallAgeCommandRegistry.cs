@@ -158,6 +158,16 @@ public sealed class RekallAgeCommandRegistry
                     result.Errors,
                     CreateTransactionSummary(context));
             }
+            catch (RekallAgeCodedBoundaryException ex)
+            {
+                var error = new RekallAgeCommandError(ex.Code, ex.Message, ex.Target);
+                return new RekallAgeDynamicCommandResult(
+                    false,
+                    ex.Message,
+                    null,
+                    [error],
+                    CreateTransactionSummary(context));
+            }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException)
             {
                 var error = new RekallAgeCommandError(

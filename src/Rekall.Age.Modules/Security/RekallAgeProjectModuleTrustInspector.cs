@@ -198,8 +198,16 @@ public sealed class RekallAgeProjectModuleTrustInspector
             return;
         }
 
+        var reparseEntry = entries.FirstOrDefault(path => IsReparse(path));
+        if (reparseEntry is not null)
+        {
+            Add(issues, "REKALL_MODULE_TRUST_REPARSE_POINT", "Module output files cannot use reparse points.", reparseEntry);
+            return;
+        }
+
         var actualNames = entries.Select(path => Path.GetFileName(path)!)
             .Where(name => !string.Equals(name, RekallAgeModuleBuildReceiptService.ReceiptFileName, StringComparison.Ordinal))
+            .Where(RekallAgeModuleBuildReceiptService.IsReceiptArtifact)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
         if (!actualNames.SequenceEqual(inventory.Keys.OrderBy(name => name, StringComparer.Ordinal), StringComparer.Ordinal))

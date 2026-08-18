@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 03:14 Africa/Johannesburg
+Last verified: 2026-08-18 03:20 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: audit-efficiency contract passed the complete product gate
+Latest milestone: wrapper-prefixed frame recovery passed 585/585 Debug tests
 
 ## Product objective
 
@@ -437,6 +437,14 @@ Studio is important, but it does not define or reorder the engine foundation.
   gauntlet, original and relocated package proof, runtime UI, software viewport,
   simulated audio, and Windows player audio. The canonical 1,149-file archive
   is 194,710,683 bytes.
+- Broad benchmark rerun 22: model variance spent eight runtime calls repeating
+  missing `Frames` failures with `fabricFrameCount`/`fabricFrames`, then stopped
+  at 36 turns/36 tools (545,575 prompt; 8,024 completion) before packaging.
+  Independent proof found zero validation issues and visible 3D/2D bodies with
+  Y delta -1.267, but no package. This is a clear benchmark failure.
+- Wrapper-prefixed frame recovery: dynamic requests now normalize the two
+  observed wrapper-prefixed fields to `Frames` only for request types declaring
+  that canonical property. The regression and full Debug suite pass at 585/585.
 
 ## Current gaps
 
@@ -452,7 +460,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the unchanged installed Ollama benchmark on the audit-efficiency distribution.
+Run the complete clean product gate for wrapper-prefixed frame recovery.
 
 ## Next after the current item
 

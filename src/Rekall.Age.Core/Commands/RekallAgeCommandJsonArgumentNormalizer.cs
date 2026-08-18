@@ -112,6 +112,8 @@ internal static class RekallAgeCommandJsonArgumentNormalizer
             .ToArray();
         ApplyAlias(value, properties, "Frames", "frame");
         ApplyAlias(value, properties, "Frames", "frameCount");
+        ApplyAlias(value, properties, "Frames", "fabricFrames");
+        ApplyAlias(value, properties, "Frames", "fabricFrameCount");
         ApplyAlias(value, properties, "PackagePath", "packageDirectory");
         ApplyAlias(value, properties, "PackagePath", "archivePath");
     }

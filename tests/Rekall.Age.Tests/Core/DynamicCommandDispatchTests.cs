@@ -107,6 +107,15 @@ public sealed class DynamicCommandDispatchTests
         var priorValue = Assert.IsType<AliasResult>(priorAliases.Value);
         Assert.Equal(12, priorValue.Frames);
         Assert.Equal("F:\\Builds\\Game.zip", priorValue.PackagePath);
+
+        var wrapperPrefixedAliases = await registry.ExecuteJsonAsync(
+            "rekall.test.aliases",
+            """{"fabricFrameCount":"30","packagePath":"F:\\Builds\\Wrapped"}""",
+            context);
+
+        Assert.True(wrapperPrefixedAliases.Ok, wrapperPrefixedAliases.Summary);
+        var wrapperPrefixedValue = Assert.IsType<AliasResult>(wrapperPrefixedAliases.Value);
+        Assert.Equal(30, wrapperPrefixedValue.Frames);
     }
 
     [Fact]

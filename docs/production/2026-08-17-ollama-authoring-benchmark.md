@@ -636,6 +636,29 @@ package creation or relocation unless evidence is missing, contradicted, or
 stale after a later mutation. The audit remains strict; it avoids redundant
 work rather than accepting weaker evidence.
 
+### Wrapper-prefixed frame rerun
+
+Rerun 22 used the audit-efficiency distribution with the unchanged 36-turn
+task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun22`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 545,575
+- Completion tokens: 8,024
+
+Model variance produced `fabricFrameCount` and `fabricFrames` instead of the
+canonical `Frames`. The agent repeated the same missing-field failure across
+eight runtime-inspection calls and exhausted the bound before packaging.
+Independent installed verification found a clean two-scene project with visible
+3D and 2D dynamic bodies and Y delta -1.267, but no playable package existed.
+
+The type-directed request normalizer now accepts the two observed wrapper-
+prefixed fields only when the selected request type declares canonical
+`Frames`. Their scalar values still pass through the existing typed conversion,
+and unrelated request contracts remain unaffected. A regression extends the
+same alias test that covers `frame` and `frameCount`.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

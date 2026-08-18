@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 05:22 Africa/Johannesburg
+Last verified: 2026-08-18 05:28 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: informative package proof and repair termination passed 591/591 Debug tests
+Latest milestone: informative package proof and repair termination passed the complete product gate
 
 ## Product objective
 
@@ -30,8 +30,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,727,467-byte win-x64 archive assembled.
-- Canonical verification: 590/590 Release tests passed twice independently;
+- Windows distribution: fresh 194,731,087-byte win-x64 archive assembled.
+- Canonical verification: 591/591 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
@@ -573,6 +573,13 @@ Studio is important, but it does not define or reorder the engine foundation.
   repair count; advisory-only leftovers terminate as `no-progress` with an
   explicit instruction not to retry unchanged. The full Debug suite passes at
   591/591.
+- Informative-proof distribution gate: the clean Release build completed with
+  zero warnings and zero errors; both independent Release passes completed at
+  591/591; installed acceptance passed SDK/module authoring, the generic
+  gauntlet, original and relocated package proof, runtime UI, software viewport,
+  simulated audio, and Windows player audio. Relocated package audit explicitly
+  reported `informative-frame: True` with four distinct colors. The canonical
+  1,149-file archive is 194,731,087 bytes.
 
 ## Current gaps
 
@@ -588,8 +595,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for informative package proof and repair
-termination.
+Run the unchanged installed Ollama benchmark on the informative-proof
+distribution.
 
 ## Next after the current item
 

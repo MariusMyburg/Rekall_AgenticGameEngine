@@ -810,10 +810,11 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Audit the persisted project/scene/package schemas and command contracts, then
-add deterministic compatibility fixtures and explicit migration diagnostics.
-The module trust boundary and desktop recovery paths remain installed-product
-verified.
+Implement the persisted compatibility design: central project/scene schema
+enforcement, deterministic read-only inspection, and explicit atomic legacy
+migration. Package, module SDK, receipt, animation, and diagnostic versions
+remain intentionally separate contracts. The module trust boundary and desktop
+recovery paths remain installed-product verified.
 
 ## Next after the current item
 
@@ -828,6 +829,8 @@ reordering the foundation roadmap.
 - `docs/superpowers/plans/2026-08-17-runtime-subsystems.md`
 - `docs/superpowers/specs/2026-08-18-runtime-soak-performance-design.md`
 - `docs/superpowers/plans/2026-08-18-runtime-soak-performance.md`
+- `docs/superpowers/specs/2026-08-18-persisted-compatibility-migrations-design.md`
+- `docs/superpowers/plans/2026-08-18-persisted-compatibility-migrations.md`
 - `Artifacts/TestResults/release-pass-1.trx`
 - `Artifacts/TestResults/release-pass-2.trx`
 - `Artifacts/Distribution/Rekall-AGE-0.1.0-preview.1-win-x64.zip`

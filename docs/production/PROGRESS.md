@@ -864,6 +864,12 @@ archive extraction, diagnostics, migration concurrency, and the explicitly
 full-trust module boundary. Prioritize generic bounded contracts and executable
 diagnostics; do not misrepresent in-process modules as sandboxed.
 
+Selected first security slice: unify playable ZIP preflight before manifest
+deserialization, inventory allocation, destination creation, hashing, or
+execution. Inspection and extraction will share one bounded immutable entry
+plan covering unique bounded manifests, paths/collisions, ancestor conflicts,
+special-file metadata, and size/count ceilings.
+
 ## Next after the current item
 
 Complete the selected adversarial security slice, then advance generic
@@ -879,6 +885,8 @@ instead of reordering the foundation roadmap.
 - `docs/superpowers/plans/2026-08-18-runtime-soak-performance.md`
 - `docs/superpowers/specs/2026-08-18-persisted-compatibility-migrations-design.md`
 - `docs/superpowers/plans/2026-08-18-persisted-compatibility-migrations.md`
+- `docs/superpowers/specs/2026-08-18-package-archive-preflight-security-design.md`
+- `docs/superpowers/plans/2026-08-18-package-archive-preflight-security.md`
 - `Artifacts/TestResults/release-pass-1.trx`
 - `Artifacts/TestResults/release-pass-2.trx`
 - `Artifacts/Distribution/Rekall-AGE-0.1.0-preview.1-win-x64.zip`

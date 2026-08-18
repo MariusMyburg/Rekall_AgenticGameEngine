@@ -14,7 +14,7 @@ public static class RekallAgeAtomicFile
     {
         var prepared = Prepare(path, contents, maximumBytes, cancellationToken);
         await using var documentLock = await AcquireLockAsync(prepared.FullPath, cancellationToken).ConfigureAwait(false);
-        await WritePreparedAsync(prepared, cancellationToken).ConfigureAwait(false);
+        await WritePreparedAsync(prepared, previousVersionPath: null, cancellationToken).ConfigureAwait(false);
     }
 
     public static async ValueTask<string> WriteAllTextIfRevisionAsync(
@@ -22,6 +22,21 @@ public static class RekallAgeAtomicFile
         string contents,
         long maximumBytes,
         string expectedRevision,
+        CancellationToken cancellationToken) =>
+        await WriteAllTextIfRevisionAsync(
+            path,
+            contents,
+            maximumBytes,
+            expectedRevision,
+            previousVersionPath: null,
+            cancellationToken).ConfigureAwait(false);
+
+    public static async ValueTask<string> WriteAllTextIfRevisionAsync(
+        string path,
+        string contents,
+        long maximumBytes,
+        string expectedRevision,
+        string? previousVersionPath,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expectedRevision);
@@ -48,7 +63,25 @@ public static class RekallAgeAtomicFile
                 currentRevision);
         }
 
-        await WritePreparedAsync(prepared, cancellationToken).ConfigureAwait(false);
+        string? fullPreviousVersionPath = null;
+        if (currentRevision != RekallAgeDocumentRevision.Missing && previousVersionPath is not null)
+        {
+            fullPreviousVersionPath = Path.GetFullPath(previousVersionPath);
+            if (fullPreviousVersionPath.Equals(prepared.FullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("Previous-version path must differ from the destination.", nameof(previousVersionPath));
+            }
+            if (!string.Equals(
+                Path.GetPathRoot(fullPreviousVersionPath),
+                Path.GetPathRoot(prepared.FullPath),
+                StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("Previous-version path must be on the destination volume.", nameof(previousVersionPath));
+            }
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPreviousVersionPath)!);
+        }
+
+        await WritePreparedAsync(prepared, fullPreviousVersionPath, cancellationToken).ConfigureAwait(false);
         return RekallAgeDocumentRevision.Compute(prepared.Bytes);
     }
 
@@ -94,6 +127,7 @@ public static class RekallAgeAtomicFile
 
     private static async ValueTask WritePreparedAsync(
         PreparedDocument prepared,
+        string? previousVersionPath,
         CancellationToken cancellationToken)
     {
         var temporaryPath = Path.Combine(
@@ -116,7 +150,11 @@ public static class RekallAgeAtomicFile
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            await PublishAsync(temporaryPath, prepared.FullPath, cancellationToken).ConfigureAwait(false);
+            await PublishAsync(
+                temporaryPath,
+                prepared.FullPath,
+                previousVersionPath,
+                cancellationToken).ConfigureAwait(false);
             published = true;
         }
         finally
@@ -177,6 +215,7 @@ public static class RekallAgeAtomicFile
     private static async ValueTask PublishAsync(
         string temporaryPath,
         string destinationPath,
+        string? previousVersionPath,
         CancellationToken cancellationToken)
     {
         const int maximumAttempts = 16;
@@ -187,7 +226,7 @@ public static class RekallAgeAtomicFile
             {
                 if (File.Exists(destinationPath))
                 {
-                    File.Replace(temporaryPath, destinationPath, destinationBackupFileName: null, ignoreMetadataErrors: true);
+                    File.Replace(temporaryPath, destinationPath, previousVersionPath, ignoreMetadataErrors: true);
                 }
                 else
                 {

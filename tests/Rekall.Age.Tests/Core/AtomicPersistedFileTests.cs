@@ -228,6 +228,79 @@ public sealed class AtomicPersistedFileTests
         Assert.Empty(TemporarySiblings(path));
     }
 
+    [Fact]
+    public async Task ConditionalReplacementRetainsExactPreviousBytes()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, "document.json");
+        var previousPath = Path.Combine(root, ".rekall", "recovery", "document.json.previous");
+        var original = Encoding.UTF8.GetBytes("{\"version\":1}");
+        await File.WriteAllBytesAsync(path, original);
+
+        await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+            path,
+            "{\"version\":2}",
+            maximumBytes: 1024,
+            RekallAgeDocumentRevision.Compute(original),
+            previousPath,
+            CancellationToken.None);
+
+        Assert.Equal(original, await File.ReadAllBytesAsync(previousPath));
+        Assert.Equal("{\"version\":2}", await File.ReadAllTextAsync(path));
+        await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+            path,
+            "{\"version\":3}",
+            maximumBytes: 1024,
+            RekallAgeDocumentRevision.Compute(Encoding.UTF8.GetBytes("{\"version\":2}")),
+            previousPath,
+            CancellationToken.None);
+        Assert.Equal("{\"version\":2}", await File.ReadAllTextAsync(previousPath));
+        Assert.Equal("{\"version\":3}", await File.ReadAllTextAsync(path));
+        Assert.Empty(ControlSiblings(path));
+    }
+
+    [Fact]
+    public async Task StaleConditionalReplacementPreservesExistingPreviousVersion()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, "document.json");
+        var previousPath = Path.Combine(root, ".rekall", "recovery", "document.json.previous");
+        Directory.CreateDirectory(Path.GetDirectoryName(previousPath)!);
+        await File.WriteAllTextAsync(path, "current");
+        await File.WriteAllTextAsync(previousPath, "known-good");
+
+        await Assert.ThrowsAsync<RekallAgeDocumentRevisionException>(
+            () => RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+                path,
+                "stale",
+                maximumBytes: 1024,
+                RekallAgeDocumentRevision.Compute(Encoding.UTF8.GetBytes("other")),
+                previousPath,
+                CancellationToken.None).AsTask());
+
+        Assert.Equal("current", await File.ReadAllTextAsync(path));
+        Assert.Equal("known-good", await File.ReadAllTextAsync(previousPath));
+    }
+
+    [Fact]
+    public async Task ConditionalCreationDoesNotFabricatePreviousVersion()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, "document.json");
+        var previousPath = Path.Combine(root, ".rekall", "recovery", "document.json.previous");
+
+        await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+            path,
+            "created",
+            maximumBytes: 1024,
+            RekallAgeDocumentRevision.Missing,
+            previousPath,
+            CancellationToken.None);
+
+        Assert.False(File.Exists(previousPath));
+        Assert.Equal("created", await File.ReadAllTextAsync(path));
+    }
+
     private static IReadOnlyList<string> TemporarySiblings(string destination) =>
         Directory.GetFiles(
             Path.GetDirectoryName(destination)!,

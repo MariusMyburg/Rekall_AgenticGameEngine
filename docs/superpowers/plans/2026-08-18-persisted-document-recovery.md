@@ -10,10 +10,10 @@ from one bounded last-known-good version.
 
 ### Task 1: Atomic previous-version retention
 
-- [ ] Write failing exact-backup, stale/failure preservation, cancellation,
+- [x] Write failing exact-backup, stale/failure preservation, cancellation,
   creation, and cleanup tests.
-- [ ] Extend conditional publication with an atomic same-volume previous target.
-- [ ] Keep all paths confined and bounded.
+- [x] Extend conditional publication with an atomic same-volume previous target.
+- [x] Keep all paths confined and bounded.
 
 ### Task 2: Project and scene recovery store
 

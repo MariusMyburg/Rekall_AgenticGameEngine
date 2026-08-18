@@ -893,6 +893,14 @@ silently roll back. Design and TDD sequence:
 `docs/superpowers/specs/2026-08-18-persisted-document-recovery-design.md` and
 `docs/superpowers/plans/2026-08-18-persisted-document-recovery.md`.
 
+Persisted document recovery Task 1 is verified at 13/13 focused persistence
+tests. Conditional publication can atomically retain the exact prior bytes at a
+distinct same-volume recovery path while replacing the live document. Repeated
+success replaces the recovery snapshot with exactly the immediately preceding
+version; stale writes preserve both live and recovery bytes; creation does not
+fabricate history; existing cancellation, busy, size, and cleanup guarantees
+remain green.
+
 The next risk-driven tranche is optimistic document revisions. Atomic files
 eliminate torn reads but do not prevent two valid agent/editor processes from
 silently overwriting one another. The reviewed design adds exact snapshot

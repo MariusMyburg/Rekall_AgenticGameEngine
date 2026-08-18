@@ -95,6 +95,7 @@ internal static class RekallAgeMcpToolClassifier
     {
         return name is
             "rekall.context.engine_status" or
+            "rekall.module.inspect_trust" or
             "rekall.live.status" or
             "rekall.live.reload_scene" or
             "rekall.live.reload_assets" or
@@ -118,6 +119,7 @@ internal static class RekallAgeMcpToolClassifier
         return name switch
         {
             "rekall.context.engine_status" => 5,
+            "rekall.module.inspect_trust" => 12,
             "rekall.workflow.create_blueprint_project" => 9,
             "rekall.workflow.agent_authoring_gauntlet" => 10,
             "rekall.workflow.package_playable_game" => 11,

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 07:42 Africa/Johannesburg
+Last verified: 2026-08-18 07:49 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: verified admission is the only agent-authored module load path
+Latest milestone: module trust inspection is public and package workflows preflight it explicitly
 
 ## Product objective
 
@@ -704,6 +704,17 @@ Studio is important, but it does not define or reorder the engine foundation.
   non-shipping ancillary output and are excluded from receipts, while every
   other output remains exact. The focused loader/adapter matrix passes at 23/23
   and the complete Debug suite at 637/637.
+- Public trust workflow: `rekall.module.inspect_trust` is a read-only,
+  recommended CLI/MCP command that reports the explicit
+  `in-process-full-trust` posture, bounded module evidence, exact issues, and a
+  rebuild action without loading code. Engine status and README guidance make
+  clear that unsigned receipts are integrity/provenance consistency—not a
+  sandbox, code signature, or publisher authentication. Playable verification
+  exposes a named `module-trust` check, and packaging repeats trust inspection
+  immediately before copying the `Game` payload. An injected reparse regression
+  proves exact rejection and no payload copy. Packaged receipts intentionally
+  exclude non-shipping PDBs while remaining exact for all shipping artifacts.
+  The complete Debug suite passes at 639/639.
 
 ## Current gaps
 
@@ -728,8 +739,9 @@ Slice 2 anchors the installed SDK to an atomic inventory and the running
 engine's canonical resources. Slice 3 emits bounded receipts and inspects them
 without code loading. Slice 4 makes that inspection mandatory before every
 module load and preserves exact trust errors through CLI/dynamic adapters; the
-complete Debug suite passes at 637/637. Public trust inspection, explicit
-workflow/package preflight, and the full product gate remain in progress.
+complete Debug suite passes at 637/637. Slice 5 exposes read-only inspection and
+explicit verify/package preflight, with the complete Debug suite at 639/639.
+Installed adversarial acceptance and the full product gate remain in progress.
 
 ## Next after the current item
 

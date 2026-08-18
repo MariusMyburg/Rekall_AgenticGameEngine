@@ -4,6 +4,7 @@ using Rekall.Age.LevelDesign.Commands;
 using Rekall.Age.Mcp;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime.Commands;
+using Rekall.Age.Modules.Commands;
 
 namespace Rekall.Age.Tests.Mcp;
 
@@ -27,8 +28,10 @@ public sealed class WorkbenchMcpCatalogTests
         registry.Register(new InspectRuntimeSoakCommand());
         registry.Register(new CaptureRuntimeViewportCommand());
         registry.Register(new ExportSceneGlbCommand());
+        registry.Register(new InspectModuleTrustCommand());
 
-        var names = RekallAgeMcpCatalog.FromRegistry(registry).Tools.Select(tool => tool.Name).ToArray();
+        var tools = RekallAgeMcpCatalog.FromRegistry(registry).Tools;
+        var names = tools.Select(tool => tool.Name).ToArray();
 
         Assert.Contains("rekall.asset.import_report", names);
         Assert.Contains("rekall.level.entity.duplicate", names);
@@ -41,5 +44,9 @@ public sealed class WorkbenchMcpCatalogTests
         Assert.Contains("rekall.runtime.inspect_soak", names);
         Assert.Contains("rekall.render.capture_runtime_viewport", names);
         Assert.Contains("rekall.render.export_scene_glb", names);
+        Assert.Contains(tools, tool =>
+            tool.Name == "rekall.module.inspect_trust"
+            && tool.Recommended
+            && tool.Category == "modules");
     }
 }

@@ -664,9 +664,23 @@ rekall.module.list_sources
 rekall.module.read_source
 rekall.module.write_source
 rekall.build.modules
+rekall.module.inspect_trust
 ```
 
 The playable scaffold is intentionally neutral. It creates an editable shell, not a game design.
+
+Canonical builds emit a bounded `rekall.module.build.json` receipt beside each
+module assembly. Before schema discovery, runtime execution, playback, or
+packaging, Rekall AGE verifies the receipt, source freshness when source is
+present, artifact hashes and sizes, assembly identity, and output containment.
+Use `module trust <projectRoot>` in the CLI or
+`rekall.module.inspect_trust` through MCP to inspect the boundary without
+loading module code.
+
+The current C# module posture is deliberately named `in-process-full-trust`.
+Receipts provide integrity and provenance consistency; they are not a sandbox,
+code signature, or publisher-authentication mechanism. Only load modules from
+authors and projects you trust.
 
 ## Runtime SDK Helpers
 

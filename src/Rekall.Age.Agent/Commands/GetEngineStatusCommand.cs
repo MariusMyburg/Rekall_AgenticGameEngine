@@ -138,6 +138,10 @@ public sealed class GetEngineStatusCommand
                     "Compile project C# modules so their components and runtime systems can run in scene snapshots and player builds.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
+                    "rekall.module.inspect_trust",
+                    "Inspect module receipts and artifacts without loading code; reports in-process full-trust and integrity/provenance issues before execution or packaging.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
                     "rekall.shader.write",
                     "Author project GLSL shaders with Vulkan compile validation before runtime use.",
                     Recommended: false),

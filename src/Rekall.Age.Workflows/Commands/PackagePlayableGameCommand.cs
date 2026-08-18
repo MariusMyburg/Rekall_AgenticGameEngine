@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Core.Product;
+using Rekall.Age.Modules.Security;
 
 namespace Rekall.Age.Workflows.Commands;
 
@@ -37,6 +38,17 @@ public sealed class PackagePlayableGameCommand
 {
     private readonly VerifyPlayableGameCommand _verifyPlayableGame = new();
     private readonly BuildPlayerCommand _buildPlayer = new();
+    private readonly RekallAgeProjectModuleTrustInspector _moduleTrust;
+
+    public PackagePlayableGameCommand()
+        : this(new RekallAgeProjectModuleTrustInspector())
+    {
+    }
+
+    internal PackagePlayableGameCommand(RekallAgeProjectModuleTrustInspector moduleTrust)
+    {
+        _moduleTrust = moduleTrust;
+    }
 
     public string Name => "rekall.workflow.package_playable_game";
 
@@ -130,6 +142,18 @@ public sealed class PackagePlayableGameCommand
                 result,
                 !player.Ok ? player.Summary : proofPlayer!.Summary,
                 !player.Ok ? player.Errors : proofPlayer!.Errors);
+        }
+
+        var packageTrust = _moduleTrust.Inspect(request.ProjectRoot);
+        if (!packageTrust.Ready)
+        {
+            return RekallAgeCommandResult<PackagePlayableGameResult>.Failure(
+                result,
+                "Module trust preflight failed before package copy.",
+                packageTrust.Issues.Select(issue => new RekallAgeCommandError(
+                    issue.Code,
+                    issue.Message,
+                    issue.Target)).ToArray());
         }
 
         CopyProjectToPackage(request.ProjectRoot, bundledGameRoot, outputDirectory);

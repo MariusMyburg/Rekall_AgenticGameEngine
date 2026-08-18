@@ -25,6 +25,7 @@ public sealed class AgentAuthoringGauntletTests
         Assert.Equal("Main", result.Value.SceneName);
         Assert.NotNull(result.Value.Package);
         Assert.NotNull(result.Value.Audit);
+        Assert.Contains(result.Value.Package!.Checks, check => check is { Name: "module-trust", Passed: true });
         Assert.True(File.Exists(result.Value.Package!.ArchivePath));
         Assert.True(File.Exists(result.Value.Audit!.Capture.OutputPath));
         Assert.All(result.Value.Checks, check => Assert.True(check.Passed, check.Summary));

@@ -5,12 +5,44 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Modules;
 using Rekall.Age.Workflows.Commands;
+using Rekall.Age.Modules.Security;
 using Rekall.Age.World;
 
 namespace Rekall.Age.Tests.Workflows;
 
 public sealed class PlayablePackageIntegrityTests
 {
+    [Fact]
+    public async Task PackageCopyStopsWhenFinalModuleTrustPreflightFails()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var initialOutput = Path.Combine(TestPaths.CreateTempDirectory(), "InitialTrustPackage");
+        var output = Path.Combine(TestPaths.CreateTempDirectory(), "RejectedTrustPackage");
+        var context = new RekallAgeCommandContext(
+            "package-trust-preflight-test",
+            RekallAgeTransaction.Begin("package trust preflight"),
+            CancellationToken.None);
+        var authored = await new RunAgentAuthoringGauntletCommand().ExecuteAsync(
+            new RunAgentAuthoringGauntletRequest(root, "Package Trust Game", "Main", initialOutput),
+            context);
+        Assert.True(authored.Ok, authored.Summary);
+        var moduleDirectory = Assert.Single(Directory.EnumerateDirectories(Path.Combine(root, "Modules")));
+        var moduleName = Path.GetFileName(moduleDirectory);
+        var assemblyPath = Path.Combine(moduleDirectory, "bin", "rekall", "net10.0", $"{moduleName}.dll");
+        var inspector = new RekallAgeProjectModuleTrustInspector(
+            readAttributes: path => Path.GetFullPath(path).Equals(Path.GetFullPath(assemblyPath), StringComparison.OrdinalIgnoreCase)
+                ? FileAttributes.Normal | FileAttributes.ReparsePoint
+                : File.GetAttributes(path));
+
+        var packaged = await new PackagePlayableGameCommand(inspector).ExecuteAsync(
+            new PackagePlayableGameRequest(root, "Main", output),
+            context);
+
+        Assert.False(packaged.Ok);
+        Assert.Contains(packaged.Errors, error => error.Code == "REKALL_MODULE_TRUST_REPARSE_POINT");
+        Assert.False(Directory.Exists(Path.Combine(output, "Game")));
+    }
+
     [Fact]
     public async Task GraphicsPackageIncludesDeterministicProofPlayerForCaptureAndAudit()
     {

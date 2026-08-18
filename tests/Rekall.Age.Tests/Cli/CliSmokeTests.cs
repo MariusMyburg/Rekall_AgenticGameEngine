@@ -148,6 +148,12 @@ public sealed class CliSmokeTests
         Assert.Contains("Built 1 module project", build.Output);
         Assert.Contains("CrystalMining.dll", build.Output);
 
+        var trust = await RunAsync(cliAssembly, "module", "trust", root);
+        Assert.Equal(0, trust.ExitCode);
+        Assert.Contains("Ready: True", trust.Output);
+        Assert.Contains("Trust posture: in-process-full-trust", trust.Output);
+        Assert.Contains("Module CrystalMining: ready=True", trust.Output);
+
         var capture = await RunAsync(cliAssembly, "capture", "screenshot", root, "Main");
         Assert.Equal(0, capture.ExitCode);
         Assert.Contains("Main_preview.png", capture.Output);

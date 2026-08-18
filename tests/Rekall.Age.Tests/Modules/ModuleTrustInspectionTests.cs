@@ -10,6 +10,32 @@ namespace Rekall.Age.Tests.Modules;
 public sealed class ModuleTrustInspectionTests
 {
     [Fact]
+    public async Task PublicTrustCommandIsReadOnlyAndReturnsRebuildActionWhenStale()
+    {
+        var (readyRoot, _) = await ScaffoldAndBuildAsync("TrustCommandReadyModule");
+        var readyContext = CreateContext("trust command ready");
+        var command = new InspectModuleTrustCommand();
+
+        var ready = await command.ExecuteAsync(new InspectModuleTrustRequest(readyRoot), readyContext);
+
+        Assert.True(ready.Ok, ready.Summary);
+        Assert.Equal("in-process-full-trust", ready.Value.TrustPosture);
+        Assert.Empty(readyContext.Transaction.ChangedResources);
+
+        var (staleRoot, staleModule) = await ScaffoldAndBuildAsync("TrustCommandStaleModule");
+        var source = Assert.Single(Directory.EnumerateFiles(staleModule, "*.cs", SearchOption.TopDirectoryOnly));
+        await File.AppendAllTextAsync(source, Environment.NewLine + "// stale public inspection");
+        var staleContext = CreateContext("trust command stale");
+
+        var stale = await command.ExecuteAsync(new InspectModuleTrustRequest(staleRoot), staleContext);
+
+        Assert.False(stale.Ok);
+        Assert.Contains(stale.Errors, error => error.Code == "REKALL_MODULE_SOURCE_STALE");
+        Assert.Contains(stale.Value.NextActions, action => action.Tool == "rekall.build.modules");
+        Assert.Empty(staleContext.Transaction.ChangedResources);
+    }
+
+    [Fact]
     public async Task CanonicalBuildWritesInspectableFullTrustReceipt()
     {
         var (root, moduleDirectory) = await ScaffoldAndBuildAsync("ReceiptModule");

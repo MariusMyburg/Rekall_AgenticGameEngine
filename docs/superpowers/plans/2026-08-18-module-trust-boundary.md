@@ -166,19 +166,19 @@ git commit -m "fix: verify modules before loading"
 - Modify: `tests/Rekall.Age.Tests/Workflows/PlayablePackageIntegrityTests.cs`
 - Modify: `README.md`
 
-- [ ] **Step 1: Add failing command/catalog/package tests**
+- [x] **Step 1: Add failing command/catalog/package tests**
 
 Assert `rekall.module.inspect_trust` is read-only, recommended/discoverable, states `in-process-full-trust`, and gives rebuild next actions. Package verification must add a module-trust check; package creation must refuse stale/tampered outputs before copying.
 
-- [ ] **Step 2: Implement command, adapters, and workflow preflight**
+- [x] **Step 2: Implement command, adapters, and workflow preflight**
 
 Register one typed command for CLI/MCP. Add concise engine-status and README guidance that receipts are not a sandbox/signature. Reuse the inspector in verify/package workflows and preserve exact issues.
 
-- [ ] **Step 3: Prove packaged and relocated verification**
+- [x] **Step 3: Prove packaged and relocated verification**
 
 Update package tests to require the receipt beside the module DLL, verify loading after source/project/SDK removal, reject a copied DLL mutation, and retain package relocation/run/audit success.
 
-- [ ] **Step 4: Run focused integration tests GREEN and commit**
+- [x] **Step 4: Run focused integration tests GREEN and commit**
 
 ```powershell
 git add src/Rekall.Age.Modules/Commands/InspectModuleTrustCommand.cs src/Rekall.Age.Cli/Program.cs src/Rekall.Age.Agent/Commands/GetEngineStatusCommand.cs src/Rekall.Age.Workflows tests/Rekall.Age.Tests README.md

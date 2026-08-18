@@ -184,6 +184,10 @@ public sealed class AgentContextCommandTests
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.module.list_sources");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.module.read_source");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.build.modules" && workflow.Recommended);
+        Assert.Contains(result.Value.WorkflowTools, workflow =>
+            workflow.Tool == "rekall.module.inspect_trust"
+            && workflow.Recommended
+            && workflow.Purpose.Contains("full-trust", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.shader.assign_pipeline");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.render.performance.inspect_scene_budget");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.render.visibility.inspect_scene");

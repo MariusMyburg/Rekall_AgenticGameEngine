@@ -199,6 +199,7 @@ internal static class RekallAgeCli
                 ["module", "schemas"] => await ListSchemasAsync(registry, context, null),
                 ["module", "schemas", var moduleId] => await ListSchemasAsync(registry, context, moduleId),
                 ["module", "schemas", "project", var root] => await ListProjectSchemasAsync(registry, context, root),
+                ["module", "trust", var root] => await InspectModuleTrustAsync(registry, context, root),
                 ["module", "sources", var root] => await ListModuleSourcesAsync(registry, context, root),
                 ["module", "read-source", var root, var moduleName, var fileName] =>
                     await ReadModuleSourceAsync(registry, context, root, moduleName, fileName),
@@ -472,6 +473,7 @@ internal static class RekallAgeCli
         registry.Register(new ListTransactionHistoryCommand());
         registry.Register(new RestoreTransactionPreimageCommand());
         registry.Register(new ListComponentSchemasCommand());
+        registry.Register(new InspectModuleTrustCommand());
         registry.Register(new SearchComponentSchemasCommand());
         registry.Register(new ListModuleSourcesCommand());
         registry.Register(new ReadModuleSourceCommand());
@@ -2782,6 +2784,30 @@ internal static class RekallAgeCli
         foreach (var error in result.Errors)
         {
             Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectModuleTrustAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root)
+    {
+        var result = await registry.ExecuteAsync<InspectModuleTrustRequest, InspectModuleTrustResult>(
+            "rekall.module.inspect_trust",
+            new InspectModuleTrustRequest(root),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Ready: {result.Value.Ready}");
+        Console.WriteLine($"Trust posture: {result.Value.TrustPosture}");
+        foreach (var module in result.Value.Modules)
+        {
+            Console.WriteLine($"Module {module.ModuleName}: ready={module.Ready}; artifacts={module.OutputFiles.Count}; receipt={module.ReceiptPath}");
+        }
+        foreach (var issue in result.Value.Issues)
+        {
+            Console.WriteLine($"{issue.Code}: {issue.Message} [{issue.Target}]");
         }
 
         return result.Ok ? 0 : 1;

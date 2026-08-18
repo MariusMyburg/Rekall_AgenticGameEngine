@@ -2,6 +2,7 @@ using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
 using Rekall.Age.Playback.Commands;
+using Rekall.Age.Modules.Security;
 using Rekall.Age.Validation;
 using Rekall.Age.World;
 
@@ -35,6 +36,7 @@ public sealed class VerifyPlayableGameCommand
     private readonly BuildModulesCommand _buildModules = new();
     private readonly PlaytestSceneCommand _playtestScene = new();
     private readonly RekallAgeProjectValidator _validator = new(new RekallAgeSceneStore());
+    private readonly RekallAgeProjectModuleTrustInspector _moduleTrust = new();
 
     public string Name => "rekall.workflow.verify_playable_game";
 
@@ -71,6 +73,26 @@ public sealed class VerifyPlayableGameCommand
                 drawAssertions: [],
                 request.SceneName,
                 build.Ok ? null : build.Errors);
+        }
+
+        var trust = _moduleTrust.Inspect(request.ProjectRoot);
+        checks.Add(new RekallAgePlayableGameCheck(
+            "module-trust",
+            trust.Ready,
+            trust.Ready
+                ? $"Verified {trust.Modules.Count} module receipt(s) as {trust.TrustPosture}."
+                : string.Join(Environment.NewLine, trust.Issues.Select(issue => $"{issue.Code}: {issue.Message}"))));
+        if (!trust.Ready)
+        {
+            return NotReady(
+                checks,
+                buildSucceeded: true,
+                playtestPassed: false,
+                frames: [],
+                renderFrames: [],
+                drawAssertions: [],
+                request.SceneName,
+                trust.Issues.Select(issue => new RekallAgeCommandError(issue.Code, issue.Message, issue.Target)).ToArray());
         }
 
         var playtest = await _playtestScene.ExecuteAsync(

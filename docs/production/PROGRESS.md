@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 03:33 Africa/Johannesburg
+Last verified: 2026-08-18 03:39 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: empty-scene blueprint scaffolding passed 586/586 Debug tests
+Latest milestone: empty-scene blueprint scaffolding passed the complete product gate
 
 ## Product objective
 
@@ -460,6 +460,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   arrays for no-op/clear semantics. This provides a transactional generic
   recovery path while retaining entity/component validation. The full Debug
   suite passes at 586/586.
+- Empty-scene scaffold distribution gate: the clean Release build completed
+  with zero warnings and zero errors; both independent Release passes completed
+  at 586/586; and installed acceptance passed SDK/module authoring, the generic
+  gauntlet, original and relocated package proof, runtime UI, software viewport,
+  simulated audio, and Windows player audio. The canonical 1,149-file archive
+  is 194,710,362 bytes.
 
 ## Current gaps
 
@@ -475,7 +481,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for empty-scene blueprint scaffolding.
+Run the unchanged installed Ollama benchmark on the empty-scene distribution.
 
 ## Next after the current item
 

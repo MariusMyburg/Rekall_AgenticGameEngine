@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 06:07 Africa/Johannesburg
+Last verified: 2026-08-18 06:13 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: package relocation rejects post-inspection archive mutation through the bounded safe extractor
+Latest milestone: package relocation trust-boundary hardening passed the complete product gate
 
 ## Product objective
 
@@ -30,7 +30,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,732,792-byte win-x64 archive assembled.
+- Windows distribution: fresh 194,732,663-byte win-x64 archive assembled.
 - Canonical verification: 592/592 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
 - Current Debug verification: 592/592 tests pass after durable evidence and
@@ -625,6 +625,13 @@ Studio is important, but it does not define or reorder the engine foundation.
   `REKALL_PACKAGE_RELOCATION_SOURCE_CHANGED` failure, no traversal write, no
   destination, and no abandoned staging directory. All four package-integrity
   scenarios and the full Debug suite pass at 592/592.
+- Relocation-security distribution gate: the clean Release build completed
+  with zero warnings and zero errors; both independent Release passes completed
+  at 592/592; the rebuilt installed product passed portable SDK/module
+  authoring, the generic gauntlet, relocated ZIP run/audit/capture through the
+  hardened extractor, informative proof, runtime UI, software viewport,
+  simulated audio, and Windows player audio. The canonical 1,149-manifest-file
+  archive is 194,732,663 bytes.
 
 ## Current gaps
 
@@ -637,8 +644,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete installed-product gate for package relocation trust-boundary
-hardening.
+Harden directory-package inspection and relocation against entry/size limits
+and filesystem reparse-point escape.
 
 ## Next after the current item
 

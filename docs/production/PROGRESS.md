@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 03:48 Africa/Johannesburg
+Last verified: 2026-08-18 03:52 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: atomic-blueprint fallback contract passed 586/586 Debug tests
+Latest milestone: atomic-blueprint fallback passed the complete product gate
 
 ## Product objective
 
@@ -475,6 +475,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   atomic project once, then on structural failure creates the same named empty
   scenes and uses smaller per-scene blueprints. It must not repeat substantially
   identical failed blueprint arguments. The full Debug suite passes at 586/586.
+- Atomic-blueprint fallback distribution gate: the clean Release build
+  completed with zero warnings and zero errors; both independent Release passes
+  completed at 586/586; and installed acceptance passed SDK/module authoring,
+  the generic gauntlet, original and relocated package proof, runtime UI,
+  software viewport, simulated audio, and Windows player audio. The canonical
+  1,149-file archive is 194,710,384 bytes.
 
 ## Current gaps
 
@@ -490,7 +496,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for the atomic-blueprint fallback contract.
+Run the unchanged installed Ollama benchmark on the atomic-fallback distribution.
 
 ## Next after the current item
 

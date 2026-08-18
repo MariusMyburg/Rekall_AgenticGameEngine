@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 04:17 Africa/Johannesburg
+Last verified: 2026-08-18 04:25 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: bounded batch validation repair passed 587/587 Debug tests
+Latest milestone: bounded batch validation repair passed the complete product gate
 
 ## Product objective
 
@@ -30,8 +30,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,666,626-byte win-x64 archive assembled.
-- Canonical verification: 569/569 Release tests passed twice independently;
+- Windows distribution: fresh 194,726,034-byte win-x64 archive assembled.
+- Canonical verification: 587/587 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
@@ -505,6 +505,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   discovery actions, stops safely on failed mutation, and returns fresh project
   validation. The embedded contract uses it for multiple repairs while retaining
   deliberate-fault requirements. The full Debug suite passes at 587/587.
+- Batch validation-repair distribution gate: the clean Release build completed
+  with zero warnings and zero errors; both independent Release passes completed
+  at 587/587; and installed acceptance passed SDK/module authoring, the generic
+  gauntlet, original and relocated package proof, runtime UI, software viewport,
+  simulated audio, and Windows player audio. The canonical 1,149-file archive
+  is 194,726,034 bytes.
 
 ## Current gaps
 
@@ -520,13 +526,12 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for bounded batch validation repair.
+Run the unchanged installed Ollama benchmark on the batch-repair distribution.
 
 ## Next after the current item
 
-Rerun the unchanged installed Ollama benchmark on the rebuilt distribution.
-Classify any remaining failure by generic engine contract and regression-test
-the repair.
+Independently verify rerun 27 and classify any remaining failure by generic
+engine contract, then regression-test the repair.
 A genuine broad benchmark pass precedes quantified production hardening;
 Studio follows as a consumer of those results.
 

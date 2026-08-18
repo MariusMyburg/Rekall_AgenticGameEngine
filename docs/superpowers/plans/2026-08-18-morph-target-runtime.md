@@ -188,27 +188,27 @@ git commit -m "feat: import bounded gltf morph targets"
 - Asset resolution emits `REKALL_RENDER_MORPH_WEIGHT_COUNT_MISMATCH` for explicit incompatible overrides.
 - Adds generic read-only command `rekall.render.inspect_scene_mesh_geometry` and CLI `render mesh inspect <root> <scene> [frames]`, returning bounded final vertex/index counts and per-mesh post-morph/post-skin bounds without dumping vertex arrays.
 
-- [ ] **Step 1: Write failing exact deformation tests**
+- [x] **Step 1: Write failing exact deformation tests**
 
 Construct a real loaded mesh with two targets and assert hand-derived weighted
 positions, normalized normals, imported-default selection without a component,
 and authored override selection with runtime state. Assert zero and negative
 weights and exact base output at all-zero weights.
 
-- [ ] **Step 2: Run focused renderer tests and verify RED**
+- [x] **Step 2: Run focused renderer tests and verify RED**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter FullyQualifiedName~MorphTarget --verbosity minimal
 ```
 
-- [ ] **Step 3: Implement projection and CPU morph application**
+- [x] **Step 3: Implement projection and CPU morph application**
 
 Read only `Rekall.MorphState`, convert values to finite floats, select exact
 authored weights or node/mesh defaults, accumulate deltas, normalize/fallback
 normals, and verify every output component. Preserve target/default records on
 the returned mesh for inspection but never mutate cached asset meshes.
 
-- [ ] **Step 4: Write failing morph-before-skin and mismatch tests**
+- [x] **Step 4: Write failing morph-before-skin and mismatch tests**
 
 Create one-vertex hand-derived morph+joint data where reversing order produces
 a different point; assert the glTF order result. Supply too few/too many
@@ -216,7 +216,7 @@ authored weights and assert one bounded asset issue, imported-default output,
 and no partial override. Reassert procedural, authored geometry, virtual
 geometry, non-morph GLB, and skeletal-only behavior.
 
-- [ ] **Step 5: Add the generic bounded final-mesh inspection path**
+- [x] **Step 5: Add the generic bounded final-mesh inspection path**
 
 Write command and CLI tests first. Build the ordinary runtime frame, resolve
 assets, and invoke the same `RekallAgeVulkanSceneMeshBuilder` used by Vulkan.
@@ -225,14 +225,14 @@ vertex/index/triangle counts, finite min/max XYZ bounds, morph target count,
 and applied weight source (`none`, `default`, or `authored`). Add one bounded
 truncation warning when necessary. Do not expose raw vertex or delta arrays.
 
-- [ ] **Step 6: Implement ordering/mismatch checks and verify rendering regressions**
+- [x] **Step 6: Implement ordering/mismatch checks and verify rendering regressions**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~MorphTarget|FullyQualifiedName~InspectSceneMeshGeometry|FullyQualifiedName~VulkanScene|FullyQualifiedName~RuntimeRenderFrameBuilder|FullyQualifiedName~RenderingCliTests" --verbosity minimal
 git diff --check
 ```
 
-- [ ] **Step 7: Record evidence and commit**
+- [x] **Step 7: Record evidence and commit**
 
 ```powershell
 git add src tests docs/production/PROGRESS.md

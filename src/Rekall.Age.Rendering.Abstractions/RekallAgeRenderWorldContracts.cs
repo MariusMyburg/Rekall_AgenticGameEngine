@@ -261,7 +261,12 @@ public sealed record RekallAgeRuntimeViewportRenderable(
     string FacingMode = "world",
     RekallAgeRuntimeViewportVirtualGeometry? VirtualGeometry = null,
     RekallAgeRuntimeViewportUiVisual? UiVisual = null,
-    RekallAgeRuntimeViewportSkin? Skin = null);
+    RekallAgeRuntimeViewportSkin? Skin = null,
+    RekallAgeRuntimeViewportMorph? Morph = null);
+
+public sealed record RekallAgeRuntimeViewportMorph(
+    IReadOnlyList<double> Weights,
+    bool AuthoredOverride);
 
 public sealed record RekallAgeRuntimeViewportSkin(
     int SkinIndex,

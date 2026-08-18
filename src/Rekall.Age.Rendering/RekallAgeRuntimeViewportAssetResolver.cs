@@ -200,6 +200,25 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
             }
         }
 
+        foreach (var renderable in frame.Renderables.Where(item =>
+            item.Morph is { AuthoredOverride: true } && !string.IsNullOrWhiteSpace(item.AssetId)))
+        {
+            if (!models.TryGetValue(renderable.AssetId!, out var modelMeshes)) continue;
+            var targetCounts = modelMeshes
+                .Where(mesh => mesh.MorphTargets.Count > 0)
+                .Select(mesh => mesh.MorphTargets.Count)
+                .Distinct()
+                .ToArray();
+            var expected = targetCounts.Length == 1 ? targetCounts[0] : 0;
+            if (renderable.Morph!.Weights.Count != expected)
+            {
+                issues.Add(new RekallAgeRuntimeViewportAssetIssue(
+                    renderable.AssetId!,
+                    "REKALL_RENDER_MORPH_WEIGHT_COUNT_MISMATCH",
+                    $"Entity '{renderable.EntityName}' supplies {renderable.Morph.Weights.Count} morph weights but asset '{renderable.AssetId}' requires {expected}; imported defaults will be used."));
+            }
+        }
+
         return new RekallAgeRuntimeViewportAssetSet(images, models, issues.ToArray())
         {
             Textures = textures

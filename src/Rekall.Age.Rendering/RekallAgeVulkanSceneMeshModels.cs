@@ -35,6 +35,8 @@ public sealed record RekallAgeVulkanSceneMesh(
         Array.Empty<RekallAgeVulkanSceneMorphTarget>();
 
     public IReadOnlyList<float> DefaultMorphWeights { get; init; } = Array.Empty<float>();
+
+    public string MorphWeightSource { get; init; } = "none";
 }
 
 public sealed record RekallAgeVulkanSceneMorphTarget(

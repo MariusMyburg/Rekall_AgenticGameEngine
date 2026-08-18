@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 11:33 Africa/Johannesburg
+Last verified: 2026-08-18 11:40 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: bounded glTF morph metadata and mesh loading passed its focused gate
+Latest milestone: morph-before-skin execution and final-mesh inspection passed focused gates
 
 ## Product objective
 
@@ -902,8 +902,19 @@ deltas. It rejects more than 64 targets, more than 4,194,304 declared vectors,
 bad counts/strides/defaults/names, non-finite or excessive values, TANGENT,
 sparse/quantized accessors, missing base normals, and incompatible compound
 layouts before returning partial meshes. Existing plain and skeletal GLB paths
-remain green. The next item is exact CPU deformation before skinning plus the
-generic final-mesh geometry inspection contract.
+remain green.
+
+Morph target Task 3 is verified across a 117/117 viewport/Vulkan/asset/CLI
+selection, followed by a 4/4 inspector smoke rerun after count hardening. Render
+projection consumes runtime-only validated state. CPU preparation applies exact
+signed weights and normalized normals before skeletal matrices, atomically
+falls back to imported defaults on count mismatch, and prevents non-finite or
+out-of-float-range values reaching GPU buffers. The generic bounded
+`rekall.render.inspect_scene_mesh_geometry` command and `render mesh inspect`
+CLI use the same prepared meshes as Vulkan and report post-morph/post-skin
+counts, weight source, and finite bounds without vertex dumps. The real fixture
+produced exact bounds `(8.5,21,30)` through `(10.5,23,30)`. The remaining item
+is installed Vulkan proof and the complete Debug/two-pass Release product gate.
 
 That decision is now fixed in
 `docs/superpowers/specs/2026-08-18-morph-target-runtime-design.md`: a bounded

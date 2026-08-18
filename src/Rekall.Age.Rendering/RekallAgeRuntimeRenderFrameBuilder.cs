@@ -511,7 +511,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     ? ReadString(textLabelComponent, "facingMode") ?? ReadString(textLabelComponent, "FacingMode") ?? "world"
                     : "world",
                 VirtualGeometry: virtualGeometry,
-                Skin: ReadSkin(entity));
+                Skin: ReadSkin(entity),
+                Morph: ReadMorph(entity));
 
             if (planetComponent is not null
                 && atmosphereComponent is not null
@@ -1229,6 +1230,36 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         return new RekallAgeRuntimeViewportSkin(
             (int)ReadNumber(pose.Properties, "skinIndex", 0),
             matrices);
+    }
+
+    private static RekallAgeRuntimeViewportMorph? ReadMorph(RekallAgeRuntimeEntity? entity)
+    {
+        var state = entity?.Components.FirstOrDefault(component =>
+            component.Type.Equals("Rekall.MorphState", StringComparison.Ordinal));
+        if (state is null || ReadArray(state, "weights") is not { Count: > 0 and <= 64 } values)
+        {
+            return null;
+        }
+        var weights = new double[values.Count];
+        for (var index = 0; index < values.Count; index++)
+        {
+            if (values[index] is not JsonValue value
+                || !TryReadFiniteNumber(value, out weights[index])
+                || Math.Abs(weights[index]) > 1_000_000)
+            {
+                return null;
+            }
+        }
+        return new RekallAgeRuntimeViewportMorph(weights, AuthoredOverride: true);
+    }
+
+    private static bool TryReadFiniteNumber(JsonValue value, out double number)
+    {
+        if (value.TryGetValue<double>(out number)) return double.IsFinite(number);
+        if (value.TryGetValue<int>(out var integer)) { number = integer; return true; }
+        if (value.TryGetValue<long>(out var longInteger)) { number = longInteger; return true; }
+        number = 0;
+        return false;
     }
 
     private static IReadOnlyList<double>? ReadMatrix(JsonObject joint)

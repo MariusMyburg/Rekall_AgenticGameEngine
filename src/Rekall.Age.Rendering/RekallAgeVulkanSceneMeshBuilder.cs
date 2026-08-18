@@ -104,14 +104,99 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
 
         foreach (var mesh in modelMeshes)
         {
-            var instance = ApplySkin(mesh with
+            var instance = ApplySkin(ApplyMorph(mesh with
             {
                 EntityId = renderable.EntityId,
                 EntityName = renderable.EntityName
-            }, renderable.Skin);
+            }, renderable.Morph), renderable.Skin);
             yield return ApplyVirtualGeometry(BindRenderableMaterial(instance, renderable, assets), renderable, activeCamera);
         }
     }
+
+    private static RekallAgeVulkanSceneMesh ApplyMorph(
+        RekallAgeVulkanSceneMesh mesh,
+        RekallAgeRuntimeViewportMorph? morph)
+    {
+        if (mesh.MorphTargets.Count == 0)
+        {
+            return mesh with { MorphWeightSource = "none" };
+        }
+        if (mesh.MorphTargets.Any(target =>
+            target.PositionDeltas.Count != mesh.Vertices.Count
+            || target.NormalDeltas.Count != mesh.Vertices.Count))
+        {
+            return mesh with { MorphWeightSource = "none" };
+        }
+
+        IReadOnlyList<double> weights;
+        string source;
+        if (morph is { AuthoredOverride: true }
+            && morph.Weights.Count == mesh.MorphTargets.Count
+            && ValidWeights(morph.Weights))
+        {
+            weights = morph.Weights;
+            source = "authored";
+        }
+        else if (mesh.DefaultMorphWeights.Count == mesh.MorphTargets.Count
+            && mesh.DefaultMorphWeights.All(float.IsFinite))
+        {
+            weights = mesh.DefaultMorphWeights.Select(value => (double)value).ToArray();
+            source = "default";
+        }
+        else
+        {
+            weights = new double[mesh.MorphTargets.Count];
+            source = "default";
+        }
+
+        var vertices = new RekallAgeVulkanSceneVertex[mesh.Vertices.Count];
+        for (var vertexIndex = 0; vertexIndex < vertices.Length; vertexIndex++)
+        {
+            var vertex = mesh.Vertices[vertexIndex];
+            double x = vertex.X, y = vertex.Y, z = vertex.Z;
+            double nx = vertex.NormalX, ny = vertex.NormalY, nz = vertex.NormalZ;
+            for (var targetIndex = 0; targetIndex < mesh.MorphTargets.Count; targetIndex++)
+            {
+                var weight = weights[targetIndex];
+                var position = mesh.MorphTargets[targetIndex].PositionDeltas[vertexIndex];
+                var normal = mesh.MorphTargets[targetIndex].NormalDeltas[vertexIndex];
+                x += position.X * weight;
+                y += position.Y * weight;
+                z += position.Z * weight;
+                nx += normal.X * weight;
+                ny += normal.Y * weight;
+                nz += normal.Z * weight;
+            }
+            if (!FiniteFloat(x) || !FiniteFloat(y) || !FiniteFloat(z)
+                || !FiniteFloat(nx) || !FiniteFloat(ny) || !FiniteFloat(nz))
+            {
+                return mesh with { MorphWeightSource = "none" };
+            }
+            var baseNormal = new Vector3(vertex.NormalX, vertex.NormalY, vertex.NormalZ);
+            if (baseNormal.LengthSquared() <= 0.000001f) baseNormal = Vector3.UnitY;
+            else baseNormal = Vector3.Normalize(baseNormal);
+            var normalResult = new Vector3((float)nx, (float)ny, (float)nz);
+            normalResult = normalResult.LengthSquared() <= 0.000001f
+                ? baseNormal
+                : Vector3.Normalize(normalResult);
+            vertices[vertexIndex] = vertex with
+            {
+                X = (float)x,
+                Y = (float)y,
+                Z = (float)z,
+                NormalX = normalResult.X,
+                NormalY = normalResult.Y,
+                NormalZ = normalResult.Z
+            };
+        }
+        return mesh with { Vertices = vertices, MorphWeightSource = source };
+    }
+
+    private static bool ValidWeights(IReadOnlyList<double> weights) =>
+        weights.All(value => double.IsFinite(value) && Math.Abs(value) <= 1_000_000);
+
+    private static bool FiniteFloat(double value) =>
+        double.IsFinite(value) && value is >= -float.MaxValue and <= float.MaxValue;
 
     private static RekallAgeVulkanSceneMesh ApplySkin(
         RekallAgeVulkanSceneMesh mesh,

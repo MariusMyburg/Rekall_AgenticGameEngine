@@ -61,6 +61,10 @@ internal static class RekallAgeCli
                     await AssembleDistributionAsync(
                         registry, context, output, cli, studio, headless, windows, sdk, readme, notice, thirdParty),
                 ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
+                ["render", "mesh", "inspect", var root, var scene] =>
+                    await InspectSceneMeshGeometryAsync(registry, context, root, scene, "0"),
+                ["render", "mesh", "inspect", var root, var scene, var frames] =>
+                    await InspectSceneMeshGeometryAsync(registry, context, root, scene, frames),
                 ["render", "stereo", "inspect", var root, var scene] =>
                     await InspectStereoRenderPlanAsync(registry, context, root, scene, "0", "1920", "1080"),
                 ["render", "stereo", "inspect", var root, var scene, var frames] =>
@@ -490,6 +494,7 @@ internal static class RekallAgeCli
         registry.Register(new ScaffoldRuntimeSystemModuleCommand());
         registry.Register(new WriteModuleSourceCommand());
         registry.Register(new ListRenderBackendsCommand());
+        registry.Register(new InspectSceneMeshGeometryCommand());
         registry.Register(new InspectStereoRenderPlanCommand());
         registry.Register(new InspectScenePerformanceBudgetCommand());
         registry.Register(new ApplyVirtualGeometryToSceneCommand());
@@ -730,6 +735,31 @@ internal static class RekallAgeCli
             Console.WriteLine($"Error: {error}");
         }
 
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectSceneMeshGeometryAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string frames)
+    {
+        var result = await registry.ExecuteAsync<InspectSceneMeshGeometryRequest, InspectSceneMeshGeometryResult>(
+            "rekall.render.inspect_scene_mesh_geometry",
+            new InspectSceneMeshGeometryRequest(root, scene, int.Parse(frames, CultureInfo.InvariantCulture)),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Meshes: {result.Value.MeshCount}; vertices: {result.Value.VertexCount}; indices: {result.Value.IndexCount}; triangles: {result.Value.TriangleCount}");
+        foreach (var mesh in result.Value.Meshes)
+        {
+            Console.WriteLine(FormattableString.Invariant(
+                $"Mesh {mesh.EntityName}[{mesh.MeshIndex}]: primitive={mesh.Primitive} vertices={mesh.VertexCount} indices={mesh.IndexCount} triangles={mesh.TriangleCount} min=({mesh.Minimum.X:G9},{mesh.Minimum.Y:G9},{mesh.Minimum.Z:G9}) max=({mesh.Maximum.X:G9},{mesh.Maximum.Y:G9},{mesh.Maximum.Z:G9}) morphTargets={mesh.MorphTargetCount} morphSource={mesh.MorphWeightSource}"));
+        }
+        if (result.Value.Truncated) Console.WriteLine("Mesh inspection truncated at 256 summaries.");
+        foreach (var issue in result.Value.AssetIssues) Console.WriteLine($"{issue.Code}: {issue.Message}");
+        if (result.Value.AssetIssuesTruncated) Console.WriteLine("Asset issue inspection truncated at 256 entries.");
+        foreach (var error in result.Errors) Console.WriteLine($"{error.Code}: {error.Message}");
         return result.Ok ? 0 : 1;
     }
 

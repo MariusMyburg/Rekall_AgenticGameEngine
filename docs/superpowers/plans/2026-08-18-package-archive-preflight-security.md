@@ -24,12 +24,20 @@ metadata.
 
 ## Task 2: Inspection integration
 
-- [ ] Route archive inspection and inventory hashing through one preflighted
+- [x] Route archive inspection and inventory hashing through one preflighted
   archive handle.
-- [ ] Return exact archive security codes instead of generic path failures.
-- [ ] Preserve valid directory/manifest/archive behavior and MCP contracts.
-- [ ] Run package inspection, run, capture, audit, and relocation regressions;
+- [x] Return exact archive security codes instead of generic path failures.
+- [x] Preserve valid directory/manifest/archive behavior and MCP contracts.
+- [x] Run package inspection, run, capture, audit, and relocation regressions;
   commit.
+
+Verified 2026-08-18: 18/18 focused preflight/inspection tests and 5/5 broad
+package integrity tests pass. Archive inspection now preflights before manifest
+deserialization or file-list allocation, reads the bounded unique manifest from
+the preflight plan, and hashes only planned regular files. Oversized invalid
+JSON and duplicate manifests return exact archive codes, archive-source reparse
+points fail closed, and generated package inspect/run/capture/audit/relocation
+behavior remains green.
 
 ## Task 3: Extraction integration
 

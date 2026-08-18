@@ -1,5 +1,8 @@
 using System.IO.Compression;
+using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Transactions;
 using Rekall.Age.Workflows;
+using Rekall.Age.Workflows.Commands;
 
 namespace Rekall.Age.Tests.Workflows;
 
@@ -143,6 +146,53 @@ public sealed class PackageArchivePreflightTests
         Assert.Equal("REKALL_PACKAGE_ARCHIVE_MANIFEST_MISSING", error.Code);
     }
 
+    [Fact]
+    public async Task InspectorRejectsOversizedManifestBeforeJsonDeserialization()
+    {
+        var path = CreateArchiveFile(("rekall.package.json", new string('x', 32), null));
+        var command = new InspectPlayablePackageCommand(
+            new RekallAgePackageArchiveLimits(10, 100, 100, 8));
+
+        var result = await command.ExecuteAsync(
+            new InspectPlayablePackageRequest(path),
+            Context());
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, item => item.Code == "REKALL_PACKAGE_ARCHIVE_MANIFEST_TOO_LARGE");
+        Assert.DoesNotContain(result.Errors, item => item.Code == "REKALL_PACKAGE_PATH_KIND_INVALID");
+    }
+
+    [Fact]
+    public async Task InspectorReturnsExactDuplicateManifestCode()
+    {
+        var path = CreateArchiveFile(
+            ("rekall.package.json", "{}", null),
+            ("rekall.package.json", "{}", null));
+
+        var result = await new InspectPlayablePackageCommand().ExecuteAsync(
+            new InspectPlayablePackageRequest(path),
+            Context());
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, item => item.Code == "REKALL_PACKAGE_ARCHIVE_MANIFEST_DUPLICATE");
+    }
+
+    [Fact]
+    public async Task InspectorRejectsReparseBackedArchiveSource()
+    {
+        var path = CreateArchiveFile(("rekall.package.json", "{}", null));
+        var command = new InspectPlayablePackageCommand(
+            RekallAgePackageArchiveLimits.Default,
+            _ => FileAttributes.Archive | FileAttributes.ReparsePoint);
+
+        var result = await command.ExecuteAsync(
+            new InspectPlayablePackageRequest(path),
+            Context());
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, item => item.Code == "REKALL_PACKAGE_PATH_REPARSE_POINT");
+    }
+
     private static ZipArchive OpenArchive(params (string Path, string Content, int? ExternalAttributes)[] entries)
     {
         var stream = new MemoryStream();
@@ -167,4 +217,29 @@ public sealed class PackageArchivePreflightTests
         stream.Position = 0;
         return new ZipArchive(stream, ZipArchiveMode.Read);
     }
+
+    private static string CreateArchiveFile(params (string Path, string Content, int? ExternalAttributes)[] entries)
+    {
+        var path = Path.Combine(TestPaths.CreateTempDirectory(), "adversarial.zip");
+        using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+        foreach (var item in entries)
+        {
+            var entry = archive.CreateEntry(item.Path, CompressionLevel.Fastest);
+            if (item.ExternalAttributes.HasValue)
+            {
+                entry.ExternalAttributes = item.ExternalAttributes.Value;
+            }
+
+            if (!item.Path.EndsWith("/", StringComparison.Ordinal))
+            {
+                using var text = new StreamWriter(entry.Open());
+                text.Write(item.Content);
+            }
+        }
+
+        return path;
+    }
+
+    private static RekallAgeCommandContext Context() =>
+        new("test", RekallAgeTransaction.Begin("archive preflight"), CancellationToken.None);
 }

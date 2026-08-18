@@ -443,11 +443,11 @@ public sealed class PlayablePackageIntegrityTests
             context);
 
         Assert.False(inspection.Ok);
-        Assert.Contains(inspection.Errors, error => error.Code == "REKALL_PACKAGE_PATH_UNSAFE");
+        Assert.Contains(inspection.Errors, error => error.Code == "REKALL_PACKAGE_ARCHIVE_PATH_UNSAFE");
         Assert.False(run.Ok);
         Assert.Equal(-1, run.Value.ExitCode);
         Assert.Empty(run.Value.RenderFrames);
-        Assert.Contains(run.Errors, error => error.Code == "REKALL_PACKAGE_PATH_UNSAFE");
+        Assert.Contains(run.Errors, error => error.Code == "REKALL_PACKAGE_ARCHIVE_PATH_UNSAFE");
         Assert.False(File.Exists(Path.Combine(relocationRoot, "escaped.txt")));
     }
 

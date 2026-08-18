@@ -876,6 +876,13 @@ entry plan and rejects exceeded bounds, missing/duplicate/oversized manifests,
 traversal and Windows-ambiguous names, case/ancestor collisions, and
 link/special-file modes with stable codes before opening entry content.
 
+Archive preflight Task 2 is verified with 18/18 focused adversarial tests and
+5/5 broad package-integrity tests. ZIP inspection now applies preflight before
+manifest deserialization or file-list allocation, reads the bounded unique
+manifest and inventory from the immutable plan, hashes only planned files, and
+returns exact archive security codes. Valid inspect/run/capture/audit/relocate
+paths remain unchanged.
+
 ## Next after the current item
 
 Complete the selected adversarial security slice, then advance generic

@@ -34,6 +34,7 @@ public sealed class InspectPlayablePackageCommand
     private readonly long _maximumEntrySizeBytes;
     private readonly long _maximumPackageSizeBytes;
     private readonly Func<string, FileAttributes> _readAttributes;
+    private readonly RekallAgePackageArchiveLimits _archiveLimits;
 
     public InspectPlayablePackageCommand()
         : this(MaximumArchiveEntries, MaximumEntrySizeBytes, MaximumPackageSizeBytes)
@@ -61,6 +62,24 @@ public sealed class InspectPlayablePackageCommand
         _maximumEntrySizeBytes = maximumEntrySizeBytes;
         _maximumPackageSizeBytes = maximumPackageSizeBytes;
         _readAttributes = readAttributes ?? throw new ArgumentNullException(nameof(readAttributes));
+        _archiveLimits = new RekallAgePackageArchiveLimits(
+            maximumEntries,
+            maximumEntrySizeBytes,
+            maximumPackageSizeBytes,
+            Math.Min(4L * 1024 * 1024, maximumEntrySizeBytes));
+    }
+
+    internal InspectPlayablePackageCommand(
+        RekallAgePackageArchiveLimits archiveLimits,
+        Func<string, FileAttributes>? readAttributes = null)
+        : this(
+            archiveLimits.MaximumEntries,
+            archiveLimits.MaximumEntryBytes,
+            archiveLimits.MaximumTotalBytes,
+            readAttributes ?? File.GetAttributes)
+    {
+        archiveLimits.Validate();
+        _archiveLimits = archiveLimits;
     }
 
     public string Name => "rekall.workflow.inspect_playable_package";
@@ -83,6 +102,19 @@ public sealed class InspectPlayablePackageCommand
             return InvalidPackagePath(fullPath);
         }
 
+        if (File.Exists(fullPath)
+            && Path.GetExtension(fullPath).Equals(".zip", StringComparison.OrdinalIgnoreCase)
+            && (_readAttributes(fullPath) & FileAttributes.ReparsePoint) != 0)
+        {
+            var error = ReparsePointError(fullPath);
+            var emptyManifest = new RekallAgePlayablePackageManifest("", "", "", "", [], [], []);
+            var value = new InspectPlayablePackageResult(false, string.Empty, emptyManifest, 0, [], []);
+            return RekallAgeCommandResult<InspectPlayablePackageResult>.Failure(
+                value,
+                error.Message,
+                [error]);
+        }
+
         var directoryRoot = Directory.Exists(fullPath)
             ? fullPath
             : File.Exists(fullPath)
@@ -102,7 +134,16 @@ public sealed class InspectPlayablePackageCommand
         (string manifestPath, RekallAgePlayablePackageManifest manifest, IReadOnlyList<RekallAgePlayablePackageFile> files) package;
         try
         {
-            package = await ReadManifestAsync(fullPath, context.CancellationToken);
+            package = await ReadManifestAsync(fullPath, _archiveLimits, context.CancellationToken);
+        }
+        catch (RekallAgePackageArchiveException exception)
+        {
+            var emptyManifest = new RekallAgePlayablePackageManifest("", "", "", "", [], [], []);
+            var value = new InspectPlayablePackageResult(false, string.Empty, emptyManifest, 0, [], []);
+            return RekallAgeCommandResult<InspectPlayablePackageResult>.Failure(
+                value,
+                exception.Message,
+                [new RekallAgeCommandError(exception.Code, exception.Message, exception.Target)]);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -214,9 +255,7 @@ public sealed class InspectPlayablePackageCommand
             packagePath,
             cancellationToken,
             errors,
-            _maximumEntries,
-            _maximumEntrySizeBytes,
-            _maximumPackageSizeBytes);
+            _archiveLimits);
         foreach (var (path, expectedFile) in expected)
         {
             if (!actual.TryGetValue(path, out var actualFile))
@@ -253,72 +292,40 @@ public sealed class InspectPlayablePackageCommand
         string packagePath,
         CancellationToken cancellationToken,
         List<RekallAgeCommandError> errors,
-        int maximumEntries,
-        long maximumEntrySizeBytes,
-        long maximumPackageSizeBytes)
+        RekallAgePackageArchiveLimits archiveLimits)
     {
         var fullPath = Path.GetFullPath(packagePath);
         var actual = new Dictionary<string, ActualPackageFile>(StringComparer.OrdinalIgnoreCase);
         if (File.Exists(fullPath) && Path.GetExtension(fullPath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
         {
             using var archive = ZipFile.OpenRead(fullPath);
-            var totalLength = 0L;
-            var archiveLimitExceeded = archive.Entries.Count > maximumEntries;
-            foreach (var entry in archive.Entries)
+            RekallAgePackageArchivePlan plan;
+            try
             {
-                if (entry.Length > maximumEntrySizeBytes ||
-                    totalLength > maximumPackageSizeBytes - entry.Length)
-                {
-                    archiveLimitExceeded = true;
-                    break;
-                }
-
-                totalLength += entry.Length;
+                plan = RekallAgePackageArchivePreflight.Inspect(archive, archiveLimits);
             }
-
-            if (archiveLimitExceeded)
+            catch (RekallAgePackageArchiveException exception)
             {
                 errors.Add(new RekallAgeCommandError(
-                    "REKALL_PACKAGE_ARCHIVE_LIMIT_EXCEEDED",
-                    "Package archive exceeds the supported entry-count or uncompressed-size limit.",
-                    fullPath));
+                    exception.Code,
+                    exception.Message,
+                    exception.Target));
                 return actual;
             }
 
-            foreach (var entry in archive.Entries.Where(entry => !entry.FullName.EndsWith("/", StringComparison.Ordinal)))
+            foreach (var entryPlan in plan.Entries.Where(item => !item.IsDirectory && item != plan.Manifest))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (entry.Length > maximumEntrySizeBytes)
-                {
-                    errors.Add(new RekallAgeCommandError(
-                        "REKALL_PACKAGE_ARCHIVE_LIMIT_EXCEEDED",
-                        "A package archive entry exceeds the supported uncompressed-size limit.",
-                        entry.FullName));
-                    continue;
-                }
-
-                if (!TryValidateRelativePath(entry.FullName, out var normalized))
-                {
-                    errors.Add(new RekallAgeCommandError(
-                        "REKALL_PACKAGE_PATH_UNSAFE",
-                        "Package archive path must be normalized, relative, and traversal-free.",
-                        entry.FullName));
-                    continue;
-                }
-
-                if (normalized.Equals("rekall.package.json", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                await using var stream = entry.Open();
+                await using var stream = entryPlan.Entry.Open();
                 var hash = Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken)).ToLowerInvariant();
-                if (!actual.TryAdd(normalized, new ActualPackageFile(entry.Length, hash)))
+                if (!actual.TryAdd(
+                        entryPlan.NormalizedPath,
+                        new ActualPackageFile(entryPlan.UncompressedBytes, hash)))
                 {
                     errors.Add(new RekallAgeCommandError(
-                        "REKALL_PACKAGE_PATH_COLLISION",
+                        "REKALL_PACKAGE_ARCHIVE_PATH_COLLISION",
                         "Package archive contains a duplicate or case-colliding path.",
-                        entry.FullName));
+                        entryPlan.NormalizedPath));
                 }
             }
 
@@ -451,6 +458,7 @@ public sealed class InspectPlayablePackageCommand
         RekallAgePlayablePackageManifest Manifest,
         IReadOnlyList<RekallAgePlayablePackageFile> Files)> ReadManifestAsync(
         string packagePath,
+        RekallAgePackageArchiveLimits archiveLimits,
         CancellationToken cancellationToken)
     {
         var fullPath = Path.GetFullPath(packagePath);
@@ -463,9 +471,8 @@ public sealed class InspectPlayablePackageCommand
         if (File.Exists(fullPath) && Path.GetExtension(fullPath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
         {
             using var archive = ZipFile.OpenRead(fullPath);
-            var entry = archive.GetEntry("rekall.package.json")
-                ?? throw new InvalidOperationException($"Package archive '{fullPath}' does not contain rekall.package.json.");
-            await using var stream = entry.Open();
+            var plan = RekallAgePackageArchivePreflight.Inspect(archive, archiveLimits);
+            await using var stream = plan.Manifest.Entry.Open();
             var manifest = await JsonSerializer.DeserializeAsync<RekallAgePlayablePackageManifest>(
                 stream,
                 JsonOptions,
@@ -473,7 +480,7 @@ public sealed class InspectPlayablePackageCommand
             return (
                 $"{fullPath}!/rekall.package.json",
                 manifest ?? throw new InvalidOperationException($"Package manifest in '{fullPath}' could not be read."),
-                EnumerateArchiveFiles(archive));
+                EnumerateArchiveFiles(plan));
         }
 
         var fileManifest = await ReadManifestFileAsync(fullPath, cancellationToken);
@@ -507,15 +514,15 @@ public sealed class InspectPlayablePackageCommand
             .ToArray();
     }
 
-    private static IReadOnlyList<RekallAgePlayablePackageFile> EnumerateArchiveFiles(ZipArchive archive)
+    private static IReadOnlyList<RekallAgePlayablePackageFile> EnumerateArchiveFiles(
+        RekallAgePackageArchivePlan plan)
     {
-        return archive.Entries
-            .Where(entry => !entry.FullName.EndsWith("/", StringComparison.Ordinal))
-            .Select(entry =>
-            {
-                var path = NormalizePath(entry.FullName);
-                return new RekallAgePlayablePackageFile(path, entry.Length, IsKeyArtifact(path));
-            })
+        return plan.Entries
+            .Where(entry => !entry.IsDirectory)
+            .Select(entry => new RekallAgePlayablePackageFile(
+                entry.NormalizedPath,
+                entry.UncompressedBytes,
+                IsKeyArtifact(entry.NormalizedPath)))
             .OrderBy(file => file.Path, StringComparer.Ordinal)
             .ToArray();
     }

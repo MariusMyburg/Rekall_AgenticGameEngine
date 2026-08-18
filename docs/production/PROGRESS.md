@@ -901,6 +901,14 @@ clamps color output. Ten adversarial shape/time/value cases fail closed; the
 runtime emits bounded target-specific observations without mutation. Unknown
 interpolation names no longer silently execute as linear.
 
+Cubic interpolation Task 2 is verified in a 51/51 combined animation/asset
+selection. glTF `CUBICSPLINE` output accessors are decoded as standard
+input-tangent/value/output-tangent triplets and bounded before runtime use.
+Imported translation and scale produce the expected nonlinear midpoint;
+rotation output is normalized. Unsupported modes, non-tripled counts,
+non-finite records, duplicate cubic times, and near-zero cubic quaternions fail
+closed with no invalid pose publication.
+
 The next tranche design is fixed in
 `docs/superpowers/specs/2026-08-18-animation-state-graph-design.md`: a bounded,
 versioned, parameter-driven graph projects into the existing generic mixer,

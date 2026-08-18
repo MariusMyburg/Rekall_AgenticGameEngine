@@ -32,4 +32,66 @@ public sealed class GlbSkeletalAnimationReaderTests
         Assert.Equal(new Vector4(0, 0, 0, 0), channel.Values[0]);
         Assert.Equal(new Vector4(0, 2, 0, 0), channel.Values[1]);
     }
+
+    [Fact]
+    public async Task ReaderDecodesCubicSplineTangentValueTriplets()
+    {
+        var path = Path.Combine(TestPaths.CreateTempDirectory(), "cubic-animated.glb");
+        await File.WriteAllBytesAsync(path, GlbTestMeshFactory.CreateSingleJointCubicAnimatedGlb());
+
+        var asset = await RekallAgeGlbSkeletalAnimationReader.ReadAsync(path, CancellationToken.None);
+
+        var channel = Assert.Single(Assert.Single(asset.Animations).Channels);
+        Assert.Equal("cubicspline", channel.Interpolation);
+        Assert.Equal([0f, 1f], channel.Times);
+        Assert.Equal([new Vector4(0, 0, 0, 0), new Vector4(0, 2, 0, 0)], channel.Values);
+        Assert.Equal([new Vector4(0, 0, 0, 0), new Vector4(0, 0, 0, 0)], channel.InTangents);
+        Assert.Equal([new Vector4(0, 4, 0, 0), new Vector4(0, 0, 0, 0)], channel.OutTangents);
+    }
+
+    [Fact]
+    public async Task ReaderRejectsCubicSplineWithNonTripledOutputCount()
+    {
+        var path = Path.Combine(TestPaths.CreateTempDirectory(), "malformed-cubic.glb");
+        await File.WriteAllBytesAsync(path, GlbTestMeshFactory.CreateSingleJointCubicAnimatedGlb(outputRecordCount: 5));
+
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(async () =>
+            await RekallAgeGlbSkeletalAnimationReader.ReadAsync(path, CancellationToken.None));
+
+        Assert.Contains("exactly three times", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReaderRejectsUnknownAnimationInterpolation()
+    {
+        var path = Path.Combine(TestPaths.CreateTempDirectory(), "unknown-interpolation.glb");
+        await File.WriteAllBytesAsync(path, GlbTestMeshFactory.CreateSingleJointCubicAnimatedGlb("BEZIER"));
+
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(async () =>
+            await RekallAgeGlbSkeletalAnimationReader.ReadAsync(path, CancellationToken.None));
+
+        Assert.Contains("unsupported", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("bezier", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReaderRejectsNonFiniteCubicTangentsAndDuplicateTimes()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var nonFinitePath = Path.Combine(root, "non-finite-cubic.glb");
+        await File.WriteAllBytesAsync(
+            nonFinitePath,
+            GlbTestMeshFactory.CreateSingleJointCubicAnimatedGlb(nonFiniteOutput: true));
+        var nonFinite = await Assert.ThrowsAsync<InvalidDataException>(async () =>
+            await RekallAgeGlbSkeletalAnimationReader.ReadAsync(nonFinitePath, CancellationToken.None));
+        Assert.Contains("finite", nonFinite.Message, StringComparison.Ordinal);
+
+        var duplicatePath = Path.Combine(root, "duplicate-time-cubic.glb");
+        await File.WriteAllBytesAsync(
+            duplicatePath,
+            GlbTestMeshFactory.CreateSingleJointCubicAnimatedGlb(duplicateTimes: true));
+        var duplicate = await Assert.ThrowsAsync<InvalidDataException>(async () =>
+            await RekallAgeGlbSkeletalAnimationReader.ReadAsync(duplicatePath, CancellationToken.None));
+        Assert.Contains("strictly increasing", duplicate.Message, StringComparison.Ordinal);
+    }
 }

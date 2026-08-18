@@ -119,7 +119,17 @@ public sealed class RekallAgeSkeletalAnimationSystem : IRekallAgeRuntimeWorldSys
                     $"Skeletal animation channel targets node {channel.NodeIndex}, outside the {localPoses.Length}-node hierarchy."));
                 continue;
             }
-            var value = Sample(channel, sampleTime);
+            Vector4 value;
+            try
+            {
+                value = Sample(channel, sampleTime);
+            }
+            catch (InvalidDataException exception)
+            {
+                observations.Add(Observation(context.FrameIndex, "runtime.animation.skeletal_sample_invalid", entity,
+                    $"Skeletal animation channel for node {channel.NodeIndex} could not be sampled: {exception.Message}"));
+                return entity;
+            }
             localPoses[channel.NodeIndex] = channel.Path switch
             {
                 "translation" => localPoses[channel.NodeIndex] with { Translation = new Vector3(value.X, value.Y, value.Z) },
@@ -218,7 +228,7 @@ public sealed class RekallAgeSkeletalAnimationSystem : IRekallAgeRuntimeWorldSys
     {
         if (time <= channel.Times[0] + Epsilon)
         {
-            return channel.Values[0];
+            return FinalizeCubicSample(channel, channel.Values[0]);
         }
         var right = 1;
         while (right < channel.Times.Count && channel.Times[right] + Epsilon < time)
@@ -227,7 +237,7 @@ public sealed class RekallAgeSkeletalAnimationSystem : IRekallAgeRuntimeWorldSys
         }
         if (right >= channel.Times.Count)
         {
-            return channel.Values[^1];
+            return FinalizeCubicSample(channel, channel.Values[^1]);
         }
         var left = right - 1;
         if (channel.Interpolation.Equals("step", StringComparison.OrdinalIgnoreCase))
@@ -238,6 +248,25 @@ public sealed class RekallAgeSkeletalAnimationSystem : IRekallAgeRuntimeWorldSys
             (time - channel.Times[left]) / Math.Max(Epsilon, channel.Times[right] - channel.Times[left]),
             0,
             1);
+        if (channel.Interpolation.Equals("cubicspline", StringComparison.OrdinalIgnoreCase))
+        {
+            if (channel.InTangents is null
+                || channel.OutTangents is null
+                || channel.InTangents.Count != channel.Values.Count
+                || channel.OutTangents.Count != channel.Values.Count)
+            {
+                throw new InvalidDataException("Cubic channel tangent counts do not match its values.");
+            }
+            amount = (float)Math.Round(amount, 5, MidpointRounding.AwayFromZero);
+            var amount2 = amount * amount;
+            var amount3 = amount2 * amount;
+            var duration = channel.Times[right] - channel.Times[left];
+            var value = (2 * amount3 - 3 * amount2 + 1) * channel.Values[left]
+                + (amount3 - 2 * amount2 + amount) * duration * channel.OutTangents[left]
+                + (-2 * amount3 + 3 * amount2) * channel.Values[right]
+                + (amount3 - amount2) * duration * channel.InTangents[right];
+            return FinalizeCubicSample(channel, value);
+        }
         if (channel.Path == "rotation")
         {
             var from = Quaternion.Normalize(new Quaternion(channel.Values[left].X, channel.Values[left].Y, channel.Values[left].Z, channel.Values[left].W));
@@ -246,6 +275,32 @@ public sealed class RekallAgeSkeletalAnimationSystem : IRekallAgeRuntimeWorldSys
             return new Vector4(rotation.X, rotation.Y, rotation.Z, rotation.W);
         }
         return Vector4.Lerp(channel.Values[left], channel.Values[right], amount);
+    }
+
+    private static Vector4 FinalizeCubicSample(RekallAgeGlbNodeAnimationChannel channel, Vector4 value)
+    {
+        if (!channel.Interpolation.Equals("cubicspline", StringComparison.OrdinalIgnoreCase))
+        {
+            return value;
+        }
+        if (!float.IsFinite(value.X)
+            || !float.IsFinite(value.Y)
+            || !float.IsFinite(value.Z)
+            || !float.IsFinite(value.W))
+        {
+            throw new InvalidDataException("Cubic channel produced a non-finite value.");
+        }
+        if (channel.Path != "rotation")
+        {
+            return value;
+        }
+        var quaternion = new Quaternion(value.X, value.Y, value.Z, value.W);
+        if (quaternion.LengthSquared() < 1e-8f)
+        {
+            throw new InvalidDataException("Cubic rotation produced a near-zero quaternion.");
+        }
+        quaternion = Quaternion.Normalize(quaternion);
+        return new Vector4(quaternion.X, quaternion.Y, quaternion.Z, quaternion.W);
     }
 
     private static Matrix4x4[] BuildGlobalMatrices(

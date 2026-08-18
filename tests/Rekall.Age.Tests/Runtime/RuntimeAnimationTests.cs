@@ -314,6 +314,80 @@ public sealed class RuntimeAnimationTests
     }
 
     [Fact]
+    public async Task SkeletalAnimatorSamplesGlbCubicSplineTangentsAtFixedTime()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var source = Path.Combine(root, "cubic-animated-source.glb");
+        await File.WriteAllBytesAsync(source, GlbTestMeshFactory.CreateSingleJointCubicAnimatedGlb());
+        var asset = await RekallAgeAssetImporter.ImportAsync(
+            root, source, "model", "Cubic Rig", CancellationToken.None);
+        await new RekallAgeAssetCatalogStore().SaveAsync(
+            root, new RekallAgeAssetCatalogDocument([asset]), CancellationToken.None);
+        var actor = RekallAgeEntityDocument.Create("Rigged Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.SkeletalAnimator",
+                new JsonObject
+                {
+                    ["Model"] = asset.Id,
+                    ["Animation"] = "Cubic Lift",
+                    ["SkinIndex"] = 0,
+                    ["Playing"] = true,
+                    ["LoopMode"] = "clamp"
+                }));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault(root).RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            30,
+            CancellationToken.None);
+
+        var pose = Assert.Single(Assert.Single(result.World.Entities).Components,
+            component => component.Type == "Rekall.SkeletonPose");
+        var joint = Assert.IsType<JsonObject>(Assert.IsType<JsonArray>(pose.Properties["joints"])[0]);
+        Assert.Equal(1.5, joint["translation"]![1]!.GetValue<double>(), precision: 3);
+        Assert.DoesNotContain(result.World.Observations, observation => observation.Severity == "error");
+    }
+
+    [Fact]
+    public async Task SkeletalAnimatorAppliesCubicScaleAndNormalizesCubicRotation()
+    {
+        var scaleResult = await RunCubicSkeletalAssetAsync(
+            GlbTestMeshFactory.CreateSingleJointCubicAnimatedGlb(targetPath: "scale"),
+            "Cubic Lift");
+        var scalePose = Assert.Single(Assert.Single(scaleResult.World.Entities).Components,
+            component => component.Type == "Rekall.SkeletonPose");
+        var scaleJoint = Assert.IsType<JsonObject>(Assert.IsType<JsonArray>(scalePose.Properties["joints"])[0]);
+        Assert.Equal(1.5, scaleJoint["scale"]![1]!.GetValue<double>(), precision: 3);
+
+        var rotationResult = await RunCubicSkeletalAssetAsync(
+            GlbTestMeshFactory.CreateSingleJointCubicRotationGlb(),
+            "Cubic Turn");
+        var rotationPose = Assert.Single(Assert.Single(rotationResult.World.Entities).Components,
+            component => component.Type == "Rekall.SkeletonPose");
+        var rotationJoint = Assert.IsType<JsonObject>(Assert.IsType<JsonArray>(rotationPose.Properties["joints"])[0]);
+        var rotation = Assert.IsType<JsonArray>(rotationJoint["rotation"]);
+        Assert.Equal(0.894427, rotation[2]!.GetValue<double>(), precision: 4);
+        Assert.Equal(0.447214, rotation[3]!.GetValue<double>(), precision: 4);
+        var lengthSquared = rotation.Select(component => component!.GetValue<double>())
+            .Sum(component => component * component);
+        Assert.Equal(1, lengthSquared, precision: 5);
+    }
+
+    [Fact]
+    public async Task SkeletalAnimatorRejectsNearZeroCubicQuaternionWithoutPublishingPose()
+    {
+        var result = await RunCubicSkeletalAssetAsync(
+            GlbTestMeshFactory.CreateSingleJointCubicRotationGlb(zeroQuaternion: true),
+            "Cubic Turn");
+
+        Assert.DoesNotContain(Assert.Single(result.World.Entities).Components,
+            component => component.Type == "Rekall.SkeletonPose");
+        var observation = Assert.Single(result.World.Observations,
+            item => item.Code == "runtime.animation.skeletal_sample_invalid");
+        Assert.Contains("near-zero quaternion", observation.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task SkeletalAnimatorReportsMissingModelAsStructuredObservation()
     {
         var actor = RekallAgeEntityDocument.Create("Rigged Actor", ["actor"])
@@ -1072,5 +1146,34 @@ public sealed class RuntimeAnimationTests
                 }
             }
         };
+    }
+
+    private static async Task<RekallAgeRuntimeRunResult> RunCubicSkeletalAssetAsync(
+        byte[] glb,
+        string animation)
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var source = Path.Combine(root, "cubic-runtime.glb");
+        await File.WriteAllBytesAsync(source, glb);
+        var asset = await RekallAgeAssetImporter.ImportAsync(
+            root, source, "model", "Cubic Runtime Rig", CancellationToken.None);
+        await new RekallAgeAssetCatalogStore().SaveAsync(
+            root, new RekallAgeAssetCatalogDocument([asset]), CancellationToken.None);
+        var actor = RekallAgeEntityDocument.Create("Rigged Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.SkeletalAnimator",
+                new JsonObject
+                {
+                    ["Model"] = asset.Id,
+                    ["Animation"] = animation,
+                    ["SkinIndex"] = 0,
+                    ["Playing"] = true,
+                    ["LoopMode"] = "clamp"
+                }));
+        return await RekallAgeRuntimeExecutionLoop.CreateDefault(root).RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            30,
+            CancellationToken.None);
     }
 }

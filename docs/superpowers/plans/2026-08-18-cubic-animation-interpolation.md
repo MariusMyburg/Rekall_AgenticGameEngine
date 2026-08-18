@@ -121,7 +121,7 @@ authored animation, state-graph, and cubic selection passes 43/43.
 - `RekallAgeGlbSkeletalAnimationReader` returns triplet-decoded, count-matched channel data.
 - `RekallAgeSkeletalAnimationSystem.Sample` handles exact `cubicspline` using the Task 1 Hermite numeric policy.
 
-- [ ] **Step 1: Add a failing cubic glTF fixture and reader tests**
+- [x] **Step 1: Add a failing cubic glTF fixture and reader tests**
 
 Add `GlbTestMeshFactory.CreateSingleJointCubicAnimatedGlb()` containing two
 translation times and six VEC3 output records in input/value/output order.
@@ -129,27 +129,27 @@ Assert interpolation `cubicspline`, two values, two input tangents, and two
 output tangents. Add malformed output-count and unsupported-interpolation
 fixtures that must throw `InvalidDataException`.
 
-- [ ] **Step 2: Run reader tests and verify RED**
+- [x] **Step 2: Run reader tests and verify RED**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter FullyQualifiedName~GlbSkeletalAnimationReaderTests --verbosity minimal
 ```
 
-- [ ] **Step 3: Decode and validate standard glTF triplets**
+- [x] **Step 3: Decode and validate standard glTF triplets**
 
 Validate interpolation against `linear`, `step`, and `cubicspline` before
 constructing a channel. For cubic, require `values.Length == times.Length * 3`
 and split each triplet; otherwise require one value per time. Reject any
 non-finite time/value/tangent and require strictly increasing cubic times.
 
-- [ ] **Step 4: Add failing skeletal sampling tests**
+- [x] **Step 4: Add failing skeletal sampling tests**
 
 Run the cubic fixture through the real runtime for 30 frames and assert the
 joint translation is the nonlinear Hermite result. Add scale coverage and a
 cubic quaternion fixture whose unnormalized component interpolation must emerge
 as a finite unit quaternion. Add a near-zero quaternion rejection test.
 
-- [ ] **Step 5: Implement skeletal Hermite sampling and verify regressions**
+- [x] **Step 5: Implement skeletal Hermite sampling and verify regressions**
 
 Use duration-scaled component Hermite for translation/scale. For rotation,
 normalize the four-component result and reject length below `1e-8` or any
@@ -160,12 +160,21 @@ dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter
 git diff --check
 ```
 
-- [ ] **Step 6: Record evidence and commit**
+- [x] **Step 6: Record evidence and commit**
 
 ```powershell
 git add src/Rekall.Age.Assets src/Rekall.Age.Runtime tests/Rekall.Age.Tests docs/production/PROGRESS.md
 git commit -m "feat: execute gltf cubic spline animation"
 ```
+
+Verified 2026-08-18: the reader test first failed because channels had no
+tangent contract, and the runtime test then produced the old linear midpoint
+1.0 instead of the Hermite midpoint 1.5. The reader now preserves exact glTF
+input/value/output triplets, rejects unsupported interpolation, bad triplet
+counts, non-finite records, and duplicate cubic times. Runtime translation and
+scale reach the nonlinear result; cubic rotation normalizes to a unit
+quaternion, while near-zero output emits a bounded observation and publishes no
+pose. The combined authored, graph, reader, and skeletal selection passes 51/51.
 
 ---
 

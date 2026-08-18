@@ -32,7 +32,9 @@ public sealed record RekallAgeGlbNodeAnimationChannel(
     string Path,
     string Interpolation,
     IReadOnlyList<float> Times,
-    IReadOnlyList<Vector4> Values);
+    IReadOnlyList<Vector4> Values,
+    IReadOnlyList<Vector4>? InTangents = null,
+    IReadOnlyList<Vector4>? OutTangents = null);
 
 public static class RekallAgeGlbSkeletalAnimationReader
 {
@@ -188,30 +190,75 @@ public static class RekallAgeGlbSkeletalAnimationReader
                 var times = ReadFloatAccessor(input, 1, accessors, bufferViews, binary)
                     .Select(value => value[0]).ToArray();
                 EnsureLimit(times.Length, MaximumKeysPerChannel, "animation keys per channel");
-                var values = ReadFloatAccessor(output, componentCount, accessors, bufferViews, binary)
+                var interpolation = (ReadString(sampler, "interpolation") ?? "LINEAR").ToLowerInvariant();
+                if (interpolation is not ("linear" or "step" or "cubicspline"))
+                {
+                    throw new InvalidDataException($"GLB animation interpolation '{interpolation}' is unsupported.");
+                }
+                var rawValues = ReadFloatAccessor(output, componentCount, accessors, bufferViews, binary)
                     .Select(value => new Vector4(
                         value[0],
                         value.Length > 1 ? value[1] : 0,
                         value.Length > 2 ? value[2] : 0,
                         value.Length > 3 ? value[3] : 0))
                     .ToArray();
-                if (times.Length == 0 || values.Length != times.Length)
+                EnsureLimit(rawValues.Length, MaximumKeysPerChannel * 3, "animation output records per channel");
+                if (times.Length == 0)
                 {
-                    throw new InvalidDataException("GLB animation input and output accessor counts must match and be non-empty.");
+                    throw new InvalidDataException("GLB animation input times must be non-empty.");
                 }
-                for (var index = 1; index < times.Length; index++)
+                for (var index = 0; index < times.Length; index++)
                 {
-                    if (!float.IsFinite(times[index]) || times[index] < times[index - 1])
+                    if (!float.IsFinite(times[index])
+                        || (index > 0 && (interpolation == "cubicspline"
+                            ? times[index] <= times[index - 1]
+                            : times[index] < times[index - 1])))
                     {
-                        throw new InvalidDataException("GLB animation input times must be finite and non-decreasing.");
+                        throw new InvalidDataException(interpolation == "cubicspline"
+                            ? "GLB cubic animation input times must be finite and strictly increasing."
+                            : "GLB animation input times must be finite and non-decreasing.");
                     }
+                }
+                if (rawValues.Any(value => !IsFinite(value)))
+                {
+                    throw new InvalidDataException("GLB animation values and tangents must be finite.");
+                }
+
+                Vector4[] values;
+                Vector4[]? inTangents = null;
+                Vector4[]? outTangents = null;
+                if (interpolation == "cubicspline")
+                {
+                    if (rawValues.Length != times.Length * 3)
+                    {
+                        throw new InvalidDataException("GLB cubic animation output count must be exactly three times the input time count.");
+                    }
+                    values = new Vector4[times.Length];
+                    inTangents = new Vector4[times.Length];
+                    outTangents = new Vector4[times.Length];
+                    for (var index = 0; index < times.Length; index++)
+                    {
+                        inTangents[index] = rawValues[index * 3];
+                        values[index] = rawValues[index * 3 + 1];
+                        outTangents[index] = rawValues[index * 3 + 2];
+                    }
+                }
+                else
+                {
+                    if (rawValues.Length != times.Length)
+                    {
+                        throw new InvalidDataException("GLB animation input and output accessor counts must match.");
+                    }
+                    values = rawValues;
                 }
                 parsed.Add(new RekallAgeGlbNodeAnimationChannel(
                     nodeIndex,
                     path,
-                    (ReadString(sampler, "interpolation") ?? "LINEAR").ToLowerInvariant(),
+                    interpolation,
                     times,
-                    values));
+                    values,
+                    inTangents,
+                    outTangents));
             }
             result.Add(new RekallAgeGlbNodeAnimation(
                 ReadString(animation, "name"),
@@ -220,6 +267,12 @@ public static class RekallAgeGlbSkeletalAnimationReader
         }
         return result;
     }
+
+    private static bool IsFinite(Vector4 value) =>
+        float.IsFinite(value.X)
+        && float.IsFinite(value.Y)
+        && float.IsFinite(value.Z)
+        && float.IsFinite(value.W);
 
     private static IReadOnlyList<float[]> ReadFloatAccessor(
         int accessorIndex,

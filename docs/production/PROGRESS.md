@@ -883,6 +883,16 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
+The next risk-driven tranche is explicit persisted-document recovery. Atomic
+publication and optimistic revisions now prevent torn and stale engine writes,
+but storage damage or external/manual corruption still blocks a project. The
+reviewed design retains one exact previous validated project/scene version,
+adds bounded read-only recovery inspection, and requires an explicit
+revision-guarded restore that quarantines the damaged bytes. Normal loads never
+silently roll back. Design and TDD sequence:
+`docs/superpowers/specs/2026-08-18-persisted-document-recovery-design.md` and
+`docs/superpowers/plans/2026-08-18-persisted-document-recovery.md`.
+
 The next risk-driven tranche is optimistic document revisions. Atomic files
 eliminate torn reads but do not prevent two valid agent/editor processes from
 silently overwriting one another. The reviewed design adds exact snapshot

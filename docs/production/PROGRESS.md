@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 10:05 Africa/Johannesburg
+Last verified: 2026-08-18 10:11 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -877,6 +877,12 @@ versioned, parameter-driven graph projects into the existing generic mixer,
 uses engine delta time, preserves deterministic resume, emits generic state and
 transition facts, and keeps all game-specific parameter decisions in
 agent-authored content.
+
+Animation state graph Task 1 is verified at 22/22 focused tests. A pure
+immutable parser/evaluator now fails closed on malformed, excessive,
+non-finite, ambiguously typed, duplicate, or dangling authored graph facts and
+selects exact/any, conditional/unconditional, and self-reset transitions in
+deterministic order without world, asset, or gameplay dependencies.
 
 Archive preflight Task 1 is verified at 15/15 focused tests: a central
 metadata-only contract now returns a deterministic manifest-first immutable

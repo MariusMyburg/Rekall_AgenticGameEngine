@@ -34,14 +34,14 @@
 - Produces immutable state/transition/condition records and `SelectTransition(currentState, parameters)`.
 - Has no world, asset, I/O, or gameplay dependency.
 
-- [ ] **Step 1: Write failing parser tests**
+- [x] **Step 1: Write failing parser tests**
 
 Cover a valid two-state graph, exact-before-any ordering, typed equality and
 numeric comparisons, unconditional and self-transition rules, duplicate/missing
 states, invalid initial state/version/operator/value, non-finite numbers, every
 count/string bound, and deterministic error codes.
 
-- [ ] **Step 2: Run the focused tests and confirm they fail because the parser types do not exist**
+- [x] **Step 2: Run the focused tests and confirm they fail because the parser types do not exist**
 
 Run:
 
@@ -49,7 +49,7 @@ Run:
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter FullyQualifiedName~AnimationStateGraphDefinitionTests --verbosity minimal
 ```
 
-- [ ] **Step 3: Implement immutable parsing and evaluation**
+- [x] **Step 3: Implement immutable parsing and evaluation**
 
 Use explicit records:
 
@@ -68,14 +68,21 @@ Clone primitive parameter values into an ordinal dictionary. Reject arrays,
 objects, nulls, non-finite numbers, and unknown operators during parse. Build
 exact-state and any-state candidate sequences without hash-order dependence.
 
-- [ ] **Step 4: Run focused tests and `git diff --check`**
+- [x] **Step 4: Run focused tests and `git diff --check`**
 
-- [ ] **Step 5: Record evidence and commit**
+- [x] **Step 5: Record evidence and commit**
 
 ```powershell
 git add src/Rekall.Age.Runtime/RekallAgeAnimationStateGraphDefinition.cs tests/Rekall.Age.Tests/Runtime/AnimationStateGraphDefinitionTests.cs docs/production/PROGRESS.md
 git commit -m "feat: define bounded animation state graphs"
 ```
+
+Verified 2026-08-18: 22/22 focused parser/evaluator tests pass. The
+immutable definition rejects all documented count bounds, duplicate or missing
+states, invalid versions/operators/references, non-finite and structured
+parameters, and mismatched primitive comparisons with stable graph codes. Exact
+state ordering, any-state fallback, typed operators, unconditional transitions,
+and reset-only self-transitions are deterministic.
 
 ---
 

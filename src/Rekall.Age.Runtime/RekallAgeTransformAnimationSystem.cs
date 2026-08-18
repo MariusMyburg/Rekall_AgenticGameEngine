@@ -11,6 +11,8 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
     private const string ClipComponent = "Rekall.AnimationClip";
     private const string PlayerComponent = "Rekall.AnimationPlayer";
     private const string MixerComponent = "Rekall.AnimationMixer";
+    private const string GraphComponent = "Rekall.AnimationStateGraph";
+    private const string GraphMixerComponent = "Rekall.AnimationGraphMixer";
     private const string StateComponent = "Rekall.AnimationState";
     private const double Epsilon = 0.00001;
     private const long MaxClipBytes = 4 * 1024 * 1024;
@@ -55,6 +57,14 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         List<RekallAgeRuntimeObservation> observations)
     {
         var updated = ApplyLegacyTransformRates(entity, context);
+        if (updated.FindComponent(GraphComponent) is not null)
+        {
+            var graphMixer = updated.FindComponent(GraphMixerComponent);
+            return graphMixer is null
+                ? updated
+                : ApplyMixer(updated, graphMixer, context, emitted, observations);
+        }
+
         var mixer = updated.FindComponent(MixerComponent);
         if (mixer is not null && ReadBoolean(mixer.Properties, "playing", true))
         {
@@ -247,9 +257,12 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             var loopMode = NormalizeLoopMode(ReadString(layer, "loopMode") ?? "loop");
             var playing = ReadBoolean(layer, "playing", true);
             var previousRawTime = ReadNumber(prior, "rawTimeSeconds", ReadNumber(layer, "startTimeSeconds", 0));
-            var nextRawTime = playing
-                ? Math.Max(0, previousRawTime + context.DeltaTime.TotalSeconds * speed)
-                : previousRawTime;
+            var nextRawTime = TryGetProperty(layer, "authoritativeTimeSeconds", out var authoritativeNode)
+                && TryReadNumber(authoritativeNode, out var authoritativeTime)
+                    ? Math.Max(0, authoritativeTime)
+                    : playing
+                        ? Math.Max(0, previousRawTime + context.DeltaTime.TotalSeconds * speed)
+                        : previousRawTime;
             var sampleTime = ResolveSampleTime(nextRawTime, duration, loopMode);
             maximumTime = Math.Max(maximumTime, sampleTime);
             maximumDuration = Math.Max(maximumDuration, duration);

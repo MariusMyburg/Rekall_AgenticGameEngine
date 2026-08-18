@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 10:11 Africa/Johannesburg
+Last verified: 2026-08-18 10:18 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -883,6 +883,14 @@ immutable parser/evaluator now fails closed on malformed, excessive,
 non-finite, ambiguously typed, duplicate, or dangling authored graph facts and
 selects exact/any, conditional/unconditional, and self-reset transitions in
 deterministic order without world, asset, or gameplay dependencies.
+
+Animation state graph Task 2 is verified at 9/9 graph-runtime tests and 50/50
+combined animation tests. A pre-animation runtime system projects bounded graph
+state into the existing generic mixer, advances only by engine delta time,
+supports deterministic reset/resume and noninterruptible cross-fades, emits
+bound generic state/transition facts, suppresses conflicting drivers, and
+fails closed. Split 17+43-frame execution exactly matches continuous 60-frame
+state and output; paused graphs and 64-state clock bounds are explicit.
 
 Archive preflight Task 1 is verified at 15/15 focused tests: a central
 metadata-only contract now returns a deterministic manifest-first immutable

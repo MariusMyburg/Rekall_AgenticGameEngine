@@ -100,7 +100,7 @@ and reset-only self-transitions are deterministic.
 - Produces runtime-only `Rekall.AnimationGraphMixer` and persisted `Rekall.AnimationGraphState`.
 - Existing transform animation system treats graph mixer as highest-priority animation driver and routes it through `ApplyMixer`.
 
-- [ ] **Step 1: Write failing end-to-end runtime tests**
+- [x] **Step 1: Write failing end-to-end runtime tests**
 
 Prove initial sampling, parameter transition, exact-before-any selection,
 halfway and completed linear weights, target reset/resume, pause, one transition
@@ -108,9 +108,9 @@ per frame, noninterruption, begin/end fact payloads, split-run determinism,
 64-state bounded clocks, invalid-graph no-mutation observations, and graph versus
 player/mixer conflict diagnostics.
 
-- [ ] **Step 2: Run the focused runtime tests and confirm behavioral failures**
+- [x] **Step 2: Run the focused runtime tests and confirm behavioral failures**
 
-- [ ] **Step 3: Implement the graph system**
+- [x] **Step 3: Implement the graph system**
 
 Give the system `Priority = -10` and `Id = "runtime.animation.graph"`. For each
 graph entity, validate before mutation, restore only declared state clocks,
@@ -134,26 +134,34 @@ Emit facts only through authored handlers returned by the same generic handler
 lookup pattern used for `animation.event`. The graph system must append to the
 event view rather than replace prior facts.
 
-- [ ] **Step 4: Integrate the runtime-only mixer with the existing sampler**
+- [x] **Step 4: Integrate the runtime-only mixer with the existing sampler**
 
 Add graph mixer precedence before authored mixer/player. Suppress the other
 drivers on that entity and emit one bounded conflict observation. Continue to
 write existing `Rekall.AnimationState` layer state so clip timing, markers, and
 runtime sampling remain unchanged.
 
-- [ ] **Step 5: Run focused animation tests, then all runtime animation tests**
+- [x] **Step 5: Run focused animation tests, then all runtime animation tests**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter FullyQualifiedName~AnimationStateGraph --verbosity minimal
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter FullyQualifiedName~RuntimeAnimationTests --verbosity minimal
 ```
 
-- [ ] **Step 6: Record evidence and commit**
+- [x] **Step 6: Record evidence and commit**
 
 ```powershell
 git add src/Rekall.Age.Runtime tests/Rekall.Age.Tests/Runtime docs/production/PROGRESS.md
 git commit -m "feat: execute animation state graphs"
 ```
+
+Verified 2026-08-18: 9/9 graph runtime tests and 50/50 combined graph,
+player, mixer, marker, malformed-input, resume, and animation regression tests
+pass. Real catalog clips cross-fade generic transform properties; bound
+enter/exit/begin/end facts are exact; pause, noninterruption, reset/resume,
+64-state clocks, driver conflict, invalid fail-closed behavior, and split-run
+byte-equivalent state are covered. Existing sampling owns authoritative graph
+times without duplicating track or blend math.
 
 ---
 

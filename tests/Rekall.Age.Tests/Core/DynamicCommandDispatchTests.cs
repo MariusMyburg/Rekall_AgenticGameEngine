@@ -90,13 +90,23 @@ public sealed class DynamicCommandDispatchTests
 
         var result = await registry.ExecuteJsonAsync(
             "rekall.test.aliases",
-            """{"frameCount":"30","archivePath":"F:\\Builds\\Game.zip"}""",
+            """{"frame":"30","packageDirectory":"F:\\Builds\\Game"}""",
             context);
 
         Assert.True(result.Ok, result.Summary);
         var value = Assert.IsType<AliasResult>(result.Value);
         Assert.Equal(30, value.Frames);
-        Assert.Equal("F:\\Builds\\Game.zip", value.PackagePath);
+        Assert.Equal("F:\\Builds\\Game", value.PackagePath);
+
+        var priorAliases = await registry.ExecuteJsonAsync(
+            "rekall.test.aliases",
+            """{"frameCount":"12","archivePath":"F:\\Builds\\Game.zip"}""",
+            context);
+
+        Assert.True(priorAliases.Ok, priorAliases.Summary);
+        var priorValue = Assert.IsType<AliasResult>(priorAliases.Value);
+        Assert.Equal(12, priorValue.Frames);
+        Assert.Equal("F:\\Builds\\Game.zip", priorValue.PackagePath);
     }
 
     [Fact]

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 02:32 Africa/Johannesburg
+Last verified: 2026-08-18 02:40 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: evidence-gated agent completion passed the complete product gate
+Latest milestone: bounded request-alias repair passed 584/584 Debug tests
 
 ## Product objective
 
@@ -386,6 +386,18 @@ Studio is important, but it does not define or reorder the engine foundation.
   the generic gauntlet, original and relocated package proof, runtime UI,
   software viewport, simulated audio, and Windows player audio. The canonical
   1,149-file archive is 194,709,786 bytes.
+- Broad benchmark rerun 19: the evidence gate correctly prevented a premature
+  success and stopped at 36 turns/35 tools (614,364 prompt; 8,248 completion)
+  after revalidating and reinspecting both scenes. Independent installed proof
+  showed the artifacts were actually complete: zero validation issues, visible
+  3D/2D dynamic bodies with Y delta -1.267, and fresh passing 467-file audits of
+  original and relocated packages. The bounded agent lacked a final audited
+  response, so the benchmark remains failed despite complete artifacts.
+- Bounded request aliases: dynamic requests now additionally normalize `frame`
+  to `Frames` and `packageDirectory` to `PackagePath` only when the selected
+  request type declares the canonical field. Existing `frameCount` and
+  `archivePath` behavior remains covered. The regression and full Debug suite
+  pass at 584/584.
 
 ## Current gaps
 
@@ -401,7 +413,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the unchanged installed Ollama benchmark on the evidence-gated distribution.
+Run the complete clean product gate for bounded request aliases.
 
 ## Next after the current item
 

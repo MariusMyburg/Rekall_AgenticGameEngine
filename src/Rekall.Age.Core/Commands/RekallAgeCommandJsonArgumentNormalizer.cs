@@ -110,7 +110,9 @@ internal static class RekallAgeCommandJsonArgumentNormalizer
         var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
             .Where(property => property.GetMethod is not null && property.GetIndexParameters().Length == 0)
             .ToArray();
+        ApplyAlias(value, properties, "Frames", "frame");
         ApplyAlias(value, properties, "Frames", "frameCount");
+        ApplyAlias(value, properties, "PackagePath", "packageDirectory");
         ApplyAlias(value, properties, "PackagePath", "archivePath");
     }
 

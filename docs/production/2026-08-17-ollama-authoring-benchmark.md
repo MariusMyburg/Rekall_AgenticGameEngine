@@ -545,6 +545,35 @@ components or artifacts, stale package proof, and existence-only evidence as
 failures. If the audit calls tools, any later completion proposal is audited
 again before the agent can return `Completed=true`.
 
+### Audited-completion rerun
+
+Rerun 19 used the evidence-gated distribution with the unchanged 36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun19`
+- Result: failed at the 36-turn bound
+- Tool calls: 35
+- Prompt tokens: 614,364
+- Completion tokens: 8,248
+
+The agent reached clean validation, original package audit, relocation, and
+relocated audit. Its completion audit then re-opened engine status, validation,
+and both runtime inspections instead of accepting an unsupported narrative. It
+ran out of turns before an audited final response. The only failed tool call
+used `frame` instead of the canonical runtime-inspection field `Frames`.
+
+Independent installed verification established that this run's artifacts were
+in fact complete: both scenes had zero issues, the visible principal 3D and 2D
+bodies each reported Y delta -1.267, and fresh independent audits of the
+467-file original and relocated packages passed run, integrity, capture, and
+nonblank checks. The fixed benchmark measures autonomous completion inside the
+bound, so complete artifacts without the final audited response remain a fail.
+
+The generic efficiency repair expands narrow type-directed normalization with
+`frame` to `Frames` and `packageDirectory` to `PackagePath`. These aliases apply
+only when the chosen command request declares the canonical field and therefore
+do not weaken unrelated schemas. Existing `frameCount` and `archivePath`
+normalization remains covered.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

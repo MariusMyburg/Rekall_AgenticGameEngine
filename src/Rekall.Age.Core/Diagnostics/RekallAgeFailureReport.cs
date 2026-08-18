@@ -87,7 +87,8 @@ public sealed record RekallAgeFailureReportIssue(string Code, string Message, st
 
 public sealed record RekallAgeFailureReportInspection(
     IReadOnlyList<RekallAgeFailureReport> Reports,
-    IReadOnlyList<RekallAgeFailureReportIssue> Issues);
+    IReadOnlyList<RekallAgeFailureReportIssue> Issues,
+    IReadOnlyDictionary<string, string>? ReportPaths = null);
 
 public sealed class RekallAgeFailureReportStoreException : Exception
 {

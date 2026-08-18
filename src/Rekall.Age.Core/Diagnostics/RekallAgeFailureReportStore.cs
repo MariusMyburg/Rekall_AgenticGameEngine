@@ -111,6 +111,7 @@ public sealed class RekallAgeFailureReportStore
             RejectReparsePoint(_root, "REKALL_FAILURE_REPORT_ROOT_REPARSE_POINT");
             var reports = new List<RekallAgeFailureReport>();
             var issues = new List<RekallAgeFailureReportIssue>();
+            var reportPaths = new Dictionary<string, string>(StringComparer.Ordinal);
             var paths = Directory.EnumerateFiles(_root, "failure-*.json", SearchOption.TopDirectoryOnly)
                 .OrderByDescending(File.GetLastWriteTimeUtc)
                 .Take(_limits.MaximumEntries)
@@ -149,6 +150,7 @@ public sealed class RekallAgeFailureReportStore
 
                     ValidateReport(report);
                     reports.Add(report);
+                    reportPaths[report.ReportId] = path;
                 }
                 catch (Exception exception) when (
                     exception is JsonException or IOException or UnauthorizedAccessException or
@@ -163,7 +165,8 @@ public sealed class RekallAgeFailureReportStore
 
             return new RekallAgeFailureReportInspection(
                 reports.OrderByDescending(report => report.TimestampUtc).Take(_limits.MaximumReports).ToArray(),
-                issues);
+                issues,
+                reportPaths);
         }
         finally
         {

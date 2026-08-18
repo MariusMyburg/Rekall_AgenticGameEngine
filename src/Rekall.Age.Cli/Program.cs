@@ -200,6 +200,8 @@ internal static class RekallAgeCli
                 ["module", "schemas", var moduleId] => await ListSchemasAsync(registry, context, moduleId),
                 ["module", "schemas", "project", var root] => await ListProjectSchemasAsync(registry, context, root),
                 ["module", "trust", var root] => await InspectModuleTrustAsync(registry, context, root),
+                ["diagnostics", "failures"] => await InspectFailureReportsAsync(registry, context, null),
+                ["diagnostics", "failures", var root] => await InspectFailureReportsAsync(registry, context, root),
                 ["module", "sources", var root] => await ListModuleSourcesAsync(registry, context, root),
                 ["module", "read-source", var root, var moduleName, var fileName] =>
                     await ReadModuleSourceAsync(registry, context, root, moduleName, fileName),
@@ -466,6 +468,7 @@ internal static class RekallAgeCli
         registry.Register(new GetProjectSummaryCommand());
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new GetEngineStatusCommand());
+        registry.Register(new InspectFailureReportsCommand());
         registry.Register(new InspectEngineDoctorCommand());
         registry.Register(new ValidateProjectCommand());
         registry.Register(new RepairProjectValidationCommand(registry));
@@ -2804,6 +2807,33 @@ internal static class RekallAgeCli
         foreach (var module in result.Value.Modules)
         {
             Console.WriteLine($"Module {module.ModuleName}: ready={module.Ready}; artifacts={module.OutputFiles.Count}; receipt={module.ReceiptPath}");
+        }
+        foreach (var issue in result.Value.Issues)
+        {
+            Console.WriteLine($"{issue.Code}: {issue.Message} [{issue.Target}]");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectFailureReportsAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string? root)
+    {
+        var result = await registry.ExecuteAsync<InspectFailureReportsRequest, InspectFailureReportsResult>(
+            "rekall.diagnostics.inspect_failures",
+            new InspectFailureReportsRequest(root),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Diagnostics root: {result.Value.Root}");
+        foreach (var report in result.Value.Reports)
+        {
+            Console.WriteLine(
+                $"{report.TimestampUtc:O} {report.Component} {report.Outcome} {report.Code} " +
+                $"mode={report.RecoveryMode} attempts={report.Attempts} frames={report.CompletedFrames}/{report.RequestedFrames?.ToString() ?? "continuous"}");
+            Console.WriteLine($"  Report: {report.Path}");
+            Console.WriteLine($"  Exception: {report.ExceptionType}: {report.ExceptionMessage}");
         }
         foreach (var issue in result.Value.Issues)
         {

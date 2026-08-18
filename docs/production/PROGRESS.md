@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 08:11 Africa/Johannesburg
+Last verified: 2026-08-18 08:15 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: bounded player-session recovery supervisor passed its focused gate
+Latest milestone: agent-readable failure inspection passed its focused gate
 
 ## Product objective
 
@@ -745,6 +745,13 @@ Studio is important, but it does not define or reorder the engine foundation.
   evidence through the bounded atomic store and returns report paths; a writer
   failure is reported but cannot hide the original outcome. The supervisor
   selection passes 8/8 and the combined diagnostics/recovery selection 13/13.
+- Agent-readable failure evidence: `rekall.diagnostics.inspect_failures` is a
+  recommended read-only CLI/MCP command with a 50-report ceiling and exact
+  component/outcome/code filtering. It returns report paths, bounded exception
+  facts, limitations, next actions, and isolated malformed-file issues without
+  executing project code. Engine status advertises the workflow. CLI output is
+  intentionally compact and excludes stack excerpts. The direct command,
+  catalog, status, and real CLI-process selection passes 5/5.
 
 ## Current gaps
 
@@ -760,9 +767,9 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Expose bounded failure evidence through the read-only agent/CLI/MCP inspection
-contract, then connect the verified supervisor to the Windows player. The
-six-slice agent-authored module trust boundary remains complete and
+Connect the verified bounded supervisor and evidence contract to the Windows
+player, including one-shot device-loss recovery and fatal/exhaustion process
+proofs. The six-slice agent-authored module trust boundary remains complete and
 installed-product verified.
 
 ## Next after the current item

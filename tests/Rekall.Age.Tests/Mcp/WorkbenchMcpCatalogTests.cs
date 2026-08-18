@@ -5,6 +5,7 @@ using Rekall.Age.Mcp;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime.Commands;
 using Rekall.Age.Modules.Commands;
+using Rekall.Age.Agent.Commands;
 
 namespace Rekall.Age.Tests.Mcp;
 
@@ -29,6 +30,7 @@ public sealed class WorkbenchMcpCatalogTests
         registry.Register(new CaptureRuntimeViewportCommand());
         registry.Register(new ExportSceneGlbCommand());
         registry.Register(new InspectModuleTrustCommand());
+        registry.Register(new InspectFailureReportsCommand());
 
         var tools = RekallAgeMcpCatalog.FromRegistry(registry).Tools;
         var names = tools.Select(tool => tool.Name).ToArray();
@@ -48,5 +50,9 @@ public sealed class WorkbenchMcpCatalogTests
             tool.Name == "rekall.module.inspect_trust"
             && tool.Recommended
             && tool.Category == "modules");
+        Assert.Contains(tools, tool =>
+            tool.Name == "rekall.diagnostics.inspect_failures"
+            && tool.Recommended
+            && tool.Category == "diagnostics");
     }
 }

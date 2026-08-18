@@ -100,20 +100,26 @@ replace the player result.
 - Modify: `tests/Rekall.Age.Tests/Mcp/WorkbenchMcpCatalogTests.cs`
 - Modify: `tests/Rekall.Age.Tests/Cli/CliSmokeTests.cs`
 
-- [ ] **Step 1: Add failing command/catalog/CLI tests**
+- [x] **Step 1: Add failing command/catalog/CLI tests**
 
 Require `rekall.diagnostics.inspect_failures` to be read-only, recommended, bounded, filterable by component/outcome/code, and to return report paths plus next actions. CLI `diagnostics failures [root]` must print stable codes/outcomes without stack flooding.
 
-- [ ] **Step 2: Implement one typed adapter surface**
+- [x] **Step 2: Implement one typed adapter surface**
 
 Register in the CLI composition root so MCP inherits it. Add engine-status guidance and exact empty/malformed/store-unavailable behavior.
 
-- [ ] **Step 3: Run focused tests GREEN and commit**
+- [x] **Step 3: Run focused tests GREEN and commit**
 
 ```powershell
 git add src/Rekall.Age.Agent/Commands/InspectFailureReportsCommand.cs src/Rekall.Age.Cli/Program.cs src/Rekall.Age.Mcp/RekallAgeMcpCatalog.cs src/Rekall.Age.Agent/Commands/GetEngineStatusCommand.cs tests/Rekall.Age.Tests
 git commit -m "feat: expose failure report inspection"
 ```
+
+Verified 2026-08-18: the focused command/catalog/status/CLI selection passed
+5/5. `rekall.diagnostics.inspect_failures` is read-only, recommended, capped
+at 50 reports, filters exact component/outcome/code values case-insensitively,
+isolates malformed files, and returns report paths plus next actions. The CLI
+prints compact exception facts but never stack excerpts.
 
 ## Task 4: Integrate bounded recovery into the Windows player
 

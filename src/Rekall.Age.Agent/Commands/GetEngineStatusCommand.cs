@@ -58,6 +58,10 @@ public sealed class GetEngineStatusCommand
                     "Prove package inspection, deterministic run, and nonblank PNG capture in one operation; use it instead of separate inspect/run/capture calls when all proof is required.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
+                    "rekall.diagnostics.inspect_failures",
+                    "Inspect bounded Player and Studio failure/recovery evidence without executing project code or exposing full stack traces.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
                     "rekall.workflow.package_playable_game",
                     "Create a playable package and return its package OutputDirectory, ArchivePath, and separate LaunchPath.",
                     Recommended: true),

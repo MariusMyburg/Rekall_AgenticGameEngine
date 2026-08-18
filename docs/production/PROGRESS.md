@@ -830,6 +830,15 @@ codes, migration eligibility, blockers, limitations, and next actions without
 executing project code or changing source bytes. Oversized/excessive inputs and
 reparse traversal fail closed.
 
+Compatibility Task 3 is verified in a 37/37 combined focused selection:
+`rekall.compatibility.migrate_project` is
+available through direct command, CLI, and MCP with dry-run as the default and
+explicit `--apply`. It stages all outputs before replacement, rechecks source
+bytes, durably preserves exact originals and hashes, keeps unknown extension
+data, records transaction preimages, rolls back partial replacement in reverse
+order, rejects reparse-backed engine state, and retains five backup sets without
+following reparse paths. Future or malformed inputs remain untouched.
+
 ## Next after the current item
 
 Expand adversarial security coverage, then complete advanced animation

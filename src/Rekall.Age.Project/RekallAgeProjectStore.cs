@@ -21,9 +21,14 @@ public sealed class RekallAgeProjectStore
     {
         Directory.CreateDirectory(projectRoot);
         var path = Path.Combine(projectRoot, ManifestFileName);
+        await File.WriteAllTextAsync(path, Serialize(manifest), cancellationToken);
+    }
+
+    public string Serialize(RekallAgeProjectManifest manifest)
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
         var current = manifest with { SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion };
-        var json = JsonSerializer.Serialize(current, JsonOptions);
-        await File.WriteAllTextAsync(path, json + Environment.NewLine, cancellationToken);
+        return JsonSerializer.Serialize(current, JsonOptions) + Environment.NewLine;
     }
 
     public async ValueTask<RekallAgeProjectManifest> LoadAsync(

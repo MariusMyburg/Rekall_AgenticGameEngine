@@ -41,14 +41,22 @@ exact blockers and next actions.
 
 ## Task 3: Add explicit atomic migration
 
-- [ ] Add failing tests for dry-run immutability, apply, exact backup bytes,
+- [x] Add failing tests for dry-run immutability, apply, exact backup bytes,
   idempotence, blocker refusal, rollback, containment, and reparse rejection.
-- [ ] Implement schema-0-to-1 typed transforms for project and scene documents.
-- [ ] Stage all output, create a bounded backup set, replace atomically, and
+- [x] Implement schema-0-to-1 typed transforms for project and scene documents.
+- [x] Stage all output, create a bounded backup set, replace atomically, and
   roll back partial replacement failures.
-- [ ] Register `rekall.compatibility.migrate_project` with dry-run default and
+- [x] Register `rekall.compatibility.migrate_project` with dry-run default and
   explicit apply mode.
-- [ ] Run focused tests and commit.
+- [x] Run focused tests and commit.
+
+Verified 2026-08-18: the combined compatibility/store/status/CLI/MCP selection
+passes 37/37. Dry-run
+validates transformations without writing; apply preserves exact originals,
+unknown top-level extension data, SHA-256 before/after facts, and transaction
+preimages. A forced second-replacement failure restores the first document
+byte-for-byte. Future schemas and reparse-backed migration state fail closed.
+Successful reruns are no-ops, and no-follow retention keeps five backup sets.
 
 ## Task 4: Product integration and release evidence
 

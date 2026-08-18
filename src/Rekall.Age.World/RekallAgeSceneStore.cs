@@ -25,9 +25,14 @@ public sealed class RekallAgeSceneStore
         var scenesDirectory = Path.Combine(projectRoot, "Scenes");
         Directory.CreateDirectory(scenesDirectory);
         var path = GetScenePath(projectRoot, scene.Name);
+        await File.WriteAllTextAsync(path, Serialize(scene), cancellationToken);
+    }
+
+    public string Serialize(RekallAgeSceneDocument scene)
+    {
+        ArgumentNullException.ThrowIfNull(scene);
         var current = scene with { SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion };
-        var json = JsonSerializer.Serialize(current, JsonOptions);
-        await File.WriteAllTextAsync(path, json + Environment.NewLine, cancellationToken);
+        return JsonSerializer.Serialize(current, JsonOptions) + Environment.NewLine;
     }
 
     public async ValueTask<RekallAgeSceneDocument> LoadAsync(

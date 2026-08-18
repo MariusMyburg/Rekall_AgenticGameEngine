@@ -20,6 +20,26 @@ public sealed class CompatibilityCliTests
         Assert.Equal(legacy, await File.ReadAllTextAsync(path));
     }
 
+    [Fact]
+    public async Task CliDryRunsThenExplicitlyAppliesMigration()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, "rekall.project.json");
+        const string legacy = """{"name":"Legacy Migration CLI","capabilities":[]}""";
+        await File.WriteAllTextAsync(path, legacy);
+
+        var dryRun = await RunAsync(FindCliAssemblyPath(), "compatibility", "migrate", root);
+        Assert.Equal(0, dryRun.ExitCode);
+        Assert.Contains("dry-run changed no files", dryRun.Output);
+        Assert.Equal(legacy, await File.ReadAllTextAsync(path));
+
+        var apply = await RunAsync(FindCliAssemblyPath(), "compatibility", "migrate", root, "--apply");
+        Assert.Equal(0, apply.ExitCode);
+        Assert.Contains("Applied: True", apply.Output);
+        Assert.Contains("Backup root:", apply.Output);
+        Assert.Contains("\"schemaVersion\": 1", await File.ReadAllTextAsync(path));
+    }
+
     private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)
     {
         var startInfo = new ProcessStartInfo("dotnet")

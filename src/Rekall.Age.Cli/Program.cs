@@ -203,6 +203,8 @@ internal static class RekallAgeCli
                 ["diagnostics", "failures"] => await InspectFailureReportsAsync(registry, context, null),
                 ["diagnostics", "failures", var root] => await InspectFailureReportsAsync(registry, context, root),
                 ["compatibility", "inspect", var root] => await InspectProjectCompatibilityAsync(registry, context, root),
+                ["compatibility", "migrate", var root] => await MigrateProjectCompatibilityAsync(registry, context, root, apply: false),
+                ["compatibility", "migrate", var root, "--apply"] => await MigrateProjectCompatibilityAsync(registry, context, root, apply: true),
                 ["module", "sources", var root] => await ListModuleSourcesAsync(registry, context, root),
                 ["module", "read-source", var root, var moduleName, var fileName] =>
                     await ReadModuleSourceAsync(registry, context, root, moduleName, fileName),
@@ -471,6 +473,7 @@ internal static class RekallAgeCli
         registry.Register(new GetEngineStatusCommand());
         registry.Register(new InspectFailureReportsCommand());
         registry.Register(new InspectProjectCompatibilityCommand());
+        registry.Register(new MigrateProjectCompatibilityCommand());
         registry.Register(new InspectEngineDoctorCommand());
         registry.Register(new ValidateProjectCommand());
         registry.Register(new RepairProjectValidationCommand(registry));
@@ -2862,6 +2865,36 @@ internal static class RekallAgeCli
             Console.WriteLine(
                 $"{document.RelativePath}: {document.Status} {document.Code} " +
                 $"schema={document.DetectedVersion?.ToString() ?? "unknown"}/{document.CurrentVersion}");
+        }
+        foreach (var blocker in result.Value.Blockers)
+        {
+            Console.WriteLine($"{blocker.Code}: {blocker.Message} [{blocker.Target}]");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> MigrateProjectCompatibilityAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        bool apply)
+    {
+        var result = await registry.ExecuteAsync<MigrateProjectCompatibilityRequest, MigrateProjectCompatibilityResult>(
+            "rekall.compatibility.migrate_project",
+            new MigrateProjectCompatibilityRequest(root, apply),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Applied: {result.Value.Applied}; no-op: {result.Value.NoOp}");
+        if (!string.IsNullOrWhiteSpace(result.Value.BackupRoot))
+        {
+            Console.WriteLine($"Backup root: {result.Value.BackupRoot}");
+        }
+        foreach (var document in result.Value.Documents)
+        {
+            Console.WriteLine(
+                $"{document.RelativePath}: schema {document.FromVersion}->{document.ToVersion} " +
+                $"sha256={document.OriginalSha256}->{document.MigratedSha256}");
         }
         foreach (var blocker in result.Value.Blockers)
         {

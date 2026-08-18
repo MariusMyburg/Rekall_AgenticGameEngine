@@ -41,6 +41,16 @@ public sealed record RekallAgeGlbMetadata(
 
     public IReadOnlyList<RekallAgeGlbSkinMetadata> Skins { get; init; } =
         Array.Empty<RekallAgeGlbSkinMetadata>();
+
+    public IReadOnlyList<string> SupportedMorphTargetSemantics { get; init; } =
+        ["POSITION", "NORMAL"];
+
+    public IReadOnlyList<string> MorphTargetLimitations { get; init; } =
+    [
+        "Maximum 64 compatible ordered targets per rendered asset.",
+        "Float VEC3 POSITION and optional NORMAL deltas only; TANGENT, sparse, and quantized accessors are unsupported.",
+        "Native glTF weights animation channels are not executed; use Rekall.MorphWeights with generic Rekall AGE animation contracts."
+    ];
 }
 
 public sealed record RekallAgeGlbSceneMetadata(string? Name, int NodeCount);
@@ -50,9 +60,18 @@ public sealed record RekallAgeGlbNodeMetadata(string? Name, int? MeshIndex)
     public int? SkinIndex { get; init; }
 
     public int ChildCount { get; init; }
+
+    public IReadOnlyList<double> MorphWeights { get; init; } = Array.Empty<double>();
 }
 
-public sealed record RekallAgeGlbMeshMetadata(string? Name, int PrimitiveCount);
+public sealed record RekallAgeGlbMeshMetadata(string? Name, int PrimitiveCount)
+{
+    public int MorphTargetCount { get; init; }
+
+    public IReadOnlyList<string> MorphTargetNames { get; init; } = Array.Empty<string>();
+
+    public IReadOnlyList<double> DefaultMorphWeights { get; init; } = Array.Empty<double>();
+}
 
 public sealed record RekallAgeGlbMaterialMetadata(string? Name);
 

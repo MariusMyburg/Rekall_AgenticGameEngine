@@ -30,7 +30,17 @@ public sealed record RekallAgeVulkanSceneMesh(
 
     public IReadOnlyList<RekallAgeVulkanSceneSkinBinding> SkinBindings { get; init; } =
         Array.Empty<RekallAgeVulkanSceneSkinBinding>();
+
+    public IReadOnlyList<RekallAgeVulkanSceneMorphTarget> MorphTargets { get; init; } =
+        Array.Empty<RekallAgeVulkanSceneMorphTarget>();
+
+    public IReadOnlyList<float> DefaultMorphWeights { get; init; } = Array.Empty<float>();
 }
+
+public sealed record RekallAgeVulkanSceneMorphTarget(
+    string Name,
+    IReadOnlyList<Vector3> PositionDeltas,
+    IReadOnlyList<Vector3> NormalDeltas);
 
 public readonly record struct RekallAgeVulkanSceneSkinBinding(
     int Joint0,

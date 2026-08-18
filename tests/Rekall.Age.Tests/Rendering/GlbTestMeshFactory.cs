@@ -485,6 +485,81 @@ internal static class GlbTestMeshFactory
         return CreateGlb(Encoding.UTF8.GetBytes(json), binary.ToArray());
     }
 
+    public static byte[] CreateMorphTriangleGlb()
+    {
+        var binary = new MemoryStream();
+        var positions = new[]
+        {
+            new[] { 0f, 0f, 0f }, new[] { 1f, 0f, 0f }, new[] { 0f, 1f, 0f }
+        };
+        var normals = Enumerable.Repeat(new[] { 0f, 0f, 1f }, 3);
+        var target0Positions = Enumerable.Repeat(new[] { 1f, 0f, 0f }, 3);
+        var target0Normals = Enumerable.Repeat(new[] { 0f, 1f, 0f }, 3);
+        var target1Positions = Enumerable.Repeat(new[] { 0f, 1f, 0f }, 3);
+        var target1Normals = Enumerable.Repeat(new[] { 1f, 0f, 0f }, 3);
+        var offsets = new List<int>();
+        foreach (var vectors in new[] { positions.AsEnumerable(), normals, target0Positions, target0Normals, target1Positions, target1Normals })
+        {
+            offsets.Add((int)binary.Position);
+            foreach (var vector in vectors)
+            {
+                foreach (var component in vector) WriteSingle(binary, component);
+            }
+        }
+        var indexOffset = (int)binary.Position;
+        WriteUInt16(binary, 0); WriteUInt16(binary, 1); WriteUInt16(binary, 2);
+        var binaryLength = checked((int)binary.Length);
+        var json = $$"""
+            {
+              "asset": { "version": "2.0" },
+              "buffers": [{ "byteLength": {{binaryLength}} }],
+              "bufferViews": [
+                { "buffer": 0, "byteOffset": {{offsets[0]}}, "byteLength": 36 },
+                { "buffer": 0, "byteOffset": {{offsets[1]}}, "byteLength": 36 },
+                { "buffer": 0, "byteOffset": {{offsets[2]}}, "byteLength": 36 },
+                { "buffer": 0, "byteOffset": {{offsets[3]}}, "byteLength": 36 },
+                { "buffer": 0, "byteOffset": {{offsets[4]}}, "byteLength": 36 },
+                { "buffer": 0, "byteOffset": {{offsets[5]}}, "byteLength": 36 },
+                { "buffer": 0, "byteOffset": {{indexOffset}}, "byteLength": 6 }
+              ],
+              "accessors": [
+                { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3" },
+                { "bufferView": 1, "componentType": 5126, "count": 3, "type": "VEC3" },
+                { "bufferView": 2, "componentType": 5126, "count": 3, "type": "VEC3" },
+                { "bufferView": 3, "componentType": 5126, "count": 3, "type": "VEC3" },
+                { "bufferView": 4, "componentType": 5126, "count": 3, "type": "VEC3" },
+                { "bufferView": 5, "componentType": 5126, "count": 3, "type": "VEC3" },
+                { "bufferView": 6, "componentType": 5123, "count": 3, "type": "SCALAR" }
+              ],
+              "meshes": [{
+                "name": "Morph Triangle",
+                "weights": [0.25, -0.5],
+                "extras": { "targetNames": ["wide", "raised"] },
+                "primitives": [{
+                  "attributes": { "POSITION": 0, "NORMAL": 1 },
+                  "targets": [
+                    { "POSITION": 2, "NORMAL": 3 },
+                    { "POSITION": 4, "NORMAL": 5 }
+                  ],
+                  "indices": 6,
+                  "mode": 4
+                }]
+              }],
+              "nodes": [{
+                "name": "Morph Node",
+                "mesh": 0,
+                "weights": [0.5, 0.75],
+                "translation": [10, 20, 30],
+                "rotation": [0, 0, 0.7071067811865476, 0.7071067811865476],
+                "scale": [2, 2, 2]
+              }],
+              "scenes": [{ "nodes": [0] }],
+              "scene": 0
+            }
+            """;
+        return CreateGlb(Encoding.UTF8.GetBytes(json), binary.ToArray());
+    }
+
     private static byte[] Pad(byte[] bytes, byte value)
     {
         var paddedLength = (bytes.Length + 3) & ~3;

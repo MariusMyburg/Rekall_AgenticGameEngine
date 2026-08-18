@@ -11,6 +11,9 @@ public sealed class RekallAgeGlbMeshLoader
     private const uint JsonChunkType = 0x4E4F534A;
     private const uint BinChunkType = 0x004E4942;
     private const int MaxVerticesPerMesh = 16_000_000;
+    private const int MaxMorphTargets = 64;
+    private const long MaxMorphDeltaVectors = 4_194_304;
+    private const float MaxMorphMagnitude = 1_000_000;
 
     public async ValueTask<IReadOnlyList<RekallAgeVulkanSceneMesh>> LoadAsync(
         string assetId,
@@ -32,6 +35,7 @@ public sealed class RekallAgeGlbMeshLoader
         var textures = ReadTextures(root, bufferViews, glb.Bin);
         var materials = ReadMaterials(assetId, root, textures);
         var rootNodeIndexes = ReadSceneRootNodes(root, nodes.Count);
+        var morphMeshes = ValidateMorphAsset(meshesElement, accessors);
         var meshes = new List<RekallAgeVulkanSceneMesh>();
         foreach (var nodeIndex in rootNodeIndexes)
         {
@@ -43,6 +47,7 @@ public sealed class RekallAgeGlbMeshLoader
                 accessors,
                 materials,
                 glb.Bin,
+                morphMeshes,
                 nodeIndex,
                 Matrix4x4.Identity,
                 meshes);
@@ -58,10 +63,12 @@ public sealed class RekallAgeGlbMeshLoader
                 meshIndex,
                 Matrix4x4.Identity,
                 null,
+                null,
                 bufferViews,
                     accessors,
                     materials,
                     glb.Bin,
+                    morphMeshes,
                     meshes);
             }
         }
@@ -77,6 +84,7 @@ public sealed class RekallAgeGlbMeshLoader
         IReadOnlyList<JsonElement> accessors,
         IReadOnlyList<MaterialInfo> materials,
         ReadOnlyMemory<byte> bin,
+        IReadOnlyDictionary<int, MorphMeshInfo> morphMeshes,
         int nodeIndex,
         Matrix4x4 parentTransform,
         List<RekallAgeVulkanSceneMesh> meshes)
@@ -100,10 +108,12 @@ public sealed class RekallAgeGlbMeshLoader
                 meshIndex,
                 transform,
                 ReadNullableInt(node, "skin"),
+                ReadOptionalMorphWeights(node, "weights"),
                 bufferViews,
                 accessors,
                 materials,
                 bin,
+                morphMeshes,
                 meshes);
         }
 
@@ -121,6 +131,7 @@ public sealed class RekallAgeGlbMeshLoader
                         accessors,
                         materials,
                         bin,
+                        morphMeshes,
                         childIndex,
                         transform,
                         meshes);
@@ -135,10 +146,12 @@ public sealed class RekallAgeGlbMeshLoader
         int meshIndex,
         Matrix4x4 transform,
         int? skinIndex,
+        IReadOnlyList<float>? nodeMorphWeights,
         IReadOnlyList<JsonElement> bufferViews,
         IReadOnlyList<JsonElement> accessors,
         IReadOnlyList<MaterialInfo> materials,
         ReadOnlyMemory<byte> bin,
+        IReadOnlyDictionary<int, MorphMeshInfo> morphMeshes,
         List<RekallAgeVulkanSceneMesh> output)
     {
         if (!mesh.TryGetProperty("primitives", out var primitives) || primitives.ValueKind != JsonValueKind.Array)
@@ -147,6 +160,8 @@ public sealed class RekallAgeGlbMeshLoader
         }
 
         var primitiveIndex = 0;
+        morphMeshes.TryGetValue(meshIndex, out var morphMesh);
+        var defaultMorphWeights = ResolveDefaultMorphWeights(morphMesh, nodeMorphWeights);
         foreach (var primitive in primitives.EnumerateArray())
         {
             if (ReadInt(primitive, "mode", 4) != 4
@@ -185,6 +200,15 @@ public sealed class RekallAgeGlbMeshLoader
                 && weightAccessorElement.TryGetInt32(out var weightAccessor)
                 ? ReadWeightAccessor(weightAccessor, accessors, bufferViews, bin)
                 : [];
+            var morphTargets = ReadMorphTargets(
+                primitive,
+                morphMesh,
+                positions.Count,
+                normals,
+                transform,
+                accessors,
+                bufferViews,
+                bin);
             var material = ResolveMaterial(primitive, materials);
             var indices = primitive.TryGetProperty("indices", out var indicesElement)
                 && indicesElement.TryGetInt32(out var indicesAccessor)
@@ -202,6 +226,8 @@ public sealed class RekallAgeGlbMeshLoader
                 uvs,
                 joints,
                 weights,
+                morphTargets,
+                morphTargets.Count > 0 ? defaultMorphWeights : [],
                 skinIndex,
                 material,
                 indices,
@@ -221,6 +247,8 @@ public sealed class RekallAgeGlbMeshLoader
         IReadOnlyList<Vector2> uvs,
         IReadOnlyList<JointIndexes> joints,
         IReadOnlyList<Vector4> weights,
+        IReadOnlyList<SourceMorphTarget> morphTargets,
+        IReadOnlyList<float> defaultMorphWeights,
         int? skinIndex,
         MaterialInfo material,
         IReadOnlyList<int> sourceIndices,
@@ -229,6 +257,8 @@ public sealed class RekallAgeGlbMeshLoader
         var vertices = new List<RekallAgeVulkanSceneVertex>(Math.Min(sourceIndices.Count, MaxVerticesPerMesh));
         var indices = new List<uint>(Math.Min(sourceIndices.Count, MaxVerticesPerMesh));
         var skinBindings = new List<RekallAgeVulkanSceneSkinBinding>(Math.Min(sourceIndices.Count, MaxVerticesPerMesh));
+        var morphPositionDeltas = morphTargets.Select(_ => new List<Vector3>()).ToArray();
+        var morphNormalDeltas = morphTargets.Select(_ => new List<Vector3>()).ToArray();
         var remap = new Dictionary<int, uint>();
         var chunk = 0;
         for (var i = 0; i + 2 < sourceIndices.Count; i += 3)
@@ -335,6 +365,11 @@ public sealed class RekallAgeGlbMeshLoader
                 weight.Y,
                 weight.Z,
                 weight.W));
+            for (var targetIndex = 0; targetIndex < morphTargets.Count; targetIndex++)
+            {
+                morphPositionDeltas[targetIndex].Add(morphTargets[targetIndex].PositionDeltas[sourceIndex]);
+                morphNormalDeltas[targetIndex].Add(morphTargets[targetIndex].NormalDeltas[sourceIndex]);
+            }
             remap[sourceIndex] = vertexIndex;
             return vertexIndex;
         }
@@ -367,13 +402,196 @@ public sealed class RekallAgeGlbMeshLoader
                 SkinBindings = skinIndex is not null && skinBindings.Any(binding =>
                     binding.Weight0 + binding.Weight1 + binding.Weight2 + binding.Weight3 > 0.000001f)
                     ? skinBindings.ToArray()
-                    : []
+                    : [],
+                MorphTargets = morphTargets.Select((target, targetIndex) =>
+                    new RekallAgeVulkanSceneMorphTarget(
+                        target.Name,
+                        morphPositionDeltas[targetIndex].ToArray(),
+                        morphNormalDeltas[targetIndex].ToArray())).ToArray(),
+                DefaultMorphWeights = defaultMorphWeights.ToArray()
             });
             vertices.Clear();
             indices.Clear();
             skinBindings.Clear();
+            foreach (var deltas in morphPositionDeltas) deltas.Clear();
+            foreach (var deltas in morphNormalDeltas) deltas.Clear();
             remap.Clear();
         }
+    }
+
+    private static IReadOnlyDictionary<int, MorphMeshInfo> ValidateMorphAsset(
+        JsonElement meshes,
+        IReadOnlyList<JsonElement> accessors)
+    {
+        var result = new Dictionary<int, MorphMeshInfo>();
+        IReadOnlyList<string>? assetNames = null;
+        for (var meshIndex = 0; meshIndex < meshes.GetArrayLength(); meshIndex++)
+        {
+            var mesh = meshes[meshIndex];
+            if (!mesh.TryGetProperty("primitives", out var primitives) || primitives.ValueKind != JsonValueKind.Array) continue;
+            var count = 0;
+            foreach (var primitive in primitives.EnumerateArray())
+            {
+                if (!primitive.TryGetProperty("targets", out var targets)) continue;
+                if (targets.ValueKind != JsonValueKind.Array)
+                    throw new InvalidDataException("GLB morph targets must be an array.");
+                if (targets.GetArrayLength() is < 1 or > MaxMorphTargets)
+                    throw new InvalidDataException($"GLB morph target count must be 1 to {MaxMorphTargets}.");
+                if (count != 0 && count != targets.GetArrayLength())
+                    throw new InvalidDataException("GLB mesh primitives use incompatible morph target counts.");
+                count = targets.GetArrayLength();
+                long vectors = 0;
+                foreach (var target in targets.EnumerateArray())
+                {
+                    if (target.ValueKind != JsonValueKind.Object) throw new InvalidDataException("GLB morph target must be an object.");
+                    foreach (var semantic in target.EnumerateObject())
+                    {
+                        if (semantic.Name is not ("POSITION" or "NORMAL"))
+                            throw new InvalidDataException($"GLB morph semantic '{semantic.Name}' is unsupported; POSITION and NORMAL are supported.");
+                        if (!semantic.Value.TryGetInt32(out var accessorIndex) || accessorIndex < 0 || accessorIndex >= accessors.Count)
+                            throw new InvalidDataException($"GLB morph {semantic.Name} accessor is invalid.");
+                        var accessorCount = ReadInt(accessors[accessorIndex], "count", 0);
+                        if (accessorCount <= 0) throw new InvalidDataException($"GLB morph {semantic.Name} accessor count must be positive.");
+                        vectors += accessorCount;
+                    }
+                    if (!target.TryGetProperty("POSITION", out _))
+                        throw new InvalidDataException("GLB morph target must define POSITION deltas.");
+                }
+                if (vectors > MaxMorphDeltaVectors)
+                    throw new InvalidDataException($"GLB morph primitive exceeds the {MaxMorphDeltaVectors} delta-vector limit.");
+            }
+            if (count == 0) continue;
+            var names = ReadMorphTargetNames(mesh, count);
+            if (assetNames is not null && !assetNames.SequenceEqual(names, StringComparer.Ordinal))
+                throw new InvalidDataException("GLB morph-bearing primitives use incompatible ordered target layouts.");
+            assetNames ??= names;
+            var defaults = ReadOptionalMorphWeights(mesh, "weights") ?? Enumerable.Repeat(0f, count).ToArray();
+            if (defaults.Count != count) throw new InvalidDataException("GLB mesh morph weight count does not match its target count.");
+            result[meshIndex] = new MorphMeshInfo(names, defaults);
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<string> ReadMorphTargetNames(JsonElement mesh, int count)
+    {
+        if (!mesh.TryGetProperty("extras", out var extras) || extras.ValueKind != JsonValueKind.Object
+            || !extras.TryGetProperty("targetNames", out var names))
+            return Enumerable.Range(0, count).Select(index => $"target-{index}").ToArray();
+        if (names.ValueKind != JsonValueKind.Array || names.GetArrayLength() != count)
+            throw new InvalidDataException("GLB morph target names must exactly match the target count.");
+        return names.EnumerateArray().Select((name, index) =>
+        {
+            var value = name.ValueKind == JsonValueKind.String ? name.GetString() : null;
+            if (string.IsNullOrWhiteSpace(value) || value.Length > 128)
+                throw new InvalidDataException($"GLB morph target name {index} must contain 1 to 128 characters.");
+            return value;
+        }).ToArray()!;
+    }
+
+    private static IReadOnlyList<float>? ReadOptionalMorphWeights(JsonElement source, string property)
+    {
+        if (!source.TryGetProperty(property, out var values)) return null;
+        if (values.ValueKind != JsonValueKind.Array || values.GetArrayLength() > MaxMorphTargets)
+            throw new InvalidDataException($"GLB {property} must contain at most {MaxMorphTargets} values.");
+        return values.EnumerateArray().Select((value, index) =>
+        {
+            if (value.ValueKind != JsonValueKind.Number || !value.TryGetSingle(out var number)
+                || !float.IsFinite(number) || Math.Abs(number) > MaxMorphMagnitude)
+                throw new InvalidDataException($"GLB {property} entry {index} must be finite with absolute value at most 1000000.");
+            return number;
+        }).ToArray();
+    }
+
+    private static IReadOnlyList<float> ResolveDefaultMorphWeights(
+        MorphMeshInfo? mesh,
+        IReadOnlyList<float>? nodeWeights)
+    {
+        if (mesh is null)
+        {
+            if (nodeWeights is { Count: > 0 }) throw new InvalidDataException("GLB node weights reference a mesh without morph targets.");
+            return [];
+        }
+        if (nodeWeights is not null && nodeWeights.Count != mesh.Names.Count)
+            throw new InvalidDataException("GLB node morph weight count does not match its target count.");
+        return nodeWeights ?? mesh.DefaultWeights;
+    }
+
+    private static IReadOnlyList<SourceMorphTarget> ReadMorphTargets(
+        JsonElement primitive,
+        MorphMeshInfo? mesh,
+        int vertexCount,
+        IReadOnlyList<Vector3> baseNormals,
+        Matrix4x4 transform,
+        IReadOnlyList<JsonElement> accessors,
+        IReadOnlyList<JsonElement> bufferViews,
+        ReadOnlyMemory<byte> bin)
+    {
+        if (!primitive.TryGetProperty("targets", out var targets)) return [];
+        if (mesh is null || targets.ValueKind != JsonValueKind.Array || targets.GetArrayLength() != mesh.Names.Count)
+            throw new InvalidDataException("GLB morph target layout is inconsistent.");
+        return targets.EnumerateArray().Select((target, index) =>
+        {
+            var positions = ReadMorphVec3Accessor(ReadInt(target, "POSITION", -1), vertexCount, "POSITION", accessors, bufferViews, bin)
+                .Select(value => Vector3.TransformNormal(value, transform)).ToArray();
+            var normalIndex = -1;
+            var hasNormalTarget = target.TryGetProperty("NORMAL", out var normalAccessor)
+                && normalAccessor.TryGetInt32(out normalIndex);
+            if (hasNormalTarget && baseNormals.Count != vertexCount)
+                throw new InvalidDataException("GLB morph NORMAL deltas require a matching base NORMAL accessor.");
+            var normals = hasNormalTarget
+                ? TransformNormalDeltas(
+                    ReadMorphVec3Accessor(normalIndex, vertexCount, "NORMAL", accessors, bufferViews, bin),
+                    baseNormals,
+                    transform)
+                : Enumerable.Repeat(Vector3.Zero, vertexCount).ToArray();
+            return new SourceMorphTarget(mesh.Names[index], positions, normals);
+        }).ToArray();
+    }
+
+    private static IReadOnlyList<Vector3> ReadMorphVec3Accessor(
+        int accessorIndex,
+        int expectedCount,
+        string semantic,
+        IReadOnlyList<JsonElement> accessors,
+        IReadOnlyList<JsonElement> bufferViews,
+        ReadOnlyMemory<byte> bin)
+    {
+        if (!TryResolveAccessor(accessorIndex, accessors, bufferViews, bin, out var accessor, out var view, out var bytes)
+            || accessor.TryGetProperty("sparse", out _)
+            || ReadString(accessor, "type") != "VEC3"
+            || ReadInt(accessor, "componentType", 0) != 5126
+            || ReadInt(accessor, "count", 0) != expectedCount)
+            throw new InvalidDataException($"GLB morph {semantic} accessor must be non-sparse float VEC3 with exactly {expectedCount} entries.");
+        var stride = ReadInt(view, "byteStride", 12);
+        if (stride < 12 || checked((expectedCount - 1) * stride + 12) > bytes.Length)
+            throw new InvalidDataException($"GLB morph {semantic} accessor data is truncated or has an invalid stride.");
+        var result = new Vector3[expectedCount];
+        for (var index = 0; index < expectedCount; index++)
+        {
+            var offset = index * stride;
+            var value = new Vector3(ReadSingle(bytes.Span, offset), ReadSingle(bytes.Span, offset + 4), ReadSingle(bytes.Span, offset + 8));
+            if (!float.IsFinite(value.X) || !float.IsFinite(value.Y) || !float.IsFinite(value.Z)
+                || Math.Abs(value.X) > MaxMorphMagnitude || Math.Abs(value.Y) > MaxMorphMagnitude || Math.Abs(value.Z) > MaxMorphMagnitude)
+                throw new InvalidDataException($"GLB morph {semantic} entry {index} is non-finite or exceeds magnitude 1000000.");
+            result[index] = value;
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<Vector3> TransformNormalDeltas(
+        IReadOnlyList<Vector3> deltas,
+        IReadOnlyList<Vector3> baseNormals,
+        Matrix4x4 transform)
+    {
+        var result = new Vector3[deltas.Count];
+        for (var index = 0; index < deltas.Count; index++)
+        {
+            var baseLength = Vector3.TransformNormal(baseNormals[index], transform).Length();
+            if (!float.IsFinite(baseLength) || baseLength <= 0.000001f)
+                throw new InvalidDataException($"GLB morph NORMAL base entry {index} cannot be transformed safely.");
+            result[index] = Vector3.TransformNormal(deltas[index], transform) / baseLength;
+        }
+        return result;
     }
 
     private static IReadOnlyList<Vector3> ReadVec3Accessor(
@@ -1065,6 +1283,15 @@ public sealed class RekallAgeGlbMeshLoader
     private readonly record struct GlbPayload(ReadOnlyMemory<byte> Json, ReadOnlyMemory<byte> Bin);
 
     private readonly record struct JointIndexes(int X, int Y, int Z, int W);
+
+    private sealed record MorphMeshInfo(
+        IReadOnlyList<string> Names,
+        IReadOnlyList<float> DefaultWeights);
+
+    private sealed record SourceMorphTarget(
+        string Name,
+        IReadOnlyList<Vector3> PositionDeltas,
+        IReadOnlyList<Vector3> NormalDeltas);
 
     private sealed record MaterialInfo(
         Vector4 BaseColor,

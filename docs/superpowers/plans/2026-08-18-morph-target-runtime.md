@@ -122,7 +122,7 @@ git commit -m "feat: validate inspectable morph weights"
 - Adds `RekallAgeVulkanSceneMorphTarget(string Name, IReadOnlyList<Vector3> PositionDeltas, IReadOnlyList<Vector3> NormalDeltas)`.
 - Adds `MorphTargets` and `DefaultMorphWeights` init properties to `RekallAgeVulkanSceneMesh`.
 
-- [ ] **Step 1: Add a failing minimal morph GLB fixture and metadata/loader tests**
+- [x] **Step 1: Add a failing minimal morph GLB fixture and metadata/loader tests**
 
 Build a triangle with base POSITION/NORMAL and two target objects, ordered names
 `wide` and `raised`, mesh defaults `[0.25,-0.5]`, and a node override
@@ -130,13 +130,13 @@ Build a triangle with base POSITION/NORMAL and two target objects, ordered names
 deltas/defaults. Include a node transform and hand-derive that translation does
 not affect deltas while scale/rotation do.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~GlbMorphTargetLoaderTests|FullyQualifiedName~AssetPipelineImportTests" --verbosity minimal
 ```
 
-- [ ] **Step 3: Implement metadata discovery and bounded loader records**
+- [x] **Step 3: Implement metadata discovery and bounded loader records**
 
 Metadata assigns deterministic `target-N` fallbacks, limits names to 128
 characters, records mesh defaults and node overrides separately without reading
@@ -146,7 +146,7 @@ zero weights; validates target array count before accessor allocation; validates
 exact accessor shape/count and finite magnitude; then remaps target deltas
 beside each emitted chunk vertex.
 
-- [ ] **Step 4: Add failing adversarial loader tests**
+- [x] **Step 4: Add failing adversarial loader tests**
 
 Use real GLBs for 65 targets, target-vector total above 4,194,304, mismatched
 accessor count, NaN and magnitude overflow, TANGENT/sparse/quantized accessors,
@@ -154,7 +154,7 @@ bad default counts, target-name overflow, and incompatible multi-primitive
 layouts. Assert deterministic `InvalidDataException` messages and no partial
 mesh result.
 
-- [ ] **Step 5: Complete validation, run non-morph/skinning loader regressions, and commit**
+- [x] **Step 5: Complete validation, run non-morph/skinning loader regressions, and commit**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~GlbMorphTargetLoaderTests|FullyQualifiedName~GlbMeshLoader|FullyQualifiedName~GlbSkeletal|FullyQualifiedName~AssetPipelineImportTests" --verbosity minimal

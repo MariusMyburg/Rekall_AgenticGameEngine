@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 11:25 Africa/Johannesburg
+Last verified: 2026-08-18 11:33 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: generic morph-weight runtime contract passed its focused gate
+Latest milestone: bounded glTF morph metadata and mesh loading passed its focused gate
 
 ## Product objective
 
@@ -891,8 +891,19 @@ out-of-range input; removes stale state; preserves exact negative and
 extrapolated values; and publishes sorted bounded `Rekall.MorphState`
 projection. Split execution matches continuous execution. Runtime CLI
 inspection reports counts and invariant-culture weights without vertex data.
-The next implementation item is bounded glTF target metadata and mesh loading;
-authored modules remain responsible for game behavior.
+Authored modules remain responsible for game behavior.
+
+Morph target Task 2 is verified in a 24/24 combined asset/loader/skeletal
+selection. Asset reports expose ordered names, separate mesh defaults and node
+overrides, supported POSITION/NORMAL semantics, and explicit limitations. The
+loader carries exact aligned deltas and resolved defaults through node
+translation/rotation/scale and index remapping, excluding translation from
+deltas. It rejects more than 64 targets, more than 4,194,304 declared vectors,
+bad counts/strides/defaults/names, non-finite or excessive values, TANGENT,
+sparse/quantized accessors, missing base normals, and incompatible compound
+layouts before returning partial meshes. Existing plain and skeletal GLB paths
+remain green. The next item is exact CPU deformation before skinning plus the
+generic final-mesh geometry inspection contract.
 
 That decision is now fixed in
 `docs/superpowers/specs/2026-08-18-morph-target-runtime-design.md`: a bounded

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 04:00 Africa/Johannesburg
+Last verified: 2026-08-18 04:07 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: targeted audit repair passed 586/586 Debug tests
+Latest milestone: targeted audit repair passed the complete product gate
 
 ## Product objective
 
@@ -490,6 +490,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   wholesale replacement. A genuine failed requirement must be repaired with
   the smallest canonical targeted mutation, followed only by evidence made
   stale by that change. The full Debug suite passes at 586/586.
+- Targeted audit-repair distribution gate: the clean Release build completed
+  with zero warnings and zero errors; both independent Release passes completed
+  at 586/586; and installed acceptance passed SDK/module authoring, the generic
+  gauntlet, original and relocated package proof, runtime UI, software viewport,
+  simulated audio, and Windows player audio. The canonical 1,149-file archive
+  is 194,710,647 bytes.
 
 ## Current gaps
 
@@ -505,7 +511,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for targeted completion-audit repair.
+Run the unchanged installed Ollama benchmark on the targeted-audit distribution.
 
 ## Next after the current item
 

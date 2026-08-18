@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 07:57 Africa/Johannesburg
+Last verified: 2026-08-18 08:05 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: installed agent-authored module trust boundary passed the complete product gate
+Latest milestone: bounded atomic desktop failure-report foundation passed its focused gate
 
 ## Product objective
 
@@ -728,6 +728,14 @@ Studio is important, but it does not define or reorder the engine foundation.
   growth. The canonical 1,149-manifest-file archive is 194,923,288 bytes with
   SHA-256
   `365fcc80428348006174384f32221f47d352b8238807caf75e83ca35deb743b5`.
+- Bounded failure-report foundation: the shared Core contract records only
+  explicit schema/product/component/outcome/category/recovery/frame/exception
+  facts and operator actions. Its store uses per-root concurrency control,
+  unique temporary files plus atomic moves, bounded payload/read/retention
+  limits, newest-first inspection, malformed-file isolation, and fail-closed
+  reparse-root handling. The focused Debug selection passed 5/5, including 12
+  concurrent complete writes and contract checks excluding ambient environment
+  variables, arbitrary exception data, and project content.
 
 ## Current gaps
 
@@ -743,9 +751,9 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Define and implement device-loss recovery, crash reporting, and release
-operability evidence. The six-slice agent-authored module trust boundary is
-complete and installed-product verified.
+Implement the graphics failure classifier and bounded player-session supervisor
+on the verified atomic failure-report foundation. The six-slice agent-authored
+module trust boundary remains complete and installed-product verified.
 
 ## Next after the current item
 

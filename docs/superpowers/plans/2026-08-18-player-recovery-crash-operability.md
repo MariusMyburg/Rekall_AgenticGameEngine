@@ -18,11 +18,11 @@
 - Create: `src/Rekall.Age.Core/Diagnostics/RekallAgeFailureReportStore.cs`
 - Create: `tests/Rekall.Age.Tests/Core/FailureReportStoreTests.cs`
 
-- [ ] **Step 1: Add failing storage tests**
+- [x] **Step 1: Add failing storage tests**
 
 Cover schema/product/component/outcome/category/frame/attempt fields, explicit-root and Local App Data resolution, atomic JSON creation, newest-first bounded reads, report-size/entry/retention limits, malformed JSON, duplicate ids, traversal-safe filenames, reparse roots, and concurrent writes. Assert reports never serialize environment variables, arbitrary exception data, or project content.
 
-- [ ] **Step 2: Run focused tests RED**
+- [x] **Step 2: Run focused tests RED**
 
 ```powershell
 $env:TEMP='F:\Dev\Rekall_AGE\.worktrees\production-foundation\Artifacts\TestTemp'
@@ -32,16 +32,21 @@ dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj -c Debug --filter Ful
 
 Expected: report contracts/store do not exist.
 
-- [ ] **Step 3: Implement bounded contracts and atomic store**
+- [x] **Step 3: Implement bounded contracts and atomic store**
 
 Use schema 1, product metadata, stable code/category/outcome/recovery-mode, bounded exception facts, project/scene identifiers, limitations, and next actions. Stream/limit reads, reject reparse roots, use unique temp plus atomic move, cap defaults at 50 reports and 1 MiB/report, and delete only validated report files beyond retention.
 
-- [ ] **Step 4: Run focused tests GREEN and commit**
+- [x] **Step 4: Run focused tests GREEN and commit**
 
 ```powershell
 git add src/Rekall.Age.Core/Diagnostics tests/Rekall.Age.Tests/Core/FailureReportStoreTests.cs
 git commit -m "feat: add bounded failure reports"
 ```
+
+Verified 2026-08-18: the focused Debug selection passed 5/5. Evidence covers
+atomic creation, newest-first reads, bounded retention and payloads, malformed
+report isolation, concurrent unique writes, root reparse rejection, and an
+explicit contract that does not capture ambient environment or exception data.
 
 ## Task 2: Implement graphics failure classification and bounded supervision
 

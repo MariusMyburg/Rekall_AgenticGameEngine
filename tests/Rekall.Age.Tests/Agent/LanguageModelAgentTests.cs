@@ -29,6 +29,8 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("every requested visible dynamic body has a renderer", prompt, StringComparison.Ordinal);
         Assert.Contains("scaffold the required playable module before the first packaging call", prompt, StringComparison.Ordinal);
         Assert.Contains("rekall.validation.repair_project", prompt, StringComparison.Ordinal);
+        Assert.Contains("immediately after the first complete scene authoring", prompt, StringComparison.Ordinal);
+        Assert.Contains("never add new entities merely to exercise validation", prompt, StringComparison.Ordinal);
         Assert.Contains("retry once with the same named scenes and empty entities arrays", prompt, StringComparison.Ordinal);
         Assert.Contains("Never repeat substantially the same failed blueprint arguments", prompt, StringComparison.Ordinal);
         Assert.True(
@@ -160,6 +162,10 @@ public sealed class LanguageModelAgentTests
             model.Requests[4].Messages,
             message => message.Role == "user"
                 && message.Content.Contains("targeted canonical mutation", StringComparison.Ordinal));
+        Assert.Contains(
+            model.Requests[4].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("do not add new entities merely to exercise validation", StringComparison.Ordinal));
     }
 
     [Fact]

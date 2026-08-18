@@ -29,7 +29,7 @@ public sealed class AgentContextTests
         Assert.Equal("Crystal Mines", summary.Project);
         Assert.Equal("blocked", summary.Health.Status);
         Assert.Contains(summary.Health.BlockingIssues, issue => issue.Contains("active camera", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains("rekall.workflow.fix_validation_errors", summary.RecommendedNextActions);
+        Assert.Contains("rekall.validation.project", summary.RecommendedNextActions);
     }
 
     [Fact]

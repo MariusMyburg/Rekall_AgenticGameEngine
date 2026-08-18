@@ -787,6 +787,36 @@ suggestions that preserve authored properties while replacing the typo with
 the validator's computed canonical type. The full Debug suite passes at
 588/588.
 
+### Validation-sequencing rerun
+
+Rerun 28 used the canonical-repair distribution with the unchanged 36-turn
+task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun28`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 515,162
+- Completion tokens: 8,862
+
+The agent reached clean validation, deterministic inspection of both scenes,
+module build, and graphics package creation by tool 26. During completion audit
+it deferred the requested deliberate-fault exercise until after packaging,
+added new fault-only entities, repaired them, and exhausted the remaining turns
+before package refresh or relocation.
+
+Independent installed verification found the final project clean and both 3D
+and 2D dynamic bodies moving by -1.267 after 30 frames. The original 467-file
+package independently passed inspection, a 30-frame run, audit, and nonblank
+capture. Relocation and relocated proof were the only missing deliverables.
+
+The embedded and completion-audit contracts now require deliberate faults on
+existing relevant components immediately after initial scene authoring, before
+runtime or packaging, and prohibit adding entities merely for validation
+exercise. Validator and agent-context guidance no longer advertise the
+nonexistent `rekall.workflow.fix_validation_errors` or incomplete blueprint
+arguments; missing generic content points to registered validation and schema
+discovery operations. The full Debug suite passes at 589/589.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

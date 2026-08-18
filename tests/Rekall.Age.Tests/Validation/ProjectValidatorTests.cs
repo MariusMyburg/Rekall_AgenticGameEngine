@@ -11,6 +11,25 @@ namespace Rekall.Age.Tests.Validation;
 public sealed class ProjectValidatorTests
 {
     [Fact]
+    public async Task ValidateSceneMissingCameraSuggestsRegisteredSchemaDiscovery()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Visible", [])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.SpriteRenderer")));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        var issue = Assert.Single(report.Issues, item => item.Code == "REKALL_CAMERA_MISSING");
+        var suggestion = Assert.Single(issue.SuggestedCommands!);
+        Assert.Equal("rekall.module.search_component_schemas", suggestion.Tool);
+        Assert.Contains("camera", Assert.IsType<string>(suggestion.Arguments["query"]), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ValidateSceneDoesNotRequireCameraForCanvasOnlyContent()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -511,7 +530,10 @@ public sealed class ProjectValidatorTests
         Assert.Equal("ok", result.Value.Status);
         Assert.True(result.Value.WarningCount >= 3);
         Assert.Contains(result.Value.Issues, issue => issue.Code == "REKALL_XR_RIG_MISSING");
-        Assert.Contains(result.Value.SuggestedNextActions, action => action.Tool == "rekall.scene.apply_blueprint");
+        Assert.Contains(
+            result.Value.SuggestedNextActions,
+            action => action.Tool == "rekall.module.search_component_schemas"
+                && Equals(action.Arguments["query"], "XrRig"));
     }
 
     [Fact]

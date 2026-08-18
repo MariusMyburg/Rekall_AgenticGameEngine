@@ -59,8 +59,12 @@ public sealed class RekallAgeProjectValidator
                 scene.Name,
                 [
                     new RekallAgeSuggestedCommand(
-                        "rekall.workflow.fix_validation_errors",
-                        new Dictionary<string, object?> { ["scene"] = scene.Name })
+                        "rekall.module.search_component_schemas",
+                        new Dictionary<string, object?>
+                        {
+                            ["query"] = "camera transform",
+                            ["limit"] = 20
+                        })
                 ]));
         }
 
@@ -102,8 +106,12 @@ public sealed class RekallAgeProjectValidator
                 scene.Name,
                 [
                     new RekallAgeSuggestedCommand(
-                        "rekall.scene.apply_blueprint",
-                        new Dictionary<string, object?> { ["scene"] = scene.Name })
+                        "rekall.module.search_component_schemas",
+                        new Dictionary<string, object?>
+                        {
+                            ["query"] = "UiCanvas",
+                            ["limit"] = 10
+                        })
                 ]));
         }
 
@@ -572,8 +580,12 @@ public sealed class RekallAgeProjectValidator
                 scene.Name,
                 [
                     new RekallAgeSuggestedCommand(
-                        "rekall.scene.apply_blueprint",
-                        new Dictionary<string, object?> { ["scene"] = scene.Name })
+                        "rekall.module.search_component_schemas",
+                        new Dictionary<string, object?>
+                        {
+                            ["query"] = "XrRig",
+                            ["limit"] = 10
+                        })
                 ]));
         }
 

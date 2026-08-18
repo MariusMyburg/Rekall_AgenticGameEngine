@@ -40,7 +40,7 @@ public sealed class RekallAgeContextBuilder
         var artifacts = FindArtifacts(projectRoot);
         var status = blocking.Count == 0 ? "ok" : "blocked";
         IReadOnlyList<string> nextActions = blocking.Count != 0
-            ? ["rekall.workflow.fix_validation_errors"]
+            ? ["rekall.validation.project"]
             : artifacts.Any(artifact => artifact.Kind == "playable-package-archive")
                 ? ["rekall.workflow.audit_playable_package", "rekall.workflow.run_playable_package"]
                 : ["rekall.workflow.package_playable_game", "rekall.capture.screenshot"];

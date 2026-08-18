@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 04:40 Africa/Johannesburg
+Last verified: 2026-08-18 04:51 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: canonical validation repair passed the complete product gate
+Latest milestone: validation sequencing and registered guidance passed 589/589 Debug tests
 
 ## Product objective
 
@@ -526,6 +526,18 @@ Studio is important, but it does not define or reorder the engine foundation.
   the generic gauntlet, original and relocated package proof, runtime UI,
   software viewport, simulated audio, and Windows player audio. The canonical
   1,149-file archive is 194,726,872 bytes.
+- Broad benchmark rerun 28: the installed agent reached clean validation,
+  moving visible 3D/2D scenes, module build, and package creation, then deferred
+  deliberate-fault exercise until after packaging and stopped at 36 turns/36
+  tools (515,162 prompt; 8,862 completion). Independent proof found both bodies
+  moving by -1.267 and the original 467-file package passing inspect, run,
+  audit, and nonblank capture; relocation alone remained missing.
+- Validation sequencing and registered guidance: deliberate faults must use
+  existing relevant components immediately after scene authoring, never new
+  audit-only entities. Validator and context suggestions now reference only
+  registered validation/schema operations instead of the nonexistent generic
+  repair workflow or incomplete blueprint calls. The full Debug suite passes
+  at 589/589.
 
 ## Current gaps
 
@@ -541,7 +553,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the unchanged installed Ollama benchmark on the canonical-repair distribution.
+Run the complete clean product gate for validation sequencing and registered guidance.
 
 ## Next after the current item
 

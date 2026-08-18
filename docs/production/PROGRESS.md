@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 07:49 Africa/Johannesburg
+Last verified: 2026-08-18 07:57 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: module trust inspection is public and package workflows preflight it explicitly
+Latest milestone: installed agent-authored module trust boundary passed the complete product gate
 
 ## Product objective
 
@@ -30,11 +30,11 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,778,548-byte win-x64 archive assembled.
-- Canonical verification: 601/601 Release tests passed twice independently;
+- Windows distribution: fresh 194,923,288-byte win-x64 archive assembled.
+- Canonical verification: 639/639 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
-- Current Debug verification: 601/601 tests pass after runtime soak inspection
-  and deterministic resumed-time correction.
+- Current Debug verification: 639/639 tests pass after the complete module
+  trust boundary implementation.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
   paths have installed-binary proof.
@@ -715,11 +715,27 @@ Studio is important, but it does not define or reorder the engine foundation.
   proves exact rejection and no payload copy. Packaged receipts intentionally
   exclude non-shipping PDBs while remaining exact for all shipping artifacts.
   The complete Debug suite passes at 639/639.
+- Installed module-trust distribution gate: the shipped CLI scaffolded and
+  built a portable runtime module, emitted its receipt, and reported
+  `Ready: True` with `in-process-full-trust`. A copied project then had one DLL
+  byte changed in place; both read-only trust inspection and schema-loading
+  admission returned nonzero with exact
+  `REKALL_MODULE_OUTPUT_HASH_MISMATCH`, while the untouched project and
+  relocated package continued to run, audit, and capture. The clean Release
+  build had zero warnings/errors, both independent Release passes completed at
+  639/639, the installed gauntlet/package/UI/audio/Windows-player/soak matrix
+  passed, and the 600-frame soak ran at 4,627.9 FPS with 687,712 bytes retained
+  growth. The canonical 1,149-manifest-file archive is 194,923,288 bytes with
+  SHA-256
+  `365fcc80428348006174384f32221f47d352b8238807caf75e83ca35deb743b5`.
 
 ## Current gaps
 
 - Add device-loss and crash recovery, broader security threat tests,
   compatibility fixtures, and release-operability evidence.
+- In-process C# modules intentionally remain full trust and receipts remain
+  unsigned; a future restricted/out-of-process host and publisher signatures
+  are separate security capabilities, not claims of the current boundary.
 - Complete advanced animation coverage such as cubic interpolation, morph
   targets, complex transform fixtures, and generic state-graph primitives.
 - Replace the current Studio facade with a professional workbench only after
@@ -727,21 +743,9 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Define and implement explicit trust policy and loading boundaries for
-agent-authored C# modules.
-
-The trust-boundary design and six-slice implementation plan are committed.
-Slice 1 rejects noncanonical project targets/tasks/imports/references,
-nested module/source layouts, source/output bounds, and simulated reparse
-points before starting `dotnet`; it also disables inherited
-`Directory.Build.props/targets` and resets only policy-verified output roots.
-Slice 2 anchors the installed SDK to an atomic inventory and the running
-engine's canonical resources. Slice 3 emits bounded receipts and inspects them
-without code loading. Slice 4 makes that inspection mandatory before every
-module load and preserves exact trust errors through CLI/dynamic adapters; the
-complete Debug suite passes at 637/637. Slice 5 exposes read-only inspection and
-explicit verify/package preflight, with the complete Debug suite at 639/639.
-Installed adversarial acceptance and the full product gate remain in progress.
+Define and implement device-loss recovery, crash reporting, and release
+operability evidence. The six-slice agent-authored module trust boundary is
+complete and installed-product verified.
 
 ## Next after the current item
 

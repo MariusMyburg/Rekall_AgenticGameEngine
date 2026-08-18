@@ -17,6 +17,7 @@ if (-not (Test-Path -LiteralPath $windowsPlayer -PathType Leaf)) {
 
 $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/')
 $proofRoot = Join-Path $tempRoot ('rekall-age-installed-proof-' + [Guid]::NewGuid().ToString('N'))
+$moduleTrustTamperRoot = Join-Path $tempRoot ('rekall-age-installed-module-tamper-' + [Guid]::NewGuid().ToString('N'))
 $gauntletRoot = Join-Path $tempRoot ('rekall-age-installed-gauntlet-' + [Guid]::NewGuid().ToString('N'))
 $relocationRoot = Join-Path $tempRoot ('rekall-age-relocated-package-' + [Guid]::NewGuid().ToString('N'))
 $audioRoot = Join-Path $tempRoot ('rekall-age-installed-audio-' + [Guid]::NewGuid().ToString('N'))
@@ -48,6 +49,12 @@ try {
     Invoke-Rekall module scaffold-runtime-system $proofRoot proof.motion 'Proof Motion' ProofMotion MotionState MotionSystem
     Invoke-Rekall build modules $proofRoot
     Invoke-Rekall context doctor $proofRoot
+    $trustOutput = Invoke-RekallOutput module trust $proofRoot
+    if (-not $trustOutput.Contains('Ready: True', [StringComparison]::Ordinal) -or
+        -not $trustOutput.Contains('Trust posture: in-process-full-trust', [StringComparison]::Ordinal)) {
+        throw "Installed module trust inspection did not report ready full-trust evidence.`n$trustOutput"
+    }
+    Write-Output $trustOutput
 
     $moduleProject = Join-Path $proofRoot 'Modules\ProofMotion\ProofMotion.csproj'
     $moduleText = [IO.File]::ReadAllText($moduleProject)
@@ -61,6 +68,39 @@ try {
     if (-not (Test-Path -LiteralPath $sdkManifest -PathType Leaf)) {
         throw "Project-local SDK manifest was not created at '$sdkManifest'."
     }
+
+    $moduleReceipt = Join-Path $proofRoot 'Modules\ProofMotion\bin\rekall\net10.0\rekall.module.build.json'
+    if (-not (Test-Path -LiteralPath $moduleReceipt -PathType Leaf)) {
+        throw "Installed module build receipt was not created at '$moduleReceipt'."
+    }
+
+    Copy-Item -LiteralPath $proofRoot -Destination $moduleTrustTamperRoot -Recurse
+    $tamperedAssembly = Join-Path $moduleTrustTamperRoot 'Modules\ProofMotion\bin\rekall\net10.0\ProofMotion.dll'
+    $tamperedBytes = [IO.File]::ReadAllBytes($tamperedAssembly)
+    if ($tamperedBytes.Length -lt 1) {
+        throw "Installed module assembly is unexpectedly empty at '$tamperedAssembly'."
+    }
+    $lastByte = $tamperedBytes.Length - 1
+    $tamperedBytes[$lastByte] = [byte]($tamperedBytes[$lastByte] -bxor 0xff)
+    [IO.File]::WriteAllBytes($tamperedAssembly, $tamperedBytes)
+
+    $tamperedTrustLines = @(& $cli module trust $moduleTrustTamperRoot 2>&1)
+    $tamperedTrustExit = $LASTEXITCODE
+    $tamperedTrustOutput = $tamperedTrustLines -join "`n"
+    if ($tamperedTrustExit -eq 0 -or
+        -not $tamperedTrustOutput.Contains('REKALL_MODULE_OUTPUT_HASH_MISMATCH', [StringComparison]::Ordinal)) {
+        throw "Installed tampered module trust inspection did not fail with the exact hash code.`n$tamperedTrustOutput"
+    }
+    Write-Output $tamperedTrustOutput
+
+    $tamperedLoadLines = @(& $cli module schemas project $moduleTrustTamperRoot 2>&1)
+    $tamperedLoadExit = $LASTEXITCODE
+    $tamperedLoadOutput = $tamperedLoadLines -join "`n"
+    if ($tamperedLoadExit -eq 0 -or
+        -not $tamperedLoadOutput.Contains('REKALL_MODULE_OUTPUT_HASH_MISMATCH', [StringComparison]::Ordinal)) {
+        throw "Installed tampered module load did not fail with the exact hash code.`n$tamperedLoadOutput"
+    }
+    Write-Output $tamperedLoadOutput
 
     $packageRoot = Join-Path $gauntletRoot 'Package'
     Invoke-Rekall game gauntlet $gauntletRoot 'Installed Distribution Proof' $packageRoot
@@ -223,7 +263,7 @@ try {
 finally {
     $env:SDL_AUDIODRIVER = $previousSdlAudioDriver
     if ($succeeded) {
-        foreach ($path in @($proofRoot, $gauntletRoot, $relocationRoot, $audioRoot)) {
+        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot)) {
             $resolved = [IO.Path]::GetFullPath($path)
             if ($resolved.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and
                 (Test-Path -LiteralPath $resolved)) {
@@ -232,6 +272,6 @@ finally {
         }
     }
     else {
-        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$gauntletRoot', '$relocationRoot', and '$audioRoot'."
+        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', and '$audioRoot'."
     }
 }

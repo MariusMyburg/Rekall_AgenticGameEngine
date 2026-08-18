@@ -193,11 +193,11 @@ git commit -m "feat: expose module trust inspection"
 - Modify: `docs/production/PROGRESS.md`
 - Modify: `docs/superpowers/plans/2026-08-18-module-trust-boundary.md`
 
-- [ ] **Step 1: Extend installed acceptance**
+- [x] **Step 1: Extend installed acceptance**
 
 Use the shipped CLI to scaffold/build/inspect a module and require ready/full-trust/receipt evidence. Copy its project or package to a separate proof root, mutate one byte in the copied module DLL, and require exact trust rejection before load. Then prove the untouched original/relocated package still runs and audits.
 
-- [ ] **Step 2: Run full Debug verification**
+- [x] **Step 2: Run full Debug verification**
 
 ```powershell
 $env:TEMP='F:\Dev\Rekall_AGE\.worktrees\production-foundation\Artifacts\TestTemp'
@@ -205,7 +205,7 @@ $env:TMP=$env:TEMP
 dotnet test Rekall.AGE.sln -c Debug -p:UseSharedCompilation=false --verbosity minimal
 ```
 
-- [ ] **Step 3: Run the canonical installed product gate**
+- [x] **Step 3: Run the canonical installed product gate**
 
 ```powershell
 $env:TEMP='F:\Dev\Rekall_AGE\.worktrees\production-foundation\Artifacts\GateTemp'
@@ -215,11 +215,11 @@ pwsh -NoProfile -File eng\build.ps1
 
 Require zero build warnings/errors, two independent full Release passes, a self-contained Windows distribution, installed adversarial module rejection, and the unchanged SDK/gauntlet/package/UI/audio/soak matrix.
 
-- [ ] **Step 4: Review and record exact evidence**
+- [x] **Step 4: Review and record exact evidence**
 
 Use requesting-code-review (subject to current delegation rules) and verification-before-completion. Record test count, exact trust codes, installed positive/negative results, archive size/hash, remaining unsigned-receipt/full-trust limitations, and next device-loss/crash priority in `docs/production/PROGRESS.md`.
 
-- [ ] **Step 5: Commit and preserve the production branch**
+- [x] **Step 5: Commit and preserve the production branch**
 
 ```powershell
 git add eng/accept-distribution.ps1 docs/production/PROGRESS.md docs/superpowers/plans/2026-08-18-module-trust-boundary.md

@@ -883,6 +883,16 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
+The next risk-driven tranche is optimistic document revisions. Atomic files
+eliminate torn reads but do not prevent two valid agent/editor processes from
+silently overwriting one another. The reviewed design adds exact snapshot
+revision tokens, bounded cross-process compare-and-publish, stable conflict
+diagnostics, conditional project/scene mutations, and serialized transaction
+append. It does not claim automatic content merge or collaborative-editing UX.
+Design and TDD sequence:
+`docs/superpowers/specs/2026-08-18-optimistic-document-revisions-design.md` and
+`docs/superpowers/plans/2026-08-18-optimistic-document-revisions.md`.
+
 Atomic persisted JSON was selected as the next risk-driven tranche. Code inspection found
 that project and scene loads schema-probe one file handle and then reopen the
 path for typed deserialization, while their saves write directly to the live

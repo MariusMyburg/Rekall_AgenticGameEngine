@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 03:52 Africa/Johannesburg
+Last verified: 2026-08-18 04:00 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: atomic-blueprint fallback passed the complete product gate
+Latest milestone: targeted audit repair passed 586/586 Debug tests
 
 ## Product objective
 
@@ -481,6 +481,15 @@ Studio is important, but it does not define or reorder the engine foundation.
   the generic gauntlet, original and relocated package proof, runtime UI,
   software viewport, simulated audio, and Windows player audio. The canonical
   1,149-file archive is 194,710,384 bytes.
+- Broad benchmark rerun 25: the agent reached original/relocated package audits,
+  then its completion audit wholesale replaced Main and stopped at 36 turns/38
+  tools (715,864 prompt; 11,563 completion). Independent proof found five
+  blocking noncanonical rigid-body types, zero 3D motion, and stale package
+  evidence. This is a failed, regressed final state.
+- Targeted audit repair: completion audits now prohibit scene redesign or
+  wholesale replacement. A genuine failed requirement must be repaired with
+  the smallest canonical targeted mutation, followed only by evidence made
+  stale by that change. The full Debug suite passes at 586/586.
 
 ## Current gaps
 
@@ -496,7 +505,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the unchanged installed Ollama benchmark on the atomic-fallback distribution.
+Run the complete clean product gate for targeted completion-audit repair.
 
 ## Next after the current item
 

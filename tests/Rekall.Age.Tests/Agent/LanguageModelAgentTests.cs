@@ -151,6 +151,14 @@ public sealed class LanguageModelAgentTests
             model.Requests[4].Messages,
             message => message.Role == "user"
                 && message.Content.Contains("do not relocate an already proven relocated package again", StringComparison.Ordinal));
+        Assert.Contains(
+            model.Requests[4].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("do not redesign or wholesale replace a scene", StringComparison.Ordinal));
+        Assert.Contains(
+            model.Requests[4].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("targeted canonical mutation", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -710,6 +710,34 @@ blueprints. It explicitly prohibits repeating substantially the same failed
 blueprint arguments. A regression locks the fallback wording into the installed
 agent contract.
 
+### Targeted-audit-repair rerun
+
+Rerun 25 used the atomic-fallback distribution with the unchanged 36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun25`
+- Result: failed at the 36-turn bound
+- Tool calls: 38
+- Prompt tokens: 715,864
+- Completion tokens: 11,563
+
+The agent reached clean validation, both runtime inspections, module build,
+original package audit, relocation, and relocated audit within its first 27
+tool calls. Its completion audit then reopened authoring and successfully
+replaced Main with an invented noncanonical blueprint before exhausting the
+bound on further repairs.
+
+Independent installed verification found five blocking `Rekall.RigidBody3D`
+type errors (the canonical type is `Rekall.Rigidbody3D`) and zero 3D physics
+motion. Physics2D remained valid and moving, but both earlier package audits
+were stale after the scene mutation. The evidence gate correctly withheld
+completion.
+
+The completion-audit instruction now prohibits redesigning or wholesale
+replacing a scene. When direct evidence identifies a genuine failure, the agent
+must use the smallest targeted canonical mutation against exact registered
+schemas and rerun only evidence made stale by that mutation. The evidence bar
+is unchanged; the repair scope is bounded to prevent audit-time regressions.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

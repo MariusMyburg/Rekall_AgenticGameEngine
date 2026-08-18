@@ -23,6 +23,13 @@ public sealed class RuntimeAnimationStateGraphTests
         Assert.Equal("active", graphState.Properties["activeState"]!.GetValue<string>());
         Assert.Equal("idle", graphState.Properties["previousState"]!.GetValue<string>());
         Assert.Equal(0.5, graphState.Properties["transitionProgress"]!.GetValue<double>(), precision: 3);
+        var projected = Assert.Single(halfway.World.Subsystems.Animation.Players);
+        Assert.Equal("AnimationStateGraph", projected.Kind);
+        Assert.Equal("active", projected.StateName);
+        Assert.Equal("idle", projected.PreviousStateName);
+        Assert.Equal("clip-active", projected.ClipAssetId);
+        Assert.Equal(0.5, projected.TransitionProgress, precision: 3);
+        Assert.Equal(2, projected.LayerCount);
 
         var completed = await loop.RunAsync(halfway.World, 30, CancellationToken.None);
         var completedActor = Assert.Single(completed.World.Entities);

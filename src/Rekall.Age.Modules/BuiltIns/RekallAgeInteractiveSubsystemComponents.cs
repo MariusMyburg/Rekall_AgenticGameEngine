@@ -86,6 +86,21 @@ public sealed class RekallAgeAnimationMixerComponent : RekallAgeComponent
     public object[] Layers { get; init; } = [];
 }
 
+[RekallAgeComponent("Animation State Graph", Description = "Selects and cross-fades reusable animation clips through bounded, inspectable parameters and ordered transitions. Agent-authored modules own parameter meaning and updates; the engine never supplies game-specific states or decisions.")]
+public sealed class RekallAgeAnimationStateGraphComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 1, Maximum = 1)] public int Version { get; init; } = 1;
+    [RekallAgeProperty] public bool Playing { get; init; } = true;
+    [RekallAgeProperty(Description = "Required declared state name used when no valid runtime state exists. Names are ordinal and at most 128 characters.")]
+    public string InitialState { get; init; } = string.Empty;
+    [RekallAgeProperty(Kind = "animationGraphParameters", Description = "Object of at most 128 agent-authored finite number, boolean, or string parameters. Strings are at most 1,024 characters. Modules update these generic values from game facts.")]
+    public object Parameters { get; init; } = new();
+    [RekallAgeProperty(Kind = "animationGraphStates", Description = "Array of at most 64 {name,clip,speed,loopMode,startTimeSeconds} states. Clip is a reusable animation catalog id; loopMode is clamp, loop, or pingpong.")]
+    public object[] States { get; init; } = [];
+    [RekallAgeProperty(Kind = "animationGraphTransitions", Description = "Ordered array of at most 256 {from,to,durationSeconds,resetTime,conditions} transitions with at most 16 conditions each. Conditions use equals, notEquals, greater, greaterOrEqual, less, or lessOrEqual. Exact-state transitions precede '*' any-state transitions.")]
+    public object[] Transitions { get; init; } = [];
+}
+
 [RekallAgeComponent("Skeletal Animator", Description = "Samples a named animation and skin from an imported GLB model into an inspectable joint pose.")]
 public sealed class RekallAgeSkeletalAnimatorComponent : RekallAgeComponent
 {

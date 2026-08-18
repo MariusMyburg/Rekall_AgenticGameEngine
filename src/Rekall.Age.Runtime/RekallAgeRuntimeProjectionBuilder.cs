@@ -473,6 +473,50 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             Layers = projectedLayers
                         });
                         break;
+                    case "Rekall.AnimationStateGraph":
+                        var graphState = entity.Components.FirstOrDefault(candidate =>
+                            candidate.Type.Equals("Rekall.AnimationGraphState", StringComparison.Ordinal));
+                        var graphAnimationState = entity.Components.FirstOrDefault(candidate =>
+                            candidate.Type.Equals("Rekall.AnimationState", StringComparison.Ordinal));
+                        var activeState = graphState is null ? null : ReadString(graphState.Properties, "activeState");
+                        var previousState = graphState is null ? null : ReadString(graphState.Properties, "previousState");
+                        var graphStateDefinitions = ReadArray(component.Properties, "states");
+                        var activeDefinition = graphStateDefinitions?.OfType<JsonObject>().FirstOrDefault(candidate =>
+                            string.Equals(ReadString(candidate, "name"), activeState, StringComparison.Ordinal));
+                        var graphLayerNodes = graphAnimationState is null
+                            ? null
+                            : ReadArray(graphAnimationState.Properties, "layers");
+                        var graphLayers = graphLayerNodes?.OfType<JsonObject>()
+                            .Select((layer, index) => new RekallAgeRuntimeAnimationLayer(
+                                (ReadString(layer, "name") ?? $"layer-{index}").Replace("graph:", string.Empty, StringComparison.Ordinal),
+                                ReadString(layer, "clip"),
+                                ReadNumber(layer, "weight", 1),
+                                ReadNumber(layer, "targetWeight", ReadNumber(layer, "weight", 1)),
+                                ReadNumber(layer, "timeSeconds", ReadNumber(layer, "rawTimeSeconds", 0)),
+                                ReadNumber(layer, "durationSeconds", 0),
+                                ReadBoolean(layer, "playing", true)))
+                            .ToArray() ?? [];
+                        var activeLayer = graphLayers.FirstOrDefault(layer => layer.Name == activeState);
+                        animationPlayers.Add(new RekallAgeRuntimeAnimationPlayer(
+                            entity.Id,
+                            entity.Name,
+                            "AnimationStateGraph",
+                            activeDefinition is null ? null : ReadString(activeDefinition, "clip"))
+                        {
+                            Playing = graphState is null
+                                ? ReadBoolean(component.Properties, "playing", true)
+                                : ReadBoolean(graphState.Properties, "playing", true),
+                            TimeSeconds = activeLayer?.TimeSeconds ?? 0,
+                            DurationSeconds = activeLayer?.DurationSeconds ?? 0,
+                            LoopMode = activeDefinition is null ? "loop" : ReadString(activeDefinition, "loopMode") ?? "loop",
+                            LayerCount = graphLayers.Length,
+                            ActiveLayerCount = graphLayers.Count(layer => layer.Weight > 0.00001),
+                            Layers = graphLayers,
+                            StateName = activeState,
+                            PreviousStateName = previousState,
+                            TransitionProgress = graphState is null ? 1 : ReadNumber(graphState.Properties, "transitionProgress", 1)
+                        });
+                        break;
                     case "Rekall.SkeletalAnimator":
                         var pose = entity.Components.FirstOrDefault(candidate =>
                             candidate.Type.Equals("Rekall.SkeletonPose", StringComparison.Ordinal));

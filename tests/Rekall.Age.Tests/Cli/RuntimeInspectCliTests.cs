@@ -108,6 +108,52 @@ public sealed class RuntimeInspectCliTests
     }
 
     [Fact]
+    public async Task RuntimeInspectPrintsAnimationStateGraphFacts()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Runtime Graph CLI", ["world", "animation"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "animation"])
+                .AddEntity(RekallAgeEntityDocument.Create("Actor", ["actor"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject()))
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.AnimationStateGraph",
+                        new JsonObject
+                        {
+                            ["version"] = 1,
+                            ["initialState"] = "idle",
+                            ["parameters"] = new JsonObject { ["phase"] = 1 },
+                            ["states"] = new JsonArray
+                            {
+                                new JsonObject { ["name"] = "idle", ["clip"] = "clip-idle" },
+                                new JsonObject { ["name"] = "active", ["clip"] = "clip-active" }
+                            },
+                            ["transitions"] = new JsonArray
+                            {
+                                new JsonObject
+                                {
+                                    ["from"] = "idle", ["to"] = "active", ["durationSeconds"] = 1,
+                                    ["conditions"] = new JsonArray
+                                    {
+                                        new JsonObject { ["parameter"] = "phase", ["operator"] = "greater", ["value"] = 0 }
+                                    }
+                                }
+                            }
+                        }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(FindCliAssemblyPath(), "runtime", "inspect", root, "Main", "1");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("kind=AnimationStateGraph", result.Output);
+        Assert.Contains("state=active previous=idle transition=0.017", result.Output);
+    }
+
+    [Fact]
     public async Task RuntimeInspectPrintsCameraCulledRenderables()
     {
         var root = TestPaths.CreateTempDirectory();

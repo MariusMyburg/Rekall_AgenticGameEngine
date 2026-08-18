@@ -486,6 +486,12 @@ public sealed record RekallAgeRuntimeAnimationPlayer(
     public string? SkinName { get; init; }
 
     public int JointCount { get; init; }
+
+    public string? StateName { get; init; }
+
+    public string? PreviousStateName { get; init; }
+
+    public double TransitionProgress { get; init; } = 1;
 }
 
 public sealed record RekallAgeRuntimeAnimationLayer(

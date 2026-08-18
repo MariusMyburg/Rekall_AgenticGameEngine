@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 10:18 Africa/Johannesburg
+Last verified: 2026-08-18 10:22 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -891,6 +891,13 @@ supports deterministic reset/resume and noninterruptible cross-fades, emits
 bound generic state/transition facts, suppresses conflicting drivers, and
 fails closed. Split 17+43-frame execution exactly matches continuous 60-frame
 state and output; paused graphs and 64-state clock bounds are explicit.
+
+Animation state graph Task 3 is verified in a consolidated 64/64 selection.
+`Rekall.AnimationStateGraph` is discoverable through built-in schemas and MCP
+with exact bounded authoring shapes and explicit agent-owned parameter meaning.
+Runtime projection and CLI inspection report graph kind, active/previous state,
+active clip, transition progress, and bounded layers without unbounded
+parameter dumps; existing animation inspection remains compatible.
 
 Archive preflight Task 1 is verified at 15/15 focused tests: a central
 metadata-only contract now returns a deterministic manifest-first immutable

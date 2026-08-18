@@ -58,6 +58,14 @@ public sealed class ModuleMetadataTests
         var layers = Assert.Single(mixer.Properties, property => property.Name == "Layers" && property.Kind == "animationLayers");
         Assert.Contains("targetWeight", layers.Description, StringComparison.Ordinal);
         Assert.Contains("32", layers.Description, StringComparison.Ordinal);
+        var graph = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.AnimationStateGraph");
+        Assert.Contains("agent-authored modules", graph.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(graph.Properties, property => property.Name == "Parameters" && property.Kind == "animationGraphParameters");
+        var states = Assert.Single(graph.Properties, property => property.Name == "States" && property.Kind == "animationGraphStates");
+        Assert.Contains("64", states.Description, StringComparison.Ordinal);
+        var transitions = Assert.Single(graph.Properties, property => property.Name == "Transitions" && property.Kind == "animationGraphTransitions");
+        Assert.Contains("256", transitions.Description, StringComparison.Ordinal);
+        Assert.Contains("16", transitions.Description, StringComparison.Ordinal);
         var skeletal = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.SkeletalAnimator");
         Assert.Contains(skeletal.Properties, property => property.Name == "Model" && property.AssetKind == "model");
         Assert.Contains(skeletal.Properties, property => property.Name == "Animation");

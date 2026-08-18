@@ -3287,7 +3287,10 @@ internal static class RekallAgeCli
         Console.WriteLine($"Animation players: {result.Value.AnimationPlayerCount}");
         foreach (var player in result.Value.AnimationPlayers)
         {
-            Console.WriteLine($"  Animation {player.EntityName}: kind={player.Kind} inline={player.InlineClip} playing={player.Playing} time={player.TimeSeconds:F3}/{player.DurationSeconds:F3} loop={player.LoopMode} layers={player.ActiveLayerCount}/{player.LayerCount}");
+            var graphState = player.StateName is null
+                ? string.Empty
+                : $" state={player.StateName} previous={player.PreviousStateName ?? "(none)"} transition={player.TransitionProgress:F3}";
+            Console.WriteLine($"  Animation {player.EntityName}: kind={player.Kind} inline={player.InlineClip} playing={player.Playing} time={player.TimeSeconds:F3}/{player.DurationSeconds:F3} loop={player.LoopMode} layers={player.ActiveLayerCount}/{player.LayerCount}{graphState}");
             if (player.JointCount > 0)
             {
                 Console.WriteLine($"    Skeleton: animation={player.AnimationName ?? "(none)"} skin={player.SkinName ?? "(unnamed)"} joints={player.JointCount}");

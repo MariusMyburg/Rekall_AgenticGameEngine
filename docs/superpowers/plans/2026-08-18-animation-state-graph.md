@@ -182,27 +182,33 @@ times without duplicating track or blend math.
 - Registers public component type `Rekall.AnimationStateGraph`.
 - Extends `RekallAgeRuntimeAnimationPlayer` with nullable `StateName`, `PreviousStateName`, and numeric `TransitionProgress` without breaking existing constructors.
 
-- [ ] **Step 1: Write failing discovery, projection, and CLI tests**
+- [x] **Step 1: Write failing discovery, projection, and CLI tests**
 
 Assert the schema names exact shapes/limits and explicitly says modules own
 parameter semantics. Assert runtime projection reports kind, active/previous
 state, active clip, transition progress, and projected layers. Assert CLI output
 prints those facts without dumping unbounded parameter values.
 
-- [ ] **Step 2: Implement schema registration and inspection fields**
+- [x] **Step 2: Implement schema registration and inspection fields**
 
 Use component properties `Version`, `Playing`, `InitialState`, `Parameters`,
 `States`, and `Transitions` with descriptive `Kind` metadata. Read live facts
 from `Rekall.AnimationGraphState` and layers from `Rekall.AnimationState`.
 
-- [ ] **Step 3: Run metadata, animation projection, CLI, and MCP catalog regressions**
+- [x] **Step 3: Run metadata, animation projection, CLI, and MCP catalog regressions**
 
-- [ ] **Step 4: Record evidence and commit**
+- [x] **Step 4: Record evidence and commit**
 
 ```powershell
 git add src tests docs/production/PROGRESS.md
 git commit -m "feat: inspect animation state graphs"
 ```
+
+Verified 2026-08-18: a consolidated 64/64 graph definition/runtime,
+legacy animation, built-in metadata, CLI inspection, and MCP agent-tool
+selection passes. Agents discover exact state/transition/parameter shapes and
+limits. Runtime projection and CLI expose active/previous state, transition
+progress, active clip, and bounded layers without dumping parameters.
 
 ---
 

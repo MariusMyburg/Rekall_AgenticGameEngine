@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 04:25 Africa/Johannesburg
+Last verified: 2026-08-18 04:33 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: bounded batch validation repair passed the complete product gate
+Latest milestone: canonical validation repair passed 588/588 Debug tests
 
 ## Product objective
 
@@ -511,6 +511,15 @@ Studio is important, but it does not define or reorder the engine foundation.
   gauntlet, original and relocated package proof, runtime UI, software viewport,
   simulated audio, and Windows player audio. The canonical 1,149-file archive
   is 194,726,034 bytes.
+- Broad benchmark rerun 27: the installed agent stopped at 36 turns/36 tools
+  (568,211 prompt; 8,199 completion) after batch repair aborted on an incomplete
+  advisory blueprint suggestion. Independent proof found two blocking invented
+  component types, zero active physics bodies in both scenes, and no package.
+- Canonical validation repair: batch execution now permits only exact safe
+  component mutation commands. Close unknown reserved component types receive
+  executable canonical add/remove repairs with authored properties preserved,
+  rather than incomplete blueprint hints. The full Debug suite passes at
+  588/588.
 
 ## Current gaps
 
@@ -526,11 +535,12 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the unchanged installed Ollama benchmark on the batch-repair distribution.
+Run the complete clean product gate for canonical validation repair.
 
 ## Next after the current item
 
-Independently verify rerun 27 and classify any remaining failure by generic
+Rerun the unchanged installed Ollama benchmark on the rebuilt distribution.
+Independently verify the result and classify any remaining failure by generic
 engine contract, then regression-test the repair.
 A genuine broad benchmark pass precedes quantified production hardening;
 Studio follows as a consumer of those results.

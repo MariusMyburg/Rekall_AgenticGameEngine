@@ -153,8 +153,24 @@ public sealed class RekallAgeProjectValidator
                     entity.Id,
                     [
                         new RekallAgeSuggestedCommand(
-                            "rekall.scene.apply_blueprint",
-                            new Dictionary<string, object?> { ["query"] = component.Type })
+                            "rekall.component.add",
+                            new Dictionary<string, object?>
+                            {
+                                ["projectRoot"] = projectRoot,
+                                ["sceneName"] = scene.Name,
+                                ["entityId"] = entity.Id,
+                                ["componentType"] = suggestion.Type,
+                                ["properties"] = component.Properties.DeepClone().AsObject()
+                            }),
+                        new RekallAgeSuggestedCommand(
+                            "rekall.component.remove",
+                            new Dictionary<string, object?>
+                            {
+                                ["projectRoot"] = projectRoot,
+                                ["sceneName"] = scene.Name,
+                                ["entityId"] = entity.Id,
+                                ["componentType"] = component.Type
+                            })
                     ]));
             }
 

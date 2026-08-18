@@ -92,8 +92,9 @@ public sealed class RepairProjectValidationCommand(RekallAgeCommandRegistry regi
         return result.Value;
     }
 
-    private static bool IsRepairMutation(string tool) =>
-        tool.StartsWith("rekall.component.", StringComparison.Ordinal)
-        || tool.Equals("rekall.scene.apply_blueprint", StringComparison.Ordinal)
-        || tool.Equals("rekall.project.add_capability", StringComparison.Ordinal);
+    private static bool IsRepairMutation(string tool) => tool is
+        "rekall.component.add"
+        or "rekall.component.remove"
+        or "rekall.component.remove_property"
+        or "rekall.component.set_property";
 }

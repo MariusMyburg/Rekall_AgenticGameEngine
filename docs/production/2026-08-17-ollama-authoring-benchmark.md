@@ -761,6 +761,32 @@ are repaired in one call with zero remaining issues. The embedded contract uses
 the batch primitive whenever validation returns multiple repairs while retaining
 the explicit requirement to repair every deliberate fault.
 
+### Canonical validation-repair rerun
+
+Rerun 27 used the batch-repair distribution with the unchanged 36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun27`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 568,211
+- Completion tokens: 8,199
+
+The agent used the new batch command, but it aborted after encountering an
+incomplete advisory `rekall.scene.apply_blueprint` suggestion. It then retried
+already-applied individual property removals and never reached packaging.
+
+Independent installed verification found two blocking invented component
+types, zero active physics bodies in both scenes, and no package. Main used
+`Rekall.RigidBody3D` instead of `Rekall.Rigidbody3D`; Physics2D used
+`Rekall.MeshRenderer2D` instead of `Rekall.MeshRenderer` and lacked a 2D body.
+
+Batch repair now uses an exact allowlist of safe component mutations instead
+of treating every component-prefixed command and incomplete blueprint hint as
+executable. Close unknown reserved types now receive executable add/remove
+suggestions that preserve authored properties while replacing the typo with
+the validator's computed canonical type. The full Debug suite passes at
+588/588.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

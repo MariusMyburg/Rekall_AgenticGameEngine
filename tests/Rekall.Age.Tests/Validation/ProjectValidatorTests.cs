@@ -580,4 +580,42 @@ public sealed class ProjectValidatorTests
         Assert.Equal(0, result.Value.Validation.IssueCount);
         Assert.Equal("ok", result.Value.Validation.Status);
     }
+
+    [Fact]
+    public async Task RepairProjectValidationCanonicalizesCloseReservedComponentTypes()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity(RekallAgeEntityDocument.Create("Body", [])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.RigidBody3D"))
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.Transform3D",
+                        new JsonObject { ["invalidProperty"] = 1 }))),
+            CancellationToken.None);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new ValidateProjectCommand());
+        registry.Register(new AddComponentCommand());
+        registry.Register(new RemoveComponentCommand());
+        registry.Register(new RemoveComponentPropertyCommand());
+        registry.Register(new RepairProjectValidationCommand(registry));
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("skip advisory validation suggestions"),
+            CancellationToken.None);
+
+        var result = await registry.ExecuteAsync<RepairProjectValidationRequest, RepairProjectValidationResult>(
+            "rekall.validation.repair_project",
+            new RepairProjectValidationRequest(root),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.ExecutedRepairCount >= 3);
+        Assert.Equal(0, result.Value.Validation.IssueCount);
+        var repaired = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        var components = Assert.Single(repaired.Entities).Components;
+        Assert.Contains(components, component => component.Type == "Rekall.Rigidbody3D");
+        Assert.DoesNotContain(components, component => component.Type == "Rekall.RigidBody3D");
+    }
 }

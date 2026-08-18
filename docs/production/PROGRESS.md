@@ -891,6 +891,8 @@ The cubic interpolation design is fixed in
 authored clips and glTF `CUBICSPLINE` share duration-scaled Hermite semantics,
 fail closed on unknown modes or malformed/non-finite tangent data, preserve
 exact endpoints, and keep morph targets outside this focused tranche.
+The executable TDD sequence is tracked in
+`docs/superpowers/plans/2026-08-18-cubic-animation-interpolation.md`.
 
 The next tranche design is fixed in
 `docs/superpowers/specs/2026-08-18-animation-state-graph-design.md`: a bounded,
@@ -972,6 +974,8 @@ reordering the foundation roadmap.
 - `docs/superpowers/plans/2026-08-18-package-archive-preflight-security.md`
 - `docs/production/package-trust-and-archive-security.md`
 - `docs/superpowers/specs/2026-08-18-animation-state-graph-design.md`
+- `docs/superpowers/specs/2026-08-18-cubic-animation-interpolation-design.md`
+- `docs/superpowers/plans/2026-08-18-cubic-animation-interpolation.md`
 - `Artifacts/TestResults/release-pass-1.trx`
 - `Artifacts/TestResults/release-pass-2.trx`
 - `Artifacts/Distribution/Rekall-AGE-0.1.0-preview.1-win-x64.zip`

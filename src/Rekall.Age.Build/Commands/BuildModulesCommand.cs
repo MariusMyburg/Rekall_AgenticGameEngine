@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Modules.Security;
 
 namespace Rekall.Age.Build.Commands;
 
@@ -20,6 +21,18 @@ public sealed record BuildModuleResult(
 public sealed class BuildModulesCommand
     : IRekallAgeCommand<BuildModulesRequest, BuildModulesResult>
 {
+    private readonly RekallAgeModuleBuildPolicy _buildPolicy;
+
+    public BuildModulesCommand()
+        : this(new RekallAgeModuleBuildPolicy())
+    {
+    }
+
+    internal BuildModulesCommand(RekallAgeModuleBuildPolicy buildPolicy)
+    {
+        _buildPolicy = buildPolicy;
+    }
+
     public string Name => "rekall.build.modules";
 
     public RekallAgeCommandSchema Schema => new(
@@ -32,12 +45,25 @@ public sealed class BuildModulesCommand
         BuildModulesRequest request,
         RekallAgeCommandContext context)
     {
-        var moduleProjects = FindModuleProjects(request.ProjectRoot);
+        var policy = _buildPolicy.Inspect(request.ProjectRoot);
         var results = new List<BuildModuleResult>();
-
-        foreach (var projectPath in moduleProjects)
+        if (!policy.Ready)
         {
-            var result = await BuildProjectAsync(projectPath, context.CancellationToken);
+            return RekallAgeCommandResult<BuildModulesResult>.Failure(
+                new BuildModulesResult(results),
+                "Module build policy rejected one or more projects before compilation.",
+                policy.Issues
+                    .Select(issue => new RekallAgeCommandError(
+                        "REKALL_MODULE_BUILD_POLICY_REJECTED",
+                        issue.Message,
+                        issue.Target))
+                    .ToArray());
+        }
+
+        foreach (var candidate in policy.Candidates)
+        {
+            ResetVerifiedOutputDirectory(candidate);
+            var result = await BuildProjectAsync(candidate, context.CancellationToken);
             results.Add(result);
             if (result.Succeeded)
             {
@@ -83,21 +109,28 @@ public sealed class BuildModulesCommand
             $"Built {results.Count} module project(s).");
     }
 
-    private static IReadOnlyList<string> FindModuleProjects(string projectRoot)
+    private static void ResetVerifiedOutputDirectory(RekallAgeModuleBuildCandidate candidate)
     {
-        var modulesRoot = Path.Combine(Path.GetFullPath(projectRoot), "Modules");
-        if (!Directory.Exists(modulesRoot))
+        var output = Path.GetFullPath(candidate.OutputDirectory);
+        var module = Path.GetFullPath(candidate.ModuleDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!output.StartsWith(module + Path.DirectorySeparatorChar, comparison))
         {
-            return Array.Empty<string>();
+            throw new InvalidOperationException($"Verified module output '{output}' is outside '{module}'.");
         }
 
-        return Directory.EnumerateFiles(modulesRoot, "*.csproj", SearchOption.AllDirectories)
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .ToArray();
+        if (Directory.Exists(output))
+        {
+            Directory.Delete(output, recursive: true);
+        }
     }
 
-    private static async Task<BuildModuleResult> BuildProjectAsync(string projectPath, CancellationToken cancellationToken)
+    private static async Task<BuildModuleResult> BuildProjectAsync(
+        RekallAgeModuleBuildCandidate candidate,
+        CancellationToken cancellationToken)
     {
+        var projectPath = candidate.ProjectPath;
         var startInfo = new ProcessStartInfo("dotnet")
         {
             RedirectStandardOutput = true,
@@ -109,6 +142,8 @@ public sealed class BuildModulesCommand
         startInfo.ArgumentList.Add("--nologo");
         startInfo.ArgumentList.Add("-v:minimal");
         startInfo.ArgumentList.Add("/nr:false");
+        startInfo.ArgumentList.Add("-p:ImportDirectoryBuildProps=false");
+        startInfo.ArgumentList.Add("-p:ImportDirectoryBuildTargets=false");
         var portableSdkProject = IsPortableSdkProject(projectPath);
         if (portableSdkProject)
         {
@@ -125,13 +160,10 @@ public sealed class BuildModulesCommand
         await process.WaitForExitAsync(cancellationToken);
         var output = await outputTask + await errorTask;
 
-        var moduleName = Path.GetFileNameWithoutExtension(projectPath);
-        var assemblyPath = Path.Combine(
-            Path.GetDirectoryName(projectPath)!,
-            "bin",
-            portableSdkProject ? "rekall" : "Debug",
-            "net10.0",
-            $"{moduleName}.dll");
+        var moduleName = candidate.ModuleName;
+        var assemblyPath = portableSdkProject
+            ? Path.Combine(candidate.OutputDirectory, $"{moduleName}.dll")
+            : Path.Combine(Path.GetDirectoryName(projectPath)!, "bin", "Debug", "net10.0", $"{moduleName}.dll");
         var sdkVersion = ReadSdkVersion(projectPath);
 
         return new BuildModuleResult(

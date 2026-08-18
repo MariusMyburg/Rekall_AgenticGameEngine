@@ -19,11 +19,11 @@
 - Modify: `src/Rekall.Age.Build/Commands/BuildModulesCommand.cs`
 - Create: `tests/Rekall.Age.Tests/Modules/ModuleBuildPolicyTests.cs`
 
-- [ ] **Step 1: Add failing policy tests**
+- [x] **Step 1: Add failing policy tests**
 
 Scaffold a module, mutate its project in separate tests with a custom target/write marker, `UsingTask`, arbitrary import, `PackageReference`, and `ProjectReference`, then execute `BuildModulesCommand`. Assert each returns `REKALL_MODULE_BUILD_POLICY_REJECTED`, does not start a build, and never creates the marker. Add cases for nested module projects, reparse-point source, more than injected source/module limits, oversized source, and canonical success.
 
-- [ ] **Step 2: Run focused tests RED**
+- [x] **Step 2: Run focused tests RED**
 
 ```powershell
 $env:TEMP='F:\Dev\Rekall_AGE\.worktrees\production-foundation\Artifacts\TestTemp'
@@ -33,15 +33,15 @@ dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --filter FullyQualifi
 
 Expected: policy types/codes are missing or malicious projects still execute.
 
-- [ ] **Step 3: Implement bounded canonical discovery and validation**
+- [x] **Step 3: Implement bounded canonical discovery and validation**
 
 Add injectable production defaults: 256 direct module directories, one canonical direct project, 256 direct `.cs` files/module, 4 MiB/file, and 32 MiB total. Validate normalized physical containment and reject reparse points before reading. Compare normalized project text with `RekallAgeModuleProjectFile.Create(moduleName)`; expose the canonical text from one source of truth.
 
-- [ ] **Step 4: Harden the build process invocation**
+- [x] **Step 4: Harden the build process invocation**
 
 Pass `-p:ImportDirectoryBuildProps=false` and `-p:ImportDirectoryBuildTargets=false`. Only after policy success, safely reset the verified module output root and invoke the canonical project. Return structured policy errors without starting `dotnet`.
 
-- [ ] **Step 5: Run focused tests GREEN and commit**
+- [x] **Step 5: Run focused tests GREEN and commit**
 
 ```powershell
 dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --filter "FullyQualifiedName~ModuleBuildPolicyTests|FullyQualifiedName~ScaffoldModuleCommandTests|FullyQualifiedName~ScaffoldPlayableModuleCommandTests|FullyQualifiedName~ScaffoldRuntimeSystemModuleCommandTests" -p:UseSharedCompilation=false

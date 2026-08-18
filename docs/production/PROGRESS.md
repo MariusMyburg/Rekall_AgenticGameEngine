@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 06:56 Africa/Johannesburg
+Last verified: 2026-08-18 07:08 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -683,6 +683,15 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 Define and implement explicit trust policy and loading boundaries for
 agent-authored C# modules.
+
+The trust-boundary design and six-slice implementation plan are committed.
+Slice 1 now rejects noncanonical project targets/tasks/imports/references,
+nested module/source layouts, source/output bounds, and simulated reparse
+points before starting `dotnet`; it also disables inherited
+`Directory.Build.props/targets` and resets only policy-verified output roots.
+The complete Modules test namespace passes at 34/34. SDK anchoring, build
+receipts, verified loading, adapters/package preflight, and the full product
+gate remain in progress.
 
 ## Next after the current item
 

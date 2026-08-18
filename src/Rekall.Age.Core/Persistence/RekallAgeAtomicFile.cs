@@ -55,7 +55,14 @@ public static class RekallAgeAtomicFile
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            File.Move(temporaryPath, fullPath, overwrite: true);
+            if (File.Exists(fullPath))
+            {
+                File.Replace(temporaryPath, fullPath, destinationBackupFileName: null, ignoreMetadataErrors: true);
+            }
+            else
+            {
+                File.Move(temporaryPath, fullPath);
+            }
             published = true;
         }
         finally

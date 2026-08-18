@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Rekall.Age.Core.Compatibility;
 using Rekall.Age.Core.Product;
+using Rekall.Age.Core.Persistence;
 
 namespace Rekall.Age.Project;
 
@@ -9,7 +10,8 @@ public sealed class RekallAgeProjectStore
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        MaxDepth = RekallAgeDocumentSchemaProbe.MaximumDocumentDepth
     };
 
     public const string ManifestFileName = "rekall.project.json";
@@ -21,7 +23,11 @@ public sealed class RekallAgeProjectStore
     {
         Directory.CreateDirectory(projectRoot);
         var path = Path.Combine(projectRoot, ManifestFileName);
-        await File.WriteAllTextAsync(path, Serialize(manifest), cancellationToken);
+        await RekallAgeAtomicFile.WriteAllTextAsync(
+            path,
+            Serialize(manifest),
+            RekallAgeDocumentSchemaProbe.MaximumDocumentBytes,
+            cancellationToken);
     }
 
     public string Serialize(RekallAgeProjectManifest manifest)
@@ -36,17 +42,14 @@ public sealed class RekallAgeProjectStore
         CancellationToken cancellationToken)
     {
         var path = Path.Combine(projectRoot, ManifestFileName);
-        await RekallAgeDocumentSchemaProbe.ReadAsync(
+        var snapshot = await RekallAgeDocumentSchemaProbe.ReadSnapshotAsync(
             path,
             "project",
             RekallAgeProductInfo.Current.ProjectSchemaVersion,
             cancellationToken);
-        await using var stream = File.OpenRead(path);
-        var manifest = await JsonSerializer.DeserializeAsync<RekallAgeProjectManifest>(
-            stream,
-            JsonOptions,
-            cancellationToken);
-        return (manifest ?? throw new InvalidOperationException($"Manifest '{path}' could not be read.")) with
+        cancellationToken.ThrowIfCancellationRequested();
+        var manifest = snapshot.Deserialize<RekallAgeProjectManifest>(JsonOptions);
+        return manifest with
         {
             SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion
         };

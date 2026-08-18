@@ -27,9 +27,10 @@ public sealed class AtomicPersistedFileTests
         var path = Path.Combine(root, "oversized.json");
         await File.WriteAllBytesAsync(path, new byte[17]);
 
-        var error = await Assert.ThrowsAsync<InvalidDataException>(
+        var error = await Assert.ThrowsAsync<RekallAgeBoundedFileSnapshotException>(
             () => RekallAgeBoundedFileSnapshot.ReadAsync(path, 16, CancellationToken.None).AsTask());
 
+        Assert.Equal("REKALL_FILE_SNAPSHOT_TOO_LARGE", error.Code);
         Assert.Contains("17", error.Message, StringComparison.Ordinal);
         Assert.Contains("16", error.Message, StringComparison.Ordinal);
     }

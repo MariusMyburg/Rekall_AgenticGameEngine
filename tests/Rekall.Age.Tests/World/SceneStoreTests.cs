@@ -4,6 +4,8 @@ using Rekall.Age.Core.Compatibility;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
+using System.Text;
+using System.Collections.Concurrent;
 
 namespace Rekall.Age.Tests.World;
 
@@ -114,5 +116,76 @@ public sealed class SceneStoreTests
         Assert.Equal(expectedCode, error.Code);
         Assert.Equal("scene", error.DocumentKind);
         Assert.Equal(Path.GetFullPath(path), error.DocumentPath);
+    }
+
+    [Fact]
+    public async Task SceneLoadAcceptsTheSameBoundedDepthAsSchemaInspection()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        var path = store.GetScenePath(root, "Main");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var nested = new string('[', 80) + "0" + new string(']', 80);
+        await File.WriteAllTextAsync(
+            path,
+            $$"""{"schemaVersion":1,"id":"deep","name":"Main","capabilities":[],"entities":[],"extension":{{nested}}}""");
+
+        var scene = await store.LoadAsync(root, "Main", CancellationToken.None);
+
+        Assert.Equal("deep", scene.Id);
+    }
+
+    [Fact]
+    public async Task SceneSavePublishesBomlessJsonWithoutTemporarySiblings()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+
+        await store.SaveAsync(root, RekallAgeSceneDocument.Create("Main", ["world"]), CancellationToken.None);
+
+        var path = store.GetScenePath(root, "Main");
+        var bytes = await File.ReadAllBytesAsync(path);
+        Assert.False(bytes.AsSpan().StartsWith(Encoding.UTF8.Preamble));
+        Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!, ".Main.age.scene.json.tmp-*"));
+    }
+
+    [Fact]
+    public async Task ConcurrentReadersObserveOnlyCompleteSceneDocumentsDuringRepeatedSaves()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        var scene = Enumerable.Range(0, 128).Aggregate(
+            RekallAgeSceneDocument.Create("Main", ["world"]),
+            (current, index) => current.AddEntity(RekallAgeEntityDocument.Create($"Entity {index:D3}", ["stress"])));
+        await store.SaveAsync(root, scene, CancellationToken.None);
+        var failures = new ConcurrentQueue<Exception>();
+        using var stop = new CancellationTokenSource();
+        var readers = Enumerable.Range(0, 4).Select(_ => Task.Run(async () =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                try
+                {
+                    var loaded = await store.LoadAsync(root, "Main", CancellationToken.None);
+                    Assert.Equal(128, loaded.Entities.Count);
+                }
+                catch (Exception error)
+                {
+                    failures.Enqueue(error);
+                    break;
+                }
+            }
+        })).ToArray();
+
+        for (var index = 0; index < 50; index++)
+        {
+            await store.SaveAsync(root, scene with { Id = $"scene_{index:D3}" }, CancellationToken.None);
+            await Task.Delay(1);
+        }
+        stop.Cancel();
+        await Task.WhenAll(readers);
+
+        Assert.Empty(failures);
+        Assert.Empty(Directory.GetFiles(Path.Combine(root, "Scenes"), ".Main.age.scene.json.tmp-*"));
     }
 }

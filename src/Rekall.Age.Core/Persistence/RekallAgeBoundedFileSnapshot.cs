@@ -1,5 +1,19 @@
 namespace Rekall.Age.Core.Persistence;
 
+public sealed class RekallAgeBoundedFileSnapshotException : IOException
+{
+    public RekallAgeBoundedFileSnapshotException(string code, string path, string message, Exception? innerException = null)
+        : base(message, innerException)
+    {
+        Code = code;
+        Path = path;
+    }
+
+    public string Code { get; }
+
+    public string Path { get; }
+}
+
 public sealed record RekallAgeBoundedFileSnapshot(string Path, byte[] Bytes)
 {
     public static async ValueTask<RekallAgeBoundedFileSnapshot> ReadAsync(
@@ -18,17 +32,13 @@ public sealed record RekallAgeBoundedFileSnapshot(string Path, byte[] Bytes)
 
         cancellationToken.ThrowIfCancellationRequested();
         var fullPath = System.IO.Path.GetFullPath(path);
-        await using var stream = new FileStream(
-            fullPath,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.Read,
-            bufferSize: 4096,
-            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        await using var stream = await OpenForSnapshotAsync(fullPath, cancellationToken).ConfigureAwait(false);
         var length = stream.Length;
         if (length > maximumBytes)
         {
-            throw new InvalidDataException(
+            throw new RekallAgeBoundedFileSnapshotException(
+                "REKALL_FILE_SNAPSHOT_TOO_LARGE",
+                fullPath,
                 $"File '{fullPath}' is {length} bytes; the limit is {maximumBytes} bytes.");
         }
 
@@ -39,17 +49,47 @@ public sealed record RekallAgeBoundedFileSnapshot(string Path, byte[] Bytes)
         }
         catch (EndOfStreamException error)
         {
-            throw new InvalidDataException(
+            throw new RekallAgeBoundedFileSnapshotException(
+                "REKALL_FILE_SNAPSHOT_CHANGED",
+                fullPath,
                 $"File '{fullPath}' changed while its bounded snapshot was being read.",
                 error);
         }
 
         if (stream.Length != length)
         {
-            throw new InvalidDataException(
+            throw new RekallAgeBoundedFileSnapshotException(
+                "REKALL_FILE_SNAPSHOT_CHANGED",
+                fullPath,
                 $"File '{fullPath}' changed while its bounded snapshot was being read.");
         }
 
         return new RekallAgeBoundedFileSnapshot(fullPath, bytes);
+    }
+
+    private static async ValueTask<FileStream> OpenForSnapshotAsync(
+        string fullPath,
+        CancellationToken cancellationToken)
+    {
+        const int maximumAttempts = 8;
+        for (var attempt = 1; ; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return new FileStream(
+                    fullPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read | FileShare.Delete,
+                    bufferSize: 4096,
+                    FileOptions.Asynchronous | FileOptions.SequentialScan);
+            }
+            catch (IOException) when (attempt < maximumAttempts)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(attempt, 4)), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
     }
 }

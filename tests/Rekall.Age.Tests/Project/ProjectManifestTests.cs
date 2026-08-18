@@ -3,6 +3,8 @@ using Rekall.Age.Core.Compatibility;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
+using System.Text;
+using System.Text.Json;
 
 namespace Rekall.Age.Tests.Project;
 
@@ -96,6 +98,64 @@ public sealed class ProjectManifestTests
         await File.WriteAllTextAsync(
             Path.Combine(root, RekallAgeProjectStore.ManifestFileName),
             "{ not-json");
+
+        var error = await Assert.ThrowsAsync<RekallAgeDocumentCompatibilityException>(
+            () => new RekallAgeProjectStore().LoadAsync(root, CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_DOCUMENT_JSON_MALFORMED", error.Code);
+    }
+
+    [Fact]
+    public async Task ManifestUsesOneSchemaSnapshotAndConsistentBoundedJsonDepth()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, RekallAgeProjectStore.ManifestFileName);
+        var nested = new string('[', 80) + "0" + new string(']', 80);
+        var source = $$"""{"schemaVersion":1,"name":"Deep","capabilities":[],"extension":{{nested}}}""";
+        await File.WriteAllTextAsync(path, source);
+
+        var snapshot = await RekallAgeDocumentSchemaProbe.ReadSnapshotAsync(
+            path,
+            "project",
+            currentVersion: 1,
+            CancellationToken.None);
+        await File.WriteAllTextAsync(path, "{\"schemaVersion\":2}");
+        var manifest = snapshot.Deserialize<RekallAgeProjectManifest>(new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            MaxDepth = RekallAgeDocumentSchemaProbe.MaximumDocumentDepth
+        });
+
+        Assert.Equal(1, snapshot.Schema.DetectedVersion);
+        Assert.Equal(Encoding.UTF8.GetBytes(source), snapshot.File.Bytes);
+        Assert.Equal("Deep", manifest.Name);
+    }
+
+    [Fact]
+    public async Task ManifestSavePublishesBomlessJsonWithoutTemporarySiblings()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeProjectStore();
+
+        await store.SaveAsync(root, RekallAgeProjectManifest.Create("Atomic", ["world"]), CancellationToken.None);
+
+        var path = Path.Combine(root, RekallAgeProjectStore.ManifestFileName);
+        var bytes = await File.ReadAllBytesAsync(path);
+        Assert.False(bytes.AsSpan().StartsWith(Encoding.UTF8.Preamble));
+        Assert.Empty(Directory.GetFiles(root, ".rekall.project.json.tmp-*"));
+    }
+
+    [Fact]
+    public async Task ManifestBeyondTheSharedJsonDepthFailsWithTypedCompatibilityCode()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, RekallAgeProjectStore.ManifestFileName);
+        var nested = new string('[', RekallAgeDocumentSchemaProbe.MaximumDocumentDepth + 1)
+            + "0"
+            + new string(']', RekallAgeDocumentSchemaProbe.MaximumDocumentDepth + 1);
+        await File.WriteAllTextAsync(
+            path,
+            $$"""{"schemaVersion":1,"name":"Too Deep","capabilities":[],"extension":{{nested}}}""");
 
         var error = await Assert.ThrowsAsync<RekallAgeDocumentCompatibilityException>(
             () => new RekallAgeProjectStore().LoadAsync(root, CancellationToken.None).AsTask());

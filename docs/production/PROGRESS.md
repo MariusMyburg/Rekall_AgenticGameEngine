@@ -903,6 +903,16 @@ shared UTF-8-without-BOM publisher stages beside the destination with
 successful staging, preserves existing bytes on cancellation/failure, and
 cleans recognizable temporary siblings.
 
+Atomic persisted JSON Task 2 is verified in a 50/50 combined
+project/scene/core/compatibility/transaction selection. Schema validation and
+typed deserialization now consume the same immutable bytes at one shared depth
+limit of 128; depth 80 loads consistently and depth 129 fails with typed code
+`REKALL_DOCUMENT_JSON_MALFORMED`. Project and scene saves use durable atomic
+publication. A four-reader/50-write scene stress test observed only complete
+128-entity documents and passed five additional repetitions. Windows existing
+files use `File.Replace`; snapshot opens allow delete sharing and retry only a
+small bounded transient replacement window.
+
 The bounded cubic interpolation tranche is installed-product verified. The
 bounded morph-target tranche is also installed-product verified. Morph target
 Task 1 passed a 51/51 focused runtime/schema/CLI selection.

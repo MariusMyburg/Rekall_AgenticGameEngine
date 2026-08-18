@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Rekall.Age.Core.Compatibility;
 using Rekall.Age.Core.Product;
+using Rekall.Age.Core.Persistence;
 
 namespace Rekall.Age.World;
 
@@ -9,7 +10,8 @@ public sealed class RekallAgeSceneStore
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        MaxDepth = RekallAgeDocumentSchemaProbe.MaximumDocumentDepth
     };
 
     public string GetScenePath(string projectRoot, string sceneName)
@@ -25,7 +27,11 @@ public sealed class RekallAgeSceneStore
         var scenesDirectory = Path.Combine(projectRoot, "Scenes");
         Directory.CreateDirectory(scenesDirectory);
         var path = GetScenePath(projectRoot, scene.Name);
-        await File.WriteAllTextAsync(path, Serialize(scene), cancellationToken);
+        await RekallAgeAtomicFile.WriteAllTextAsync(
+            path,
+            Serialize(scene),
+            RekallAgeDocumentSchemaProbe.MaximumDocumentBytes,
+            cancellationToken);
     }
 
     public string Serialize(RekallAgeSceneDocument scene)
@@ -41,17 +47,14 @@ public sealed class RekallAgeSceneStore
         CancellationToken cancellationToken)
     {
         var path = GetScenePath(projectRoot, sceneName);
-        await RekallAgeDocumentSchemaProbe.ReadAsync(
+        var snapshot = await RekallAgeDocumentSchemaProbe.ReadSnapshotAsync(
             path,
             "scene",
             RekallAgeProductInfo.Current.ProjectSchemaVersion,
             cancellationToken);
-        await using var stream = File.OpenRead(path);
-        var scene = await JsonSerializer.DeserializeAsync<RekallAgeSceneDocument>(
-            stream,
-            JsonOptions,
-            cancellationToken);
-        return (scene ?? throw new InvalidOperationException($"Scene '{path}' could not be read.")) with
+        cancellationToken.ThrowIfCancellationRequested();
+        var scene = snapshot.Deserialize<RekallAgeSceneDocument>(JsonOptions);
+        return scene with
         {
             SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion
         };

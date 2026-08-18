@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Rekall.Age.Core.Persistence;
 
 namespace Rekall.Age.Core.Compatibility;
 
@@ -7,11 +8,32 @@ public sealed record RekallAgeDocumentSchema(
     int CurrentVersion,
     bool IsLegacy);
 
+public sealed record RekallAgeDocumentSnapshot(
+    RekallAgeDocumentSchema Schema,
+    RekallAgeBoundedFileSnapshot File)
+{
+    public T Deserialize<T>(JsonSerializerOptions options) =>
+        JsonSerializer.Deserialize<T>(File.Bytes, options)
+        ?? throw new InvalidOperationException($"Document '{File.Path}' could not be deserialized as {typeof(T).Name}.");
+}
+
 public static class RekallAgeDocumentSchemaProbe
 {
     public const long MaximumDocumentBytes = 64L * 1024L * 1024L;
+    public const int MaximumDocumentDepth = 128;
 
     public static async ValueTask<RekallAgeDocumentSchema> ReadAsync(
+        string documentPath,
+        string documentKind,
+        int currentVersion,
+        CancellationToken cancellationToken) =>
+        (await ReadSnapshotAsync(
+            documentPath,
+            documentKind,
+            currentVersion,
+            cancellationToken).ConfigureAwait(false)).Schema;
+
+    public static async ValueTask<RekallAgeDocumentSnapshot> ReadSnapshotAsync(
         string documentPath,
         string documentKind,
         int currentVersion,
@@ -22,32 +44,29 @@ public static class RekallAgeDocumentSchemaProbe
         ArgumentOutOfRangeException.ThrowIfLessThan(currentVersion, 1);
 
         var fullPath = Path.GetFullPath(documentPath);
-        var length = new FileInfo(fullPath).Length;
-        if (length > MaximumDocumentBytes)
+        RekallAgeBoundedFileSnapshot snapshot;
+        try
         {
-            throw Failure(
-                "REKALL_DOCUMENT_TOO_LARGE",
-                documentKind,
+            snapshot = await RekallAgeBoundedFileSnapshot.ReadAsync(
                 fullPath,
-                null,
-                currentVersion,
-                $"{documentKind} document '{fullPath}' is {length} bytes; the limit is {MaximumDocumentBytes} bytes.");
+                MaximumDocumentBytes,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (RekallAgeBoundedFileSnapshotException error)
+        {
+            var code = error.Code == "REKALL_FILE_SNAPSHOT_TOO_LARGE"
+                ? "REKALL_DOCUMENT_TOO_LARGE"
+                : "REKALL_DOCUMENT_READ_CHANGED";
+            throw Failure(code, documentKind, fullPath, null, currentVersion, error.Message, error);
         }
 
         JsonDocument document;
         try
         {
-            await using var stream = new FileStream(
-                fullPath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                bufferSize: 4096,
-                FileOptions.Asynchronous | FileOptions.SequentialScan);
-            document = await JsonDocument.ParseAsync(
-                stream,
-                new JsonDocumentOptions { MaxDepth = 128 },
-                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            document = JsonDocument.Parse(
+                snapshot.Bytes,
+                new JsonDocumentOptions { MaxDepth = MaximumDocumentDepth });
         }
         catch (JsonException error)
         {
@@ -80,7 +99,9 @@ public static class RekallAgeDocumentSchemaProbe
                 .ToArray();
             if (schemaProperties.Length == 0)
             {
-                return new RekallAgeDocumentSchema(0, currentVersion, IsLegacy: true);
+                return new RekallAgeDocumentSnapshot(
+                    new RekallAgeDocumentSchema(0, currentVersion, IsLegacy: true),
+                    snapshot);
             }
 
             if (schemaProperties.Length != 1 ||
@@ -108,10 +129,12 @@ public static class RekallAgeDocumentSchemaProbe
                     $"{documentKind} document '{fullPath}' uses future schema {detectedVersion}; this engine supports through schema {currentVersion}.");
             }
 
-            return new RekallAgeDocumentSchema(
-                detectedVersion,
-                currentVersion,
-                IsLegacy: detectedVersion < currentVersion);
+            return new RekallAgeDocumentSnapshot(
+                new RekallAgeDocumentSchema(
+                    detectedVersion,
+                    currentVersion,
+                    IsLegacy: detectedVersion < currentVersion),
+                snapshot);
         }
     }
 

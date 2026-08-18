@@ -30,12 +30,12 @@ snapshot and publishes complete durable files atomically.
 - Modify: `tests/Rekall.Age.Tests/Project/ProjectManifestTests.cs`
 - Modify: `tests/Rekall.Age.Tests/World/SceneStoreTests.cs`
 
-- [ ] Write failing over-depth, over-limit, immutable snapshot, repeated-reader,
+- [x] Write failing over-depth, over-limit, immutable snapshot, repeated-reader,
   cancellation, and exact-existing-destination tests.
-- [ ] Make schema probe expose one bounded snapshot and deserialize that exact
+- [x] Make schema probe expose one bounded snapshot and deserialize that exact
   byte sequence with the same depth limit.
-- [ ] Publish project/scene saves only through the atomic writer.
-- [ ] Run project/world/compatibility/transaction regressions.
+- [x] Publish project/scene saves only through the atomic writer.
+- [x] Run project/world/compatibility/transaction regressions.
 
 ### Task 3: Migrate remaining engine-owned JSON stores
 

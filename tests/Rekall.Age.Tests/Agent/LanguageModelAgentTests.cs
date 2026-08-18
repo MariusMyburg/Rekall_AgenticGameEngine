@@ -28,6 +28,7 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("do not call it more than once", prompt, StringComparison.Ordinal);
         Assert.Contains("every requested visible dynamic body has a renderer", prompt, StringComparison.Ordinal);
         Assert.Contains("scaffold the required playable module before the first packaging call", prompt, StringComparison.Ordinal);
+        Assert.Contains("rekall.validation.repair_project", prompt, StringComparison.Ordinal);
         Assert.Contains("retry once with the same named scenes and empty entities arrays", prompt, StringComparison.Ordinal);
         Assert.Contains("Never repeat substantially the same failed blueprint arguments", prompt, StringComparison.Ordinal);
         Assert.True(

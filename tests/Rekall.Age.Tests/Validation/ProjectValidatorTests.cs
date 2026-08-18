@@ -4,6 +4,7 @@ using Rekall.Age.Core.Transactions;
 using Rekall.Age.Validation;
 using Rekall.Age.Validation.Commands;
 using Rekall.Age.World;
+using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Tests.Validation;
 
@@ -546,5 +547,37 @@ public sealed class ProjectValidatorTests
         Assert.Contains(
             result.Value.Scenes.Single(scene => scene.SceneName == "Physics2D").Issues,
             issue => issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN");
+    }
+
+    [Fact]
+    public async Task RepairProjectValidationExecutesAllEngineSuggestedRepairsInOneBoundedCall()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity(RekallAgeEntityDocument.Create("Body", [])
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.Transform3D",
+                        new JsonObject { ["invalidOne"] = 1, ["invalidTwo"] = 2 }))),
+            CancellationToken.None);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new ValidateProjectCommand());
+        registry.Register(new RemoveComponentPropertyCommand());
+        registry.Register(new RepairProjectValidationCommand(registry));
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("batch validation repair"),
+            CancellationToken.None);
+
+        var result = await registry.ExecuteAsync<RepairProjectValidationRequest, RepairProjectValidationResult>(
+            "rekall.validation.repair_project",
+            new RepairProjectValidationRequest(root),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(2, result.Value.ExecutedRepairCount);
+        Assert.Equal(0, result.Value.Validation.IssueCount);
+        Assert.Equal("ok", result.Value.Validation.Status);
     }
 }

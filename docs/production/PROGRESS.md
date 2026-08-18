@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 04:07 Africa/Johannesburg
+Last verified: 2026-08-18 04:17 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: targeted audit repair passed the complete product gate
+Latest milestone: bounded batch validation repair passed 587/587 Debug tests
 
 ## Product objective
 
@@ -496,6 +496,15 @@ Studio is important, but it does not define or reorder the engine foundation.
   gauntlet, original and relocated package proof, runtime UI, software viewport,
   simulated audio, and Windows player audio. The canonical 1,149-file archive
   is 194,710,647 bytes.
+- Broad benchmark rerun 26: all 35 tools succeeded, but 27 individual suggested
+  property-removal calls consumed the 36-turn bound (616,406 prompt; 11,328
+  completion) before runtime or package proof. This is a clear throughput
+  failure despite correct individual diagnostics.
+- Bounded batch validation repair: `rekall.validation.repair_project` executes
+  engine-generated mutation suggestions in bounded passes, skips read-only
+  discovery actions, stops safely on failed mutation, and returns fresh project
+  validation. The embedded contract uses it for multiple repairs while retaining
+  deliberate-fault requirements. The full Debug suite passes at 587/587.
 
 ## Current gaps
 
@@ -511,7 +520,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the unchanged installed Ollama benchmark on the targeted-audit distribution.
+Run the complete clean product gate for bounded batch validation repair.
 
 ## Next after the current item
 

@@ -445,6 +445,7 @@ internal static class RekallAgeCli
         registry.Register(new GetEngineStatusCommand());
         registry.Register(new InspectEngineDoctorCommand());
         registry.Register(new ValidateProjectCommand());
+        registry.Register(new RepairProjectValidationCommand(registry));
         registry.Register(new ValidateSceneCommand());
         registry.Register(new ListTransactionHistoryCommand());
         registry.Register(new RestoreTransactionPreimageCommand());

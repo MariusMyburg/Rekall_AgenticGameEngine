@@ -738,6 +738,29 @@ must use the smallest targeted canonical mutation against exact registered
 schemas and rerun only evidence made stale by that mutation. The evidence bar
 is unchanged; the repair scope is bounded to prevent audit-time regressions.
 
+### Batched-validation-repair rerun
+
+Rerun 26 used the targeted-audit distribution with the unchanged 36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun26`
+- Result: failed at the 36-turn bound
+- Tool calls: 35
+- Prompt tokens: 616,406
+- Completion tokens: 11,328
+
+Every tool call succeeded, but the authored component payloads contained many
+invalid built-in properties. The agent spent 27 separate calls executing
+engine-suggested `remove_property` repairs and exhausted the bound before
+runtime or packaging. This exposed a generic validation throughput gap.
+
+The installed command set now includes `rekall.validation.repair_project`. It
+executes all engine-generated mutation suggestions across bounded passes,
+skips read-only discovery guidance, stops on any failed mutation, and returns a
+fresh aggregate validation result. A regression proves two invalid properties
+are repaired in one call with zero remaining issues. The embedded contract uses
+the batch primitive whenever validation returns multiple repairs while retaining
+the explicit requirement to repair every deliberate fault.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

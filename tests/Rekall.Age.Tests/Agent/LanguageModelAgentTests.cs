@@ -20,6 +20,19 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public void EmbeddedAgentContractPreventsKnownBroadDeliveryWaste()
+    {
+        var prompt = RekallAgeEmbeddedAgentContract.SystemPrompt;
+
+        Assert.Contains("exact tool is rekall.module.search_component_schemas", prompt, StringComparison.Ordinal);
+        Assert.Contains("every requested visible dynamic body has a renderer", prompt, StringComparison.Ordinal);
+        Assert.Contains("scaffold the required playable module before the first packaging call", prompt, StringComparison.Ordinal);
+        Assert.True(
+            prompt.IndexOf("scaffold the required playable module", StringComparison.Ordinal)
+            < prompt.IndexOf("first packaging call", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task AgentExecutesToolCallsAndReturnsMeasuredFinalResponse()
     {
         var model = new ScriptedModelClient(

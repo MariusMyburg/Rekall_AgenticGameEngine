@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 02:45 Africa/Johannesburg
+Last verified: 2026-08-18 02:54 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: bounded request-alias repair passed the complete product gate
+Latest milestone: visible-delivery agent contract passed 585/585 Debug tests
 
 ## Product objective
 
@@ -404,6 +404,17 @@ Studio is important, but it does not define or reorder the engine foundation.
   gauntlet, original and relocated package proof, runtime UI, software viewport,
   simulated audio, and Windows player audio. The canonical 1,149-file archive
   is 194,709,366 bytes.
+- Broad benchmark rerun 20: the installed agent stopped at 36 turns/32 tools
+  (688,007 prompt; 16,335 completion) without an audited final response. Field
+  aliases removed the prior malformed inspection/package requests, but one
+  invented schema-search namespace and packaging before module scaffolding
+  remained. Independent evidence found zero validation issues, visible 3D
+  motion, genuine but non-rendered 2D body motion, and fresh passing 218-file
+  original/relocated package audits. This remains a failed benchmark.
+- Visible-delivery agent contract: embedded runs now name the exact component-
+  schema search command, require a renderer on every requested visible dynamic
+  body, and order required module scaffolding before the first package call.
+  The regression and full Debug suite pass at 585/585.
 
 ## Current gaps
 
@@ -419,12 +430,13 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the unchanged installed Ollama benchmark on the request-alias distribution.
+Run the complete clean product gate for the visible-delivery agent contract.
 
 ## Next after the current item
 
-Classify any remaining benchmark failure by generic engine contract and fix it
-with regression tests.
+Rerun the unchanged installed Ollama benchmark on the rebuilt distribution.
+Classify any remaining failure by generic engine contract and regression-test
+the repair.
 A genuine broad benchmark pass precedes quantified production hardening;
 Studio follows as a consumer of those results.
 

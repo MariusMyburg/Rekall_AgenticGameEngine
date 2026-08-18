@@ -574,6 +574,36 @@ only when the chosen command request declares the canonical field and therefore
 do not weaken unrelated schemas. Existing `frameCount` and `archivePath`
 normalization remains covered.
 
+### Visible-delivery rerun
+
+Rerun 20 used the request-alias distribution with the unchanged 36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun20`
+- Result: failed at the 36-turn bound
+- Tool calls: 32
+- Prompt tokens: 688,007
+- Completion tokens: 16,335
+
+The aliases eliminated the prior malformed runtime and package-path fields, but
+the agent still spent one call on an invented
+`rekall.tools.search_component_schemas` name and attempted packaging before
+scaffolding the required playable module. It reached clean validation, runtime
+inspection, original audit, relocation, relocated audit, and further completion
+audits, but never returned an audited final answer.
+
+Independent installed verification found zero validation issues; a visible 3D
+dynamic body with Y delta -1.267; and fresh passing run/capture/nonblank audits
+of the 218-file original and relocated packages. The moving 2D body also had Y
+delta -1.267, but lacked a renderer, so the scene's one visible renderable was
+only the static floor. The visible dynamic-body requirement therefore remained
+unmet even outside the turn-bound failure.
+
+The generic correction makes the exact component-schema search namespace
+explicit, requires every requested visible simulated body to have a renderer in
+addition to its physics composition, and directs agents to scaffold a playable
+module before the first package call when the project has none. A regression
+test locks all three bounded-delivery requirements into the embedded contract.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

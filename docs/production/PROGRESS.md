@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 03:39 Africa/Johannesburg
+Last verified: 2026-08-18 03:48 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: empty-scene blueprint scaffolding passed the complete product gate
+Latest milestone: atomic-blueprint fallback contract passed 586/586 Debug tests
 
 ## Product objective
 
@@ -466,6 +466,15 @@ Studio is important, but it does not define or reorder the engine foundation.
   gauntlet, original and relocated package proof, runtime UI, software viewport,
   simulated audio, and Windows player audio. The canonical 1,149-file archive
   is 194,710,362 bytes.
+- Broad benchmark rerun 24: the installed agent stopped at 36 turns/36 tools
+  (573,004 prompt; 15,500 completion) after four similar oversized blueprint
+  failures, later validation/runtime work, and package preflight/scaffolding.
+  Independent proof found one warning, non-rendered requested dynamic bodies,
+  zero visible 2D renderables, and no package. This is a clear failure.
+- Atomic-blueprint fallback contract: the embedded agent now attempts a complete
+  atomic project once, then on structural failure creates the same named empty
+  scenes and uses smaller per-scene blueprints. It must not repeat substantially
+  identical failed blueprint arguments. The full Debug suite passes at 586/586.
 
 ## Current gaps
 
@@ -481,7 +490,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the unchanged installed Ollama benchmark on the empty-scene distribution.
+Run the complete clean product gate for the atomic-blueprint fallback contract.
 
 ## Next after the current item
 

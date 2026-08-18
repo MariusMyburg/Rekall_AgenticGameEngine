@@ -683,6 +683,33 @@ supports an empty array as a no-op or an explicit clear when `clearExisting` is
 true. Schema descriptions expose the recovery path, and a two-scene regression
 proves persisted empty scaffolds without weakening entity/component validation.
 
+### Atomic-fallback rerun
+
+Rerun 24 used the empty-scene distribution with the unchanged 36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun24`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 573,004
+- Completion tokens: 15,500
+
+The empty-scene capability eventually established the project, but only after
+four substantially similar oversized atomic-blueprint deserialization failures.
+The agent reached validation and runtime inspection, then stopped after package
+preflight and module scaffolding without producing a package.
+
+Independent installed verification found one remaining camera-layer warning,
+genuine 3D/2D motion, but no renderer on either requested dynamic body. The 2D
+scene reported zero visible renderables. The artifacts and bounded completion
+both failed the acceptance bar.
+
+The embedded contract now makes the recovery deterministic: try the complete
+atomic project blueprint once; on argument or structure failure, retry once with
+the same named scenes and empty entity arrays, then apply smaller per-scene
+blueprints. It explicitly prohibits repeating substantially the same failed
+blueprint arguments. A regression locks the fallback wording into the installed
+agent contract.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 06:13 Africa/Johannesburg
+Last verified: 2026-08-18 06:20 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: package relocation trust-boundary hardening passed the complete product gate
+Latest milestone: directory packages enforce bounded inspection and reject reparse points
 
 ## Product objective
 
@@ -632,6 +632,14 @@ Studio is important, but it does not define or reorder the engine foundation.
   hardened extractor, informative proof, runtime UI, software viewport,
   simulated audio, and Windows player audio. The canonical 1,149-manifest-file
   archive is 194,732,663 bytes.
+- Directory-package trust boundary: directory and manifest-path inspection now
+  applies the same default 100,000-entry, 8 GB per-file, and 32 GB total
+  uncompressed bounds as archive inspection before recursive enumeration or
+  hashing. Package roots and descendants marked as symbolic links, junctions,
+  or other reparse points fail with a structured
+  `REKALL_PACKAGE_PATH_REPARSE_POINT` diagnostic. Injectable bounded limits and
+  file attributes provide deterministic low-cost regression coverage; all four
+  package-integrity scenarios and the full Debug suite pass at 592/592.
 
 ## Current gaps
 
@@ -644,8 +652,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Harden directory-package inspection and relocation against entry/size limits
-and filesystem reparse-point escape.
+Run the complete installed-product gate for bounded directory-package
+inspection and reparse-point rejection.
 
 ## Next after the current item
 

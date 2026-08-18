@@ -207,6 +207,30 @@ public sealed class PlayablePackageIntegrityTests
             context);
 
         Assert.True(result.Ok, result.Summary);
+        var boundedInspection = await new InspectPlayablePackageCommand(
+            maximumEntries: 1,
+            maximumEntrySizeBytes: long.MaxValue,
+            maximumPackageSizeBytes: long.MaxValue).ExecuteAsync(
+                new InspectPlayablePackageRequest(output),
+                context);
+        Assert.False(boundedInspection.Ok);
+        Assert.Contains(
+            boundedInspection.Errors,
+            error => error.Code == "REKALL_PACKAGE_DIRECTORY_LIMIT_EXCEEDED");
+        var reparseInspection = await new InspectPlayablePackageCommand(
+            maximumEntries: int.MaxValue,
+            maximumEntrySizeBytes: long.MaxValue,
+            maximumPackageSizeBytes: long.MaxValue,
+            readAttributes: path => Path.GetFileName(path).Equals("Game", StringComparison.Ordinal)
+                ? FileAttributes.Directory | FileAttributes.ReparsePoint
+                : File.GetAttributes(path)).ExecuteAsync(
+                    new InspectPlayablePackageRequest(output),
+                    context);
+        Assert.False(reparseInspection.Ok);
+        Assert.Contains(
+            reparseInspection.Errors,
+            error => error.Code == "REKALL_PACKAGE_PATH_REPARSE_POINT");
+
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(result.Value.ManifestPath));
         var manifest = document.RootElement;
         Assert.Equal(2, manifest.GetProperty("schemaVersion").GetInt32());

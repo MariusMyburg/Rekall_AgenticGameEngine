@@ -30,6 +30,38 @@ public sealed class InspectPlayablePackageCommand
     internal const int MaximumArchiveEntries = 100_000;
     internal const long MaximumEntrySizeBytes = 8L * 1024 * 1024 * 1024;
     internal const long MaximumPackageSizeBytes = 32L * 1024 * 1024 * 1024;
+    private readonly int _maximumEntries;
+    private readonly long _maximumEntrySizeBytes;
+    private readonly long _maximumPackageSizeBytes;
+    private readonly Func<string, FileAttributes> _readAttributes;
+
+    public InspectPlayablePackageCommand()
+        : this(MaximumArchiveEntries, MaximumEntrySizeBytes, MaximumPackageSizeBytes)
+    {
+    }
+
+    public InspectPlayablePackageCommand(
+        int maximumEntries,
+        long maximumEntrySizeBytes,
+        long maximumPackageSizeBytes)
+        : this(maximumEntries, maximumEntrySizeBytes, maximumPackageSizeBytes, File.GetAttributes)
+    {
+    }
+
+    internal InspectPlayablePackageCommand(
+        int maximumEntries,
+        long maximumEntrySizeBytes,
+        long maximumPackageSizeBytes,
+        Func<string, FileAttributes> readAttributes)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumEntries);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumEntrySizeBytes);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumPackageSizeBytes);
+        _maximumEntries = maximumEntries;
+        _maximumEntrySizeBytes = maximumEntrySizeBytes;
+        _maximumPackageSizeBytes = maximumPackageSizeBytes;
+        _readAttributes = readAttributes ?? throw new ArgumentNullException(nameof(readAttributes));
+    }
 
     public string Name => "rekall.workflow.inspect_playable_package";
 
@@ -49,6 +81,22 @@ public sealed class InspectPlayablePackageCommand
             && !Path.GetFileName(fullPath).Equals("rekall.package.json", StringComparison.OrdinalIgnoreCase))
         {
             return InvalidPackagePath(fullPath);
+        }
+
+        var directoryRoot = Directory.Exists(fullPath)
+            ? fullPath
+            : File.Exists(fullPath)
+                && Path.GetFileName(fullPath).Equals("rekall.package.json", StringComparison.OrdinalIgnoreCase)
+                    ? Path.GetDirectoryName(fullPath)
+                    : null;
+        if (directoryRoot is not null && InspectDirectoryBounds(directoryRoot) is { } directoryError)
+        {
+            var emptyManifest = new RekallAgePlayablePackageManifest("", "", "", "", [], [], []);
+            var value = new InspectPlayablePackageResult(false, string.Empty, emptyManifest, 0, [], []);
+            return RekallAgeCommandResult<InspectPlayablePackageResult>.Failure(
+                value,
+                directoryError.Message,
+                [directoryError]);
         }
 
         (string manifestPath, RekallAgePlayablePackageManifest manifest, IReadOnlyList<RekallAgePlayablePackageFile> files) package;
@@ -104,7 +152,7 @@ public sealed class InspectPlayablePackageCommand
             [new RekallAgeCommandError("REKALL_PACKAGE_PATH_KIND_INVALID", message, packagePath)]);
     }
 
-    private static async ValueTask<IReadOnlyList<RekallAgeCommandError>> VerifyIntegrityAsync(
+    private async ValueTask<IReadOnlyList<RekallAgeCommandError>> VerifyIntegrityAsync(
         string packagePath,
         RekallAgePlayablePackageManifest manifest,
         CancellationToken cancellationToken)
@@ -162,7 +210,13 @@ public sealed class InspectPlayablePackageCommand
             }
         }
 
-        var actual = await ReadActualFilesAsync(packagePath, cancellationToken, errors);
+        var actual = await ReadActualFilesAsync(
+            packagePath,
+            cancellationToken,
+            errors,
+            _maximumEntries,
+            _maximumEntrySizeBytes,
+            _maximumPackageSizeBytes);
         foreach (var (path, expectedFile) in expected)
         {
             if (!actual.TryGetValue(path, out var actualFile))
@@ -198,7 +252,10 @@ public sealed class InspectPlayablePackageCommand
     private static async ValueTask<Dictionary<string, ActualPackageFile>> ReadActualFilesAsync(
         string packagePath,
         CancellationToken cancellationToken,
-        List<RekallAgeCommandError> errors)
+        List<RekallAgeCommandError> errors,
+        int maximumEntries,
+        long maximumEntrySizeBytes,
+        long maximumPackageSizeBytes)
     {
         var fullPath = Path.GetFullPath(packagePath);
         var actual = new Dictionary<string, ActualPackageFile>(StringComparer.OrdinalIgnoreCase);
@@ -206,11 +263,11 @@ public sealed class InspectPlayablePackageCommand
         {
             using var archive = ZipFile.OpenRead(fullPath);
             var totalLength = 0L;
-            var archiveLimitExceeded = archive.Entries.Count > MaximumArchiveEntries;
+            var archiveLimitExceeded = archive.Entries.Count > maximumEntries;
             foreach (var entry in archive.Entries)
             {
-                if (entry.Length > MaximumEntrySizeBytes ||
-                    totalLength > MaximumPackageSizeBytes - entry.Length)
+                if (entry.Length > maximumEntrySizeBytes ||
+                    totalLength > maximumPackageSizeBytes - entry.Length)
                 {
                     archiveLimitExceeded = true;
                     break;
@@ -231,7 +288,7 @@ public sealed class InspectPlayablePackageCommand
             foreach (var entry in archive.Entries.Where(entry => !entry.FullName.EndsWith("/", StringComparison.Ordinal)))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (entry.Length > MaximumEntrySizeBytes)
+                if (entry.Length > maximumEntrySizeBytes)
                 {
                     errors.Add(new RekallAgeCommandError(
                         "REKALL_PACKAGE_ARCHIVE_LIMIT_EXCEEDED",
@@ -294,6 +351,67 @@ public sealed class InspectPlayablePackageCommand
 
         return actual;
     }
+
+    private RekallAgeCommandError? InspectDirectoryBounds(string packageRoot)
+    {
+        var pending = new Queue<string>();
+        var root = Path.GetFullPath(packageRoot);
+        if ((_readAttributes(root) & FileAttributes.ReparsePoint) != 0)
+        {
+            return ReparsePointError(root);
+        }
+
+        pending.Enqueue(root);
+        var entryCount = 0;
+        var totalLength = 0L;
+        while (pending.TryDequeue(out var directory))
+        {
+            foreach (var entry in Directory.EnumerateFileSystemEntries(
+                         directory,
+                         "*",
+                         SearchOption.TopDirectoryOnly))
+            {
+                entryCount++;
+                if (entryCount > _maximumEntries)
+                {
+                    return DirectoryLimitError(packageRoot);
+                }
+
+                var attributes = _readAttributes(entry);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    return ReparsePointError(entry);
+                }
+
+                if ((attributes & FileAttributes.Directory) != 0)
+                {
+                    pending.Enqueue(entry);
+                    continue;
+                }
+
+                var length = new FileInfo(entry).Length;
+                if (length > _maximumEntrySizeBytes
+                    || totalLength > _maximumPackageSizeBytes - length)
+                {
+                    return DirectoryLimitError(packageRoot);
+                }
+
+                totalLength += length;
+            }
+        }
+
+        return null;
+    }
+
+    private static RekallAgeCommandError DirectoryLimitError(string packageRoot) => new(
+        "REKALL_PACKAGE_DIRECTORY_LIMIT_EXCEEDED",
+        "Package directory exceeds the supported entry-count, per-file-size, or total-size limit.",
+        packageRoot);
+
+    private static RekallAgeCommandError ReparsePointError(string path) => new(
+        "REKALL_PACKAGE_PATH_REPARSE_POINT",
+        "Package directories must not contain symbolic links, junctions, or other reparse points.",
+        path);
 
     private static void ValidateManifestPath(
         string path,

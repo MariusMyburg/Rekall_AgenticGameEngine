@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 06:27 Africa/Johannesburg
+Last verified: 2026-08-18 06:56 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: bounded directory-package inspection passed the complete product gate
+Latest milestone: installed runtime soak and performance inspection passed the complete product gate
 
 ## Product objective
 
@@ -30,11 +30,11 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,734,675-byte win-x64 archive assembled.
-- Canonical verification: 592/592 Release tests passed twice independently;
+- Windows distribution: fresh 194,778,548-byte win-x64 archive assembled.
+- Canonical verification: 601/601 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
-- Current Debug verification: 592/592 tests pass after durable evidence and
-  camera-mask guidance changes.
+- Current Debug verification: 601/601 tests pass after runtime soak inspection
+  and deterministic resumed-time correction.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
   paths have installed-binary proof.
@@ -647,11 +647,33 @@ Studio is important, but it does not define or reorder the engine foundation.
   software viewport, simulated audio, and Windows player audio. The canonical
   1,149-manifest-file archive is 194,734,675 bytes with SHA-256
   `9b754c5f6d2b81b13e28a2516b74855178a020c47ae7a8f043ea36bb6ea935f9`.
+- Runtime soak/performance contract: `rekall.runtime.inspect_soak` now loads an
+  authored scene once, resumes its immutable world through bounded fixed-step
+  chunks, records compact subsystem/memory/throughput checkpoints, and returns
+  named deterministic and caller-budget checks through the same CLI/MCP
+  contract. Test-first implementation exposed and fixed a core resumed-time
+  drift: continuous and chunked execution now derive elapsed time from an
+  absolute frame timebase. Invalid requests fail before scene I/O, and budget
+  failures preserve all evidence with
+  `REKALL_RUNTIME_SOAK_BUDGET_EXCEEDED`.
+- Runtime-soak distribution gate: the installed CLI completed 600 frames over
+  exactly 10 simulated seconds in five checkpoints at 4,629.6 frames/second,
+  with 686,216 bytes retained managed-memory growth, stable 20-system order,
+  zero entity growth, and zero checkpoint observations/events. All nine checks
+  passed against a 30 FPS, 64 MiB, zero-entity-growth, 32-observation, and
+  128-event budget. A separate installed negative proof completed 12 frames
+  and retained three checkpoints while returning exit code 1, a failed
+  throughput check, and the structured budget error. The clean Release build
+  had zero warnings/errors, both Release passes completed at 601/601, and the
+  installed SDK/module, gauntlet, relocated-package, UI/viewport, audio, and
+  soak matrix passed. The canonical 1,149-manifest-file archive is 194,778,548
+  bytes with SHA-256
+  `675a442cf35947263841ae915550632c7a63f4d5fa0bbbc572c378f8f607cd2f`.
 
 ## Current gaps
 
-- Add broader performance budgets, soak/device-loss recovery, security threat
-  tests, compatibility fixtures, and release-operability evidence.
+- Add device-loss and crash recovery, broader security threat tests,
+  compatibility fixtures, and release-operability evidence.
 - Complete advanced animation coverage such as cubic interpolation, morph
   targets, complex transform fixtures, and generic state-graph primitives.
 - Replace the current Studio facade with a professional workbench only after
@@ -659,20 +681,21 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Define and implement the first quantified lifecycle soak/recovery and runtime
-performance regression gate.
+Define and implement explicit trust policy and loading boundaries for
+agent-authored C# modules.
 
 ## Next after the current item
 
-Continue with explicit module trust policy and broader device-loss, crash,
-compatibility, and release-operability evidence. Studio follows proven engine
-contracts.
+Continue with device-loss recovery, crash reporting, compatibility/migration,
+and release-operability evidence. Studio follows proven engine contracts.
 
 ## Evidence index
 
 - `docs/production/2026-08-17-engine-maturity-audit.md`
 - `docs/production/2026-08-17-ollama-authoring-benchmark.md`
 - `docs/superpowers/plans/2026-08-17-runtime-subsystems.md`
+- `docs/superpowers/specs/2026-08-18-runtime-soak-performance-design.md`
+- `docs/superpowers/plans/2026-08-18-runtime-soak-performance.md`
 - `Artifacts/TestResults/release-pass-1.trx`
 - `Artifacts/TestResults/release-pass-2.trx`
 - `Artifacts/Distribution/Rekall-AGE-0.1.0-preview.1-win-x64.zip`

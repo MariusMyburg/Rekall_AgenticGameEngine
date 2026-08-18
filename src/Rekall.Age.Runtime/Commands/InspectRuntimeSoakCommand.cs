@@ -119,7 +119,7 @@ public sealed class InspectRuntimeSoakCommand
         var retainedGrowth = finalMemory - baselineMemory;
         var wallMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
         var throughput = wallMilliseconds <= 0
-            ? double.PositiveInfinity
+            ? double.MaxValue
             : completedFrames / stopwatch.Elapsed.TotalSeconds;
         var checks = BuildChecks(
             request,
@@ -222,7 +222,7 @@ public sealed class InspectRuntimeSoakCommand
             world.FrameIndex,
             world.ElapsedTime.TotalSeconds,
             wallTime.TotalMilliseconds,
-            wallTime <= TimeSpan.Zero ? double.PositiveInfinity : completedFrames / wallTime.TotalSeconds,
+            wallTime <= TimeSpan.Zero ? double.MaxValue : completedFrames / wallTime.TotalSeconds,
             world.Entities.Count,
             world.Entities.Sum(entity => entity.Components.Count),
             world.Observations.Count,

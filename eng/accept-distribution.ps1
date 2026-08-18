@@ -31,6 +31,16 @@ function Invoke-Rekall {
     }
 }
 
+function Invoke-RekallOutput {
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+    $lines = @(& $cli @Arguments 2>&1)
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) {
+        throw "Distributed Rekall AGE command failed ($exitCode): $($Arguments -join ' ')`n$($lines -join "`n")"
+    }
+    return $lines -join "`n"
+}
+
 try {
     Invoke-Rekall context doctor
     Invoke-Rekall project create $proofRoot 'Installed Product Proof' 'world,rendering3d'
@@ -175,6 +185,23 @@ try {
     )
     $scene | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $scenePath -Encoding utf8
     Invoke-Rekall runtime inspect $audioRoot Main 30
+    $soakOutput = Invoke-RekallOutput runtime soak $audioRoot Main 600 120 30 67108864 0 32 128
+    foreach ($expectedCheck in @(
+        'Check complete-execution: PASS',
+        'Check frame-continuity: PASS',
+        'Check elapsed-continuity: PASS',
+        'Check stable-systems: PASS',
+        'Check throughput: PASS',
+        'Check retained-managed-memory: PASS',
+        'Check entity-growth: PASS',
+        'Check checkpoint-observations: PASS',
+        'Check checkpoint-events: PASS'
+    )) {
+        if (-not $soakOutput.Contains($expectedCheck, [StringComparison]::Ordinal)) {
+            throw "Installed runtime soak did not contain '$expectedCheck'.`n$soakOutput"
+        }
+    }
+    Write-Output $soakOutput
 
     $uiCaptureDirectory = Join-Path $audioRoot 'Builds\InstalledUiProof'
     Invoke-Rekall render viewport capture $audioRoot Main 1 $uiCaptureDirectory 200 100 software

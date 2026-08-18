@@ -159,27 +159,27 @@ git commit -m "feat: expose runtime soak evidence"
 - Modify: `eng/accept-distribution.ps1`
 - Modify: `docs/production/PROGRESS.md`
 
-- [ ] **Step 1: Add installed CLI soak proof**
+- [x] **Step 1: Add installed CLI soak proof**
 
 After the installed audio/UI scene is authored and inspected, invoke the distributed CLI with 600 frames, 120-frame checkpoints, a conservative 30 frames/second minimum, 64 MiB maximum retained managed-memory growth, zero entity growth, 32 observations, and 128 events. Capture output and require passed completion, frame-continuity, elapsed-continuity, stable-systems, throughput, retained-memory, entity-growth, observations, and events checks.
 
-- [ ] **Step 2: Run installed acceptance in the assembled distribution gate**
+- [x] **Step 2: Run installed acceptance in the assembled distribution gate**
 
 Use the repository product gate rather than accepting a source-tree CLI run as installed evidence:
 
 ```powershell
 $env:TEMP='F:\Dev\Rekall_AGE\.worktrees\production-foundation\Artifacts\GateTemp'
 $env:TMP=$env:TEMP
-pwsh -NoProfile -File eng\product-gate.ps1
+pwsh -NoProfile -File eng\build.ps1
 ```
 
 Expected: clean Release build with zero warnings/errors, two independent passing Release test runs, assembled self-contained Windows distribution, and installed acceptance including the new soak proof.
 
-- [ ] **Step 3: Record exact evidence in the durable ledger**
+- [x] **Step 3: Record exact evidence in the durable ledger**
 
 Update `docs/production/PROGRESS.md` with the timestamp, test total, measured installed throughput and retained-memory growth, archive size/hash, product-gate result, current lifecycle/performance posture, and next production risk. Never claim broad device-loss/crash recovery from this offline soak gate.
 
-- [ ] **Step 4: Commit acceptance and evidence**
+- [x] **Step 4: Commit acceptance and evidence**
 
 ```powershell
 git add eng/accept-distribution.ps1 docs/production/PROGRESS.md
@@ -193,18 +193,18 @@ git commit -m "test: gate installed runtime soak"
 - Review: all files changed by Tasks 1-4
 - Modify if needed: `docs/production/PROGRESS.md`
 
-- [ ] **Step 1: Inspect the branch diff and working tree**
+- [x] **Step 1: Inspect the branch diff and working tree**
 
 Run `git status --short` and `git diff HEAD~4 --check`. Confirm no unrelated user work, generated artifacts, secrets, absolute machine paths in product output, or Studio-specific coupling entered the change.
 
-- [ ] **Step 2: Verify command semantics from the installed executable**
+- [x] **Step 2: Verify command semantics from the installed executable**
 
 Confirm the acceptance output contains the exact measured checks and that a deliberately impossible throughput budget returns exit code 1 with `REKALL_RUNTIME_SOAK_BUDGET_EXCEEDED` while retaining checkpoint evidence.
 
-- [ ] **Step 3: Update the durable next-action queue**
+- [x] **Step 3: Update the durable next-action queue**
 
 Mark the runtime soak/performance milestone complete only after the full gate. Set the next production priority to module trust/loading boundaries, followed by device-loss recovery, crash reporting, compatibility/migration, and release operability.
 
-- [ ] **Step 4: Commit any review corrections**
+- [x] **Step 4: Commit any review corrections**
 
 Use a focused commit message matching the correction. Leave the worktree clean before reporting the milestone.

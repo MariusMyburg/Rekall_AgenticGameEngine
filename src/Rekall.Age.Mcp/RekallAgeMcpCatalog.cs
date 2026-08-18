@@ -62,6 +62,11 @@ internal static class RekallAgeMcpToolClassifier
             return "diagnostics";
         }
 
+        if (name.StartsWith("rekall.compatibility.", StringComparison.Ordinal))
+        {
+            return "compatibility";
+        }
+
         if (name.StartsWith("rekall.live.", StringComparison.Ordinal))
         {
             return "live";
@@ -101,6 +106,7 @@ internal static class RekallAgeMcpToolClassifier
         return name is
             "rekall.context.engine_status" or
             "rekall.diagnostics.inspect_failures" or
+            "rekall.compatibility.inspect_project" or
             "rekall.module.inspect_trust" or
             "rekall.live.status" or
             "rekall.live.reload_scene" or
@@ -126,6 +132,7 @@ internal static class RekallAgeMcpToolClassifier
         {
             "rekall.context.engine_status" => 5,
             "rekall.diagnostics.inspect_failures" => 6,
+            "rekall.compatibility.inspect_project" => 7,
             "rekall.module.inspect_trust" => 12,
             "rekall.workflow.create_blueprint_project" => 9,
             "rekall.workflow.agent_authoring_gauntlet" => 10,

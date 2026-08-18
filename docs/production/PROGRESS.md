@@ -822,6 +822,14 @@ normalize implicit legacy schema 0 only in memory, keep loads read-only, and
 fail closed with typed stable codes for malformed, invalid, or future schema
 facts.
 
+Compatibility Task 2 is verified at 14/14 focused tests: the recommended
+`rekall.compatibility.inspect_project` command now provides bounded, read-only,
+manifest-first inspection through direct command, CLI, and MCP surfaces. It
+reports current/legacy/future/malformed/missing states, exact versions and
+codes, migration eligibility, blockers, limitations, and next actions without
+executing project code or changing source bytes. Oversized/excessive inputs and
+reparse traversal fail closed.
+
 ## Next after the current item
 
 Expand adversarial security coverage, then complete advanced animation

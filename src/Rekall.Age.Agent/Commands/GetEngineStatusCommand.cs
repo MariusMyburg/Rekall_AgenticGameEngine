@@ -62,6 +62,10 @@ public sealed class GetEngineStatusCommand
                     "Inspect bounded Player and Studio failure/recovery evidence without executing project code or exposing full stack traces.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
+                    "rekall.compatibility.inspect_project",
+                    "Inspect persisted project and scene schema compatibility without changing files or executing project code.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
                     "rekall.workflow.package_playable_game",
                     "Create a playable package and return its package OutputDirectory, ArchivePath, and separate LaunchPath.",
                     Recommended: true),

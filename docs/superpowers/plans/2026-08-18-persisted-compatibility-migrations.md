@@ -22,15 +22,22 @@ schema facts.
 
 ## Task 2: Add deterministic whole-project inspection
 
-- [ ] Add fixtures for current, legacy, mixed, future, malformed, missing,
+- [x] Add fixtures for current, legacy, mixed, future, malformed, missing,
   oversized, excessive-count, and reparse-path cases.
-- [ ] Implement bounded, ordinal, read-only compatibility inspection across the
+- [x] Implement bounded, ordinal, read-only compatibility inspection across the
   manifest and live scene glob.
-- [ ] Return stable status/code/version/migratability facts, blockers,
+- [x] Return stable status/code/version/migratability facts, blockers,
   limitations, and exact next actions.
-- [ ] Register `rekall.compatibility.inspect_project` for direct, CLI, and MCP
+- [x] Register `rekall.compatibility.inspect_project` for direct, CLI, and MCP
   discovery and advertise it in engine status.
-- [ ] Run focused tests and commit.
+- [x] Run focused tests and commit.
+
+Verified 2026-08-18: focused compatibility inspection, real CLI process, MCP
+catalog, and engine-status coverage pass at 14/14. Inspection keeps source bytes
+unchanged; orders the project manifest before ordinal scene paths; isolates
+legacy, current, future, malformed, missing, oversized, and excessive-count
+facts; refuses reparse traversal through a real Windows junction; and returns
+exact blockers and next actions.
 
 ## Task 3: Add explicit atomic migration
 

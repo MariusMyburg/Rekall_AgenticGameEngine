@@ -39,7 +39,7 @@ internal static class RekallAgeCli
         Log.Information("Rekall AGE command starting. Args={Args}", string.Join(' ', args));
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <agent|game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|transaction|capture|render|module|build|validation|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <agent|game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|compatibility|diagnostics|transaction|capture|render|module|build|validation|mcp> ...");
             Log.Information("Rekall AGE command finished with usage error. LogDirectory={LogDirectory}", logDirectory);
             Log.CloseAndFlush();
             return 2;
@@ -202,6 +202,7 @@ internal static class RekallAgeCli
                 ["module", "trust", var root] => await InspectModuleTrustAsync(registry, context, root),
                 ["diagnostics", "failures"] => await InspectFailureReportsAsync(registry, context, null),
                 ["diagnostics", "failures", var root] => await InspectFailureReportsAsync(registry, context, root),
+                ["compatibility", "inspect", var root] => await InspectProjectCompatibilityAsync(registry, context, root),
                 ["module", "sources", var root] => await ListModuleSourcesAsync(registry, context, root),
                 ["module", "read-source", var root, var moduleName, var fileName] =>
                     await ReadModuleSourceAsync(registry, context, root, moduleName, fileName),
@@ -469,6 +470,7 @@ internal static class RekallAgeCli
         registry.Register(new GetSceneSummaryCommand());
         registry.Register(new GetEngineStatusCommand());
         registry.Register(new InspectFailureReportsCommand());
+        registry.Register(new InspectProjectCompatibilityCommand());
         registry.Register(new InspectEngineDoctorCommand());
         registry.Register(new ValidateProjectCommand());
         registry.Register(new RepairProjectValidationCommand(registry));
@@ -2838,6 +2840,32 @@ internal static class RekallAgeCli
         foreach (var issue in result.Value.Issues)
         {
             Console.WriteLine($"{issue.Code}: {issue.Message} [{issue.Target}]");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectProjectCompatibilityAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root)
+    {
+        var result = await registry.ExecuteAsync<InspectProjectCompatibilityRequest, InspectProjectCompatibilityResult>(
+            "rekall.compatibility.inspect_project",
+            new InspectProjectCompatibilityRequest(root),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Project root: {result.Value.ProjectRoot}");
+        Console.WriteLine($"Current: {result.Value.IsCurrent}; migratable: {result.Value.CanMigrate}");
+        foreach (var document in result.Value.Documents)
+        {
+            Console.WriteLine(
+                $"{document.RelativePath}: {document.Status} {document.Code} " +
+                $"schema={document.DetectedVersion?.ToString() ?? "unknown"}/{document.CurrentVersion}");
+        }
+        foreach (var blocker in result.Value.Blockers)
+        {
+            Console.WriteLine($"{blocker.Code}: {blocker.Message} [{blocker.Target}]");
         }
 
         return result.Ok ? 0 : 1;

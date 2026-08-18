@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 10:02 Africa/Johannesburg
+Last verified: 2026-08-18 10:05 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -871,6 +871,13 @@ agent-inspectable, genre-neutral contracts such as state graphs and richer
 interpolation/transform coverage; authored modules remain responsible for game
 behavior.
 
+The next tranche design is fixed in
+`docs/superpowers/specs/2026-08-18-animation-state-graph-design.md`: a bounded,
+versioned, parameter-driven graph projects into the existing generic mixer,
+uses engine delta time, preserves deterministic resume, emits generic state and
+transition facts, and keeps all game-specific parameter decisions in
+agent-authored content.
+
 Archive preflight Task 1 is verified at 15/15 focused tests: a central
 metadata-only contract now returns a deterministic manifest-first immutable
 entry plan and rejects exceeded bounds, missing/duplicate/oversized manifests,
@@ -921,6 +928,7 @@ the foundation roadmap.
 - `docs/superpowers/specs/2026-08-18-package-archive-preflight-security-design.md`
 - `docs/superpowers/plans/2026-08-18-package-archive-preflight-security.md`
 - `docs/production/package-trust-and-archive-security.md`
+- `docs/superpowers/specs/2026-08-18-animation-state-graph-design.md`
 - `Artifacts/TestResults/release-pass-1.trx`
 - `Artifacts/TestResults/release-pass-2.trx`
 - `Artifacts/Distribution/Rekall-AGE-0.1.0-preview.1-win-x64.zip`

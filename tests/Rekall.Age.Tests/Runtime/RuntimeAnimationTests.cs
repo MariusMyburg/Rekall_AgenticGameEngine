@@ -439,7 +439,7 @@ public sealed class RuntimeAnimationTests
                 new JsonObject
                 {
                     ["version"] = 1,
-                    ["durationSeconds"] = 1,
+                    ["durationSeconds"] = 2,
                     ["tracks"] = new JsonArray { ScalarTrack("Rekall.Transform3D", "x", 0, 1, "linear") }
                 }))
             .AddComponent(RekallAgeComponentDocument.Create("Rekall.AnimationPlayer", new JsonObject()));
@@ -524,6 +524,174 @@ public sealed class RuntimeAnimationTests
         Assert.Equal(0.5, player.TimeSeconds, precision: 4);
         Assert.DoesNotContain(result.World.Observations, observation =>
             observation.Code == "REKALL_ANIMATION_MISSING_CLIP");
+    }
+
+    [Fact]
+    public async Task CubicAnimationTrackUsesDurationScaledHermiteTangents()
+    {
+        var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["x"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationClip",
+                new JsonObject
+                {
+                    ["version"] = 1,
+                    ["durationSeconds"] = 1,
+                    ["tracks"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["component"] = "Rekall.Transform3D",
+                            ["property"] = "x",
+                            ["interpolation"] = "cubic",
+                            ["keys"] = new JsonArray
+                            {
+                                new JsonObject
+                                {
+                                    ["time"] = 0,
+                                    ["value"] = 0,
+                                    ["inTangent"] = 0,
+                                    ["outTangent"] = 6
+                                },
+                                new JsonObject
+                                {
+                                    ["time"] = 2,
+                                    ["value"] = 6,
+                                    ["inTangent"] = 0,
+                                    ["outTangent"] = 0
+                                }
+                            }
+                        }
+                    }
+                }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationPlayer",
+                new JsonObject { ["playing"] = true, ["loopMode"] = "clamp" }));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault().RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            60,
+            CancellationToken.None);
+
+        Assert.Equal(4.5, Assert.Single(result.World.Entities).Transform.Position3D.X, precision: 4);
+        Assert.DoesNotContain(result.World.Observations, observation => observation.Severity == "error");
+    }
+
+    [Fact]
+    public async Task CubicAnimationTrackSamplesFlatVectorsAndColorsComponentWise()
+    {
+        var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.SpriteRenderer",
+                new JsonObject { ["offset"] = new JsonArray(0, 10), ["tint"] = "#102030" }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationClip",
+                new JsonObject
+                {
+                    ["version"] = 1,
+                    ["durationSeconds"] = 1,
+                    ["tracks"] = new JsonArray
+                    {
+                        CubicTrack(
+                            "Rekall.SpriteRenderer",
+                            "offset",
+                            new JsonArray(0, 10),
+                            new JsonArray(10, 20),
+                            new JsonArray(20, 40),
+                            new JsonArray(0, 0)),
+                        CubicTrack(
+                            "Rekall.SpriteRenderer",
+                            "tint",
+                            "#102030",
+                            "#506070",
+                            new JsonArray(256, 0, -256),
+                            new JsonArray(0, 0, 0))
+                    }
+                }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationPlayer",
+                new JsonObject { ["playing"] = true, ["loopMode"] = "clamp" }));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault().RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            30,
+            CancellationToken.None);
+
+        var sprite = Assert.Single(Assert.Single(result.World.Entities).Components,
+            component => component.Type == "Rekall.SpriteRenderer");
+        Assert.Equal("7.5", sprite.Properties["offset"]![0]!.ToJsonString());
+        Assert.Equal("20", sprite.Properties["offset"]![1]!.ToJsonString());
+        Assert.Equal("#504030", sprite.Properties["tint"]!.GetValue<string>());
+        Assert.DoesNotContain(result.World.Observations, observation => observation.Severity == "error");
+    }
+
+    [Fact]
+    public async Task UnknownAnimationInterpolationFailsClosedWithoutTargetMutation()
+    {
+        var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["x"] = 7 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationClip",
+                new JsonObject
+                {
+                    ["version"] = 1,
+                    ["durationSeconds"] = 1,
+                    ["tracks"] = new JsonArray
+                    {
+                        ScalarTrack("Rekall.Transform3D", "x", 0, 10, "bezier")
+                    }
+                }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.AnimationPlayer", new JsonObject()));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault().RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            30,
+            CancellationToken.None);
+
+        Assert.Equal(7, Assert.Single(result.World.Entities).Transform.Position3D.X);
+        var observation = Assert.Single(result.World.Observations,
+            item => item.Code == "runtime.animation.interpolation_invalid");
+        Assert.Contains("Rekall.Transform3D.x", observation.Message, StringComparison.Ordinal);
+        Assert.Contains("bezier", observation.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MalformedCubicAnimationTrackEmitsBoundedObservationWithoutTargetMutation()
+    {
+        var invalidTrack = CubicTrack("Rekall.Transform3D", "x", 0, 10, 20, 0);
+        ((JsonObject)((JsonArray)invalidTrack["keys"]!)[0]!).Remove("outTangent");
+        var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["x"] = 7 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationClip",
+                new JsonObject
+                {
+                    ["version"] = 1,
+                    ["durationSeconds"] = 1,
+                    ["tracks"] = new JsonArray { invalidTrack }
+                }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.AnimationPlayer", new JsonObject()));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault().RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "animation"]).AddEntity(actor)),
+            30,
+            CancellationToken.None);
+
+        Assert.Equal(7, Assert.Single(result.World.Entities).Transform.Position3D.X);
+        var observation = Assert.Single(result.World.Observations,
+            item => item.Code == "runtime.animation.cubic_key_invalid");
+        Assert.Contains("Rekall.Transform3D.x", observation.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("System.", observation.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -869,6 +1037,39 @@ public sealed class RuntimeAnimationTests
             {
                 new JsonObject { ["time"] = 0, ["value"] = from },
                 new JsonObject { ["time"] = 1, ["value"] = to }
+            }
+        };
+    }
+
+    private static JsonObject CubicTrack(
+        string component,
+        string property,
+        JsonNode from,
+        JsonNode to,
+        JsonNode outTangent,
+        JsonNode inTangent)
+    {
+        return new JsonObject
+        {
+            ["component"] = component,
+            ["property"] = property,
+            ["interpolation"] = "cubic",
+            ["keys"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["time"] = 0,
+                    ["value"] = from,
+                    ["inTangent"] = outTangent.DeepClone(),
+                    ["outTangent"] = outTangent
+                },
+                new JsonObject
+                {
+                    ["time"] = 1,
+                    ["value"] = to,
+                    ["inTangent"] = inTangent,
+                    ["outTangent"] = inTangent.DeepClone()
+                }
             }
         };
     }

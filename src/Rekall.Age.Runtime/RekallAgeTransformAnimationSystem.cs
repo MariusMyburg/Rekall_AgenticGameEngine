@@ -487,21 +487,7 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             return entity;
         }
 
-        var keys = keyNodes.OfType<JsonObject>()
-            .Select(key => new AnimationKey(ReadNumber(key, "time", 0), key["value"]?.DeepClone()))
-            .Where(key => key.Value is not null)
-            .OrderBy(key => key.Time)
-            .ToArray();
-        if (keys.Length == 0)
-        {
-            observations.Add(AnimationObservation(
-                frame,
-                "runtime.animation.track_no_valid_keys",
-                entity,
-                $"Animation track '{componentType}.{propertyName}' has no keys with values."));
-            return entity;
-        }
-        if (entity.FindComponent(componentType) is not { } component)
+        if (entity.FindComponent(componentType) is not { })
         {
             observations.Add(AnimationObservation(
                 frame,
@@ -521,7 +507,55 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             return entity;
         }
 
-        var value = Sample(keys, sampleTime, ReadString(track, "interpolation") ?? "linear");
+        var interpolation = ReadString(track, "interpolation") ?? "linear";
+        if (interpolation.ToLowerInvariant() is not ("step" or "linear" or "smooth" or "smoothstep" or "cubic"))
+        {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.interpolation_invalid",
+                entity,
+                $"Animation track '{componentType}.{propertyName}' uses unsupported interpolation '{interpolation}'."));
+            return entity;
+        }
+        if (interpolation.Equals("cubic", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!RekallAgeCubicAnimationSampler.TryCreateKeys(keyNodes, out var cubicKeys, out var issue))
+            {
+                observations.Add(AnimationObservation(
+                    frame,
+                    "runtime.animation.cubic_key_invalid",
+                    entity,
+                    $"Animation track '{componentType}.{propertyName}' is invalid: {issue}"));
+                return entity;
+            }
+            var cubicValue = RekallAgeCubicAnimationSampler.Sample(cubicKeys, sampleTime);
+            if (cubicValue is null)
+            {
+                observations.Add(AnimationObservation(
+                    frame,
+                    "runtime.animation.cubic_key_invalid",
+                    entity,
+                    $"Animation track '{componentType}.{propertyName}' produced a non-finite cubic value."));
+                return entity;
+            }
+            return ApplySampledValue(entity, componentType, propertyName, cubicValue);
+        }
+
+        var keys = keyNodes.OfType<JsonObject>()
+            .Select(key => new AnimationKey(ReadNumber(key, "time", 0), key["value"]?.DeepClone()))
+            .Where(key => key.Value is not null)
+            .OrderBy(key => key.Time)
+            .ToArray();
+        if (keys.Length == 0)
+        {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.track_no_valid_keys",
+                entity,
+                $"Animation track '{componentType}.{propertyName}' has no keys with values."));
+            return entity;
+        }
+        var value = Sample(keys, sampleTime, interpolation);
         if (value is null)
         {
             return entity;

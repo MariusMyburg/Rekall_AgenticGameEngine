@@ -37,7 +37,7 @@
 - Produces internal `RekallAgeCubicAnimationSampler.Sample(IReadOnlyList<RekallAgeCubicAnimationKey>, double time)` returning a cloned `JsonNode`.
 - `RekallAgeTransformAnimationSystem.ApplyTrack` routes only exact `cubic` tracks through this helper and emits stable observations before mutation.
 
-- [ ] **Step 1: Write failing scalar, vector, color, and endpoint tests**
+- [x] **Step 1: Write failing scalar, vector, color, and endpoint tests**
 
 Add real runtime tests with two-key clips. Prove scalar `0 -> 6` over one
 second with outgoing tangent 12 and incoming tangent 0 samples 4.5 at 0.5
@@ -45,7 +45,7 @@ seconds rather than the linear value 3. Prove a two-element vector samples each
 component independently, RGB/RGBA output rounds and clamps, and exact key times
 return the authored value.
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter FullyQualifiedName~RuntimeAnimationTests --verbosity minimal
@@ -54,7 +54,7 @@ dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter
 Expected: the new cubic tracks sample through the old linear fallback and the
 nonlinear assertions fail.
 
-- [ ] **Step 3: Implement the bounded cubic helper and runtime routing**
+- [x] **Step 3: Implement the bounded cubic helper and runtime routing**
 
 Define immutable parsed keys containing time, value kind/components, and
 in/out tangent component arrays. Evaluate each component with:
@@ -71,14 +71,14 @@ var result = (2 * t3 - 3 * t2 + 1) * p0
 Preserve exact scalar/vector/color output shape. Reuse the existing five-place
 normalized-time rounding and clone endpoint values.
 
-- [ ] **Step 4: Write failing malformed-input and compatibility tests**
+- [x] **Step 4: Write failing malformed-input and compatibility tests**
 
 Cover missing tangent, non-finite number, nested array, vector length mismatch,
 wrong color tangent arity, duplicate/decreasing/non-finite time, cubic string,
 and unknown interpolation. For every case assert the exact stable observation
 and unchanged target property. Reassert step, linear, smooth, and smoothstep.
 
-- [ ] **Step 5: Implement fail-closed validation and run all animation regressions**
+- [x] **Step 5: Implement fail-closed validation and run all animation regressions**
 
 Use `runtime.animation.cubic_key_invalid` for invalid cubic data and
 `runtime.animation.interpolation_invalid` for unknown modes. Include the exact
@@ -90,12 +90,19 @@ dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter
 git diff --check
 ```
 
-- [ ] **Step 6: Record evidence and commit**
+- [x] **Step 6: Record evidence and commit**
 
 ```powershell
 git add src/Rekall.Age.Runtime tests/Rekall.Age.Tests/Runtime docs/production/PROGRESS.md
 git commit -m "feat: sample bounded cubic animation tracks"
 ```
+
+Verified 2026-08-18: the scalar test first failed with the old linear value
+3.0, then passed with the hand-derived Hermite value 4.5 over a two-second
+segment, proving duration-scaled tangent units. Vector and RGB/RGBA color paths,
+exact endpoints, channel clamping, 10 malformed shape/time/value cases, bounded
+runtime diagnostics, and unknown-mode fail-closed behavior pass. The combined
+authored animation, state-graph, and cubic selection passes 43/43.
 
 ---
 

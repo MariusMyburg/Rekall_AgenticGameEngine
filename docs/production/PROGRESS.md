@@ -894,6 +894,13 @@ exact endpoints, and keep morph targets outside this focused tranche.
 The executable TDD sequence is tracked in
 `docs/superpowers/plans/2026-08-18-cubic-animation-interpolation.md`.
 
+Cubic interpolation Task 1 is verified in a 43/43 animation selection. A
+focused parser/sampler accepts finite scalar, flat-vector, and RGB/RGBA Hermite
+keys, scales tangents by segment duration, preserves exact endpoints, and
+clamps color output. Ten adversarial shape/time/value cases fail closed; the
+runtime emits bounded target-specific observations without mutation. Unknown
+interpolation names no longer silently execute as linear.
+
 The next tranche design is fixed in
 `docs/superpowers/specs/2026-08-18-animation-state-graph-design.md`: a bounded,
 versioned, parameter-driven graph projects into the existing generic mixer,

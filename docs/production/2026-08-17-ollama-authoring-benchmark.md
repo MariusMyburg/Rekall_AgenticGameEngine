@@ -904,6 +904,37 @@ next generic repair is to make the agent's completion ledger retain satisfied
 evidence and keep unresolved validation facts salient, so it can correct the
 last contract mismatch instead of rediscovering already-proven milestones.
 
+### First bounded broad-authoring pass
+
+Rerun 32 used the durable-evidence and camera-mask guidance distribution with
+the unchanged 36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun32`
+- Result: completed in 23 turns
+- Tool calls: 20
+- Prompt tokens: 483,918
+- Completion tokens: 6,135
+
+The installed agent completed project and two-scene authoring, deliberate fault
+repair, clean validation, both 30-frame runtime inspections, playable-module
+scaffolding, graphics packaging, original audit, relocation, relocated audit,
+and a completion audit. It returned `Completed=True` well inside the fixed
+bound and did not reopen passing work.
+
+Independent installed verification found two scenes with zero issues and zero
+warnings. Main's `DynamicCube` moved from Y `5.000` to `3.733`, and
+Physics2D's `DynamicBox2D` moved from Y `5.000` to `3.733`; both deltas were
+`-1.267` after 30 frames. The 3D mass was the canonical JSON number `0.0001`,
+the 2D mass was `5`, and neither runtime inspection reported a culled
+renderable. Both original and relocated packages contained 218 files, ran with
+exit code 0, captured nonblank frames, and passed `informative-frame` with five
+distinct colors.
+
+This is the first genuine bounded broad-authoring acceptance pass. It closes
+the measured engine/agent contract gap that drove reruns 1-31 and clears the
+priority queue to move from authoring correctness into quantified production
+hardening.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

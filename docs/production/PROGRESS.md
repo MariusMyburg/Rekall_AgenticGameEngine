@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 05:56 Africa/Johannesburg
+Last verified: 2026-08-18 06:00 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: durable agent evidence and camera-mask guidance pass the complete product gate
+Latest milestone: installed Ollama broad-authoring benchmark completed within its fixed bound
 
 ## Product objective
 
@@ -609,12 +609,17 @@ Studio is important, but it does not define or reorder the engine foundation.
   viewport, simulated audio, and Windows player audio. Relocated audit
   explicitly reported `informative-frame: True` with four distinct colors.
   The canonical 1,149-manifest-file archive is 194,732,792 bytes.
+- Broad benchmark rerun 32: the unchanged installed-agent task completed in 23
+  turns and 20 tool calls (483,918 prompt; 6,135 completion), well inside its
+  36-turn bound. Independent installed verification found two scenes with zero
+  issues and zero warnings, 3D and 2D bodies each moving by `-1.267` after 30
+  frames, canonical positive numeric masses, and no culled renderables. Both
+  original and relocated 218-file packages were ready, ran with exit code 0,
+  captured nonblank frames, and passed `informative-frame` with five distinct
+  colors. This is the first genuine bounded broad-authoring acceptance pass.
 
 ## Current gaps
 
-- Make the installed Ollama benchmark complete generic 2D/3D physics,
-  deliberate-fault repair, visual proof, package audit, and relocation within
-  its fixed turn budget.
 - Add broader performance budgets, soak/device-loss recovery, security threat
   tests, compatibility fixtures, and release-operability evidence.
 - Complete advanced animation coverage such as cubic interpolation, morph
@@ -624,15 +629,15 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the unchanged installed Ollama benchmark on the durable-evidence and
-camera-mask guidance distribution.
+Audit existing performance, soak/recovery, security, compatibility, and
+release-operability coverage and select the highest-risk missing production
+contract.
 
 ## Next after the current item
 
-Independently verify the benchmark result and classify any remaining generic
-engine contract gap before the next repair.
-A genuine broad benchmark pass precedes quantified production hardening;
-Studio follows as a consumer of those results.
+Implement and independently gate the selected quantified production-hardening
+contract. Studio follows as a consumer of proven engine contracts, not as a
+reaction to isolated questions.
 
 ## Evidence index
 

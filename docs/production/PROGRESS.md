@@ -894,6 +894,8 @@ That decision is now fixed in
 POSITION/NORMAL deltas remain aligned through chunking, CPU deformation occurs
 before skinning, asset/runtime counts fail closed, and native glTF `weights`
 channels remain an explicit follow-up rather than partial hidden support.
+The TDD implementation sequence is tracked in
+`docs/superpowers/plans/2026-08-18-morph-target-runtime.md`.
 
 The cubic interpolation design is fixed in
 `docs/superpowers/specs/2026-08-18-cubic-animation-interpolation-design.md`:
@@ -993,10 +995,13 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
-Design a bounded morph-target vertical slice, then compare its implementation
-cost and renderer leverage against the remaining adversarial
-JSON/migration/diagnostic and full-trust module risks. Studio continues to
-follow proven engine contracts instead of reordering the foundation roadmap.
+Execute the reviewed bounded morph-target plan: generic authored weights,
+runtime state and inspection, bounded glTF POSITION/NORMAL targets with
+mesh/node defaults, deformation before skinning, generic final-mesh geometry
+inspection, and installed hardware-Vulkan proof. Then compare the verified
+renderer leverage against the remaining adversarial JSON/migration/diagnostic
+and full-trust module risks. Studio continues to follow proven engine contracts
+instead of reordering the foundation roadmap.
 
 ## Evidence index
 
@@ -1014,6 +1019,7 @@ follow proven engine contracts instead of reordering the foundation roadmap.
 - `docs/superpowers/specs/2026-08-18-cubic-animation-interpolation-design.md`
 - `docs/superpowers/plans/2026-08-18-cubic-animation-interpolation.md`
 - `docs/superpowers/specs/2026-08-18-morph-target-runtime-design.md`
+- `docs/superpowers/plans/2026-08-18-morph-target-runtime.md`
 - `Artifacts/TestResults/release-pass-1.trx`
 - `Artifacts/TestResults/release-pass-2.trx`
 - `Artifacts/Distribution/Rekall-AGE-0.1.0-preview.1-win-x64.zip`

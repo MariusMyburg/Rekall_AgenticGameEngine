@@ -50,6 +50,7 @@ This README is the broad public entry point and the technical reference for the 
 - [Multiplayer](#multiplayer)
 - [Live Player Editing](#live-player-editing)
 - [Playable Verification And Packaging](#playable-verification-and-packaging)
+- [Persisted Compatibility And Migration](#persisted-compatibility-and-migration)
 - [Failure Diagnostics And Player Recovery](#failure-diagnostics-and-player-recovery)
 - [Studio Workbench](#studio-workbench)
 - [Testing](#testing)
@@ -1689,6 +1690,48 @@ Audit checks:
 - verification checks passed
 
 The agent authoring gauntlet is the preferred broad proof loop when validating a user-facing playable path. It creates a project, authors a generic scene blueprint, writes an agent-owned playable module, verifies the result, packages it, audits the package, captures a proof frame, and returns next actions. It is not a game template system: the authored behavior lives in project data and project module source.
+
+## Persisted Compatibility And Migration
+
+Project manifests and scene documents use explicit schema version 1. Existing
+documents without `schemaVersion` are treated as legacy schema 0 in memory so
+they remain readable, but loading alone never rewrites them. Explicit future,
+negative, non-integral, duplicate, malformed, oversized, or reparse-backed
+schema inputs fail closed.
+
+Inspect a project before authoring, validation, packaging, or migration:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- compatibility inspect .age-sandbox
+```
+
+The underlying recommended MCP command is
+`rekall.compatibility.inspect_project`. It reads the manifest first and then
+top-level scene documents in ordinal order, without loading modules or
+executing project code. It returns exact paths, detected/current versions,
+current/legacy/future/malformed/missing status, migration eligibility,
+blockers, limitations, and next actions.
+
+Migration is dry-run by default. Apply requires an explicit flag:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- compatibility migrate .age-sandbox
+dotnet run --project src/Rekall.Age.Cli -- compatibility migrate .age-sandbox --apply
+```
+
+Apply stages every schema-0-to-1 transform before replacement, rechecks source
+bytes, preserves unknown top-level extension data, records before/after
+SHA-256, and keeps exact originals under `.rekall/migrations`. Replacement is
+same-directory and rollback restores already-replaced documents in reverse
+order if a later replacement fails. Five newest backup sets are retained using
+no-follow reparse-safe cleanup. A current project is a successful no-op;
+unsupported future or malformed content remains byte-for-byte untouched.
+
+This compatibility surface covers the engine-owned project manifest and scene
+documents. Package manifests, module SDK manifests, build receipts, animation
+clips, and failure reports retain independent version contracts. Rekall AGE
+does not guess future formats, downgrade projects, or reinterpret
+agent-authored component semantics.
 
 ## Failure Diagnostics And Player Recovery
 

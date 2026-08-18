@@ -22,6 +22,7 @@ $gauntletRoot = Join-Path $tempRoot ('rekall-age-installed-gauntlet-' + [Guid]::
 $relocationRoot = Join-Path $tempRoot ('rekall-age-relocated-package-' + [Guid]::NewGuid().ToString('N'))
 $audioRoot = Join-Path $tempRoot ('rekall-age-installed-audio-' + [Guid]::NewGuid().ToString('N'))
 $diagnosticsRoot = Join-Path $tempRoot ('rekall-age-installed-diagnostics-' + [Guid]::NewGuid().ToString('N'))
+$compatibilityRoot = Join-Path $tempRoot ('rekall-age-installed-compatibility-' + [Guid]::NewGuid().ToString('N'))
 $succeeded = $false
 $previousSdlAudioDriver = $env:SDL_AUDIODRIVER
 $previousDiagnosticsRoot = $env:REKALL_AGE_DIAGNOSTICS_DIR
@@ -40,6 +41,19 @@ function Invoke-RekallOutput {
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {
         throw "Distributed Rekall AGE command failed ($exitCode): $($Arguments -join ' ')`n$($lines -join "`n")"
+    }
+    return $lines -join "`n"
+}
+
+function Invoke-RekallFailureOutput {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [int]$ExpectedExitCode = 1
+    )
+    $lines = @(& $cli @Arguments 2>&1)
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne $ExpectedExitCode) {
+        throw "Distributed Rekall AGE negative command exited $exitCode, expected $ExpectedExitCode`: $($Arguments -join ' ')`n$($lines -join "`n")"
     }
     return $lines -join "`n"
 }
@@ -71,6 +85,72 @@ function Invoke-WindowsPlayerProof {
 
 try {
     Invoke-Rekall context doctor
+
+    $compatibilityScenes = Join-Path $compatibilityRoot 'Scenes'
+    New-Item -ItemType Directory -Path $compatibilityScenes -Force | Out-Null
+    $compatibilityManifest = Join-Path $compatibilityRoot 'rekall.project.json'
+    $compatibilityScene = Join-Path $compatibilityScenes 'Main.age.scene.json'
+    $legacyManifest = '{"name":"Installed Legacy Compatibility","capabilities":["world"],"agentExtension":{"preserve":true}}'
+    $legacyScene = '{"id":"installed_legacy","name":"Main","capabilities":["world"],"entities":[],"agentExtension":{"preserve":true}}'
+    $utf8NoBom = [Text.UTF8Encoding]::new($false)
+    [IO.File]::WriteAllText($compatibilityManifest, $legacyManifest, $utf8NoBom)
+    [IO.File]::WriteAllText($compatibilityScene, $legacyScene, $utf8NoBom)
+    $legacyManifestHash = (Get-FileHash -LiteralPath $compatibilityManifest -Algorithm SHA256).Hash
+    $legacySceneHash = (Get-FileHash -LiteralPath $compatibilityScene -Algorithm SHA256).Hash
+
+    $legacyInspection = Invoke-RekallOutput compatibility inspect $compatibilityRoot
+    if (-not $legacyInspection.Contains('Current: False; migratable: True', [StringComparison]::Ordinal) -or
+        ([Text.RegularExpressions.Regex]::Matches($legacyInspection, 'REKALL_DOCUMENT_SCHEMA_LEGACY')).Count -ne 2) {
+        throw "Installed compatibility inspection did not report two migratable legacy documents.`n$legacyInspection"
+    }
+
+    $migrationDryRun = Invoke-RekallOutput compatibility migrate $compatibilityRoot
+    if (-not $migrationDryRun.Contains('dry-run changed no files', [StringComparison]::Ordinal) -or
+        (Get-FileHash -LiteralPath $compatibilityManifest -Algorithm SHA256).Hash -ne $legacyManifestHash -or
+        (Get-FileHash -LiteralPath $compatibilityScene -Algorithm SHA256).Hash -ne $legacySceneHash) {
+        throw "Installed compatibility dry-run changed bytes or omitted dry-run evidence.`n$migrationDryRun"
+    }
+
+    $migrationApply = Invoke-RekallOutput compatibility migrate $compatibilityRoot --apply
+    if (-not $migrationApply.Contains('Applied: True', [StringComparison]::Ordinal) -or
+        -not $migrationApply.Contains('Backup root:', [StringComparison]::Ordinal)) {
+        throw "Installed compatibility apply did not report applied backup evidence.`n$migrationApply"
+    }
+    $migratedManifestText = [IO.File]::ReadAllText($compatibilityManifest)
+    $migratedSceneText = [IO.File]::ReadAllText($compatibilityScene)
+    if (-not $migratedManifestText.Contains('"schemaVersion": 1', [StringComparison]::Ordinal) -or
+        -not $migratedSceneText.Contains('"schemaVersion": 1', [StringComparison]::Ordinal) -or
+        -not $migratedManifestText.Contains('"agentExtension"', [StringComparison]::Ordinal) -or
+        -not $migratedSceneText.Contains('"agentExtension"', [StringComparison]::Ordinal)) {
+        throw 'Installed compatibility migration did not preserve schema and extension facts.'
+    }
+    $backupSets = @(Get-ChildItem -LiteralPath (Join-Path $compatibilityRoot '.rekall\migrations') -Directory -Filter 'migration-*')
+    if ($backupSets.Count -ne 1 -or
+        (Get-FileHash -LiteralPath (Join-Path $backupSets[0].FullName 'rekall.project.json') -Algorithm SHA256).Hash -ne $legacyManifestHash -or
+        (Get-FileHash -LiteralPath (Join-Path $backupSets[0].FullName 'Scenes\Main.age.scene.json') -Algorithm SHA256).Hash -ne $legacySceneHash) {
+        throw 'Installed compatibility migration did not preserve one exact backup set.'
+    }
+
+    $currentInspection = Invoke-RekallOutput compatibility inspect $compatibilityRoot
+    if (-not $currentInspection.Contains('Current: True; migratable: False', [StringComparison]::Ordinal) -or
+        ([Text.RegularExpressions.Regex]::Matches($currentInspection, 'REKALL_DOCUMENT_SCHEMA_CURRENT')).Count -ne 2) {
+        throw "Installed compatibility reinspection did not report two current documents.`n$currentInspection"
+    }
+
+    $futureManifestText = $migratedManifestText.Replace('"schemaVersion": 1', '"schemaVersion": 2', [StringComparison]::Ordinal)
+    [IO.File]::WriteAllText($compatibilityManifest, $futureManifestText, $utf8NoBom)
+    $futureHash = (Get-FileHash -LiteralPath $compatibilityManifest -Algorithm SHA256).Hash
+    $futureFailure = Invoke-RekallFailureOutput -Arguments @('compatibility', 'migrate', $compatibilityRoot, '--apply')
+    if (-not $futureFailure.Contains('REKALL_DOCUMENT_SCHEMA_FUTURE', [StringComparison]::Ordinal) -or
+        (Get-FileHash -LiteralPath $compatibilityManifest -Algorithm SHA256).Hash -ne $futureHash) {
+        throw "Installed future-schema refusal was incomplete or changed source bytes.`n$futureFailure"
+    }
+    Write-Output $legacyInspection
+    Write-Output $migrationDryRun
+    Write-Output $migrationApply
+    Write-Output $currentInspection
+    Write-Output $futureFailure
+
     Invoke-Rekall project create $proofRoot 'Installed Product Proof' 'world,rendering3d'
     Invoke-Rekall scene create $proofRoot Main 'world,rendering3d'
     Invoke-Rekall module scaffold-runtime-system $proofRoot proof.motion 'Proof Motion' ProofMotion MotionState MotionSystem
@@ -344,7 +424,7 @@ finally {
     $env:SDL_AUDIODRIVER = $previousSdlAudioDriver
     $env:REKALL_AGE_DIAGNOSTICS_DIR = $previousDiagnosticsRoot
     if ($succeeded) {
-        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot, $diagnosticsRoot)) {
+        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot, $diagnosticsRoot, $compatibilityRoot)) {
             $resolved = [IO.Path]::GetFullPath($path)
             if ($resolved.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and
                 (Test-Path -LiteralPath $resolved)) {
@@ -353,6 +433,6 @@ finally {
         }
     }
     else {
-        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', '$audioRoot', and '$diagnosticsRoot'."
+        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', '$audioRoot', '$diagnosticsRoot', and '$compatibilityRoot'."
     }
 }

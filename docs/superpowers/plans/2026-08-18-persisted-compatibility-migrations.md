@@ -51,8 +51,8 @@ exact blockers and next actions.
 - [x] Run focused tests and commit.
 
 Verified 2026-08-18: the combined compatibility/store/status/CLI/MCP selection
-passes 37/37. Dry-run
-validates transformations without writing; apply preserves exact originals,
+passes 37/37. Dry-run validates transformations without writing; apply
+preserves exact originals,
 unknown top-level extension data, SHA-256 before/after facts, and transaction
 preimages. A forced second-replacement failure restores the first document
 byte-for-byte. Future schemas and reparse-backed migration state fail closed.
@@ -60,10 +60,26 @@ Successful reruns are no-ops, and no-follow retention keeps five backup sets.
 
 ## Task 4: Product integration and release evidence
 
-- [ ] Document compatibility policy and operator/agent workflow.
-- [ ] Extend installed acceptance with legacy inspection, dry-run, migration,
+- [x] Document compatibility policy and operator/agent workflow.
+- [x] Extend installed acceptance with legacy inspection, dry-run, migration,
   current reinspection, and future-version refusal using shipped binaries.
-- [ ] Run strict builds, complete Debug, and two-pass Release installed gate.
-- [ ] Record counts, codes, archive hash, limitations, and next security
+- [x] Run strict builds, complete Debug, and two-pass Release installed gate.
+- [x] Record counts, codes, archive hash, limitations, and next security
   priority in `docs/production/PROGRESS.md`.
-- [ ] Review, commit, and preserve `codex/production-foundation`.
+- [x] Review, commit, and preserve `codex/production-foundation`.
+
+Verified 2026-08-18: the complete Debug suite passed 683/683 in 2m21s. The
+canonical locked product gate built Release with zero warnings/errors and
+passed two independent 683/683 runs in 2m16s and 2m17s. The shipped CLI
+inspected two legacy documents, proved byte-stable dry-run, applied both
+migrations with exact backups and extension preservation, reinspected two
+current documents, then rejected schema 2 with
+`REKALL_DOCUMENT_SCHEMA_FUTURE` without changing its SHA-256. The unchanged
+installed trust/tamper, authoring gauntlet, relocation/package, informative
+frame, UI, audio, 600-frame soak, and desktop recovery matrix passed. Soak
+simulated exactly 10 seconds at 4,504.8 FPS with 703,912 bytes retained growth
+and nine passing checks. The 195,076,001-byte archive has SHA-256
+`AF052294419AB1BF392D0D6E85CBFF15EAF23DC2E969F7CBC98F23787AEFC99E`.
+Compatibility does not imply downgrade support, future-schema interpretation,
+or migration of agent-authored component semantics. The next priority is
+broader adversarial security coverage.

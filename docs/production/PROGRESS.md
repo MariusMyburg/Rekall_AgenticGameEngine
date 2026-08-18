@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 08:57 Africa/Johannesburg
+Last verified: 2026-08-18 09:30 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: installed desktop recovery passed the complete two-pass Release product gate
+Latest milestone: persisted compatibility and atomic migration passed the installed two-pass Release product gate
 
 ## Product objective
 
@@ -30,12 +30,14 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 195,035,125-byte win-x64 archive assembled with
-  SHA-256 `DD5D47DB8E6D647E64666DD3DFCF3D482181C7CA10FEF45F2C6A495E228FBD53`.
-- Canonical verification: 658/658 Release tests passed twice independently;
+- Windows distribution: fresh 195,076,001-byte win-x64 archive assembled with
+  SHA-256 `AF052294419AB1BF392D0D6E85CBFF15EAF23DC2E969F7CBC98F23787AEFC99E`.
+  Its manifest lists 1,149 payload files; the assembled directory has 1,150
+  files including the distribution manifest itself.
+- Canonical verification: 683/683 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
-- Current Debug verification: 658/658 tests pass after desktop recovery and
-  diagnostics integration.
+- Current Debug verification: 683/683 tests pass after persisted compatibility
+  and migration integration.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
   paths have installed-binary proof.
@@ -795,11 +797,22 @@ Studio is important, but it does not define or reorder the engine foundation.
   691,608 bytes retained growth and all nine checks passing. Recovery is a
   bounded cold restart and intentionally does not preserve arbitrary in-memory
   module state.
+- Installed compatibility product gate: shipped binaries inspected exactly two
+  implicit schema-0 documents as migratable, proved dry-run byte immutability,
+  applied both schema-1 migrations, preserved unknown extension data and one
+  exact backup set, then reinspected exactly two current documents. A forced
+  project schema 2 was rejected with `REKALL_DOCUMENT_SCHEMA_FUTURE` and its
+  SHA-256 remained unchanged. The same canonical run passed Debug at 683/683,
+  two independent Release passes at 683/683, installed module trust/tamper,
+  the generic authoring gauntlet, relocation/package audit, an informative
+  hardware frame, runtime UI, audible player, 600-frame soak, and all desktop
+  recovery outcomes. Soak simulated exactly 10 seconds at 4,504.8 FPS with
+  703,912 bytes retained growth and all nine checks passing.
 
 ## Current gaps
 
-- Add versioned compatibility and migration fixtures, plus broader security
-  threat tests around authored content, package boundaries, and diagnostics.
+- Expand adversarial security tests around authored JSON, migration races,
+  package/archive boundaries, diagnostic stores, and full-trust module inputs.
 - In-process C# modules intentionally remain full trust and receipts remain
   unsigned; a future restricted/out-of-process host and publisher signatures
   are separate security capabilities, not claims of the current boundary.
@@ -808,7 +821,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Replace the current Studio facade with a professional workbench only after
   its runtime/authoring contracts are stable and independently proven.
 
-## In progress
+## Recently completed
 
 Implement the persisted compatibility design: central project/scene schema
 enforcement, deterministic read-only inspection, and explicit atomic legacy
@@ -839,11 +852,23 @@ data, records transaction preimages, rolls back partial replacement in reverse
 order, rejects reparse-backed engine state, and retains five backup sets without
 following reparse paths. Future or malformed inputs remain untouched.
 
+Compatibility Task 4 is installed-product verified: policy and CLI/MCP
+workflows are documented, Debug and both Release passes complete at 683/683,
+and shipped-binary positive and negative migration proofs passed alongside the
+unchanged installed product matrix.
+
+## In progress
+
+Audit the next adversarial security slice across engine-owned JSON, package and
+archive extraction, diagnostics, migration concurrency, and the explicitly
+full-trust module boundary. Prioritize generic bounded contracts and executable
+diagnostics; do not misrepresent in-process modules as sandboxed.
+
 ## Next after the current item
 
-Expand adversarial security coverage, then complete advanced animation
-primitives. Studio continues to follow proven engine contracts instead of
-reordering the foundation roadmap.
+Complete the selected adversarial security slice, then advance generic
+animation primitives. Studio continues to follow proven engine contracts
+instead of reordering the foundation roadmap.
 
 ## Evidence index
 

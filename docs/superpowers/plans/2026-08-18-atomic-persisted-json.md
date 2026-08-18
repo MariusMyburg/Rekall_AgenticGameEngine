@@ -15,11 +15,11 @@ snapshot and publishes complete durable files atomically.
 - Create: `src/Rekall.Age.Core/Persistence/RekallAgeBoundedFileSnapshot.cs`
 - Create: `tests/Rekall.Age.Tests/Core/AtomicPersistedFileTests.cs`
 
-- [ ] Write failing tests for exact reads, over-limit/growth/short-read failure,
+- [x] Write failing tests for exact reads, over-limit/growth/short-read failure,
   cancellation, durable replacement, prior-byte preservation, and temporary-file
   cleanup.
-- [ ] Implement one-handle bounded snapshots and same-directory atomic publish.
-- [ ] Run the focused core tests and `git diff --check`.
+- [x] Implement one-handle bounded snapshots and same-directory atomic publish.
+- [x] Run the focused core tests and `git diff --check`.
 
 ### Task 2: One-snapshot project and scene documents
 

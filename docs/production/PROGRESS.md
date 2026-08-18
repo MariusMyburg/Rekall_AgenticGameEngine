@@ -895,6 +895,14 @@ restricted host for full-trust C# modules. Design and TDD sequence:
 `docs/superpowers/specs/2026-08-18-atomic-persisted-json-design.md` and
 `docs/superpowers/plans/2026-08-18-atomic-persisted-json.md`.
 
+Atomic persisted JSON Task 1 is verified at 5/5 focused core tests. A shared
+bounded snapshot reads one exact byte sequence from one handle, rejects size
+overflow before the document allocation, and detects short/changed reads. A
+shared UTF-8-without-BOM publisher stages beside the destination with
+`CreateNew`, write-through flushes the complete payload, replaces only after
+successful staging, preserves existing bytes on cancellation/failure, and
+cleans recognizable temporary siblings.
+
 The bounded cubic interpolation tranche is installed-product verified. The
 bounded morph-target tranche is also installed-product verified. Morph target
 Task 1 passed a 51/51 focused runtime/schema/CLI selection.

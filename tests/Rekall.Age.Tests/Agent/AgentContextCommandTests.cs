@@ -36,7 +36,9 @@ public sealed class AgentContextCommandTests
 
         Assert.True(project.Ok);
         Assert.Equal("ok", project.Value.Summary.Health.Status);
+        Assert.Matches("^[0-9a-f]{64}$", project.Value.Summary.Revision);
         Assert.True(scene.Ok);
+        Assert.Matches("^[0-9a-f]{64}$", scene.Value.Summary.Revision);
         Assert.Equal("Main", scene.Value.Summary.Scene);
         Assert.Contains(scene.Value.Summary.Entities, entity => entity.Name == "PuzzleGrid");
         Assert.Contains(scene.Value.Summary.ComponentTypes, component => component.EndsWith(".GridBoard", StringComparison.Ordinal));

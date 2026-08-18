@@ -23,10 +23,10 @@ inspectable recovery facts.
 
 ### Task 3: Agent inspection and transaction append serialization
 
-- [ ] Expose bounded project/scene revisions through CLI/MCP inspection.
-- [ ] Serialize cooperating transaction-log appends so concurrent commands do
+- [x] Expose bounded project/scene revisions through CLI/MCP inspection.
+- [x] Serialize cooperating transaction-log appends so concurrent commands do
   not discard history.
-- [ ] Add schema/discovery and repeated concurrent command coverage.
+- [x] Add schema/discovery and repeated concurrent command coverage.
 
 ### Task 4: Installed conflict proof and complete gate
 

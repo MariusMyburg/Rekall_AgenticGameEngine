@@ -912,6 +912,16 @@ existing project or scene. A dynamic stale entity mutation returned exact code
 `REKALL_DOCUMENT_REVISION_CONFLICT` with expected/current recovery facts while
 preserving the intervening entity.
 
+Optimistic document revisions Task 3 is verified in a 69/69 combined
+agent-context/MCP/transaction/level-design/geometry selection. Compact project
+and scene summaries expose their exact 64-character revisions, while MCP
+schemas expose optional `expectedRevision` without making it mandatory for
+ordinary semantic operations. A wider source audit converted generic
+level-design, KSA import, geometry, prefab, parenting, grid, and virtual-geometry
+scene mutations to conditional publication. Thirty-two simultaneous distinct
+transaction appends retained all 32 entries through bounded conflict/reload
+retries and left no engine-owned control files.
+
 Atomic persisted JSON was selected as the next risk-driven tranche. Code inspection found
 that project and scene loads schema-probe one file handle and then reopen the
 path for typed deserialization, while their saves write directly to the live

@@ -5,6 +5,7 @@ using Rekall.Age.Core.Transactions;
 using Rekall.Age.Mcp;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Workflows.Commands;
+using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Tests.Mcp;
 
@@ -46,6 +47,25 @@ public sealed class McpJsonRpcServerTests
         Assert.True(tool.GetProperty("inputSchema").GetProperty("properties").TryGetProperty("message", out _));
         Assert.Equal("unknown", tool.GetProperty("rekallCategory").GetString());
         Assert.False(tool.GetProperty("rekallRecommended").GetBoolean());
+    }
+
+    [Fact]
+    public async Task MutationSchemaExposesOptionalExpectedRevision()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CreateEntityCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(
+            """{"jsonrpc":"2.0","id":21,"method":"tools/list"}""",
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var schema = document.RootElement.GetProperty("result").GetProperty("tools")[0].GetProperty("inputSchema");
+        Assert.Equal("string", schema.GetProperty("properties").GetProperty("expectedRevision").GetProperty("type").GetString());
+        Assert.DoesNotContain(
+            schema.GetProperty("required").EnumerateArray(),
+            item => item.GetString() == "expectedRevision");
     }
 
     [Fact]

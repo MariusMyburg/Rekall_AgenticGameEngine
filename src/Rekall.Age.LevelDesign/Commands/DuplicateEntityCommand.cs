@@ -29,7 +29,8 @@ public sealed class DuplicateEntityCommand : IRekallAgeCommand<DuplicateEntityRe
         DuplicateEntityRequest request,
         RekallAgeCommandContext context)
     {
-        var scene = await _store.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var scene = loaded.Value;
         var source = scene.GetRequiredEntity(request.EntityId);
         var duplicate = new RekallAgeEntityDocument(
             $"ent_{Guid.NewGuid():N}",
@@ -43,7 +44,7 @@ public sealed class DuplicateEntityCommand : IRekallAgeCommand<DuplicateEntityRe
             Locked = source.Locked
         };
         var updated = scene.AddEntity(duplicate);
-        await _store.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(request.ProjectRoot, updated, loaded.Revision, context.CancellationToken);
         context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
         return RekallAgeCommandResult<DuplicateEntityResult>.Success(
             new DuplicateEntityResult(duplicate.Id, updated),

@@ -30,7 +30,8 @@ public sealed class InstantiatePrefabCommand : IRekallAgeCommand<InstantiatePref
         InstantiatePrefabRequest request,
         RekallAgeCommandContext context)
     {
-        var scene = await _sceneStore.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var loaded = await _sceneStore.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var scene = loaded.Value;
         var prefab = await _prefabStore.LoadAsync(request.ProjectRoot, request.PrefabId, context.CancellationToken);
         var entity = new RekallAgeEntityDocument(
             $"ent_{Guid.NewGuid():N}",
@@ -43,7 +44,7 @@ public sealed class InstantiatePrefabCommand : IRekallAgeCommand<InstantiatePref
             Locked = prefab.RootEntity.Locked
         };
         var updated = scene.AddEntity(entity);
-        await _sceneStore.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
+        await _sceneStore.SaveIfRevisionAsync(request.ProjectRoot, updated, loaded.Revision, context.CancellationToken);
         context.Transaction.RecordChangedResource(_sceneStore.GetScenePath(request.ProjectRoot, request.SceneName));
         return RekallAgeCommandResult<InstantiatePrefabResult>.Success(
             new InstantiatePrefabResult(entity.Id, updated),

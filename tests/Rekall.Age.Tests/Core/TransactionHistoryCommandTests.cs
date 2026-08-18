@@ -160,4 +160,24 @@ public sealed class TransactionHistoryCommandTests
         Assert.Contains(restoreContext.Transaction.ChangedResources, resource =>
             resource.EndsWith("Main.age.scene.json", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public async Task ConcurrentTransactionAppendsRetainEveryDistinctEntry()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeTransactionLogStore();
+        var transactions = Enumerable.Range(0, 32)
+            .Select(index => RekallAgeTransaction.Begin($"concurrent {index:D2}"))
+            .ToArray();
+
+        await Task.WhenAll(transactions.Select(transaction =>
+            store.AppendAsync(root, transaction, "agent", CancellationToken.None).AsTask()));
+
+        var document = await store.LoadAsync(root, CancellationToken.None);
+        Assert.Equal(32, document.Transactions.Count);
+        Assert.Equal(
+            transactions.Select(transaction => transaction.Id).Order(StringComparer.Ordinal),
+            document.Transactions.Select(transaction => transaction.Id).Order(StringComparer.Ordinal));
+        Assert.Empty(Directory.GetFiles(Path.Combine(root, "Transactions"), ".transactions.age.json.*"));
+    }
 }

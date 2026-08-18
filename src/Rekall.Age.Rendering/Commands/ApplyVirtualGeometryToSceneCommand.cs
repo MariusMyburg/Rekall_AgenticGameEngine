@@ -61,8 +61,9 @@ public sealed class ApplyVirtualGeometryToSceneCommand
                 errors);
         }
 
-        var scene = await _sceneStore.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken)
+        var loaded = await _sceneStore.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken)
             .ConfigureAwait(false);
+        var scene = loaded.Value;
         var sourceTrianglesByEntityId = await InspectSourceTrianglesByEntityIdAsync(request, scene, context.CancellationToken)
             .ConfigureAwait(false);
         var candidates = scene.Entities
@@ -99,7 +100,11 @@ public sealed class ApplyVirtualGeometryToSceneCommand
 
         if (applied.Count > 0 && !request.DryRun)
         {
-            await _sceneStore.SaveAsync(request.ProjectRoot, updated, context.CancellationToken).ConfigureAwait(false);
+            await _sceneStore.SaveIfRevisionAsync(
+                request.ProjectRoot,
+                updated,
+                loaded.Revision,
+                context.CancellationToken).ConfigureAwait(false);
             context.Transaction.RecordChangedResource(_sceneStore.GetScenePath(request.ProjectRoot, request.SceneName));
         }
 

@@ -37,7 +37,8 @@ public sealed class SnapEntityToGridCommand : IRekallAgeCommand<SnapEntityToGrid
             return RekallAgeCommandResult<SnapEntityToGridResult>.Failure(default!, error.Message, [error]);
         }
 
-        var scene = await _store.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var scene = loaded.Value;
         var updated = scene.UpdateEntity(
             request.EntityId,
             entity => entity.UpdateComponent(
@@ -45,7 +46,7 @@ public sealed class SnapEntityToGridCommand : IRekallAgeCommand<SnapEntityToGrid
                 component => component
                     .SetProperty("x", JsonValue.Create(Snap(ReadDouble(component.Properties["x"]), request.GridSize)))
                     .SetProperty("y", JsonValue.Create(Snap(ReadDouble(component.Properties["y"]), request.GridSize)))));
-        await _store.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(request.ProjectRoot, updated, loaded.Revision, context.CancellationToken);
         context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
         return RekallAgeCommandResult<SnapEntityToGridResult>.Success(
             new SnapEntityToGridResult(updated),

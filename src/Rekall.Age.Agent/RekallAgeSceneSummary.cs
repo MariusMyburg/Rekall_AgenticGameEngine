@@ -7,7 +7,8 @@ public sealed record RekallAgeSceneSummary(
     IReadOnlyList<string> ComponentTypes,
     IReadOnlyList<RekallAgeSceneCameraSummary> Cameras,
     IReadOnlyList<RekallAgeSceneRenderLayerSummary> RenderLayers,
-    string? HeadsetCameraName = null)
+    string? HeadsetCameraName = null,
+    string Revision = "")
 {
     public int EntityCount => Entities.Count;
 }

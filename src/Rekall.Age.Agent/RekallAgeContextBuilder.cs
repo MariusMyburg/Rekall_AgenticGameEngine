@@ -27,7 +27,8 @@ public sealed class RekallAgeContextBuilder
         string projectRoot,
         CancellationToken cancellationToken)
     {
-        var manifest = await _projectStore.LoadAsync(projectRoot, cancellationToken);
+        var loaded = await _projectStore.LoadVersionedAsync(projectRoot, cancellationToken);
+        var manifest = loaded.Value;
         var sceneNames = _sceneStore.ListSceneNames(projectRoot);
         var blocking = new List<string>();
 
@@ -51,7 +52,8 @@ public sealed class RekallAgeContextBuilder
             sceneNames,
             artifacts,
             new RekallAgeProjectHealth(status, blocking),
-            nextActions);
+            nextActions,
+            loaded.Revision);
     }
 
     public async ValueTask<RekallAgeSceneSummary> BuildSceneSummaryAsync(
@@ -59,7 +61,8 @@ public sealed class RekallAgeContextBuilder
         string sceneName,
         CancellationToken cancellationToken)
     {
-        var scene = await _sceneStore.LoadAsync(projectRoot, sceneName, cancellationToken);
+        var loaded = await _sceneStore.LoadVersionedAsync(projectRoot, sceneName, cancellationToken);
+        var scene = loaded.Value;
         var entities = scene.Entities
             .Select(entity => new RekallAgeEntitySummary(
                 entity.Id,
@@ -81,7 +84,8 @@ public sealed class RekallAgeContextBuilder
             componentTypes,
             cameras,
             BuildRenderLayerSummaries(scene),
-            cameras.FirstOrDefault(camera => camera.DrivesHeadsetOutput)?.EntityName);
+            cameras.FirstOrDefault(camera => camera.DrivesHeadsetOutput)?.EntityName,
+            loaded.Revision);
     }
 
     private static IReadOnlyList<RekallAgeSceneCameraSummary> BuildCameraSummaries(

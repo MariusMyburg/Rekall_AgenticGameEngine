@@ -63,7 +63,8 @@ public sealed class CreateGeometryExtrusionCommand
             return RekallAgeCommandResult<CreateGeometryExtrusionResult>.Failure(Empty(), error.Message, [error]);
         }
 
-        var scene = await _store.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var scene = loaded.Value;
         var entity = RekallAgeEntityDocument.Create(request.Name, ["geometry", "mesh", "extrusion"])
             .AddComponent(RekallAgeComponentDocument.Create(
                 "Rekall.Transform3D",
@@ -103,7 +104,7 @@ public sealed class CreateGeometryExtrusionCommand
                 }));
 
         var updated = scene.AddEntity(entity);
-        await _store.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(request.ProjectRoot, updated, loaded.Revision, context.CancellationToken);
         context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
         return RekallAgeCommandResult<CreateGeometryExtrusionResult>.Success(
             new CreateGeometryExtrusionResult(entity.Id, mesh.Vertices.Count, mesh.Indices.Count, updated),

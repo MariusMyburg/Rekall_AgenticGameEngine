@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using System.Xml;
 using Rekall.Age.Assets;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Persistence;
 using Rekall.Age.World;
 
 namespace Rekall.Age.LevelDesign.Commands;
@@ -80,7 +81,8 @@ public sealed class ImportKsaPlanetCommand
         var normalTexture = await ImportTextureAsync("Normal", "Normal");
         await _assetStore.SaveAsync(request.ProjectRoot, catalog, context.CancellationToken);
 
-        var scene = await LoadOrCreateSceneAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var loaded = await LoadOrCreateSceneAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var scene = loaded.Value;
         var planetProperties = new JsonObject
         {
             ["Radius"] = body.Radius,
@@ -134,7 +136,11 @@ public sealed class ImportKsaPlanetCommand
         }
 
         var updatedScene = EnsureCameraAndLight(scene.AddEntity(entity));
-        await _sceneStore.SaveAsync(request.ProjectRoot, updatedScene, context.CancellationToken);
+        await _sceneStore.SaveIfRevisionAsync(
+            request.ProjectRoot,
+            updatedScene,
+            loaded.Revision,
+            context.CancellationToken);
 
         context.Transaction.RecordChangedResource(_assetStore.GetCatalogPath(request.ProjectRoot));
         context.Transaction.RecordChangedResource(_sceneStore.GetScenePath(request.ProjectRoot, updatedScene.Name));
@@ -156,15 +162,17 @@ public sealed class ImportKsaPlanetCommand
             $"Imported KSA planet '{body.Id}' with {imported.Count} texture asset(s).");
     }
 
-    private async ValueTask<RekallAgeSceneDocument> LoadOrCreateSceneAsync(
+    private async ValueTask<RekallAgeVersionedDocument<RekallAgeSceneDocument>> LoadOrCreateSceneAsync(
         string projectRoot,
         string sceneName,
         CancellationToken cancellationToken)
     {
         var path = _sceneStore.GetScenePath(projectRoot, sceneName);
         return File.Exists(path)
-            ? await _sceneStore.LoadAsync(projectRoot, sceneName, cancellationToken)
-            : RekallAgeSceneDocument.Create(sceneName, ["world", "rendering3d", "planet"]);
+            ? await _sceneStore.LoadVersionedAsync(projectRoot, sceneName, cancellationToken)
+            : new RekallAgeVersionedDocument<RekallAgeSceneDocument>(
+                RekallAgeSceneDocument.Create(sceneName, ["world", "rendering3d", "planet"]),
+                RekallAgeDocumentRevision.Missing);
     }
 
     private static RekallAgeSceneDocument EnsureCameraAndLight(RekallAgeSceneDocument scene)

@@ -109,8 +109,8 @@ public sealed class CreateGeometryRecipeCommand
                 meshResult.Errors);
         }
 
-        var scene = meshResult.Value.Scene
-            ?? await _store.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var scene = loaded.Value;
         var updated = scene.UpdateEntity(
             meshResult.Value.EntityId,
             entity => (entity with { Tags = AddTag(entity.Tags, "recipe") })
@@ -123,7 +123,7 @@ public sealed class CreateGeometryRecipeCommand
                         ["parts"] = ToPartsArray(request.Parts, defaultColor)
                     })));
 
-        await _store.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(request.ProjectRoot, updated, loaded.Revision, context.CancellationToken);
         context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
 
         return RekallAgeCommandResult<CreateGeometryRecipeResult>.Success(

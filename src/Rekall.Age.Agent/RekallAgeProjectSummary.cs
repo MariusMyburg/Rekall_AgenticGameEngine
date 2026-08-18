@@ -6,7 +6,8 @@ public sealed record RekallAgeProjectSummary(
     IReadOnlyList<string> PlayableScenes,
     IReadOnlyList<RekallAgeProjectArtifact> Artifacts,
     RekallAgeProjectHealth Health,
-    IReadOnlyList<string> RecommendedNextActions);
+    IReadOnlyList<string> RecommendedNextActions,
+    string Revision = "");
 
 public sealed record RekallAgeProjectArtifact(
     string Kind,

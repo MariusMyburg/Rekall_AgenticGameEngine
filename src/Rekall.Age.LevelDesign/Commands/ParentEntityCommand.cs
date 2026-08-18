@@ -33,14 +33,15 @@ public sealed class ParentEntityCommand : IRekallAgeCommand<ParentEntityRequest,
             return RekallAgeCommandResult<ParentEntityResult>.Failure(default!, error.Message, [error]);
         }
 
-        var scene = await _store.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var scene = loaded.Value;
         if (!string.IsNullOrWhiteSpace(request.ParentId))
         {
             scene.GetRequiredEntity(request.ParentId);
         }
 
         var updated = scene.UpdateEntity(request.EntityId, entity => entity with { ParentId = request.ParentId });
-        await _store.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(request.ProjectRoot, updated, loaded.Revision, context.CancellationToken);
         context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
         return RekallAgeCommandResult<ParentEntityResult>.Success(
             new ParentEntityResult(updated),

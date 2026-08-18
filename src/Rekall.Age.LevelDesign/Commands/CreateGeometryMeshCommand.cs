@@ -76,7 +76,8 @@ public sealed class CreateGeometryMeshCommand
             return RekallAgeCommandResult<CreateGeometryMeshResult>.Failure(Empty(), validation.Message, [validation]);
         }
 
-        var scene = await _store.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var scene = loaded.Value;
         var geometryProperties = new JsonObject
         {
             ["color"] = color,
@@ -114,7 +115,7 @@ public sealed class CreateGeometryMeshCommand
                 }));
 
         var updated = scene.AddEntity(entity);
-        await _store.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(request.ProjectRoot, updated, loaded.Revision, context.CancellationToken);
         context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
         return RekallAgeCommandResult<CreateGeometryMeshResult>.Success(
             new CreateGeometryMeshResult(entity.Id, request.Vertices.Count, request.Indices.Count, updated),

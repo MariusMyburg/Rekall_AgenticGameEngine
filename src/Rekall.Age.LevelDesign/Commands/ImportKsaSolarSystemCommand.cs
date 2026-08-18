@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using System.Xml;
 using Rekall.Age.Assets;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Persistence;
 using Rekall.Age.World;
 
 namespace Rekall.Age.LevelDesign.Commands;
@@ -126,7 +127,15 @@ public sealed class ImportKsaSolarSystemCommand
                     .ThenBy(entity => entity.Id, StringComparer.Ordinal)
                     .ToArray()
             };
-        await _sceneStore.SaveAsync(request.ProjectRoot, scene, context.CancellationToken);
+        var scenePath = _sceneStore.GetScenePath(request.ProjectRoot, scene.Name);
+        var expectedRevision = File.Exists(scenePath)
+            ? (await _sceneStore.LoadVersionedAsync(request.ProjectRoot, scene.Name, context.CancellationToken)).Revision
+            : RekallAgeDocumentRevision.Missing;
+        await _sceneStore.SaveIfRevisionAsync(
+            request.ProjectRoot,
+            scene,
+            expectedRevision,
+            context.CancellationToken);
         context.Transaction.RecordChangedResource(_sceneStore.GetScenePath(request.ProjectRoot, scene.Name));
 
         return RekallAgeCommandResult<ImportKsaSolarSystemResult>.Success(

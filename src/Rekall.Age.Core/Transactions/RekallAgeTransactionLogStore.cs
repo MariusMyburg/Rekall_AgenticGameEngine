@@ -75,7 +75,6 @@ public sealed class RekallAgeTransactionLogStore
         string actor,
         CancellationToken cancellationToken)
     {
-        var existing = await LoadAsync(projectRoot, cancellationToken);
         var resourcePreimages = await PersistPreimagesAsync(projectRoot, transaction, cancellationToken);
         var entry = new RekallAgeTransactionLogEntry(
             transaction.Id,
@@ -89,19 +88,58 @@ public sealed class RekallAgeTransactionLogStore
                 .ToArray(),
             ResourcePreimages = resourcePreimages
         };
-        var document = new RekallAgeTransactionLogDocument(
-            existing.Transactions
-                .Where(item => !item.Id.Equals(entry.Id, StringComparison.Ordinal))
-                .Append(entry)
-                .OrderByDescending(item => item.StartedAtUtc)
-                .ToArray());
+        var path = GetPath(projectRoot);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        const int maximumAttempts = 64;
+        for (var attempt = 1; ; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var existing = await LoadVersionedAsync(path, cancellationToken).ConfigureAwait(false);
+            var document = new RekallAgeTransactionLogDocument(
+                existing.Value.Transactions
+                    .Where(item => !item.Id.Equals(entry.Id, StringComparison.Ordinal))
+                    .Append(entry)
+                    .OrderByDescending(item => item.StartedAtUtc)
+                    .ToArray());
+            var json = JsonSerializer.Serialize(document, JsonOptions) + Environment.NewLine;
+            try
+            {
+                await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+                    path,
+                    json,
+                    RekallAgePersistedJson.MaximumDocumentBytes,
+                    existing.Revision,
+                    cancellationToken).ConfigureAwait(false);
+                return;
+            }
+            catch (RekallAgeDocumentRevisionException error) when (
+                error.Code == "REKALL_DOCUMENT_REVISION_CONFLICT" &&
+                attempt < maximumAttempts)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(attempt, 4)), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+    }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(GetPath(projectRoot))!);
-        var json = JsonSerializer.Serialize(document, JsonOptions);
-        await RekallAgePersistedJson.WriteAllTextAsync(
-            GetPath(projectRoot),
-            json + Environment.NewLine,
-            cancellationToken);
+    private static async ValueTask<RekallAgeVersionedDocument<RekallAgeTransactionLogDocument>> LoadVersionedAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        if (!File.Exists(path))
+        {
+            return new RekallAgeVersionedDocument<RekallAgeTransactionLogDocument>(
+                RekallAgeTransactionLogDocument.Empty,
+                RekallAgeDocumentRevision.Missing);
+        }
+
+        var snapshot = await RekallAgeBoundedFileSnapshot.ReadAsync(
+            path,
+            RekallAgePersistedJson.MaximumDocumentBytes,
+            cancellationToken).ConfigureAwait(false);
+        var document = JsonSerializer.Deserialize<RekallAgeTransactionLogDocument>(snapshot.Bytes, JsonOptions)
+            ?? throw new InvalidOperationException($"Document '{path}' could not be deserialized as a transaction log.");
+        return new RekallAgeVersionedDocument<RekallAgeTransactionLogDocument>(document, snapshot.Revision);
     }
 
     private static async ValueTask<IReadOnlyList<RekallAgeTransactionResourcePreimageEntry>> PersistPreimagesAsync(

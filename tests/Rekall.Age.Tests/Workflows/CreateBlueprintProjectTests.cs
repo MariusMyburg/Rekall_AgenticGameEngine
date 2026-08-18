@@ -86,6 +86,34 @@ public sealed class CreateBlueprintProjectTests
     }
 
     [Fact]
+    public async Task CreatesNamedEmptySceneScaffoldsForIncrementalAuthoringRecovery()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("empty scene scaffold"),
+            CancellationToken.None);
+
+        var result = await new CreateBlueprintProjectCommand().ExecuteAsync(
+            new CreateBlueprintProjectRequest(
+                root,
+                "Scaffolded Project",
+                ["world"],
+                Scenes:
+                [
+                    new RekallAgeProjectBlueprintScene("Main", ["world"], []),
+                    new RekallAgeProjectBlueprintScene("Physics2D", ["world"], [])
+                ]),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(2, result.Value.Scenes.Count);
+        var store = new RekallAgeSceneStore();
+        Assert.Empty((await store.LoadAsync(root, "Main", CancellationToken.None)).Entities);
+        Assert.Empty((await store.LoadAsync(root, "Physics2D", CancellationToken.None)).Entities);
+    }
+
+    [Fact]
     public async Task RejectsInvalidLaterSceneBeforeWritingAnyProjectFiles()
     {
         var parent = TestPaths.CreateTempDirectory();

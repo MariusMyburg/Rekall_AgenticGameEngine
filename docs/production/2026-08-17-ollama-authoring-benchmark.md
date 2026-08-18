@@ -659,6 +659,30 @@ prefixed fields only when the selected request type declares canonical
 and unrelated request contracts remain unaffected. A regression extends the
 same alias test that covers `frame` and `frameCount`.
 
+### Empty-scene scaffold rerun
+
+Rerun 23 used the wrapper-recovery distribution with the unchanged 36-turn
+task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun23`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 572,246
+- Completion tokens: 15,997
+
+The agent repeatedly attempted to establish the requested project with two
+named but empty scenes before applying content incrementally. The atomic
+project command rejected every empty scene, after which malformed component
+nesting and repeated repair calls consumed the run. It never reached runtime or
+packaging; only the project and scene documents existed afterward.
+
+Empty scenes are a valid engine-general authoring state, so the blueprint
+contract now accepts them. The project workflow can transactionally establish
+all named scenes with empty entity arrays, and the ordinary scene blueprint
+supports an empty array as a no-op or an explicit clear when `clearExisting` is
+true. Schema descriptions expose the recovery path, and a two-scene regression
+proves persisted empty scaffolds without weakening entity/component validation.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

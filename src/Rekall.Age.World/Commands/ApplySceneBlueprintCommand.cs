@@ -37,7 +37,7 @@ public sealed class ApplySceneBlueprintCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Applies a generic scene entity/component blueprint in one transaction for efficient agent world authoring. Exact compact shape: {\"projectRoot\":\"...\",\"sceneName\":\"Main\",\"entities\":[{\"name\":\"Entity\",\"components\":[{\"type\":\"Rekall.Transform3D\",\"properties\":{\"X\":0}}]}],\"clearExisting\":false}. entities and components are JSON arrays; each component uses type and properties.",
+        "Applies a generic scene entity/component blueprint in one transaction for efficient agent world authoring. Exact compact shape: {\"projectRoot\":\"...\",\"sceneName\":\"Main\",\"entities\":[{\"name\":\"Entity\",\"components\":[{\"type\":\"Rekall.Transform3D\",\"properties\":{\"X\":0}}]}],\"clearExisting\":false}. entities and components are JSON arrays; each component uses type and properties. An empty entities array is valid for an empty scene or to clear a scene when clearExisting is true.",
         typeof(ApplySceneBlueprintRequest).FullName!,
         typeof(ApplySceneBlueprintResult).FullName!);
 
@@ -106,12 +106,8 @@ public sealed class ApplySceneBlueprintCommand
                 sceneTarget));
         }
 
-        if (entities is not { Count: > 0 })
+        if (entities is null)
         {
-            errors.Add(new RekallAgeCommandError(
-                "REKALL_SCENE_BLUEPRINT_EMPTY",
-                "Scene blueprint must contain at least one entity.",
-                sceneTarget));
             return errors;
         }
 

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 03:26 Africa/Johannesburg
+Last verified: 2026-08-18 03:33 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: wrapper-prefixed frame recovery passed the complete product gate
+Latest milestone: empty-scene blueprint scaffolding passed 586/586 Debug tests
 
 ## Product objective
 
@@ -451,6 +451,15 @@ Studio is important, but it does not define or reorder the engine foundation.
   gauntlet, original and relocated package proof, runtime UI, software viewport,
   simulated audio, and Windows player audio. The canonical 1,149-file archive
   is 194,710,286 bytes.
+- Broad benchmark rerun 23: the agent stopped at 36 turns/36 tools (572,246
+  prompt; 15,997 completion) after repeated empty-scene project rejections and
+  malformed incremental blueprint repairs. It never reached runtime or package
+  proof; only project/scene documents existed. This is a clear failure.
+- Empty-scene blueprint scaffolding: atomic project creation now permits named
+  scenes with empty entity arrays, and ordinary scene blueprints accept empty
+  arrays for no-op/clear semantics. This provides a transactional generic
+  recovery path while retaining entity/component validation. The full Debug
+  suite passes at 586/586.
 
 ## Current gaps
 
@@ -466,7 +475,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the unchanged installed Ollama benchmark on the wrapper-recovery distribution.
+Run the complete clean product gate for empty-scene blueprint scaffolding.
 
 ## Next after the current item
 

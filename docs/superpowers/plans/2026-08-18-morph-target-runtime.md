@@ -254,7 +254,7 @@ git commit -m "feat: render morph targets before skinning"
 - Uses only shipped CLI/player binaries and a generated bounded glTF fixture.
 - Proves asset metadata, generic authored animation, runtime state, CPU vertex movement, and native Vulkan frame output.
 
-- [ ] **Step 1: Add installed morph fixture and assertions**
+- [x] **Step 1: Add installed morph fixture and assertions**
 
 Generate a visible triangle with one `raised` POSITION/NORMAL target, author a
 generic cubic clip over `Rekall.MorphWeights.Weights`, and inspect frames 1 and
@@ -265,7 +265,7 @@ SHA-256 hashes. Independently derive the expected bounds in the acceptance
 script and compare with invariant-culture numeric output. Keep the
 desktop/windowed and package proofs unchanged.
 
-- [ ] **Step 2: Run complete Debug verification**
+- [x] **Step 2: Run complete Debug verification**
 
 ```powershell
 $env:TEMP = 'F:\Dev\Rekall_AGE\.worktrees\production-foundation\Artifacts\TestTemp'
@@ -273,7 +273,7 @@ $env:TMP = $env:TEMP
 dotnet test Rekall.AGE.sln --no-restore --verbosity minimal
 ```
 
-- [ ] **Step 3: Run the canonical locked two-pass Release gate**
+- [x] **Step 3: Run the canonical locked two-pass Release gate**
 
 ```powershell
 $env:TEMP = 'F:\Dev\Rekall_AGE\.worktrees\production-foundation\Artifacts\GateTemp'
@@ -281,13 +281,13 @@ $env:TMP = $env:TEMP
 & .\eng\build.ps1
 ```
 
-- [ ] **Step 4: Record exact evidence and limitations**
+- [x] **Step 4: Record exact evidence and limitations**
 
 Record test counts/timings, metadata, runtime weights, moved vertex bounds,
 Vulkan backend/device, frame hashes, soak data, archive size/hash, and the
 explicit native-glTF-weight-animation/TANGENT/sparse/compound-layout limits.
 
-- [ ] **Step 5: Review and commit**
+- [x] **Step 5: Review and commit**
 
 ```powershell
 git diff --check

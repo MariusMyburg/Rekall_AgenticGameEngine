@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 11:40 Africa/Johannesburg
+Last verified: 2026-08-18 11:59 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: morph-before-skin execution and final-mesh inspection passed focused gates
+Latest milestone: bounded morph targets passed the installed hardware-Vulkan product gate
 
 ## Product objective
 
@@ -30,14 +30,14 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 195,163,655-byte win-x64 archive assembled with
-  SHA-256 `85CB44D5718825F9F865F7F2FE156ECDE4C325BA5E7DA0573BCADC2DD440204E`.
+- Windows distribution: fresh 195,236,150-byte win-x64 archive assembled with
+  SHA-256 `CB0DA6560A1422BE5DE7F99182A4651170C6CE397B912762875E1E7BCDF1FE0A`.
   Its manifest lists 1,149 payload files; the assembled directory has 1,150
   files including the distribution manifest itself.
-- Canonical verification: 760/760 Release tests passed twice independently;
+- Canonical verification: 792/792 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
-- Current Debug verification: 760/760 tests pass after authored/glTF cubic
-  animation integration and installed proof.
+- Current Debug verification: 792/792 tests pass after bounded morph-target
+  integration and schema-search growth hardening.
 - Installed acceptance: canonical gate exited 0; project/module workflows,
   packaging and relocation, negative archive preflight, nonblank capture,
   runtime UI, and audible audio paths have installed-binary proof.
@@ -818,7 +818,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 - In-process C# modules intentionally remain full trust and receipts remain
   unsigned; a future restricted/out-of-process host and publisher signatures
   are separate security capabilities, not claims of the current boundary.
-- Complete advanced animation coverage such as morph targets, broader complex
+- Complete advanced animation breadth such as native glTF weight-channel
+  animation, TANGENT/sparse/quantized morph accessors, broader complex
   transform fixtures, richer graph curves, and interruptible or hierarchical
   graph policies.
 - Replace the current Studio facade with a professional workbench only after
@@ -882,8 +883,9 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The bounded cubic interpolation tranche is installed-product verified. Morph
-target Task 1 is now verified in a 51/51 focused runtime/schema/CLI selection.
+The bounded cubic interpolation tranche is installed-product verified. The
+bounded morph-target tranche is also installed-product verified. Morph target
+Task 1 passed a 51/51 focused runtime/schema/CLI selection.
 `Rekall.MorphWeights` exposes one bounded, non-clamped generic array and reuses
 ordinary linear/cubic clips and state-graph catalog clips. A post-animation
 runtime system rejects empty, excessive, non-numeric, nested, non-finite, and
@@ -913,8 +915,23 @@ out-of-float-range values reaching GPU buffers. The generic bounded
 `rekall.render.inspect_scene_mesh_geometry` command and `render mesh inspect`
 CLI use the same prepared meshes as Vulkan and report post-morph/post-skin
 counts, weight source, and finite bounds without vertex dumps. The real fixture
-produced exact bounds `(8.5,21,30)` through `(10.5,23,30)`. The remaining item
-is installed Vulkan proof and the complete Debug/two-pass Release product gate.
+produced exact bounds `(8.5,21,30)` through `(10.5,23,30)`.
+
+Morph target Task 4 passed the complete product gate. Debug passed 792/792 in
+1m27s; the locked zero-warning, zero-error Release build passed 792/792 twice
+in 1m26s and 1m24s. Shipped binaries imported the real two-target GLB as
+`wide,raised` with mesh defaults `[0.25,-0.5]`, sampled generic cubic authored
+weights to `[0.75,0]` at frame 30, and reported final post-morph bounds
+`(8,21.5,30)` through `(10,23.5,30)`. Native Vulkan captures were informative,
+hardware accelerated, free of fallbacks/issues/observations, and changed from
+SHA-256 `D97998D4615E2B707B22C0D7137FB84C7C7C26086789B05205A2616D8C07A503`
+to `57D4F1735ED1B04F3C8B4AD4A5E481C880C3F59183563D7EFA4F07880D7B32D3`.
+The installed matrix passed; its 600-frame soak simulated exactly 10 seconds
+at 4,312.7 FPS with 709,392 retained bytes and all nine checks. The
+1,149-payload-file archive is 195,236,150 bytes with SHA-256
+`CB0DA6560A1422BE5DE7F99182A4651170C6CE397B912762875E1E7BCDF1FE0A`.
+Native glTF weight animation and TANGENT/sparse/quantized or incompatible
+compound morph layouts remain explicit unsupported boundaries.
 
 That decision is now fixed in
 `docs/superpowers/specs/2026-08-18-morph-target-runtime-design.md`: a bounded
@@ -1023,13 +1040,11 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
-Execute the reviewed bounded morph-target plan: generic authored weights,
-runtime state and inspection, bounded glTF POSITION/NORMAL targets with
-mesh/node defaults, deformation before skinning, generic final-mesh geometry
-inspection, and installed hardware-Vulkan proof. Then compare the verified
-renderer leverage against the remaining adversarial JSON/migration/diagnostic
-and full-trust module risks. Studio continues to follow proven engine contracts
-instead of reordering the foundation roadmap.
+Compare the now-verified animation/renderer foundation against the remaining
+adversarial JSON, migration-race, diagnostic-store, and full-trust module risks,
+then select the highest-leverage generic production-hardening tranche. Studio
+continues to follow proven engine contracts instead of reordering the
+foundation roadmap.
 
 ## Evidence index
 
@@ -1053,6 +1068,8 @@ instead of reordering the foundation roadmap.
 - `Artifacts/Distribution/Rekall-AGE-0.1.0-preview.1-win-x64.zip`
 - `eng/accept-installed-skeletal-animation.ps1`
 - `Artifacts/InstalledSkeletalProof/<run-id>/evidence.json`
+- `eng/accept-installed-morph-animation.ps1`
+- `Artifacts/InstalledMorphProof/isolated-pass/evidence.json`
 
 ## Update rule
 

@@ -25,6 +25,7 @@ $diagnosticsRoot = Join-Path $tempRoot ('rekall-age-installed-diagnostics-' + [G
 $compatibilityRoot = Join-Path $tempRoot ('rekall-age-installed-compatibility-' + [Guid]::NewGuid().ToString('N'))
 $archiveSecurityRoot = Join-Path $tempRoot ('rekall-age-installed-archive-security-' + [Guid]::NewGuid().ToString('N'))
 $animationGraphRoot = Join-Path $tempRoot ('rekall-age-installed-animation-graph-' + [Guid]::NewGuid().ToString('N'))
+$morphRoot = Join-Path $tempRoot ('rekall-age-installed-morph-proof-' + [Guid]::NewGuid().ToString('N'))
 $succeeded = $false
 $previousSdlAudioDriver = $env:SDL_AUDIODRIVER
 $previousDiagnosticsRoot = $env:REKALL_AGE_DIAGNOSTICS_DIR
@@ -568,6 +569,9 @@ try {
     }
     Write-Output $diagnosticsOutput
 
+    & (Join-Path $PSScriptRoot 'accept-installed-morph-animation.ps1') -DistributionRoot $distribution -EvidenceRoot $morphRoot
+    if ($LASTEXITCODE -ne 0) { throw "Installed morph animation acceptance failed ($LASTEXITCODE)." }
+
     $succeeded = $true
     Write-Output "Installed distribution acceptance passed: $distribution"
 }
@@ -575,7 +579,7 @@ finally {
     $env:SDL_AUDIODRIVER = $previousSdlAudioDriver
     $env:REKALL_AGE_DIAGNOSTICS_DIR = $previousDiagnosticsRoot
     if ($succeeded) {
-        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot, $diagnosticsRoot, $compatibilityRoot, $archiveSecurityRoot, $animationGraphRoot)) {
+        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot, $diagnosticsRoot, $compatibilityRoot, $archiveSecurityRoot, $animationGraphRoot, $morphRoot)) {
             $resolved = [IO.Path]::GetFullPath($path)
             if ($resolved.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and
                 (Test-Path -LiteralPath $resolved)) {
@@ -584,6 +588,6 @@ finally {
         }
     }
     else {
-        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', '$audioRoot', '$diagnosticsRoot', '$compatibilityRoot', '$archiveSecurityRoot', and '$animationGraphRoot'."
+        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', '$audioRoot', '$diagnosticsRoot', '$compatibilityRoot', '$archiveSecurityRoot', '$animationGraphRoot', and '$morphRoot'."
     }
 }

@@ -100,6 +100,7 @@ public sealed class SearchComponentSchemasCommand
             {
                 item.Component,
                 Score = terms.Sum(term => item.SearchText.Contains(term, StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                    + RequestedNameScore(item.Component, terms)
                     + FamilyScore(item.Component.TypeName, terms)
             })
             .Where(item => terms.Length == 0 || item.Score > 0)
@@ -111,6 +112,43 @@ public sealed class SearchComponentSchemasCommand
         return RekallAgeCommandResult<SearchComponentSchemasResult>.Success(
             new SearchComponentSchemasResult(matches),
             $"Found {matches.Length} component schemas for '{request.Query}'.");
+    }
+
+    private static int RequestedNameScore(RekallAgeComponentSchema component, IReadOnlyList<string> terms)
+    {
+        var typeName = component.TypeName[(component.TypeName.LastIndexOf('.') + 1)..];
+        if (terms.Any(term => term.Equals(typeName, StringComparison.OrdinalIgnoreCase)))
+        {
+            return 100;
+        }
+
+        var displayTerms = component.DisplayName.Split(
+            [' ', '.', '_', '-', '/'],
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (displayTerms.Length == 0 || displayTerms.Length > terms.Count)
+        {
+            return 0;
+        }
+
+        for (var offset = 0; offset <= terms.Count - displayTerms.Length; offset++)
+        {
+            var requested = true;
+            for (var index = 0; index < displayTerms.Length; index++)
+            {
+                if (!terms[offset + index].Equals(displayTerms[index], StringComparison.OrdinalIgnoreCase))
+                {
+                    requested = false;
+                    break;
+                }
+            }
+
+            if (requested)
+            {
+                return 100;
+            }
+        }
+
+        return 0;
     }
 
     private static int FamilyScore(string typeName, IReadOnlyList<string> terms)

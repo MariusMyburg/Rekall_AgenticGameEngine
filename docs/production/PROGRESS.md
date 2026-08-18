@@ -883,6 +883,18 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
+The next risk-driven tranche is atomic persisted JSON. Code inspection found
+that project and scene loads schema-probe one file handle and then reopen the
+path for typed deserialization, while their saves write directly to the live
+file. The same direct-write pattern exists in the asset catalog/pipeline,
+prefab, render-plan, and transaction-log stores. The reviewed design now fixes
+one bounded immutable read snapshot, consistent parse depth, durable
+same-directory atomic publication, failure cleanup, and installed concurrent
+reader proof. It explicitly does not claim multi-writer merge semantics or a
+restricted host for full-trust C# modules. Design and TDD sequence:
+`docs/superpowers/specs/2026-08-18-atomic-persisted-json-design.md` and
+`docs/superpowers/plans/2026-08-18-atomic-persisted-json.md`.
+
 The bounded cubic interpolation tranche is installed-product verified. The
 bounded morph-target tranche is also installed-product verified. Morph target
 Task 1 passed a 51/51 focused runtime/schema/CLI selection.

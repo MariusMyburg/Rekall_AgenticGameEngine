@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 09:49 Africa/Johannesburg
+Last verified: 2026-08-18 10:02 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: persisted compatibility and atomic migration passed the installed two-pass Release product gate
+Latest milestone: bounded ZIP preflight and transactional extraction passed the installed two-pass Release product gate
 
 ## Product objective
 
@@ -30,17 +30,17 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 195,076,001-byte win-x64 archive assembled with
-  SHA-256 `AF052294419AB1BF392D0D6E85CBFF15EAF23DC2E969F7CBC98F23787AEFC99E`.
+- Windows distribution: fresh 195,083,188-byte win-x64 archive assembled with
+  SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
   Its manifest lists 1,149 payload files; the assembled directory has 1,150
   files including the distribution manifest itself.
-- Canonical verification: 683/683 Release tests passed twice independently;
+- Canonical verification: 706/706 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
-- Current Debug verification: 683/683 tests pass after persisted compatibility
-  and migration integration.
-- Installed acceptance: direct rerun exited 0; project/module workflows,
-  packaging and relocation, nonblank capture, runtime UI, and audible audio
-  paths have installed-binary proof.
+- Current Debug verification: 706/706 tests pass after archive preflight and
+  transactional extraction integration.
+- Installed acceptance: canonical gate exited 0; project/module workflows,
+  packaging and relocation, negative archive preflight, nonblank capture,
+  runtime UI, and audible audio paths have installed-binary proof.
 - Local agent: Ollama currently uses `qwen3.5:35b` through its native API.
 - Agent authoring: both source and installed multi-subsystem benchmarks created
   and repaired UI, animation, and audio content using tool calls.
@@ -812,7 +812,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 ## Current gaps
 
 - Expand adversarial security tests around authored JSON, migration races,
-  package/archive boundaries, diagnostic stores, and full-trust module inputs.
+  diagnostic stores, and full-trust module inputs.
 - In-process C# modules intentionally remain full trust and receipts remain
   unsigned; a future restricted/out-of-process host and publisher signatures
   are separate security capabilities, not claims of the current boundary.
@@ -857,18 +857,19 @@ workflows are documented, Debug and both Release passes complete at 683/683,
 and shipped-binary positive and negative migration proofs passed alongside the
 unchanged installed product matrix.
 
+Archive security Tasks 1-4 are complete. Inspection and extraction share one
+bounded metadata-first immutable ZIP plan; extraction is exact-length,
+reparse-aware, transactional, and cannot publish partial destinations. The
+trust boundary and exact limits are documented, and the installed gate includes
+a safe negative duplicate-manifest fixture.
+
 ## In progress
 
-Audit the next adversarial security slice across engine-owned JSON, package and
-archive extraction, diagnostics, migration concurrency, and the explicitly
-full-trust module boundary. Prioritize generic bounded contracts and executable
-diagnostics; do not misrepresent in-process modules as sandboxed.
-
-Selected first security slice: unify playable ZIP preflight before manifest
-deserialization, inventory allocation, destination creation, hashing, or
-execution. Inspection and extraction will share one bounded immutable entry
-plan covering unique bounded manifests, paths/collisions, ancestor conflicts,
-special-file metadata, and size/count ceilings.
+Advance generic animation authoring primitives now that the selected package
+archive security tranche is installed-product verified. Prioritize
+agent-inspectable, genre-neutral contracts such as state graphs and richer
+interpolation/transform coverage; authored modules remain responsible for game
+behavior.
 
 Archive preflight Task 1 is verified at 15/15 focused tests: a central
 metadata-only contract now returns a deterministic manifest-first immutable
@@ -891,11 +892,22 @@ and publishes by atomic directory move. Invalid preflight cannot create a
 destination, existing destinations remain untouched, failures clean staging,
 and changed-after-inspection relocation retains its stable diagnostic.
 
+Archive preflight Task 4 is installed-product verified. The full Debug suite
+passed 706/706 in 2m18s; the locked Release build had zero warnings/errors and
+two independent 706/706 passes completed in 2m18s and 2m17s. Shipped inspect
+and audit rejected a duplicate-root-manifest ZIP with exact code
+`REKALL_PACKAGE_ARCHIVE_MANIFEST_DUPLICATE`, and rejected audit produced no
+output directory. The unchanged installed product matrix passed. Soak completed
+600 frames and exactly 10 seconds at 4,449.2 FPS with 693,680 retained bytes and
+all nine checks. The 1,149-payload-file archive is 195,083,188 bytes with
+SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
+
 ## Next after the current item
 
-Complete the selected adversarial security slice, then advance generic
-animation primitives. Studio continues to follow proven engine contracts
-instead of reordering the foundation roadmap.
+Design and implement the next generic animation primitive tranche, then return
+to the remaining adversarial JSON/migration/diagnostic and full-trust module
+risks. Studio continues to follow proven engine contracts instead of reordering
+the foundation roadmap.
 
 ## Evidence index
 
@@ -908,6 +920,7 @@ instead of reordering the foundation roadmap.
 - `docs/superpowers/plans/2026-08-18-persisted-compatibility-migrations.md`
 - `docs/superpowers/specs/2026-08-18-package-archive-preflight-security-design.md`
 - `docs/superpowers/plans/2026-08-18-package-archive-preflight-security.md`
+- `docs/production/package-trust-and-archive-security.md`
 - `Artifacts/TestResults/release-pass-1.trx`
 - `Artifacts/TestResults/release-pass-2.trx`
 - `Artifacts/Distribution/Rekall-AGE-0.1.0-preview.1-win-x64.zip`

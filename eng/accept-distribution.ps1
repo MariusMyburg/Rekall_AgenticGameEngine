@@ -23,6 +23,7 @@ $relocationRoot = Join-Path $tempRoot ('rekall-age-relocated-package-' + [Guid]:
 $audioRoot = Join-Path $tempRoot ('rekall-age-installed-audio-' + [Guid]::NewGuid().ToString('N'))
 $diagnosticsRoot = Join-Path $tempRoot ('rekall-age-installed-diagnostics-' + [Guid]::NewGuid().ToString('N'))
 $compatibilityRoot = Join-Path $tempRoot ('rekall-age-installed-compatibility-' + [Guid]::NewGuid().ToString('N'))
+$archiveSecurityRoot = Join-Path $tempRoot ('rekall-age-installed-archive-security-' + [Guid]::NewGuid().ToString('N'))
 $succeeded = $false
 $previousSdlAudioDriver = $env:SDL_AUDIODRIVER
 $previousDiagnosticsRoot = $env:REKALL_AGE_DIAGNOSTICS_DIR
@@ -229,6 +230,46 @@ try {
         throw "Installed gauntlet package contains authoring-only or secret-bearing payload: '$($forbiddenPayload[0].FullName)'."
     }
 
+    New-Item -ItemType Directory -Path $archiveSecurityRoot | Out-Null
+    $duplicateManifestArchive = Join-Path $archiveSecurityRoot 'duplicate-manifest.zip'
+    $archiveStream = [IO.File]::Open($duplicateManifestArchive, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    try {
+        $adversarialArchive = [IO.Compression.ZipArchive]::new(
+            $archiveStream,
+            [IO.Compression.ZipArchiveMode]::Create,
+            $true)
+        try {
+            foreach ($content in @('{}', '{"duplicate":true}')) {
+                $entry = $adversarialArchive.CreateEntry('rekall.package.json')
+                $writer = [IO.StreamWriter]::new($entry.Open(), [Text.UTF8Encoding]::new($false))
+                try {
+                    $writer.Write($content)
+                }
+                finally {
+                    $writer.Dispose()
+                }
+            }
+        }
+        finally {
+            $adversarialArchive.Dispose()
+        }
+    }
+    finally {
+        $archiveStream.Dispose()
+    }
+
+    $negativeArchiveOutput = Invoke-RekallFailureOutput -Arguments @('game', 'inspect-package', $duplicateManifestArchive)
+    if (-not $negativeArchiveOutput.Contains('REKALL_PACKAGE_ARCHIVE_MANIFEST_DUPLICATE', [StringComparison]::Ordinal)) {
+        throw "Installed archive preflight did not reject the duplicate root manifest with its exact code.`n$negativeArchiveOutput"
+    }
+    $negativeAuditRoot = Join-Path $archiveSecurityRoot 'RejectedAudit'
+    $negativeAuditOutput = Invoke-RekallFailureOutput -Arguments @('game', 'audit-package', $duplicateManifestArchive, $negativeAuditRoot)
+    if (-not $negativeAuditOutput.Contains('REKALL_PACKAGE_ARCHIVE_MANIFEST_DUPLICATE', [StringComparison]::Ordinal) -or
+        (Test-Path -LiteralPath $negativeAuditRoot)) {
+        throw "Installed archive audit did not fail closed before producing output.`n$negativeAuditOutput"
+    }
+    Write-Output $negativeArchiveOutput
+
     New-Item -ItemType Directory -Path $relocationRoot | Out-Null
     $relocatedArchive = Join-Path $relocationRoot 'renamed-relocated-game.zip'
     Copy-Item -LiteralPath ($packageRoot + '.zip') -Destination $relocatedArchive
@@ -424,7 +465,7 @@ finally {
     $env:SDL_AUDIODRIVER = $previousSdlAudioDriver
     $env:REKALL_AGE_DIAGNOSTICS_DIR = $previousDiagnosticsRoot
     if ($succeeded) {
-        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot, $diagnosticsRoot, $compatibilityRoot)) {
+        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot, $diagnosticsRoot, $compatibilityRoot, $archiveSecurityRoot)) {
             $resolved = [IO.Path]::GetFullPath($path)
             if ($resolved.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and
                 (Test-Path -LiteralPath $resolved)) {
@@ -433,6 +474,6 @@ finally {
         }
     }
     else {
-        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', '$audioRoot', '$diagnosticsRoot', and '$compatibilityRoot'."
+        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', '$audioRoot', '$diagnosticsRoot', '$compatibilityRoot', and '$archiveSecurityRoot'."
     }
 }

@@ -58,8 +58,19 @@ stable source-changed diagnostic and cleanup behavior.
 
 ## Task 4: Product gate
 
-- [ ] Document package trust and archive limits.
-- [ ] Extend installed acceptance with a safe negative archive fixture.
-- [ ] Run complete Debug and canonical two-pass Release installed gate.
-- [ ] Record exact evidence, limitations, archive hash, and next priority in
+- [x] Document package trust and archive limits.
+- [x] Extend installed acceptance with a safe negative archive fixture.
+- [x] Run complete Debug and canonical two-pass Release installed gate.
+- [x] Record exact evidence, limitations, archive hash, and next priority in
   `docs/production/PROGRESS.md`; review and commit.
+
+Verified 2026-08-18: the complete Debug suite passed 706/706 in 2m18s. The
+canonical locked Release gate built with zero warnings/errors and passed two
+independent 706/706 runs in 2m18s and 2m17s. Shipped binaries rejected a
+duplicate-root-manifest ZIP through inspect and audit with exact code
+`REKALL_PACKAGE_ARCHIVE_MANIFEST_DUPLICATE`; rejected audit created no output.
+The unchanged installed product matrix passed, including module tamper,
+authoring gauntlet, relocation, informative UI, audio, compatibility, recovery,
+and a 600-frame/10-second soak at 4,449.2 FPS with 693,680 retained bytes. The
+1,149-payload-file archive is 195,083,188 bytes with SHA-256
+`5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.

@@ -57,8 +57,8 @@ Maturity labels:
 | Playable packaging | Proven | relative hashed manifest, minimal payload, forbidden-file checks, archive safety, relocation run/audit/capture, packaged runtime UI/animation/audio state | signing, delta patching/updater integration, broader clean-machine matrix |
 | Engine distribution | Proven | locked restore, two suites, self-contained applications, hashes, clean installed gauntlet | binary signing, installer/updater, release provenance/SBOM, clean-machine VM matrix |
 | Studio | Facade | real read models and a WPF shell | controls are unwired, viewport is text, no interactive open/edit/play workflow |
-| Security | Partial | no currently known vulnerable NuGet dependency; distribution forbidden-file checks | arbitrary-module trust boundary, fuzzing, path/archive hardening, secret scanning, signed releases, threat model |
-| Test platform | Implemented | 558 green tests; latest canonical two-pass Release acceptance covers Vulkan, relocation, SDL audio, runtime UI visual proof, animation limits, malformed corpus, and long-run determinism | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
+| Security | Partial | no currently known vulnerable NuGet dependency; distribution forbidden-file checks; bounded metadata-first ZIP preflight and transactional exact-length extraction | restricted module hosting, fuzzing breadth, secret scanning, signed releases/packages, threat model |
+| Test platform | Implemented | 706 green tests; latest canonical two-pass Release acceptance covers Vulkan, relocation, SDL audio, runtime UI visual proof, animation limits, malformed corpus, long-run determinism, recovery, compatibility, and adversarial ZIP preflight | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
 | LLM providers/Ollama | Implemented | provider-neutral contracts, native Ollama chat/tools/model discovery, bounded loop, `qwen3.5:35b` source benchmark in 15 turns and expanded installed UI/audio/animation benchmark in 23 turns | additional models/providers and installed benchmark breadth, lower token/correction cost, quality/cost routing policy |
 
 ## Material findings
@@ -67,8 +67,11 @@ Maturity labels:
 
 The Windows engine archive and playable game package are self-contained, hashed,
 minimal, and exercised after relocation. Package inspection rejects undeclared,
-tampered, and unsafe archive paths before execution. Signing, provenance, and a
-clean-machine OS/GPU matrix remain release-engineering gaps.
+tampered, ambiguous, oversized, linked, or colliding archive content before
+deserialization or execution. Extraction is exact-length and transactional.
+The precise boundary is documented in
+`docs/production/package-trust-and-archive-security.md`. Signing, provenance,
+and a clean-machine OS/GPU matrix remain release-engineering gaps.
 
 ### 2. Core audio, UI, and animation now execute; advanced breadth remains
 

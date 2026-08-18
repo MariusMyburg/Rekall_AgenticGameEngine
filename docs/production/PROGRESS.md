@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 06:20 Africa/Johannesburg
+Last verified: 2026-08-18 06:27 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: directory packages enforce bounded inspection and reject reparse points
+Latest milestone: bounded directory-package inspection passed the complete product gate
 
 ## Product objective
 
@@ -30,7 +30,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,732,663-byte win-x64 archive assembled.
+- Windows distribution: fresh 194,734,675-byte win-x64 archive assembled.
 - Canonical verification: 592/592 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
 - Current Debug verification: 592/592 tests pass after durable evidence and
@@ -640,6 +640,13 @@ Studio is important, but it does not define or reorder the engine foundation.
   `REKALL_PACKAGE_PATH_REPARSE_POINT` diagnostic. Injectable bounded limits and
   file attributes provide deterministic low-cost regression coverage; all four
   package-integrity scenarios and the full Debug suite pass at 592/592.
+- Directory-security distribution gate: the clean Release build completed with
+  zero warnings and zero errors; both independent Release passes completed at
+  592/592; the installed product passed bounded directory-package gauntlet,
+  hardened relocated ZIP run/audit/capture, informative proof, runtime UI,
+  software viewport, simulated audio, and Windows player audio. The canonical
+  1,149-manifest-file archive is 194,734,675 bytes with SHA-256
+  `9b754c5f6d2b81b13e28a2516b74855178a020c47ae7a8f043ea36bb6ea935f9`.
 
 ## Current gaps
 
@@ -652,14 +659,14 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete installed-product gate for bounded directory-package
-inspection and reparse-point rejection.
+Define and implement the first quantified lifecycle soak/recovery and runtime
+performance regression gate.
 
 ## Next after the current item
 
-Continue the quantified hardening audit with module trust policy, directory
-package limits/reparse handling, lifecycle soak/recovery, and performance
-regression budgets. Studio follows proven engine contracts.
+Continue with explicit module trust policy and broader device-loss, crash,
+compatibility, and release-operability evidence. Studio follows proven engine
+contracts.
 
 ## Evidence index
 

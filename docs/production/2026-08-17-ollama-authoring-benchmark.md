@@ -846,6 +846,31 @@ applying schema minima and maxima. A negative string mass produces the same
 blocking out-of-range issue and canonical numeric repair as a JSON number. The
 full Debug suite passes at 590/590.
 
+### Informative-package-proof rerun
+
+Rerun 30 used the numeric-string validation distribution with the unchanged
+36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun30`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 638,419
+- Completion tokens: 13,470
+
+The agent completed deliberate fault validation/repair before runtime, proved
+both scenes, built and audited an original package, then completion audit
+reopened authoring instead of relocating. It replaced project content and spent
+four final calls repeating a no-progress batch repair.
+
+Independent final-state verification found 17 issues: Main had lost its rigid
+body and Physics2D still moved by -1.267 but had no active camera. The original
+package existed and its audit had passed. The remaining generic evidence gap is
+that package audit reports a nonblank frame but not whether the frame is
+informative; the audit therefore treats the explicit informative-proof
+requirement as missing and tries to re-author content. Batch repair also needs
+an unmistakable no-progress result when only advisory/non-automatic issues
+remain.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

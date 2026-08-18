@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 05:11 Africa/Johannesburg
+Last verified: 2026-08-18 05:15 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: numeric-string range validation passed the complete product gate
+Latest milestone: broad rerun 30 isolated informative package-proof gap
 
 ## Product objective
 
@@ -559,6 +559,13 @@ Studio is important, but it does not define or reorder the engine foundation.
   the generic gauntlet, original and relocated package proof, runtime UI,
   software viewport, simulated audio, and Windows player audio. The canonical
   1,149-file archive is 194,727,467 bytes.
+- Broad benchmark rerun 30: the agent repaired faults before runtime, proved
+  both moving scenes, and audited an original package, then completion audit
+  reopened authoring and stopped at 36 turns/36 tools (638,419 prompt; 13,470
+  completion). Independent final proof found 17 issues after the rewrite, no 3D
+  body, and a still-moving 2D body. Package audit exposed only nonblank proof,
+  not the task's required informative-frame fact, and batch repair was repeated
+  four times after reaching non-automatic remaining issues.
 
 ## Current gaps
 
@@ -574,7 +581,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the unchanged installed Ollama benchmark on the numeric-string validation distribution.
+Expose informative frame analysis through packaged capture/audit results and
+make batch validation repair report no-progress termination unambiguously.
 
 ## Next after the current item
 

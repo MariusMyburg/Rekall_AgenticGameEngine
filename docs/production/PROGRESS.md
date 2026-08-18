@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 02:28 Africa/Johannesburg
+Last verified: 2026-08-18 02:32 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: evidence-gated agent completion passed 584/584 Debug tests
+Latest milestone: evidence-gated agent completion passed the complete product gate
 
 ## Product objective
 
@@ -380,6 +380,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   existence evidence as failures. If audit resumes tool use, the next proposed
   completion is audited again. The regression and full Debug suite pass at
   584/584.
+- Evidence-gated completion distribution gate: the clean Release build
+  completed with zero warnings and zero errors; both independent Release passes
+  completed at 584/584; and installed acceptance passed SDK/module authoring,
+  the generic gauntlet, original and relocated package proof, runtime UI,
+  software viewport, simulated audio, and Windows player audio. The canonical
+  1,149-file archive is 194,709,786 bytes.
 
 ## Current gaps
 
@@ -395,7 +401,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for evidence-gated agent completion.
+Rerun the unchanged installed Ollama benchmark on the evidence-gated distribution.
 
 ## Next after the current item
 

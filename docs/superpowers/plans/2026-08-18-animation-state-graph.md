@@ -224,19 +224,19 @@ progress, active clip, and bounded layers without dumping parameters.
 - Extends installed acceptance with a genre-neutral two-clip graph proof.
 - Does not weaken or replace any existing installed proof.
 
-- [ ] **Step 1: Add installed graph fixture and assertions**
+- [x] **Step 1: Add installed graph fixture and assertions**
 
 Author two generic color/transform clips plus a graph. Update a neutral `phase`
 parameter through authored content, inspect the transition, capture pre/post
 frames, require distinct SHA-256 hashes, and require no error observations.
 
-- [ ] **Step 2: Run complete Debug verification**
+- [x] **Step 2: Run complete Debug verification**
 
 ```powershell
 dotnet test Rekall.AGE.sln --no-restore --verbosity minimal
 ```
 
-- [ ] **Step 3: Run the canonical locked two-pass Release gate**
+- [x] **Step 3: Run the canonical locked two-pass Release gate**
 
 ```powershell
 $env:TEMP = 'F:\Dev\Rekall_AGE\.worktrees\production-foundation\Artifacts\GateTemp'
@@ -244,11 +244,29 @@ $env:TMP = $env:TEMP
 & .\eng\build.ps1
 ```
 
-- [ ] **Step 4: Record exact test counts, timings, installed facts, frame hashes, soak data, archive size/hash, limitations, and next priority**
+- [x] **Step 4: Record exact test counts, timings, installed facts, frame hashes, soak data, archive size/hash, limitations, and next priority**
 
-- [ ] **Step 5: Review, run `git diff --check`, and commit**
+- [x] **Step 5: Review, run `git diff --check`, and commit**
 
 ```powershell
 git add eng/accept-distribution.ps1 docs
 git commit -m "test: gate installed animation state graphs"
 ```
+
+Verified 2026-08-18: the complete Debug suite passed 738/738 in 2m20s. The
+canonical locked Release build completed with zero warnings and zero errors;
+its two independent Release passes completed 738/738 in 2m20s and 2m17s.
+Fresh installed binaries authored a neutral two-state graph, captured an
+informative red idle frame, changed only the generic `phase` parameter,
+inspected `active` with `previous=idle` at exactly 0.500 transition progress,
+and captured an informative green active frame. The frame SHA-256 values were
+`E17ABB6DAE0EDD3963D775617A0FBCADD38E8AE5FCD5E13AE9A52475B3BDC7E4` and
+`DC7D7EEB7133226AEA816A7DF24DEEE30C10ABBB15C1881119CBB709F3B405E4`.
+The unchanged installed matrix and all recovery outcomes passed. The 600-frame
+soak simulated exactly 10 seconds at 4,264.1 FPS with 681,624 bytes retained
+managed-memory growth and all nine checks passing. The archive contains 1,149
+manifested payload files, is 195,141,113 bytes, and has SHA-256
+`7297CE4FCF52960F3217BE6A80CF7046E8052F9A3E12998602C807C0DA9A426D`.
+Version 1 intentionally permits only one noninterruptible transition per frame;
+blend curves, hierarchical graphs, and transition interruption remain future
+generic capabilities rather than hidden behavior.

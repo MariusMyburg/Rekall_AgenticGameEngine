@@ -24,6 +24,7 @@ $audioRoot = Join-Path $tempRoot ('rekall-age-installed-audio-' + [Guid]::NewGui
 $diagnosticsRoot = Join-Path $tempRoot ('rekall-age-installed-diagnostics-' + [Guid]::NewGuid().ToString('N'))
 $compatibilityRoot = Join-Path $tempRoot ('rekall-age-installed-compatibility-' + [Guid]::NewGuid().ToString('N'))
 $archiveSecurityRoot = Join-Path $tempRoot ('rekall-age-installed-archive-security-' + [Guid]::NewGuid().ToString('N'))
+$animationGraphRoot = Join-Path $tempRoot ('rekall-age-installed-animation-graph-' + [Guid]::NewGuid().ToString('N'))
 $succeeded = $false
 $previousSdlAudioDriver = $env:SDL_AUDIODRIVER
 $previousDiagnosticsRoot = $env:REKALL_AGE_DIAGNOSTICS_DIR
@@ -280,6 +281,90 @@ try {
         throw "Relocated package audit did not produce a nonblank proof frame at '$relocatedFrame'."
     }
 
+    Invoke-Rekall project create $animationGraphRoot 'Installed Animation Graph Proof' 'animation,ui'
+    Invoke-Rekall scene create $animationGraphRoot Main 'animation,ui'
+    $graphAssetDirectory = Join-Path $animationGraphRoot 'Assets\animation'
+    New-Item -ItemType Directory -Path $graphAssetDirectory -Force | Out-Null
+    $idleClip = @{
+        version = 1; durationSeconds = 2
+        tracks = @(@{
+            component = 'Rekall.Panel'; property = 'BackgroundColor'; interpolation = 'step'
+            keys = @(@{ time = 0; value = '#b02030' }, @{ time = 2; value = '#b02030' })
+        })
+    }
+    $activeClip = @{
+        version = 1; durationSeconds = 2
+        tracks = @(@{
+            component = 'Rekall.Panel'; property = 'BackgroundColor'; interpolation = 'step'
+            keys = @(@{ time = 0; value = '#20b060' }, @{ time = 2; value = '#20b060' })
+        })
+    }
+    $idleClip | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $graphAssetDirectory 'idle.age.animation.json') -Encoding utf8
+    $activeClip | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $graphAssetDirectory 'active.age.animation.json') -Encoding utf8
+    $graphCatalog = @{
+        assets = @(
+            @{ id = 'graph-idle'; name = 'graph-idle'; displayName = 'Graph Idle'; kind = 'animation'; sourcePath = ''; importedPath = 'Assets/animation/idle.age.animation.json'; contentHash = 'installed-graph-idle' },
+            @{ id = 'graph-active'; name = 'graph-active'; displayName = 'Graph Active'; kind = 'animation'; sourcePath = ''; importedPath = 'Assets/animation/active.age.animation.json'; contentHash = 'installed-graph-active' }
+        )
+    }
+    $graphCatalog | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $animationGraphRoot 'Assets\assets.age.catalog.json') -Encoding utf8
+    $graphScenePath = Join-Path $animationGraphRoot 'Scenes\Main.age.scene.json'
+    $graphScene = Get-Content -LiteralPath $graphScenePath -Raw | ConvertFrom-Json
+    $graphScene.capabilities = @('animation', 'ui')
+    $graphScene.entities = @(
+        @{
+            id = 'graph-canvas'; name = 'Graph Canvas'; tags = @('ui'); parentId = $null; prefabSourceId = $null; visible = $true; locked = $false
+            components = @(@{ type = 'Rekall.UiCanvas'; properties = @{ ReferenceWidth = 200; ReferenceHeight = 100 } })
+        },
+        @{
+            id = 'graph-panel'; name = 'Graph Panel'; tags = @('ui', 'animation'); parentId = 'graph-canvas'; prefabSourceId = $null; visible = $true; locked = $false
+            components = @(
+                @{ type = 'Rekall.Panel'; properties = @{ X = 20; Y = 20; Width = 160; Height = 60; BackgroundColor = '#b02030' } },
+                @{ type = 'Rekall.AnimationStateGraph'; properties = @{
+                    Version = 1; Playing = $true; InitialState = 'idle'; Parameters = @{ phase = 0 }
+                    States = @(
+                        @{ name = 'idle'; clip = 'graph-idle'; speed = 1; loopMode = 'loop'; startTimeSeconds = 0 },
+                        @{ name = 'active'; clip = 'graph-active'; speed = 1; loopMode = 'loop'; startTimeSeconds = 0 }
+                    )
+                    Transitions = @(@{
+                        from = 'idle'; to = 'active'; durationSeconds = 1; resetTime = $true
+                        conditions = @(@{ parameter = 'phase'; operator = 'greater'; value = 0 })
+                    })
+                } }
+            )
+        }
+    )
+    $graphScene | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $graphScenePath -Encoding utf8
+    $graphBeforeDirectory = Join-Path $animationGraphRoot 'Builds\GraphBefore'
+    Invoke-Rekall render viewport capture $animationGraphRoot Main 1 $graphBeforeDirectory 200 100 software
+    $graphBeforeFrame = Join-Path $graphBeforeDirectory 'Main_runtime_001.png'
+
+    $graphScene = Get-Content -LiteralPath $graphScenePath -Raw | ConvertFrom-Json
+    $graphComponent = $graphScene.entities[1].components | Where-Object { $_.type -eq 'Rekall.AnimationStateGraph' }
+    $graphComponent.properties.Parameters.phase = 1
+    $graphScene | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $graphScenePath -Encoding utf8
+    $graphInspection = Invoke-RekallOutput runtime inspect $animationGraphRoot Main 30
+    if (-not $graphInspection.Contains('kind=AnimationStateGraph', [StringComparison]::Ordinal) -or
+        -not $graphInspection.Contains('state=active previous=idle transition=0.500', [StringComparison]::Ordinal)) {
+        throw "Installed animation graph inspection omitted active transition facts.`n$graphInspection"
+    }
+    Write-Output $graphInspection
+    $graphAfterDirectory = Join-Path $animationGraphRoot 'Builds\GraphAfter'
+    Invoke-Rekall render viewport capture $animationGraphRoot Main 60 $graphAfterDirectory 200 100 software
+    $graphAfterFrame = Join-Path $graphAfterDirectory 'Main_runtime_060.png'
+    if (-not (Test-Path -LiteralPath $graphBeforeFrame -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $graphAfterFrame -PathType Leaf) -or
+        (Get-Item -LiteralPath $graphBeforeFrame).Length -le 100 -or
+        (Get-Item -LiteralPath $graphAfterFrame).Length -le 100) {
+        throw 'Installed animation graph proof frames are missing or blank.'
+    }
+    $graphBeforeHash = (Get-FileHash -LiteralPath $graphBeforeFrame -Algorithm SHA256).Hash
+    $graphAfterHash = (Get-FileHash -LiteralPath $graphAfterFrame -Algorithm SHA256).Hash
+    if ($graphBeforeHash -eq $graphAfterHash) {
+        throw "Installed animation graph proof frames were identical: $graphBeforeHash"
+    }
+    Write-Output "Installed animation graph frames: before=$graphBeforeHash after=$graphAfterHash"
+
     Invoke-Rekall project create $audioRoot 'Installed Runtime Subsystems Proof' 'audio,ui'
     Invoke-Rekall scene create $audioRoot Main 'audio,ui'
     $audioDirectory = Join-Path $audioRoot 'Assets\audio'
@@ -465,7 +550,7 @@ finally {
     $env:SDL_AUDIODRIVER = $previousSdlAudioDriver
     $env:REKALL_AGE_DIAGNOSTICS_DIR = $previousDiagnosticsRoot
     if ($succeeded) {
-        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot, $diagnosticsRoot, $compatibilityRoot, $archiveSecurityRoot)) {
+        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot, $diagnosticsRoot, $compatibilityRoot, $archiveSecurityRoot, $animationGraphRoot)) {
             $resolved = [IO.Path]::GetFullPath($path)
             if ($resolved.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and
                 (Test-Path -LiteralPath $resolved)) {
@@ -474,6 +559,6 @@ finally {
         }
     }
     else {
-        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', '$audioRoot', '$diagnosticsRoot', '$compatibilityRoot', and '$archiveSecurityRoot'."
+        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', '$audioRoot', '$diagnosticsRoot', '$compatibilityRoot', '$archiveSecurityRoot', and '$animationGraphRoot'."
     }
 }

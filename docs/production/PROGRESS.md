@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 10:22 Africa/Johannesburg
+Last verified: 2026-08-18 10:38 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: bounded ZIP preflight and transactional extraction passed the installed two-pass Release product gate
+Latest milestone: generic animation state graphs passed the installed two-pass Release product gate
 
 ## Product objective
 
@@ -30,21 +30,22 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 195,083,188-byte win-x64 archive assembled with
-  SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
+- Windows distribution: fresh 195,141,113-byte win-x64 archive assembled with
+  SHA-256 `7297CE4FCF52960F3217BE6A80CF7046E8052F9A3E12998602C807C0DA9A426D`.
   Its manifest lists 1,149 payload files; the assembled directory has 1,150
   files including the distribution manifest itself.
-- Canonical verification: 706/706 Release tests passed twice independently;
+- Canonical verification: 738/738 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
-- Current Debug verification: 706/706 tests pass after archive preflight and
-  transactional extraction integration.
+- Current Debug verification: 738/738 tests pass after animation state-graph
+  integration and installed proof.
 - Installed acceptance: canonical gate exited 0; project/module workflows,
   packaging and relocation, negative archive preflight, nonblank capture,
   runtime UI, and audible audio paths have installed-binary proof.
 - Local agent: Ollama currently uses `qwen3.5:35b` through its native API.
 - Agent authoring: both source and installed multi-subsystem benchmarks created
   and repaired UI, animation, and audio content using tool calls.
-- Runtime animation: generic clip playback, weighted layers, crossfades,
+- Runtime animation: generic clip playback, bounded parameter-driven state
+  graphs, weighted layers, crossfades,
   deterministic resume, GLB skeletal channels, runtime joint poses, imported
   JOINTS_0/WEIGHTS_0, and CPU skinning before Vulkan submission are covered.
 - Installed skeletal rendering: the shipped CLI sampled `Lift` at frame 30,
@@ -817,7 +818,8 @@ Studio is important, but it does not define or reorder the engine foundation.
   unsigned; a future restricted/out-of-process host and publisher signatures
   are separate security capabilities, not claims of the current boundary.
 - Complete advanced animation coverage such as cubic interpolation, morph
-  targets, complex transform fixtures, and generic state-graph primitives.
+  targets, complex transform fixtures, richer graph curves, and interruptible
+  or hierarchical graph policies.
 - Replace the current Studio facade with a professional workbench only after
   its runtime/authoring contracts are stable and independently proven.
 
@@ -863,13 +865,26 @@ reparse-aware, transactional, and cannot publish partial destinations. The
 trust boundary and exact limits are documented, and the installed gate includes
 a safe negative duplicate-manifest fixture.
 
+Animation state graph Task 4 is installed-product verified. Fresh shipped
+binaries authored a genre-neutral two-clip graph, captured an informative idle
+frame, changed only its generic `phase` parameter, inspected `active` with
+`previous=idle` at exactly 0.500 transition progress, and captured a distinct
+informative active frame. The frame SHA-256 values are
+`E17ABB6DAE0EDD3963D775617A0FBCADD38E8AE5FCD5E13AE9A52475B3BDC7E4` and
+`DC7D7EEB7133226AEA816A7DF24DEEE30C10ABBB15C1881119CBB709F3B405E4`.
+Debug passed 738/738 in 2m20s; the zero-warning, zero-error locked Release build
+passed 738/738 twice in 2m20s and 2m17s. The unchanged installed product matrix
+passed, including all recovery outcomes. Its 600-frame soak simulated exactly
+10 seconds at 4,264.1 FPS with 681,624 retained bytes and all nine checks. The
+1,149-payload-file archive is 195,141,113 bytes with SHA-256
+`7297CE4FCF52960F3217BE6A80CF7046E8052F9A3E12998602C807C0DA9A426D`.
+
 ## In progress
 
-Advance generic animation authoring primitives now that the selected package
-archive security tranche is installed-product verified. Prioritize
-agent-inspectable, genre-neutral contracts such as state graphs and richer
-interpolation/transform coverage; authored modules remain responsible for game
-behavior.
+Advance generic animation authoring primitives now that state graphs are
+installed-product verified. The next contained tranche is agent-inspectable
+cubic interpolation with deterministic, bounded tangent data and richer
+transform fixtures; authored modules remain responsible for game behavior.
 
 The next tranche design is fixed in
 `docs/superpowers/specs/2026-08-18-animation-state-graph-design.md`: a bounded,
@@ -932,10 +947,11 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
-Design and implement the next generic animation primitive tranche, then return
-to the remaining adversarial JSON/migration/diagnostic and full-trust module
-risks. Studio continues to follow proven engine contracts instead of reordering
-the foundation roadmap.
+Design and implement bounded cubic animation interpolation, prove it through
+the existing sampler and installed runtime, then evaluate morph-target breadth
+against the remaining adversarial JSON/migration/diagnostic and full-trust
+module risks. Studio continues to follow proven engine contracts instead of
+reordering the foundation roadmap.
 
 ## Evidence index
 

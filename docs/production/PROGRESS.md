@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 04:33 Africa/Johannesburg
+Last verified: 2026-08-18 04:40 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: canonical validation repair passed 588/588 Debug tests
+Latest milestone: canonical validation repair passed the complete product gate
 
 ## Product objective
 
@@ -30,8 +30,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,726,034-byte win-x64 archive assembled.
-- Canonical verification: 587/587 Release tests passed twice independently;
+- Windows distribution: fresh 194,726,872-byte win-x64 archive assembled.
+- Canonical verification: 588/588 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
@@ -520,6 +520,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   executable canonical add/remove repairs with authored properties preserved,
   rather than incomplete blueprint hints. The full Debug suite passes at
   588/588.
+- Canonical validation-repair distribution gate: the clean Release build
+  completed with zero warnings and zero errors; both independent Release passes
+  completed at 588/588; and installed acceptance passed SDK/module authoring,
+  the generic gauntlet, original and relocated package proof, runtime UI,
+  software viewport, simulated audio, and Windows player audio. The canonical
+  1,149-file archive is 194,726,872 bytes.
 
 ## Current gaps
 
@@ -535,7 +541,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for canonical validation repair.
+Run the unchanged installed Ollama benchmark on the canonical-repair distribution.
 
 ## Next after the current item
 

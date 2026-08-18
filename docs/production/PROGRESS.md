@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 02:54 Africa/Johannesburg
+Last verified: 2026-08-18 03:00 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: visible-delivery agent contract passed 585/585 Debug tests
+Latest milestone: visible-delivery agent contract passed the complete product gate
 
 ## Product objective
 
@@ -415,6 +415,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   schema search command, require a renderer on every requested visible dynamic
   body, and order required module scaffolding before the first package call.
   The regression and full Debug suite pass at 585/585.
+- Visible-delivery contract distribution gate: the clean Release build
+  completed with zero warnings and zero errors; both independent Release passes
+  completed at 585/585; and installed acceptance passed SDK/module authoring,
+  the generic gauntlet, original and relocated package proof, runtime UI,
+  software viewport, simulated audio, and Windows player audio. The canonical
+  1,149-file archive is 194,710,036 bytes.
 
 ## Current gaps
 
@@ -430,7 +436,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for the visible-delivery agent contract.
+Run the unchanged installed Ollama benchmark on the visible-delivery distribution.
 
 ## Next after the current item
 

@@ -454,9 +454,17 @@ public sealed record RekallAgeRuntimeAudioMixFrame(
 public sealed record RekallAgeRuntimeAnimationView(
     IReadOnlyList<RekallAgeRuntimeAnimationPlayer> Players)
 {
+    public IReadOnlyList<RekallAgeRuntimeMorphState> MorphStates { get; init; } =
+        Array.Empty<RekallAgeRuntimeMorphState>();
+
     public static RekallAgeRuntimeAnimationView Empty { get; } = new(
         Array.Empty<RekallAgeRuntimeAnimationPlayer>());
 }
+
+public sealed record RekallAgeRuntimeMorphState(
+    string EntityId,
+    string EntityName,
+    IReadOnlyList<double> Weights);
 
 public sealed record RekallAgeRuntimeAnimationPlayer(
     string EntityId,

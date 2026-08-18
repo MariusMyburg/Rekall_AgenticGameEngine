@@ -55,6 +55,11 @@ public sealed record InspectSceneRuntimeResult(
 
     public bool AnimationPlayersTruncated { get; init; }
 
+    public IReadOnlyList<RekallAgeRuntimeMorphState> MorphStates { get; init; } =
+        Array.Empty<RekallAgeRuntimeMorphState>();
+
+    public bool MorphStatesTruncated { get; init; }
+
     public IReadOnlyList<InspectSceneRuntimeEntityState> EntityStates { get; init; } =
         Array.Empty<InspectSceneRuntimeEntityState>();
 
@@ -249,6 +254,8 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
             AudioVoicesTruncated = audio.Voices.Count > maximumSubsystemItems,
             AnimationPlayers = animation.Players.Take(maximumSubsystemItems).ToArray(),
             AnimationPlayersTruncated = animation.Players.Count > maximumSubsystemItems,
+            MorphStates = animation.MorphStates.Take(maximumSubsystemItems).ToArray(),
+            MorphStatesTruncated = animation.MorphStates.Count > maximumSubsystemItems,
             EntityStates = entityStates,
             EntityStatesTruncated = world.Entities.Count > maximumEntityStates,
             UiCanvasCount = ui.Canvases.Count,

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 11:12 Africa/Johannesburg
+Last verified: 2026-08-18 11:25 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: bounded cubic animation passed the installed two-pass Release product gate
+Latest milestone: generic morph-weight runtime contract passed its focused gate
 
 ## Product objective
 
@@ -882,11 +882,17 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The bounded cubic interpolation tranche is installed-product verified. The
-next engine-general animation decision is whether morph-target import,
-sampling, inspection, and renderer execution can form one bounded vertical
-slice without weakening the existing asset limits; authored modules remain
-responsible for game behavior.
+The bounded cubic interpolation tranche is installed-product verified. Morph
+target Task 1 is now verified in a 51/51 focused runtime/schema/CLI selection.
+`Rekall.MorphWeights` exposes one bounded, non-clamped generic array and reuses
+ordinary linear/cubic clips and state-graph catalog clips. A post-animation
+runtime system rejects empty, excessive, non-numeric, nested, non-finite, and
+out-of-range input; removes stale state; preserves exact negative and
+extrapolated values; and publishes sorted bounded `Rekall.MorphState`
+projection. Split execution matches continuous execution. Runtime CLI
+inspection reports counts and invariant-culture weights without vertex data.
+The next implementation item is bounded glTF target metadata and mesh loading;
+authored modules remain responsible for game behavior.
 
 That decision is now fixed in
 `docs/superpowers/specs/2026-08-18-morph-target-runtime-design.md`: a bounded

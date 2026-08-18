@@ -74,6 +74,13 @@ public sealed class ModuleMetadataTests
         var skeletal = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.SkeletalAnimator");
         Assert.Contains(skeletal.Properties, property => property.Name == "Model" && property.AssetKind == "model");
         Assert.Contains(skeletal.Properties, property => property.Name == "Animation");
+        var morph = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.MorphWeights");
+        Assert.Contains("same entity", morph.Description, StringComparison.OrdinalIgnoreCase);
+        var weights = Assert.Single(morph.Properties, property => property.Name == "Weights" && property.Kind == "morphWeights");
+        Assert.Contains("1 to 64", weights.Description, StringComparison.Ordinal);
+        Assert.Contains("1,000,000", weights.Description, StringComparison.Ordinal);
+        Assert.Contains("not clamped", weights.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("AnimationClip", weights.Description, StringComparison.Ordinal);
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.AudioEmitter");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.UiCanvas");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Button");

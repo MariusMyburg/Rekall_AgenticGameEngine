@@ -22,6 +22,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         var voices = new List<RekallAgeRuntimeAudioVoice>();
         var audioBuses = new List<RekallAgeRuntimeAudioBus>();
         var animationPlayers = new List<RekallAgeRuntimeAnimationPlayer>();
+        var morphStates = new List<RekallAgeRuntimeMorphState>();
         var canvases = new List<RekallAgeRuntimeUiCanvas>();
         var elements = new List<RekallAgeRuntimeUiElement>();
         var networkSessions = new List<RekallAgeRuntimeNetworkSession>();
@@ -541,6 +542,21 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             JointCount = pose is null ? 0 : ReadInt32(pose.Properties, "jointCount", 0)
                         });
                         break;
+                    case "Rekall.MorphState":
+                        var projectedWeights = ReadArray(component.Properties, "weights")?
+                            .Take(64)
+                            .Select(TryReadFiniteNumber)
+                            .Where(value => value is not null)
+                            .Select(value => value!.Value)
+                            .ToArray() ?? [];
+                        if (projectedWeights.Length > 0)
+                        {
+                            morphStates.Add(new RekallAgeRuntimeMorphState(
+                                entity.Id,
+                                entity.Name,
+                                projectedWeights));
+                        }
+                        break;
                     default:
                         if (IsLight(component.Type))
                         {
@@ -638,7 +654,12 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                                 .Max(),
                             Samples: Array.Empty<float>())
                 },
-                new RekallAgeRuntimeAnimationView(Sort(animationPlayers)),
+                new RekallAgeRuntimeAnimationView(Sort(animationPlayers))
+                {
+                    MorphStates = morphStates
+                        .OrderBy(state => state.EntityId, StringComparer.Ordinal)
+                        .ToArray()
+                },
                 new RekallAgeRuntimeUiView(
                     Sort(canvases),
                     Sort(elements),
@@ -668,6 +689,18 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                 .ThenBy(observation => observation.Code, StringComparer.Ordinal)
                 .ToArray()
         };
+    }
+
+    private static double? TryReadFiniteNumber(JsonNode? node)
+    {
+        if (node is not JsonValue value)
+        {
+            return null;
+        }
+        if (value.TryGetValue<double>(out var number) && double.IsFinite(number)) return number;
+        if (value.TryGetValue<int>(out var integer)) return integer;
+        if (value.TryGetValue<long>(out var longInteger)) return longInteger;
+        return null;
     }
 
     private static RekallAgeRuntimeUiLayout? ReadUiLayout(RekallAgeRuntimeEntity entity)

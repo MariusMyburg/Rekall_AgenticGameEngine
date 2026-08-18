@@ -154,6 +154,30 @@ public sealed class RuntimeInspectCliTests
     }
 
     [Fact]
+    public async Task RuntimeInspectPrintsBoundedMorphState()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Runtime Morph CLI", ["world", "animation", "rendering3d"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "animation", "rendering3d"])
+                .AddEntity(RekallAgeEntityDocument.Create("Morph Actor", ["actor"])
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.MorphWeights",
+                        new JsonObject { ["weights"] = new JsonArray(0.25, -0.5, 2) }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(FindCliAssemblyPath(), "runtime", "inspect", root, "Main", "1");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Morph states: 1", result.Output);
+        Assert.Contains("Morph Morph Actor: count=3 weights=[0.25,-0.5,2]", result.Output);
+    }
+
+    [Fact]
     public async Task RuntimeInspectPrintsCameraCulledRenderables()
     {
         var root = TestPaths.CreateTempDirectory();

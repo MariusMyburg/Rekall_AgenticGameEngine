@@ -46,7 +46,7 @@
 - Adds `IReadOnlyList<RekallAgeRuntimeMorphState> MorphStates` to `RekallAgeRuntimeAnimationView` with a compatibility default.
 - Adds runtime system id `runtime.animation.morph`, priority 5, after clip/graph/skeletal sampling and before downstream render projection.
 
-- [ ] **Step 1: Write failing schema and runtime tests**
+- [x] **Step 1: Write failing schema and runtime tests**
 
 Assert schema name, same-entity mesh guidance, 64-entry and ±1,000,000 bounds,
 non-clamping, and generic clip/mixer/graph reuse. Run a world with valid weights
@@ -55,7 +55,7 @@ a real linear clip and a real cubic clip and assert post-animation runtime
 state. The production mutation these tests catch is a system running before
 animation or coercing/clamping weight values.
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~RuntimeMorphTargetTests|FullyQualifiedName~ModuleMetadataTests" --verbosity minimal
@@ -63,7 +63,7 @@ dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter
 
 Expected: schema/state/system assertions fail because no morph contract exists.
 
-- [ ] **Step 3: Implement component registration and runtime validation**
+- [x] **Step 3: Implement component registration and runtime validation**
 
 For each entity, remove stale `Rekall.MorphState` first. Accept only a flat
 numeric array of 1..64 finite values in the inclusive magnitude range. Deep
@@ -71,14 +71,14 @@ clone valid values into runtime state; on failure emit one bounded
 `runtime.animation.morph_weights_invalid` observation naming the entity and
 actual bounded count/reason. Do not mutate `Rekall.MorphWeights`.
 
-- [ ] **Step 4: Add failing invalid-input, stale-state, and split-run tests**
+- [x] **Step 4: Add failing invalid-input, stale-state, and split-run tests**
 
 Cover empty/excessive arrays, null/string/object/nested entries, NaN/infinity,
 ±1,000,001, component removal, valid negative/extrapolated weights, continuous
 60 versus split 17+43 frames, and graph-driven catalog clips. Assert invalid
 input publishes no state and one bounded observation.
 
-- [ ] **Step 5: Implement bounded projection and CLI output**
+- [x] **Step 5: Implement bounded projection and CLI output**
 
 Define:
 
@@ -93,7 +93,7 @@ Projection reads runtime state only, caps output at 64 values, and sorts by
 entity id. CLI prints one line per state with count and invariant-culture
 bounded weights. It never dumps vertex deltas.
 
-- [ ] **Step 6: Verify runtime/schema/CLI regressions and commit**
+- [x] **Step 6: Verify runtime/schema/CLI regressions and commit**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~RuntimeMorphTargetTests|FullyQualifiedName~ModuleMetadataTests|FullyQualifiedName~RuntimeInspectCliTests|FullyQualifiedName~SceneRuntimeFoundationTests" --verbosity minimal

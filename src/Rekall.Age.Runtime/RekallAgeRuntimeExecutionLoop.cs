@@ -45,6 +45,7 @@ public sealed class RekallAgeRuntimeExecutionLoop
             new RekallAgeAnimationStateGraphSystem(),
             new RekallAgeTransformAnimationSystem(projectRoot),
             new RekallAgeSkeletalAnimationSystem(projectRoot),
+            new RekallAgeMorphWeightSystem(),
             new RekallAgeAudioSystem(projectRoot),
             new RekallAgeBepuPhysicsSystem(),
             new NoOpRuntimeWorldSystem("runtime.rendering"),

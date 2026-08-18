@@ -3300,6 +3300,13 @@ internal static class RekallAgeCli
                 Console.WriteLine($"    Layer {layer.Name}: clip={layer.ClipAssetId ?? "(none)"} weight={layer.Weight:F3}->{layer.TargetWeight:F3} time={layer.TimeSeconds:F3}/{layer.DurationSeconds:F3} playing={layer.Playing}");
             }
         }
+        Console.WriteLine($"Morph states: {result.Value.MorphStates.Count}{(result.Value.MorphStatesTruncated ? "+ (truncated)" : string.Empty)}");
+        foreach (var state in result.Value.MorphStates)
+        {
+            var weights = string.Join(",", state.Weights.Select(weight =>
+                weight.ToString("G17", System.Globalization.CultureInfo.InvariantCulture)));
+            Console.WriteLine($"  Morph {state.EntityName}: count={state.Weights.Count} weights=[{weights}]");
+        }
         Console.WriteLine($"UI: {result.Value.UiCanvasCount} canvases, {result.Value.UiElementCount} elements, {result.Value.InteractiveUiElementCount} interactive");
         foreach (var element in result.Value.UiElements)
         {

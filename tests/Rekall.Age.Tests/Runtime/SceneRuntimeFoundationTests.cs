@@ -214,6 +214,7 @@ public sealed class SceneRuntimeFoundationTests
                 "runtime.rendering",
                 "runtime.transform",
                 "runtime.ui",
+                "runtime.animation.morph",
                 "runtime.events.collision",
                 "runtime.events.trigger",
                 "runtime.ui.interaction",

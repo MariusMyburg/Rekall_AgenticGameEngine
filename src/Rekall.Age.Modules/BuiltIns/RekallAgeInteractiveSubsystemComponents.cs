@@ -115,6 +115,13 @@ public sealed class RekallAgeSkeletalAnimatorComponent : RekallAgeComponent
     [RekallAgeProperty(Minimum = 0)] public double StartTimeSeconds { get; init; }
 }
 
+[RekallAgeComponent("Morph Weights", Description = "Supplies a complete generic morph-target weight array for the Rekall.MeshRenderer on the same entity. The existing AnimationClip, AnimationMixer, cubic interpolation, and AnimationStateGraph contracts can animate Weights.")]
+public sealed class RekallAgeMorphWeightsComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Kind = "morphWeights", Description = "Array of 1 to 64 finite numbers with absolute value at most 1,000,000. Values are not clamped to 0..1. The array is a complete override and must match the imported asset target count; omit this component to use imported defaults. AnimationClip and AnimationMixer tracks may target Rekall.MorphWeights.Weights.")]
+    public double[] Weights { get; init; } = [];
+}
+
 [RekallAgeComponent("UI Canvas", Description = "Defines a resolution-independent reference canvas and draw layer.")]
 public sealed class RekallAgeUiCanvasComponent : RekallAgeComponent
 {

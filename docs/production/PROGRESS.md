@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 11:59 Africa/Johannesburg
+Last verified: 2026-08-18 12:27 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: bounded morph targets passed the installed hardware-Vulkan product gate
+Latest milestone: atomic persisted JSON passed the installed concurrent-reader product gate
 
 ## Product objective
 
@@ -30,14 +30,14 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 195,236,150-byte win-x64 archive assembled with
-  SHA-256 `CB0DA6560A1422BE5DE7F99182A4651170C6CE397B912762875E1E7BCDF1FE0A`.
+- Windows distribution: fresh 195,258,607-byte win-x64 archive assembled with
+  SHA-256 `2E05246183D9A65F3CF250DECFD5BAF713946255E0BA8FEFE3D7CDD19402F456`.
   Its manifest lists 1,149 payload files; the assembled directory has 1,150
   files including the distribution manifest itself.
-- Canonical verification: 792/792 Release tests passed twice independently;
+- Canonical verification: 806/806 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
-- Current Debug verification: 792/792 tests pass after bounded morph-target
-  integration and schema-search growth hardening.
+- Current Debug verification: 806/806 tests pass after atomic persisted JSON
+  integration and bounded publication-contention hardening.
 - Installed acceptance: canonical gate exited 0; project/module workflows,
   packaging and relocation, negative archive preflight, nonblank capture,
   runtime UI, and audible audio paths have installed-binary proof.
@@ -883,7 +883,7 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The next risk-driven tranche is atomic persisted JSON. Code inspection found
+Atomic persisted JSON was selected as the next risk-driven tranche. Code inspection found
 that project and scene loads schema-probe one file handle and then reopen the
 path for typed deserialization, while their saves write directly to the live
 file. The same direct-write pattern exists in the asset catalog/pipeline,
@@ -922,6 +922,20 @@ shapes; a sparse 64 MiB+1 catalog fails before JSON allocation; depth-80 render
 metadata loads consistently; and successful writes leave no temporary siblings.
 Transaction append remains intentionally last-writer-wins rather than claiming
 multi-writer merge semantics.
+
+Atomic persisted JSON Task 4 passed the complete product gate. Debug passed
+806/806 in 1m25s; the locked zero-warning, zero-error Release build passed
+806/806 twice in 1m25s and 1m24s. A fresh installed CLI performed 20 capability
+mutations and 40 entity mutations while an independent process repeatedly
+opened and parsed the live project, scene, and transaction documents. It parsed
+5,783 complete snapshots, tolerated one bounded transient replacement-window
+open miss, observed zero malformed documents, and found zero leaked temporary
+siblings. The unchanged installed matrix passed; its 600-frame soak simulated
+exactly 10 seconds at 4,365.4 FPS with 703,760 retained bytes and all nine
+checks. The 1,149-payload-file archive is 195,258,607 bytes with SHA-256
+`2E05246183D9A65F3CF250DECFD5BAF713946255E0BA8FEFE3D7CDD19402F456`.
+This proves atomic publication and immutable-reader safety, not multi-writer
+merge: independent simultaneous writers remain explicitly last-writer-wins.
 
 The bounded cubic interpolation tranche is installed-product verified. The
 bounded morph-target tranche is also installed-product verified. Morph target
@@ -1080,11 +1094,11 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
-Compare the now-verified animation/renderer foundation against the remaining
-adversarial JSON, migration-race, diagnostic-store, and full-trust module risks,
-then select the highest-leverage generic production-hardening tranche. Studio
-continues to follow proven engine contracts instead of reordering the
-foundation roadmap.
+Compare the now-verified animation/renderer and atomic-persistence foundations
+against the remaining migration-conflict/recovery, diagnostic-store, and
+full-trust module risks, then select the highest-leverage generic
+production-hardening tranche. Studio continues to follow proven engine
+contracts instead of reordering the foundation roadmap.
 
 ## Evidence index
 
@@ -1103,6 +1117,9 @@ foundation roadmap.
 - `docs/superpowers/plans/2026-08-18-cubic-animation-interpolation.md`
 - `docs/superpowers/specs/2026-08-18-morph-target-runtime-design.md`
 - `docs/superpowers/plans/2026-08-18-morph-target-runtime.md`
+- `docs/superpowers/specs/2026-08-18-atomic-persisted-json-design.md`
+- `docs/superpowers/plans/2026-08-18-atomic-persisted-json.md`
+- `eng/accept-installed-atomic-json.ps1`
 - `Artifacts/TestResults/release-pass-1.trx`
 - `Artifacts/TestResults/release-pass-2.trx`
 - `Artifacts/Distribution/Rekall-AGE-0.1.0-preview.1-win-x64.zip`

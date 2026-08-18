@@ -54,9 +54,9 @@ snapshot and publishes complete durable files atomically.
 - Modify: `eng/accept-distribution.ps1`
 - Modify: production audit/progress and this plan.
 
-- [ ] Exercise repeated shipped-CLI mutations and inspections while independent
+- [x] Exercise repeated shipped-CLI mutations and inspections while independent
   readers parse the live documents; require zero malformed reads and zero temp
   siblings.
-- [ ] Run the complete Debug suite.
-- [ ] Run the locked zero-warning two-pass Release/distribution gate.
-- [ ] Record exact evidence, explicit lost-update limitation, and commit.
+- [x] Run the complete Debug suite.
+- [x] Run the locked zero-warning two-pass Release/distribution gate.
+- [x] Record exact evidence and the explicit lost-update limitation.

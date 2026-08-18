@@ -55,14 +55,7 @@ public static class RekallAgeAtomicFile
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            if (File.Exists(fullPath))
-            {
-                File.Replace(temporaryPath, fullPath, destinationBackupFileName: null, ignoreMetadataErrors: true);
-            }
-            else
-            {
-                File.Move(temporaryPath, fullPath);
-            }
+            await PublishAsync(temporaryPath, fullPath, cancellationToken).ConfigureAwait(false);
             published = true;
         }
         finally
@@ -78,6 +71,38 @@ public static class RekallAgeAtomicFile
                     // Preserve the publication error; stale temp files remain
                     // recognizable and are never treated as live documents.
                 }
+            }
+        }
+    }
+
+    private static async ValueTask PublishAsync(
+        string temporaryPath,
+        string destinationPath,
+        CancellationToken cancellationToken)
+    {
+        const int maximumAttempts = 16;
+        for (var attempt = 1; ; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                if (File.Exists(destinationPath))
+                {
+                    File.Replace(temporaryPath, destinationPath, destinationBackupFileName: null, ignoreMetadataErrors: true);
+                }
+                else
+                {
+                    File.Move(temporaryPath, destinationPath);
+                }
+                return;
+            }
+            catch (Exception error) when (
+                error is IOException or UnauthorizedAccessException &&
+                attempt < maximumAttempts &&
+                File.Exists(temporaryPath))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(attempt, 4)), cancellationToken)
+                    .ConfigureAwait(false);
             }
         }
     }

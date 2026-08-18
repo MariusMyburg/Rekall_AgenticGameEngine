@@ -358,6 +358,8 @@ public sealed class ProjectValidatorTests
         Assert.Equal("warning", issue.Severity);
         Assert.Equal("Camera", issue.Target);
         Assert.Contains("helpers", issue.Message, StringComparison.Ordinal);
+        Assert.Contains("CullingMask", issue.Message, StringComparison.Ordinal);
+        Assert.Contains("'*'", issue.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -387,6 +389,7 @@ public sealed class ProjectValidatorTests
         Assert.Equal("warning", issue.Severity);
         Assert.Equal("helpers", issue.Target);
         Assert.Contains("Helper Cube", issue.Message, StringComparison.Ordinal);
+        Assert.Contains("CullingMask", issue.Message, StringComparison.Ordinal);
     }
 
     [Fact]

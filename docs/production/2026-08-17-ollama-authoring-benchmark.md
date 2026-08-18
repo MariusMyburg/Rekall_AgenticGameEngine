@@ -871,6 +871,39 @@ requirement as missing and tries to re-author content. Batch repair also needs
 an unmistakable no-progress result when only advisory/non-automatic issues
 remain.
 
+### Bounded-completion rerun
+
+Rerun 31 used the informative-proof and explicit repair-termination
+distribution with the unchanged 36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun31`
+- Result: failed at the 36-turn bound
+- Tool calls: 35
+- Prompt tokens: 605,077
+- Completion tokens: 10,904
+
+The agent repaired the deliberate faults, inspected moving 3D and 2D bodies,
+built the playable module, packaged the game, audited the original package,
+relocated it, and audited the relocated copy by tool 26. Unlike reruns 29 and
+30, its completion audit did not replace the project or repeat a no-progress
+repair. It nevertheless spent the remaining bound on discovery and repeated
+inspection instead of returning a completion result.
+
+Independent verification with the installed CLI found zero blocking issues
+and four warnings. Both `DynamicBall` bodies moved after 30 frames: Main moved
+to Y `-2.132`, and Physics2D moved to Y `-0.041`. Both masses were canonical
+JSON numbers at `0.0001`. The original and relocated 218-file packages were
+ready, ran with exit code 0, captured nonblank frames, and passed the explicit
+`informative-frame` check with three distinct colors.
+
+The four warnings expose the remaining content/evidence defect precisely:
+both cameras use culling mask `2147483647`, while the active balls use render
+layer `default`. Runtime inspection reports both balls as culled. Therefore
+rerun 31 is a strong artifact-level advance but not a clean bounded pass. The
+next generic repair is to make the agent's completion ledger retain satisfied
+evidence and keep unresolved validation facts salient, so it can correct the
+last contract mismatch instead of rediscovering already-proven milestones.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

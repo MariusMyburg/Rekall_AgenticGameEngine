@@ -188,6 +188,42 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("Blueprint properties were invalid", failures, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task PrunedLedgerRetainsOlderDurableEvidenceAlongsideRecentExecutions()
+    {
+        var calls = new List<RekallAgeLanguageModelToolCall>
+        {
+            new(
+                "rekall.validation.project",
+                new JsonObject { ["ProjectRoot"] = "game" })
+        };
+        calls.AddRange(Enumerable.Range(2, 13).Select(sequence =>
+            new RekallAgeLanguageModelToolCall(
+                $"noise.{sequence}",
+                new JsonObject { ["sequence"] = sequence })));
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "", calls, "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Complete", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 2,
+                MaxContextMessages = 4
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        var ledger = Assert.Single(model.Requests[1].Messages, message =>
+            message.Role == "system"
+            && message.Content.StartsWith("Persistent Rekall tool ledger", StringComparison.Ordinal));
+        Assert.Contains("#1 rekall.validation.project ok", ledger.Content, StringComparison.Ordinal);
+        Assert.Contains("#14 noise.14 ok", ledger.Content, StringComparison.Ordinal);
+    }
+
     private sealed class ScriptedModelClient(params RekallAgeLanguageModelResponse[] responses) : IRekallAgeLanguageModelClient
     {
         private int _index;

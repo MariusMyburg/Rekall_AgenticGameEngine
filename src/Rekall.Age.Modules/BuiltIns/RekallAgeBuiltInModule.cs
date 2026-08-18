@@ -197,7 +197,7 @@ public sealed class RekallAgeCamera2DComponent : RekallAgeComponent
     [RekallAgeProperty]
     public string ClearColor { get; init; } = "#102030";
 
-    [RekallAgeProperty]
+    [RekallAgeProperty(Description = "Comma-separated named render layers included by this camera. Use * to include every layer and !name to exclude a layer, for example '*, !helpers'. This is a layer-name expression, not a numeric bitmask.")]
     public string CullingMask { get; init; } = "*";
 
     [RekallAgeProperty]
@@ -246,7 +246,7 @@ public sealed class RekallAgeCamera3DComponent : RekallAgeComponent
     [RekallAgeProperty]
     public string ClearColor { get; init; } = "#101820";
 
-    [RekallAgeProperty]
+    [RekallAgeProperty(Description = "Comma-separated named render layers included by this camera. Use * to include every layer and !name to exclude a layer, for example '*, !helpers'. This is a layer-name expression, not a numeric bitmask.")]
     public string CullingMask { get; init; } = "*";
 
     [RekallAgeProperty]

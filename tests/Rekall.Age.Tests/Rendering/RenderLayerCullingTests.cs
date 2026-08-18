@@ -74,9 +74,17 @@ public sealed class RenderLayerCullingTests
 
         var layer = Assert.Single(module.Components, component => component.DisplayName == "Render Layer");
         var camera = Assert.Single(module.Components, component => component.DisplayName == "Camera 3D");
+        var camera2D = Assert.Single(module.Components, component => component.DisplayName == "Camera 2D");
 
         Assert.Contains(layer.Properties, property => property.Name == "Layer" && property.Kind == "string");
         Assert.Contains(camera.Properties, property => property.Name == "CullingMask" && property.Kind == "string");
+        Assert.Contains(camera.Properties, property => property.Name == "CullingMask"
+            && property.Description is not null
+            && property.Description.Contains("*", StringComparison.Ordinal)
+            && property.Description.Contains("named render layers", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(camera2D.Properties, property => property.Name == "CullingMask"
+            && property.Description is not null
+            && property.Description.Contains("*", StringComparison.Ordinal));
         Assert.Contains(camera.Properties, property => property.Name == "RenderOrder" && property.Kind == "number");
         Assert.Contains(camera.Properties, property => property.Name == "ViewportWidth" && property.Kind == "number");
     }

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 05:28 Africa/Johannesburg
+Last verified: 2026-08-18 05:50 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: informative package proof and repair termination passed the complete product gate
+Latest milestone: durable agent evidence and camera-mask authoring guidance pass the full Debug suite
 
 ## Product objective
 
@@ -33,6 +33,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Windows distribution: fresh 194,731,087-byte win-x64 archive assembled.
 - Canonical verification: 591/591 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
+- Current Debug verification: 592/592 tests pass after durable evidence and
+  camera-mask guidance changes.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
   paths have installed-binary proof.
@@ -580,6 +582,26 @@ Studio is important, but it does not define or reorder the engine foundation.
   simulated audio, and Windows player audio. Relocated package audit explicitly
   reported `informative-frame: True` with four distinct colors. The canonical
   1,149-file archive is 194,731,087 bytes.
+- Broad benchmark rerun 31: the unchanged installed-agent task reached moving
+  3D and 2D scenes, original package audit, relocation, and relocated audit by
+  tool 26, then stopped at the 36-turn limit after 35 tool calls (605,077
+  prompt; 10,904 completion). Independent installed verification found zero
+  blocking validation issues, both dynamic bodies moving, canonical numeric
+  masses of `0.0001`, and both 218-file packages ready, runnable, nonblank, and
+  explicitly informative with three distinct colors. Four camera-culling
+  warnings remain because each camera mask excludes the authored render layer;
+  both balls are therefore reported culled. This is the strongest artifact
+  result so far, but not a clean bounded benchmark pass.
+- Durable completion evidence and camera-mask guidance: pruned agent context
+  now retains up to 12 distinct successful validation/runtime/build/delivery
+  milestones in addition to the 12 most recent executions. Camera 2D/3D
+  schemas explicitly define `CullingMask` as a named-layer expression and
+  reject numeric-bitmask folklore through guidance; render-layer validation
+  warnings now state the exact wildcard or named-layer correction. The full
+  Debug suite passes at 592/592. The first full run failed only after `F:`
+  reached zero free bytes from 36.4 GB of accumulated generated test/gate temp
+  artifacts; after stopping the runner and clearing only those verified
+  ephemeral directories, the unchanged suite passed with about 69 GB free.
 
 ## Current gaps
 
@@ -595,14 +617,12 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the unchanged installed Ollama benchmark on the informative-proof
-distribution.
+Run the complete installed-product gate for the durable-evidence and
+camera-mask guidance changes.
 
 ## Next after the current item
 
-Rerun the unchanged installed Ollama benchmark on the rebuilt distribution.
-Independently verify the result and classify any remaining failure by generic
-engine contract, then regression-test the repair.
+Rebuild the installed product and rerun the unchanged Ollama benchmark.
 A genuine broad benchmark pass precedes quantified production hardening;
 Studio follows as a consumer of those results.
 

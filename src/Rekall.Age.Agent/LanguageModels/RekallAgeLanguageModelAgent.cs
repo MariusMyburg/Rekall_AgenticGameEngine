@@ -223,7 +223,19 @@ public sealed class RekallAgeLanguageModelAgent(
     private static RekallAgeLanguageModelMessage CreateLedgerMessage(
         IReadOnlyList<RekallAgeLanguageModelToolExecution> executions)
     {
-        var lines = executions.TakeLast(12).Select(execution =>
+        var durableEvidence = executions
+            .Where(execution => execution.Succeeded && IsDurableEvidenceTool(execution.Name))
+            .GroupBy(
+                execution => execution.Name + "\n" + execution.Arguments.ToJsonString(),
+                StringComparer.Ordinal)
+            .Select(group => group.Last())
+            .TakeLast(12);
+        var selectedExecutions = durableEvidence
+            .Concat(executions.TakeLast(12))
+            .GroupBy(execution => execution.Sequence)
+            .Select(group => group.First())
+            .OrderBy(execution => execution.Sequence);
+        var lines = selectedExecutions.Select(execution =>
         {
             var arguments = execution.Arguments.ToJsonString();
             if (arguments.Length > 500)
@@ -238,4 +250,14 @@ public sealed class RekallAgeLanguageModelAgent(
             "Persistent Rekall tool ledger (older raw tool messages may have been pruned; trust this ledger and inspect current state when uncertain):\n"
             + string.Join('\n', lines));
     }
+
+    private static bool IsDurableEvidenceTool(string name) =>
+        name.StartsWith("rekall.validation.", StringComparison.Ordinal)
+        || name.StartsWith("rekall.runtime.inspect", StringComparison.Ordinal)
+        || name.StartsWith("rekall.build.", StringComparison.Ordinal)
+        || name.StartsWith("rekall.workflow.package_", StringComparison.Ordinal)
+        || name.StartsWith("rekall.workflow.audit_", StringComparison.Ordinal)
+        || name.StartsWith("rekall.workflow.relocate_", StringComparison.Ordinal)
+        || name.StartsWith("rekall.workflow.capture_", StringComparison.Ordinal)
+        || name.StartsWith("rekall.workflow.run_", StringComparison.Ordinal);
 }

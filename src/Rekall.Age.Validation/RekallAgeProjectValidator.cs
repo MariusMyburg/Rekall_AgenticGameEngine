@@ -539,7 +539,7 @@ public sealed class RekallAgeProjectValidator
 
                 issues.Add(new RekallAgeValidationIssue(
                     "REKALL_CAMERA_CULLING_MASK_EMPTY_LAYER",
-                    $"Camera '{entity.Name}' culling mask references layer '{layer}', but no active renderable uses that layer.",
+                    $"Camera '{entity.Name}' CullingMask references layer '{layer}', but no active renderable uses that layer. Set CullingMask to '*' to include every named render layer, or list only intended layer names.",
                     "warning",
                     entity.Name));
             }
@@ -555,7 +555,7 @@ public sealed class RekallAgeProjectValidator
 
             issues.Add(new RekallAgeValidationIssue(
                 "REKALL_RENDER_LAYER_NOT_VISIBLE",
-                $"Render layer '{layer}' contains active renderables but no active camera culling mask includes it. Entities: {string.Join(", ", entityNames)}.",
+                $"Render layer '{layer}' contains active renderables but no active camera CullingMask includes it. Entities: {string.Join(", ", entityNames)}. Add '{layer}' to an intended camera CullingMask or use '*' to include every named render layer.",
                 "warning",
                 layer));
         }

@@ -1,4 +1,3 @@
-using System.IO.Compression;
 using Rekall.Age.Core.Commands;
 
 namespace Rekall.Age.Workflows.Commands;
@@ -99,7 +98,23 @@ public sealed class RelocatePlayablePackageCommand
         {
             if (File.Exists(source) && Path.GetExtension(source).Equals(".zip", StringComparison.OrdinalIgnoreCase))
             {
-                ZipFile.ExtractToDirectory(source, staging);
+                try
+                {
+                    RekallAgeSafePackageExtraction.Extract(source, staging);
+                }
+                catch (Exception exception) when (
+                    exception is InvalidDataException or IOException or UnauthorizedAccessException)
+                {
+                    var message = "Package archive changed after integrity inspection or could not be extracted safely. Recreate or revalidate the source package before relocation.";
+                    var error = new RekallAgeCommandError(
+                        "REKALL_PACKAGE_RELOCATION_SOURCE_CHANGED",
+                        message,
+                        source);
+                    return RekallAgeCommandResult<RelocatePlayablePackageResult>.Failure(
+                        empty,
+                        $"{message} {exception.Message}",
+                        [error]);
+                }
             }
             else
             {

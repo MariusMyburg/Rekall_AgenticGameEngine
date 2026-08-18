@@ -344,6 +344,34 @@ public sealed class PlayablePackageIntegrityTests
         Assert.True(audit.Value.Capture.NonBlank);
         Assert.True(File.Exists(audit.Value.Capture.OutputPath));
 
+        var changedAfterInspectionZip = Path.Combine(relocationRoot, "changed-after-inspection.zip");
+        ZipFile.CreateFromDirectory(
+            packageDirectory,
+            changedAfterInspectionZip,
+            CompressionLevel.Fastest,
+            includeBaseDirectory: false);
+        var changedDestination = Path.Combine(relocationRoot, "changed-destination");
+        var changedSource = await new RelocatePlayablePackageCommand(_ =>
+        {
+            using var archive = ZipFile.Open(changedAfterInspectionZip, ZipArchiveMode.Update);
+            using var writer = new StreamWriter(archive.CreateEntry("../escaped-during-relocation.txt").Open());
+            writer.Write("must never be extracted");
+            return long.MaxValue;
+        }).ExecuteAsync(
+            new RelocatePlayablePackageRequest(changedAfterInspectionZip, changedDestination),
+            context);
+
+        Assert.False(changedSource.Ok);
+        Assert.Contains(
+            changedSource.Errors,
+            error => error.Code == "REKALL_PACKAGE_RELOCATION_SOURCE_CHANGED");
+        Assert.False(Directory.Exists(changedDestination));
+        Assert.False(File.Exists(Path.Combine(relocationRoot, "escaped-during-relocation.txt")));
+        Assert.Empty(Directory.EnumerateDirectories(
+            relocationRoot,
+            ".rekall-relocate-*",
+            SearchOption.TopDirectoryOnly));
+
         using (var archive = ZipFile.Open(relocatedZip, ZipArchiveMode.Update))
         {
             var unsafeEntry = archive.CreateEntry("../escaped.txt");

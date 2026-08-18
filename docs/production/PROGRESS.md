@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 06:00 Africa/Johannesburg
+Last verified: 2026-08-18 06:07 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: installed Ollama broad-authoring benchmark completed within its fixed bound
+Latest milestone: package relocation rejects post-inspection archive mutation through the bounded safe extractor
 
 ## Product objective
 
@@ -617,6 +617,14 @@ Studio is important, but it does not define or reorder the engine foundation.
   original and relocated 218-file packages were ready, ran with exit code 0,
   captured nonblank frames, and passed `informative-frame` with five distinct
   colors. This is the first genuine bounded broad-authoring acceptance pass.
+- Package relocation trust-boundary hardening: ZIP relocation now reuses the
+  same normalized-path, collision, entry-count, per-entry-size, and total-size
+  bounded extractor as package run/audit/capture. An adversarial regression
+  test mutates a previously inspected archive during the relocation capacity
+  check and proves structured
+  `REKALL_PACKAGE_RELOCATION_SOURCE_CHANGED` failure, no traversal write, no
+  destination, and no abandoned staging directory. All four package-integrity
+  scenarios and the full Debug suite pass at 592/592.
 
 ## Current gaps
 
@@ -629,15 +637,14 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Audit existing performance, soak/recovery, security, compatibility, and
-release-operability coverage and select the highest-risk missing production
-contract.
+Run the complete installed-product gate for package relocation trust-boundary
+hardening.
 
 ## Next after the current item
 
-Implement and independently gate the selected quantified production-hardening
-contract. Studio follows as a consumer of proven engine contracts, not as a
-reaction to isolated questions.
+Continue the quantified hardening audit with module trust policy, directory
+package limits/reparse handling, lifecycle soak/recovery, and performance
+regression budgets. Studio follows proven engine contracts.
 
 ## Evidence index
 

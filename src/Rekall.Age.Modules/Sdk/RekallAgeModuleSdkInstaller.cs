@@ -14,7 +14,18 @@ public sealed record RekallAgeModuleSdkInstallation(
 public sealed record RekallAgeModuleSdkManifest(
     string ProductVersion,
     int CompatibilityVersion,
-    IReadOnlyList<string> Assemblies);
+    IReadOnlyList<string> Assemblies)
+{
+    public int SchemaVersion { get; init; } = 1;
+
+    public IReadOnlyList<RekallAgeModuleSdkFileIntegrity> Files { get; init; } =
+        Array.Empty<RekallAgeModuleSdkFileIntegrity>();
+}
+
+public sealed record RekallAgeModuleSdkFileIntegrity(
+    string Path,
+    long SizeBytes,
+    string Sha256);
 
 public sealed class RekallAgeModuleSdkInstaller
 {
@@ -53,20 +64,41 @@ public sealed class RekallAgeModuleSdkInstaller
         await File.WriteAllTextAsync(propsPath, CreatePropsFile(), cancellationToken);
 
         var manifestPath = Path.Combine(sdkRoot, "rekall.sdk.json");
+        var integrity = installedAssemblies
+            .Append(propsPath)
+            .Select(path => new RekallAgeModuleSdkFileIntegrity(
+                Path.GetFileName(path),
+                new FileInfo(path).Length,
+                ComputeSha256(path)))
+            .OrderBy(file => file.Path, StringComparer.Ordinal)
+            .ToArray();
         var manifest = new RekallAgeModuleSdkManifest(
             RekallAgeProductInfo.Current.Version,
             compatibilityVersion,
-            AssemblyNames);
-        await File.WriteAllTextAsync(
-            manifestPath,
-            JsonSerializer.Serialize(
-                manifest,
-                new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    WriteIndented = true
-                }),
-            cancellationToken);
+            AssemblyNames)
+        {
+            Files = integrity
+        };
+        var manifestJson = JsonSerializer.Serialize(
+            manifest,
+            new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            });
+        var temporaryManifest = manifestPath + $".tmp-{Guid.NewGuid():N}";
+        try
+        {
+            await File.WriteAllTextAsync(temporaryManifest, manifestJson, cancellationToken);
+            File.Move(temporaryManifest, manifestPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryManifest))
+            {
+                File.Delete(temporaryManifest);
+            }
+        }
 
         var resources = installedAssemblies
             .Append(propsPath)
@@ -81,7 +113,7 @@ public sealed class RekallAgeModuleSdkInstaller
             resources);
     }
 
-    private static string ResolveAssembly(string assemblyName)
+    internal static string ResolveAssembly(string assemblyName)
     {
         var loaded = AppDomain.CurrentDomain.GetAssemblies()
             .FirstOrDefault(assembly =>
@@ -104,7 +136,7 @@ public sealed class RekallAgeModuleSdkInstaller
             candidate);
     }
 
-    private static string CreatePropsFile()
+    internal static string CreatePropsFile()
     {
         return """
             <Project>
@@ -117,5 +149,13 @@ public sealed class RekallAgeModuleSdkInstaller
             </Project>
 
             """;
+    }
+
+    internal static IReadOnlyList<string> RequiredAssemblyNames => AssemblyNames;
+
+    private static string ComputeSha256(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream)).ToLowerInvariant();
     }
 }

@@ -22,15 +22,24 @@ public sealed class BuildModulesCommand
     : IRekallAgeCommand<BuildModulesRequest, BuildModulesResult>
 {
     private readonly RekallAgeModuleBuildPolicy _buildPolicy;
+    private readonly RekallAgeModuleSdkIntegrityVerifier _sdkIntegrityVerifier;
 
     public BuildModulesCommand()
-        : this(new RekallAgeModuleBuildPolicy())
+        : this(new RekallAgeModuleBuildPolicy(), new RekallAgeModuleSdkIntegrityVerifier())
     {
     }
 
     internal BuildModulesCommand(RekallAgeModuleBuildPolicy buildPolicy)
+        : this(buildPolicy, new RekallAgeModuleSdkIntegrityVerifier())
+    {
+    }
+
+    internal BuildModulesCommand(
+        RekallAgeModuleBuildPolicy buildPolicy,
+        RekallAgeModuleSdkIntegrityVerifier sdkIntegrityVerifier)
     {
         _buildPolicy = buildPolicy;
+        _sdkIntegrityVerifier = sdkIntegrityVerifier;
     }
 
     public string Name => "rekall.build.modules";
@@ -58,6 +67,23 @@ public sealed class BuildModulesCommand
                         issue.Message,
                         issue.Target))
                     .ToArray());
+        }
+
+        if (policy.Candidates.Count > 0)
+        {
+            var sdkIntegrity = _sdkIntegrityVerifier.Verify(request.ProjectRoot);
+            if (!sdkIntegrity.Ready)
+            {
+                return RekallAgeCommandResult<BuildModulesResult>.Failure(
+                    new BuildModulesResult(results),
+                    "Project-local module SDK integrity verification failed before compilation.",
+                    sdkIntegrity.Issues
+                        .Select(issue => new RekallAgeCommandError(
+                            "REKALL_MODULE_SDK_INTEGRITY_FAILED",
+                            issue.Message,
+                            issue.Target))
+                        .ToArray());
+            }
         }
 
         foreach (var candidate in policy.Candidates)

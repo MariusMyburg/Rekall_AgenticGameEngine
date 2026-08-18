@@ -59,23 +59,23 @@ git commit -m "fix: enforce canonical module builds"
 - Modify: `tests/Rekall.Age.Tests/Workflows/EngineDoctorTests.cs`
 - Create: `tests/Rekall.Age.Tests/Modules/ModuleSdkIntegrityTests.cs`
 
-- [ ] **Step 1: Add failing SDK mutation tests**
+- [x] **Step 1: Add failing SDK mutation tests**
 
 After scaffold/SDK installation, independently mutate props, an SDK assembly, inventory hash, compatibility version, add an unexpected SDK file, and simulate a reparse point/low bound. Assert `REKALL_MODULE_SDK_INTEGRITY_FAILED` before build. Prove changing both local resource and local inventory still fails against host canonical bytes.
 
-- [ ] **Step 2: Run SDK tests RED**
+- [x] **Step 2: Run SDK tests RED**
 
 Run the two SDK-related test classes; expect missing inventory and mutation acceptance.
 
-- [ ] **Step 3: Add SDK inventory and verifier**
+- [x] **Step 3: Add SDK inventory and verifier**
 
 Extend `RekallAgeModuleSdkManifest` compatibly with schema version and file integrity records. Install props/assemblies first, compute normalized size/SHA-256 inventory, and atomically replace the JSON manifest. Verify exact expected resources, bounds, local inventory, engine compatibility, canonical props, and host assembly hashes.
 
-- [ ] **Step 4: Require SDK verification before every build**
+- [x] **Step 4: Require SDK verification before every build**
 
 Build policy success is followed by SDK verification; failure returns the exact SDK integrity code and starts no compiler process.
 
-- [ ] **Step 5: Run SDK/build tests GREEN and commit**
+- [x] **Step 5: Run SDK/build tests GREEN and commit**
 
 ```powershell
 git add src/Rekall.Age.Modules/Security/RekallAgeModuleSdkIntegrityVerifier.cs src/Rekall.Age.Modules/Sdk/RekallAgeModuleSdkInstaller.cs src/Rekall.Age.Build/Commands/BuildModulesCommand.cs tests/Rekall.Age.Tests/Modules/ModuleSdkIntegrityTests.cs tests/Rekall.Age.Tests/Workflows/EngineDoctorTests.cs

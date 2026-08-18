@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 07:08 Africa/Johannesburg
+Last verified: 2026-08-18 07:15 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: installed runtime soak and performance inspection passed the complete product gate
+Latest milestone: project-local module SDK integrity is anchored to the running engine
 
 ## Product objective
 
@@ -669,6 +669,14 @@ Studio is important, but it does not define or reorder the engine foundation.
   soak matrix passed. The canonical 1,149-manifest-file archive is 194,778,548
   bytes with SHA-256
   `675a442cf35947263841ae915550632c7a63f4d5fa0bbbc572c378f8f607cd2f`.
+- Module SDK trust anchor: project-local SDK manifests now carry an atomic,
+  bounded SHA-256 inventory, and every module build verifies the exact resource
+  set, compatibility/product contract, canonical props bytes, and running-host
+  assembly bytes before starting the compiler. Reparse paths, forged local
+  resources even with matching forged inventory, malformed/duplicate entries,
+  unexpected files/directories, and injected low bounds fail closed with
+  `REKALL_MODULE_SDK_INTEGRITY_FAILED`. The complete Modules plus engine-doctor
+  Debug selection passes at 62/62.
 
 ## Current gaps
 
@@ -685,11 +693,12 @@ Define and implement explicit trust policy and loading boundaries for
 agent-authored C# modules.
 
 The trust-boundary design and six-slice implementation plan are committed.
-Slice 1 now rejects noncanonical project targets/tasks/imports/references,
+Slice 1 rejects noncanonical project targets/tasks/imports/references,
 nested module/source layouts, source/output bounds, and simulated reparse
 points before starting `dotnet`; it also disables inherited
 `Directory.Build.props/targets` and resets only policy-verified output roots.
-The complete Modules test namespace passes at 34/34. SDK anchoring, build
+Slice 2 anchors the installed SDK to an atomic inventory and the running
+engine's canonical resources, with 62/62 relevant Debug tests passing. Build
 receipts, verified loading, adapters/package preflight, and the full product
 gate remain in progress.
 

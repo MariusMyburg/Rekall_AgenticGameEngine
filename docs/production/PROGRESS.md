@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 02:16 Africa/Johannesburg
+Last verified: 2026-08-18 02:20 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: compact blueprint tool contracts passed 583/583 Debug tests
+Latest milestone: compact blueprint tool contracts passed the complete product gate
 
 ## Product objective
 
@@ -358,6 +358,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   identity, scene/entity/component arrays, and the canonical component
   `type`/`properties` shape. They explicitly prohibit JSON-string encoding for
   the nested arrays. The regression and full Debug suite pass at 583/583.
+- Compact blueprint-contract distribution gate: the clean Release build
+  completed with zero warnings and zero errors; both independent Release passes
+  completed at 583/583; and installed acceptance passed SDK/module authoring,
+  the generic gauntlet, original and relocated package proof, runtime UI,
+  software viewport, simulated audio, and Windows player audio. The canonical
+  1,149-file archive is 194,708,844 bytes.
 
 ## Current gaps
 
@@ -373,7 +379,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for compact blueprint tool contracts.
+Rerun the unchanged installed Ollama benchmark on the compact-blueprint distribution.
 
 ## Next after the current item
 

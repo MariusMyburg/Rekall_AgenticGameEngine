@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 02:40 Africa/Johannesburg
+Last verified: 2026-08-18 02:45 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: bounded request-alias repair passed 584/584 Debug tests
+Latest milestone: bounded request-alias repair passed the complete product gate
 
 ## Product objective
 
@@ -398,6 +398,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   request type declares the canonical field. Existing `frameCount` and
   `archivePath` behavior remains covered. The regression and full Debug suite
   pass at 584/584.
+- Bounded request-alias distribution gate: the clean Release build completed
+  with zero warnings and zero errors; both independent Release passes completed
+  at 584/584; and installed acceptance passed SDK/module authoring, the generic
+  gauntlet, original and relocated package proof, runtime UI, software viewport,
+  simulated audio, and Windows player audio. The canonical 1,149-file archive
+  is 194,709,366 bytes.
 
 ## Current gaps
 
@@ -413,12 +419,12 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for bounded request aliases.
+Run the unchanged installed Ollama benchmark on the request-alias distribution.
 
 ## Next after the current item
 
-Rerun the identical installed Ollama benchmark on the rebuilt distribution.
-Classify any remaining failure by generic engine contract and fix it with regression tests.
+Classify any remaining benchmark failure by generic engine contract and fix it
+with regression tests.
 A genuine broad benchmark pass precedes quantified production hardening;
 Studio follows as a consumer of those results.
 

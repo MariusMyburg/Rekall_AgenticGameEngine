@@ -9,6 +9,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Rendering.Recovery;
+using Rekall.Age.Core.Diagnostics;
 using Rekall.Age.Playback;
 using Rekall.Age.Runtime;
 using Rekall.Age.Runtime.Abstractions;
@@ -36,6 +38,41 @@ internal static class Program
 {
     private static async Task<int> Main(string[] args)
     {
+        try
+        {
+            return await RunAsync(args).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            PlayerLog.Write($"REKALL_PLAYER_PROCESS_FATAL: {exception}");
+            Console.Error.WriteLine($"REKALL_PLAYER_PROCESS_FATAL: {exception.Message}");
+            try
+            {
+                var report = RekallAgeFailureReport.Create(
+                    "player.windows", "fatal", "process.unhandled", "REKALL_PLAYER_PROCESS_FATAL", "none",
+                    0, 0, null,
+                    exception.GetType().FullName ?? exception.GetType().Name,
+                    exception.Message,
+                    exception.StackTrace ?? string.Empty,
+                    "vulkan",
+                    args.FirstOrDefault() ?? string.Empty,
+                    args.Skip(1).FirstOrDefault() ?? string.Empty,
+                    ["The player failed outside the supervised graphics-session lifecycle."],
+                    ["rekall.diagnostics.inspect_failures"]);
+                var path = await new RekallAgeFailureReportStore().WriteAsync(report).ConfigureAwait(false);
+                Console.Error.WriteLine($"Report: {path}");
+            }
+            catch (Exception reportException)
+            {
+                PlayerLog.Write($"REKALL_PLAYER_FAILURE_REPORT_WRITE_FAILED: {reportException.Message}");
+            }
+
+            return 10;
+        }
+    }
+
+    private static async Task<int> RunAsync(string[] args)
+    {
         PlayerLog.Write("Player process starting.");
         if (args.Length < 2)
         {
@@ -59,9 +96,12 @@ internal static class Program
         var openXrEyeHeight = ReadPositiveIntOption(args, "--vr-eye-height") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeHeight;
         var frameLimit = ReadPositiveIntOption(args, "--frames") ?? 0;
         var audioRequired = HasOption(args, "--audio-required");
-        await using var player = await RekallAgeVeldridPlayer.CreateAsync(
-            Path.GetFullPath(args[0]),
-            args[1],
+        var projectRoot = Path.GetFullPath(args[0]);
+        var sceneName = args[1];
+        var faultInjection = RekallAgePlayerFaultInjection.Parse(args, ReadPositiveIntOption, HasOption);
+        var factory = new RekallAgeVeldridPlayerSessionFactory(
+            projectRoot,
+            sceneName,
             syncToVerticalBlank,
             openXrRequested,
             simulateXrInput,
@@ -70,17 +110,47 @@ internal static class Program
             sceneSupersampleFactor,
             openXrEyeWidth,
             openXrEyeHeight,
-            CancellationToken.None);
-        if (audioRequired && !player.AudioOutputAvailable)
+            audioRequired,
+            faultInjection);
+        var evidenceWriter = new RekallAgePlayerFailureReportWriter(
+            new RekallAgeFailureReportStore(),
+            new RekallAgePlayerFailureReportContext("player.windows", backend, projectRoot, sceneName));
+        var supervisor = new RekallAgePlayerSessionSupervisor(
+            factory,
+            new RekallAgeGraphicsFailureClassifier(),
+            evidenceWriter);
+
+        PlayerLog.Write("Player entering supervised render loop.");
+        var result = await supervisor.RunAsync(frameLimit <= 0 ? null : frameLimit, CancellationToken.None)
+            .ConfigureAwait(false);
+        Console.WriteLine(result.Code);
+        Console.WriteLine($"Outcome: {result.Outcome}");
+        Console.WriteLine($"Recovery mode: {result.RecoveryMode}");
+        Console.WriteLine($"Attempts: {result.Attempts}");
+        Console.WriteLine($"Frames: {result.CompletedFrames}/{result.RequestedFrames?.ToString(CultureInfo.InvariantCulture) ?? "continuous"}");
+        foreach (var path in result.EvidencePaths)
         {
-            PlayerLog.Write("Player process exiting: required audio output is unavailable.");
-            Console.Error.WriteLine("Required SDL audio output is unavailable. See the player log for details.");
-            return 3;
+            Console.WriteLine($"Report: {path}");
+        }
+        foreach (var issue in result.EvidenceIssues)
+        {
+            Console.Error.WriteLine(issue);
         }
 
-        PlayerLog.Write("Player entering render loop.");
-        player.Run(frameLimit);
-        if (audioRequired && player.AudioSubmittedFrameCount == 0)
+        if (!result.Succeeded)
+        {
+            if (result.LastFailure?.Exception is RekallAgePlayerAudioUnavailableException)
+            {
+                PlayerLog.Write("Player process exiting: required audio output is unavailable.");
+                Console.Error.WriteLine("Required SDL audio output is unavailable. See the player log for details.");
+                return 3;
+            }
+
+            PlayerLog.Write($"Player process exiting: {result.Code}.");
+            return result.Outcome == RekallAgePlayerSessionOutcomes.Exhausted ? 11 : 10;
+        }
+
+        if (audioRequired && factory.AudioSubmittedFrameCount == 0)
         {
             PlayerLog.Write("Player process exiting: required audio output received no runtime mix frames.");
             Console.Error.WriteLine("Required SDL audio output received no runtime mix frames.");
@@ -109,7 +179,7 @@ internal static class Program
         return args.Skip(2).Any(arg => arg.Equals(name, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static int? ReadPositiveIntOption(string[] args, string name)
+    internal static int? ReadPositiveIntOption(string[] args, string name)
     {
         var raw = ReadOption(args, name);
         return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value > 0
@@ -796,22 +866,31 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         PlayerLog.Write($"Asset hot reload watching {assetsRoot}.");
     }
 
-    public void Run(int frameLimit = 0)
+    public int Run(int frameLimit = 0, Action<int>? beforeFrame = null)
     {
         var renderedFrames = 0;
-        while (_window.Exists && (frameLimit <= 0 || renderedFrames < frameLimit))
+        try
         {
-            CaptureInput(_window.PumpEvents());
-            if (!_window.Exists)
+            while (_window.Exists && (frameLimit <= 0 || renderedFrames < frameLimit))
             {
-                break;
+                CaptureInput(_window.PumpEvents());
+                if (!_window.Exists)
+                {
+                    break;
+                }
+
+                beforeFrame?.Invoke(renderedFrames + 1);
+                RenderFrame();
+                renderedFrames++;
             }
 
-            RenderFrame();
-            renderedFrames++;
+            _device.WaitForIdle();
+            return renderedFrames;
         }
-
-        _device.WaitForIdle();
+        catch (Exception exception) when (exception is not RekallAgePlayerSessionRunException)
+        {
+            throw new RekallAgePlayerSessionRunException(renderedFrames, exception);
+        }
     }
 
     private void StartOpenXrHeadsetSubmit()
@@ -967,53 +1046,74 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await StopOpenXrHeadsetSubmitAsync().ConfigureAwait(false);
-        _device.WaitForIdle();
+        void Cleanup(string target, Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception exception)
+            {
+                PlayerLog.Write($"Player cleanup issue target={target}: {exception.Message}");
+            }
+        }
+
+        Cleanup("graphics.wait-idle", _device.WaitForIdle);
         if (_mouseCaptured)
         {
-            SetMouseCapture(false);
+            Cleanup("mouse-capture", () => SetMouseCapture(false));
         }
 
-        _assetWatcher?.Dispose();
-        _audioOutput?.Dispose();
-        await _liveServer.DisposeAsync();
-        _sceneTarget.Dispose();
+        Cleanup("asset-watcher", () => _assetWatcher?.Dispose());
+        Cleanup("audio-output", () => _audioOutput?.Dispose());
+        try
+        {
+            await _liveServer.DisposeAsync();
+        }
+        catch (Exception exception)
+        {
+            PlayerLog.Write($"Player cleanup issue target=live-server: {exception.Message}");
+        }
+
+        Cleanup("scene-target", _sceneTarget.Dispose);
         foreach (var materialSet in _materialSets.Values)
         {
-            materialSet.Dispose();
+            Cleanup("material-set", materialSet.Dispose);
         }
 
-        _hudTextureSet.Dispose();
-        _uiTexture.Dispose();
-        _frameSet.Dispose();
-        _drawSet.Dispose();
-        _postProcessSet.Dispose();
-        _vertexBuffer.Dispose();
-        _indexBuffer.Dispose();
-        _hudVertexBuffer.Dispose();
-        _frameUniformBuffer.Dispose();
-        _drawUniformBuffer.Dispose();
-        _postProcessUniformBuffer.Dispose();
+        Cleanup("hud-texture-set", _hudTextureSet.Dispose);
+        Cleanup("ui-texture", _uiTexture.Dispose);
+        Cleanup("frame-set", _frameSet.Dispose);
+        Cleanup("draw-set", _drawSet.Dispose);
+        Cleanup("post-process-set", _postProcessSet.Dispose);
+        Cleanup("vertex-buffer", _vertexBuffer.Dispose);
+        Cleanup("index-buffer", _indexBuffer.Dispose);
+        Cleanup("hud-vertex-buffer", _hudVertexBuffer.Dispose);
+        Cleanup("frame-uniform-buffer", _frameUniformBuffer.Dispose);
+        Cleanup("draw-uniform-buffer", _drawUniformBuffer.Dispose);
+        Cleanup("post-process-uniform-buffer", _postProcessUniformBuffer.Dispose);
         foreach (var texture in _textures.Values)
         {
-            texture.Dispose();
+            Cleanup("project-texture", texture.Dispose);
         }
 
-        _whiteTexture.Dispose();
-        _flatNormalTexture.Dispose();
-        _defaultMetallicRoughnessTexture.Dispose();
-        _hudTexture.Dispose();
-        _scenePipeline.Dispose();
-        _sceneTransparentPipeline.Dispose();
-        _presentPipeline.Dispose();
-        _hudPipeline.Dispose();
-        _frameLayout.Dispose();
-        _drawLayout.Dispose();
-        _materialLayout.Dispose();
-        _presentTextureLayout.Dispose();
-        _postProcessLayout.Dispose();
-        _hudTextureLayout.Dispose();
-        _commands.Dispose();
-        _device.Dispose();
+        Cleanup("white-texture", _whiteTexture.Dispose);
+        Cleanup("flat-normal-texture", _flatNormalTexture.Dispose);
+        Cleanup("metallic-roughness-texture", _defaultMetallicRoughnessTexture.Dispose);
+        Cleanup("hud-texture", _hudTexture.Dispose);
+        Cleanup("scene-pipeline", _scenePipeline.Dispose);
+        Cleanup("scene-transparent-pipeline", _sceneTransparentPipeline.Dispose);
+        Cleanup("present-pipeline", _presentPipeline.Dispose);
+        Cleanup("hud-pipeline", _hudPipeline.Dispose);
+        Cleanup("frame-layout", _frameLayout.Dispose);
+        Cleanup("draw-layout", _drawLayout.Dispose);
+        Cleanup("material-layout", _materialLayout.Dispose);
+        Cleanup("present-texture-layout", _presentTextureLayout.Dispose);
+        Cleanup("post-process-layout", _postProcessLayout.Dispose);
+        Cleanup("hud-texture-layout", _hudTextureLayout.Dispose);
+        Cleanup("command-list", _commands.Dispose);
+        Cleanup("graphics-device", _device.Dispose);
+        Cleanup("window", _window.Close);
     }
 
     private async ValueTask StopOpenXrHeadsetSubmitAsync()

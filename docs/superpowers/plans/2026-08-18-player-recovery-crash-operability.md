@@ -130,28 +130,38 @@ prints compact exception facts but never stack excerpts.
 - Modify: `src/Rekall.Age.Player.Windows/Rekall.Age.Player.Windows.csproj`
 - Create: `tests/Rekall.Age.Tests/Cli/WindowsPlayerRecoveryTests.cs`
 
-- [ ] **Step 1: Add failing process-level recovery tests**
+- [x] **Step 1: Add failing process-level recovery tests**
 
 Publish/use the Windows player, set an isolated diagnostic root, run a small project with `--frames`, inject one device loss, and assert exit 0, exact requested total frames, one cold restart, and a recovered report. Add fatal injection and always-device-loss exhaustion cases with stable nonzero codes and no unbounded processes/files.
 
-- [ ] **Step 2: Extract a supervisor-compatible session adapter**
+- [x] **Step 2: Extract a supervisor-compatible session adapter**
 
 Keep the existing `RekallAgeVeldridPlayer` implementation but wrap create/run/dispose behind the generic session contract. `Run` must report frames completed before failure. Dispose the failed session fully before recreation.
 
-- [ ] **Step 3: Add one-shot diagnostic fault injection**
+- [x] **Step 3: Add one-shot diagnostic fault injection**
 
 Parse `--simulate-device-loss-frame` and a test-only fatal/exhaustion variant. Store one-shot state at process-supervisor scope so a successful retry does not inject forever. Do not expose injection to project modules or runtime input.
 
-- [ ] **Step 4: Add top-level fatal reporting and stable exits**
+- [x] **Step 4: Add top-level fatal reporting and stable exits**
 
 Catch startup/session failures, classify, write a bounded report, print code/path, and return stable exit codes. Preserve `--audio-required`, windowed VR, live editing, and ordinary close behavior.
 
-- [ ] **Step 5: Run Windows player/recovery tests GREEN and commit**
+- [x] **Step 5: Run Windows player/recovery tests GREEN and commit**
 
 ```powershell
 git add src/Rekall.Age.Player.Windows tests/Rekall.Age.Tests/Cli/WindowsPlayerRecoveryTests.cs
 git commit -m "feat: recover Windows player device loss"
 ```
+
+Verified 2026-08-18: the strict Windows-player Debug build completed with zero
+warnings/errors. A real Vulkan process proof recovered one injected loss in two
+sessions, exited 0, and completed exactly 5/5 frames with
+`REKALL_PLAYER_GRAPHICS_RECOVERED`. Arbitrary fatal injection exited 10 after
+one attempt. Repeated loss exhausted two retries, exited 11 after three
+attempts, and reported three completed frames. The combined player,
+supervisor, and inspection selection passed 11/11. Cleanup is best-effort and
+ordered through every GPU resource and explicit SDL-window closure so a failed
+`WaitForIdle` cannot prevent cold recreation.
 
 ## Task 5: Unify Studio fatal evidence and document operability
 

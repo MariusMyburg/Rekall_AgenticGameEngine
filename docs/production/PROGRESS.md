@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 08:15 Africa/Johannesburg
+Last verified: 2026-08-18 08:25 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: agent-readable failure inspection passed its focused gate
+Latest milestone: real Windows-player device-loss recovery passed its process gate
 
 ## Product objective
 
@@ -752,6 +752,20 @@ Studio is important, but it does not define or reorder the engine foundation.
   executing project code. Engine status advertises the workflow. CLI output is
   intentionally compact and excludes stack excerpts. The direct command,
   catalog, status, and real CLI-process selection passes 5/5.
+- Windows-player cold recovery: the Veldrid/SDL player now runs through the
+  generic bounded supervisor and recreates the complete session only for
+  classified graphics lifecycle failures. A real Vulkan process injected one
+  device loss, disposed the failed session, completed exactly 5/5 total frames
+  in two attempts, emitted `REKALL_PLAYER_GRAPHICS_RECOVERED`, and exited 0.
+  Arbitrary fatal injection emitted `REKALL_PLAYER_RUNTIME_FATAL` and exited 10
+  after one attempt. Repeated loss stopped after the default two retries,
+  emitted `REKALL_PLAYER_GRAPHICS_RECOVERY_EXHAUSTED`, exited 11 after three
+  attempts, and preserved three completed frames. Each case wrote one bounded
+  report. Strict player build produced zero warnings/errors; the combined
+  player/supervisor/inspection selection passes 11/11. Cleanup proceeds across
+  all GPU resources and closes the SDL window even when idle-wait/disposal
+  steps fail. Recovery remains an honest cold restart and does not preserve
+  arbitrary in-memory module state.
 
 ## Current gaps
 
@@ -767,9 +781,9 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Connect the verified bounded supervisor and evidence contract to the Windows
-player, including one-shot device-loss recovery and fatal/exhaustion process
-proofs. The six-slice agent-authored module trust boundary remains complete and
+Route Studio desktop fatal hooks through the same bounded evidence contract and
+document operator-facing recovery/privacy/exit behavior, then run the full
+installed product gate. The module trust boundary remains complete and
 installed-product verified.
 
 ## Next after the current item

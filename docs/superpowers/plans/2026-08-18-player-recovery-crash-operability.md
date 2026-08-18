@@ -57,28 +57,36 @@ explicit contract that does not capture ambient environment or exception data.
 - Create: `src/Rekall.Age.Rendering/Recovery/RekallAgePlayerSessionSupervisor.cs`
 - Create: `tests/Rekall.Age.Tests/Rendering/PlayerSessionSupervisorTests.cs`
 
-- [ ] **Step 1: Add failing classifier/supervisor tests**
+- [x] **Step 1: Add failing classifier/supervisor tests**
 
 Prove typed device loss and narrow Vulkan/Veldrid signatures are recoverable; swapchain/surface invalidation is separately categorized; arbitrary `InvalidOperationException`, module trust exceptions, initialization failures, and misleading nested messages are fatal. Prove bounded retry count, disposal before recreation, finite-frame remainder accounting, continuous mode, cancellation, success-after-retry, exhaustion, and no retry for fatal failures.
 
-- [ ] **Step 2: Run focused tests RED**
+- [x] **Step 2: Run focused tests RED**
 
 Expected: classifier and supervisor types are missing.
 
-- [ ] **Step 3: Implement pure lifecycle contracts**
+- [x] **Step 3: Implement pure lifecycle contracts**
 
 Define an injected player-session interface/factory and supervisor result/events. Walk a bounded exception chain. Default to two retries with a bounded delay. Never depend on SDL or Veldrid concrete types in the supervisor.
 
-- [ ] **Step 4: Persist recovered/exhausted/fatal evidence**
+- [x] **Step 4: Persist recovered/exhausted/fatal evidence**
 
 Connect the supervisor to the report store through an injected writer. Successful recovery emits `recovered`/`cold-session-restart`; exhaustion and fatal failures emit stable fatal codes. Report-write failure must not create a retry loop or hide the original result.
 
-- [ ] **Step 5: Run focused tests GREEN and commit**
+- [x] **Step 5: Run focused tests GREEN and commit**
 
 ```powershell
 git add src/Rekall.Age.Rendering/Recovery tests/Rekall.Age.Tests/Rendering/PlayerSessionSupervisorTests.cs
 git commit -m "feat: supervise recoverable player failures"
 ```
+
+Verified 2026-08-18: the supervisor selection passed 8/8 and the combined
+diagnostic/recovery selection passed 13/13. Recovery is limited to typed or
+narrow Veldrid Vulkan device/surface signatures, disposes a failed session
+before recreation, preserves finite and continuous frame accounting, stops
+after two retries by default, never retries initialization/arbitrary runtime
+failures, and persists bounded evidence without allowing report failures to
+replace the player result.
 
 ## Task 3: Expose read-only failure inspection to agents
 

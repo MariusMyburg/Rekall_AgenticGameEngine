@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 08:05 Africa/Johannesburg
+Last verified: 2026-08-18 08:11 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: bounded atomic desktop failure-report foundation passed its focused gate
+Latest milestone: bounded player-session recovery supervisor passed its focused gate
 
 ## Product objective
 
@@ -736,6 +736,15 @@ Studio is important, but it does not define or reorder the engine foundation.
   reparse-root handling. The focused Debug selection passed 5/5, including 12
   concurrent complete writes and contract checks excluding ambient environment
   variables, arbitrary exception data, and project content.
+- Bounded player-session supervision: rendering now classifies only typed
+  device loss and narrow Veldrid Vulkan device/surface signatures as
+  recoverable. The generic supervisor disposes failed sessions before cold
+  recreation, preserves finite-frame remainder and continuous-run accounting,
+  defaults to two retries, and keeps initialization or arbitrary runtime
+  failures fatal. Its production writer persists recovered/exhausted/fatal
+  evidence through the bounded atomic store and returns report paths; a writer
+  failure is reported but cannot hide the original outcome. The supervisor
+  selection passes 8/8 and the combined diagnostics/recovery selection 13/13.
 
 ## Current gaps
 
@@ -751,9 +760,10 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Implement the graphics failure classifier and bounded player-session supervisor
-on the verified atomic failure-report foundation. The six-slice agent-authored
-module trust boundary remains complete and installed-product verified.
+Expose bounded failure evidence through the read-only agent/CLI/MCP inspection
+contract, then connect the verified supervisor to the Windows player. The
+six-slice agent-authored module trust boundary remains complete and
+installed-product verified.
 
 ## Next after the current item
 

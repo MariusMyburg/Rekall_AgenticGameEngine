@@ -25,6 +25,7 @@ public sealed class LanguageModelAgentTests
         var prompt = RekallAgeEmbeddedAgentContract.SystemPrompt;
 
         Assert.Contains("exact tool is rekall.module.search_component_schemas", prompt, StringComparison.Ordinal);
+        Assert.Contains("do not call it more than once", prompt, StringComparison.Ordinal);
         Assert.Contains("every requested visible dynamic body has a renderer", prompt, StringComparison.Ordinal);
         Assert.Contains("scaffold the required playable module before the first packaging call", prompt, StringComparison.Ordinal);
         Assert.True(
@@ -140,6 +141,14 @@ public sealed class LanguageModelAgentTests
             model.Requests[4].Messages,
             message => message.Role == "user"
                 && message.Content.Contains("missing components", StringComparison.Ordinal));
+        Assert.Contains(
+            model.Requests[4].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("do not repeat a passing operation", StringComparison.Ordinal));
+        Assert.Contains(
+            model.Requests[4].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("do not relocate an already proven relocated package again", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -604,6 +604,38 @@ addition to its physics composition, and directs agents to scaffold a playable
 module before the first package call when the project has none. A regression
 test locks all three bounded-delivery requirements into the embedded contract.
 
+### Audit-efficiency rerun
+
+Rerun 21 used the visible-delivery distribution with the unchanged 36-turn
+task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun21`
+- Result: failed at the 36-turn bound
+- Tool calls: 34
+- Prompt tokens: 663,401
+- Completion tokens: 10,676
+
+The agent authored complete artifacts and produced a final-looking response on
+turn 36, but the evidence gate correctly returned `Completed=False` because no
+turn remained to audit that proposal. Independent installed verification found
+zero validation issues, visible rendered 3D and 2D dynamic bodies with Y delta
+-1.267, and fresh passing run/capture/nonblank audits of the 467-file original
+and final relocated packages.
+
+The remaining waste was audit-side rather than artifact-side. The trace
+repeated component-schema discovery despite a sufficient initial query, then
+revalidated, reinspected, reaudited, and attempted another relocation after the
+existing relocated package had already passed. One repeated relocation failed
+because its destination correctly already existed; the agent then created and
+audited a second relocated copy.
+
+The generic correction now tells initial schema discovery to be consolidated
+unless returned evidence explicitly omits a required concept. The completion-
+audit instruction reuses current direct passing evidence and prohibits repeated
+package creation or relocation unless evidence is missing, contradicted, or
+stale after a later mutation. The audit remains strict; it avoids redundant
+work rather than accepting weaker evidence.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

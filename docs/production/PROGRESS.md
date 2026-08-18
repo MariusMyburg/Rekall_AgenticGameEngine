@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 03:00 Africa/Johannesburg
+Last verified: 2026-08-18 03:08 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: visible-delivery agent contract passed the complete product gate
+Latest milestone: audit-efficiency contract passed 585/585 Debug tests
 
 ## Product objective
 
@@ -421,6 +421,16 @@ Studio is important, but it does not define or reorder the engine foundation.
   the generic gauntlet, original and relocated package proof, runtime UI,
   software viewport, simulated audio, and Windows player audio. The canonical
   1,149-file archive is 194,710,036 bytes.
+- Broad benchmark rerun 21: the agent produced complete artifacts and a final-
+  looking response at turn 36 after 34 tools (663,401 prompt; 10,676 completion),
+  but the evidence gate correctly returned `Completed=False` because no audit
+  turn remained. Independent proof found zero validation issues, visible 3D/2D
+  motion, and fresh passing 467-file original/relocated audits. Repeated schema
+  discovery and a redundant second relocation cycle consumed the final budget.
+- Audit-efficiency contract: initial component discovery is now explicitly
+  consolidated, and completion audits reuse current passing direct evidence.
+  They must not recreate or relocate proven packages unless evidence is missing,
+  contradicted, or stale after mutation. The full Debug suite passes at 585/585.
 
 ## Current gaps
 
@@ -436,7 +446,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the unchanged installed Ollama benchmark on the visible-delivery distribution.
+Run the complete clean product gate for the audit-efficiency contract.
 
 ## Next after the current item
 

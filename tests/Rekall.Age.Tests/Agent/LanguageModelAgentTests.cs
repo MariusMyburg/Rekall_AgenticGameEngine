@@ -6,6 +6,20 @@ namespace Rekall.Age.Tests.Agent;
 public sealed class LanguageModelAgentTests
 {
     [Fact]
+    public void EmbeddedAgentContractOrdersAuthoringEvidenceBeforeDeliverableProof()
+    {
+        var prompt = RekallAgeEmbeddedAgentContract.SystemPrompt;
+
+        Assert.Contains("repair every deliberate fault", prompt, StringComparison.Ordinal);
+        Assert.Contains("PositionDelta2D", prompt, StringComparison.Ordinal);
+        Assert.Contains("PositionDelta3D", prompt, StringComparison.Ordinal);
+        Assert.Contains("do not reopen authoring after package proof", prompt, StringComparison.Ordinal);
+        Assert.True(
+            prompt.IndexOf("repair every deliberate fault", StringComparison.Ordinal)
+            < prompt.IndexOf("package proof", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task AgentExecutesToolCallsAndReturnsMeasuredFinalResponse()
     {
         var model = new ScriptedModelClient(

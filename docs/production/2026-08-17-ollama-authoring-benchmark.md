@@ -453,6 +453,37 @@ initial transform and explicit 2D/3D position deltas for every bounded entity
 state. Against the untouched run, it directly reports Y delta -1.267 for the
 two 3D bodies and the 2D body.
 
+### Delivery-sequencing rerun
+
+Rerun 16 used the motion-evidence distribution with the unchanged 36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun16`
+- Result: failed at the 36-turn bound
+- Tool calls: 35
+- Prompt tokens: 475,141
+- Completion tokens: 8,249
+
+The run created, validated, inspected, packaged, audited, and relocated the
+game, then stopped one operation before relocated-package audit. Independent
+installed verification proved both scenes clean with zero warnings: Main had
+one dynamic 3D body, one static collider, and Y delta -1.267; Physics2D had the
+matching planar contract and the same Y delta. Both original and relocated
+package manifests existed.
+
+Four recoverable calls prevented completion: an empty scene blueprint omitted
+`Entities`, an inspection omitted `Frames`, packaging preceded the exact
+scaffold repair, and the first package audit placed proof output inside the
+immutable package. The last case was correctly rejected without corrupting the
+package and returned a safe retry.
+
+The generic response is an explicit embedded delivery protocol rather than a
+benchmark-specific workflow. Requested deliberate faults and all validation
+repairs must finish before runtime evidence; explicit position deltas are direct
+motion proof; and original audit, relocation, and relocated audit happen only
+after authoring is stable. Package proof outputs must stay outside immutable
+packages. The contract is now centralized and regression-tested instead of
+being an opaque CLI string.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

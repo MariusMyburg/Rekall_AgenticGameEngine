@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 01:54 Africa/Johannesburg
+Last verified: 2026-08-18 02:01 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: runtime motion evidence passed the complete product gate
+Latest milestone: embedded delivery sequencing contract passed 582/582 Debug tests
 
 ## Product objective
 
@@ -324,6 +324,22 @@ Studio is important, but it does not define or reorder the engine foundation.
   gauntlet, original and relocated package proof, runtime UI, software viewport,
   simulated audio, and Windows player audio. Installed inspection printed the
   new delta fields. The canonical 1,149-file archive is 194,706,489 bytes.
+- Broad benchmark rerun 16: the installed agent stopped at the 36-turn bound
+  after 35 tools (475,141 prompt; 8,249 completion), one operation short of a
+  relocated-package audit. Independent verification proved zero validation
+  issues, exact Y delta -1.267 for one 3D and one 2D dynamic body, static
+  colliders, and original/relocated manifests. Recoverable waste included a
+  blueprint without `Entities`, inspection without `Frames`, a package attempt
+  before scaffolding, and an unsafe proof directory correctly rejected by the
+  immutable-package guard. This is not an accepted pass.
+- Embedded delivery sequencing contract: the Ollama agent system contract is
+  now a named, regression-tested engine API. It requires requested fault
+  injection and zero-issue repair before runtime evidence; treats nonzero
+  `PositionDelta2D`/`PositionDelta3D` as direct motion proof; and orders original
+  audit, relocation, and relocated audit after authoring is stable. It also
+  prohibits reopening authoring after package proof unless evidence failed and
+  explicitly keeps proof output outside immutable packages. The full Debug
+  suite passes at 582/582.
 
 ## Current gaps
 
@@ -339,7 +355,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the unchanged installed Ollama benchmark on the motion-evidence distribution.
+Run the complete clean product gate for the embedded delivery sequencing contract.
 
 ## Next after the current item
 

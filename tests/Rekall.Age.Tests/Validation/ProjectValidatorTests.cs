@@ -143,6 +143,30 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneRejectsNumericStringPropertiesOutsideSchemaBounds()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var body = RekallAgeEntityDocument.Create("Body", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody3D",
+                new JsonObject { ["Mass"] = "-2.5" }));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["physics"]).AddEntity(body),
+            CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        var issue = Assert.Single(report.Issues, item =>
+            item.Code == "REKALL_COMPONENT_PROPERTY_OUT_OF_RANGE");
+        Assert.Contains(issue.SuggestedCommands!, command =>
+            command.Tool == "rekall.component.set_property"
+            && Equals(command.Arguments["value"], 0.0001));
+    }
+
+    [Fact]
     public async Task ValidateSceneRequiresDimensionMatchingTransformForPhysicsBodies()
     {
         var root = TestPaths.CreateTempDirectory();

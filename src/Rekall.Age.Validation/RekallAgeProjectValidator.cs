@@ -3,6 +3,7 @@ using Rekall.Age.Core.Rendering;
 using Rekall.Age.Modules;
 using Rekall.Age.Modules.BuiltIns;
 using Rekall.Age.World;
+using System.Globalization;
 using System.Text.Json.Nodes;
 
 namespace Rekall.Age.Validation;
@@ -444,6 +445,12 @@ public sealed class RekallAgeProjectValidator
             if (jsonValue.TryGetValue<decimal>(out var decimalValue))
             {
                 value = (double)decimalValue;
+                return true;
+            }
+
+            if (jsonValue.TryGetValue<string>(out var text)
+                && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+            {
                 return true;
             }
         }

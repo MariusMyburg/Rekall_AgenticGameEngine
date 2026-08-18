@@ -817,6 +817,35 @@ nonexistent `rekall.workflow.fix_validation_errors` or incomplete blueprint
 arguments; missing generic content points to registered validation and schema
 discovery operations. The full Debug suite passes at 589/589.
 
+### Numeric-string validation rerun
+
+Rerun 29 used the validation-sequencing distribution with the unchanged
+36-turn task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun29`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 677,078
+- Completion tokens: 12,861
+
+The agent correctly performed its fault exercise before runtime and reached
+both motion inspections, graphics packaging, original audit, relocation, and
+relocated audit by tool 26. Completion audit then reopened authoring and
+replaced current project content, leaving three blocking issues and two
+warnings in the final source state.
+
+Independent verification found both 467-file packages still passing inspect,
+run, audit, and nonblank capture. Inspection also found the packaged 3D body
+retained `Mass` as the JSON string `"-2.5"`. Project validation had incorrectly
+reported zero issues because numeric range checks accepted only JSON number
+tokens and ignored numeric-looking strings, so the negative-mass exercise was
+never actually repaired.
+
+Built-in numeric range validation now parses invariant numeric strings before
+applying schema minima and maxima. A negative string mass produces the same
+blocking out-of-range issue and canonical numeric repair as a JSON number. The
+full Debug suite passes at 590/590.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

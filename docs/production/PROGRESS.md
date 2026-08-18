@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 04:57 Africa/Johannesburg
+Last verified: 2026-08-18 05:05 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: validation sequencing and registered guidance passed the complete product gate
+Latest milestone: numeric-string range validation passed 590/590 Debug tests
 
 ## Product objective
 
@@ -544,6 +544,15 @@ Studio is important, but it does not define or reorder the engine foundation.
   gauntlet, original and relocated package proof, runtime UI, software viewport,
   simulated audio, and Windows player audio. The canonical 1,149-file archive
   is 194,726,496 bytes.
+- Broad benchmark rerun 29: the agent reached both moving-scene inspections,
+  original package audit, relocation, and relocated audit by tool 26, then
+  completion audit regressed the source project and stopped at 36 turns/36
+  tools (677,078 prompt; 12,861 completion). Both independent 467-file package
+  audits passed, but the package retained negative mass as string `"-2.5"`
+  because validation had falsely reported numeric strings as clean.
+- Numeric-string range validation: invariant numeric strings now participate in
+  built-in schema minimum/maximum enforcement and receive canonical numeric
+  repair suggestions. The full Debug suite passes at 590/590.
 
 ## Current gaps
 
@@ -559,7 +568,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the unchanged installed Ollama benchmark on the validation-sequencing distribution.
+Run the complete clean product gate for numeric-string range validation.
 
 ## Next after the current item
 

@@ -41,12 +41,20 @@ behavior remains green.
 
 ## Task 3: Extraction integration
 
-- [ ] Add failing extraction tests for no destination on invalid preflight,
+- [x] Add failing extraction tests for no destination on invalid preflight,
   destination reparse rejection, exact streamed length, and changed archives.
-- [ ] Extract only the immutable preflight plan with bounded copying.
-- [ ] Keep relocation/run/capture staging cleanup and source-changed diagnostics
+- [x] Extract only the immutable preflight plan with bounded copying.
+- [x] Keep relocation/run/capture staging cleanup and source-changed diagnostics
   deterministic.
-- [ ] Run focused tests and commit.
+- [x] Run focused tests and commit.
+
+Verified 2026-08-18: 23/23 focused archive security tests and 5/5 broad
+package-integrity tests pass. Extraction now preflights before destination
+creation, rejects existing or reparse-backed destination boundaries, streams
+each immutable planned entry to its exact declared length, and publishes only
+through an atomic sibling-directory move. Invalid, truncated, or changed
+archives cannot publish partial package destinations; relocation preserves its
+stable source-changed diagnostic and cleanup behavior.
 
 ## Task 4: Product gate
 

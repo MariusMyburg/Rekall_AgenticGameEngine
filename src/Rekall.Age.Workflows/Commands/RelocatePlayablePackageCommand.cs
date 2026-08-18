@@ -103,7 +103,7 @@ public sealed class RelocatePlayablePackageCommand
                     RekallAgeSafePackageExtraction.Extract(source, staging);
                 }
                 catch (Exception exception) when (
-                    exception is InvalidDataException or IOException or UnauthorizedAccessException)
+                    exception is RekallAgePackageArchiveException or InvalidDataException or IOException or UnauthorizedAccessException)
                 {
                     var message = "Package archive changed after integrity inspection or could not be extracted safely. Recreate or revalidate the source package before relocation.";
                     var error = new RekallAgeCommandError(

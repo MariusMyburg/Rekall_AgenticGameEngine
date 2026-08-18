@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 09:30 Africa/Johannesburg
+Last verified: 2026-08-18 09:49 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -882,6 +882,14 @@ manifest deserialization or file-list allocation, reads the bounded unique
 manifest and inventory from the immutable plan, hashes only planned files, and
 returns exact archive security codes. Valid inspect/run/capture/audit/relocate
 paths remain unchanged.
+
+Archive preflight Task 3 is verified with 23/23 focused archive security tests
+and 5/5 broad package-integrity tests. Extraction now consumes only the shared
+immutable preflight plan, checks destination boundaries for reparse points,
+copies every entry to its exact declared length, stages beside the destination,
+and publishes by atomic directory move. Invalid preflight cannot create a
+destination, existing destinations remain untouched, failures clean staging,
+and changed-after-inspection relocation retains its stable diagnostic.
 
 ## Next after the current item
 

@@ -193,6 +193,86 @@ public sealed class PackageArchivePreflightTests
         Assert.Contains(result.Errors, item => item.Code == "REKALL_PACKAGE_PATH_REPARSE_POINT");
     }
 
+    [Fact]
+    public void InvalidArchivePreflightDoesNotCreateExtractionDestination()
+    {
+        var archivePath = CreateArchiveFile(
+            ("rekall.package.json", "{}", null),
+            ("rekall.package.json", "{}", null));
+        var destination = Path.Combine(TestPaths.CreateTempDirectory(), "extracted");
+
+        var error = Assert.Throws<RekallAgePackageArchiveException>(
+            () => RekallAgeSafePackageExtraction.Extract(archivePath, destination));
+
+        Assert.Equal("REKALL_PACKAGE_ARCHIVE_MANIFEST_DUPLICATE", error.Code);
+        Assert.False(Directory.Exists(destination));
+    }
+
+    [Fact]
+    public void ExtractionRefusesExistingDestinationWithoutMutation()
+    {
+        var archivePath = CreateArchiveFile(("rekall.package.json", "{}", null));
+        var destination = Path.Combine(TestPaths.CreateTempDirectory(), "existing");
+        Directory.CreateDirectory(destination);
+        var sentinel = Path.Combine(destination, "sentinel.txt");
+        File.WriteAllText(sentinel, "preserve");
+
+        var error = Assert.Throws<RekallAgePackageArchiveException>(
+            () => RekallAgeSafePackageExtraction.Extract(archivePath, destination));
+
+        Assert.Equal("REKALL_PACKAGE_EXTRACTION_DESTINATION_EXISTS", error.Code);
+        Assert.Equal("preserve", File.ReadAllText(sentinel));
+    }
+
+    [Fact]
+    public void ExtractionRefusesReparseBackedDestinationBoundary()
+    {
+        var archivePath = CreateArchiveFile(("rekall.package.json", "{}", null));
+        var destination = Path.Combine(TestPaths.CreateTempDirectory(), "extracted");
+
+        var error = Assert.Throws<RekallAgePackageArchiveException>(() =>
+            RekallAgeSafePackageExtraction.Extract(
+                archivePath,
+                destination,
+                getAttributes: _ => FileAttributes.Directory | FileAttributes.ReparsePoint));
+
+        Assert.Equal("REKALL_PACKAGE_EXTRACTION_DESTINATION_REPARSE", error.Code);
+        Assert.False(Directory.Exists(destination));
+    }
+
+    [Fact]
+    public void ExactLengthCopyRejectsShortAndLongStreams()
+    {
+        using var shortInput = new MemoryStream([1, 2]);
+        using var shortOutput = new MemoryStream();
+        var shortError = Assert.Throws<RekallAgePackageArchiveException>(() =>
+            RekallAgeSafePackageExtraction.CopyExactly(shortInput, shortOutput, 3, "Game/data.bin"));
+
+        using var longInput = new MemoryStream([1, 2, 3]);
+        using var longOutput = new MemoryStream();
+        var longError = Assert.Throws<RekallAgePackageArchiveException>(() =>
+            RekallAgeSafePackageExtraction.CopyExactly(longInput, longOutput, 2, "Game/data.bin"));
+
+        Assert.Equal("REKALL_PACKAGE_ARCHIVE_ENTRY_LENGTH_MISMATCH", shortError.Code);
+        Assert.Equal("REKALL_PACKAGE_ARCHIVE_ENTRY_LENGTH_MISMATCH", longError.Code);
+    }
+
+    [Fact]
+    public void ValidArchiveIsPublishedWithExactContents()
+    {
+        var archivePath = CreateArchiveFile(
+            ("Game/", string.Empty, null),
+            ("Game/data.txt", "payload", null),
+            ("rekall.package.json", "{}", null));
+        var destination = Path.Combine(TestPaths.CreateTempDirectory(), "extracted");
+
+        RekallAgeSafePackageExtraction.Extract(archivePath, destination);
+
+        Assert.Equal("{}", File.ReadAllText(Path.Combine(destination, "rekall.package.json")));
+        Assert.Equal("payload", File.ReadAllText(Path.Combine(destination, "Game", "data.txt")));
+        Assert.Empty(Directory.EnumerateDirectories(Path.GetDirectoryName(destination)!, ".rekall-extract-*"));
+    }
+
     private static ZipArchive OpenArchive(params (string Path, string Content, int? ExternalAttributes)[] entries)
     {
         var stream = new MemoryStream();

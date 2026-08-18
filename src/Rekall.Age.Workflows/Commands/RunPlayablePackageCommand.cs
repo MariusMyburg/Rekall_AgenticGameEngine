@@ -144,7 +144,6 @@ public sealed class RunPlayablePackageCommand
         if (File.Exists(fullPath) && Path.GetExtension(fullPath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
         {
             var extractionRoot = Path.Combine(Path.GetTempPath(), "RekallAgePackageRuns", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(extractionRoot);
             RekallAgeSafePackageExtraction.Extract(fullPath, extractionRoot);
             return new PreparedPackage(extractionRoot, extractionRoot, extractionRoot);
         }

@@ -76,11 +76,14 @@ public sealed class RekallAgeRuntimeExecutionLoop
         }
 
         var world = initialWorld;
+        var timelineOrigin = initialWorld.ElapsedTime
+            - TimeSpan.FromSeconds(initialWorld.FrameIndex * _fixedDeltaSeconds);
         for (var frame = 0; frame < frames; frame++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var nextFrameIndex = world.FrameIndex + 1;
-            var nextElapsed = initialWorld.ElapsedTime + TimeSpan.FromSeconds((frame + 1) * _fixedDeltaSeconds);
+            var nextElapsed = timelineOrigin
+                + TimeSpan.FromSeconds(nextFrameIndex * _fixedDeltaSeconds);
             var context = new RekallAgeRuntimeWorldFrameContext(
                 nextFrameIndex,
                 _fixedDeltaTime,

@@ -18,7 +18,7 @@
 - Reference: `tests/Rekall.Age.Tests/Runtime/SceneRuntimeFoundationTests.cs`
 - Reference: `src/Rekall.Age.Runtime/RekallAgeRuntimeExecutionLoop.cs`
 
-- [ ] **Step 1: Add a multi-chunk continuity test**
+- [x] **Step 1: Add a multi-chunk continuity test**
 
 Create a temporary project and scene through `RekallAgeProjectStore` and `RekallAgeSceneStore`, then execute a request for 125 frames with a 50-frame checkpoint interval and disabled machine-dependent budgets. Assert:
 
@@ -31,15 +31,15 @@ Assert.Equal(125.0 / 60.0, result.Value.FinalElapsedSeconds, precision: 10);
 Assert.All(result.Value.Checks, check => Assert.True(check.Passed, check.Message));
 ```
 
-- [ ] **Step 2: Add a structured budget-failure test**
+- [x] **Step 2: Add a structured budget-failure test**
 
 Run a valid scene with `MinimumFramesPerSecond = double.MaxValue`. Assert `Ok` is false, the measured result is retained, the throughput check fails, and errors contain exactly `REKALL_RUNTIME_SOAK_BUDGET_EXCEEDED`.
 
-- [ ] **Step 3: Add invalid-request tests**
+- [x] **Step 3: Add invalid-request tests**
 
 Use a nonexistent project root with zero frames, zero checkpoint interval, excessive frames, negative entity limits, and non-finite throughput. Each case must fail with `REKALL_RUNTIME_SOAK_INVALID_REQUEST`, proving validation occurs before scene I/O.
 
-- [ ] **Step 4: Run the focused test and observe RED**
+- [x] **Step 4: Run the focused test and observe RED**
 
 Run:
 
@@ -56,19 +56,20 @@ Expected: compilation fails because the soak request, result, and command do not
 **Files:**
 
 - Create: `src/Rekall.Age.Runtime/Commands/InspectRuntimeSoakCommand.cs`
+- Modify: `src/Rekall.Age.Runtime/RekallAgeRuntimeExecutionLoop.cs`
 - Modify: `tests/Rekall.Age.Tests/Runtime/RuntimeSoakCommandTests.cs`
 - Reference: `src/Rekall.Age.Runtime/RekallAgeRuntimeWorldBuilder.cs`
 - Reference: `src/Rekall.Age.Runtime/RekallAgeRuntimeExecutionLoop.cs`
 
-- [ ] **Step 1: Define typed request and evidence records**
+- [x] **Step 1: Define typed request and evidence records**
 
 Define `InspectRuntimeSoakRequest` with project/scene, bounded frame and checkpoint values, optional throughput and retained-memory budgets, entity/observation/event limits, and stable-system requirement. Define compact `RuntimeSoakCheckpoint`, `RuntimeSoakCheck`, and `InspectRuntimeSoakResult` records with initial/final frame and elapsed values, wall time, throughput, memory measurements, system order, checkpoints, and checks.
 
-- [ ] **Step 2: Validate before loading**
+- [x] **Step 2: Validate before loading**
 
 Use constants `MaximumFrames = 1_000_000` and `MaximumCheckpoints = 10_000`. Reject blank roots/scenes; frame counts outside `1..MaximumFrames`; checkpoint intervals outside `1..Frames`; more than `MaximumCheckpoints`; negative entity/observation/event limits; non-finite or negative throughput; and retained-memory limits below `-1`. Return a minimal result plus `REKALL_RUNTIME_SOAK_INVALID_REQUEST`.
 
-- [ ] **Step 3: Execute one world through resumable chunks**
+- [x] **Step 3: Execute one world through resumable chunks**
 
 Load once using `RekallAgeSceneStore`, project with `RekallAgeRuntimeWorldBuilder`, create one `RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot)`, then repeat:
 
@@ -82,15 +83,15 @@ checkpoints.Add(ToCheckpoint(initialWorld, world, completedFrames, stopwatch.Ela
 
 Capture retained managed memory with `GC.GetTotalMemory(forceFullCollection: true)` before and after execution and sampled memory with `GC.GetTotalMemory(false)` at checkpoints. Use `Stopwatch.GetElapsedTime` or `Stopwatch` only for advisory wall-clock measurements; deterministic continuity comes from frame and elapsed values.
 
-- [ ] **Step 4: Evaluate named checks and preserve failures**
+- [x] **Step 4: Evaluate named checks and preserve failures**
 
 Always check completion, frame continuity, elapsed continuity, and stable ordered systems. Conditionally check configured throughput and retained-memory growth. Check entity growth, maximum checkpoint observations, and maximum checkpoint events. If any check fails, return the full result with `REKALL_RUNTIME_SOAK_BUDGET_EXCEEDED`; otherwise return success with measured throughput and retained growth in the summary.
 
-- [ ] **Step 5: Run the focused tests and observe GREEN**
+- [x] **Step 5: Run the focused tests and observe GREEN**
 
 Run the Task 1 command. Expected: all `RuntimeSoakCommandTests` pass.
 
-- [ ] **Step 6: Commit the core contract**
+- [x] **Step 6: Commit the core contract**
 
 ```powershell
 git add src/Rekall.Age.Runtime/Commands/InspectRuntimeSoakCommand.cs tests/Rekall.Age.Tests/Runtime/RuntimeSoakCommandTests.cs

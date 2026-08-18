@@ -31,6 +31,44 @@ public sealed class RuntimeInspectCliTests
     }
 
     [Fact]
+    public async Task RuntimeSoakPrintsCheckpointsAndPassedChecks()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Runtime Soak CLI", ["world"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity(RekallAgeEntityDocument.Create("Actor", ["actor"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject()))),
+            CancellationToken.None);
+
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            "runtime",
+            "soak",
+            root,
+            "Main",
+            "125",
+            "50",
+            "0",
+            "-1",
+            "0",
+            "128",
+            "1024");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Completed frames: 125", result.Output);
+        Assert.Contains("Checkpoints: 3", result.Output);
+        Assert.Contains("Check complete-execution: PASS", result.Output);
+        Assert.Contains("Check frame-continuity: PASS", result.Output);
+        Assert.Contains("Check elapsed-continuity: PASS", result.Output);
+        Assert.Contains("Check stable-systems: PASS", result.Output);
+    }
+
+    [Fact]
     public async Task RuntimeInspectAcceptsRuntimeInputJson()
     {
         var root = TestPaths.CreateTempDirectory();

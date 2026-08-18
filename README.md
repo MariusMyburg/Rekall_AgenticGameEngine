@@ -540,6 +540,7 @@ dotnet run --project src/Rekall.Age.Cli -- module schemas
 dotnet run --project src/Rekall.Age.Cli -- module schemas project .age-sandbox
 dotnet run --project src/Rekall.Age.Cli -- validation scene .age-sandbox Main
 dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
+dotnet run --project src/Rekall.Age.Cli -- runtime soak .age-sandbox Main 3600 600 30 67108864 0 128 1024
 dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport 640 360 vulkan
 dotnet run --project src/Rekall.Age.Cli -- game gauntlet .age-sandbox "Agentic Game" .age-sandbox/Builds/AgentAuthoringGauntlet
 dotnet run --project src/Rekall.Age.Cli -- game verify-playable .age-sandbox Main 2
@@ -603,11 +604,19 @@ Use closed-loop checks:
 dotnet run --project src/Rekall.Age.Cli -- game gauntlet .age-sandbox "Agentic Game" .age-sandbox/Builds/AgentAuthoringGauntlet
 dotnet run --project src/Rekall.Age.Cli -- validation scene .age-sandbox Main
 dotnet run --project src/Rekall.Age.Cli -- runtime inspect .age-sandbox Main 3
+dotnet run --project src/Rekall.Age.Cli -- runtime soak .age-sandbox Main 3600 600 30 67108864 0 128 1024
 dotnet run --project src/Rekall.Age.Cli -- render viewport capture .age-sandbox Main 3 .age-sandbox/Artifacts/Viewport 640 360 vulkan
 dotnet run --project src/Rekall.Age.Cli -- render performance budget .age-sandbox Main desktop60 0 1920 1080
 dotnet run --project src/Rekall.Age.Cli -- game package-playable .age-sandbox Main .age-sandbox/Builds/RekallAgePlayer
 dotnet run --project src/Rekall.Age.Cli -- game audit-package .age-sandbox/Builds/RekallAgePlayer.zip .age-sandbox/Artifacts/PackageAudit
 ```
+
+`runtime soak` resumes the same immutable scene world through bounded fixed-step
+chunks and always checks completion, frame/elapsed continuity, stable runtime
+system order, and configured entity/observation/event growth. Throughput and
+retained managed-memory blocking are explicit caller budgets: use `0` and `-1`
+respectively to collect those measurements without applying machine-dependent
+failure thresholds.
 
 ### 6. Iterate Narrowly
 

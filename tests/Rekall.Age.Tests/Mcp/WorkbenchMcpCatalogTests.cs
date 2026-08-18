@@ -24,6 +24,7 @@ public sealed class WorkbenchMcpCatalogTests
         registry.Register(new InstantiatePrefabCommand());
         registry.Register(new SnapEntityToGridCommand());
         registry.Register(new InspectSceneRuntimeCommand());
+        registry.Register(new InspectRuntimeSoakCommand());
         registry.Register(new CaptureRuntimeViewportCommand());
         registry.Register(new ExportSceneGlbCommand());
 
@@ -37,6 +38,7 @@ public sealed class WorkbenchMcpCatalogTests
         Assert.Contains("rekall.geometry.create_extrusion", names);
         Assert.Contains("rekall.level.prefab.instantiate", names);
         Assert.Contains("rekall.runtime.inspect_scene", names);
+        Assert.Contains("rekall.runtime.inspect_soak", names);
         Assert.Contains("rekall.render.capture_runtime_viewport", names);
         Assert.Contains("rekall.render.export_scene_glb", names);
     }

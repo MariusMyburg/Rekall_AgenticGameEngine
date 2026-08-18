@@ -86,6 +86,10 @@ public sealed class GetEngineStatusCommand
                     "Inspect deterministic built-in scene simulation after a requested frame count without requiring a compiled playable module; use this for physics, animation, UI, audio, event, and entity-state proof.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
+                    "rekall.runtime.inspect_soak",
+                    "Produce long-run deterministic stability, bounded-growth, and performance evidence for an authored scene without requiring a playable module.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
                     "rekall.solar.import_ksa_system",
                     "Import KSA astronomical XML into generic celestial body, Kepler orbit, and renderable planet entities.",
                     Recommended: true),

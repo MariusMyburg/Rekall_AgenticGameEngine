@@ -109,7 +109,7 @@ git commit -m "feat: add runtime soak inspection"
 - Modify: `tests/Rekall.Age.Tests/Agent/AgentContextCommandTests.cs`
 - Modify: `README.md`
 
-- [ ] **Step 1: Add failing CLI, MCP, and status tests**
+- [x] **Step 1: Add failing CLI, MCP, and status tests**
 
 Register `InspectRuntimeSoakCommand` in the workbench catalog test and assert `rekall.runtime.inspect_soak`. Add an engine-status assertion that its workflow entry is recommended and mentions stability/performance evidence. Add a CLI process test for:
 
@@ -119,7 +119,7 @@ runtime soak <root> Main 125 50 0 -1 0 128 1024
 
 Assert exit zero and output containing `Completed frames: 125`, `Checkpoints: 3`, and passed continuity checks.
 
-- [ ] **Step 2: Run the integration tests and observe RED**
+- [x] **Step 2: Run the integration tests and observe RED**
 
 Run:
 
@@ -129,23 +129,23 @@ dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --filter "FullyQualif
 
 Expected: the new catalog, guidance, and CLI assertions fail.
 
-- [ ] **Step 3: Register and route the command**
+- [x] **Step 3: Register and route the command**
 
 Add `registry.Register(new InspectRuntimeSoakCommand())`. Add a CLI route with the nine explicit values plus a shorter route that uses request defaults. Parse with invariant culture, execute `rekall.runtime.inspect_soak`, and print summary, frame totals, elapsed time, throughput, retained-memory growth, checkpoint count/details, and every named check. Return `result.Ok ? 0 : 1`.
 
-- [ ] **Step 4: Add agent discovery guidance**
+- [x] **Step 4: Add agent discovery guidance**
 
 Add a recommended `RekallAgeAgentWorkflowTool` entry explaining that `rekall.runtime.inspect_soak` produces long-run deterministic stability, bounded-growth, and throughput evidence without authoring content or requiring a playable module.
 
-- [ ] **Step 5: Document the public command**
+- [x] **Step 5: Document the public command**
 
 Add the generic soak command to README verification examples and explain that machine-dependent throughput and retained-memory blockers are opt-in explicit budgets; deterministic continuity and bounded scene facts are always checked.
 
-- [ ] **Step 6: Run integration and focused runtime tests GREEN**
+- [x] **Step 6: Run integration and focused runtime tests GREEN**
 
 Run the Task 3 test command plus the Task 1 focused command. Expected: all pass.
 
-- [ ] **Step 7: Commit adapters and guidance**
+- [x] **Step 7: Commit adapters and guidance**
 
 ```powershell
 git add src/Rekall.Age.Cli/Program.cs src/Rekall.Age.Agent/Commands/GetEngineStatusCommand.cs tests/Rekall.Age.Tests/Cli/RuntimeInspectCliTests.cs tests/Rekall.Age.Tests/Mcp/WorkbenchMcpCatalogTests.cs tests/Rekall.Age.Tests/Agent/AgentContextCommandTests.cs README.md

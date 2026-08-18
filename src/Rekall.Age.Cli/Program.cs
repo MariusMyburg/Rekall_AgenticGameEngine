@@ -318,6 +318,22 @@ internal static class RekallAgeCli
                 ["run", "scene", var root, var scene, var seconds, var inputsJson] => await RunSceneAsync(registry, context, root, scene, seconds, inputsJson),
                 ["runtime", "inspect", var root, var scene, var frames] => await InspectRuntimeAsync(registry, context, root, scene, frames, null),
                 ["runtime", "inspect", var root, var scene, var frames, var inputsJson] => await InspectRuntimeAsync(registry, context, root, scene, frames, inputsJson),
+                ["runtime", "soak", var root, var scene] => await InspectRuntimeSoakAsync(
+                    registry, context, root, scene, "3600", "600", "0", "-1", "0", "128", "1024"),
+                ["runtime", "soak", var root, var scene, var frames, var checkpointInterval, var minimumFramesPerSecond,
+                    var maximumRetainedMemoryGrowthBytes, var maximumEntityGrowth, var maximumObservations, var maximumEvents] =>
+                    await InspectRuntimeSoakAsync(
+                        registry,
+                        context,
+                        root,
+                        scene,
+                        frames,
+                        checkpointInterval,
+                        minimumFramesPerSecond,
+                        maximumRetainedMemoryGrowthBytes,
+                        maximumEntityGrowth,
+                        maximumObservations,
+                        maximumEvents),
                 ["multiplayer", "host", var root, var scene] => await MultiplayerHostAsync(registry, context, root, scene, "30"),
                 ["multiplayer", "host", var root, var scene, var durationSeconds] => await MultiplayerHostAsync(registry, context, root, scene, durationSeconds),
                 ["multiplayer", "status", var root, var scene] => await MultiplayerStatusAsync(registry, context, root, scene),
@@ -507,6 +523,7 @@ internal static class RekallAgeCli
         registry.Register(new PlaytestSceneCommand());
         registry.Register(new RunSceneCommand());
         registry.Register(new InspectSceneRuntimeCommand());
+        registry.Register(new InspectRuntimeSoakCommand());
         registry.Register(new MultiplayerHostCommand());
         registry.Register(new MultiplayerStatusCommand());
         registry.Register(new MultiplayerConnectCommand());
@@ -3197,6 +3214,64 @@ internal static class RekallAgeCli
         foreach (var observation in result.Value.Observations)
         {
             Console.WriteLine($"{observation.Severity} {observation.Code} {observation.Subsystem} {observation.TargetId}: {observation.Message}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectRuntimeSoakAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string frames,
+        string checkpointInterval,
+        string minimumFramesPerSecond,
+        string maximumRetainedMemoryGrowthBytes,
+        string maximumEntityGrowth,
+        string maximumObservations,
+        string maximumEvents)
+    {
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        var request = new InspectRuntimeSoakRequest(
+            root,
+            scene,
+            int.Parse(frames, culture),
+            int.Parse(checkpointInterval, culture),
+            double.Parse(minimumFramesPerSecond, culture),
+            long.Parse(maximumRetainedMemoryGrowthBytes, culture),
+            int.Parse(maximumEntityGrowth, culture),
+            int.Parse(maximumObservations, culture),
+            int.Parse(maximumEvents, culture));
+        var result = await registry.ExecuteAsync<InspectRuntimeSoakRequest, InspectRuntimeSoakResult>(
+            "rekall.runtime.inspect_soak",
+            request,
+            context);
+
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Completed frames: {result.Value.CompletedFrames}/{result.Value.RequestedFrames}");
+        Console.WriteLine($"Final frame: {result.Value.FinalFrameIndex}");
+        Console.WriteLine($"Elapsed seconds: {result.Value.FinalElapsedSeconds:F9}");
+        Console.WriteLine($"Wall milliseconds: {result.Value.WallMilliseconds:F3}");
+        Console.WriteLine($"Frames per second: {result.Value.FramesPerSecond:F1}");
+        Console.WriteLine($"Retained managed-memory growth: {result.Value.RetainedManagedMemoryGrowthBytes} bytes");
+        Console.WriteLine($"Peak sampled managed memory: {result.Value.PeakSampledManagedMemoryBytes} bytes");
+        Console.WriteLine($"Systems run: {string.Join(", ", result.Value.SystemsRun)}");
+        Console.WriteLine($"Checkpoints: {result.Value.Checkpoints.Count}");
+        foreach (var checkpoint in result.Value.Checkpoints)
+        {
+            Console.WriteLine(
+                $"  Frame {checkpoint.FrameIndex}: completed={checkpoint.CompletedFrames} elapsed={checkpoint.ElapsedSeconds:F9}s wall={checkpoint.WallMilliseconds:F3}ms fps={checkpoint.FramesPerSecond:F1} entities={checkpoint.EntityCount} components={checkpoint.ComponentCount} observations={checkpoint.ObservationCount} events={checkpoint.EventCount} memory={checkpoint.SampledManagedMemoryBytes}");
+        }
+
+        foreach (var check in result.Value.Checks)
+        {
+            Console.WriteLine($"Check {check.Name}: {(check.Passed ? "PASS" : "FAIL")} - {check.Message}");
         }
 
         foreach (var error in result.Errors)

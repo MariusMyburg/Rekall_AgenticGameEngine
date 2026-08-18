@@ -174,6 +174,11 @@ public sealed class AgentContextCommandTests
             && workflow.Recommended
             && workflow.Purpose.Contains("without", StringComparison.OrdinalIgnoreCase)
             && workflow.Purpose.Contains("playable module", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Value.WorkflowTools, workflow =>
+            workflow.Tool == "rekall.runtime.inspect_soak"
+            && workflow.Recommended
+            && workflow.Purpose.Contains("stability", StringComparison.OrdinalIgnoreCase)
+            && workflow.Purpose.Contains("performance", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.entity.delete");
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.module.scaffold_runtime_system" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow => workflow.Tool == "rekall.module.list_sources");

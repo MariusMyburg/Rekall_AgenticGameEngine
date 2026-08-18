@@ -484,6 +484,36 @@ after authoring is stable. Package proof outputs must stay outside immutable
 packages. The contract is now centralized and regression-tested instead of
 being an opaque CLI string.
 
+### Compact-blueprint rerun
+
+Rerun 17 used the delivery-contract distribution with the unchanged 36-turn
+task.
+
+- Project: `Artifacts/BenchmarkRuns/installed-broad-rerun17`
+- Result: failed at the 36-turn bound
+- Tool calls: 36
+- Prompt tokens: 640,102
+- Completion tokens: 8,977
+
+Model variance regressed this run into authoring and repair. The first atomic
+project blueprint encoded `Scenes` as a JSON string while omitting
+`ProjectRoot`, `ProjectName`, and `ProjectCapabilities`. Later calls created the
+project but authored enough malformed component/property structure to consume
+the remaining budget on suggested removals. No runtime inspection or package
+workflow occurred in the agent trace.
+
+Independent installed inspection nevertheless found two functioning physics
+scenes: the principal 3D and 2D bodies each had Y delta -1.267. Static-floor
+collider composition was incomplete in Main, and Physics2D retained two
+camera/render-layer warnings. With no deliverable, the run is a clear failure.
+
+The generic correction puts a compact exact JSON exemplar directly in the
+atomic project and scene blueprint tool descriptions. It shows required project
+identity, true scene/entity/component arrays, and the canonical component
+`type`/`properties` nesting, explicitly warning that nested arrays are never
+JSON strings. This complements the formal generated schema at the point where
+an LLM chooses argument structure.
+
 ## Expanded installed-engine benchmark
 
 The benchmark was then expanded to require UI, animation, imported audio, static

@@ -37,7 +37,7 @@ public sealed class ApplySceneBlueprintCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Applies a generic scene entity/component blueprint in one transaction for efficient agent world authoring.",
+        "Applies a generic scene entity/component blueprint in one transaction for efficient agent world authoring. Exact compact shape: {\"projectRoot\":\"...\",\"sceneName\":\"Main\",\"entities\":[{\"name\":\"Entity\",\"components\":[{\"type\":\"Rekall.Transform3D\",\"properties\":{\"X\":0}}]}],\"clearExisting\":false}. entities and components are JSON arrays; each component uses type and properties.",
         typeof(ApplySceneBlueprintRequest).FullName!,
         typeof(ApplySceneBlueprintResult).FullName!);
 

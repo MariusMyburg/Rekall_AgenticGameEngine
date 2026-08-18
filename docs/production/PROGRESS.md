@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 02:07 Africa/Johannesburg
+Last verified: 2026-08-18 02:16 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: embedded delivery sequencing contract passed the complete product gate
+Latest milestone: compact blueprint tool contracts passed 583/583 Debug tests
 
 ## Product objective
 
@@ -346,6 +346,18 @@ Studio is important, but it does not define or reorder the engine foundation.
   the generic gauntlet, original and relocated package proof, runtime UI,
   software viewport, simulated audio, and Windows player audio. The canonical
   1,149-file archive is 194,708,031 bytes.
+- Broad benchmark rerun 17: model variance consumed the full 36 tools (640,102
+  prompt; 8,977 completion) in authoring and validation repair without runtime
+  or package work. The first atomic blueprint encoded `Scenes` as a string and
+  omitted project identity; later authoring required many component/property
+  removals. Independent evidence still found real 3D/2D motion, but Physics2D
+  retained two visibility warnings and no deliverable existed. This is not an
+  accepted pass.
+- Compact blueprint tool contracts: atomic project and scene blueprint command
+  descriptions now include minimal exact nested JSON exemplars covering project
+  identity, scene/entity/component arrays, and the canonical component
+  `type`/`properties` shape. They explicitly prohibit JSON-string encoding for
+  the nested arrays. The regression and full Debug suite pass at 583/583.
 
 ## Current gaps
 
@@ -361,7 +373,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Rerun the unchanged installed Ollama benchmark on the delivery-contract distribution.
+Run the complete clean product gate for compact blueprint tool contracts.
 
 ## Next after the current item
 

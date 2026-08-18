@@ -10,6 +10,20 @@ namespace Rekall.Age.Tests.Workflows;
 public sealed class CreateBlueprintProjectTests
 {
     [Fact]
+    public void BlueprintSchemasExposeCompactExactNestedJsonShapesForAgents()
+    {
+        var projectDescription = new CreateBlueprintProjectCommand().Schema.Description;
+        var sceneDescription = new ApplySceneBlueprintCommand().Schema.Description;
+
+        Assert.Contains("\"scenes\":[", projectDescription, StringComparison.Ordinal);
+        Assert.Contains("\"projectRoot\"", projectDescription, StringComparison.Ordinal);
+        Assert.Contains("\"type\":\"Rekall.Transform3D\"", projectDescription, StringComparison.Ordinal);
+        Assert.Contains("never a JSON string", projectDescription, StringComparison.Ordinal);
+        Assert.Contains("\"entities\":[", sceneDescription, StringComparison.Ordinal);
+        Assert.Contains("\"properties\":{", sceneDescription, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CreatesProjectSceneAndCompleteAgentSuppliedBlueprintInOneCommand()
     {
         var root = TestPaths.CreateTempDirectory();

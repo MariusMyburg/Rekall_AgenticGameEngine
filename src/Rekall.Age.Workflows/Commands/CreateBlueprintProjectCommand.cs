@@ -37,7 +37,7 @@ public sealed class CreateBlueprintProjectCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Creates a project and one or many complete scenes from agent-supplied generic entity/component blueprints in one command. For multi-scene games, put every scene in Scenes instead of authoring incrementally.",
+        "Creates a project and one or many complete scenes from agent-supplied generic entity/component blueprints in one command. For multi-scene games, put every scene in Scenes instead of authoring incrementally. Exact compact shape: {\"projectRoot\":\"...\",\"projectName\":\"Game\",\"projectCapabilities\":[],\"scenes\":[{\"name\":\"Main\",\"capabilities\":[],\"entities\":[{\"name\":\"Entity\",\"components\":[{\"type\":\"Rekall.Transform3D\",\"properties\":{\"X\":0}}]}]}]}. scenes, entities, and components are JSON arrays, never a JSON string; each component uses type and properties.",
         typeof(CreateBlueprintProjectRequest).FullName!,
         typeof(CreateBlueprintProjectResult).FullName!);
 

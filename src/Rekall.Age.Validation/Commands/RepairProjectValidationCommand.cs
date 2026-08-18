@@ -12,7 +12,9 @@ public sealed record RepairProjectValidationResult(
     ValidateProjectResult Validation,
     int ExecutedRepairCount,
     int RepairPassCount,
-    IReadOnlyList<string> ExecutedTools);
+    IReadOnlyList<string> ExecutedTools,
+    string TerminationReason,
+    int RemainingAutomaticRepairCount);
 
 public sealed class RepairProjectValidationCommand(RekallAgeCommandRegistry registry)
     : IRekallAgeCommand<RepairProjectValidationRequest, RepairProjectValidationResult>
@@ -63,7 +65,13 @@ public sealed class RepairProjectValidationCommand(RekallAgeCommandRegistry regi
                         $"Suggested repair '{suggestion.Tool}' failed: {result.Summary}",
                         suggestion.Tool);
                     return RekallAgeCommandResult<RepairProjectValidationResult>.Failure(
-                        new RepairProjectValidationResult(validation, executedTools.Count, passes, executedTools),
+                        new RepairProjectValidationResult(
+                            validation,
+                            executedTools.Count,
+                            passes,
+                            executedTools,
+                            "repair-failed",
+                            CountAutomaticRepairs(validation)),
                         error.Message,
                         [error]);
                 }
@@ -74,12 +82,30 @@ public sealed class RepairProjectValidationCommand(RekallAgeCommandRegistry regi
             validation = await ValidateAsync(request.ProjectRoot, context);
         }
 
-        var value = new RepairProjectValidationResult(validation, executedTools.Count, passes, executedTools);
+        var remainingAutomaticRepairs = CountAutomaticRepairs(validation);
+        var terminationReason = validation.IssueCount == 0
+            ? "clean"
+            : remainingAutomaticRepairs == 0
+                ? "no-progress"
+                : executedTools.Count >= maxRepairs
+                    ? "repair-limit"
+                    : "pass-limit";
+        var value = new RepairProjectValidationResult(
+            validation,
+            executedTools.Count,
+            passes,
+            executedTools,
+            terminationReason,
+            remainingAutomaticRepairs);
         return RekallAgeCommandResult<RepairProjectValidationResult>.Success(
             value,
-            validation.IssueCount == 0
-                ? $"Project validation repair executed {executedTools.Count} suggested command(s) and reached zero issues."
-                : $"Project validation repair executed {executedTools.Count} suggested command(s); {validation.IssueCount} issue(s) remain.");
+            terminationReason switch
+            {
+                "clean" => $"Project validation repair executed {executedTools.Count} suggested command(s) and reached zero issues.",
+                "no-progress" => $"Project validation repair executed {executedTools.Count} suggested command(s); {validation.IssueCount} issue(s) remain and no automatic repair mutations are available. Do not retry this command unchanged; inspect the remaining diagnostics and author the missing content with exact registered schemas.",
+                "repair-limit" => $"Project validation repair reached the {maxRepairs}-repair limit with {validation.IssueCount} issue(s) and {remainingAutomaticRepairs} automatic repair(s) remaining.",
+                _ => $"Project validation repair reached the {maxPasses}-pass limit with {validation.IssueCount} issue(s) and {remainingAutomaticRepairs} automatic repair(s) remaining."
+            });
     }
 
     private static async ValueTask<ValidateProjectResult> ValidateAsync(
@@ -97,4 +123,7 @@ public sealed class RepairProjectValidationCommand(RekallAgeCommandRegistry regi
         or "rekall.component.remove"
         or "rekall.component.remove_property"
         or "rekall.component.set_property";
+
+    private static int CountAutomaticRepairs(ValidateProjectResult validation) =>
+        validation.SuggestedNextActions.Count(suggestion => IsRepairMutation(suggestion.Tool));
 }

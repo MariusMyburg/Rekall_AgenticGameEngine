@@ -122,7 +122,13 @@ public sealed class AuditPlayablePackageCommand
             new RekallAgePlayablePackageAuditCheck(
                 "nonblank-frame",
                 capture.Value.NonBlank,
-                capture.Value.NonBlank ? "Package proof frame is non-blank." : "Package proof frame is blank.")
+                capture.Value.NonBlank ? "Package proof frame is non-blank." : "Package proof frame is blank."),
+            new RekallAgePlayablePackageAuditCheck(
+                "informative-frame",
+                capture.Value.FrameAnalysis.VisuallyInformative,
+                capture.Value.FrameAnalysis.VisuallyInformative
+                    ? $"Package proof frame is informative with {capture.Value.FrameAnalysis.DistinctColorCount} distinct color(s)."
+                    : $"Package proof frame is not informative. Analysis warnings: {string.Join(", ", capture.Value.FrameAnalysis.WarningCodes)}.")
         };
         var ready = checks.All(check => check.Passed);
         var result = new AuditPlayablePackageResult(
@@ -201,6 +207,7 @@ public sealed class AuditPlayablePackageCommand
             0,
             0,
             [],
+            Rekall.Age.Rendering.RekallAgeViewportFrameAnalysis.NotAnalyzed,
             string.Empty);
         var checks = new[]
         {

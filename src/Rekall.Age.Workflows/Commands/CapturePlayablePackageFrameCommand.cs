@@ -1,5 +1,6 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
+using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Workflows;
 
@@ -24,6 +25,7 @@ public sealed record CapturePlayablePackageFrameResult(
     int NonBackgroundPixels,
     int DrawCommandCount,
     IReadOnlyList<string> DrawCommandKinds,
+    RekallAgeViewportFrameAnalysis FrameAnalysis,
     string Text);
 
 public sealed class CapturePlayablePackageFrameCommand
@@ -128,10 +130,11 @@ public sealed class CapturePlayablePackageFrameCommand
             viewport.FrameIndex,
             viewport.Width,
             viewport.Height,
-            viewport.NonBlank && viewport.FrameAnalysis.VisuallyInformative,
+            viewport.NonBlank,
             nonBackgroundPixels,
             viewport.RenderableCount,
             viewport.RenderableKinds,
+            viewport.FrameAnalysis,
             $"Captured packaged authored scene '{inspection.Value.Manifest.SceneName}' using {viewport.BackendId}.");
         return RekallAgeCommandResult<CapturePlayablePackageFrameResult>.Success(
             resultValue,
@@ -233,7 +236,19 @@ public sealed class CapturePlayablePackageFrameCommand
     }
 
     private static CapturePlayablePackageFrameResult Empty(int frameIndex, int width, int height, string kind) =>
-        new(false, string.Empty, kind, frameIndex, width, height, false, 0, 0, [], string.Empty);
+        new(
+            false,
+            string.Empty,
+            kind,
+            frameIndex,
+            width,
+            height,
+            false,
+            0,
+            0,
+            [],
+            RekallAgeViewportFrameAnalysis.NotAnalyzed,
+            string.Empty);
 
     private static StringComparison PathComparison =>
         OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;

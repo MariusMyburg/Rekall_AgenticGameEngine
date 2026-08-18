@@ -50,6 +50,8 @@ public sealed class PlayablePackageIntegrityTests
             context);
         Assert.True(capture.Ok, capture.Summary);
         Assert.True(capture.Value.NonBlank);
+        Assert.True(capture.Value.FrameAnalysis.Analyzed);
+        Assert.True(capture.Value.FrameAnalysis.VisuallyInformative);
         Assert.Equal("package_play_frame_001.png", Path.GetFileName(capture.Value.OutputPath));
         Assert.Equal("runtime-viewport", capture.Value.Kind);
         Assert.Contains("sprite", capture.Value.DrawCommandKinds);
@@ -61,6 +63,9 @@ public sealed class PlayablePackageIntegrityTests
             context);
         Assert.True(audit.Ok, audit.Summary);
         Assert.True(audit.Value.Ready);
+        Assert.Contains(
+            audit.Value.Checks,
+            check => check.Name == "informative-frame" && check.Passed);
 
         var relocated = await new RelocatePlayablePackageCommand().ExecuteAsync(
             new RelocatePlayablePackageRequest(
@@ -75,6 +80,7 @@ public sealed class PlayablePackageIntegrityTests
             context);
         Assert.True(relocatedAudit.Ok, relocatedAudit.Summary);
         Assert.True(relocatedAudit.Value.Ready);
+        Assert.True(relocatedAudit.Value.Capture.FrameAnalysis.VisuallyInformative);
 
         var insufficientDestination = Path.Combine(TestPaths.CreateTempDirectory(), "InsufficientSpacePackage");
         var insufficientSpace = await new RelocatePlayablePackageCommand(_ => 0).ExecuteAsync(

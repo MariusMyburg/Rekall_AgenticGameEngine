@@ -664,4 +664,34 @@ public sealed class ProjectValidatorTests
         Assert.Contains(components, component => component.Type == "Rekall.Rigidbody3D");
         Assert.DoesNotContain(components, component => component.Type == "Rekall.RigidBody3D");
     }
+
+    [Fact]
+    public async Task RepairProjectValidationReportsNoProgressWhenOnlyAdvisoryActionsRemain()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"])
+                .AddEntity(RekallAgeEntityDocument.Create("Visible", [])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.SpriteRenderer"))),
+            CancellationToken.None);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new ValidateProjectCommand());
+        registry.Register(new RepairProjectValidationCommand(registry));
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("report validation repair no progress"),
+            CancellationToken.None);
+
+        var result = await registry.ExecuteAsync<RepairProjectValidationRequest, RepairProjectValidationResult>(
+            "rekall.validation.repair_project",
+            new RepairProjectValidationRequest(root),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal("no-progress", result.Value.TerminationReason);
+        Assert.Equal(0, result.Value.RemainingAutomaticRepairCount);
+        Assert.Contains("do not retry", result.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.True(result.Value.Validation.IssueCount > 0);
+    }
 }

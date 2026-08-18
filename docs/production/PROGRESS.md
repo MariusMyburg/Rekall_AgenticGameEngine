@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 05:15 Africa/Johannesburg
+Last verified: 2026-08-18 05:22 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: broad rerun 30 isolated informative package-proof gap
+Latest milestone: informative package proof and repair termination passed 591/591 Debug tests
 
 ## Product objective
 
@@ -566,6 +566,13 @@ Studio is important, but it does not define or reorder the engine foundation.
   body, and a still-moving 2D body. Package audit exposed only nonblank proof,
   not the task's required informative-frame fact, and batch repair was repeated
   four times after reaching non-automatic remaining issues.
+- Informative package proof and repair termination: packaged capture now keeps
+  nonblank and informative facts distinct, returns full bounded frame analysis,
+  and package audit requires an explicit `informative-frame` check. Batch
+  validation repair now returns a termination reason and remaining automatic
+  repair count; advisory-only leftovers terminate as `no-progress` with an
+  explicit instruction not to retry unchanged. The full Debug suite passes at
+  591/591.
 
 ## Current gaps
 
@@ -581,8 +588,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Expose informative frame analysis through packaged capture/audit results and
-make batch validation repair report no-progress termination unambiguously.
+Run the complete clean product gate for informative package proof and repair
+termination.
 
 ## Next after the current item
 

@@ -28,7 +28,11 @@ public sealed class CreateProjectCommand : IRekallAgeCommand<CreateProjectReques
         RekallAgeCommandContext context)
     {
         var manifest = RekallAgeProjectManifest.Create(request.Name, request.Capabilities);
-        await _store.SaveAsync(request.ProjectRoot, manifest, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(
+            request.ProjectRoot,
+            manifest,
+            Core.Persistence.RekallAgeDocumentRevision.Missing,
+            context.CancellationToken);
         var manifestPath = Path.Combine(request.ProjectRoot, RekallAgeProjectStore.ManifestFileName);
         context.Transaction.RecordChangedResource(manifestPath);
 

@@ -28,7 +28,11 @@ public sealed class CreateSceneCommand : IRekallAgeCommand<CreateSceneRequest, C
         RekallAgeCommandContext context)
     {
         var scene = RekallAgeSceneDocument.Create(request.Name, request.Capabilities);
-        await _store.SaveAsync(request.ProjectRoot, scene, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(
+            request.ProjectRoot,
+            scene,
+            Core.Persistence.RekallAgeDocumentRevision.Missing,
+            context.CancellationToken);
         var path = _store.GetScenePath(request.ProjectRoot, scene.Name);
         context.Transaction.RecordChangedResource(path);
         return RekallAgeCommandResult<CreateSceneResult>.Success(

@@ -8,7 +8,8 @@ public sealed record AddComponentRequest(
     string SceneName,
     string EntityId,
     string ComponentType,
-    JsonObject? Properties = null);
+    JsonObject? Properties = null,
+    string? ExpectedRevision = null);
 
 public sealed record AddComponentResult(RekallAgeSceneDocument Scene);
 
@@ -28,10 +29,15 @@ public sealed class AddComponentCommand : IRekallAgeCommand<AddComponentRequest,
         AddComponentRequest request,
         RekallAgeCommandContext context)
     {
-        var scene = await _store.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var scene = loaded.Value;
         var component = RekallAgeComponentDocument.Create(request.ComponentType, request.Properties ?? new JsonObject());
         var updated = scene.UpdateEntity(request.EntityId, entity => entity.AddComponent(component));
-        await _store.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(
+            request.ProjectRoot,
+            updated,
+            request.ExpectedRevision ?? loaded.Revision,
+            context.CancellationToken);
         context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
         return RekallAgeCommandResult<AddComponentResult>.Success(
             new AddComponentResult(updated),

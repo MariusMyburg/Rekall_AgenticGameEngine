@@ -2,7 +2,10 @@ using Rekall.Age.Core.Commands;
 
 namespace Rekall.Age.Project.Commands;
 
-public sealed record AddCapabilityRequest(string ProjectRoot, string Capability);
+public sealed record AddCapabilityRequest(
+    string ProjectRoot,
+    string Capability,
+    string? ExpectedRevision = null);
 
 public sealed record AddCapabilityResult(RekallAgeProjectManifest Manifest);
 
@@ -22,9 +25,14 @@ public sealed class AddCapabilityCommand : IRekallAgeCommand<AddCapabilityReques
         AddCapabilityRequest request,
         RekallAgeCommandContext context)
     {
-        var manifest = await _store.LoadAsync(request.ProjectRoot, context.CancellationToken);
+        var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, context.CancellationToken);
+        var manifest = loaded.Value;
         var updated = manifest.AddCapability(request.Capability);
-        await _store.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(
+            request.ProjectRoot,
+            updated,
+            request.ExpectedRevision ?? loaded.Revision,
+            context.CancellationToken);
         context.Transaction.RecordChangedResource(Path.Combine(request.ProjectRoot, RekallAgeProjectStore.ManifestFileName));
 
         return RekallAgeCommandResult<AddCapabilityResult>.Success(

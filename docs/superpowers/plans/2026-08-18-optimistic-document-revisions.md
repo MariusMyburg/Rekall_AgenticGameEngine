@@ -17,9 +17,9 @@ inspectable recovery facts.
 
 ### Task 2: Project and scene mutation integration
 
-- [ ] Add versioned project/scene loads without changing persisted shapes.
-- [ ] Convert every ordinary project/scene mutation to conditional save.
-- [ ] Prove intervening changes survive and stale commands return recovery facts.
+- [x] Add versioned project/scene loads without changing persisted shapes.
+- [x] Convert every ordinary project/scene mutation to conditional save.
+- [x] Prove intervening changes survive and stale commands return recovery facts.
 
 ### Task 3: Agent inspection and transaction append serialization
 

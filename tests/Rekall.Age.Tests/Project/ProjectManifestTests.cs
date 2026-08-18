@@ -1,6 +1,7 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Compatibility;
 using Rekall.Age.Core.Transactions;
+using Rekall.Age.Core.Persistence;
 using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
 using System.Text;
@@ -161,5 +162,47 @@ public sealed class ProjectManifestTests
             () => new RekallAgeProjectStore().LoadAsync(root, CancellationToken.None).AsTask());
 
         Assert.Equal("REKALL_DOCUMENT_JSON_MALFORMED", error.Code);
+    }
+
+    [Fact]
+    public async Task VersionedManifestSaveRejectsAnInterveningWriter()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeProjectStore();
+        await store.SaveAsync(root, RekallAgeProjectManifest.Create("Initial", ["world"]), CancellationToken.None);
+        var loaded = await store.LoadVersionedAsync(root, CancellationToken.None);
+        await store.SaveAsync(root, loaded.Value with { Name = "Intervening" }, CancellationToken.None);
+
+        var error = await Assert.ThrowsAsync<RekallAgeDocumentRevisionException>(
+            () => store.SaveIfRevisionAsync(
+                root,
+                loaded.Value with { Name = "Stale" },
+                loaded.Revision,
+                CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", error.Code);
+        Assert.Equal("Intervening", (await store.LoadAsync(root, CancellationToken.None)).Name);
+        Assert.Equal(
+            RekallAgeDocumentRevision.Compute(await File.ReadAllBytesAsync(Path.Combine(root, RekallAgeProjectStore.ManifestFileName))),
+            error.CurrentRevision);
+    }
+
+    [Fact]
+    public async Task ProjectCreationCannotSilentlyOverwriteAnExistingManifest()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeProjectStore();
+        await store.SaveAsync(root, RekallAgeProjectManifest.Create("Existing", ["world"]), CancellationToken.None);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CreateProjectCommand());
+
+        var result = await registry.ExecuteJsonAsync(
+            "rekall.project.create",
+            JsonSerializer.Serialize(new { projectRoot = root, name = "Replacement", capabilities = new[] { "world" } }),
+            new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("create existing"), CancellationToken.None));
+
+        Assert.False(result.Ok);
+        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", Assert.Single(result.Errors).Code);
+        Assert.Equal("Existing", (await store.LoadAsync(root, CancellationToken.None)).Name);
     }
 }

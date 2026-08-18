@@ -30,6 +30,21 @@ public sealed class RekallAgeProjectStore
             cancellationToken);
     }
 
+    public async ValueTask<string> SaveIfRevisionAsync(
+        string projectRoot,
+        RekallAgeProjectManifest manifest,
+        string expectedRevision,
+        CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(projectRoot);
+        return await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+            Path.Combine(projectRoot, ManifestFileName),
+            Serialize(manifest),
+            RekallAgeDocumentSchemaProbe.MaximumDocumentBytes,
+            expectedRevision,
+            cancellationToken);
+    }
+
     public string Serialize(RekallAgeProjectManifest manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
@@ -38,6 +53,11 @@ public sealed class RekallAgeProjectStore
     }
 
     public async ValueTask<RekallAgeProjectManifest> LoadAsync(
+        string projectRoot,
+        CancellationToken cancellationToken) =>
+        (await LoadVersionedAsync(projectRoot, cancellationToken).ConfigureAwait(false)).Value;
+
+    public async ValueTask<RekallAgeVersionedDocument<RekallAgeProjectManifest>> LoadVersionedAsync(
         string projectRoot,
         CancellationToken cancellationToken)
     {
@@ -49,9 +69,9 @@ public sealed class RekallAgeProjectStore
             cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         var manifest = snapshot.Deserialize<RekallAgeProjectManifest>(JsonOptions);
-        return manifest with
+        return new RekallAgeVersionedDocument<RekallAgeProjectManifest>(manifest with
         {
             SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion
-        };
+        }, snapshot.File.Revision);
     }
 }

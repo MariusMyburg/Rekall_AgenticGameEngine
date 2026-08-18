@@ -7,7 +7,8 @@ public sealed record RemoveComponentPropertyRequest(
     string SceneName,
     string EntityId,
     string ComponentType,
-    string PropertyName);
+    string PropertyName,
+    string? ExpectedRevision = null);
 
 public sealed record RemoveComponentPropertyResult(RekallAgeSceneDocument Scene);
 
@@ -28,7 +29,8 @@ public sealed class RemoveComponentPropertyCommand
         RemoveComponentPropertyRequest request,
         RekallAgeCommandContext context)
     {
-        var scene = await _store.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var scene = loaded.Value;
         var updated = scene.UpdateEntity(
             request.EntityId,
             entity => entity.UpdateComponent(
@@ -36,7 +38,11 @@ public sealed class RemoveComponentPropertyCommand
                 component => component.RemoveProperty(request.PropertyName)));
         var scenePath = _store.GetScenePath(request.ProjectRoot, request.SceneName);
         context.Transaction.CaptureResourcePreimage(scenePath);
-        await _store.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(
+            request.ProjectRoot,
+            updated,
+            request.ExpectedRevision ?? loaded.Revision,
+            context.CancellationToken);
         context.Transaction.RecordChangedResource(scenePath);
 
         return RekallAgeCommandResult<RemoveComponentPropertyResult>.Success(

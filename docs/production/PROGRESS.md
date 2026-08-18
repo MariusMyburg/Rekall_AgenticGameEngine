@@ -902,6 +902,16 @@ complete file or returns exact `REKALL_DOCUMENT_REVISION_CONFLICT` /
 using one revision produced exactly one winner and one stale rejection, with no
 temporary or engine-owned lock debris.
 
+Optimistic document revisions Task 2 is verified in a 57/57 combined
+project/world/compatibility/transaction selection plus a 12/12 project rerun.
+Project and scene stores expose versioned loads and conditional saves without
+changing persisted JSON. Every ordinary capability/entity/component/blueprint
+mutation saves against the loaded or explicitly supplied `expectedRevision`;
+creation now requires the explicit missing revision and cannot overwrite an
+existing project or scene. A dynamic stale entity mutation returned exact code
+`REKALL_DOCUMENT_REVISION_CONFLICT` with expected/current recovery facts while
+preserving the intervening entity.
+
 Atomic persisted JSON was selected as the next risk-driven tranche. Code inspection found
 that project and scene loads schema-probe one file handle and then reopen the
 path for typed deserialization, while their saves write directly to the live

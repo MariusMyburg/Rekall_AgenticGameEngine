@@ -2,9 +2,11 @@ using System.Text.Json.Nodes;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Compatibility;
 using Rekall.Age.Core.Transactions;
+using Rekall.Age.Core.Persistence;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
 using System.Text;
+using System.Text.Json;
 using System.Collections.Concurrent;
 
 namespace Rekall.Age.Tests.World;
@@ -187,5 +189,63 @@ public sealed class SceneStoreTests
 
         Assert.Empty(failures);
         Assert.Empty(Directory.GetFiles(Path.Combine(root, "Scenes"), ".Main.age.scene.json.tmp-*"));
+    }
+
+    [Fact]
+    public async Task VersionedSceneSaveRejectsAnInterveningWriter()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        await store.SaveAsync(root, RekallAgeSceneDocument.Create("Main", ["world"]), CancellationToken.None);
+        var loaded = await store.LoadVersionedAsync(root, "Main", CancellationToken.None);
+        var intervening = loaded.Value.AddEntity(RekallAgeEntityDocument.Create("Intervening", ["proof"]));
+        await store.SaveAsync(root, intervening, CancellationToken.None);
+
+        var error = await Assert.ThrowsAsync<RekallAgeDocumentRevisionException>(
+            () => store.SaveIfRevisionAsync(
+                root,
+                loaded.Value.AddEntity(RekallAgeEntityDocument.Create("Stale", ["proof"])),
+                loaded.Revision,
+                CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", error.Code);
+        var current = await store.LoadAsync(root, "Main", CancellationToken.None);
+        Assert.Equal("Intervening", Assert.Single(current.Entities).Name);
+    }
+
+    [Fact]
+    public async Task DynamicMutationReturnsExactConflictAndRecoveryFactsForExplicitStaleRevision()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        await store.SaveAsync(root, RekallAgeSceneDocument.Create("Main", ["world"]), CancellationToken.None);
+        var stale = await store.LoadVersionedAsync(root, "Main", CancellationToken.None);
+        await store.SaveAsync(
+            root,
+            stale.Value.AddEntity(RekallAgeEntityDocument.Create("Intervening", ["proof"])),
+            CancellationToken.None);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CreateEntityCommand());
+        var arguments = JsonSerializer.Serialize(new
+        {
+            projectRoot = root,
+            sceneName = "Main",
+            name = "Stale",
+            tags = new[] { "proof" },
+            expectedRevision = stale.Revision
+        });
+
+        var result = await registry.ExecuteJsonAsync(
+            "rekall.entity.create",
+            arguments,
+            new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("stale mutation"), CancellationToken.None));
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", error.Code);
+        Assert.Contains(stale.Revision, error.Message, StringComparison.Ordinal);
+        Assert.Contains("current revision", error.Message, StringComparison.OrdinalIgnoreCase);
+        var current = await store.LoadAsync(root, "Main", CancellationToken.None);
+        Assert.Equal("Intervening", Assert.Single(current.Entities).Name);
     }
 }

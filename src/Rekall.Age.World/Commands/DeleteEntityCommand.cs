@@ -5,7 +5,8 @@ namespace Rekall.Age.World.Commands;
 public sealed record DeleteEntityRequest(
     string ProjectRoot,
     string SceneName,
-    string EntityId);
+    string EntityId,
+    string? ExpectedRevision = null);
 
 public sealed record DeleteEntityResult(
     RekallAgeSceneDocument Scene,
@@ -28,7 +29,8 @@ public sealed class DeleteEntityCommand : IRekallAgeCommand<DeleteEntityRequest,
         DeleteEntityRequest request,
         RekallAgeCommandContext context)
     {
-        var scene = await _store.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var scene = loaded.Value;
         var deleted = scene.Entities.FirstOrDefault(entity => entity.Id.Equals(request.EntityId, StringComparison.Ordinal));
         if (deleted is null)
         {
@@ -47,7 +49,11 @@ public sealed class DeleteEntityCommand : IRekallAgeCommand<DeleteEntityRequest,
         };
         var scenePath = _store.GetScenePath(request.ProjectRoot, request.SceneName);
         context.Transaction.CaptureResourcePreimage(scenePath);
-        await _store.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(
+            request.ProjectRoot,
+            updated,
+            request.ExpectedRevision ?? loaded.Revision,
+            context.CancellationToken);
         context.Transaction.RecordChangedResource(scenePath);
 
         return RekallAgeCommandResult<DeleteEntityResult>.Success(

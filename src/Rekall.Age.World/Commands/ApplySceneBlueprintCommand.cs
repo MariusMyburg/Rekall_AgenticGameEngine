@@ -7,7 +7,8 @@ public sealed record ApplySceneBlueprintRequest(
     string ProjectRoot,
     string SceneName,
     IReadOnlyList<RekallAgeSceneBlueprintEntity> Entities,
-    bool ClearExisting = false);
+    bool ClearExisting = false,
+    string? ExpectedRevision = null);
 
 public sealed record RekallAgeSceneBlueprintEntity(
     string Name,
@@ -54,7 +55,8 @@ public sealed class ApplySceneBlueprintCommand
                 validationErrors);
         }
 
-        var scene = await _store.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var scene = loaded.Value;
         var existing = request.ClearExisting ? [] : scene.Entities.ToList();
         var removedCount = request.ClearExisting ? scene.Entities.Count : 0;
         var upsertedCount = 0;
@@ -84,7 +86,11 @@ public sealed class ApplySceneBlueprintCommand
         };
         var scenePath = _store.GetScenePath(request.ProjectRoot, request.SceneName);
         context.Transaction.CaptureResourcePreimage(scenePath);
-        await _store.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(
+            request.ProjectRoot,
+            updated,
+            request.ExpectedRevision ?? loaded.Revision,
+            context.CancellationToken);
         context.Transaction.RecordChangedResource(scenePath);
 
         return RekallAgeCommandResult<ApplySceneBlueprintResult>.Success(

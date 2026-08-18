@@ -6,7 +6,8 @@ public sealed record CreateEntityRequest(
     string ProjectRoot,
     string SceneName,
     string Name,
-    IReadOnlyList<string> Tags);
+    IReadOnlyList<string> Tags,
+    string? ExpectedRevision = null);
 
 public sealed record CreateEntityResult(
     string EntityId,
@@ -28,10 +29,15 @@ public sealed class CreateEntityCommand : IRekallAgeCommand<CreateEntityRequest,
         CreateEntityRequest request,
         RekallAgeCommandContext context)
     {
-        var scene = await _store.LoadAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
+        var scene = loaded.Value;
         var entity = RekallAgeEntityDocument.Create(request.Name, request.Tags);
         var updated = scene.AddEntity(entity);
-        await _store.SaveAsync(request.ProjectRoot, updated, context.CancellationToken);
+        await _store.SaveIfRevisionAsync(
+            request.ProjectRoot,
+            updated,
+            request.ExpectedRevision ?? loaded.Revision,
+            context.CancellationToken);
         context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
         return RekallAgeCommandResult<CreateEntityResult>.Success(
             new CreateEntityResult(entity.Id, updated),

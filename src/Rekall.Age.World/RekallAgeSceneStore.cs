@@ -34,6 +34,22 @@ public sealed class RekallAgeSceneStore
             cancellationToken);
     }
 
+    public async ValueTask<string> SaveIfRevisionAsync(
+        string projectRoot,
+        RekallAgeSceneDocument scene,
+        string expectedRevision,
+        CancellationToken cancellationToken)
+    {
+        var scenesDirectory = Path.Combine(projectRoot, "Scenes");
+        Directory.CreateDirectory(scenesDirectory);
+        return await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+            GetScenePath(projectRoot, scene.Name),
+            Serialize(scene),
+            RekallAgeDocumentSchemaProbe.MaximumDocumentBytes,
+            expectedRevision,
+            cancellationToken);
+    }
+
     public string Serialize(RekallAgeSceneDocument scene)
     {
         ArgumentNullException.ThrowIfNull(scene);
@@ -42,6 +58,12 @@ public sealed class RekallAgeSceneStore
     }
 
     public async ValueTask<RekallAgeSceneDocument> LoadAsync(
+        string projectRoot,
+        string sceneName,
+        CancellationToken cancellationToken) =>
+        (await LoadVersionedAsync(projectRoot, sceneName, cancellationToken).ConfigureAwait(false)).Value;
+
+    public async ValueTask<RekallAgeVersionedDocument<RekallAgeSceneDocument>> LoadVersionedAsync(
         string projectRoot,
         string sceneName,
         CancellationToken cancellationToken)
@@ -54,10 +76,10 @@ public sealed class RekallAgeSceneStore
             cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         var scene = snapshot.Deserialize<RekallAgeSceneDocument>(JsonOptions);
-        return scene with
+        return new RekallAgeVersionedDocument<RekallAgeSceneDocument>(scene with
         {
             SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion
-        };
+        }, snapshot.File.Revision);
     }
 
     public IReadOnlyList<string> ListSceneNames(string projectRoot)

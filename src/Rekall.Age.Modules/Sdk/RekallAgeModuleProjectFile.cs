@@ -19,6 +19,7 @@ public static class RekallAgeModuleProjectFile
                 <ImplicitUsings>enable</ImplicitUsings>
                 <AssemblyName>{escapedModuleName}</AssemblyName>
                 <RekallAgeSdkCompatibilityVersion>{compatibilityVersion}</RekallAgeSdkCompatibilityVersion>
+                <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**</DefaultItemExcludes>
               </PropertyGroup>
               <Import Project="{sdkProps}" Condition="Exists('{sdkProps}')" />
               <Target Name="ValidateRekallAgeSdk" BeforeTargets="ResolveReferences" Condition="!Exists('{sdkProps}')">

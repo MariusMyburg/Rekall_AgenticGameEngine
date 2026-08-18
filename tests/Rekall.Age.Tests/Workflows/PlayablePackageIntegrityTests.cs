@@ -131,8 +131,8 @@ public sealed class PlayablePackageIntegrityTests
                 Path.Combine(TestPaths.CreateTempDirectory(), "InitialPackage")),
             context);
         Assert.True(authored.Ok, authored.Summary);
-        Directory.CreateDirectory(Path.Combine(root, ".rekall", "sdk", "1"));
-        await File.WriteAllTextAsync(Path.Combine(root, ".rekall", "sdk", "1", "sdk-cache.dll"), "cache");
+        Directory.CreateDirectory(Path.Combine(root, ".rekall", "cache"));
+        await File.WriteAllTextAsync(Path.Combine(root, ".rekall", "cache", "sdk-cache.dll"), "cache");
         await File.WriteAllTextAsync(Path.Combine(root, "DevOnly.cs"), "// authored source");
         await File.WriteAllTextAsync(Path.Combine(root, "DevOnly.csproj"), "<Project />");
         await File.WriteAllTextAsync(Path.Combine(root, "local.env"), "SECRET=do-not-ship");

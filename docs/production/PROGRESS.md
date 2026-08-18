@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 07:15 Africa/Johannesburg
+Last verified: 2026-08-18 07:31 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: project-local module SDK integrity is anchored to the running engine
+Latest milestone: bounded module build receipts and read-only trust inspection pass the full Debug suite
 
 ## Product objective
 
@@ -677,6 +677,21 @@ Studio is important, but it does not define or reorder the engine foundation.
   unexpected files/directories, and injected low bounds fail closed with
   `REKALL_MODULE_SDK_INTEGRITY_FAILED`. The complete Modules plus engine-doctor
   Debug selection passes at 62/62.
+- Module provenance receipts: successful canonical builds now atomically emit
+  `rekall.module.build.json` with the explicit `in-process-full-trust` posture,
+  product/SDK identity, deterministic pre-build source fingerprint, output
+  size/SHA-256 inventory, and main assembly identity. The read-only inspector
+  rejects stale source, missing/extra/tampered output, malformed/traversing or
+  duplicate receipt entries, identity mismatches, reparse points, and injected
+  bounds without loading module code; packaged output remains verifiable after
+  authoring source is removed. Source edits during compilation fail with
+  `REKALL_MODULE_SOURCE_CHANGED_DURING_BUILD` and no receipt.
+- Canonical intermediate hardening: module projects exclude every `bin/**` and
+  `obj/**` tree from source discovery, while policy verifies and build resets
+  the dedicated `obj/rekall` tree. This fixed a full-suite discovery where a
+  migrated example's legacy generated sources entered portable compilation.
+  Bouncing Ball now consumes the public project-local SDK instead of repository
+  project references. The complete Debug suite passes at 631/631.
 
 ## Current gaps
 
@@ -698,9 +713,10 @@ nested module/source layouts, source/output bounds, and simulated reparse
 points before starting `dotnet`; it also disables inherited
 `Directory.Build.props/targets` and resets only policy-verified output roots.
 Slice 2 anchors the installed SDK to an atomic inventory and the running
-engine's canonical resources, with 62/62 relevant Debug tests passing. Build
-receipts, verified loading, adapters/package preflight, and the full product
-gate remain in progress.
+engine's canonical resources. Slice 3 emits bounded receipts and inspects them
+without code loading; its focused adversarial suite passes at 11/11 and the
+complete Debug suite at 631/631. Verified-only loading, adapters/package
+preflight, and the full product gate remain in progress.
 
 ## Next after the current item
 

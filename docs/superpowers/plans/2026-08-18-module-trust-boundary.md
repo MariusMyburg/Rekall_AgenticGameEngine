@@ -92,23 +92,23 @@ git commit -m "fix: verify project module sdk integrity"
 - Modify: `src/Rekall.Age.Build/Commands/BuildModulesCommand.cs`
 - Create: `tests/Rekall.Age.Tests/Modules/ModuleTrustInspectionTests.cs`
 
-- [ ] **Step 1: Add failing receipt and inspection tests**
+- [x] **Step 1: Add failing receipt and inspection tests**
 
 Prove a canonical build writes `rekall.module.build.json`, trust inspection reports `in-process-full-trust`, relative normalized paths, exact SDK/product data, source fingerprint, and output inventory. Add missing/malformed/schema/compatibility/traversal/case-collision/duplicate/extra/missing/size/hash/assembly-identity/reparse/bounds cases with specific codes. Mutating source after an authoring build must return `REKALL_MODULE_SOURCE_STALE`; packaged output without source remains verifiable.
 
-- [ ] **Step 2: Run receipt tests RED**
+- [x] **Step 2: Run receipt tests RED**
 
 Expected: no receipt or inspector exists.
 
-- [ ] **Step 3: Implement atomic receipt writing**
+- [x] **Step 3: Implement atomic receipt writing**
 
 After successful build, compute a deterministic source fingerprint from canonical relative paths and bytes. Inventory only load-relevant files after the output root was reset. Write schema 1 atomically and add receipt path/trust posture to `BuildModuleResult` as backward-compatible init properties.
 
-- [ ] **Step 4: Implement bounded read-only inspection**
+- [x] **Step 4: Implement bounded read-only inspection**
 
 Validate without loading assemblies. Use lazy bounded enumeration, normalized ordinal path keys plus OS collision keys, SHA-256 streaming, injected low limits/attributes for deterministic tests, and compact named checks/issues.
 
-- [ ] **Step 5: Run receipt tests GREEN and commit**
+- [x] **Step 5: Run receipt tests GREEN and commit**
 
 ```powershell
 git add src/Rekall.Age.Modules/Security src/Rekall.Age.Build/Commands/BuildModulesCommand.cs tests/Rekall.Age.Tests/Modules/ModuleTrustInspectionTests.cs

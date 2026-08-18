@@ -127,6 +127,41 @@ public sealed class ModuleBuildPolicyTests
         Assert.True(File.Exists(Path.Combine(moduleDirectory, "bin", "rekall", "net10.0", "DirectoryTargetModule.dll")));
     }
 
+    [Fact]
+    public async Task LegacyIntermediateSourcesAreExcludedFromCanonicalCompilation()
+    {
+        var (root, _, moduleDirectory) = await ScaffoldAsync("LegacyIntermediateModule");
+        var legacyIntermediate = Path.Combine(moduleDirectory, "obj", "Debug", "net10.0");
+        Directory.CreateDirectory(legacyIntermediate);
+        await File.WriteAllTextAsync(
+            Path.Combine(legacyIntermediate, "StaleGenerated.cs"),
+            "#error Stale generated sources must never enter canonical compilation");
+
+        var result = await BuildAsync(root);
+
+        Assert.True(result.Ok, result.Summary);
+    }
+
+    [Fact]
+    public async Task SimulatedIntermediateDescendantReparsePointIsRejectedBeforeReset()
+    {
+        var (root, _, moduleDirectory) = await ScaffoldAsync("IntermediateReparseModule");
+        var intermediateDirectory = Path.Combine(moduleDirectory, "obj", "rekall");
+        Directory.CreateDirectory(intermediateDirectory);
+        var intermediateFile = Path.Combine(intermediateDirectory, "untrusted.cache");
+        await File.WriteAllBytesAsync(intermediateFile, [1, 2, 3]);
+        var policy = new RekallAgeModuleBuildPolicy(
+            new RekallAgeModuleBuildPolicyLimits(),
+            path => Path.GetFullPath(path).Equals(Path.GetFullPath(intermediateFile), StringComparison.OrdinalIgnoreCase)
+                ? FileAttributes.Normal | FileAttributes.ReparsePoint
+                : File.GetAttributes(path));
+
+        var result = await BuildAsync(root, policy);
+
+        AssertPolicyRejected(result);
+        Assert.True(File.Exists(intermediateFile));
+    }
+
     private static void AssertPolicyRejected(RekallAgeCommandResult<BuildModulesResult> result)
     {
         Assert.False(result.Ok);

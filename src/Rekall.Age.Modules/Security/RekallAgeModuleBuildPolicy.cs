@@ -15,6 +15,7 @@ public sealed record RekallAgeModuleBuildCandidate(
     string ModuleDirectory,
     string ProjectPath,
     string OutputDirectory,
+    string IntermediateDirectory,
     IReadOnlyList<string> SourcePaths);
 
 public sealed record RekallAgeModuleBuildPolicyIssue(
@@ -198,7 +199,9 @@ public sealed class RekallAgeModuleBuildPolicy
         }
 
         var outputDirectory = Path.Combine(moduleDirectory, "bin", "rekall", "net10.0");
+        var intermediateDirectory = Path.Combine(moduleDirectory, "obj", "rekall");
         InspectOutputTree(outputDirectory, moduleDirectory, issues);
+        InspectOutputTree(intermediateDirectory, moduleDirectory, issues);
         if (issues.Count > 0)
         {
             return;
@@ -209,6 +212,7 @@ public sealed class RekallAgeModuleBuildPolicy
             moduleDirectory,
             projectPath,
             outputDirectory,
+            intermediateDirectory,
             sources));
     }
 

@@ -4,6 +4,7 @@ using Rekall.Age.Core.Transactions;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime;
+using Rekall.Age.Modules.Sdk;
 using System.Runtime.CompilerServices;
 
 namespace Rekall.Age.Tests.Examples;
@@ -14,6 +15,7 @@ public sealed class BouncingBallExampleSceneTests
     public async Task BouncingBallExampleBuildsRunsAndCapturesViewport()
     {
         var root = Path.Combine(FindRepositoryRoot(), "Examples", "BouncingBall");
+        await new RekallAgeModuleSdkInstaller().InstallAsync(root, CancellationToken.None);
         var context = new RekallAgeCommandContext(
             "test",
             RekallAgeTransaction.Begin("bouncing ball example"),
@@ -50,6 +52,7 @@ public sealed class BouncingBallExampleSceneTests
     public async Task BouncingBallExampleEventuallyRestsOnTheFloor()
     {
         var root = Path.Combine(FindRepositoryRoot(), "Examples", "BouncingBall");
+        await new RekallAgeModuleSdkInstaller().InstallAsync(root, CancellationToken.None);
         var context = new RekallAgeCommandContext(
             "test",
             RekallAgeTransaction.Begin("bouncing ball settle check"),

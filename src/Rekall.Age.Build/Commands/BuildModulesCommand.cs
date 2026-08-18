@@ -16,30 +16,48 @@ public sealed record BuildModuleResult(
     bool Succeeded,
     string Output,
     int ExitCode,
-    string SdkVersion);
+    string SdkVersion)
+{
+    public string ReceiptPath { get; init; } = string.Empty;
+
+    public string TrustPosture { get; init; } = string.Empty;
+}
 
 public sealed class BuildModulesCommand
     : IRekallAgeCommand<BuildModulesRequest, BuildModulesResult>
 {
     private readonly RekallAgeModuleBuildPolicy _buildPolicy;
     private readonly RekallAgeModuleSdkIntegrityVerifier _sdkIntegrityVerifier;
+    private readonly RekallAgeModuleBuildReceiptService _receiptService;
 
     public BuildModulesCommand()
-        : this(new RekallAgeModuleBuildPolicy(), new RekallAgeModuleSdkIntegrityVerifier())
+        : this(
+            new RekallAgeModuleBuildPolicy(),
+            new RekallAgeModuleSdkIntegrityVerifier(),
+            new RekallAgeModuleBuildReceiptService())
     {
     }
 
     internal BuildModulesCommand(RekallAgeModuleBuildPolicy buildPolicy)
-        : this(buildPolicy, new RekallAgeModuleSdkIntegrityVerifier())
+        : this(buildPolicy, new RekallAgeModuleSdkIntegrityVerifier(), new RekallAgeModuleBuildReceiptService())
     {
     }
 
     internal BuildModulesCommand(
         RekallAgeModuleBuildPolicy buildPolicy,
         RekallAgeModuleSdkIntegrityVerifier sdkIntegrityVerifier)
+        : this(buildPolicy, sdkIntegrityVerifier, new RekallAgeModuleBuildReceiptService())
+    {
+    }
+
+    internal BuildModulesCommand(
+        RekallAgeModuleBuildPolicy buildPolicy,
+        RekallAgeModuleSdkIntegrityVerifier sdkIntegrityVerifier,
+        RekallAgeModuleBuildReceiptService receiptService)
     {
         _buildPolicy = buildPolicy;
         _sdkIntegrityVerifier = sdkIntegrityVerifier;
+        _receiptService = receiptService;
     }
 
     public string Name => "rekall.build.modules";
@@ -88,12 +106,65 @@ public sealed class BuildModulesCommand
 
         foreach (var candidate in policy.Candidates)
         {
-            ResetVerifiedOutputDirectory(candidate);
+            string sourceFingerprint;
+            try
+            {
+                sourceFingerprint = _receiptService.CaptureSourceFingerprint(candidate);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+            {
+                return RekallAgeCommandResult<BuildModulesResult>.Failure(
+                    new BuildModulesResult(results),
+                    "Module source could not be fingerprinted safely before compilation.",
+                    [new RekallAgeCommandError(
+                        "REKALL_MODULE_SOURCE_FINGERPRINT_FAILED",
+                        ex.Message,
+                        candidate.ModuleDirectory)]);
+            }
+            ResetVerifiedGeneratedDirectory(candidate, candidate.OutputDirectory);
+            ResetVerifiedGeneratedDirectory(candidate, candidate.IntermediateDirectory);
             var result = await BuildProjectAsync(candidate, context.CancellationToken);
+            if (result.Succeeded)
+            {
+                string receiptPath;
+                try
+                {
+                    receiptPath = await _receiptService.WriteAsync(
+                        request.ProjectRoot,
+                        candidate,
+                        sourceFingerprint,
+                        context.CancellationToken);
+                }
+                catch (RekallAgeModuleReceiptException ex)
+                {
+                    results.Add(result with { Succeeded = false, Output = ex.Message });
+                    return RekallAgeCommandResult<BuildModulesResult>.Failure(
+                        new BuildModulesResult(results),
+                        "A bounded module build receipt could not be issued.",
+                        [new RekallAgeCommandError(ex.Code, ex.Message, ex.Target)]);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+                {
+                    results.Add(result with { Succeeded = false, Output = ex.Message });
+                    return RekallAgeCommandResult<BuildModulesResult>.Failure(
+                        new BuildModulesResult(results),
+                        "A bounded module build receipt could not be written safely.",
+                        [new RekallAgeCommandError(
+                            "REKALL_MODULE_RECEIPT_WRITE_FAILED",
+                            ex.Message,
+                            candidate.OutputDirectory)]);
+                }
+                result = result with
+                {
+                    ReceiptPath = receiptPath,
+                    TrustPosture = RekallAgeModuleTrustPostures.InProcessFullTrust
+                };
+            }
             results.Add(result);
             if (result.Succeeded)
             {
                 context.Transaction.RecordChangedResource(result.AssemblyPath);
+                context.Transaction.RecordChangedResource(result.ReceiptPath);
             }
         }
 
@@ -135,9 +206,11 @@ public sealed class BuildModulesCommand
             $"Built {results.Count} module project(s).");
     }
 
-    private static void ResetVerifiedOutputDirectory(RekallAgeModuleBuildCandidate candidate)
+    private static void ResetVerifiedGeneratedDirectory(
+        RekallAgeModuleBuildCandidate candidate,
+        string directory)
     {
-        var output = Path.GetFullPath(candidate.OutputDirectory);
+        var output = Path.GetFullPath(directory);
         var module = Path.GetFullPath(candidate.ModuleDirectory)
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;

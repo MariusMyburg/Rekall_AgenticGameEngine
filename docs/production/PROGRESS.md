@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 02:01 Africa/Johannesburg
+Last verified: 2026-08-18 02:07 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: embedded delivery sequencing contract passed 582/582 Debug tests
+Latest milestone: embedded delivery sequencing contract passed the complete product gate
 
 ## Product objective
 
@@ -340,6 +340,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   prohibits reopening authoring after package proof unless evidence failed and
   explicitly keeps proof output outside immutable packages. The full Debug
   suite passes at 582/582.
+- Embedded delivery-contract distribution gate: the clean Release build
+  completed with zero warnings and zero errors; both independent Release passes
+  completed at 582/582; and installed acceptance passed SDK/module authoring,
+  the generic gauntlet, original and relocated package proof, runtime UI,
+  software viewport, simulated audio, and Windows player audio. The canonical
+  1,149-file archive is 194,708,031 bytes.
 
 ## Current gaps
 
@@ -355,7 +361,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for the embedded delivery sequencing contract.
+Rerun the unchanged installed Ollama benchmark on the delivery-contract distribution.
 
 ## Next after the current item
 

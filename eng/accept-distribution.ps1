@@ -27,6 +27,7 @@ $archiveSecurityRoot = Join-Path $tempRoot ('rekall-age-installed-archive-securi
 $animationGraphRoot = Join-Path $tempRoot ('rekall-age-installed-animation-graph-' + [Guid]::NewGuid().ToString('N'))
 $morphRoot = Join-Path $tempRoot ('rekall-age-installed-morph-proof-' + [Guid]::NewGuid().ToString('N'))
 $atomicJsonRoot = Join-Path $tempRoot ('rekall-age-installed-atomic-json-' + [Guid]::NewGuid().ToString('N'))
+$documentRevisionRoot = Join-Path $tempRoot ('rekall-age-installed-document-revisions-' + [Guid]::NewGuid().ToString('N'))
 $succeeded = $false
 $previousSdlAudioDriver = $env:SDL_AUDIODRIVER
 $previousDiagnosticsRoot = $env:REKALL_AGE_DIAGNOSTICS_DIR
@@ -576,6 +577,9 @@ try {
     & (Join-Path $PSScriptRoot 'accept-installed-atomic-json.ps1') -DistributionRoot $distribution -ProjectRoot $atomicJsonRoot
     if ($LASTEXITCODE -ne 0) { throw "Installed atomic JSON acceptance failed ($LASTEXITCODE)." }
 
+    & (Join-Path $PSScriptRoot 'accept-installed-document-revisions.ps1') -DistributionRoot $distribution -ProjectRoot $documentRevisionRoot
+    if ($LASTEXITCODE -ne 0) { throw "Installed document revision acceptance failed ($LASTEXITCODE)." }
+
     $succeeded = $true
     Write-Output "Installed distribution acceptance passed: $distribution"
 }
@@ -583,7 +587,7 @@ finally {
     $env:SDL_AUDIODRIVER = $previousSdlAudioDriver
     $env:REKALL_AGE_DIAGNOSTICS_DIR = $previousDiagnosticsRoot
     if ($succeeded) {
-        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot, $diagnosticsRoot, $compatibilityRoot, $archiveSecurityRoot, $animationGraphRoot, $morphRoot, $atomicJsonRoot)) {
+        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot, $diagnosticsRoot, $compatibilityRoot, $archiveSecurityRoot, $animationGraphRoot, $morphRoot, $atomicJsonRoot, $documentRevisionRoot)) {
             $resolved = [IO.Path]::GetFullPath($path)
             if ($resolved.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and
                 (Test-Path -LiteralPath $resolved)) {
@@ -592,6 +596,6 @@ finally {
         }
     }
     else {
-        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', '$audioRoot', '$diagnosticsRoot', '$compatibilityRoot', '$archiveSecurityRoot', '$animationGraphRoot', '$morphRoot', and '$atomicJsonRoot'."
+        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', '$audioRoot', '$diagnosticsRoot', '$compatibilityRoot', '$archiveSecurityRoot', '$animationGraphRoot', '$morphRoot', '$atomicJsonRoot', and '$documentRevisionRoot'."
     }
 }

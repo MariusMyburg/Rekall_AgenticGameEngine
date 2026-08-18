@@ -30,7 +30,7 @@ inspectable recovery facts.
 
 ### Task 4: Installed conflict proof and complete gate
 
-- [ ] Exercise competing shipped-CLI writers, exact conflict reporting,
+- [x] Exercise competing shipped-CLI writers, exact conflict reporting,
   reload/retry, validation, and no lock/temp leaks.
-- [ ] Run complete Debug and locked two-pass Release/distribution verification.
-- [ ] Record exact evidence and remaining content-merge boundary in progress.
+- [x] Run complete Debug and locked two-pass Release/distribution verification.
+- [x] Record exact evidence and remaining content-merge boundary in progress.

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.World;
@@ -315,6 +316,32 @@ public sealed class CliSmokeTests
         var restored = await sceneStore.LoadAsync(root, "Main", CancellationToken.None);
         var component = Assert.Single(restored.Entities.Single().Components);
         Assert.Equal(4, component.Properties["speed"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task CliExposesRevisionAndRejectsExplicitStaleMutation()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var cli = FindCliAssemblyPath();
+        Assert.Equal(0, (await RunAsync(cli, "project", "create", root, "Revision Proof", "world")).ExitCode);
+        Assert.Equal(0, (await RunAsync(cli, "scene", "create", root, "Main", "world")).ExitCode);
+        var initial = await RunAsync(cli, "context", "scene", root, "Main");
+        var staleRevision = Regex.Match(initial.Output, "Revision: ([0-9a-f]{64})").Groups[1].Value;
+        Assert.Equal(64, staleRevision.Length);
+
+        Assert.Equal(0, (await RunAsync(cli, "entity", "create", root, "Main", "Intervening", "proof")).ExitCode);
+        var stale = await RunAsync(cli, "entity", "create", root, "Main", "Stale", "proof", staleRevision);
+        Assert.Equal(1, stale.ExitCode);
+        Assert.Contains("REKALL_DOCUMENT_REVISION_CONFLICT", stale.Output, StringComparison.Ordinal);
+
+        var refreshed = await RunAsync(cli, "context", "scene", root, "Main");
+        var currentRevision = Regex.Match(refreshed.Output, "Revision: ([0-9a-f]{64})").Groups[1].Value;
+        Assert.NotEqual(staleRevision, currentRevision);
+        Assert.Equal(0, (await RunAsync(cli, "entity", "create", root, "Main", "Retried", "proof", currentRevision)).ExitCode);
+        var final = await RunAsync(cli, "context", "scene", root, "Main");
+        Assert.Contains("Intervening", final.Output, StringComparison.Ordinal);
+        Assert.Contains("Retried", final.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("Stale", final.Output, StringComparison.Ordinal);
     }
 
     private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)

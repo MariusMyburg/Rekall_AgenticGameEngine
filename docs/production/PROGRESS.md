@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 12:27 Africa/Johannesburg
+Last verified: 2026-08-18 12:55 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: atomic persisted JSON passed the installed concurrent-reader product gate
+Latest milestone: optimistic document revisions passed the installed conflict-recovery product gate
 
 ## Product objective
 
@@ -30,14 +30,14 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 195,258,607-byte win-x64 archive assembled with
-  SHA-256 `2E05246183D9A65F3CF250DECFD5BAF713946255E0BA8FEFE3D7CDD19402F456`.
+- Windows distribution: fresh 195,300,134-byte win-x64 archive assembled with
+  SHA-256 `A222BB5ACD590E796F1CEEB920FAF96FBB5C509604273E5D360450DAE60B3005`.
   Its manifest lists 1,149 payload files; the assembled directory has 1,150
   files including the distribution manifest itself.
-- Canonical verification: 806/806 Release tests passed twice independently;
+- Canonical verification: 818/818 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
-- Current Debug verification: 806/806 tests pass after atomic persisted JSON
-  integration and bounded publication-contention hardening.
+- Current Debug verification: 818/818 tests pass after optimistic document
+  revisions, serialized transaction append, and reader-contention hardening.
 - Installed acceptance: canonical gate exited 0; project/module workflows,
   packaging and relocation, negative archive preflight, nonblank capture,
   runtime UI, and audible audio paths have installed-binary proof.
@@ -922,6 +922,25 @@ scene mutations to conditional publication. Thirty-two simultaneous distinct
 transaction appends retained all 32 entries through bounded conflict/reload
 retries and left no engine-owned control files.
 
+Optimistic document revisions Task 4 passed the complete product gate. Debug
+passed 818/818 in 1m24s; the clean locked Release build had zero warnings and
+zero errors, and two independent Release passes completed 818/818 in 1m25s and
+1m27s. The first Release attempt exposed a transient Windows replace/open
+window in the existing reader stress test; snapshot acquisition was hardened to
+a bounded 64-attempt ceiling and the exact Release stress passed 10 consecutive
+reruns before the complete gate restarted from zero. Shipped binaries exposed
+an exact scene revision, rejected a stale mutation with
+`REKALL_DOCUMENT_REVISION_CONFLICT`, exposed a changed revision, accepted the
+refreshed retry, retained both valid entity edits and both audit entries, and
+left zero lock/temp controls. Atomic acceptance concurrently parsed 5,784
+complete documents with three tolerated transient opens and zero malformed
+documents. The installed matrix passed; its 600-frame soak simulated exactly
+10 seconds at 4,259.3 FPS with 712,576 retained bytes and all nine checks. The
+1,149-payload-file archive is 195,300,134 bytes with SHA-256
+`A222BB5ACD590E796F1CEEB920FAF96FBB5C509604273E5D360450DAE60B3005`.
+Automatic content merge, CRDTs, and collaborative-editor conflict UX remain
+explicitly outside this tranche.
+
 Atomic persisted JSON was selected as the next risk-driven tranche. Code inspection found
 that project and scene loads schema-probe one file handle and then reopen the
 path for typed deserialization, while their saves write directly to the live
@@ -959,8 +978,9 @@ pipeline, prefab, render-plan, and transaction-log stores now share an explicit
 through the durable atomic writer. Cross-store round trips preserve existing
 shapes; a sparse 64 MiB+1 catalog fails before JSON allocation; depth-80 render
 metadata loads consistently; and successful writes leave no temporary siblings.
-Transaction append remains intentionally last-writer-wins rather than claiming
-multi-writer merge semantics.
+At this milestone transaction append was still last-writer-wins; optimistic
+document revisions Task 3 later closed that audit-history loss window through
+bounded compare/reload retries without claiming content-merge semantics.
 
 Atomic persisted JSON Task 4 passed the complete product gate. Debug passed
 806/806 in 1m25s; the locked zero-warning, zero-error Release build passed
@@ -1133,9 +1153,9 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
-Compare the now-verified animation/renderer and atomic-persistence foundations
-against the remaining migration-conflict/recovery, diagnostic-store, and
-full-trust module risks, then select the highest-leverage generic
+Compare the now-verified animation/renderer and revisioned-persistence
+foundations against the remaining corruption recovery, diagnostic-store, and
+full-trust module-isolation risks, then select the highest-leverage generic
 production-hardening tranche. Studio continues to follow proven engine
 contracts instead of reordering the foundation roadmap.
 
@@ -1159,6 +1179,9 @@ contracts instead of reordering the foundation roadmap.
 - `docs/superpowers/specs/2026-08-18-atomic-persisted-json-design.md`
 - `docs/superpowers/plans/2026-08-18-atomic-persisted-json.md`
 - `eng/accept-installed-atomic-json.ps1`
+- `docs/superpowers/specs/2026-08-18-optimistic-document-revisions-design.md`
+- `docs/superpowers/plans/2026-08-18-optimistic-document-revisions.md`
+- `eng/accept-installed-document-revisions.ps1`
 - `Artifacts/TestResults/release-pass-1.trx`
 - `Artifacts/TestResults/release-pass-2.trx`
 - `Artifacts/Distribution/Rekall-AGE-0.1.0-preview.1-win-x64.zip`

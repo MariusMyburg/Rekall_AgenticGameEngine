@@ -73,7 +73,7 @@ public sealed record RekallAgeBoundedFileSnapshot(string Path, byte[] Bytes)
         string fullPath,
         CancellationToken cancellationToken)
     {
-        const int maximumAttempts = 8;
+        const int maximumAttempts = 64;
         for (var attempt = 1; ; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -87,9 +87,11 @@ public sealed record RekallAgeBoundedFileSnapshot(string Path, byte[] Bytes)
                     bufferSize: 4096,
                     FileOptions.Asynchronous | FileOptions.SequentialScan);
             }
-            catch (IOException) when (attempt < maximumAttempts)
+            catch (Exception error) when (
+                error is IOException or UnauthorizedAccessException &&
+                attempt < maximumAttempts)
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(attempt, 4)), cancellationToken)
+                await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(attempt, 8)), cancellationToken)
                     .ConfigureAwait(false);
             }
         }

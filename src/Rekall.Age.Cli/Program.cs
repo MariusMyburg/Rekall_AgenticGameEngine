@@ -257,8 +257,12 @@ internal static class RekallAgeCli
                     await CapturePlayablePackageFrameAsync(registry, context, packagePath, outputDirectory, frameIndex),
                 ["project", "create", var root, var name, var capabilities] => await CreateProjectAsync(registry, context, root, name, capabilities),
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
+                ["capability", "add", var root, var capability, var expectedRevision] =>
+                    await AddCapabilityAsync(registry, context, root, capability, expectedRevision),
                 ["scene", "create", var root, var name, var capabilities] => await CreateSceneAsync(registry, context, root, name, capabilities),
                 ["entity", "create", var root, var scene, var name, var tags] => await CreateEntityAsync(registry, context, root, scene, name, tags),
+                ["entity", "create", var root, var scene, var name, var tags, var expectedRevision] =>
+                    await CreateEntityAsync(registry, context, root, scene, name, tags, expectedRevision),
                 ["entity", "inspect", var root, var scene, var entityId] => await InspectEntityAsync(registry, context, root, scene, entityId),
                 ["component", "set", var root, var scene, var entityId, var componentType, var propertyName, var value] =>
                     await SetComponentPropertyAsync(registry, context, root, scene, entityId, componentType, propertyName, value),
@@ -2719,11 +2723,12 @@ internal static class RekallAgeCli
         RekallAgeCommandRegistry registry,
         RekallAgeCommandContext context,
         string root,
-        string capability)
+        string capability,
+        string? expectedRevision = null)
     {
         var result = await registry.ExecuteAsync<AddCapabilityRequest, AddCapabilityResult>(
             "rekall.capability.add",
-            new AddCapabilityRequest(root, capability),
+            new AddCapabilityRequest(root, capability, expectedRevision),
             context);
         Console.WriteLine(result.Summary);
         return result.Ok ? 0 : 1;
@@ -2750,11 +2755,12 @@ internal static class RekallAgeCli
         string root,
         string scene,
         string name,
-        string tags)
+        string tags,
+        string? expectedRevision = null)
     {
         var result = await registry.ExecuteAsync<CreateEntityRequest, CreateEntityResult>(
             "rekall.entity.create",
-            new CreateEntityRequest(root, scene, name, SplitCsv(tags)),
+            new CreateEntityRequest(root, scene, name, SplitCsv(tags), expectedRevision),
             context);
         Console.WriteLine(result.Summary);
         return result.Ok ? 0 : 1;
@@ -2772,6 +2778,7 @@ internal static class RekallAgeCli
         var summary = result.Value.Summary;
 
         Console.WriteLine($"{summary.Project}: {summary.Health.Status}");
+        Console.WriteLine($"Revision: {summary.Revision}");
         foreach (var issue in summary.Health.BlockingIssues)
         {
             Console.WriteLine($"- {issue}");
@@ -3172,6 +3179,7 @@ internal static class RekallAgeCli
             context);
         var summary = result.Value.Summary;
         Console.WriteLine($"Scene {summary.Scene}: {summary.EntityCount} entities");
+        Console.WriteLine($"Revision: {summary.Revision}");
         Console.WriteLine($"Components: {string.Join(", ", summary.ComponentTypes)}");
         if (!string.IsNullOrWhiteSpace(summary.HeadsetCameraName))
         {

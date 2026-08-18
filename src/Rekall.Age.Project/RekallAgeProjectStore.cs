@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Rekall.Age.Core.Compatibility;
+using Rekall.Age.Core.Product;
 
 namespace Rekall.Age.Project;
 
@@ -19,7 +21,8 @@ public sealed class RekallAgeProjectStore
     {
         Directory.CreateDirectory(projectRoot);
         var path = Path.Combine(projectRoot, ManifestFileName);
-        var json = JsonSerializer.Serialize(manifest, JsonOptions);
+        var current = manifest with { SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion };
+        var json = JsonSerializer.Serialize(current, JsonOptions);
         await File.WriteAllTextAsync(path, json + Environment.NewLine, cancellationToken);
     }
 
@@ -28,11 +31,19 @@ public sealed class RekallAgeProjectStore
         CancellationToken cancellationToken)
     {
         var path = Path.Combine(projectRoot, ManifestFileName);
+        await RekallAgeDocumentSchemaProbe.ReadAsync(
+            path,
+            "project",
+            RekallAgeProductInfo.Current.ProjectSchemaVersion,
+            cancellationToken);
         await using var stream = File.OpenRead(path);
         var manifest = await JsonSerializer.DeserializeAsync<RekallAgeProjectManifest>(
             stream,
             JsonOptions,
             cancellationToken);
-        return manifest ?? throw new InvalidOperationException($"Manifest '{path}' could not be read.");
+        return (manifest ?? throw new InvalidOperationException($"Manifest '{path}' could not be read.")) with
+        {
+            SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion
+        };
     }
 }

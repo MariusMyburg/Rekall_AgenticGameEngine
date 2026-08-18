@@ -1,4 +1,5 @@
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Compatibility;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
@@ -46,5 +47,59 @@ public sealed class ProjectManifestTests
 
         Assert.True(result.Ok);
         Assert.Equal(["rendering3d", "world"], result.Value.Manifest.Capabilities);
+    }
+
+    [Fact]
+    public async Task LegacyManifestLoadsAsCurrentWithoutRewritingSource()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, RekallAgeProjectStore.ManifestFileName);
+        const string legacy = """
+            {
+              "name": "Legacy Project",
+              "capabilities": ["world"]
+            }
+            """;
+        await File.WriteAllTextAsync(path, legacy);
+
+        var manifest = await new RekallAgeProjectStore().LoadAsync(root, CancellationToken.None);
+
+        Assert.Equal(1, manifest.SchemaVersion);
+        Assert.Equal(legacy, await File.ReadAllTextAsync(path));
+    }
+
+    [Theory]
+    [InlineData("2", "REKALL_DOCUMENT_SCHEMA_FUTURE")]
+    [InlineData("-1", "REKALL_DOCUMENT_SCHEMA_INVALID")]
+    [InlineData("\"one\"", "REKALL_DOCUMENT_SCHEMA_INVALID")]
+    public async Task UnsupportedManifestSchemaFailsClosed(string schemaToken, string expectedCode)
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, RekallAgeProjectStore.ManifestFileName);
+        await File.WriteAllTextAsync(
+            path,
+            $$"""{"name":"Blocked","schemaVersion":{{schemaToken}},"capabilities":[]}""");
+
+        var error = await Assert.ThrowsAsync<RekallAgeDocumentCompatibilityException>(
+            () => new RekallAgeProjectStore().LoadAsync(root, CancellationToken.None).AsTask());
+
+        Assert.Equal(expectedCode, error.Code);
+        Assert.Equal("project", error.DocumentKind);
+        Assert.Equal(Path.GetFullPath(path), error.DocumentPath);
+        Assert.Equal(1, error.CurrentVersion);
+    }
+
+    [Fact]
+    public async Task MalformedManifestJsonReturnsTypedCompatibilityFailure()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await File.WriteAllTextAsync(
+            Path.Combine(root, RekallAgeProjectStore.ManifestFileName),
+            "{ not-json");
+
+        var error = await Assert.ThrowsAsync<RekallAgeDocumentCompatibilityException>(
+            () => new RekallAgeProjectStore().LoadAsync(root, CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_DOCUMENT_JSON_MALFORMED", error.Code);
     }
 }

@@ -816,6 +816,12 @@ migration. Package, module SDK, receipt, animation, and diagnostic versions
 remain intentionally separate contracts. The module trust boundary and desktop
 recovery paths remain installed-product verified.
 
+Compatibility Task 1 is verified at 14/14 focused tests: project and scene
+stores now share a bounded raw schema probe, persist explicit schema 1,
+normalize implicit legacy schema 0 only in memory, keep loads read-only, and
+fail closed with typed stable codes for malformed, invalid, or future schema
+facts.
+
 ## Next after the current item
 
 Expand adversarial security coverage, then complete advanced animation

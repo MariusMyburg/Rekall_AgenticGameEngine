@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Rekall.Age.Core.Compatibility;
+using Rekall.Age.Core.Product;
 
 namespace Rekall.Age.World;
 
@@ -23,7 +25,8 @@ public sealed class RekallAgeSceneStore
         var scenesDirectory = Path.Combine(projectRoot, "Scenes");
         Directory.CreateDirectory(scenesDirectory);
         var path = GetScenePath(projectRoot, scene.Name);
-        var json = JsonSerializer.Serialize(scene, JsonOptions);
+        var current = scene with { SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion };
+        var json = JsonSerializer.Serialize(current, JsonOptions);
         await File.WriteAllTextAsync(path, json + Environment.NewLine, cancellationToken);
     }
 
@@ -33,12 +36,20 @@ public sealed class RekallAgeSceneStore
         CancellationToken cancellationToken)
     {
         var path = GetScenePath(projectRoot, sceneName);
+        await RekallAgeDocumentSchemaProbe.ReadAsync(
+            path,
+            "scene",
+            RekallAgeProductInfo.Current.ProjectSchemaVersion,
+            cancellationToken);
         await using var stream = File.OpenRead(path);
         var scene = await JsonSerializer.DeserializeAsync<RekallAgeSceneDocument>(
             stream,
             JsonOptions,
             cancellationToken);
-        return scene ?? throw new InvalidOperationException($"Scene '{path}' could not be read.");
+        return (scene ?? throw new InvalidOperationException($"Scene '{path}' could not be read.")) with
+        {
+            SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion
+        };
     }
 
     public IReadOnlyList<string> ListSceneNames(string projectRoot)

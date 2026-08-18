@@ -6,13 +6,19 @@ Design: `docs/superpowers/specs/2026-08-18-persisted-compatibility-migrations-de
 
 ## Task 1: Establish document schema boundaries
 
-- [ ] Add failing project/scene store tests for current, missing, future,
+- [x] Add failing project/scene store tests for current, missing, future,
   malformed, negative, and non-integral schema versions.
-- [ ] Add a typed compatibility exception and bounded raw schema probe.
-- [ ] Add explicit scene schema version 1 while treating a missing version as
+- [x] Add a typed compatibility exception and bounded raw schema probe.
+- [x] Add explicit scene schema version 1 while treating a missing version as
   legacy schema 0 in memory.
-- [ ] Enforce the same boundary in both stores and keep load read-only.
-- [ ] Run focused tests and commit.
+- [x] Enforce the same boundary in both stores and keep load read-only.
+- [x] Run focused tests and commit.
+
+Verified 2026-08-18: 14 focused project/scene store tests pass. Both stores
+probe bounded JSON before typed deserialization, normalize implicit schema 0 to
+the current in-memory contract without rewriting on load, persist explicit
+schema 1, and return typed stable failures for malformed, invalid, or future
+schema facts.
 
 ## Task 2: Add deterministic whole-project inspection
 

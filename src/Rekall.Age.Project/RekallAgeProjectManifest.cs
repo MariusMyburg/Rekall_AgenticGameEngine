@@ -1,3 +1,5 @@
+using Rekall.Age.Core.Product;
+
 namespace Rekall.Age.Project;
 
 public sealed record RekallAgeProjectManifest(
@@ -12,7 +14,10 @@ public sealed record RekallAgeProjectManifest(
             throw new ArgumentException("Project name is required.", nameof(name));
         }
 
-        return new RekallAgeProjectManifest(name.Trim(), 1, NormalizeCapabilities(capabilities));
+        return new RekallAgeProjectManifest(
+            name.Trim(),
+            RekallAgeProductInfo.Current.ProjectSchemaVersion,
+            NormalizeCapabilities(capabilities));
     }
 
     public RekallAgeProjectManifest AddCapability(string capability)

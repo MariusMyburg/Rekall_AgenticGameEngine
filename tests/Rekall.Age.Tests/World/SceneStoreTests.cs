@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Compatibility;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
@@ -54,5 +55,64 @@ public sealed class SceneStoreTests
 
         Assert.True(result.Ok);
         Assert.Contains(result.Value.Scene.Entities.Single().Components, component => component.Type == "Rekall.Camera2D");
+    }
+
+    [Fact]
+    public async Task SavedSceneDeclaresCurrentSchema()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"]);
+
+        await store.SaveAsync(root, scene, CancellationToken.None);
+
+        var json = await File.ReadAllTextAsync(store.GetScenePath(root, "Main"));
+        Assert.Contains("\"schemaVersion\": 1", json, StringComparison.Ordinal);
+        Assert.Equal(1, scene.SchemaVersion);
+    }
+
+    [Fact]
+    public async Task LegacySceneLoadsAsCurrentWithoutRewritingSource()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        var path = store.GetScenePath(root, "Main");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        const string legacy = """
+            {
+              "id": "scene_legacy",
+              "name": "Main",
+              "capabilities": ["world"],
+              "entities": []
+            }
+            """;
+        await File.WriteAllTextAsync(path, legacy);
+
+        var scene = await store.LoadAsync(root, "Main", CancellationToken.None);
+
+        Assert.Equal(1, scene.SchemaVersion);
+        Assert.Equal(legacy, await File.ReadAllTextAsync(path));
+    }
+
+    [Theory]
+    [InlineData("2", "REKALL_DOCUMENT_SCHEMA_FUTURE")]
+    [InlineData("-1", "REKALL_DOCUMENT_SCHEMA_INVALID")]
+    [InlineData("true", "REKALL_DOCUMENT_SCHEMA_INVALID")]
+    public async Task UnsupportedSceneSchemaFailsClosed(string schemaToken, string expectedCode)
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        var path = store.GetScenePath(root, "Main");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(
+            path,
+            $$"""{"schemaVersion":{{schemaToken}},"id":"scene_blocked","name":"Main","capabilities":[],"entities":[]}""");
+
+        var error = await Assert.ThrowsAsync<RekallAgeDocumentCompatibilityException>(
+            () => store.LoadAsync(root, "Main", CancellationToken.None).AsTask());
+
+        Assert.Equal(expectedCode, error.Code);
+        Assert.Equal("scene", error.DocumentKind);
+        Assert.Equal(Path.GetFullPath(path), error.DocumentPath);
     }
 }

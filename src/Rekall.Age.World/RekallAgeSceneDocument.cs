@@ -1,6 +1,9 @@
+using Rekall.Age.Core.Product;
+
 namespace Rekall.Age.World;
 
 public sealed record RekallAgeSceneDocument(
+    int SchemaVersion,
     string Id,
     string Name,
     IReadOnlyList<string> Capabilities,
@@ -14,6 +17,7 @@ public sealed record RekallAgeSceneDocument(
         }
 
         return new RekallAgeSceneDocument(
+            RekallAgeProductInfo.Current.ProjectSchemaVersion,
             $"scene_{Guid.NewGuid():N}",
             name.Trim(),
             NormalizeCapabilities(capabilities),

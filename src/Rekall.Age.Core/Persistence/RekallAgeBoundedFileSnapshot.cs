@@ -16,6 +16,8 @@ public sealed class RekallAgeBoundedFileSnapshotException : IOException
 
 public sealed record RekallAgeBoundedFileSnapshot(string Path, byte[] Bytes)
 {
+    public string Revision { get; } = RekallAgeDocumentRevision.Compute(Bytes);
+
     public static async ValueTask<RekallAgeBoundedFileSnapshot> ReadAsync(
         string path,
         long maximumBytes,

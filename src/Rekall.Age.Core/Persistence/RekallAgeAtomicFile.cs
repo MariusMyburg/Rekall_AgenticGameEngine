@@ -12,6 +12,61 @@ public static class RekallAgeAtomicFile
         long maximumBytes,
         CancellationToken cancellationToken)
     {
+        var prepared = Prepare(path, contents, maximumBytes, cancellationToken);
+        await using var documentLock = await AcquireLockAsync(prepared.FullPath, cancellationToken).ConfigureAwait(false);
+        await WritePreparedAsync(prepared, cancellationToken).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<string> WriteAllTextIfRevisionAsync(
+        string path,
+        string contents,
+        long maximumBytes,
+        string expectedRevision,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedRevision);
+        if (!RekallAgeDocumentRevision.IsValid(expectedRevision))
+        {
+            throw new ArgumentException("Expected revision must be 'missing' or a lowercase SHA-256 token.", nameof(expectedRevision));
+        }
+
+        var prepared = Prepare(path, contents, maximumBytes, cancellationToken);
+        await using var documentLock = await AcquireLockAsync(prepared.FullPath, cancellationToken).ConfigureAwait(false);
+        var currentRevision = File.Exists(prepared.FullPath)
+            ? (await RekallAgeBoundedFileSnapshot.ReadAsync(
+                prepared.FullPath,
+                maximumBytes,
+                cancellationToken).ConfigureAwait(false)).Revision
+            : RekallAgeDocumentRevision.Missing;
+        if (!currentRevision.Equals(expectedRevision, StringComparison.Ordinal))
+        {
+            throw new RekallAgeDocumentRevisionException(
+                "REKALL_DOCUMENT_REVISION_CONFLICT",
+                prepared.FullPath,
+                $"Document '{prepared.FullPath}' changed: expected revision '{expectedRevision}', current revision '{currentRevision}'. Reload the document, reapply the semantic change, and retry.",
+                expectedRevision,
+                currentRevision);
+        }
+
+        await WritePreparedAsync(prepared, cancellationToken).ConfigureAwait(false);
+        return RekallAgeDocumentRevision.Compute(prepared.Bytes);
+    }
+
+    public static string GetLockPath(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var fullPath = Path.GetFullPath(path);
+        var directory = Path.GetDirectoryName(fullPath)
+            ?? throw new InvalidOperationException($"Document path '{fullPath}' has no parent directory.");
+        return Path.Combine(directory, $".{Path.GetFileName(fullPath)}.lock");
+    }
+
+    private static PreparedDocument Prepare(
+        string path,
+        string contents,
+        long maximumBytes,
+        CancellationToken cancellationToken)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(contents);
         if (maximumBytes < 1 || maximumBytes > int.MaxValue)
@@ -23,21 +78,27 @@ public static class RekallAgeAtomicFile
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var byteCount = Utf8WithoutBom.GetByteCount(contents);
-        if (byteCount > maximumBytes)
+        var fullPath = Path.GetFullPath(path);
+        var bytes = Utf8WithoutBom.GetBytes(contents);
+        if (bytes.LongLength > maximumBytes)
         {
             throw new InvalidDataException(
-                $"Document for '{Path.GetFullPath(path)}' is {byteCount} bytes; the limit is {maximumBytes} bytes.");
+                $"Document for '{fullPath}' is {bytes.LongLength} bytes; the limit is {maximumBytes} bytes.");
         }
 
-        var fullPath = Path.GetFullPath(path);
         var directory = Path.GetDirectoryName(fullPath)
             ?? throw new InvalidOperationException($"Document path '{fullPath}' has no parent directory.");
         Directory.CreateDirectory(directory);
+        return new PreparedDocument(fullPath, directory, bytes);
+    }
+
+    private static async ValueTask WritePreparedAsync(
+        PreparedDocument prepared,
+        CancellationToken cancellationToken)
+    {
         var temporaryPath = Path.Combine(
-            directory,
-            $".{Path.GetFileName(fullPath)}.tmp-{Guid.NewGuid():N}");
-        var bytes = Utf8WithoutBom.GetBytes(contents);
+            prepared.Directory,
+            $".{Path.GetFileName(prepared.FullPath)}.tmp-{Guid.NewGuid():N}");
         var published = false;
         try
         {
@@ -49,13 +110,13 @@ public static class RekallAgeAtomicFile
                 bufferSize: 4096,
                 FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.WriteThrough))
             {
-                await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+                await stream.WriteAsync(prepared.Bytes, cancellationToken).ConfigureAwait(false);
                 await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
                 stream.Flush(flushToDisk: true);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            await PublishAsync(temporaryPath, fullPath, cancellationToken).ConfigureAwait(false);
+            await PublishAsync(temporaryPath, prepared.FullPath, cancellationToken).ConfigureAwait(false);
             published = true;
         }
         finally
@@ -71,6 +132,44 @@ public static class RekallAgeAtomicFile
                     // Preserve the publication error; stale temp files remain
                     // recognizable and are never treated as live documents.
                 }
+            }
+        }
+    }
+
+    private static async ValueTask<FileStream> AcquireLockAsync(
+        string destinationPath,
+        CancellationToken cancellationToken)
+    {
+        const int maximumAttempts = 64;
+        var lockPath = GetLockPath(destinationPath);
+        for (var attempt = 1; ; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return new FileStream(
+                    lockPath,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.None,
+                    bufferSize: 1,
+                    FileOptions.Asynchronous | FileOptions.DeleteOnClose);
+            }
+            catch (Exception error) when (
+                error is IOException or UnauthorizedAccessException &&
+                attempt < maximumAttempts)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(attempt, 8)), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                throw new RekallAgeDocumentRevisionException(
+                    "REKALL_DOCUMENT_BUSY",
+                    destinationPath,
+                    $"Document '{destinationPath}' remained busy after {maximumAttempts} bounded lock attempts.",
+                    RekallAgeDocumentRevision.Missing,
+                    RekallAgeDocumentRevision.Missing);
             }
         }
     }
@@ -106,4 +205,6 @@ public static class RekallAgeAtomicFile
             }
         }
     }
+
+    private sealed record PreparedDocument(string FullPath, string Directory, byte[] Bytes);
 }

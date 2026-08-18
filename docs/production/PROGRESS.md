@@ -893,6 +893,15 @@ Design and TDD sequence:
 `docs/superpowers/specs/2026-08-18-optimistic-document-revisions-design.md` and
 `docs/superpowers/plans/2026-08-18-optimistic-document-revisions.md`.
 
+Optimistic document revisions Task 1 is verified at 10/10 focused persistence
+tests. Every immutable snapshot exposes a deterministic lowercase SHA-256 token.
+All cooperating atomic writers now take a cancellable bounded sibling lock;
+conditional publication compares under that lock and either publishes the
+complete file or returns exact `REKALL_DOCUMENT_REVISION_CONFLICT` /
+`REKALL_DOCUMENT_BUSY` codes without changing the destination. Two writers
+using one revision produced exactly one winner and one stale rejection, with no
+temporary or engine-owned lock debris.
+
 Atomic persisted JSON was selected as the next risk-driven tranche. Code inspection found
 that project and scene loads schema-probe one file handle and then reopen the
 path for typed deserialization, while their saves write directly to the live

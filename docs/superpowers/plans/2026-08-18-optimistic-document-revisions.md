@@ -10,10 +10,10 @@ inspectable recovery facts.
 
 ### Task 1: Generic revisioned compare-and-publish
 
-- [ ] Write failing revision, stale-write, missing/existing, busy, cancellation,
+- [x] Write failing revision, stale-write, missing/existing, busy, cancellation,
   cleanup, and concurrent-writer tests.
-- [ ] Add exact snapshot revision tokens and bounded sibling-lock publication.
-- [ ] Return stable coded conflict/busy failures and preserve destination bytes.
+- [x] Add exact snapshot revision tokens and bounded sibling-lock publication.
+- [x] Return stable coded conflict/busy failures and preserve destination bytes.
 
 ### Task 2: Project and scene mutation integration
 

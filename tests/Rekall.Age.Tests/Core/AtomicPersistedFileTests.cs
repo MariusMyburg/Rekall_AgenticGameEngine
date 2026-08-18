@@ -18,6 +18,9 @@ public sealed class AtomicPersistedFileTests
 
         Assert.Equal(Path.GetFullPath(path), snapshot.Path);
         Assert.Equal(expected, snapshot.Bytes);
+        Assert.Equal(
+            "4ffb9dfa894034b93b9b3eba989f3ff628c667b9eecfbbc3e9144b036e602950",
+            snapshot.Revision);
     }
 
     [Fact]
@@ -93,8 +96,145 @@ public sealed class AtomicPersistedFileTests
         Assert.Empty(TemporarySiblings(destinationDirectory));
     }
 
+    [Fact]
+    public async Task ConditionalPublisherCreatesOnlyFromExplicitMissingRevision()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, "document.json");
+
+        var revision = await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+            path,
+            "first",
+            maximumBytes: 1024,
+            RekallAgeDocumentRevision.Missing,
+            CancellationToken.None);
+
+        Assert.Equal(RekallAgeDocumentRevision.Compute(Encoding.UTF8.GetBytes("first")), revision);
+        Assert.Equal("first", await File.ReadAllTextAsync(path));
+        Assert.Empty(ControlSiblings(path));
+    }
+
+    [Fact]
+    public async Task ConditionalPublisherRejectsStaleRevisionWithoutChangingDestination()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, "document.json");
+        await File.WriteAllTextAsync(path, "original");
+        var expected = RekallAgeDocumentRevision.Compute(Encoding.UTF8.GetBytes("original"));
+        await File.WriteAllTextAsync(path, "intervening");
+        var current = RekallAgeDocumentRevision.Compute(Encoding.UTF8.GetBytes("intervening"));
+
+        var error = await Assert.ThrowsAsync<RekallAgeDocumentRevisionException>(
+            () => RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+                path,
+                "replacement",
+                maximumBytes: 1024,
+                expected,
+                CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", error.Code);
+        Assert.Equal(expected, error.ExpectedRevision);
+        Assert.Equal(current, error.CurrentRevision);
+        Assert.Equal("intervening", await File.ReadAllTextAsync(path));
+        Assert.Empty(ControlSiblings(path));
+    }
+
+    [Fact]
+    public async Task ConditionalPublisherAllowsExactlyOneWriterForOneRevision()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, "document.json");
+        await File.WriteAllTextAsync(path, "base");
+        var revision = RekallAgeDocumentRevision.Compute(Encoding.UTF8.GetBytes("base"));
+
+        var writes = new[] { "alpha", "beta" }.Select(value => Task.Run(async () =>
+        {
+            try
+            {
+                return (Succeeded: true, Revision: await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+                    path,
+                    value,
+                    maximumBytes: 1024,
+                    revision,
+                    CancellationToken.None), Error: (RekallAgeDocumentRevisionException?)null);
+            }
+            catch (RekallAgeDocumentRevisionException error)
+            {
+                return (Succeeded: false, Revision: string.Empty, Error: error);
+            }
+        })).ToArray();
+
+        var results = await Task.WhenAll(writes);
+
+        Assert.Single(results, result => result.Succeeded);
+        var rejected = Assert.Single(results, result => !result.Succeeded);
+        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", rejected.Error!.Code);
+        Assert.Contains(await File.ReadAllTextAsync(path), new[] { "alpha", "beta" });
+        Assert.Empty(ControlSiblings(path));
+    }
+
+    [Fact]
+    public async Task ConditionalPublisherHonorsCancellationWhileDocumentIsBusy()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, "document.json");
+        await File.WriteAllTextAsync(path, "base");
+        var lockPath = RekallAgeAtomicFile.GetLockPath(path);
+        await using var held = new FileStream(
+            lockPath,
+            FileMode.OpenOrCreate,
+            FileAccess.ReadWrite,
+            FileShare.None,
+            bufferSize: 1,
+            FileOptions.Asynchronous);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+                path,
+                "replacement",
+                maximumBytes: 1024,
+                RekallAgeDocumentRevision.Compute(Encoding.UTF8.GetBytes("base")),
+                cancellation.Token).AsTask());
+
+        Assert.Equal("base", await File.ReadAllTextAsync(path));
+        Assert.Empty(TemporarySiblings(path));
+    }
+
+    [Fact]
+    public async Task ConditionalPublisherFailsWithStableCodeWhenDocumentRemainsBusy()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, "document.json");
+        await File.WriteAllTextAsync(path, "base");
+        await using var held = new FileStream(
+            RekallAgeAtomicFile.GetLockPath(path),
+            FileMode.OpenOrCreate,
+            FileAccess.ReadWrite,
+            FileShare.None,
+            bufferSize: 1,
+            FileOptions.Asynchronous);
+
+        var error = await Assert.ThrowsAsync<RekallAgeDocumentRevisionException>(
+            () => RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+                path,
+                "replacement",
+                maximumBytes: 1024,
+                RekallAgeDocumentRevision.Compute(Encoding.UTF8.GetBytes("base")),
+                CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_DOCUMENT_BUSY", error.Code);
+        Assert.Equal("base", await File.ReadAllTextAsync(path));
+        Assert.Empty(TemporarySiblings(path));
+    }
+
     private static IReadOnlyList<string> TemporarySiblings(string destination) =>
         Directory.GetFiles(
             Path.GetDirectoryName(destination)!,
             $".{Path.GetFileName(destination)}.tmp-*");
+
+    private static IReadOnlyList<string> ControlSiblings(string destination) =>
+        Directory.GetFiles(
+            Path.GetDirectoryName(destination)!,
+            $".{Path.GetFileName(destination)}.*");
 }

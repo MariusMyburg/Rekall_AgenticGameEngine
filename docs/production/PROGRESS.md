@@ -886,6 +886,12 @@ installed-product verified. The next contained tranche is agent-inspectable
 cubic interpolation with deterministic, bounded tangent data and richer
 transform fixtures; authored modules remain responsible for game behavior.
 
+The cubic interpolation design is fixed in
+`docs/superpowers/specs/2026-08-18-cubic-animation-interpolation-design.md`:
+authored clips and glTF `CUBICSPLINE` share duration-scaled Hermite semantics,
+fail closed on unknown modes or malformed/non-finite tangent data, preserve
+exact endpoints, and keep morph targets outside this focused tranche.
+
 The next tranche design is fixed in
 `docs/superpowers/specs/2026-08-18-animation-state-graph-design.md`: a bounded,
 versioned, parameter-driven graph projects into the existing generic mixer,

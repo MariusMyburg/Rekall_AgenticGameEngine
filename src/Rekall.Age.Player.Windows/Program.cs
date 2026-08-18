@@ -190,6 +190,8 @@ internal static class Program
 
 internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 {
+    private static readonly object SdlInitializationGate = new();
+    private static bool _sdlVideoInitialized;
     private const int InitialWidth = 1280;
     private const int InitialHeight = 720;
     private const int HudWidth = 360;
@@ -491,7 +493,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             WindowState.Normal,
             BuildWindowTitle(sceneName, openXrRequested, simulateXrInput, playableMode));
         PlayerLog.Write("Creating SDL window.");
-        var window = VeldridStartup.CreateWindow(ref windowInfo);
+        EnsureSdlVideoInitialized();
+        var window = new Sdl2Window(
+            windowInfo.WindowTitle,
+            windowInfo.X,
+            windowInfo.Y,
+            windowInfo.WindowWidth,
+            windowInfo.WindowHeight,
+            SDL_WindowFlags.OpenGL | SDL_WindowFlags.Resizable | SDL_WindowFlags.Shown,
+            threadedProcessing: true);
         var options = new GraphicsDeviceOptions(
             debug: false,
             swapchainDepthFormat: PixelFormat.D24_UNorm_S8_UInt,
@@ -1048,6 +1058,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         await StopOpenXrHeadsetSubmitAsync().ConfigureAwait(false);
         void Cleanup(string target, Action action)
         {
+            var started = Stopwatch.GetTimestamp();
             try
             {
                 action();
@@ -1055,6 +1066,14 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             catch (Exception exception)
             {
                 PlayerLog.Write($"Player cleanup issue target={target}: {exception.Message}");
+            }
+            finally
+            {
+                var elapsed = Stopwatch.GetElapsedTime(started);
+                if (elapsed >= TimeSpan.FromMilliseconds(100))
+                {
+                    PlayerLog.Write($"Player cleanup slow target={target} elapsedMs={elapsed.TotalMilliseconds:F0}.");
+                }
             }
         }
 
@@ -1068,7 +1087,13 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Cleanup("audio-output", () => _audioOutput?.Dispose());
         try
         {
+            var liveServerStarted = Stopwatch.GetTimestamp();
             await _liveServer.DisposeAsync();
+            var liveServerElapsed = Stopwatch.GetElapsedTime(liveServerStarted);
+            if (liveServerElapsed >= TimeSpan.FromMilliseconds(100))
+            {
+                PlayerLog.Write($"Player cleanup slow target=live-server elapsedMs={liveServerElapsed.TotalMilliseconds:F0}.");
+            }
         }
         catch (Exception exception)
         {
@@ -1113,7 +1138,32 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Cleanup("hud-texture-layout", _hudTextureLayout.Dispose);
         Cleanup("command-list", _commands.Dispose);
         Cleanup("graphics-device", _device.Dispose);
-        Cleanup("window", _window.Close);
+        Cleanup("window", () =>
+        {
+            _window.Close();
+            if (!SpinWait.SpinUntil(() => !_window.Exists, TimeSpan.FromSeconds(1)))
+            {
+                throw new TimeoutException("SDL window owner did not close within one second.");
+            }
+        });
+    }
+
+    private static void EnsureSdlVideoInitialized()
+    {
+        lock (SdlInitializationGate)
+        {
+            if (_sdlVideoInitialized)
+            {
+                return;
+            }
+
+            if (Sdl2Native.SDL_Init(SDLInitFlags.Video) != 0)
+            {
+                throw new InvalidOperationException("SDL video initialization failed.");
+            }
+
+            _sdlVideoInitialized = true;
+        }
     }
 
     private async ValueTask StopOpenXrHeadsetSubmitAsync()

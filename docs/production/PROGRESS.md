@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 08:25 Africa/Johannesburg
+Last verified: 2026-08-18 08:46 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: real Windows-player device-loss recovery passed its process gate
+Latest milestone: unified desktop diagnostics passed the complete Debug gate at 658/658
 
 ## Product objective
 
@@ -766,6 +766,18 @@ Studio is important, but it does not define or reorder the engine foundation.
   all GPU resources and closes the SDL window even when idle-wait/disposal
   steps fail. Recovery remains an honest cold restart and does not preserve
   arbitrary in-memory module state.
+- Desktop diagnostics and shutdown operability: Studio startup, dispatcher,
+  AppDomain, and unobserved-task failures now use the same bounded atomic
+  evidence contract with exception-instance duplicate suppression. Dispatcher
+  failures remain fatal; unobserved tasks are recorded and explicitly
+  observed. The strict Studio build and focused desktop/Studio/CLI selection
+  pass with zero warnings/errors and 4/4 tests. Full-suite diagnosis also found
+  that Veldrid's non-threaded SDL window could block close for about 21 seconds
+  after async initialization. The player now owns SDL windows on a dedicated
+  thread and requires confirmed closure within one second; the unchanged
+  three-process fault proof dropped to 5 seconds. Locked dependency graphs were
+  regenerated and the exact locked graphics-player publish regression passed.
+  The complete Debug suite passes 658/658 in 2m15s.
 
 ## Current gaps
 
@@ -781,10 +793,9 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Route Studio desktop fatal hooks through the same bounded evidence contract and
-document operator-facing recovery/privacy/exit behavior, then run the full
-installed product gate. The module trust boundary remains complete and
-installed-product verified.
+Extend installed acceptance with recovery, fatal, exhaustion, and CLI evidence
+inspection, then run the complete two-pass Release product gate. The module
+trust boundary remains complete and installed-product verified.
 
 ## Next after the current item
 

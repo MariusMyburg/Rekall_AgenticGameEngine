@@ -163,6 +163,12 @@ supervisor, and inspection selection passed 11/11. Cleanup is best-effort and
 ordered through every GPU resource and explicit SDL-window closure so a failed
 `WaitForIdle` cannot prevent cold recreation.
 
+Full-suite follow-up found Veldrid's non-threaded SDL window could take about
+21 seconds to close after async player initialization. The player now uses a
+dedicated SDL window-owner thread and requires owner-confirmed closure within
+one second. The unchanged three-process recovery proof now completes in about
+5 seconds instead of 47-87 seconds.
+
 ## Task 5: Unify Studio fatal evidence and document operability
 
 **Files:**
@@ -172,25 +178,34 @@ ordered through every GPU resource and explicit SDL-window closure so a failed
 - Modify: `tests/Rekall.Age.Tests/Cli/StudioCliTests.cs`
 - Modify: `docs/production/PROGRESS.md`
 
-- [ ] **Step 1: Add failing Studio/report integration tests**
+- [x] **Step 1: Add failing Studio/report integration tests**
 
 Prove dispatcher, AppDomain, startup, and unobserved-task paths map to bounded report requests without serializing arbitrary state. Dispatcher continuation remains explicit and fatal startup terminates.
 
-- [ ] **Step 2: Route Studio hooks through the shared reporter**
+- [x] **Step 2: Route Studio hooks through the shared reporter**
 
 Retain Serilog, add structured report ids/paths, and avoid duplicate reports for the same failure event where practical.
 
-- [ ] **Step 3: Document exact posture and operator workflow**
+- [x] **Step 3: Document exact posture and operator workflow**
 
 Document CLI/MCP inspection, diagnostic location override, retention/privacy, stable exit codes, cold-restart limitations, and that recovery is not arbitrary exception suppression.
 
-- [ ] **Step 4: Run focused and full Debug suites, then commit**
+- [x] **Step 4: Run focused and full Debug suites, then commit**
 
 ```powershell
 dotnet test Rekall.AGE.sln -c Debug -p:UseSharedCompilation=false --verbosity minimal
 git add src/Rekall.Age.Studio/App.xaml.cs README.md tests/Rekall.Age.Tests/Cli/StudioCliTests.cs docs/production/PROGRESS.md
 git commit -m "feat: unify desktop failure diagnostics"
 ```
+
+Verified 2026-08-18: the strict Studio build completed with zero warnings and
+errors; focused desktop/Studio/CLI diagnostics passed 4/4. Startup, dispatcher,
+AppDomain, and unobserved-task paths use one bounded reporter with exception-
+instance duplicate suppression. Dispatcher failures remain fatal while task
+failures are explicitly observed. Locked dependency graphs were regenerated
+after the explicit Core references; the previously failing locked graphics
+player publish test passed, then the complete Debug suite passed 658/658 in
+2m15s.
 
 ## Task 6: Installed recovery acceptance and complete product gate
 

@@ -1689,6 +1689,40 @@ Audit checks:
 
 The agent authoring gauntlet is the preferred broad proof loop when validating a user-facing playable path. It creates a project, authors a generic scene blueprint, writes an agent-owned playable module, verifies the result, packages it, audits the package, captures a proof frame, and returns next actions. It is not a game template system: the authored behavior lives in project data and project module source.
 
+## Failure Diagnostics And Player Recovery
+
+Player and Studio failures write bounded schema-1 JSON evidence to
+`%LOCALAPPDATA%\Rekall AGE\Diagnostics`. Operators and isolated acceptance runs
+can override the directory with `REKALL_AGE_DIAGNOSTICS_DIR`.
+
+Inspect evidence through the same read-only command exposed to CLI and MCP:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- diagnostics failures
+dotnet run --project src/Rekall.Age.Cli -- diagnostics failures C:\isolated\diagnostics
+```
+
+`rekall.diagnostics.inspect_failures` returns newest-first report paths,
+component/outcome/code filters, bounded exception facts, limitations, and next
+actions. CLI output intentionally omits stack excerpts. The store keeps at most
+50 reports by default, caps each report at 1 MiB, rejects reparse-point roots,
+and never captures environment variables, exception `Data`, project content,
+tokens, dumps, or arbitrary object graphs. Reports remain local; Rekall AGE does
+not upload telemetry.
+
+The Windows player retries only classified graphics device-loss or invalid
+swapchain/surface failures. It disposes the failed SDL/Vulkan session before a
+full `cold-session-restart`, with two retries after the initial attempt. A
+successful restart exits normally and emits `REKALL_PLAYER_GRAPHICS_RECOVERED`.
+Repeated loss exits 11 with `REKALL_PLAYER_GRAPHICS_RECOVERY_EXHAUSTED`;
+arbitrary runtime failures are never retried and exit 10. Existing argument,
+required-audio-unavailable, and required-audio-empty exits remain 2, 3, and 4.
+
+Cold restart reloads authored state from disk. It is not seamless GPU-resource
+resurrection and does not preserve arbitrary in-memory module state. Studio
+uses the same bounded evidence contract for startup, dispatcher, AppDomain, and
+unobserved-task failures; it does not automatically restart.
+
 ## Studio Workbench
 
 Studio is the WPF workbench shell.
@@ -1706,6 +1740,7 @@ Current foundation:
 - asset reports
 - generic Studio action palette for validation, runtime inspection, viewport capture, asset import reports, module builds, and gauntlet workflows
 - logging
+- bounded structured desktop failure evidence shared with the Player and CLI/MCP
 
 Studio Workbench 2 keeps Studio as an inspectable authoring surface over engine primitives. It summarizes scene structure, component usage, tags, runtime observations, diagnostics, assets, imports, and transaction history, then exposes generic `rekall.*` actions rather than embedding genre-specific game creation behavior.
 

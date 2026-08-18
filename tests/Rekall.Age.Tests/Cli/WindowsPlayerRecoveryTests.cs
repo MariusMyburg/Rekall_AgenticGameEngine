@@ -5,6 +5,7 @@ using Rekall.Age.Core.Transactions;
 
 namespace Rekall.Age.Tests.Cli;
 
+[Collection("Windows player process")]
 public sealed class WindowsPlayerRecoveryTests
 {
     [Fact]
@@ -134,3 +135,6 @@ public sealed class WindowsPlayerRecoveryTests
         throw new InvalidOperationException("Could not locate the repository root.");
     }
 }
+
+[CollectionDefinition("Windows player process", DisableParallelization = true)]
+public sealed class WindowsPlayerProcessCollection;

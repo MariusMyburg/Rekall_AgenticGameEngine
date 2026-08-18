@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Rekall.Age.Core.Persistence;
 
 namespace Rekall.Age.Rendering;
 
@@ -7,7 +8,8 @@ public sealed class RekallAgeRenderPlanStore
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        MaxDepth = RekallAgePersistedJson.MaximumDocumentDepth
     };
 
     public string GetPlanPath(string projectRoot)
@@ -20,12 +22,10 @@ public sealed class RekallAgeRenderPlanStore
         CancellationToken cancellationToken)
     {
         var path = GetPlanPath(projectRoot);
-        await using var stream = File.OpenRead(path);
-        var plan = await JsonSerializer.DeserializeAsync<RekallAgeRenderPlanDocument>(
-            stream,
+        return await RekallAgePersistedJson.ReadAsync<RekallAgeRenderPlanDocument>(
+            path,
             JsonOptions,
             cancellationToken);
-        return plan ?? throw new InvalidOperationException($"Render plan '{path}' could not be read.");
     }
 
     public async ValueTask SaveAsync(
@@ -36,6 +36,9 @@ public sealed class RekallAgeRenderPlanStore
         var directory = Path.Combine(projectRoot, "Render");
         Directory.CreateDirectory(directory);
         var json = JsonSerializer.Serialize(plan, JsonOptions);
-        await File.WriteAllTextAsync(GetPlanPath(projectRoot), json + Environment.NewLine, cancellationToken);
+        await RekallAgePersistedJson.WriteAllTextAsync(
+            GetPlanPath(projectRoot),
+            json + Environment.NewLine,
+            cancellationToken);
     }
 }

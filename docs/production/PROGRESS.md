@@ -913,6 +913,16 @@ publication. A four-reader/50-write scene stress test observed only complete
 files use `File.Replace`; snapshot opens allow delete sharing and retry only a
 small bounded transient replacement window.
 
+Atomic persisted JSON Task 3 is verified in a 92/92 combined
+asset/level-design/render-plan/transaction selection. Asset catalog, asset
+pipeline, prefab, render-plan, and transaction-log stores now share an explicit
+64 MiB and depth-128 policy, deserialize one bounded snapshot, and publish only
+through the durable atomic writer. Cross-store round trips preserve existing
+shapes; a sparse 64 MiB+1 catalog fails before JSON allocation; depth-80 render
+metadata loads consistently; and successful writes leave no temporary siblings.
+Transaction append remains intentionally last-writer-wins rather than claiming
+multi-writer merge semantics.
+
 The bounded cubic interpolation tranche is installed-product verified. The
 bounded morph-target tranche is also installed-product verified. Morph target
 Task 1 passed a 51/51 focused runtime/schema/CLI selection.

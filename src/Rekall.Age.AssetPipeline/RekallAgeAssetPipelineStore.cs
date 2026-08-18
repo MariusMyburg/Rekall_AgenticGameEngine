@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Rekall.Age.Core.Persistence;
 
 namespace Rekall.Age.AssetPipeline;
 
@@ -7,7 +8,8 @@ public sealed class RekallAgeAssetPipelineStore
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        MaxDepth = RekallAgePersistedJson.MaximumDocumentDepth
     };
 
     public string GetPath(string projectRoot)
@@ -25,11 +27,10 @@ public sealed class RekallAgeAssetPipelineStore
             return RekallAgeAssetPipelineDocument.Empty;
         }
 
-        await using var stream = File.OpenRead(path);
-        return await JsonSerializer.DeserializeAsync<RekallAgeAssetPipelineDocument>(
-            stream,
+        return await RekallAgePersistedJson.ReadAsync<RekallAgeAssetPipelineDocument>(
+            path,
             JsonOptions,
-            cancellationToken) ?? RekallAgeAssetPipelineDocument.Empty;
+            cancellationToken);
     }
 
     public async ValueTask SaveAsync(
@@ -39,6 +40,9 @@ public sealed class RekallAgeAssetPipelineStore
     {
         Directory.CreateDirectory(Path.Combine(projectRoot, "Assets"));
         var json = JsonSerializer.Serialize(document, JsonOptions);
-        await File.WriteAllTextAsync(GetPath(projectRoot), json + Environment.NewLine, cancellationToken);
+        await RekallAgePersistedJson.WriteAllTextAsync(
+            GetPath(projectRoot),
+            json + Environment.NewLine,
+            cancellationToken);
     }
 }

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using Rekall.Age.Core.Persistence;
 
 namespace Rekall.Age.Core.Transactions;
 
@@ -43,7 +44,8 @@ public sealed class RekallAgeTransactionLogStore
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        MaxDepth = RekallAgePersistedJson.MaximumDocumentDepth
     };
 
     public string GetPath(string projectRoot)
@@ -61,11 +63,10 @@ public sealed class RekallAgeTransactionLogStore
             return RekallAgeTransactionLogDocument.Empty;
         }
 
-        await using var stream = File.OpenRead(path);
-        return await JsonSerializer.DeserializeAsync<RekallAgeTransactionLogDocument>(
-            stream,
+        return await RekallAgePersistedJson.ReadAsync<RekallAgeTransactionLogDocument>(
+            path,
             JsonOptions,
-            cancellationToken) ?? RekallAgeTransactionLogDocument.Empty;
+            cancellationToken);
     }
 
     public async ValueTask AppendAsync(
@@ -97,7 +98,10 @@ public sealed class RekallAgeTransactionLogStore
 
         Directory.CreateDirectory(Path.GetDirectoryName(GetPath(projectRoot))!);
         var json = JsonSerializer.Serialize(document, JsonOptions);
-        await File.WriteAllTextAsync(GetPath(projectRoot), json + Environment.NewLine, cancellationToken);
+        await RekallAgePersistedJson.WriteAllTextAsync(
+            GetPath(projectRoot),
+            json + Environment.NewLine,
+            cancellationToken);
     }
 
     private static async ValueTask<IReadOnlyList<RekallAgeTransactionResourcePreimageEntry>> PersistPreimagesAsync(

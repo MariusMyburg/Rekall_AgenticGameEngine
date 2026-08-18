@@ -43,9 +43,9 @@ snapshot and publishes complete durable files atomically.
 - Modify asset catalog/pipeline, prefab, render-plan, and transaction-log stores.
 - Add focused store regression and adversarial tests.
 
-- [ ] Apply explicit per-document size/depth limits and bounded snapshot reads.
-- [ ] Replace direct live-file writes with the shared atomic publisher.
-- [ ] Prove serialized compatibility and no temporary-file enumeration/leaks.
+- [x] Apply explicit per-document size/depth limits and bounded snapshot reads.
+- [x] Replace direct live-file writes with the shared atomic publisher.
+- [x] Prove serialized compatibility and no temporary-file enumeration/leaks.
 
 ### Task 4: Installed mutation proof and full product gate
 

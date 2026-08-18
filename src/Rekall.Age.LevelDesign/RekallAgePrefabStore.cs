@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Rekall.Age.Core.Persistence;
 
 namespace Rekall.Age.LevelDesign;
 
@@ -7,7 +8,8 @@ public sealed class RekallAgePrefabStore
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        MaxDepth = RekallAgePersistedJson.MaximumDocumentDepth
     };
 
     public string GetPath(string projectRoot, string prefabId)
@@ -22,7 +24,10 @@ public sealed class RekallAgePrefabStore
     {
         Directory.CreateDirectory(Path.Combine(projectRoot, "Prefabs"));
         var json = JsonSerializer.Serialize(prefab, JsonOptions);
-        await File.WriteAllTextAsync(GetPath(projectRoot, prefab.Id), json + Environment.NewLine, cancellationToken);
+        await RekallAgePersistedJson.WriteAllTextAsync(
+            GetPath(projectRoot, prefab.Id),
+            json + Environment.NewLine,
+            cancellationToken);
     }
 
     public async ValueTask<RekallAgePrefabDocument> LoadAsync(
@@ -30,10 +35,9 @@ public sealed class RekallAgePrefabStore
         string prefabId,
         CancellationToken cancellationToken)
     {
-        await using var stream = File.OpenRead(GetPath(projectRoot, prefabId));
-        return await JsonSerializer.DeserializeAsync<RekallAgePrefabDocument>(
-            stream,
+        return await RekallAgePersistedJson.ReadAsync<RekallAgePrefabDocument>(
+            GetPath(projectRoot, prefabId),
             JsonOptions,
-            cancellationToken) ?? throw new InvalidOperationException($"Prefab '{prefabId}' could not be read.");
+            cancellationToken);
     }
 }

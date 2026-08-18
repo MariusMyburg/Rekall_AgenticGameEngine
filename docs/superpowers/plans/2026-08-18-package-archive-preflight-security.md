@@ -6,13 +6,21 @@ Design: `docs/superpowers/specs/2026-08-18-package-archive-preflight-security-de
 
 ## Task 1: Central bounded preflight
 
-- [ ] Add failing metadata-only tests for valid archives, count/size bounds,
+- [x] Add failing metadata-only tests for valid archives, count/size bounds,
   unique bounded manifest, unsafe/ambiguous names, case collisions, ancestor
   conflicts, and symlink/special-file modes.
-- [ ] Implement stable preflight contracts and errors with deterministic entry
+- [x] Implement stable preflight contracts and errors with deterministic entry
   plans.
-- [ ] Prove no manifest stream is opened before preflight succeeds.
-- [ ] Run focused tests and commit.
+- [x] Prove no manifest stream is opened before preflight succeeds.
+- [x] Run focused tests and commit.
+
+Verified 2026-08-18: 15/15 metadata-only preflight tests pass. The preflight
+returns a manifest-first immutable entry plan and rejects count/size overflow,
+missing/duplicate/oversized manifests, traversal and Windows-ambiguous paths,
+case collisions, file/ancestor conflicts, and link/special-file metadata using
+stable codes. No entry content stream is opened by preflight; an oversized
+manifest with invalid JSON content is rejected solely from central-directory
+metadata.
 
 ## Task 2: Inspection integration
 

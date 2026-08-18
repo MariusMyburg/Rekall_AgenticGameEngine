@@ -870,6 +870,12 @@ execution. Inspection and extraction will share one bounded immutable entry
 plan covering unique bounded manifests, paths/collisions, ancestor conflicts,
 special-file metadata, and size/count ceilings.
 
+Archive preflight Task 1 is verified at 15/15 focused tests: a central
+metadata-only contract now returns a deterministic manifest-first immutable
+entry plan and rejects exceeded bounds, missing/duplicate/oversized manifests,
+traversal and Windows-ambiguous names, case/ancestor collisions, and
+link/special-file modes with stable codes before opening entry content.
+
 ## Next after the current item
 
 Complete the selected adversarial security slice, then advance generic

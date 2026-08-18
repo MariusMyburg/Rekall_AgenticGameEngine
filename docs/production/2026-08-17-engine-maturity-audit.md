@@ -49,7 +49,7 @@ Maturity labels:
 | Software rendering | Implemented | deterministic viewport and proof captures | fidelity limits must remain explicit; not a shipping renderer |
 | OpenXR | Partial/experimental | real runtime probing, swapchains, stereo planning, windowed headset submission | repeatable headset acceptance, performance, controller breadth, lifecycle hardening |
 | Audio | Proven | validated PCM WAV decoding, deterministic voices/mix frames, buses, gain/pitch/looping, spatial attenuation/pan, SDL Windows device queue, relocated package and installed-player proof | streaming/compressed codecs, device hot-plug/recovery, effects/DSP, broader hardware matrix |
-| Animation | Implemented | versioned inline/catalog clips, scalar/vector/color/string and sprite-frame tracks, interpolation, loop/clamp/ping-pong, bounded weighted layers and deterministic cross-fades, bounded parameter-driven state graphs with deterministic resume and installed distinct-frame proof, per-layer/state inspection, bounded GLB skin/hierarchy/channel import, deterministic skeletal joint-pose sampling, JOINTS_0/WEIGHTS_0 preservation, CPU vertex/normal skinning before Vulkan submission, and installed hardware Vulkan captures with distinct frame hashes and visible deformation; bounded asset/track/key/marker work with structured diagnostics, deterministic malformed corpus, 7,200-frame resume proof, events, generic property mutation | cubic-spline/morph breadth, complex transform fixtures, richer transition curves and interruptible/hierarchical graph policies |
+| Animation | Implemented | versioned inline/catalog clips, scalar/vector/color/string and sprite-frame tracks, bounded Hermite interpolation, glTF CUBICSPLINE import/execution, loop/clamp/ping-pong, bounded weighted layers and deterministic cross-fades, bounded parameter-driven state graphs with deterministic resume and installed distinct-frame proof, per-layer/state inspection, bounded GLB skin/hierarchy/channel import, deterministic skeletal joint-pose sampling, JOINTS_0/WEIGHTS_0 preservation, CPU vertex/normal skinning before Vulkan submission, and installed hardware Vulkan captures with distinct frame hashes and visible deformation; bounded asset/track/key/marker work with structured diagnostics, deterministic malformed corpus, 7,200-frame resume proof, events, generic property mutation | morph-target breadth, broader complex transform fixtures, richer transition curves and interruptible/hierarchical graph policies |
 | Runtime UI | Proven | canvases, anchors, deterministic container stacking/padding/gap/alignment/clipping, panels/labels/images/buttons, semantic focus/navigation, pointer interaction facts, pixel-level software proof, Vulkan overlays, and installed-distribution visual capture | accessibility semantics, richer text shaping, responsive-layout breadth, broader hardware visual matrix |
 | Assets | Partial | images, DDS/KTX2, GLB metadata/meshes/skins/animation channels, WAV recognition, reports, Tripo bridge | audio cooking, morph and broader animation dependency import, dependency graph, reimport/watch pipeline, deterministic cache cleanup |
 | Multiplayer | Partial/experimental | authoritative session, ownership, snapshots/deltas, named-pipe and WebSocket transport | authentication, encryption policy, internet deployment, discovery/matchmaking, load/adversarial tests |
@@ -58,7 +58,7 @@ Maturity labels:
 | Engine distribution | Proven | locked restore, two suites, self-contained applications, hashes, clean installed gauntlet | binary signing, installer/updater, release provenance/SBOM, clean-machine VM matrix |
 | Studio | Facade | real read models and a WPF shell | controls are unwired, viewport is text, no interactive open/edit/play workflow |
 | Security | Partial | no currently known vulnerable NuGet dependency; distribution forbidden-file checks; bounded metadata-first ZIP preflight and transactional exact-length extraction | restricted module hosting, fuzzing breadth, secret scanning, signed releases/packages, threat model |
-| Test platform | Implemented | 738 green tests; latest canonical two-pass Release acceptance covers Vulkan, relocation, SDL audio, runtime UI visual proof, animation limits and state graphs, malformed corpus, long-run determinism, recovery, compatibility, and adversarial ZIP preflight | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
+| Test platform | Implemented | 760 green tests; latest canonical two-pass Release acceptance covers Vulkan, relocation, SDL audio, runtime UI visual proof, animation limits, state graphs and cubic sampling, malformed corpus, long-run determinism, recovery, compatibility, and adversarial ZIP preflight | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
 | LLM providers/Ollama | Implemented | provider-neutral contracts, native Ollama chat/tools/model discovery, bounded loop, `qwen3.5:35b` source benchmark in 15 turns and expanded installed UI/audio/animation benchmark in 23 turns | additional models/providers and installed benchmark breadth, lower token/correction cost, quality/cost routing policy |
 
 ## Material findings
@@ -81,9 +81,10 @@ paths. Versioned animation clips mutate generic component properties and expose
 post-simulation state. Weighted cross-fades and skeletal GLB execution now reach
 the installed Vulkan renderer with visibly distinct captured frames. Bounded
 parameter-driven state graphs also have shipped-binary inspection and
-distinct-frame proof. Richer text and accessibility, cubic/morph animation
-breadth, richer graph policies, and compressed/streaming audio remain material
-gaps.
+distinct-frame proof. Authored and glTF cubic Hermite curves now share bounded
+duration-scaled semantics with installed nonlinear proof. Richer text and
+accessibility, morph animation breadth, richer graph policies, and
+compressed/streaming audio remain material gaps.
 
 ### 3. The agent-native architecture is measured but not yet broad enough
 

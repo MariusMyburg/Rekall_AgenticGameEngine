@@ -285,19 +285,32 @@ try {
     Invoke-Rekall scene create $animationGraphRoot Main 'animation,ui'
     $graphAssetDirectory = Join-Path $animationGraphRoot 'Assets\animation'
     New-Item -ItemType Directory -Path $graphAssetDirectory -Force | Out-Null
+    $cubicPositionTrack = @{
+        component = 'Rekall.Panel'; property = 'X'; interpolation = 'cubic'
+        keys = @(
+            @{ time = 0; value = 20; inTangent = 0; outTangent = 240 },
+            @{ time = 1; value = 140; inTangent = 0; outTangent = 0 }
+        )
+    }
     $idleClip = @{
         version = 1; durationSeconds = 2
-        tracks = @(@{
-            component = 'Rekall.Panel'; property = 'BackgroundColor'; interpolation = 'step'
-            keys = @(@{ time = 0; value = '#b02030' }, @{ time = 2; value = '#b02030' })
-        })
+        tracks = @(
+            @{
+                component = 'Rekall.Panel'; property = 'BackgroundColor'; interpolation = 'step'
+                keys = @(@{ time = 0; value = '#b02030' }, @{ time = 2; value = '#b02030' })
+            },
+            $cubicPositionTrack
+        )
     }
     $activeClip = @{
         version = 1; durationSeconds = 2
-        tracks = @(@{
-            component = 'Rekall.Panel'; property = 'BackgroundColor'; interpolation = 'step'
-            keys = @(@{ time = 0; value = '#20b060' }, @{ time = 2; value = '#20b060' })
-        })
+        tracks = @(
+            @{
+                component = 'Rekall.Panel'; property = 'BackgroundColor'; interpolation = 'step'
+                keys = @(@{ time = 0; value = '#20b060' }, @{ time = 2; value = '#20b060' })
+            },
+            $cubicPositionTrack
+        )
     }
     $idleClip | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $graphAssetDirectory 'idle.age.animation.json') -Encoding utf8
     $activeClip | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $graphAssetDirectory 'active.age.animation.json') -Encoding utf8
@@ -319,7 +332,7 @@ try {
         @{
             id = 'graph-panel'; name = 'Graph Panel'; tags = @('ui', 'animation'); parentId = 'graph-canvas'; prefabSourceId = $null; visible = $true; locked = $false
             components = @(
-                @{ type = 'Rekall.Panel'; properties = @{ X = 20; Y = 20; Width = 160; Height = 60; BackgroundColor = '#b02030' } },
+                @{ type = 'Rekall.Panel'; properties = @{ X = 20; Y = 20; Width = 60; Height = 60; BackgroundColor = '#b02030' } },
                 @{ type = 'Rekall.AnimationStateGraph'; properties = @{
                     Version = 1; Playing = $true; InitialState = 'idle'; Parameters = @{ phase = 0 }
                     States = @(
@@ -336,7 +349,12 @@ try {
     )
     $graphScene | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $graphScenePath -Encoding utf8
     $graphBeforeDirectory = Join-Path $animationGraphRoot 'Builds\GraphBefore'
-    Invoke-Rekall render viewport capture $animationGraphRoot Main 1 $graphBeforeDirectory 200 100 software
+    $graphBeforeCapture = Invoke-RekallOutput render viewport capture $animationGraphRoot Main 1 $graphBeforeDirectory 200 100 software
+    if (-not $graphBeforeCapture.Contains('Frame analysis: informative=True', [StringComparison]::Ordinal) -or
+        -not $graphBeforeCapture.Contains('Observations: 0', [StringComparison]::Ordinal)) {
+        throw "Installed animation graph pre-transition capture was not clean and informative.`n$graphBeforeCapture"
+    }
+    Write-Output $graphBeforeCapture
     $graphBeforeFrame = Join-Path $graphBeforeDirectory 'Main_runtime_001.png'
 
     $graphScene = Get-Content -LiteralPath $graphScenePath -Raw | ConvertFrom-Json
@@ -345,12 +363,19 @@ try {
     $graphScene | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $graphScenePath -Encoding utf8
     $graphInspection = Invoke-RekallOutput runtime inspect $animationGraphRoot Main 30
     if (-not $graphInspection.Contains('kind=AnimationStateGraph', [StringComparison]::Ordinal) -or
-        -not $graphInspection.Contains('state=active previous=idle transition=0.500', [StringComparison]::Ordinal)) {
+        -not $graphInspection.Contains('state=active previous=idle transition=0.500', [StringComparison]::Ordinal) -or
+        -not $graphInspection.Contains('Graph Panel: kind=Panel interactive=False text="" layout=(110.0,20.0,60.0,60.0)', [StringComparison]::Ordinal)) {
         throw "Installed animation graph inspection omitted active transition facts.`n$graphInspection"
     }
     Write-Output $graphInspection
+    Write-Output 'Installed cubic animation position: x=110.0 at frame 30 (linear would be 80.0)'
     $graphAfterDirectory = Join-Path $animationGraphRoot 'Builds\GraphAfter'
-    Invoke-Rekall render viewport capture $animationGraphRoot Main 60 $graphAfterDirectory 200 100 software
+    $graphAfterCapture = Invoke-RekallOutput render viewport capture $animationGraphRoot Main 60 $graphAfterDirectory 200 100 software
+    if (-not $graphAfterCapture.Contains('Frame analysis: informative=True', [StringComparison]::Ordinal) -or
+        -not $graphAfterCapture.Contains('Observations: 0', [StringComparison]::Ordinal)) {
+        throw "Installed animation graph post-transition capture was not clean and informative.`n$graphAfterCapture"
+    }
+    Write-Output $graphAfterCapture
     $graphAfterFrame = Join-Path $graphAfterDirectory 'Main_runtime_060.png'
     if (-not (Test-Path -LiteralPath $graphBeforeFrame -PathType Leaf) -or
         -not (Test-Path -LiteralPath $graphAfterFrame -PathType Leaf) -or

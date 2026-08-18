@@ -48,6 +48,11 @@ public sealed class ModuleMetadataTests
         var tracks = Assert.Single(animation.Properties, property => property.Name == "Tracks" && property.Kind == "animationTracks");
         Assert.Contains("1,024", tracks.Description, StringComparison.Ordinal);
         Assert.Contains("4,096", tracks.Description, StringComparison.Ordinal);
+        Assert.Contains("cubic", tracks.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("inTangent", tracks.Description, StringComparison.Ordinal);
+        Assert.Contains("outTangent", tracks.Description, StringComparison.Ordinal);
+        Assert.Contains("units per second", tracks.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("16", tracks.Description, StringComparison.Ordinal);
         var events = Assert.Single(animation.Properties, property => property.Name == "Events" && property.Kind == "animationEvents");
         Assert.Contains("4,096", events.Description, StringComparison.Ordinal);
         var player = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.AnimationPlayer");

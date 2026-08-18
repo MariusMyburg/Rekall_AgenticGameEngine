@@ -191,19 +191,19 @@ pose. The combined authored, graph, reader, and skeletal selection passes 51/51.
 - Extends only the existing `animationTracks` description; no new component or command.
 - Extends installed acceptance with a genre-neutral cubic property track and exact runtime/UI assertion.
 
-- [ ] **Step 1: Write a failing schema discovery test**
+- [x] **Step 1: Write a failing schema discovery test**
 
 Assert the `Tracks` description names `cubic`, the four-field key shape,
 units-per-second tangents, scalar/flat-vector/color shapes, 16 components, and
 the unchanged 1,024/4,096 bounds.
 
-- [ ] **Step 2: Update schema metadata and run metadata/MCP regressions**
+- [x] **Step 2: Update schema metadata and run metadata/MCP regressions**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ModuleMetadataTests|FullyQualifiedName~Mcp" --verbosity minimal
 ```
 
-- [ ] **Step 3: Add an installed cubic fixture and exact assertion**
+- [x] **Step 3: Add an installed cubic fixture and exact assertion**
 
 Extend the neutral installed animation project with a panel track from X 20 to
 140 over one second, outgoing tangent 240 and incoming tangent 0. Inspect at
@@ -211,7 +211,7 @@ frame 30 and require UI layout X 110.0, which distinguishes Hermite from the
 linear value 80.0. Capture the resulting frame, require it informative and
 nonblank, and keep all existing graph/package/runtime acceptance assertions.
 
-- [ ] **Step 4: Run complete Debug verification**
+- [x] **Step 4: Run complete Debug verification**
 
 ```powershell
 $env:TEMP = 'F:\Dev\Rekall_AGE\.worktrees\production-foundation\Artifacts\TestTemp'
@@ -219,7 +219,7 @@ $env:TMP = $env:TEMP
 dotnet test Rekall.AGE.sln --no-restore --verbosity minimal
 ```
 
-- [ ] **Step 5: Run the canonical locked two-pass Release gate**
+- [x] **Step 5: Run the canonical locked two-pass Release gate**
 
 ```powershell
 $env:TEMP = 'F:\Dev\Rekall_AGE\.worktrees\production-foundation\Artifacts\GateTemp'
@@ -227,7 +227,7 @@ $env:TMP = $env:TEMP
 & .\eng\build.ps1
 ```
 
-- [ ] **Step 6: Record exact evidence, review, and commit**
+- [x] **Step 6: Record exact evidence, review, and commit**
 
 Record test counts/timings, exact installed nonlinear value, proof-frame hash,
 soak measurements, archive size/hash, and explicit limitations. Update the
@@ -238,3 +238,20 @@ git diff --check
 git add src tests eng docs
 git commit -m "test: gate installed cubic animation"
 ```
+
+Verified 2026-08-18: schema/MCP selection passed 21/21 and exposes exact cubic
+key shape, tangent units, value shapes, and limits. Debug passed 760/760 in
+2m23s. The locked Release build completed with zero warnings and zero errors in
+8.18s; both independent Release passes completed 760/760 in 2m18s. Shipped
+binaries sampled the generic panel at X 110.0 on frame 30, where linear would
+be 80.0, while the state graph simultaneously reported `active`,
+`previous=idle`, and transition 0.500. Both clean, informative proof frames had
+zero runtime observations and distinct SHA-256 values
+`38DAB210A0FE5E822F773251EFE18B1B05EF713709F2940813B2F8A99AC3C143` and
+`0C9C041274F4063D671D2B9F5ABEBFB0BBC5F6A9E9F8D1AA91D5F86140AAD017`.
+The unchanged installed matrix passed. Its 600-frame soak simulated exactly 10
+seconds at 4,382.7 FPS with 673,112 bytes retained managed-memory growth and
+all nine checks passing. The 1,149-payload archive is 195,163,655 bytes with
+SHA-256 `85CB44D5718825F9F865F7F2FE156ECDE4C325BA5E7DA0573BCADC2DD440204E`.
+Automatic tangents, morph weights, quaternion squad, and graph curve policies
+remain explicit future capabilities.

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 10:38 Africa/Johannesburg
+Last verified: 2026-08-18 11:12 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: generic animation state graphs passed the installed two-pass Release product gate
+Latest milestone: bounded cubic animation passed the installed two-pass Release product gate
 
 ## Product objective
 
@@ -30,22 +30,23 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 195,141,113-byte win-x64 archive assembled with
-  SHA-256 `7297CE4FCF52960F3217BE6A80CF7046E8052F9A3E12998602C807C0DA9A426D`.
+- Windows distribution: fresh 195,163,655-byte win-x64 archive assembled with
+  SHA-256 `85CB44D5718825F9F865F7F2FE156ECDE4C325BA5E7DA0573BCADC2DD440204E`.
   Its manifest lists 1,149 payload files; the assembled directory has 1,150
   files including the distribution manifest itself.
-- Canonical verification: 738/738 Release tests passed twice independently;
+- Canonical verification: 760/760 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
-- Current Debug verification: 738/738 tests pass after animation state-graph
-  integration and installed proof.
+- Current Debug verification: 760/760 tests pass after authored/glTF cubic
+  animation integration and installed proof.
 - Installed acceptance: canonical gate exited 0; project/module workflows,
   packaging and relocation, negative archive preflight, nonblank capture,
   runtime UI, and audible audio paths have installed-binary proof.
 - Local agent: Ollama currently uses `qwen3.5:35b` through its native API.
 - Agent authoring: both source and installed multi-subsystem benchmarks created
   and repaired UI, animation, and audio content using tool calls.
-- Runtime animation: generic clip playback, bounded parameter-driven state
-  graphs, weighted layers, crossfades,
+- Runtime animation: generic clip playback, bounded Hermite interpolation,
+  glTF `CUBICSPLINE`, bounded parameter-driven state graphs, weighted layers,
+  crossfades,
   deterministic resume, GLB skeletal channels, runtime joint poses, imported
   JOINTS_0/WEIGHTS_0, and CPU skinning before Vulkan submission are covered.
 - Installed skeletal rendering: the shipped CLI sampled `Lift` at frame 30,
@@ -817,9 +818,9 @@ Studio is important, but it does not define or reorder the engine foundation.
 - In-process C# modules intentionally remain full trust and receipts remain
   unsigned; a future restricted/out-of-process host and publisher signatures
   are separate security capabilities, not claims of the current boundary.
-- Complete advanced animation coverage such as cubic interpolation, morph
-  targets, complex transform fixtures, richer graph curves, and interruptible
-  or hierarchical graph policies.
+- Complete advanced animation coverage such as morph targets, broader complex
+  transform fixtures, richer graph curves, and interruptible or hierarchical
+  graph policies.
 - Replace the current Studio facade with a professional workbench only after
   its runtime/authoring contracts are stable and independently proven.
 
@@ -881,10 +882,11 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-Advance generic animation authoring primitives now that state graphs are
-installed-product verified. The next contained tranche is agent-inspectable
-cubic interpolation with deterministic, bounded tangent data and richer
-transform fixtures; authored modules remain responsible for game behavior.
+The bounded cubic interpolation tranche is installed-product verified. The
+next engine-general animation decision is whether morph-target import,
+sampling, inspection, and renderer execution can form one bounded vertical
+slice without weakening the existing asset limits; authored modules remain
+responsible for game behavior.
 
 The cubic interpolation design is fixed in
 `docs/superpowers/specs/2026-08-18-cubic-animation-interpolation-design.md`:
@@ -908,6 +910,20 @@ Imported translation and scale produce the expected nonlinear midpoint;
 rotation output is normalized. Unsupported modes, non-tripled counts,
 non-finite records, duplicate cubic times, and near-zero cubic quaternions fail
 closed with no invalid pose publication.
+
+Cubic interpolation Task 3 is installed-product verified. Agent schemas expose
+the exact four-field cubic key shape, derivatives in units per second, supported
+value shapes, and bounds. Debug passed 760/760 in 2m23s; the zero-warning,
+zero-error Release build completed in 8.18s and both independent Release passes
+completed 760/760 in 2m18s. Shipped binaries reported X 110.0 at frame 30 where
+linear would be 80.0 while the graph transition was exactly 0.500. Clean,
+informative frames had SHA-256
+`38DAB210A0FE5E822F773251EFE18B1B05EF713709F2940813B2F8A99AC3C143` and
+`0C9C041274F4063D671D2B9F5ABEBFB0BBC5F6A9E9F8D1AA91D5F86140AAD017`.
+The installed matrix passed; its final 600-frame soak reached 4,382.7 FPS with
+673,112 retained bytes and all nine checks. The 1,149-payload archive is
+195,163,655 bytes with SHA-256
+`85CB44D5718825F9F865F7F2FE156ECDE4C325BA5E7DA0573BCADC2DD440204E`.
 
 The next tranche design is fixed in
 `docs/superpowers/specs/2026-08-18-animation-state-graph-design.md`: a bounded,
@@ -970,11 +986,10 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
-Design and implement bounded cubic animation interpolation, prove it through
-the existing sampler and installed runtime, then evaluate morph-target breadth
-against the remaining adversarial JSON/migration/diagnostic and full-trust
-module risks. Studio continues to follow proven engine contracts instead of
-reordering the foundation roadmap.
+Design a bounded morph-target vertical slice, then compare its implementation
+cost and renderer leverage against the remaining adversarial
+JSON/migration/diagnostic and full-trust module risks. Studio continues to
+follow proven engine contracts instead of reordering the foundation roadmap.
 
 ## Evidence index
 

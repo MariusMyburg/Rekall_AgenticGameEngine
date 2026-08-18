@@ -215,11 +215,11 @@ player publish test passed, then the complete Debug suite passed 658/658 in
 - Modify: `docs/production/PROGRESS.md`
 - Modify: `docs/superpowers/plans/2026-08-18-player-recovery-crash-operability.md`
 
-- [ ] **Step 1: Extend installed acceptance**
+- [x] **Step 1: Extend installed acceptance**
 
 Use an isolated installed diagnostics directory. Run the shipped Windows player with one-shot device loss and require exit 0, exact recovery code/mode/attempt evidence, and CLI inspection. Run exhaustion/fatal negative proofs and require stable nonzero codes. Re-run ordinary audio-required player and the unchanged gauntlet/package/UI/audio/soak matrix.
 
-- [ ] **Step 2: Run full Debug verification**
+- [x] **Step 2: Run full Debug verification**
 
 ```powershell
 $env:TEMP='F:\Dev\Rekall_AGE\.worktrees\production-foundation\Artifacts\TestTemp'
@@ -227,7 +227,7 @@ $env:TMP=$env:TEMP
 dotnet test Rekall.AGE.sln -c Debug -p:UseSharedCompilation=false --verbosity minimal
 ```
 
-- [ ] **Step 3: Run the canonical installed product gate**
+- [x] **Step 3: Run the canonical installed product gate**
 
 ```powershell
 $env:TEMP='F:\Dev\Rekall_AGE\.worktrees\production-foundation\Artifacts\GateTemp'
@@ -237,13 +237,30 @@ pwsh -NoProfile -File eng\build.ps1
 
 Require zero warnings/errors, two independent full Release passes, self-contained Windows distribution, installed recovery/fatal/exhaustion evidence, and the unchanged installed product matrix.
 
-- [ ] **Step 4: Review and record exact evidence**
+- [x] **Step 4: Review and record exact evidence**
 
 Use requesting-code-review subject to delegation rules and verification-before-completion. Record Debug/Release counts, exact recovery/fatal codes, report paths/counts, installed positive/negative outcomes, archive size/hash, cold-restart/state-preservation limitations, and the next compatibility/migration priority.
 
-- [ ] **Step 5: Commit and preserve the production branch**
+- [x] **Step 5: Commit and preserve the production branch**
 
 ```powershell
 git add eng/accept-distribution.ps1 docs/production/PROGRESS.md docs/superpowers/plans/2026-08-18-player-recovery-crash-operability.md
 git commit -m "test: gate installed player recovery"
 ```
+
+Verified 2026-08-18: the canonical product gate completed a locked restore, a
+zero-warning/zero-error Release build, and two independent 658/658 Release
+passes. Installed recovery completed 5/5 frames in two attempts, emitted
+`REKALL_PLAYER_GRAPHICS_RECOVERED`, and exited 0. The fatal path emitted
+`REKALL_PLAYER_RUNTIME_FATAL` after one attempt and exited 10. The exhaustion
+path emitted `REKALL_PLAYER_GRAPHICS_RECOVERY_EXHAUSTED` after three attempts,
+preserved 3/5 frames, and exited 11. Exactly three bounded reports were written
+and all three codes were returned by the shipped CLI inspection command. The
+unchanged installed gauntlet, relocation/package audit, informative Vulkan
+frame, runtime UI, audio, and 600-frame soak passed; soak simulated exactly 10
+seconds at 4,467.9 FPS with 691,608 bytes retained growth and nine checks
+passing. The resulting 1,149-file archive is 195,035,125 bytes with SHA-256
+`DD5D47DB8E6D647E64666DD3DFCF3D482181C7CA10FEF45F2C6A495E228FBD53`.
+Recovery remains a cold session restart and does not promise preservation of
+arbitrary in-memory module state. The next production priority is deterministic
+compatibility and migration coverage.

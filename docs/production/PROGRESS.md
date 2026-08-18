@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 08:46 Africa/Johannesburg
+Last verified: 2026-08-18 08:57 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: unified desktop diagnostics passed the complete Debug gate at 658/658
+Latest milestone: installed desktop recovery passed the complete two-pass Release product gate
 
 ## Product objective
 
@@ -30,11 +30,12 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,923,288-byte win-x64 archive assembled.
-- Canonical verification: 639/639 Release tests passed twice independently;
+- Windows distribution: fresh 195,035,125-byte win-x64 archive assembled with
+  SHA-256 `DD5D47DB8E6D647E64666DD3DFCF3D482181C7CA10FEF45F2C6A495E228FBD53`.
+- Canonical verification: 658/658 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
-- Current Debug verification: 639/639 tests pass after the complete module
-  trust boundary implementation.
+- Current Debug verification: 658/658 tests pass after desktop recovery and
+  diagnostics integration.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
   paths have installed-binary proof.
@@ -778,11 +779,27 @@ Studio is important, but it does not define or reorder the engine foundation.
   three-process fault proof dropped to 5 seconds. Locked dependency graphs were
   regenerated and the exact locked graphics-player publish regression passed.
   The complete Debug suite passes 658/658 in 2m15s.
+- Installed recovery product gate: the canonical build completed a locked
+  restore, a zero-warning/zero-error Release build, and two independent
+  658/658 Release passes. Installed one-shot graphics loss recovered by cold
+  session restart in two attempts, completed 5/5 frames, emitted
+  `REKALL_PLAYER_GRAPHICS_RECOVERED`, and exited 0. Installed arbitrary fatal
+  failure emitted `REKALL_PLAYER_RUNTIME_FATAL` after one attempt and exited
+  10. Installed repeated graphics loss exhausted the two-retry budget after
+  three attempts, preserved 3/5 completed frames, emitted
+  `REKALL_PLAYER_GRAPHICS_RECOVERY_EXHAUSTED`, and exited 11. Exactly three
+  bounded reports were written and the shipped CLI inspected all three codes.
+  The unchanged installed authoring gauntlet, relocated package audit,
+  informative hardware frame, runtime UI, audible player, and 600-frame soak
+  also passed. The soak simulated exactly 10 seconds at 4,467.9 FPS with
+  691,608 bytes retained growth and all nine checks passing. Recovery is a
+  bounded cold restart and intentionally does not preserve arbitrary in-memory
+  module state.
 
 ## Current gaps
 
-- Add device-loss and crash recovery, broader security threat tests,
-  compatibility fixtures, and release-operability evidence.
+- Add versioned compatibility and migration fixtures, plus broader security
+  threat tests around authored content, package boundaries, and diagnostics.
 - In-process C# modules intentionally remain full trust and receipts remain
   unsigned; a future restricted/out-of-process host and publisher signatures
   are separate security capabilities, not claims of the current boundary.
@@ -793,14 +810,16 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Extend installed acceptance with recovery, fatal, exhaustion, and CLI evidence
-inspection, then run the complete two-pass Release product gate. The module
-trust boundary remains complete and installed-product verified.
+Audit the persisted project/scene/package schemas and command contracts, then
+add deterministic compatibility fixtures and explicit migration diagnostics.
+The module trust boundary and desktop recovery paths remain installed-product
+verified.
 
 ## Next after the current item
 
-Continue with device-loss recovery, crash reporting, compatibility/migration,
-and release-operability evidence. Studio follows proven engine contracts.
+Expand adversarial security coverage, then complete advanced animation
+primitives. Studio continues to follow proven engine contracts instead of
+reordering the foundation roadmap.
 
 ## Evidence index
 

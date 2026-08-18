@@ -50,6 +50,7 @@ This README is the broad public entry point and the technical reference for the 
 - [Multiplayer](#multiplayer)
 - [Live Player Editing](#live-player-editing)
 - [Playable Verification And Packaging](#playable-verification-and-packaging)
+- [Failure Diagnostics And Player Recovery](#failure-diagnostics-and-player-recovery)
 - [Studio Workbench](#studio-workbench)
 - [Testing](#testing)
 - [Contributor Rules](#contributor-rules)

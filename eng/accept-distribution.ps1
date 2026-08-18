@@ -21,8 +21,10 @@ $moduleTrustTamperRoot = Join-Path $tempRoot ('rekall-age-installed-module-tampe
 $gauntletRoot = Join-Path $tempRoot ('rekall-age-installed-gauntlet-' + [Guid]::NewGuid().ToString('N'))
 $relocationRoot = Join-Path $tempRoot ('rekall-age-relocated-package-' + [Guid]::NewGuid().ToString('N'))
 $audioRoot = Join-Path $tempRoot ('rekall-age-installed-audio-' + [Guid]::NewGuid().ToString('N'))
+$diagnosticsRoot = Join-Path $tempRoot ('rekall-age-installed-diagnostics-' + [Guid]::NewGuid().ToString('N'))
 $succeeded = $false
 $previousSdlAudioDriver = $env:SDL_AUDIODRIVER
+$previousDiagnosticsRoot = $env:REKALL_AGE_DIAGNOSTICS_DIR
 
 function Invoke-Rekall {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
@@ -40,6 +42,31 @@ function Invoke-RekallOutput {
         throw "Distributed Rekall AGE command failed ($exitCode): $($Arguments -join ' ')`n$($lines -join "`n")"
     }
     return $lines -join "`n"
+}
+
+function Invoke-WindowsPlayerProof {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [Parameter(Mandatory = $true)][int]$ExpectedExitCode
+    )
+
+    New-Item -ItemType Directory -Path $diagnosticsRoot -Force | Out-Null
+    $stdoutPath = Join-Path $diagnosticsRoot ($Name + '.stdout.txt')
+    $stderrPath = Join-Path $diagnosticsRoot ($Name + '.stderr.txt')
+    $process = Start-Process -FilePath $windowsPlayer -ArgumentList $Arguments -PassThru -WindowStyle Hidden `
+        -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+    if (-not $process.WaitForExit(45000)) {
+        $process.Kill($true)
+        throw "Installed Windows player proof '$Name' exceeded 45 seconds."
+    }
+    $process.WaitForExit()
+    $output = ([IO.File]::ReadAllText($stdoutPath) + [IO.File]::ReadAllText($stderrPath))
+    if ($process.ExitCode -ne $ExpectedExitCode) {
+        throw "Installed Windows player proof '$Name' exited $($process.ExitCode), expected $ExpectedExitCode.`n$output"
+    }
+
+    return $output
 }
 
 try {
@@ -251,19 +278,73 @@ try {
     }
 
     $env:SDL_AUDIODRIVER = 'dummy'
+    $env:REKALL_AGE_DIAGNOSTICS_DIR = $diagnosticsRoot
     $audioProcess = Start-Process -FilePath $windowsPlayer -ArgumentList @($audioRoot, 'Main', '--frames', '10', '--audio-required') -PassThru -WindowStyle Hidden
     $audioProcess.WaitForExit()
     if ($audioProcess.ExitCode -ne 0) {
         throw "Installed Windows player audio device proof failed ($($audioProcess.ExitCode))."
     }
 
+    $recoveredOutput = Invoke-WindowsPlayerProof 'recovered' @(
+        $audioRoot, 'Main', '--frames', '5', '--no-vsync', '--simulate-device-loss-frame', '2') 0
+    if (-not $recoveredOutput.Contains('REKALL_PLAYER_GRAPHICS_RECOVERED', [StringComparison]::Ordinal) -or
+        -not $recoveredOutput.Contains('Outcome: recovered', [StringComparison]::Ordinal) -or
+        -not $recoveredOutput.Contains('Recovery mode: cold-session-restart', [StringComparison]::Ordinal) -or
+        -not $recoveredOutput.Contains('Attempts: 2', [StringComparison]::Ordinal) -or
+        -not $recoveredOutput.Contains('Frames: 5/5', [StringComparison]::Ordinal)) {
+        throw "Installed Windows player recovery proof was incomplete.`n$recoveredOutput"
+    }
+    Write-Output $recoveredOutput
+
+    $fatalOutput = Invoke-WindowsPlayerProof 'fatal' @(
+        $audioRoot, 'Main', '--frames', '5', '--no-vsync', '--simulate-fatal-frame', '2') 10
+    if (-not $fatalOutput.Contains('REKALL_PLAYER_RUNTIME_FATAL', [StringComparison]::Ordinal) -or
+        -not $fatalOutput.Contains('Outcome: fatal', [StringComparison]::Ordinal) -or
+        -not $fatalOutput.Contains('Attempts: 1', [StringComparison]::Ordinal)) {
+        throw "Installed Windows player fatal proof was incomplete.`n$fatalOutput"
+    }
+    Write-Output $fatalOutput
+
+    $exhaustedOutput = Invoke-WindowsPlayerProof 'exhausted' @(
+        $audioRoot, 'Main', '--frames', '5', '--no-vsync', '--simulate-device-loss-always-frame', '2') 11
+    if (-not $exhaustedOutput.Contains('REKALL_PLAYER_GRAPHICS_RECOVERY_EXHAUSTED', [StringComparison]::Ordinal) -or
+        -not $exhaustedOutput.Contains('Outcome: exhausted', [StringComparison]::Ordinal) -or
+        -not $exhaustedOutput.Contains('Attempts: 3', [StringComparison]::Ordinal) -or
+        -not $exhaustedOutput.Contains('Frames: 3/5', [StringComparison]::Ordinal)) {
+        throw "Installed Windows player exhaustion proof was incomplete.`n$exhaustedOutput"
+    }
+    Write-Output $exhaustedOutput
+
+    $reportFiles = @(Get-ChildItem -LiteralPath $diagnosticsRoot -Filter 'failure-*.json' -File)
+    if ($reportFiles.Count -ne 3) {
+        throw "Installed recovery acceptance expected exactly three JSON reports, found $($reportFiles.Count)."
+    }
+    $reportCodes = @($reportFiles | ForEach-Object { (Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json).code })
+    foreach ($expectedCode in @(
+        'REKALL_PLAYER_GRAPHICS_RECOVERED',
+        'REKALL_PLAYER_RUNTIME_FATAL',
+        'REKALL_PLAYER_GRAPHICS_RECOVERY_EXHAUSTED')) {
+        if ($expectedCode -notin $reportCodes) {
+            throw "Installed recovery reports did not contain '$expectedCode'."
+        }
+    }
+
+    $diagnosticsOutput = Invoke-RekallOutput diagnostics failures $diagnosticsRoot
+    foreach ($expectedCode in $reportCodes) {
+        if (-not $diagnosticsOutput.Contains($expectedCode, [StringComparison]::Ordinal)) {
+            throw "Installed CLI diagnostics inspection did not contain '$expectedCode'.`n$diagnosticsOutput"
+        }
+    }
+    Write-Output $diagnosticsOutput
+
     $succeeded = $true
     Write-Output "Installed distribution acceptance passed: $distribution"
 }
 finally {
     $env:SDL_AUDIODRIVER = $previousSdlAudioDriver
+    $env:REKALL_AGE_DIAGNOSTICS_DIR = $previousDiagnosticsRoot
     if ($succeeded) {
-        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot)) {
+        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot, $diagnosticsRoot)) {
             $resolved = [IO.Path]::GetFullPath($path)
             if ($resolved.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and
                 (Test-Path -LiteralPath $resolved)) {
@@ -272,6 +353,6 @@ finally {
         }
     }
     else {
-        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', and '$audioRoot'."
+        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', '$audioRoot', and '$diagnosticsRoot'."
     }
 }

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 04:51 Africa/Johannesburg
+Last verified: 2026-08-18 04:57 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: validation sequencing and registered guidance passed 589/589 Debug tests
+Latest milestone: validation sequencing and registered guidance passed the complete product gate
 
 ## Product objective
 
@@ -30,8 +30,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,726,872-byte win-x64 archive assembled.
-- Canonical verification: 588/588 Release tests passed twice independently;
+- Windows distribution: fresh 194,726,496-byte win-x64 archive assembled.
+- Canonical verification: 589/589 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
@@ -538,6 +538,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   registered validation/schema operations instead of the nonexistent generic
   repair workflow or incomplete blueprint calls. The full Debug suite passes
   at 589/589.
+- Validation-sequencing distribution gate: the clean Release build completed
+  with zero warnings and zero errors; both independent Release passes completed
+  at 589/589; and installed acceptance passed SDK/module authoring, the generic
+  gauntlet, original and relocated package proof, runtime UI, software viewport,
+  simulated audio, and Windows player audio. The canonical 1,149-file archive
+  is 194,726,496 bytes.
 
 ## Current gaps
 
@@ -553,7 +559,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for validation sequencing and registered guidance.
+Run the unchanged installed Ollama benchmark on the validation-sequencing distribution.
 
 ## Next after the current item
 

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 05:05 Africa/Johannesburg
+Last verified: 2026-08-18 05:11 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: numeric-string range validation passed 590/590 Debug tests
+Latest milestone: numeric-string range validation passed the complete product gate
 
 ## Product objective
 
@@ -30,8 +30,8 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 194,726,496-byte win-x64 archive assembled.
-- Canonical verification: 589/589 Release tests passed twice independently;
+- Windows distribution: fresh 194,727,467-byte win-x64 archive assembled.
+- Canonical verification: 590/590 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
 - Installed acceptance: direct rerun exited 0; project/module workflows,
   packaging and relocation, nonblank capture, runtime UI, and audible audio
@@ -553,6 +553,12 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Numeric-string range validation: invariant numeric strings now participate in
   built-in schema minimum/maximum enforcement and receive canonical numeric
   repair suggestions. The full Debug suite passes at 590/590.
+- Numeric-string validation distribution gate: the clean Release build
+  completed with zero warnings and zero errors; both independent Release passes
+  completed at 590/590; and installed acceptance passed SDK/module authoring,
+  the generic gauntlet, original and relocated package proof, runtime UI,
+  software viewport, simulated audio, and Windows player audio. The canonical
+  1,149-file archive is 194,727,467 bytes.
 
 ## Current gaps
 
@@ -568,7 +574,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## In progress
 
-Run the complete clean product gate for numeric-string range validation.
+Run the unchanged installed Ollama benchmark on the numeric-string validation distribution.
 
 ## Next after the current item
 

@@ -156,11 +156,40 @@ public static class RekallAgeStudioAutomation
         return result;
     }
 
-    private static string? ResolvePackageArchivePath(string projectRoot)
+    internal static string? ResolvePackageArchivePath(string projectRoot)
     {
-        var builds = Path.Combine(projectRoot, "Builds");
-        if (!Directory.Exists(builds)) return null;
-        return Directory.EnumerateFiles(builds, "*.zip", SearchOption.TopDirectoryOnly)
+        if (!Directory.Exists(projectRoot)) return null;
+        const int maximumDirectories = 1_024;
+        const int maximumArchives = 256;
+        var directories = new Stack<string>();
+        var archives = new List<string>();
+        directories.Push(projectRoot);
+        var visitedDirectories = 0;
+        while (directories.Count > 0
+            && visitedDirectories < maximumDirectories
+            && archives.Count < maximumArchives)
+        {
+            var directory = directories.Pop();
+            visitedDirectories++;
+            try
+            {
+                archives.AddRange(Directory.EnumerateFiles(directory, "*.zip", SearchOption.TopDirectoryOnly)
+                    .Take(maximumArchives - archives.Count));
+                foreach (var child in Directory.EnumerateDirectories(directory, "*", SearchOption.TopDirectoryOnly))
+                {
+                    if ((File.GetAttributes(child) & FileAttributes.ReparsePoint) == 0)
+                    {
+                        directories.Push(child);
+                    }
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // Package evidence discovery is best-effort and never follows inaccessible paths.
+            }
+        }
+
+        return archives
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .FirstOrDefault();
     }

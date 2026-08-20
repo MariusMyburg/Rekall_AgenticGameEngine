@@ -125,6 +125,25 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public void AutomationFindsNestedAgentAuthoredPackageOutput()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-package-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var nested = Path.Combine(root, "Output", "Packages");
+            Directory.CreateDirectory(nested);
+            var archive = Path.Combine(nested, "EchoFoundry.zip");
+            File.WriteAllText(archive, "package");
+
+            Assert.Equal(archive, RekallAgeStudioAutomation.ResolvePackageArchivePath(root));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ViewModelCreatesAndEditsProjectThroughSchemaGuidedCanonicalCommands()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-vm-" + Guid.NewGuid().ToString("N"));

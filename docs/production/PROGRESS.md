@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 17:47 Africa/Johannesburg
+Last verified: 2026-08-20 17:56 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: second task-specific Ollama-authored playable delivery accepted
+Latest milestone: uninterrupted task-specific Ollama game creation passed
 
 ## Product objective
 
@@ -36,7 +36,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Debug verification: 908/908 engine tests and 5/5 Windows Studio
+- Current Debug verification: 908/908 engine tests and 6/6 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -920,17 +920,37 @@ Studio is important, but it does not define or reorder the engine foundation.
   real play/package/audit controls, and installed Studio-to-agent game creation
   are now present. The workbench is functional but not yet a finished
   professional editor.
-- Run a fresh installed, empty-project task-specific benchmark without a
-  continuation prompt. Both `Prism Relay` and `Signal Garden` are accepted
-  task-specific authored artifacts and deliveries, but their original
-  empty-project runs needed bounded continuations after reaching the 64-turn
-  limit. `Signal Garden` exposed avoidable repeated scope arguments and late
-  playable-adapter discovery; those generic contracts are now repaired. The
-  next acceptance raises the standard from successful recoverable authoring
-  sessions to a single uninterrupted installed-product session, while further
-  reducing empty or malformed non-scope tool arguments.
+- Repeat the now-passing uninterrupted empty-project task-specific benchmark
+  against freshly assembled installed binaries. Repository-built Studio passed
+  the complete `Echo Foundry` authoring and audit session in 49 turns. The next
+  bar is distribution parity, followed by reducing the six recovered malformed
+  or initially incomplete non-scope tool calls without hiding real errors.
 
 ## Recently completed
+
+`Echo Foundry` is the first uninterrupted empty-project task-specific game
+creation pass. Local Ollama `qwen3.5:35b` authored the 3D industrial arena,
+semantic controls, four resonators, HUD, delta-time movement/contact/score/reset
+runtime system, and separate generic playable proof adapter; repaired compiler
+and visual-composition evidence; reached zero validation issues; built and
+trusted both modules; packaged the Windows game; repaired an initially
+one-color-dominated proof frame through ordinary scene authoring; and passed the
+consolidated package audit in one 49-turn session. Studio captured a 960x540
+viewport with seven renderables. The session's engine work and audit were
+successful, but automation initially reported false because its evidence
+collector searched only `Builds` while the agent correctly used
+`Output/Packages`. Package discovery is now bounded to 1,024 project-local
+directories and 256 archives, skips reparse points, and verified the unchanged
+archive in a four-turn audit-only run. Package SHA-256:
+`03F8BFB1E0D7CC09E9D1CD2EB11FEACB48DA1C2CA7CA8B6972D205CD502E9976`;
+Studio viewport:
+`A5B27F145862D62E88AF25A3665E8D7E767BF663398CE5423EF8BB4A2CB9D66A`;
+package-audit frame:
+`D86CE63E2BFB4780E28C8517724D9264DB13B9DB333C64D67441FDFA1421F3FB`;
+collector evidence:
+`A88A17CCF4D5F4F5A231DF69C35CAF0B4AC78ED20B0E4042597C7892EAED3EA8`.
+Current verification remains 908/908 engine tests, advances to 6/6 Studio
+tests, and the full solution builds with zero warnings and zero errors.
 
 The task-specific `Signal Garden` checkpoint is accepted from direct repository
 evidence. Starting from an empty project, local Ollama `qwen3.5:35b` authored a
@@ -1043,11 +1063,11 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The current item remains the actual AI game-creation loop. Run a fresh
-installed-product benchmark from an empty project with a new arbitrary game
-brief and require one uninterrupted session to produce clean validation,
+The current item remains the actual AI game-creation loop. Assemble fresh
+installed binaries and repeat an empty-project arbitrary-game brief through the
+installed Studio in one uninterrupted session, requiring clean validation,
 informative capture, compiled agent-authored behavior, playable package, and a
-passing consolidated audit. Use its concrete failures to improve only generic
+passing consolidated audit. Use concrete failures to improve only generic
 authoring primitives, schemas, diagnostics, and repair efficiency. Studio,
 embedded AI, MCP, CLI, and packaged players must continue to consume the same
 contracts.

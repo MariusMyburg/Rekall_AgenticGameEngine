@@ -10,6 +10,12 @@ public sealed record RekallAgeRuntimeRaycastHit(
     RekallAgeRuntimeVector3 Point,
     string ColliderType);
 
+public sealed record RekallAgeRuntimeRaycast2DHit(
+    RekallAgeRuntimeEntity Entity,
+    double Distance,
+    RekallAgeRuntimeVector2 Point,
+    string ColliderType);
+
 public static class RekallAgeRuntimeModuleSdk
 {
     public static RekallAgeRuntimeComponent? FindComponent(
@@ -781,6 +787,74 @@ public static class RekallAgeRuntimeModuleSdk
             .ToArray();
     }
 
+    public static IReadOnlyList<RekallAgeRuntimeRaycast2DHit> Raycast2D(
+        this RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeVector2 origin,
+        RekallAgeRuntimeVector2 direction,
+        double range,
+        string? tag = null,
+        string? componentType = null)
+    {
+        if (range <= 0)
+        {
+            return Array.Empty<RekallAgeRuntimeRaycast2DHit>();
+        }
+
+        var normalized = Normalize2D(direction);
+        if (LengthSquared2D(normalized) <= 0.000001)
+        {
+            return Array.Empty<RekallAgeRuntimeRaycast2DHit>();
+        }
+
+        var hits = new List<RekallAgeRuntimeRaycast2DHit>();
+        foreach (var entity in world.Entities)
+        {
+            if (!entity.Visible
+                || (!string.IsNullOrWhiteSpace(tag) && !entity.HasTag(tag))
+                || (!string.IsNullOrWhiteSpace(componentType) && entity.FindComponent(componentType) is null))
+            {
+                continue;
+            }
+
+            foreach (var collider in entity.Components.Where(Is2DCollider))
+            {
+                double distance;
+                RekallAgeRuntimeVector2 point;
+                var intersects = collider.Type switch
+                {
+                    "Rekall.CircleCollider2D" => TryIntersectCircle2D(
+                        origin,
+                        normalized,
+                        range,
+                        entity.Transform.Position2D,
+                        Math.Max(0.0001, collider.Properties.ReadNumber("radius", collider.Properties.ReadNumber("Radius", 0.5)))
+                            * Math.Max(Math.Abs(entity.Transform.Scale2D.X), Math.Abs(entity.Transform.Scale2D.Y)),
+                        out distance,
+                        out point),
+                    _ => TryIntersectBox2D(
+                        origin,
+                        normalized,
+                        range,
+                        entity,
+                        collider,
+                        out distance,
+                        out point)
+                };
+                if (intersects)
+                {
+                    hits.Add(new RekallAgeRuntimeRaycast2DHit(entity, distance, point, collider.Type));
+                    break;
+                }
+            }
+        }
+
+        return hits
+            .OrderBy(hit => hit.Distance)
+            .ThenBy(hit => hit.Entity.Name, StringComparer.Ordinal)
+            .ThenBy(hit => hit.Entity.Id, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     public static double ReadNumber(this JsonObject properties, string name, double fallback)
     {
         if (!properties.TryGetPropertyValue(name, out var node) || node is not JsonValue value)
@@ -1059,6 +1133,135 @@ public static class RekallAgeRuntimeModuleSdk
             "Rekall.SphereCollider3D" or
             "Rekall.CapsuleCollider3D" or
             "Rekall.MeshCollider";
+    }
+
+    private static bool Is2DCollider(RekallAgeRuntimeComponent component)
+    {
+        return component.Type is "Rekall.BoxCollider2D" or "Rekall.CircleCollider2D";
+    }
+
+    private static bool TryIntersectCircle2D(
+        RekallAgeRuntimeVector2 origin,
+        RekallAgeRuntimeVector2 direction,
+        double range,
+        RekallAgeRuntimeVector2 center,
+        double radius,
+        out double distance,
+        out RekallAgeRuntimeVector2 point)
+    {
+        var offsetX = origin.X - center.X;
+        var offsetY = origin.Y - center.Y;
+        var b = 2 * (offsetX * direction.X + offsetY * direction.Y);
+        var c = offsetX * offsetX + offsetY * offsetY - radius * radius;
+        var discriminant = b * b - 4 * c;
+        if (discriminant < 0)
+        {
+            return NoHit2D(out distance, out point);
+        }
+
+        var sqrt = Math.Sqrt(discriminant);
+        var near = (-b - sqrt) * 0.5;
+        var far = (-b + sqrt) * 0.5;
+        distance = near >= 0 ? near : far;
+        if (distance < 0 || distance > range)
+        {
+            return NoHit2D(out distance, out point);
+        }
+
+        point = new RekallAgeRuntimeVector2(
+            origin.X + direction.X * distance,
+            origin.Y + direction.Y * distance);
+        return true;
+    }
+
+    private static bool TryIntersectBox2D(
+        RekallAgeRuntimeVector2 origin,
+        RekallAgeRuntimeVector2 direction,
+        double range,
+        RekallAgeRuntimeEntity entity,
+        RekallAgeRuntimeComponent collider,
+        out double distance,
+        out RekallAgeRuntimeVector2 point)
+    {
+        var radians = -entity.Transform.Rotation2D * Math.PI / 180;
+        var cosine = Math.Cos(radians);
+        var sine = Math.Sin(radians);
+        var relativeX = origin.X - entity.Transform.Position2D.X;
+        var relativeY = origin.Y - entity.Transform.Position2D.Y;
+        var localOriginX = relativeX * cosine - relativeY * sine;
+        var localOriginY = relativeX * sine + relativeY * cosine;
+        var localDirectionX = direction.X * cosine - direction.Y * sine;
+        var localDirectionY = direction.X * sine + direction.Y * cosine;
+        var halfWidth = Math.Max(
+            0.0001,
+            Math.Abs(collider.Properties.ReadNumber("width", collider.Properties.ReadNumber("Width", 1))
+                * entity.Transform.Scale2D.X)) * 0.5;
+        var halfHeight = Math.Max(
+            0.0001,
+            Math.Abs(collider.Properties.ReadNumber("height", collider.Properties.ReadNumber("Height", 1))
+                * entity.Transform.Scale2D.Y)) * 0.5;
+        var near = double.NegativeInfinity;
+        var far = double.PositiveInfinity;
+        if (!IntersectSlab(localOriginX, localDirectionX, halfWidth, ref near, ref far)
+            || !IntersectSlab(localOriginY, localDirectionY, halfHeight, ref near, ref far))
+        {
+            return NoHit2D(out distance, out point);
+        }
+
+        distance = near >= 0 ? near : far;
+        if (distance < 0 || distance > range)
+        {
+            return NoHit2D(out distance, out point);
+        }
+
+        point = new RekallAgeRuntimeVector2(
+            origin.X + direction.X * distance,
+            origin.Y + direction.Y * distance);
+        return true;
+    }
+
+    private static bool IntersectSlab(
+        double origin,
+        double direction,
+        double halfExtent,
+        ref double near,
+        ref double far)
+    {
+        if (Math.Abs(direction) <= 0.000001)
+        {
+            return origin >= -halfExtent && origin <= halfExtent;
+        }
+
+        var first = (-halfExtent - origin) / direction;
+        var second = (halfExtent - origin) / direction;
+        if (first > second)
+        {
+            (first, second) = (second, first);
+        }
+
+        near = Math.Max(near, first);
+        far = Math.Min(far, second);
+        return near <= far;
+    }
+
+    private static bool NoHit2D(out double distance, out RekallAgeRuntimeVector2 point)
+    {
+        distance = 0;
+        point = new RekallAgeRuntimeVector2(0, 0);
+        return false;
+    }
+
+    private static RekallAgeRuntimeVector2 Normalize2D(RekallAgeRuntimeVector2 value)
+    {
+        var length = Math.Sqrt(LengthSquared2D(value));
+        return length <= 0.000001
+            ? new RekallAgeRuntimeVector2(0, 0)
+            : new RekallAgeRuntimeVector2(value.X / length, value.Y / length);
+    }
+
+    private static double LengthSquared2D(RekallAgeRuntimeVector2 value)
+    {
+        return value.X * value.X + value.Y * value.Y;
     }
 
     private static bool TryIntersectCollider(

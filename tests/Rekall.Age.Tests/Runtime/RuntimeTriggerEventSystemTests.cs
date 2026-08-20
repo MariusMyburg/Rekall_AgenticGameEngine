@@ -40,14 +40,14 @@ public sealed class RuntimeTriggerEventSystemTests
     public async Task TriggerSystemEmitsEnterForA2DCollider()
     {
         var world = CreateWorld(
-            CreateTrigger(
+            CreateTrigger2D(
                 "zone",
                 "Zone",
-                x: 0,
+                x: 4,
                 [
                     new JsonObject { ["event"] = "trigger.enter", ["handler"] = "enteredZone" }
                 ]),
-            CreateActor2D("actor", "Actor", x: 0.5));
+            CreateActor2D("actor", "Actor", x: 4.9));
 
         var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
             .RunAsync(world, 1, CancellationToken.None);
@@ -210,12 +210,48 @@ public sealed class RuntimeTriggerEventSystemTests
             false,
             RekallAgeRuntimeTransform.Identity with
             {
-                Position3D = new RekallAgeRuntimeVector3(x, 0, 0)
+                Position2D = new RekallAgeRuntimeVector2(x, 0)
             },
             [
                 new RekallAgeRuntimeComponent(
                     "Rekall.CircleCollider2D",
                     new JsonObject { ["radius"] = 0.5 })
+            ]);
+    }
+
+    private static RekallAgeRuntimeEntity CreateTrigger2D(
+        string id,
+        string name,
+        double x,
+        JsonArray events)
+    {
+        return new RekallAgeRuntimeEntity(
+            id,
+            name,
+            [],
+            null,
+            null,
+            true,
+            false,
+            RekallAgeRuntimeTransform.Identity with
+            {
+                Position2D = new RekallAgeRuntimeVector2(x, 0),
+                Scale2D = new RekallAgeRuntimeVector2(2, 2)
+            },
+            [
+                new RekallAgeRuntimeComponent(
+                    "Rekall.Transform2D",
+                    new JsonObject()),
+                new RekallAgeRuntimeComponent(
+                    "Rekall.Trigger",
+                    new JsonObject
+                    {
+                        ["shape"] = "sphere",
+                        ["radius"] = 0.25
+                    }),
+                new RekallAgeRuntimeComponent(
+                    "Rekall.EventBindings",
+                    new JsonObject { ["events"] = events })
             ]);
     }
 }

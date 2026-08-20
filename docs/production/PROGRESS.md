@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 23:12 Africa/Johannesburg
+Last verified: 2026-08-20 23:25 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: generic 2D collision and trigger event parity
+Latest milestone: generic 2D physics authoring parity
 
 ## Product objective
 
@@ -37,17 +37,27 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Release verification: 928/928 engine tests and 7/7 Windows Studio
+- Current Release verification: 934/934 engine tests and 7/7 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Physics event parity: BEPU-backed 2D bodies now participate in the same
   generic `collision.begin`/`collision.stay`/`collision.end` and
   `trigger.enter`/`trigger.stay`/`trigger.exit` authoring contracts as 3D
-  bodies. Focused tests proved exact `Rekall.CircleCollider2D` payload facts;
-  the complete Release suite passes 928/928. These events intentionally remain
-  deterministic bounding-radius overlap facts rather than exact BEPU contact
-  manifolds; contact points, normals, impulses, and exact shape overlap are a
+  bodies. Runtime-realistic tests prove `Position2D`/`Scale2D` coordinates and
+  exact `Rekall.CircleCollider2D` payload facts rather than accidentally using
+  the unused 3D origin. The complete Release suite passes 934/934. These events
+  intentionally remain deterministic bounding-radius overlap facts rather
+  than exact BEPU contact manifolds; contact points, normals, impulses, and
+  exact shape overlap are a
   separate production physics tranche.
+- Physics SDK parity: agent-authored C# modules now have a typed `Raycast2D`
+  alongside `Raycast3D`. It returns stable distance-ordered visible box/circle
+  hits with optional tag/component filters, exact circle intersection, and
+  exact transformed oriented-box intersection. Runtime SDK inspection exposes
+  its compiled signature, usage, immutable `RekallAgeRuntimeVector2`, and
+  construction guidance. `Rekall.EventBindings` schemas now document the exact
+  `{ event, handler, active }` shape, generic lifecycle/pointer/2D-or-3D
+  collision/trigger facts, and custom event emission.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
   product. Shipped project/module workflows, the generic game-authoring
   gauntlet, packaging and clean relocation, package audit, nonblank capture,
@@ -922,11 +932,14 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Physics is functional but not yet production-complete. 2D is a planar BEPU
   projection with box/circle shapes and persisted linear velocity; 3D adds
   box/sphere/capsule and static or convex mesh shapes. There are no generic
-  joints/constraints, dedicated 2D world/material contract, 2D ray query,
-  exposed angular state/control, collision layers/masks, or exact contact
-  manifold facts. The simulation is rebuilt from authored/runtime state each
-  frame, so persistent-body broadphase/sleep performance still needs a
-  measured production tranche.
+  joints/constraints, dedicated 2D world/material contract, exposed angular
+  state/control, collision layers/masks, or exact contact manifold facts.
+  BEPU body poses/shapes currently do not apply authored Transform2D/3D
+  rotation or scale, even though inspection/event/query contracts preserve
+  those transforms; that fidelity mismatch is a priority generic physics gap.
+  The simulation is also rebuilt from authored/runtime state each frame, so
+  persistent-body broadphase/sleep performance needs a measured production
+  tranche.
 - 3D rendering is substantial and hardware-backed: perspective/orthographic
   cameras, viewports/layers/stereo/OpenXR, primitives and authored/imported GLB
   meshes, PBR texture inputs, directional/point lighting, generic animation,
@@ -1451,11 +1464,13 @@ The 2026-08-20 capability audit verified that built-in component schemas and
 `rekall.module.search_component_schemas` expose exact 2D/3D transform, camera,
 renderer, light, rigidbody, collider, world, and material contracts, while
 `rekall.module.inspect_runtime_sdk` exposes immutable entity/component helpers,
-semantic input, generic events/observations, camera vectors, and `Raycast3D`.
+semantic input, generic events/observations, camera vectors, and typed
+`Raycast2D`/`Raycast3D` queries.
 Runtime inspection, viewport capture diagnostics, validator repair actions,
 and MCP command schemas provide executable evidence. The next AI-first physics
 work should be driven by the real Qwen benchmark, with likely candidates being
-2D spatial queries and richer contact evidence rather than genre behavior.
+physics transform fidelity and richer contact evidence rather than genre
+behavior.
 
 AI game-creation Tasks 1-3 have a verified functional checkpoint. A new
 UI-independent workbench session creates projects

@@ -78,4 +78,26 @@ public sealed class InspectRuntimeSdkCommandTests
         Assert.False(result.Ok);
         Assert.Contains(result.Errors, error => error.Code == "REKALL_RUNTIME_SDK_QUERY_REQUIRED");
     }
+
+    [Fact]
+    public async Task ReturnsTyped2DPhysicsQueryContracts()
+    {
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("inspect 2d physics sdk"),
+            CancellationToken.None);
+
+        var result = await new InspectRuntimeSdkCommand().ExecuteAsync(
+            new InspectRuntimeSdkRequest("2d planar raycast vector", Limit: 16),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "Raycast2D"
+            && contract.Signature.Contains("RekallAgeRuntimeVector2 origin", StringComparison.Ordinal)
+            && contract.Usage!.Contains("world.Raycast2D", StringComparison.Ordinal));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "RekallAgeRuntimeVector2"
+            && contract.Description.Contains("planar", StringComparison.OrdinalIgnoreCase));
+    }
 }

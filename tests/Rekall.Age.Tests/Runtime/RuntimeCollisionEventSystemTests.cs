@@ -60,6 +60,26 @@ public sealed class RuntimeCollisionEventSystemTests
     }
 
     [Fact]
+    public async Task CollisionSystemDoesNotOverlapSeparated2DCollidersAtThe3DOrigin()
+    {
+        var world = CreateWorld(
+            CreateCircle2D(
+                "actor-a",
+                "Actor A",
+                x: 0,
+                [
+                    new JsonObject { ["event"] = "collision.begin", ["handler"] = "touchStarted" }
+                ]),
+            CreateCircle2D("actor-b", "Actor B", x: 4, []));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, 1, CancellationToken.None);
+
+        Assert.DoesNotContain(result.World.Subsystems.Events.Events, runtimeEvent =>
+            runtimeEvent.Type == "collision.begin");
+    }
+
+    [Fact]
     public async Task CollisionSystemEmitsStayForPersistingOverlaps()
     {
         var world = CreateWorld(
@@ -184,7 +204,7 @@ public sealed class RuntimeCollisionEventSystemTests
             false,
             RekallAgeRuntimeTransform.Identity with
             {
-                Position3D = new RekallAgeRuntimeVector3(x, 0, 0)
+                Position2D = new RekallAgeRuntimeVector2(x, 0)
             },
             [
                 new RekallAgeRuntimeComponent(

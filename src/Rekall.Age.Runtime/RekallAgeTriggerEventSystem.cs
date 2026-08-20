@@ -206,13 +206,19 @@ public sealed class RekallAgeTriggerEventSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeEntity entity,
         RekallAgeRuntimeComponent trigger)
     {
+        var is2D = entity.FindComponent("Rekall.Transform2D") is not null;
         var shape = (ReadString(trigger.Properties, "shape") ?? "sphere").Trim().ToLowerInvariant();
         var radius = shape switch
         {
+            "box" when is2D => EstimateBox2DBoundingRadius(entity, trigger),
             "box" => EstimateBoxBoundingRadius(entity, trigger),
-            _ => Math.Max(0.0001, ReadNumber(trigger.Properties, "radius", 1)) * MaxScale(entity)
+            _ => Math.Max(0.0001, ReadNumber(trigger.Properties, "radius", 1))
+                * (is2D ? MaxPlanarScale(entity) : MaxScale(entity))
         };
-        return new TriggerBody(entity, trigger, shape, radius);
+        var position = is2D
+            ? new RekallAgeRuntimeVector3(entity.Transform.Position2D.X, entity.Transform.Position2D.Y, 0)
+            : entity.Transform.Position3D;
+        return new TriggerBody(entity, trigger, shape, position, radius);
     }
 
     private static ColliderBody? CreateColliderBody(RekallAgeRuntimeEntity entity)
@@ -223,7 +229,10 @@ public sealed class RekallAgeTriggerEventSystem : IRekallAgeRuntimeWorldSystem
             return null;
         }
 
-        return new ColliderBody(entity, collider, EstimateColliderRadius(entity, collider));
+        var position = Is2DCollider(collider)
+            ? new RekallAgeRuntimeVector3(entity.Transform.Position2D.X, entity.Transform.Position2D.Y, 0)
+            : entity.Transform.Position3D;
+        return new ColliderBody(entity, collider, position, EstimateColliderRadius(entity, collider));
     }
 
     private static bool IsCollider(RekallAgeRuntimeComponent component)
@@ -256,14 +265,19 @@ public sealed class RekallAgeTriggerEventSystem : IRekallAgeRuntimeWorldSystem
         };
     }
 
+    private static bool Is2DCollider(RekallAgeRuntimeComponent component)
+    {
+        return component.Type is "Rekall.BoxCollider2D" or "Rekall.CircleCollider2D";
+    }
+
     private static double EstimateBox2DBoundingRadius(
         RekallAgeRuntimeEntity entity,
         RekallAgeRuntimeComponent collider)
     {
         var width = Math.Max(0.0001, ReadNumber(collider.Properties, "width", 1))
-            * Math.Abs(entity.Transform.Scale3D.X);
+            * Math.Abs(entity.Transform.Scale2D.X);
         var height = Math.Max(0.0001, ReadNumber(collider.Properties, "height", 1))
-            * Math.Abs(entity.Transform.Scale3D.Y);
+            * Math.Abs(entity.Transform.Scale2D.Y);
         return Math.Sqrt(width * width + height * height) * 0.5;
     }
 
@@ -290,14 +304,14 @@ public sealed class RekallAgeTriggerEventSystem : IRekallAgeRuntimeWorldSystem
     {
         return Math.Max(
             0.0001,
-            Math.Max(Math.Abs(entity.Transform.Scale3D.X), Math.Abs(entity.Transform.Scale3D.Y)));
+            Math.Max(Math.Abs(entity.Transform.Scale2D.X), Math.Abs(entity.Transform.Scale2D.Y)));
     }
 
     private static bool Overlaps(TriggerBody trigger, ColliderBody body)
     {
-        var dx = trigger.Entity.Transform.Position3D.X - body.Entity.Transform.Position3D.X;
-        var dy = trigger.Entity.Transform.Position3D.Y - body.Entity.Transform.Position3D.Y;
-        var dz = trigger.Entity.Transform.Position3D.Z - body.Entity.Transform.Position3D.Z;
+        var dx = trigger.Position.X - body.Position.X;
+        var dy = trigger.Position.Y - body.Position.Y;
+        var dz = trigger.Position.Z - body.Position.Z;
         var range = trigger.Radius + body.Radius;
         return dx * dx + dy * dy + dz * dz <= range * range;
     }
@@ -421,11 +435,13 @@ public sealed class RekallAgeTriggerEventSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeEntity Entity,
         RekallAgeRuntimeComponent Trigger,
         string Shape,
+        RekallAgeRuntimeVector3 Position,
         double Radius);
 
     private sealed record ColliderBody(
         RekallAgeRuntimeEntity Entity,
         RekallAgeRuntimeComponent Collider,
+        RekallAgeRuntimeVector3 Position,
         double Radius);
 
     private sealed record TriggerEventBinding(string? Handler);

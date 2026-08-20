@@ -116,13 +116,15 @@ public sealed record RekallAgeInputActionBinding(
     string? MouseAxis = null,
     double MouseScale = 1);
 
-[RekallAgeComponent("Event Bindings")]
+[RekallAgeComponent("Event Bindings", Description = "Binds generic runtime event facts to optional handler names. Agent-authored modules consume the facts and decide game behavior; the engine does not attach genre-specific consequences.")]
 public sealed class RekallAgeEventBindingsComponent : RekallAgeComponent
 {
     [RekallAgeProperty]
     public bool Active { get; init; } = true;
 
-    [RekallAgeProperty(Kind = "runtimeEvents")]
+    [RekallAgeProperty(
+        Kind = "runtimeEvents",
+        Description = "Array of { event, handler, active } objects. Built-in facts include entity.begin, entity.tick, timer.elapsed, pointer.enter/leave/hit/down/up/click, collision.begin/stay/end for 2D or 3D colliders, and trigger.enter/stay/exit. Agent-authored modules may emit and bind custom event names through EmitEvent and EmitBoundEvents.")]
     public RekallAgeEventBinding[] Events { get; init; } =
     [
         new("entity.tick")

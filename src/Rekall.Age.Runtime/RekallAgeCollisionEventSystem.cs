@@ -202,7 +202,10 @@ public sealed class RekallAgeCollisionEventSystem : IRekallAgeRuntimeWorldSystem
             return null;
         }
 
-        return new CollisionBody(entity, collider, EstimateBoundingRadius(entity, collider));
+        var position = Is2DCollider(collider)
+            ? new RekallAgeRuntimeVector3(entity.Transform.Position2D.X, entity.Transform.Position2D.Y, 0)
+            : entity.Transform.Position3D;
+        return new CollisionBody(entity, collider, position, EstimateBoundingRadius(entity, collider));
     }
 
     private static bool IsCollider(RekallAgeRuntimeComponent component)
@@ -235,14 +238,19 @@ public sealed class RekallAgeCollisionEventSystem : IRekallAgeRuntimeWorldSystem
         };
     }
 
+    private static bool Is2DCollider(RekallAgeRuntimeComponent component)
+    {
+        return component.Type is "Rekall.BoxCollider2D" or "Rekall.CircleCollider2D";
+    }
+
     private static double EstimateBox2DBoundingRadius(
         RekallAgeRuntimeEntity entity,
         RekallAgeRuntimeComponent collider)
     {
         var width = Math.Max(0.0001, ReadNumber(collider.Properties, "width", 1))
-            * Math.Abs(entity.Transform.Scale3D.X);
+            * Math.Abs(entity.Transform.Scale2D.X);
         var height = Math.Max(0.0001, ReadNumber(collider.Properties, "height", 1))
-            * Math.Abs(entity.Transform.Scale3D.Y);
+            * Math.Abs(entity.Transform.Scale2D.Y);
         return Math.Sqrt(width * width + height * height) * 0.5;
     }
 
@@ -269,14 +277,14 @@ public sealed class RekallAgeCollisionEventSystem : IRekallAgeRuntimeWorldSystem
     {
         return Math.Max(
             0.0001,
-            Math.Max(Math.Abs(entity.Transform.Scale3D.X), Math.Abs(entity.Transform.Scale3D.Y)));
+            Math.Max(Math.Abs(entity.Transform.Scale2D.X), Math.Abs(entity.Transform.Scale2D.Y)));
     }
 
     private static bool Overlaps(CollisionBody left, CollisionBody right)
     {
-        var dx = left.Entity.Transform.Position3D.X - right.Entity.Transform.Position3D.X;
-        var dy = left.Entity.Transform.Position3D.Y - right.Entity.Transform.Position3D.Y;
-        var dz = left.Entity.Transform.Position3D.Z - right.Entity.Transform.Position3D.Z;
+        var dx = left.Position.X - right.Position.X;
+        var dy = left.Position.Y - right.Position.Y;
+        var dz = left.Position.Z - right.Position.Z;
         var range = left.Radius + right.Radius;
         return dx * dx + dy * dy + dz * dz <= range * range;
     }
@@ -399,6 +407,7 @@ public sealed class RekallAgeCollisionEventSystem : IRekallAgeRuntimeWorldSystem
     private sealed record CollisionBody(
         RekallAgeRuntimeEntity Entity,
         RekallAgeRuntimeComponent Collider,
+        RekallAgeRuntimeVector3 Position,
         double Radius);
 
     private sealed record CollisionEventBinding(string? Handler);

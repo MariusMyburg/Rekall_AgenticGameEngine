@@ -96,6 +96,14 @@ public sealed class InspectRuntimeSdkCommand
                 "Frame facts are immutable. Semantic input actions are projected onto RekallAgeRuntimeWorld and consumed through world SDK helpers; do not invent context.InputActions."),
             new RekallAgeRuntimeSdkContract(
                 "runtime-type",
+                nameof(RekallAgeRuntimeVector2),
+                "record RekallAgeRuntimeVector2(double X, double Y)",
+                "An immutable planar vector used by Transform2D and Raycast2D. Compute scalar locals and construct a replacement vector; X and Y are not mutable fields.")
+            {
+                Usage = "var direction = new RekallAgeRuntimeVector2(horizontal, vertical);"
+            },
+            new RekallAgeRuntimeSdkContract(
+                "runtime-type",
                 nameof(RekallAgeRuntimeVector3),
                 "record RekallAgeRuntimeVector3(double X, double Y, double Z)",
                 "An immutable vector record. Compute scalar locals and construct a new vector; X, Y, and Z are not mutable fields.")
@@ -218,6 +226,10 @@ public sealed class InspectRuntimeSdkCommand
         nameof(RekallAgeRuntimeModuleSdk.WithComponentBoolean) or
         nameof(RekallAgeRuntimeModuleSdk.WithComponentString) =>
             "Returns a replacement immutable entity with one typed component property changed; no JsonObject namespace is required.",
+        nameof(RekallAgeRuntimeModuleSdk.Raycast2D) =>
+            "Returns stable distance-ordered hits against visible Rekall.BoxCollider2D and Rekall.CircleCollider2D entities, with optional tag and component filters.",
+        nameof(RekallAgeRuntimeModuleSdk.Raycast3D) =>
+            "Returns stable distance-ordered hits against visible 3D collider entities, with optional tag and component filters.",
         _ => "Compiled generic runtime-module SDK helper. The signature is derived from the loaded engine assembly."
     };
 
@@ -247,6 +259,10 @@ public sealed class InspectRuntimeSdkCommand
             "entity = entity.WithComponentBoolean(componentType, \"charged\", true);",
         nameof(RekallAgeRuntimeModuleSdk.WithComponentString) =>
             "entity = entity.WithComponentString(componentType, \"state\", \"complete\");",
+        nameof(RekallAgeRuntimeModuleSdk.Raycast2D) =>
+            "var hit = world.Raycast2D(origin, direction, range, tag: \"target\").FirstOrDefault();",
+        nameof(RekallAgeRuntimeModuleSdk.Raycast3D) =>
+            "var hit = world.Raycast3D(origin, direction, range, tag: \"target\").FirstOrDefault();",
         _ => null
     };
 }

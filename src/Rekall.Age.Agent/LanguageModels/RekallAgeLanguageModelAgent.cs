@@ -22,7 +22,15 @@ public sealed record RekallAgeLanguageModelAgentRequest(string Model, string Sys
     public int MaxToolResultCharacters { get; init; } = 12_000;
 
     public bool RequireCompletionAudit { get; init; }
+
+    public IProgress<RekallAgeLanguageModelAgentProgress>? Progress { get; init; }
 }
+
+public sealed record RekallAgeLanguageModelAgentProgress(
+    int Turn,
+    string Phase,
+    string Message,
+    RekallAgeLanguageModelToolExecution? ToolExecution = null);
 
 public sealed record RekallAgeLanguageModelAgentResult(
     bool Completed,
@@ -106,6 +114,10 @@ public sealed class RekallAgeLanguageModelAgent(
         for (var turn = 1; turn <= maxTurns; turn++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            request.Progress?.Report(new RekallAgeLanguageModelAgentProgress(
+                turn,
+                "turn.started",
+                $"Running agent turn {turn} of {maxTurns}."));
             var response = await modelClient.ChatAsync(
                 new RekallAgeLanguageModelRequest(
                     request.Model,
@@ -144,7 +156,12 @@ public sealed class RekallAgeLanguageModelAgent(
                     continue;
                 }
 
-                return Result(true, response.FinishReason.Length == 0 ? "complete" : response.FinishReason, finalContent, turn);
+                var completed = Result(true, response.FinishReason.Length == 0 ? "complete" : response.FinishReason, finalContent, turn);
+                request.Progress?.Report(new RekallAgeLanguageModelAgentProgress(
+                    turn,
+                    "run.completed",
+                    $"Agent completed after {turn} turns and {toolCallCount} tool calls."));
+                return completed;
             }
 
             completionAuditPending = false;
@@ -178,17 +195,28 @@ public sealed class RekallAgeLanguageModelAgent(
                 var succeeded = output["ok"] is not JsonValue okValue
                     || !okValue.TryGetValue<bool>(out var ok)
                     || ok;
-                toolExecutions.Add(new RekallAgeLanguageModelToolExecution(
+                var execution = new RekallAgeLanguageModelToolExecution(
                     toolCallCount,
                     call.Name,
                     (JsonObject)call.Arguments.DeepClone(),
                     succeeded,
-                    outputText.Length <= 1_200 ? outputText : outputText[..1_200] + "…"));
+                    outputText.Length <= 1_200 ? outputText : outputText[..1_200] + "…");
+                toolExecutions.Add(execution);
+                request.Progress?.Report(new RekallAgeLanguageModelAgentProgress(
+                    turn,
+                    "tool.completed",
+                    $"{call.Name} {(succeeded ? "completed" : "failed")}.",
+                    execution));
                 transcript.Add(new RekallAgeLanguageModelMessage("tool", outputText, call.Name));
             }
         }
 
-        return Result(false, "turn_limit", finalContent, maxTurns);
+        var limited = Result(false, "turn_limit", finalContent, maxTurns);
+        request.Progress?.Report(new RekallAgeLanguageModelAgentProgress(
+            maxTurns,
+            "run.stopped",
+            $"Agent reached the {maxTurns}-turn limit."));
+        return limited;
 
         RekallAgeLanguageModelAgentResult Result(bool completed, string reason, string content, int turns) => new(
             completed,

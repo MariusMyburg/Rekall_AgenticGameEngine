@@ -100,6 +100,25 @@
                 <TabItem Header="Runtime"><ListBox ItemsSource="{Binding RuntimeObservationLines}" /></TabItem>
                 <TabItem Header="Transactions"><ListBox ItemsSource="{Binding TransactionLines}" /></TabItem>
                 <TabItem Header="Imports"><ListBox ItemsSource="{Binding ImportLines}" /></TabItem>
+                <TabItem Header="AI Agent">
+                    <Grid Margin="8">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                            <TextBlock Text="Local Ollama model" Foreground="#9FB0C4" />
+                            <ComboBox ItemsSource="{Binding OllamaModels}" SelectedItem="{Binding SelectedOllamaModel}"
+                                      IsEditable="True" Margin="0,3,0,6" />
+                            <Button Content="Discover Models" Command="{Binding DiscoverModelsCommand}" Padding="8,4" Margin="0,0,0,8" />
+                            <TextBlock Text="Game-authoring task" Foreground="#9FB0C4" />
+                            <TextBox Text="{Binding AgentTaskInput, UpdateSourceTrigger=PropertyChanged}"
+                                     AcceptsReturn="True" TextWrapping="Wrap" Height="86" Margin="0,3,0,6" />
+                            <UniformGrid Columns="2">
+                                <Button Content="Run Agent" Command="{Binding RunAgentCommand}" Padding="8,4" Margin="0,0,3,0" />
+                                <Button Content="Cancel" Command="{Binding CancelAgentCommand}" Padding="8,4" Margin="3,0,0,0" />
+                            </UniformGrid>
+                        </StackPanel>
+                        <ListBox Grid.Column="1" ItemsSource="{Binding AgentLines}" />
+                    </Grid>
+                </TabItem>
             </TabControl>
         </Grid>
     </DockPanel>

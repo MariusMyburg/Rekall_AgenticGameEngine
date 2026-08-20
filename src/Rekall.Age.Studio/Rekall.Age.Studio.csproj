@@ -10,12 +10,14 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Rekall.Age.Core\Rekall.Age.Core.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Agent\Rekall.Age.Agent.csproj" />
     <ProjectReference Include="..\Rekall.Age.Editor\Rekall.Age.Editor.csproj" />
     <ProjectReference Include="..\Rekall.Age.Editor.Contracts\Rekall.Age.Editor.Contracts.csproj" />
     <ProjectReference Include="..\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj" />
     <ProjectReference Include="..\Rekall.Age.Workflows\Rekall.Age.Workflows.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>

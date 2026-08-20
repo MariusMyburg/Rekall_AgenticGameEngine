@@ -2,6 +2,12 @@
   "version": 1,
   "dependencies": {
     "net10.0-windows7.0": {
+      "Serilog": {
+        "type": "Direct",
+        "requested": "[4.3.1, )",
+        "resolved": "4.3.1",
+        "contentHash": "savYe7h5yRlkqBVOwP8cIRDOdqKiPmYCU4W87JH38sBmcKD5EBoXvQIw6bNEvZ/pTe1gsiye3VFCzBsoppGkXQ=="
+      },
       "Serilog.Extensions.Logging": {
         "type": "Direct",
         "requested": "[10.0.0, )",
@@ -34,6 +40,11 @@
         "resolved": "2.4.0",
         "contentHash": "KNMxkzKLHAvV7jRtErxs3rPv71fHToqo/WN96HlT6iomWuwL97tohEbt0B1WA8A6sO5t6PP+qF08d4T9A8k2uA=="
       },
+      "Microsoft.DotNet.PlatformAbstractions": {
+        "type": "Transitive",
+        "resolved": "3.1.6",
+        "contentHash": "jek4XYaQ/PGUwDKKhwR8K47Uh1189PFzMeLqO83mXrXQVIpARZCcfuDedH50YDTepBkfijCZN5U/vZi++erxtg=="
+      },
       "Microsoft.Extensions.DependencyInjection": {
         "type": "Transitive",
         "resolved": "10.0.0",
@@ -46,6 +57,11 @@
         "type": "Transitive",
         "resolved": "10.0.0",
         "contentHash": "L3AdmZ1WOK4XXT5YFPEwyt0ep6l8lGIPs7F5OOBZc77Zqeo01Of7XXICy47628sdVl0v/owxYJTe86DTgFwKCA=="
+      },
+      "Microsoft.Extensions.DependencyModel": {
+        "type": "Transitive",
+        "resolved": "9.0.9",
+        "contentHash": "fNGvKct2De8ghm0Bpfq0iWthtzIWabgOTi+gJhNOPhNJIowXNEUE2eZNW/zNCzrHVA3PXg2yZ+3cWZndC2IqYA=="
       },
       "Microsoft.Extensions.Logging": {
         "type": "Transitive",
@@ -79,15 +95,88 @@
         "resolved": "10.0.0",
         "contentHash": "inRnbpCS0nwO/RuoZIAqxQUuyjaknOOnCEZB55KSMMjRhl0RQDttSmLSGsUJN3RQ3ocf5NDLFd2mOQViHqMK5w=="
       },
-      "Serilog": {
+      "Silk.NET.Core": {
         "type": "Transitive",
-        "resolved": "4.2.0",
-        "contentHash": "gmoWVOvKgbME8TYR+gwMf7osROiWAURterc6Rt2dQyX7wtjZYpqFiA/pY6ztjGQKKV62GGCyOcmtP1UKMHgSmA=="
+        "resolved": "2.23.0",
+        "contentHash": "D7AT/nnwlB+4RZ84XY8QNGBZMJI5z9l4CSSETIJ1wCfRJzRt/341y3MRZ4HbnFz4r/IGaWOEZr86iE+0/65yyQ==",
+        "dependencies": {
+          "Microsoft.DotNet.PlatformAbstractions": "3.1.6",
+          "Microsoft.Extensions.DependencyModel": "9.0.9"
+        }
+      },
+      "Silk.NET.Maths": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "r8PdIVzME8EH0qAgbmRPO87I4GfgR2j8TofT7EMuRJDf1QluoQwnVypDoFJjQ2ZBSRsGYk5unYxxogI05Ogsmw=="
+      },
+      "Silk.NET.OpenXR": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "pKU+12sIosw1+lTlYam8rpgPgnpCUQKEJI3UO6t2RoZ3Vqc7UgS0bL79qd0aPIU1FM7ilxOYC7pd7B92bSLOeQ==",
+        "dependencies": {
+          "Silk.NET.Core": "2.23.0",
+          "Silk.NET.Maths": "2.23.0"
+        }
+      },
+      "Silk.NET.Shaderc": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "+pXfOhmSCeeMECOo9HMi3C63LVbQ7FBxPFgxPKOT6mXD8Gg/90Wt4fLX4LqUuVbGid5LW6BXAUu1g17XQoawdA==",
+        "dependencies": {
+          "Silk.NET.Core": "2.23.0",
+          "Silk.NET.Shaderc.Native": "2.23.0"
+        }
+      },
+      "Silk.NET.Shaderc.Native": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "H6OMLIWdh2HITvkmj+ALs8LTIdQvQ2/JTtkDXinVbJ3xxrQIBXhVmc9jnuTQ67YDybGlENSMrgthzhLwK0rjnQ=="
+      },
+      "Silk.NET.Vulkan": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "3/irtlSWXZ3eTi8N6nelI6L34NTB8ZJHpqVMNzZx2aX7Ek9YEQ34NoQW8/Tljrtmkg8KRhHW8hKTEzZaKV8PgA==",
+        "dependencies": {
+          "Silk.NET.Core": "2.23.0"
+        }
+      },
+      "StbImageSharp": {
+        "type": "Transitive",
+        "resolved": "2.30.15",
+        "contentHash": "7QqbupVhz2kcFUPTgMw4iHR9rYDHGundzzee19Mwmd1typ2Lnv8EVJcLJxlkeBM2+4ex0NwsMtdbGSJctp1XCQ=="
+      },
+      "ZstdSharp.Port": {
+        "type": "Transitive",
+        "resolved": "0.8.8",
+        "contentHash": "UIDFkA5DC3en3tOJ3Mof11yBx9kUQLsaeo/oFdvN6Bbkr9E9+VCqfIadHci8cu+I51K2Sl7XYWVl2R/mA75NBQ=="
+      },
+      "rekall.age.agent": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Project": "[0.1.0-preview.1, )",
+          "Rekall.Age.Validation": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.assetpipeline": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )"
+        }
       },
       "rekall.age.assets": {
         "type": "Project",
         "dependencies": {
           "Rekall.Age.Core": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.build": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )"
         }
       },
       "rekall.age.core": {
@@ -110,6 +199,24 @@
       "rekall.age.editor.contracts": {
         "type": "Project"
       },
+      "rekall.age.leveldesign": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.mcp": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Agent": "[0.1.0-preview.1, )",
+          "Rekall.Age.Build": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
+          "Serilog": "[4.3.1, )"
+        }
+      },
       "rekall.age.modules": {
         "type": "Project",
         "dependencies": {
@@ -117,10 +224,36 @@
           "Rekall.Age.Runtime.Abstractions": "[0.1.0-preview.1, )"
         }
       },
+      "rekall.age.playback": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
+          "Rekall.Age.Runtime": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
       "rekall.age.project": {
         "type": "Project",
         "dependencies": {
           "Rekall.Age.Core": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.rendering": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Playback": "[0.1.0-preview.1, )",
+          "Rekall.Age.Rendering.Abstractions": "[0.1.0-preview.1, )",
+          "Rekall.Age.Runtime": "[0.1.0-preview.1, )",
+          "Rekall.Age.Runtime.Abstractions": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )",
+          "Silk.NET.OpenXR": "[2.23.0, )",
+          "Silk.NET.Shaderc": "[2.23.0, )",
+          "Silk.NET.Vulkan": "[2.23.0, )",
+          "StbImageSharp": "[2.30.15, )",
+          "ZstdSharp.Port": "[0.8.8, )"
         }
       },
       "rekall.age.rendering.abstractions": {
@@ -156,6 +289,25 @@
           "Rekall.Age.World": "[0.1.0-preview.1, )"
         }
       },
+      "rekall.age.workflows": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Agent": "[0.1.0-preview.1, )",
+          "Rekall.Age.AssetPipeline": "[0.1.0-preview.1, )",
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
+          "Rekall.Age.Build": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.LevelDesign": "[0.1.0-preview.1, )",
+          "Rekall.Age.Mcp": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
+          "Rekall.Age.Playback": "[0.1.0-preview.1, )",
+          "Rekall.Age.Project": "[0.1.0-preview.1, )",
+          "Rekall.Age.Rendering": "[0.1.0-preview.1, )",
+          "Rekall.Age.Runtime": "[0.1.0-preview.1, )",
+          "Rekall.Age.Validation": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
       "rekall.age.world": {
         "type": "Project",
         "dependencies": {
@@ -163,6 +315,12 @@
         }
       }
     },
-    "net10.0-windows7.0/win-x64": {}
+    "net10.0-windows7.0/win-x64": {
+      "Silk.NET.Shaderc.Native": {
+        "type": "Transitive",
+        "resolved": "2.23.0",
+        "contentHash": "H6OMLIWdh2HITvkmj+ALs8LTIdQvQ2/JTtkDXinVbJ3xxrQIBXhVmc9jnuTQ67YDybGlENSMrgthzhLwK0rjnQ=="
+      }
+    }
   }
 }

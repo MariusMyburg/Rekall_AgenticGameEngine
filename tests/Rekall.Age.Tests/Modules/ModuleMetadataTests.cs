@@ -160,6 +160,7 @@ public sealed class ModuleMetadataTests
         Assert.Contains(inputActionMap.Properties, property => property.Name == "Actions" && property.Kind == "inputActions");
         Assert.Contains(module.Components, component => component.DisplayName == "Camera 2D");
         var camera3D = Assert.Single(module.Components, component => component.DisplayName == "Camera 3D");
+        Assert.Contains("separate Rekall.Transform3D", camera3D.Description, StringComparison.Ordinal);
         Assert.Contains(camera3D.Properties, property => property.Name == "StereoMode" && property.Kind == "string");
         Assert.Contains(camera3D.Properties, property => property.Name == "StereoRenderMode" && property.Kind == "string");
         Assert.Contains(camera3D.Properties, property => property.Name == "InterpupillaryDistance" && property.Minimum == 0);
@@ -183,6 +184,7 @@ public sealed class ModuleMetadataTests
         Assert.Contains(directionalLight.Properties, property => property.Name == "Intensity" && property.Minimum == 0);
         Assert.Contains(directionalLight.Properties, property => property.Name == "Color" && property.Kind == "color");
         var pointLight = Assert.Single(module.Components, component => component.DisplayName == "Point Light");
+        Assert.Contains("separate Rekall.Transform3D", pointLight.Description, StringComparison.Ordinal);
         Assert.Contains(pointLight.Properties, property => property.Name == "Intensity" && property.Minimum == 0);
         Assert.Contains(pointLight.Properties, property => property.Name == "Color" && property.Kind == "color");
         var multiplayerSession = Assert.Single(module.Components, component => component.DisplayName == "Multiplayer Session");

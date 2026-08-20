@@ -20,6 +20,12 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("Command=\"{Binding CaptureCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding PlayCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding StopCommand}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding DiscoverModelsCommand}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding RunAgentCommand}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding CancelAgentCommand}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding OllamaModels}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding AgentTaskInput", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding AgentLines}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("SelectedItemChanged=\"OnSelectedEntityChanged\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Source=\"{Binding ViewportImage}\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"{Binding ViewportSummary}\" FontSize=\"14\" VerticalAlignment=\"Center\"", xaml, StringComparison.Ordinal);
@@ -34,6 +40,10 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("rekall.component.set_property", code, StringComparison.Ordinal);
         Assert.Contains("rekall.component.remove_property", code, StringComparison.Ordinal);
         Assert.Contains("JsonNode.Parse", code, StringComparison.Ordinal);
+        Assert.Contains("RekallAgeProjectAgentSession", code, StringComparison.Ordinal);
+        Assert.Contains("RekallAgeOllamaLanguageModelClient", code, StringComparison.Ordinal);
+        Assert.Contains("qwen3.5:35b", code, StringComparison.Ordinal);
+        Assert.Contains("_session.ReloadAsync", code, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()

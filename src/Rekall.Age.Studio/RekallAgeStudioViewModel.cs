@@ -2,11 +2,13 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Editor;
 using Rekall.Age.Editor.Contracts;
 using Rekall.Age.Rendering.Commands;
@@ -17,6 +19,8 @@ namespace Rekall.Age.Studio;
 public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDisposable
 {
     private readonly RekallAgeWorkbenchSession _session;
+    private readonly HttpClient _ollamaHttpClient;
+    private readonly RekallAgeProjectAgentSession _agentSession;
     private readonly RekallAgeAsyncCommand _openCommand;
     private readonly RekallAgeAsyncCommand _createCommand;
     private readonly RekallAgeAsyncCommand _addEntityCommand;
@@ -28,14 +32,21 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _captureCommand;
     private readonly RekallAgeAsyncCommand _playCommand;
     private readonly RekallAgeAsyncCommand _stopCommand;
+    private readonly RekallAgeAsyncCommand _discoverModelsCommand;
+    private readonly RekallAgeAsyncCommand _runAgentCommand;
+    private readonly RekallAgeAsyncCommand _cancelAgentCommand;
     private Process? _player;
+    private CancellationTokenSource? _agentCancellation;
     private bool _isBusy;
+    private bool _isAgentRunning;
     private string _projectPathInput = string.Empty;
     private string _projectNameInput = "New Rekall Game";
     private string _sceneNameInput = "Main";
     private string _componentTypeInput = "Rekall.Transform";
     private string _propertyNameInput = "position";
     private string _propertyValueInput = "[0, 0, 0]";
+    private string _selectedOllamaModel = "qwen3.5:35b";
+    private string _agentTaskInput = "Describe the game feature you want the AI agent to create or revise.";
     private string _statusText = "Create or open a Rekall AGE project to begin.";
     private string _viewportTitle = "Viewport";
     private string _viewportSummary = "No rendered frame yet.";
@@ -49,6 +60,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     internal RekallAgeStudioViewModel(RekallAgeWorkbenchSession session)
     {
         _session = session;
+        _ollamaHttpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
+        var configuredOllamaUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL");
+        var ollama = new RekallAgeOllamaLanguageModelClient(
+            _ollamaHttpClient,
+            new Uri(string.IsNullOrWhiteSpace(configuredOllamaUrl) ? "http://127.0.0.1:11434" : configuredOllamaUrl));
+        _agentSession = new RekallAgeProjectAgentSession(ollama, RekallAgeDefaultCommandRegistry.Create());
         _openCommand = CreateAsyncCommand(OpenFromInputsAsync, CanOpenOrCreate);
         _createCommand = CreateAsyncCommand(CreateFromInputsAsync, CanOpenOrCreate);
         _addEntityCommand = CreateAsyncCommand(AddEntityAsync, HasOpenProject);
@@ -60,6 +77,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _captureCommand = CreateAsyncCommand(CaptureAsync, HasOpenProject);
         _playCommand = CreateAsyncCommand(PlayAsync, () => HasOpenProject() && !IsPlaying);
         _stopCommand = CreateAsyncCommand(StopAsync, () => IsPlaying);
+        _discoverModelsCommand = CreateAsyncCommand(DiscoverModelsAsync, () => !IsBusy && !IsAgentRunning);
+        _runAgentCommand = CreateAsyncCommand(RunAgentAsync, CanRunAgent);
+        _cancelAgentCommand = CreateAsyncCommand(CancelAgentAsync, () => IsAgentRunning);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -74,6 +94,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> SceneSummaryLines { get; } = [];
     public ObservableCollection<string> ActionLines { get; } = [];
     public ObservableCollection<string> RuntimeObservationLines { get; } = [];
+    public ObservableCollection<string> OllamaModels { get; } = [];
+    public ObservableCollection<string> AgentLines { get; } = [];
 
     public ICommand OpenCommand => _openCommand;
     public ICommand CreateCommand => _createCommand;
@@ -86,6 +108,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand CaptureCommand => _captureCommand;
     public ICommand PlayCommand => _playCommand;
     public ICommand StopCommand => _stopCommand;
+    public ICommand DiscoverModelsCommand => _discoverModelsCommand;
+    public ICommand RunAgentCommand => _runAgentCommand;
+    public ICommand CancelAgentCommand => _cancelAgentCommand;
 
     public string ProjectPathInput
     {
@@ -132,6 +157,24 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         set => Set(ref _propertyValueInput, value);
     }
 
+    public string SelectedOllamaModel
+    {
+        get => _selectedOllamaModel;
+        set
+        {
+            if (Set(ref _selectedOllamaModel, value)) RefreshCommands();
+        }
+    }
+
+    public string AgentTaskInput
+    {
+        get => _agentTaskInput;
+        set
+        {
+            if (Set(ref _agentTaskInput, value)) RefreshCommands();
+        }
+    }
+
     public string StatusText
     {
         get => _statusText;
@@ -167,6 +210,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool IsPlaying => _player is { HasExited: false };
 
+    public bool IsAgentRunning
+    {
+        get => _isAgentRunning;
+        private set
+        {
+            if (Set(ref _isAgentRunning, value)) RefreshCommands();
+        }
+    }
+
     public async Task InitializeAsync(string? projectRoot, string sceneName)
     {
         if (string.IsNullOrWhiteSpace(projectRoot)) return;
@@ -181,7 +233,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         await RunAsync(() => _session.SelectEntityAsync(entity.EntityId, CancellationToken.None).AsTask());
     }
 
-    public async ValueTask DisposeAsync() => await StopAsync();
+    public async ValueTask DisposeAsync()
+    {
+        _agentCancellation?.Cancel();
+        await StopAsync();
+        _agentCancellation?.Dispose();
+        _ollamaHttpClient.Dispose();
+    }
 
     private bool CanOpenOrCreate() => !IsBusy && !string.IsNullOrWhiteSpace(ProjectPathInput);
     private bool HasOpenProject() => !IsBusy && _session.Model is not null;
@@ -189,6 +247,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         && _session.SelectedEntityId is not null
         && !string.IsNullOrWhiteSpace(ComponentTypeInput);
     private bool CanEditProperty() => CanEditComponent() && !string.IsNullOrWhiteSpace(PropertyNameInput);
+    private bool CanRunAgent() => HasOpenProject()
+        && !IsAgentRunning
+        && !string.IsNullOrWhiteSpace(SelectedOllamaModel)
+        && !string.IsNullOrWhiteSpace(AgentTaskInput);
 
     private Task OpenFromInputsAsync() => RunAsync(
         () => _session.OpenAsync(ProjectPathInput, NormalizeSceneName(), CancellationToken.None).AsTask(),
@@ -287,6 +349,116 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         "Validate Scene",
         "studio",
         CancellationToken.None).AsTask());
+
+    private async Task DiscoverModelsAsync()
+    {
+        IsBusy = true;
+        try
+        {
+            var models = await _agentSession.ListModelsAsync(CancellationToken.None);
+            Replace(OllamaModels, models.Select(model => model.Id));
+            if (OllamaModels.Contains("qwen3.5:35b"))
+            {
+                SelectedOllamaModel = "qwen3.5:35b";
+            }
+            else if (OllamaModels.Count > 0 && !OllamaModels.Contains(SelectedOllamaModel))
+            {
+                SelectedOllamaModel = OllamaModels[0];
+            }
+            StatusText = OllamaModels.Count == 0
+                ? "Ollama is reachable but no local models are installed."
+                : $"Found {OllamaModels.Count} local Ollama model{(OllamaModels.Count == 1 ? string.Empty : "s")}.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task RunAgentAsync()
+    {
+        if (_session.ProjectRoot is null || _session.SceneName is null) return;
+        _agentCancellation?.Dispose();
+        _agentCancellation = new CancellationTokenSource();
+        var cancellationToken = _agentCancellation.Token;
+        IsAgentRunning = true;
+        IsBusy = true;
+        AgentLines.Clear();
+        AppendAgentLine($"model: {SelectedOllamaModel}");
+        AppendAgentLine($"task: {AgentTaskInput.Trim()}");
+        try
+        {
+            var progress = new Progress<RekallAgeLanguageModelAgentProgress>(ReportAgentProgress);
+            var result = await _agentSession.RunAsync(
+                new RekallAgeProjectAgentSessionRequest(
+                    _session.ProjectRoot,
+                    _session.SceneName,
+                    SelectedOllamaModel,
+                    AgentTaskInput)
+                {
+                    MaxTurns = 24,
+                    RequireCompletionAudit = true
+                },
+                progress,
+                cancellationToken);
+            AppendAgentLine(result.Summary);
+            if (!string.IsNullOrWhiteSpace(result.AgentResult.FinalContent))
+            {
+                AppendAgentLine($"final: {Bound(result.AgentResult.FinalContent, 2_000)}");
+            }
+
+            var reload = await _session.ReloadAsync(cancellationToken);
+            if (reload.Ok && _session.Model is not null) ApplyModel(_session.Model);
+            var validation = await _session.ExecuteAsync(
+                "rekall.validation.scene",
+                JsonSerializer.Serialize(new { projectRoot = _session.ProjectRoot, sceneName = _session.SceneName }),
+                "Validate AI authoring",
+                "studio-agent",
+                cancellationToken);
+            if (_session.Model is not null) ApplyModel(_session.Model);
+            var capture = await CaptureOperationAsync();
+            StatusText = result.Succeeded && validation.Ok && capture.Ok
+                ? result.Summary
+                : $"{result.Summary} Review Validation and AI Agent output.";
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            StatusText = "AI authoring cancelled.";
+            AppendAgentLine("cancelled by user");
+        }
+        finally
+        {
+            _agentCancellation?.Dispose();
+            _agentCancellation = null;
+            IsAgentRunning = false;
+            IsBusy = false;
+        }
+    }
+
+    private Task CancelAgentAsync()
+    {
+        _agentCancellation?.Cancel();
+        StatusText = "Cancelling AI authoring…";
+        return Task.CompletedTask;
+    }
+
+    private void ReportAgentProgress(RekallAgeLanguageModelAgentProgress progress)
+    {
+        var suffix = progress.ToolExecution is null
+            ? string.Empty
+            : $" #{progress.ToolExecution.Sequence} {(progress.ToolExecution.Succeeded ? "ok" : "failed")}";
+        AppendAgentLine($"turn {progress.Turn}: {progress.Phase}{suffix} — {progress.Message}");
+        StatusText = progress.Message;
+    }
+
+    private void AppendAgentLine(string value)
+    {
+        AgentLines.Add(Bound(value, 2_400));
+        while (AgentLines.Count > 200) AgentLines.RemoveAt(0);
+    }
+
+    private static string Bound(string value, int maxCharacters) =>
+        value.Length <= maxCharacters ? value : value[..maxCharacters] + "…";
 
     private Task CaptureAsync() => RunAsync(CaptureOperationAsync);
 
@@ -491,6 +663,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _captureCommand.RaiseCanExecuteChanged();
         _playCommand.RaiseCanExecuteChanged();
         _stopCommand.RaiseCanExecuteChanged();
+        _discoverModelsCommand.RaiseCanExecuteChanged();
+        _runAgentCommand.RaiseCanExecuteChanged();
+        _cancelAgentCommand.RaiseCanExecuteChanged();
     }
 
     private RekallAgeAsyncCommand CreateAsyncCommand(Func<Task> execute, Func<bool> canExecute) =>

@@ -58,6 +58,10 @@ internal static class RekallAgeCli
                     await RunOllamaAgentAsync(registry, model, task, "24", cancellationToken),
                 ["agent", "run", "ollama", var model, var task, var maxTurns] =>
                     await RunOllamaAgentAsync(registry, model, task, maxTurns, cancellationToken),
+                ["agent", "run-project", "ollama", var model, var root, var scene, var task] =>
+                    await RunProjectOllamaAgentAsync(registry, model, root, scene, task, "24", cancellationToken),
+                ["agent", "run-project", "ollama", var model, var root, var scene, var task, var maxTurns] =>
+                    await RunProjectOllamaAgentAsync(registry, model, root, scene, task, maxTurns, cancellationToken),
                 ["distribution", "assemble", var output, var cli, var studio, var headless, var windows, var sdk, var readme, var notice, var thirdParty] =>
                     await AssembleDistributionAsync(
                         registry, context, output, cli, studio, headless, windows, sdk, readme, notice, thirdParty),
@@ -2959,6 +2963,46 @@ internal static class RekallAgeCli
         Console.WriteLine(
             $"Agent completed={result.Completed} stop={result.StopReason} turns={result.Turns} tools={result.ToolCallCount} promptTokens={result.Usage.PromptTokens} completionTokens={result.Usage.CompletionTokens}");
         return result.Completed ? 0 : 1;
+    }
+
+    private static async Task<int> RunProjectOllamaAgentAsync(
+        RekallAgeCommandRegistry registry,
+        string model,
+        string projectRoot,
+        string sceneName,
+        string taskOrPath,
+        string maxTurnsText,
+        CancellationToken cancellationToken)
+    {
+        var task = File.Exists(taskOrPath)
+            ? await File.ReadAllTextAsync(taskOrPath, cancellationToken)
+            : taskOrPath;
+        if (!int.TryParse(maxTurnsText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var maxTurns))
+        {
+            Console.Error.WriteLine($"Invalid maximum turn count '{maxTurnsText}'.");
+            return 2;
+        }
+
+        using var httpClient = CreateOllamaHttpClient();
+        var modelClient = new RekallAgeOllamaLanguageModelClient(httpClient, ResolveOllamaBaseUri());
+        var session = new RekallAgeProjectAgentSession(modelClient, registry);
+        var result = await session.RunAsync(
+            new RekallAgeProjectAgentSessionRequest(projectRoot, sceneName, model, task)
+            {
+                MaxTurns = maxTurns,
+                RequireCompletionAudit = true
+            },
+            progress: null,
+            cancellationToken);
+        Console.WriteLine(result.AgentResult.FinalContent);
+        Console.WriteLine("Tool execution trace: " + string.Join(" -> ", result.AgentResult.ToolExecutions.Select(execution =>
+            execution.Name == "rekall.tools.execute"
+                ? execution.Arguments["name"]?.GetValue<string>() ?? execution.Name
+                : execution.Name)));
+        var failures = RekallAgeLanguageModelAgentDiagnostics.FormatFailures(result.AgentResult.ToolExecutions);
+        if (failures.Length > 0) Console.WriteLine(failures);
+        Console.WriteLine(result.Summary);
+        return result.Succeeded ? 0 : 1;
     }
 
     private static HttpClient CreateOllamaHttpClient() => new()

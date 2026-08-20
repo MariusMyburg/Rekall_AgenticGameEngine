@@ -190,7 +190,7 @@ public sealed class RekallAgeTimerComponent : RekallAgeComponent
     public bool Repeat { get; init; }
 }
 
-[RekallAgeComponent("Camera 2D")]
+[RekallAgeComponent("Camera 2D", Description = "Projects a 2D view. Put position, rotation, and scale on a separate Rekall.Transform2D component on the same entity; Camera2D properties configure projection, clipping, viewport, and render layers only.")]
 public sealed class RekallAgeCamera2DComponent : RekallAgeComponent
 {
     [RekallAgeProperty]
@@ -227,7 +227,7 @@ public sealed class RekallAgeCamera2DComponent : RekallAgeComponent
     public double FarClip { get; init; } = 1000;
 }
 
-[RekallAgeComponent("Camera 3D")]
+[RekallAgeComponent("Camera 3D", Description = "Projects a 3D view. Put position, rotation, and scale on a separate Rekall.Transform3D component on the same entity; Camera3D properties configure projection, clipping, viewport, render layers, and stereo behavior only.")]
 public sealed class RekallAgeCamera3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty]
@@ -442,7 +442,7 @@ public sealed class RekallAgeXrControllerComponent : RekallAgeComponent
     public string PoseSource { get; init; } = "left-hand";
 }
 
-[RekallAgeComponent("Directional Light")]
+[RekallAgeComponent("Directional Light", Description = "Emits directional light. Put its orientation on a separate Rekall.Transform3D component on the same entity; this component configures light intensity and color only.")]
 public sealed class RekallAgeDirectionalLightComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0)]
@@ -452,7 +452,7 @@ public sealed class RekallAgeDirectionalLightComponent : RekallAgeComponent
     public string Color { get; init; } = "#ffffff";
 }
 
-[RekallAgeComponent("Point Light")]
+[RekallAgeComponent("Point Light", Description = "Emits a point light. Put its position on a separate Rekall.Transform3D component on the same entity; this component configures light intensity and color only.")]
 public sealed class RekallAgePointLightComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0)]

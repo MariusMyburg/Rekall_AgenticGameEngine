@@ -31,12 +31,12 @@ create, author, inspect, edit, render, play, and verify desktop workflow.
 
 ### Task 3: Embedded AI authoring
 
-- [ ] Add a project-scoped agent-session service using the existing
+- [x] Add a project-scoped agent-session service using the existing
   provider-neutral agent, Ollama adapter, MCP tool executor, and embedded
   contract.
-- [ ] Add model discovery/selection, task entry, cancellation, bounded progress,
+- [x] Add model discovery/selection, task entry, cancellation, bounded progress,
   tool-result transcript, failure diagnostics, and post-run refresh/validation.
-- [ ] Prove with deterministic fake-model tests that agent tool calls mutate
+- [x] Prove with deterministic fake-model tests that agent tool calls mutate
   the open project through canonical commands only.
 - [ ] Run a real local `qwen3.5:35b` benchmark that creates and revises a small
   complete game from the Studio-facing service.

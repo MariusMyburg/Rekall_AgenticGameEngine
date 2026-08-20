@@ -25,6 +25,11 @@
         "resolved": "9.0.9",
         "contentHash": "fNGvKct2De8ghm0Bpfq0iWthtzIWabgOTi+gJhNOPhNJIowXNEUE2eZNW/zNCzrHVA3PXg2yZ+3cWZndC2IqYA=="
       },
+      "Serilog": {
+        "type": "Transitive",
+        "resolved": "4.3.1",
+        "contentHash": "savYe7h5yRlkqBVOwP8cIRDOdqKiPmYCU4W87JH38sBmcKD5EBoXvQIw6bNEvZ/pTe1gsiye3VFCzBsoppGkXQ=="
+      },
       "Silk.NET.Core": {
         "type": "Transitive",
         "resolved": "2.23.0",
@@ -80,6 +85,22 @@
         "resolved": "0.8.8",
         "contentHash": "UIDFkA5DC3en3tOJ3Mof11yBx9kUQLsaeo/oFdvN6Bbkr9E9+VCqfIadHci8cu+I51K2Sl7XYWVl2R/mA75NBQ=="
       },
+      "rekall.age.agent": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Project": "[0.1.0-preview.1, )",
+          "Rekall.Age.Validation": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.assetpipeline": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )"
+        }
+      },
       "rekall.age.assets": {
         "type": "Project",
         "dependencies": {
@@ -95,6 +116,24 @@
       },
       "rekall.age.core": {
         "type": "Project"
+      },
+      "rekall.age.leveldesign": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.mcp": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Agent": "[0.1.0-preview.1, )",
+          "Rekall.Age.Build": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
+          "Serilog": "[4.3.1, )"
+        }
       },
       "rekall.age.modules": {
         "type": "Project",

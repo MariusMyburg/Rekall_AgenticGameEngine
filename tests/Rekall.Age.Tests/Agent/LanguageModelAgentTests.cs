@@ -70,6 +70,29 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task AgentReportsBoundedTurnAndToolProgress()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "", [new RekallAgeLanguageModelToolCall("inspect", new JsonObject())], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "Done", "", [], "stop", new(1, 1, 1)));
+        var progress = new RecordingProgress<RekallAgeLanguageModelAgentProgress>();
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 2,
+                Progress = progress
+            },
+            CancellationToken.None);
+
+        Assert.Contains(progress.Values, item => item.Phase == "turn.started" && item.Turn == 1);
+        Assert.Contains(progress.Values, item => item.Phase == "tool.completed" && item.ToolExecution?.Name == "inspect");
+        Assert.Contains(progress.Values, item => item.Phase == "run.completed" && item.Turn == 2);
+    }
+
+    [Fact]
     public async Task AgentStopsAtConfiguredTurnLimit()
     {
         var repeated = new RekallAgeLanguageModelResponse(
@@ -248,5 +271,11 @@ public sealed class LanguageModelAgentTests
             Executions.Add((name, arguments));
             return ValueTask.FromResult<JsonNode>(new JsonObject { ["ready"] = true });
         }
+    }
+
+    private sealed class RecordingProgress<T> : IProgress<T>
+    {
+        public List<T> Values { get; } = [];
+        public void Report(T value) => Values.Add(value);
     }
 }

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 15:12 Africa/Johannesburg
+Last verified: 2026-08-20 15:25 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: command-backed functional Studio authoring checkpoint
+Latest milestone: embedded project-scoped Ollama authoring checkpoint
 
 ## Product objective
 
@@ -48,6 +48,21 @@ Studio is important, but it does not define or reorder the engine foundation.
   viewport capture, and Windows player launch/stop now execute through the
   shared canonical command catalog. The focused checkpoint passes 7/7 tests;
   the Studio build has zero warnings and zero errors.
+- Embedded AI: Studio now discovers local Ollama models, defaults to the
+  installed `qwen3.5:35b`, runs/cancels bounded project-scoped authoring,
+  streams turn/tool progress, and reloads, validates, and captures after the
+  run. Canonical MCP execution rejects direct or JSON-string gateway attempts
+  to use another project root. The focused agent/Ollama/MCP/Studio selection
+  passes 41/41 across agent, Ollama, MCP, workbench, schema, catalog, and CLI
+  coverage; the Studio build remains warning-free. A hidden executable smoke
+  opened the authored project, stayed alive for five seconds, and was then
+  stopped without an orphan process.
+- Real local embedded-service proof: `qwen3.5:35b` authored and repaired a
+  three-entity 3D scene with generic camera/light transforms and a colored
+  cube. A final four-turn/four-tool evidence pass reported zero issues and
+  captured an inspected nonblank 960x540 software frame at
+  `Artifacts/StudioAgentProof/vout/Main_runtime_001.png` (3,419 bytes,
+  SHA-256 `04CE4CFDC27FD73D50844FD3B3A81297A64CFF06C4870E37534395239463ED1C`).
 - Agent authoring: both source and installed multi-subsystem benchmarks created
   and repaired UI, animation, and audio content using tool calls.
 - Runtime animation: generic clip playback, bounded Hermite interpolation,
@@ -904,7 +919,7 @@ agent-authored project files to an editable, validated, visually rendered,
 playable, packaged game. Studio, embedded AI, MCP, and CLI must continue to
 consume the same generic contracts.
 
-AI game-creation Tasks 1-2 have a verified functional checkpoint. A new
+AI game-creation Tasks 1-3 have a verified functional checkpoint. A new
 UI-independent workbench session creates projects
 and scenes through canonical commands, opens and switches scenes, executes
 dynamic registered commands, appends their transactions, reloads external
@@ -918,6 +933,19 @@ reported in-product instead of escaping the UI dispatcher. Seven focused
 functional/source tests pass and the Studio build is warning-free. Undo/redo,
 scene-selection interaction, schema-guided property widgets, embedded AI, and
 installed acceptance remain open.
+
+The reusable project agent session uses the provider-neutral language-model
+agent, local Ollama adapter, progressive MCP executor, and shared default
+command catalog. It exposes model listing and bounded live progress, treats
+project-root scope violations as failed executions even when a model claims
+completion, and scopes both direct arguments and JSON-string gateway
+envelopes. Studio exposes model selection, task input, Run/Cancel, and a
+bounded transcript, then reloads, validates, and recaptures authored state.
+The first real model run exposed inefficient malformed blueprint and camera
+composition attempts; schema descriptions now explicitly separate camera and
+light configuration from Transform3D pose. The repaired proof is clean and
+visually informative, but it is a scene-authoring proof rather than the final
+playable/package installed-game acceptance.
 
 The restricted module-host tranche is paused at commit `4e43119`, a stable
 native containment and typed-broker checkpoint. Project-write denial and

@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 00:40 Africa/Johannesburg
+Last verified: 2026-08-21 01:00 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -38,7 +38,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Release verification: 949/949 engine tests and 7/7 Windows Studio
+- Current Release verification: 950/950 engine tests and 7/7 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Persistent 3D physics: the runtime now retains a BEPU simulation across
@@ -1002,6 +1002,21 @@ Studio is important, but it does not define or reorder the engine foundation.
   the complete `Echo Foundry` authoring and audit session in 49 turns. The next
   bar is distribution parity, followed by reducing the six recovered malformed
   or initially incomplete non-scope tool calls without hiding real errors.
+- Fresh arbitrary-game Benchmark 16 used the restored real local Ollama
+  `qwen3.5:35b` through repository-built Studio. It authored a runtime module,
+  repaired it to a successful build, created semantic input and scene content,
+  and reached direct runtime assertion evidence, but exhausted the 64-turn
+  budget plus 12 protected repair turns after 71 tool executions. It is an
+  honest failure: the final scene had zero renderables and three invalid
+  `Transform3D` properties, so no package was produced. The measured loop was
+  dominated by AGE rejecting the model's intuitive
+  `delta.transform.position3d.x` assertion subject even though the diagnostic
+  only said to supply a "transform delta." AGE now normalizes that generic
+  alias (and its 2D/axis variants) to the canonical `delta.position*` subjects
+  in both checkpoint preflight and runtime evaluation, and returns a copyable
+  exact transition assertion. The focused agent/runtime selection passes
+  52/52. Failure evidence SHA-256 is
+  `F29CA3D71DFD7F6DE598FF12DA7867710BF4E340F4F82554FE153E4BC6423341`.
 - Fresh arbitrary-game benchmark 2 (`Lumen Vault`) reached eight visible
   renderables and a valid active camera, and compiled an initial generic
   delta-time gameplay system, but exhausted 64 turns after destructive
@@ -1506,6 +1521,15 @@ angular state, BEPU-native material response, and bounded physics telemetry are
 now verified. Further physics breadth should be driven by the real Qwen
 benchmark, with likely candidates being exact contact evidence, collision
 filtering, constraints, or authored angular control rather than genre behavior.
+
+The programmable-rendering architecture and first executable-material-shader
+implementation plan are committed. The active rendering tranche turns existing
+agent-visible shader authoring and assignment metadata into reflected,
+ABI-validated pipelines that execute in native Vulkan capture and the Windows
+player. Custom post-processing, dynamic geometry, and typed GPU resources
+follow as separate independently verified tranches; the first post-process
+proof will be an agent-authored raindrop shader rather than an engine rain
+feature.
 
 AI game-creation Tasks 1-3 have a verified functional checkpoint. A new
 UI-independent workbench session creates projects

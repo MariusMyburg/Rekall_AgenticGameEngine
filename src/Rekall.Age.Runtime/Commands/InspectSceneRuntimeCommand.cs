@@ -310,7 +310,7 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
         RekallAgeRuntimeEntity? initialEntity,
         InspectSceneRuntimeAssertion assertion)
     {
-        var subject = assertion.Subject.Trim().ToLowerInvariant();
+        var subject = RekallAgeRuntimeAssertionSubjects.Normalize(assertion.Subject);
         if (subject == "entity") return (true, JsonValue.Create(entity.Id), string.Empty);
         if (subject == "visible") return (true, JsonValue.Create(entity.Visible), string.Empty);
         if (subject is "component" or "component.property" or "delta.component.property" or "changed.component.property")

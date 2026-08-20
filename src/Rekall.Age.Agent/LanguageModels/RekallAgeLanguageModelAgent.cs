@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using Rekall.Age.Runtime.Abstractions;
 
 namespace Rekall.Age.Agent.LanguageModels;
 
@@ -478,7 +479,7 @@ public sealed class RekallAgeLanguageModelAgent(
                 ["message"] = message,
                 ["target"] = "rekall.runtime.inspect_scene"
             }),
-            ["instruction"] = "Call rekall.runtime.inspect_scene now with non-empty inputs. The Game.* existence assertion must put the runtime entity name in entityName and the exact attached agent-owned type in componentType: {\"entityName\":\"Player\",\"subject\":\"component\",\"operator\":\"exists\",\"componentType\":\"Game.Modules.Rules.PlayerState\"}. Also include a transition assertion: a transform delta greater-than 0 or less-than 0, delta.component.property with componentType set to Game.* strictly compared with 0, or changed.component.property with componentType set to Game.* equals true. Do not put a component type in entityName, omit componentType, or weaken a failed transition assertion. A failed qualifying assertion opens targeted repair work; unrelated discovery, validation, polish, capture, and packaging remain deferred until this checkpoint executes."
+            ["instruction"] = "Call rekall.runtime.inspect_scene now with non-empty inputs. The Game.* existence assertion must put the runtime entity name in entityName and the exact attached agent-owned type in componentType: {\"entityName\":\"Player\",\"subject\":\"component\",\"operator\":\"exists\",\"componentType\":\"Game.Modules.Rules.PlayerState\"}. Also include a transition assertion using an exact subject: {\"entityName\":\"Player\",\"subject\":\"delta.position3d.x\",\"operator\":\"greater-than\",\"expected\":0}; or use delta.position2d.x/y, delta.position3d.x/y/z, delta.component.property with componentType set to Game.* strictly compared with 0, or changed.component.property with componentType set to Game.* equals true. The intuitive delta.transform.position2d/3d axis aliases are accepted and normalized. Do not put a component type in entityName, omit componentType, or weaken a failed transition assertion. A failed qualifying assertion opens targeted repair work; unrelated discovery, validation, polish, capture, and packaging remain deferred until this checkpoint executes."
         };
     }
 
@@ -632,7 +633,7 @@ public sealed class RekallAgeLanguageModelAgent(
 
     private static bool IsMeaningfulRuntimeTransition(JsonObject assertion)
     {
-        var subject = GetString(assertion, "subject").ToLowerInvariant();
+        var subject = RekallAgeRuntimeAssertionSubjects.Normalize(GetString(assertion, "subject"));
         var comparison = GetString(assertion, "operator").ToLowerInvariant();
         var expected = GetArgument(assertion, "expected");
         if (subject == "changed.component.property")

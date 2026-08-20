@@ -1082,6 +1082,10 @@ public sealed class SceneRuntimeFoundationTests
             {
                 Expected = JsonValue.Create(2.9)
             },
+            new InspectSceneRuntimeAssertion("Animated", "delta.transform.position3d.x", "greater-than-or-equal")
+            {
+                Expected = JsonValue.Create(2.9)
+            },
             new InspectSceneRuntimeAssertion("Animated", "delta.component.property", "greater-than-or-equal")
             {
                 ComponentType = "Rekall.Transform3D",
@@ -1103,7 +1107,7 @@ public sealed class SceneRuntimeFoundationTests
 
         Assert.True(result.Ok, result.Summary);
         Assert.True(result.Value.AssertionsPassed);
-        Assert.Equal(6, result.Value.AssertionResults.Count);
+        Assert.Equal(7, result.Value.AssertionResults.Count);
         Assert.All(result.Value.AssertionResults, assertion => Assert.True(assertion.Passed, assertion.Summary));
     }
 

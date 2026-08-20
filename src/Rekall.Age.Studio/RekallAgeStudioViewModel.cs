@@ -124,6 +124,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> RuntimeObservationLines { get; } = [];
     public ObservableCollection<string> OllamaModels { get; } = [];
     public ObservableCollection<string> AgentLines { get; } = [];
+    public IReadOnlyList<RekallAgeLanguageModelToolExecution> LastAgentToolExecutions { get; private set; } = [];
     public ObservableCollection<RekallAgeInspectorComponentSchemaModel> ComponentSchemas { get; } = [];
     public ObservableCollection<RekallAgeInspectorPropertySchemaModel> PropertySchemas { get; } = [];
     public ObservableCollection<string> PropertyValueChoices { get; } = [];
@@ -513,6 +514,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         IsAgentRunning = true;
         IsBusy = true;
         AgentLines.Clear();
+        LastAgentToolExecutions = [];
         AppendAgentLine($"model: {SelectedOllamaModel}");
         AppendAgentLine($"task: {AgentTaskInput.Trim()}");
         try
@@ -531,6 +533,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 },
                 progress,
                 cancellationToken);
+            LastAgentToolExecutions = result.AgentResult.ToolExecutions;
             AppendAgentLine(result.Summary);
             if (!string.IsNullOrWhiteSpace(result.AgentResult.FinalContent))
             {

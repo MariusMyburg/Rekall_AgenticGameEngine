@@ -29,7 +29,10 @@ public sealed record RekallAgeStudioAutomationResult(
     int ViewportRenderableCount,
     string PackageArchivePath,
     IReadOnlyList<string> Validation,
-    IReadOnlyList<string> AgentTranscript);
+    IReadOnlyList<string> AgentTranscript)
+{
+    public IReadOnlyList<RekallAgeLanguageModelToolExecution> AgentToolExecutions { get; init; } = [];
+}
 
 public static class RekallAgeStudioAutomation
 {
@@ -135,7 +138,10 @@ public static class RekallAgeStudioAutomation
             viewModel.ViewportRenderableCount,
             packageArchivePath ?? string.Empty,
             viewModel.ValidationLines.ToArray(),
-            viewModel.AgentLines.ToArray());
+            viewModel.AgentLines.ToArray())
+        {
+            AgentToolExecutions = viewModel.LastAgentToolExecutions
+        };
 
         var evidenceDirectory = Path.GetDirectoryName(evidencePath)
             ?? throw new ArgumentException("Evidence path must have a parent directory.", nameof(options));

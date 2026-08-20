@@ -378,6 +378,7 @@ public sealed class RekallAgeLanguageModelAgent(
     {
         var attemptedInspection = call.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal);
         var hasAssertions = attemptedInspection && HasNonemptyArrayArgument(call.Arguments, "assertions");
+        var coverage = EvaluateRuntimeCheckpointCoverage(call.Arguments);
         var code = !attemptedInspection
             ? "REKALL_RUNTIME_CHECKPOINT_REQUIRED"
             : !hasAssertions
@@ -387,11 +388,20 @@ public sealed class RekallAgeLanguageModelAgent(
             ? $"Tool '{call.Name}' is deferred until the first executable gameplay checkpoint passes or returns direct repair evidence."
             : !hasAssertions
                 ? "The first executable gameplay checkpoint requires representative input frames and a non-empty assertions array."
-                : "Existence-only runtime assertions are insufficient. The checkpoint requires representative input, an attached Game.* component assertion, and a strict assertion proving either a nonzero transform delta or a changed Game.* component property.";
+                : $"Runtime checkpoint coverage is incomplete. Missing: {string.Join(", ", coverage.Missing)}.";
         return new JsonObject
         {
             ["ok"] = false,
             ["summary"] = message,
+            ["coverage"] = new JsonObject
+            {
+                ["inputs"] = coverage.Inputs,
+                ["agentComponent"] = coverage.AgentComponent,
+                ["transition"] = coverage.Transition,
+                ["missing"] = new JsonArray(coverage.Missing
+                    .Select(item => (JsonNode?)JsonValue.Create(item))
+                    .ToArray())
+            },
             ["errors"] = new JsonArray(new JsonObject
             {
                 ["code"] = code,
@@ -485,10 +495,16 @@ public sealed class RekallAgeLanguageModelAgent(
 
     private static bool HasRuntimeCheckpointCoverage(JsonObject arguments)
     {
-        if (!HasNonemptyArrayArgument(arguments, "inputs")
-            || GetArgument(arguments, "assertions") is not JsonArray assertions)
+        var coverage = EvaluateRuntimeCheckpointCoverage(arguments);
+        return coverage.Inputs && coverage.AgentComponent && coverage.Transition;
+    }
+
+    private static RuntimeCheckpointCoverage EvaluateRuntimeCheckpointCoverage(JsonObject arguments)
+    {
+        var hasInputs = HasNonemptyArrayArgument(arguments, "inputs");
+        if (GetArgument(arguments, "assertions") is not JsonArray assertions)
         {
-            return false;
+            return new RuntimeCheckpointCoverage(hasInputs, false, false);
         }
 
         var hasAgentComponent = assertions.OfType<JsonObject>().Any(assertion =>
@@ -496,7 +512,7 @@ public sealed class RekallAgeLanguageModelAgent(
             && GetString(assertion, "operator").Equals("exists", StringComparison.OrdinalIgnoreCase)
             && IsAgentComponent(GetString(assertion, "componentType")));
         var hasTransition = assertions.OfType<JsonObject>().Any(IsMeaningfulRuntimeTransition);
-        return hasAgentComponent && hasTransition;
+        return new RuntimeCheckpointCoverage(hasInputs, hasAgentComponent, hasTransition);
     }
 
     private static bool IsMeaningfulRuntimeTransition(JsonObject assertion)
@@ -540,6 +556,19 @@ public sealed class RekallAgeLanguageModelAgent(
     private static bool TryGetNumber(JsonNode node, out double number) =>
         double.TryParse(node.ToJsonString(), NumberStyles.Float, CultureInfo.InvariantCulture, out number)
         && double.IsFinite(number);
+
+    private sealed record RuntimeCheckpointCoverage(bool Inputs, bool AgentComponent, bool Transition)
+    {
+        public IReadOnlyList<string> Missing => new[]
+        {
+            (Inputs, "non-empty inputs"),
+            (AgentComponent, "component/exists assertion for attached Game.* state"),
+            (Transition, "strict nonzero transform delta or changed Game.* property assertion")
+        }
+        .Where(item => !item.Item1)
+        .Select(item => item.Item2)
+        .ToArray();
+    }
 
     private static IReadOnlyList<RekallAgeLanguageModelMessage> BuildContext(
         IReadOnlyList<RekallAgeLanguageModelMessage> transcript,

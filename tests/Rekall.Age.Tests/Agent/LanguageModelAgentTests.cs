@@ -546,6 +546,16 @@ public sealed class LanguageModelAgentTests
             execution.Name == "rekall.runtime.inspect_scene"
             && !execution.Succeeded
             && execution.ResultPreview.Contains("REKALL_RUNTIME_CHECKPOINT_COVERAGE_REQUIRED", StringComparison.Ordinal)));
+        Assert.All(
+            result.ToolExecutions.Where(execution =>
+                execution.Name == "rekall.runtime.inspect_scene"
+                && execution.ResultPreview.Contains("REKALL_RUNTIME_CHECKPOINT_COVERAGE_REQUIRED", StringComparison.Ordinal)),
+            execution =>
+            {
+                Assert.Contains("\"inputs\":true", execution.ResultPreview, StringComparison.Ordinal);
+                Assert.Contains("\"agentComponent\":true", execution.ResultPreview, StringComparison.Ordinal);
+                Assert.Contains("\"transition\":false", execution.ResultPreview, StringComparison.Ordinal);
+            });
     }
 
     private static JsonObject MeaningfulRuntimeCheckpointArguments() => new()

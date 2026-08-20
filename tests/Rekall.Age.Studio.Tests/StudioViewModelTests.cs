@@ -51,6 +51,7 @@ public sealed class StudioViewModelTests
             Assert.True(result.Succeeded, result.Status + Environment.NewLine + string.Join(Environment.NewLine, result.AgentTranscript));
             Assert.True(result.NonblankViewport);
             Assert.True(result.ViewportRenderableCount > 0);
+            Assert.NotEmpty(result.AgentToolExecutions);
             Assert.True(File.Exists(result.PackageArchivePath));
             Assert.True(File.Exists(evidence));
         }

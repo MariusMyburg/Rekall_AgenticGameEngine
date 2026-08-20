@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 20:10 Africa/Johannesburg
+Last verified: 2026-08-20 20:22 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: gameplay checkpoints preserve prerequisite authoring access
+Latest milestone: gameplay checkpoint failures expose exact missing coverage
 
 ## Product objective
 
@@ -995,8 +995,30 @@ Studio is important, but it does not define or reorder the engine foundation.
   The scene remained empty, all 64 turns were exhausted, and no package was
   produced. This is retained as failure evidence with SHA-256
   `65A805689F53C13E81DA2ED32184606B7B73F7E4E3A7B476889210E80CA260DE`.
+- Fresh arbitrary-game benchmark 8 used real local Ollama `qwen3.5:35b`
+  against the self-contained product built from `f57854c`; its 200,956,794-byte
+  archive SHA-256 is
+  `0D24AA4CDD9FF0B685B7947F983FAE236C35D22D7BDA2B387E0F6877DF77A6B9`.
+  The deadlock was resolved: after compiling its runtime module first, the
+  model successfully used prerequisite authoring to populate a scene with an
+  active camera, input map, player state, and three seal components. It still
+  failed the product gate: nine runtime inspections omitted assertions and six
+  supplied insufficient coverage, it exhausted 64 turns, Studio saw only one
+  renderable, and no package was produced. Evidence SHA-256 is
+  `45C783F1C4355D72755068382305E06B93DB0B251EE7139EE3A6B10222E596D4`.
 
 ## Recently completed
+
+Benchmark 8's repeated malformed checkpoint attempts now receive structured,
+fact-specific repair evidence. Synthetic checkpoint failures report booleans
+for representative inputs, an attached `Game.*` component assertion, and a
+strict transition assertion, plus the exact missing list. Studio automation
+now persists the bounded structured tool-execution ledger—including arguments,
+success state, and result preview—rather than only human progress lines, so
+future installed real-model failures are independently diagnosable. Focused
+engine and Studio tests pass; the complete Release engine suite remains
+920/920, Studio passes 6/6, and the warning-as-error solution build reports
+zero warnings and zero errors. Fresh Benchmark 9 is the next real-Ollama gate.
 
 Benchmark 7's deadlock is now covered by a generic checkpoint-preparation
 contract. After a successful runtime build, the agent may still use bounded
@@ -1215,7 +1237,7 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 ## In progress
 
 The current item remains the actual AI game-creation loop. Assemble fresh
-binaries containing the prerequisite-authoring checkpoint fix and run Benchmark 8
+binaries containing fact-specific checkpoint diagnostics and run Benchmark 9
 through real local Ollama, then independently inspect its scene, source, input
 projection, and runtime transitions. Require clean validation, informative
 capture, compiled agent-authored behavior, a playable relocated package, and a

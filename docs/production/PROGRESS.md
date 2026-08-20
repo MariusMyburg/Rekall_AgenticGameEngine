@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 20:30 Africa/Johannesburg
+Last verified: 2026-08-20 20:39 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: unique one-edit tool-name recovery prevents typo loops
+Latest milestone: bounded Ollama recovery and durable partial agent evidence
 
 ## Product objective
 
@@ -36,7 +36,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Release verification: 922/922 engine tests and 6/6 Windows Studio
+- Current Release verification: 923/923 engine tests and 7/7 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -1016,8 +1016,31 @@ Studio is important, but it does not define or reorder the engine foundation.
   and no package was produced; Studio correctly reported failure. Evidence
   SHA-256 is
   `8FB9F93685B3E4F70B5431D8F136227CB1359A4732A6E17D2A281254319E8F61`.
+- Fresh arbitrary-game benchmark 10 used real local Ollama `qwen3.5:35b`
+  against the 1,177-file self-contained product built from `2e083ca`; its
+  200,963,166-byte archive SHA-256 is
+  `C728242296448F33518AF086DEC1C97DDE0BEC36A166E874DC271FF2294A12F7`.
+  The one-edit recovery removed Benchmark 9's typo loop and the model reached
+  source authoring and its first module build in 15 tool attempts. Turn 16
+  then failed outside AGE command execution when Ollama returned HTTP 500 for
+  malformed generated function-call XML. Studio correctly failed the product
+  gate, but its structured execution list was empty because the session did
+  not return normally. No scene or package was produced. Evidence SHA-256 is
+  `B5A8C70A041A1EDE99A325FF51AFB0DED301E0FBC6CA257D400AB5F761FB834D`.
 
 ## Recently completed
+
+Benchmark 10's provider interruption now has bounded generic recovery and
+durable partial evidence. The Ollama adapter retries request timeout, rate
+limit, and server failures twice with cancellation-aware bounded backoff; a
+persistent failure still surfaces with its exact status and response body.
+Studio records every completed tool execution as progress arrives, so a later
+provider or session exception cannot erase the execution ledger used to
+diagnose autonomous authoring. Focused regressions cover the observed HTTP 500
+recovery and a later-turn model failure. The complete Release engine suite
+passes 923/923, Studio passes 7/7, and the warning-as-error solution build
+reports zero warnings and zero errors. Fresh Benchmark 11 is the next real-
+Ollama gate.
 
 Benchmark 9's systematic namespace typo now has bounded deterministic recovery.
 The progressive MCP executor canonicalizes only a unique registered tool name
@@ -1259,7 +1282,7 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 ## In progress
 
 The current item remains the actual AI game-creation loop. Assemble fresh
-binaries containing bounded tool-name recovery and run Benchmark 10
+binaries containing bounded Ollama recovery and durable partial evidence, then run Benchmark 11
 through real local Ollama, then independently inspect its scene, source, input
 projection, and runtime transitions. Require clean validation, informative
 capture, compiled agent-authored behavior, a playable relocated package, and a

@@ -7,6 +7,11 @@ namespace Rekall.Age.Agent.LanguageModels;
 public sealed class RekallAgeOllamaLanguageModelClient : IRekallAgeLanguageModelClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly TimeSpan[] RetryDelays =
+    [
+        TimeSpan.FromMilliseconds(150),
+        TimeSpan.FromMilliseconds(500)
+    ];
     private readonly HttpClient _httpClient;
     private readonly Uri _baseUri;
 
@@ -60,33 +65,44 @@ public sealed class RekallAgeOllamaLanguageModelClient : IRekallAgeLanguageModel
             payload["options"] = new JsonObject { ["temperature"] = temperature };
         }
 
-        using var response = await _httpClient.PostAsJsonAsync(
-            new Uri(_baseUri, "api/chat"),
-            payload,
-            JsonOptions,
-            cancellationToken);
-        await EnsureSuccessAsync(response, cancellationToken);
-        var root = await ReadObjectAsync(response, cancellationToken);
-        var message = root["message"] as JsonObject ?? new JsonObject();
-        var calls = (message["tool_calls"] as JsonArray ?? [])
-            .OfType<JsonObject>()
-            .Select(call => call["function"] as JsonObject)
-            .Where(function => function is not null && !string.IsNullOrWhiteSpace(ReadString(function, "name")))
-            .Select(function => new RekallAgeLanguageModelToolCall(
-                ReadString(function!, "name")!,
-                function!["arguments"] as JsonObject ?? new JsonObject()))
-            .ToArray();
-        return new RekallAgeLanguageModelResponse(
-            ProviderId,
-            ReadString(root, "model") ?? request.Model,
-            ReadString(message, "content") ?? string.Empty,
-            ReadString(message, "thinking") ?? string.Empty,
-            calls,
-            ReadString(root, "done_reason") ?? string.Empty,
-            new RekallAgeLanguageModelUsage(
-                checked((int)ReadInt64(root, "prompt_eval_count")),
-                checked((int)ReadInt64(root, "eval_count")),
-                ReadInt64(root, "total_duration")));
+        for (var attempt = 0; ; attempt++)
+        {
+            using var response = await _httpClient.PostAsJsonAsync(
+                new Uri(_baseUri, "api/chat"),
+                payload,
+                JsonOptions,
+                cancellationToken);
+            if (!response.IsSuccessStatusCode
+                && IsTransient(response.StatusCode)
+                && attempt < RetryDelays.Length)
+            {
+                await Task.Delay(RetryDelays[attempt], cancellationToken);
+                continue;
+            }
+
+            await EnsureSuccessAsync(response, cancellationToken);
+            var root = await ReadObjectAsync(response, cancellationToken);
+            var message = root["message"] as JsonObject ?? new JsonObject();
+            var calls = (message["tool_calls"] as JsonArray ?? [])
+                .OfType<JsonObject>()
+                .Select(call => call["function"] as JsonObject)
+                .Where(function => function is not null && !string.IsNullOrWhiteSpace(ReadString(function, "name")))
+                .Select(function => new RekallAgeLanguageModelToolCall(
+                    ReadString(function!, "name")!,
+                    function!["arguments"] as JsonObject ?? new JsonObject()))
+                .ToArray();
+            return new RekallAgeLanguageModelResponse(
+                ProviderId,
+                ReadString(root, "model") ?? request.Model,
+                ReadString(message, "content") ?? string.Empty,
+                ReadString(message, "thinking") ?? string.Empty,
+                calls,
+                ReadString(root, "done_reason") ?? string.Empty,
+                new RekallAgeLanguageModelUsage(
+                    checked((int)ReadInt64(root, "prompt_eval_count")),
+                    checked((int)ReadInt64(root, "eval_count")),
+                    ReadInt64(root, "total_duration")));
+        }
     }
 
     private static JsonObject ToMessage(RekallAgeLanguageModelMessage message)
@@ -138,6 +154,11 @@ public sealed class RekallAgeOllamaLanguageModelClient : IRekallAgeLanguageModel
             null,
             response.StatusCode);
     }
+
+    private static bool IsTransient(System.Net.HttpStatusCode statusCode) =>
+        statusCode is System.Net.HttpStatusCode.RequestTimeout
+            or System.Net.HttpStatusCode.TooManyRequests
+        || (int)statusCode >= 500;
 
     private static async ValueTask<JsonObject> ReadObjectAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {

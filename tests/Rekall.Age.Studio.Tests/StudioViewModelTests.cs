@@ -1,7 +1,9 @@
 using System.IO;
 using System.Text.Json.Nodes;
 using Rekall.Age.Agent.LanguageModels;
+using Rekall.Age.Editor;
 using Rekall.Age.Studio;
+using Rekall.Age.Workflows;
 using Rekall.Age.World;
 
 namespace Rekall.Age.Studio.Tests;
@@ -87,6 +89,35 @@ public sealed class StudioViewModelTests
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
             var evidenceRoot = Path.GetDirectoryName(evidence)!;
             if (Directory.Exists(evidenceRoot)) Directory.Delete(evidenceRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task AgentPreservesCompletedToolEvidenceWhenALaterModelTurnFails()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-partial-evidence-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var registry = RekallAgeDefaultCommandRegistry.Create();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(registry),
+                new FailsAfterToolModel());
+            viewModel.ProjectPathInput = root;
+            viewModel.ProjectNameInput = "Partial Evidence";
+            viewModel.SceneNameInput = "Main";
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.AgentTaskInput = "Inspect the engine, then continue.";
+
+            await ExecuteAsync(viewModel.RunAgentCommand);
+
+            var execution = Assert.Single(viewModel.LastAgentToolExecutions);
+            Assert.Equal("rekall.context.engine_status", execution.Name);
+            Assert.True(execution.Succeeded);
+            Assert.Contains("REKALL_STUDIO_UNEXPECTED_FAILURE", viewModel.ValidationLines.Single(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
 
@@ -241,5 +272,33 @@ public sealed class StudioViewModelTests
                 [],
                 "stop",
                 new RekallAgeLanguageModelUsage(1, 1, 1)));
+    }
+
+    private sealed class FailsAfterToolModel : IRekallAgeLanguageModelClient
+    {
+        private int _calls;
+        public string ProviderId => "deterministic";
+
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([]);
+
+        public ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref _calls) > 1)
+            {
+                throw new InvalidDataException("simulated later model failure");
+            }
+
+            return ValueTask.FromResult(new RekallAgeLanguageModelResponse(
+                ProviderId,
+                request.Model,
+                string.Empty,
+                string.Empty,
+                [new RekallAgeLanguageModelToolCall("rekall.context.engine_status", new JsonObject())],
+                "tool_calls",
+                new RekallAgeLanguageModelUsage(1, 1, 1)));
+        }
     }
 }

@@ -72,7 +72,36 @@ public sealed class OllamaLanguageModelClientTests
         Assert.Equal(24_000_000_000, models.Single(model => model.Id == "qwen3.5:35b").SizeBytes);
     }
 
-    private static HttpResponseMessage JsonResponse(string json) => new(HttpStatusCode.OK)
+    [Fact]
+    public async Task ChatRetriesTransientServerFailureFromMalformedToolGeneration()
+    {
+        var calls = 0;
+        var handler = new StubHandler(_ => Task.FromResult(Interlocked.Increment(ref calls) == 1
+            ? JsonResponse(
+                """{"error":"XML syntax error: function closed by parameter"}""",
+                HttpStatusCode.InternalServerError)
+            : JsonResponse("""
+                {
+                  "model":"qwen3.5:35b",
+                  "message":{"role":"assistant","content":"recovered","tool_calls":[]},
+                  "done":true,
+                  "done_reason":"stop"
+                }
+                """)));
+        using var http = new HttpClient(handler);
+        var client = new RekallAgeOllamaLanguageModelClient(http, new Uri("http://localhost:11434"));
+
+        var response = await client.ChatAsync(
+            new RekallAgeLanguageModelRequest("qwen3.5:35b", [], []),
+            CancellationToken.None);
+
+        Assert.Equal(2, calls);
+        Assert.Equal("recovered", response.Content);
+    }
+
+    private static HttpResponseMessage JsonResponse(
+        string json,
+        HttpStatusCode statusCode = HttpStatusCode.OK) => new(statusCode)
     {
         Content = new StringContent(json, Encoding.UTF8, "application/json")
     };

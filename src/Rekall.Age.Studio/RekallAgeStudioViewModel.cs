@@ -61,6 +61,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private BitmapImage? _viewportImage;
     private int _viewportRenderableCount;
     private RekallAgeWorkbenchModel? _currentModel;
+    private readonly List<RekallAgeLanguageModelToolExecution> _lastAgentToolExecutions = [];
     internal bool TreatGauntletAsTerminalSuccess { get; set; }
 
     internal int AgentMaxTurns { get; set; } = 36;
@@ -124,7 +125,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> RuntimeObservationLines { get; } = [];
     public ObservableCollection<string> OllamaModels { get; } = [];
     public ObservableCollection<string> AgentLines { get; } = [];
-    public IReadOnlyList<RekallAgeLanguageModelToolExecution> LastAgentToolExecutions { get; private set; } = [];
+    public IReadOnlyList<RekallAgeLanguageModelToolExecution> LastAgentToolExecutions => _lastAgentToolExecutions;
     public ObservableCollection<RekallAgeInspectorComponentSchemaModel> ComponentSchemas { get; } = [];
     public ObservableCollection<RekallAgeInspectorPropertySchemaModel> PropertySchemas { get; } = [];
     public ObservableCollection<string> PropertyValueChoices { get; } = [];
@@ -514,7 +515,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         IsAgentRunning = true;
         IsBusy = true;
         AgentLines.Clear();
-        LastAgentToolExecutions = [];
+        _lastAgentToolExecutions.Clear();
         AppendAgentLine($"model: {SelectedOllamaModel}");
         AppendAgentLine($"task: {AgentTaskInput.Trim()}");
         try
@@ -533,7 +534,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 },
                 progress,
                 cancellationToken);
-            LastAgentToolExecutions = result.AgentResult.ToolExecutions;
+            _lastAgentToolExecutions.Clear();
+            _lastAgentToolExecutions.AddRange(result.AgentResult.ToolExecutions);
             AppendAgentLine(result.Summary);
             if (!string.IsNullOrWhiteSpace(result.AgentResult.FinalContent))
             {
@@ -577,6 +579,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private void ReportAgentProgress(RekallAgeLanguageModelAgentProgress progress)
     {
+        if (progress.ToolExecution is { } execution
+            && !_lastAgentToolExecutions.Any(existing => existing.Sequence == execution.Sequence))
+        {
+            _lastAgentToolExecutions.Add(execution);
+        }
+
         var suffix = progress.ToolExecution is null
             ? string.Empty
             : $" #{progress.ToolExecution.Sequence} {(progress.ToolExecution.Succeeded ? "ok" : "failed")}";

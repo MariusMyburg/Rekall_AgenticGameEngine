@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 01:27 Africa/Johannesburg
+Last verified: 2026-08-21 01:32 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: agent-authored project shaders execute and hot-reload safely
-in the windowed Windows Vulkan player
+Latest milestone: agent-authored shader pipelines are inspectable through CLI,
+MCP, and the canonical command registry without exposing source text
 
 ## Product objective
 
@@ -75,6 +75,13 @@ Studio is important, but it does not define or reorder the engine foundation.
   a real 300-frame process survived an intentionally corrupted live fragment
   shader after startup. The Windows Release build has zero warnings/errors and
   the focused locked Release selection passes 3/3.
+- Agent shader inspection: `rekall.shader.inspect_pipeline` and
+  `shader inspect-pipeline <root> <vertex> <fragment>` compile and reflect a
+  project pair, then return ABI version, stable SHA-256 identity, SPIR-V byte
+  counts, bounded vertex/resource metadata, validity, and bounded diagnostics
+  without returning authored source. The command is registered for MCP and the
+  focused locked Release command/catalog selection passes 12/12; the CLI build
+  has zero warnings/errors.
 - Persistent 3D physics: the runtime now retains a BEPU simulation across
   frames, incrementally synchronizes bodies and statics, preserves angular
   motion/orientation and sleep state, and lets BEPU own contact response.
@@ -1563,7 +1570,8 @@ pairs cannot alter a scene, authored shader identity reaches each GPU draw,
 and native Vulkan capture executes the selected project pipeline with measured
 pixel proof. The windowed Windows player executes the same authored sources and
 retains its last valid pipeline across broken live edits. Task 5 is active:
-agent inspection, project validation, and package integrity. End-to-end
+agent inspection is verified; dependency-inverted project validation and
+package integrity are next. End-to-end
 installed hardware proof follows. Custom post-processing, dynamic
 geometry, and typed GPU resources are
 separate subsequent tranches; the first post-process proof will be an

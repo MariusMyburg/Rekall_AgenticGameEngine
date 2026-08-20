@@ -11,6 +11,37 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class ShaderAuthoringCommandTests
 {
     [Fact]
+    public async Task InspectShaderPipelineReportsBoundedReflectedAbiWithoutSourceText()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var shaderRoot = Path.Combine(root, "Shaders", "agent");
+        Directory.CreateDirectory(shaderRoot);
+        await File.WriteAllTextAsync(Path.Combine(shaderRoot, "inspect.vert"), """
+            #version 450
+            layout(location = 0) in vec3 inPosition;
+            void main() { gl_Position = vec4(inPosition, 1.0); }
+            """);
+        await File.WriteAllTextAsync(Path.Combine(shaderRoot, "inspect.frag"), """
+            #version 450
+            layout(location = 0) out vec4 outColor;
+            void main() { outColor = vec4(0.2, 0.4, 0.8, 1.0); }
+            """);
+
+        var result = await new InspectShaderPipelineCommand().ExecuteAsync(
+            new InspectShaderPipelineRequest(root, "agent/inspect", "agent/inspect"),
+            new RekallAgeCommandContext("shader-test", RekallAgeTransaction.Begin("inspect shader"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.Valid);
+        Assert.Equal(RekallAgeSceneMaterialShaderAbi.Version, result.Value.AbiVersion);
+        Assert.Equal(64, result.Value.ContentHash.Length);
+        Assert.True(result.Value.VertexSpirvBytes > 0);
+        Assert.True(result.Value.FragmentSpirvBytes > 0);
+        Assert.Contains(result.Value.VertexElements, element => element.Location == 0 && element.Format == "Float3");
+        Assert.DoesNotContain("#version", System.Text.Json.JsonSerializer.Serialize(result.Value), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ResolveProjectShaderPipelineCompilesReflectsAndHashesStableAbi()
     {
         var root = TestPaths.CreateTempDirectory();

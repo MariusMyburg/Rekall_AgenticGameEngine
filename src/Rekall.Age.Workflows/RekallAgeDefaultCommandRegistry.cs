@@ -96,6 +96,7 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new ReadShaderSourceCommand());
         registry.Register(new WriteShaderSourceCommand());
         registry.Register(new ValidateShaderSourceCommand());
+        registry.Register(new InspectShaderPipelineCommand());
         registry.Register(new AssignShaderPipelineCommand());
         registry.Register(new BuildModulesCommand());
         registry.Register(new BuildPlayerCommand());

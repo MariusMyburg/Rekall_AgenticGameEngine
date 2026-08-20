@@ -67,6 +67,8 @@ internal static class RekallAgeCli
                     await AssembleDistributionAsync(
                         registry, context, output, cli, studio, headless, windows, sdk, readme, notice, thirdParty),
                 ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
+                ["shader", "inspect-pipeline", var root, var vertex, var fragment] =>
+                    await InspectShaderPipelineAsync(registry, context, root, vertex, fragment),
                 ["render", "mesh", "inspect", var root, var scene] =>
                     await InspectSceneMeshGeometryAsync(registry, context, root, scene, "0"),
                 ["render", "mesh", "inspect", var root, var scene, var frames] =>
@@ -666,6 +668,35 @@ internal static class RekallAgeCli
         if (result.Value.AssetIssuesTruncated) Console.WriteLine("Asset issue inspection truncated at 256 entries.");
         foreach (var error in result.Errors) Console.WriteLine($"{error.Code}: {error.Message}");
         return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectShaderPipelineAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string vertex,
+        string fragment)
+    {
+        var result = await registry.ExecuteAsync<InspectShaderPipelineRequest, InspectShaderPipelineResult>(
+            "rekall.shader.inspect_pipeline",
+            new InspectShaderPipelineRequest(root, vertex, fragment),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Valid: {result.Value.Valid}; ABI: {result.Value.AbiVersion}; SHA-256: {result.Value.ContentHash}");
+        Console.WriteLine($"SPIR-V bytes: vertex={result.Value.VertexSpirvBytes}; fragment={result.Value.FragmentSpirvBytes}");
+        foreach (var element in result.Value.VertexElements)
+        {
+            Console.WriteLine($"Vertex location={element.Location} name={element.Name} format={element.Format}");
+        }
+        foreach (var resource in result.Value.Resources)
+        {
+            Console.WriteLine($"Resource set={resource.Set} binding={resource.Binding} name={resource.Name} kind={resource.Kind} stages={resource.Stages}");
+        }
+        foreach (var diagnostic in result.Value.Diagnostics)
+        {
+            Console.WriteLine($"Diagnostic: {diagnostic}");
+        }
+        return result.Value.Valid ? 0 : 1;
     }
 
     private static async Task<int> InspectVirtualGeometrySceneAsync(

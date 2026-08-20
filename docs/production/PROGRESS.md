@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 18:30 Africa/Johannesburg
+Last verified: 2026-08-20 18:51 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -36,7 +36,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Debug verification: 911/911 engine tests and 6/6 Windows Studio
+- Current Debug verification: 915/915 engine tests and 6/6 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -933,6 +933,18 @@ Studio is important, but it does not define or reorder the engine foundation.
   receipt, and no package. This is retained as failure evidence rather than a
   product pass; evidence SHA-256 is
   `7B5A618D19D8C7D07FFAF51183732BD19D3976CAC469072BA3D6164B89092FB3`.
+- Fresh arbitrary-game benchmark 3 exposed a more serious false-positive
+  boundary. Studio reported task success with clean validation, six visible
+  renderables, two compiled modules, a 44,665,001-byte audited/relocated
+  package, and evidence SHA-256
+  `7A68FF6A88A4CF240D0DE94DCB165AD4ADA2A10F948E3B25F934979A0DD9F4A5`.
+  Independent source and runtime inspection disproved the requested gameplay:
+  `Player Orb` lacked the registered `VaultPlayerComponent`; seals were never
+  deactivated or reset; no completion/HUD state was written; and one nested
+  mutation restarted from stale `world`. The package and audit are valid but
+  are not accepted as game-completion proof. The new generic runtime assertion
+  path rejects this exact project with `REKALL_RUNTIME_ASSERTION_FAILED` and
+  reports the missing player component and bounded actual state.
 
 ## Recently completed
 
@@ -948,6 +960,20 @@ authoring-contract selection passes 29/29. The full engine suite passes
 911/911, Studio passes 6/6, and the warning-as-error solution build reports
 zero warnings and zero errors. The next gate is another fresh empty-project
 game, not subsystem expansion.
+
+The benchmark-3 false positive is now converted into an executable evidence
+contract. `rekall.runtime.inspect_scene` accepts representative input frames
+and up to 64 generic assertions over entity existence/visibility, attached
+components, component properties, final transforms, and position deltas. It
+returns bounded actual values and fails with
+`REKALL_RUNTIME_ASSERTION_FAILED` when authored behavior is absent. Task-
+specific agent sessions that author runtime systems cannot complete without a
+fresh successful assertion-bearing inspection after the latest scene/module
+mutation; CLI and MCP share the same contract. Focused runtime/agent/CLI tests
+pass, and the malformed benchmark package is independently rejected by the
+new CLI assertion path. The full engine suite passes 915/915, Studio passes
+6/6, and the warning-as-error solution build reports zero warnings and zero
+errors. Benchmark 4 remains next.
 
 `Echo Foundry` is the first uninterrupted empty-project task-specific game
 creation pass. Local Ollama `qwen3.5:35b` authored the 3D industrial arena,

@@ -615,6 +615,103 @@ public sealed class SceneRuntimeFoundationTests
     }
 
     [Fact]
+    public async Task InspectSceneRuntimeCommandEvaluatesGenericBehaviorAssertionsAgainstFinalState()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var animated = RekallAgeEntityDocument.Create("Animated", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["X"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationClip",
+                new JsonObject
+                {
+                    ["Version"] = 1,
+                    ["DurationSeconds"] = 1,
+                    ["Tracks"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["component"] = "Rekall.Transform3D",
+                            ["property"] = "X",
+                            ["interpolation"] = "linear",
+                            ["keys"] = new JsonArray
+                            {
+                                new JsonObject { ["time"] = 0, ["value"] = 0 },
+                                new JsonObject { ["time"] = 1, ["value"] = 6 }
+                            }
+                        }
+                    }
+                }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationPlayer",
+                new JsonObject { ["Playing"] = true, ["LoopMode"] = "clamp" }));
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["animation"]).AddEntity(animated),
+            CancellationToken.None);
+        var assertions = new[]
+        {
+            new InspectSceneRuntimeAssertion("Animated", "component", "exists")
+            {
+                ComponentType = "Rekall.AnimationPlayer"
+            },
+            new InspectSceneRuntimeAssertion("Animated", "component.property", "equals")
+            {
+                ComponentType = "Rekall.AnimationPlayer",
+                PropertyName = "Playing",
+                Expected = JsonValue.Create(true)
+            },
+            new InspectSceneRuntimeAssertion("Animated", "delta.position3d.x", "greater-than-or-equal")
+            {
+                Expected = JsonValue.Create(2.9)
+            },
+            new InspectSceneRuntimeAssertion("Missing", "entity", "not-exists")
+        };
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(root, "Main", 30, Assertions: assertions),
+            new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("assert runtime state"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.True(result.Value.AssertionsPassed);
+        Assert.Equal(4, result.Value.AssertionResults.Count);
+        Assert.All(result.Value.AssertionResults, assertion => Assert.True(assertion.Passed, assertion.Summary));
+    }
+
+    [Fact]
+    public async Task InspectSceneRuntimeCommandFailsWhenRequiredGameplayComponentIsNotAttached()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity(RekallAgeEntityDocument.Create("Player", ["player"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D"))),
+            CancellationToken.None);
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(
+                root,
+                "Main",
+                Assertions:
+                [
+                    new InspectSceneRuntimeAssertion("Player", "component", "exists")
+                    {
+                        ComponentType = "Game.Modules.Rules.PlayerState"
+                    }
+                ]),
+            new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("reject missing gameplay state"), CancellationToken.None));
+
+        Assert.False(result.Ok);
+        Assert.False(result.Value.AssertionsPassed);
+        var assertion = Assert.Single(result.Value.AssertionResults);
+        Assert.False(assertion.Passed);
+        Assert.Contains("Game.Modules.Rules.PlayerState", assertion.Summary, StringComparison.Ordinal);
+        Assert.Contains(result.Errors, error => error.Code == "REKALL_RUNTIME_ASSERTION_FAILED");
+    }
+
+    [Fact]
     public async Task InspectSceneRuntimeCommandExposesBoundedUiContractsForAgentVerification()
     {
         var root = TestPaths.CreateTempDirectory();

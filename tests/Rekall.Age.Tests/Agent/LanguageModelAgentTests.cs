@@ -38,6 +38,8 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("two separate semantic scalar actions", prompt, StringComparison.Ordinal);
         Assert.Contains("InputActionValue returns double", prompt, StringComparison.Ordinal);
         Assert.Contains("never scaffold that module again", prompt, StringComparison.Ordinal);
+        Assert.Contains("non-empty assertions array", prompt, StringComparison.Ordinal);
+        Assert.Contains("package audit does not prove world gameplay", prompt, StringComparison.Ordinal);
         Assert.Contains("call the matched native tool directly", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("then call them through rekall.tools.execute", prompt, StringComparison.Ordinal);
         Assert.Contains("Do not replace its compilable SDK types", prompt, StringComparison.Ordinal);
@@ -230,6 +232,59 @@ public sealed class LanguageModelAgentTests
             model.Requests[4].Messages,
             message => message.Role == "user"
                 && message.Content.Contains("do not add new entities merely to exercise validation", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AgentRequiresFreshPassingRuntimeAssertionsAfterAuthoringWorldBehavior()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "The gameplay is complete.", "", [], "stop", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", new JsonObject
+                {
+                    ["assertions"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["entityName"] = "Player",
+                            ["subject"] = "component",
+                            ["operator"] = "exists",
+                            ["componentType"] = "Game.PlayerState"
+                        }
+                    }
+                })],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "The asserted gameplay is complete.", "", [], "stop", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Confirmed from direct runtime assertions.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 5,
+                RequireCompletionAudit = true,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(5, result.Turns);
+        Assert.Contains(
+            model.Requests[2].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("passing runtime behavior assertions", StringComparison.Ordinal));
+        Assert.Contains(
+            model.Requests[4].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("Completion audit required", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -343,8 +343,9 @@ internal static class RekallAgeCli
                     await PlaytestSceneAsync(registry, context, root, scene, frames, inputsJson, assertionsJson, drawAssertionsJson),
                 ["run", "scene", var root, var scene, var seconds] => await RunSceneAsync(registry, context, root, scene, seconds, null),
                 ["run", "scene", var root, var scene, var seconds, var inputsJson] => await RunSceneAsync(registry, context, root, scene, seconds, inputsJson),
-                ["runtime", "inspect", var root, var scene, var frames] => await InspectRuntimeAsync(registry, context, root, scene, frames, null),
-                ["runtime", "inspect", var root, var scene, var frames, var inputsJson] => await InspectRuntimeAsync(registry, context, root, scene, frames, inputsJson),
+                ["runtime", "inspect", var root, var scene, var frames] => await InspectRuntimeAsync(registry, context, root, scene, frames, null, null),
+                ["runtime", "inspect", var root, var scene, var frames, var inputsJson] => await InspectRuntimeAsync(registry, context, root, scene, frames, inputsJson, null),
+                ["runtime", "inspect", var root, var scene, var frames, var inputsJson, var assertionsJson] => await InspectRuntimeAsync(registry, context, root, scene, frames, inputsJson, assertionsJson),
                 ["runtime", "soak", var root, var scene] => await InspectRuntimeSoakAsync(
                     registry, context, root, scene, "3600", "600", "0", "-1", "0", "128", "1024"),
                 ["runtime", "soak", var root, var scene, var frames, var checkpointInterval, var minimumFramesPerSecond,
@@ -3283,13 +3284,15 @@ internal static class RekallAgeCli
         string root,
         string scene,
         string frames,
-        string? inputsJson)
+        string? inputsJson,
+        string? assertionsJson)
     {
         var frameCount = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
         var inputs = await ParseRuntimeInputFramesAsync(inputsJson, context.CancellationToken);
+        var assertions = await ParseRuntimeAssertionsAsync(assertionsJson, context.CancellationToken);
         var result = await registry.ExecuteAsync<InspectSceneRuntimeRequest, InspectSceneRuntimeResult>(
             "rekall.runtime.inspect_scene",
-            new InspectSceneRuntimeRequest(root, scene, frameCount, inputs),
+            new InspectSceneRuntimeRequest(root, scene, frameCount, inputs, assertions),
             context);
 
         Console.WriteLine(result.Summary);
@@ -3370,6 +3373,11 @@ internal static class RekallAgeCli
         }
 
         Console.WriteLine($"Systems run: {string.Join(", ", result.Value.SystemsRun)}");
+        Console.WriteLine($"Runtime assertions: {result.Value.AssertionResults.Count}; passed: {result.Value.AssertionsPassed}");
+        foreach (var assertion in result.Value.AssertionResults)
+        {
+            Console.WriteLine($"  {(assertion.Passed ? "PASS" : "FAIL")} {assertion.Summary} actual={assertion.Actual?.ToJsonString() ?? "(missing)"}");
+        }
         foreach (var observation in result.Value.Observations)
         {
             Console.WriteLine($"{observation.Severity} {observation.Code} {observation.Subsystem} {observation.TargetId}: {observation.Message}");
@@ -3849,6 +3857,30 @@ internal static class RekallAgeCli
         catch (System.Text.Json.JsonException ex)
         {
             throw new ArgumentException($"Runtime input frame JSON is invalid: {ex.Message}", ex);
+        }
+    }
+
+    private static async ValueTask<IReadOnlyList<InspectSceneRuntimeAssertion>?> ParseRuntimeAssertionsAsync(
+        string? assertionsJson,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(assertionsJson))
+        {
+            return null;
+        }
+
+        var payload = File.Exists(assertionsJson)
+            ? await File.ReadAllTextAsync(assertionsJson, cancellationToken)
+            : assertionsJson;
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<InspectSceneRuntimeAssertion[]>(
+                payload,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new ArgumentException($"Runtime assertions JSON is invalid: {ex.Message}", ex);
         }
     }
 

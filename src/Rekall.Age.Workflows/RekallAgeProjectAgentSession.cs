@@ -76,6 +76,7 @@ public sealed class RekallAgeProjectAgentSession
                 Think = request.Think,
                 Temperature = request.Temperature,
                 RequireCompletionAudit = request.RequireCompletionAudit,
+                RequireRuntimeBehaviorAssertions = !request.TreatGauntletAsTerminalSuccess,
                 Progress = progress,
                 CompletionAuditPrimingTools = new HashSet<string>(
                     ["rekall.workflow.audit_playable_package"],

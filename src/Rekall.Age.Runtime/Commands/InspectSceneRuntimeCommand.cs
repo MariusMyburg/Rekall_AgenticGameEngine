@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json.Nodes;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Rendering;
 using Rekall.Age.Runtime.Abstractions;
@@ -8,7 +10,26 @@ public sealed record InspectSceneRuntimeRequest(
     string ProjectRoot,
     string SceneName,
     int Frames = 1,
-    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null);
+    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null,
+    IReadOnlyList<InspectSceneRuntimeAssertion>? Assertions = null);
+
+public sealed record InspectSceneRuntimeAssertion(
+    string EntityName,
+    string Subject,
+    string Operator = "exists")
+{
+    public string? ComponentType { get; init; }
+
+    public string? PropertyName { get; init; }
+
+    public JsonNode? Expected { get; init; }
+}
+
+public sealed record InspectSceneRuntimeAssertionResult(
+    InspectSceneRuntimeAssertion Assertion,
+    bool Passed,
+    JsonNode? Actual,
+    string Summary);
 
 public sealed record InspectSceneRuntimeResult(
     string SceneName,
@@ -76,6 +97,11 @@ public sealed record InspectSceneRuntimeResult(
         Array.Empty<RekallAgeRuntimeUiElement>();
 
     public bool UiElementsTruncated { get; init; }
+
+    public bool AssertionsPassed { get; init; } = true;
+
+    public IReadOnlyList<InspectSceneRuntimeAssertionResult> AssertionResults { get; init; } =
+        Array.Empty<InspectSceneRuntimeAssertionResult>();
 }
 
 public sealed record InspectSceneRuntimeEntityState(
@@ -107,7 +133,7 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Inspects deterministic built-in scene simulation after a requested frame count without requiring a compiled playable module; reports physics, animation, UI, audio, events, and entity states.",
+        "Inspects deterministic scene simulation after a requested frame count without requiring a compiled playable adapter; reports physics, animation, UI, audio, events, systems, and bounded entity states. For executable behavior proof, pass representative input frames plus 1-64 assertions. Assertion shape: {\"entityName\":\"Player\",\"subject\":\"component.property\",\"operator\":\"greater-than-or-equal\",\"componentType\":\"Game.Modules.Rules.PlayerState\",\"propertyName\":\"Score\",\"expected\":1}. Subjects: entity, visible, component, component.property, transform.position2d.x/y, transform.position3d.x/y/z, delta.position2d.x/y, delta.position3d.x/y/z. Operators: exists, not-exists, equals, not-equals, contains, greater-than, greater-than-or-equal, less-than, less-than-or-equal. Any failed assertion fails the command with actual bounded values.",
         typeof(InspectSceneRuntimeRequest).FullName!,
         typeof(InspectSceneRuntimeResult).FullName!);
 
@@ -167,11 +193,223 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
             Math.Max(0, request.Frames),
             request.Inputs,
             context.CancellationToken);
-        var result = ToResult(world, initialWorld);
+        var assertionResults = EvaluateAssertions(world, initialWorld, request.Assertions ?? []);
+        var assertionsPassed = assertionResults.All(assertion => assertion.Passed);
+        var result = ToResult(world, initialWorld) with
+        {
+            AssertionsPassed = assertionsPassed,
+            AssertionResults = assertionResults
+        };
+        if (!assertionsPassed)
+        {
+            var failedCount = assertionResults.Count(assertion => !assertion.Passed);
+            return RekallAgeCommandResult<InspectSceneRuntimeResult>.Failure(
+                result,
+                $"Runtime inspection completed, but {failedCount} behavior assertion(s) failed.",
+                [
+                    new RekallAgeCommandError(
+                        "REKALL_RUNTIME_ASSERTION_FAILED",
+                        $"{failedCount} runtime behavior assertion(s) failed. Inspect the bounded assertion results and repair authored content.",
+                        request.SceneName)
+                ]);
+        }
+
         return RekallAgeCommandResult<InspectSceneRuntimeResult>.Success(
             result,
-            $"Runtime {result.SceneName} frame {result.FrameIndex}: {result.EntityCount} entities, {result.RenderableCount} renderable.");
+            $"Runtime {result.SceneName} frame {result.FrameIndex}: {result.EntityCount} entities, {result.RenderableCount} renderable, {assertionResults.Count} behavior assertion(s) passed.");
     }
+
+    private static IReadOnlyList<InspectSceneRuntimeAssertionResult> EvaluateAssertions(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeWorld initialWorld,
+        IReadOnlyList<InspectSceneRuntimeAssertion> assertions)
+    {
+        const int maximumAssertions = 64;
+        var bounded = assertions.Take(maximumAssertions).ToArray();
+        var initialEntities = initialWorld.Entities.ToDictionary(entity => entity.Id, StringComparer.Ordinal);
+        var results = new List<InspectSceneRuntimeAssertionResult>(bounded.Length + (assertions.Count > maximumAssertions ? 1 : 0));
+        foreach (var assertion in bounded)
+        {
+            var entities = world.Entities
+                .Where(entity => entity.Name.Equals(assertion.EntityName, StringComparison.Ordinal))
+                .ToArray();
+            if (entities.Length != 1)
+            {
+                var missingEntityExpected = entities.Length == 0
+                    && assertion.Subject.Equals("entity", StringComparison.OrdinalIgnoreCase)
+                    && assertion.Operator.Equals("not-exists", StringComparison.OrdinalIgnoreCase);
+                results.Add(new InspectSceneRuntimeAssertionResult(
+                    assertion,
+                    missingEntityExpected,
+                    null,
+                    missingEntityExpected
+                        ? $"entity not-exists assertion passed for '{assertion.EntityName}'."
+                        : entities.Length == 0
+                        ? $"Entity '{assertion.EntityName}' was not found."
+                        : $"Entity name '{assertion.EntityName}' is ambiguous ({entities.Length} matches)."));
+                continue;
+            }
+
+            var entity = entities[0];
+            initialEntities.TryGetValue(entity.Id, out var initialEntity);
+            var resolved = ResolveAssertionSubject(entity, initialEntity, assertion);
+            if (!resolved.Valid)
+            {
+                results.Add(new InspectSceneRuntimeAssertionResult(assertion, false, resolved.Actual, resolved.Summary));
+                continue;
+            }
+
+            var passed = Compare(resolved.Actual, assertion.Expected, assertion.Operator, out var comparisonSummary);
+            results.Add(new InspectSceneRuntimeAssertionResult(
+                assertion,
+                passed,
+                resolved.Actual,
+                passed
+                    ? $"{assertion.Subject} {assertion.Operator} assertion passed for '{assertion.EntityName}'."
+                    : $"{resolved.Summary} {comparisonSummary} Entity '{assertion.EntityName}', subject '{assertion.Subject}'.".Trim()));
+        }
+
+        if (assertions.Count > maximumAssertions)
+        {
+            results.Add(new InspectSceneRuntimeAssertionResult(
+                new InspectSceneRuntimeAssertion("*", "assertion.limit", "less-than-or-equal")
+                {
+                    Expected = JsonValue.Create(maximumAssertions)
+                },
+                false,
+                JsonValue.Create(assertions.Count),
+                $"Runtime inspection accepts at most {maximumAssertions} assertions; received {assertions.Count}."));
+        }
+
+        return results;
+    }
+
+    private static (bool Valid, JsonNode? Actual, string Summary) ResolveAssertionSubject(
+        RekallAgeRuntimeEntity entity,
+        RekallAgeRuntimeEntity? initialEntity,
+        InspectSceneRuntimeAssertion assertion)
+    {
+        var subject = assertion.Subject.Trim().ToLowerInvariant();
+        if (subject == "entity") return (true, JsonValue.Create(entity.Id), string.Empty);
+        if (subject == "visible") return (true, JsonValue.Create(entity.Visible), string.Empty);
+        if (subject is "component" or "component.property")
+        {
+            if (string.IsNullOrWhiteSpace(assertion.ComponentType))
+            {
+                return (false, null, "Component assertions require componentType.");
+            }
+
+            var component = entity.Components.FirstOrDefault(candidate =>
+                candidate.Type.Equals(assertion.ComponentType, StringComparison.Ordinal));
+            if (subject == "component")
+            {
+                return component is null
+                    ? (true, null, $"Component '{assertion.ComponentType}' was not attached to '{entity.Name}'.")
+                    : (true, JsonValue.Create(component.Type), string.Empty);
+            }
+
+            if (component is null)
+            {
+                return (true, null, $"Component '{assertion.ComponentType}' was not attached to '{entity.Name}'.");
+            }
+            if (string.IsNullOrWhiteSpace(assertion.PropertyName))
+            {
+                return (false, null, "component.property assertions require propertyName.");
+            }
+
+            var property = component.Properties.FirstOrDefault(candidate =>
+                candidate.Key.Equals(assertion.PropertyName, StringComparison.OrdinalIgnoreCase));
+            return (true, property.Value?.DeepClone(), string.Empty);
+        }
+
+        var initial = initialEntity?.Transform ?? entity.Transform;
+        return subject switch
+        {
+            "transform.position2d.x" => Number(entity.Transform.Position2D.X),
+            "transform.position2d.y" => Number(entity.Transform.Position2D.Y),
+            "transform.position3d.x" => Number(entity.Transform.Position3D.X),
+            "transform.position3d.y" => Number(entity.Transform.Position3D.Y),
+            "transform.position3d.z" => Number(entity.Transform.Position3D.Z),
+            "delta.position2d.x" => Number(entity.Transform.Position2D.X - initial.Position2D.X),
+            "delta.position2d.y" => Number(entity.Transform.Position2D.Y - initial.Position2D.Y),
+            "delta.position3d.x" => Number(entity.Transform.Position3D.X - initial.Position3D.X),
+            "delta.position3d.y" => Number(entity.Transform.Position3D.Y - initial.Position3D.Y),
+            "delta.position3d.z" => Number(entity.Transform.Position3D.Z - initial.Position3D.Z),
+            _ => (false, null, $"Unknown runtime assertion subject '{assertion.Subject}'.")
+        };
+
+        static (bool Valid, JsonNode? Actual, string Summary) Number(double value) =>
+            (true, JsonValue.Create(value), string.Empty);
+    }
+
+    private static bool Compare(JsonNode? actual, JsonNode? expected, string comparisonOperator, out string summary)
+    {
+        var normalized = comparisonOperator.Trim().ToLowerInvariant();
+        if (normalized == "exists")
+        {
+            summary = actual is null ? "Expected a value to exist, but it was missing." : string.Empty;
+            return actual is not null;
+        }
+        if (normalized == "not-exists")
+        {
+            summary = actual is null ? string.Empty : $"Expected no value, but found {actual.ToJsonString()}.";
+            return actual is null;
+        }
+        if (actual is null || expected is null)
+        {
+            summary = $"Operator '{comparisonOperator}' requires both actual and expected values.";
+            return false;
+        }
+
+        if (normalized is "equals" or "not-equals")
+        {
+            var equal = TryNumber(actual, out var actualNumber) && TryNumber(expected, out var expectedNumber)
+                ? Math.Abs(actualNumber - expectedNumber) <= 1e-9
+                : JsonNode.DeepEquals(actual, expected);
+            summary = equal == (normalized == "equals")
+                ? string.Empty
+                : $"Expected {normalized} {expected.ToJsonString()}, actual {actual.ToJsonString()}.";
+            return normalized == "equals" ? equal : !equal;
+        }
+
+        if (normalized == "contains")
+        {
+            var actualText = TryString(actual);
+            var expectedText = TryString(expected);
+            var contains = actualText is not null && expectedText is not null
+                && actualText.Contains(expectedText, StringComparison.Ordinal);
+            summary = contains ? string.Empty : $"Expected {actual.ToJsonString()} to contain {expected.ToJsonString()}.";
+            return contains;
+        }
+
+        if (!TryNumber(actual, out var left) || !TryNumber(expected, out var right))
+        {
+            summary = $"Numeric operator '{comparisonOperator}' requires numeric actual and expected values.";
+            return false;
+        }
+
+        var passed = normalized switch
+        {
+            "greater-than" => left > right,
+            "greater-than-or-equal" => left >= right,
+            "less-than" => left < right,
+            "less-than-or-equal" => left <= right,
+            _ => false
+        };
+        summary = passed
+            ? string.Empty
+            : normalized is "greater-than" or "greater-than-or-equal" or "less-than" or "less-than-or-equal"
+                ? $"Numeric comparison failed: actual {left.ToString("R", CultureInfo.InvariantCulture)}, expected {comparisonOperator} {right.ToString("R", CultureInfo.InvariantCulture)}."
+                : $"Unknown runtime assertion operator '{comparisonOperator}'.";
+        return passed;
+    }
+
+    private static bool TryNumber(JsonNode node, out double value) =>
+        double.TryParse(node.ToJsonString(), NumberStyles.Float, CultureInfo.InvariantCulture, out value)
+        && double.IsFinite(value);
+
+    private static string? TryString(JsonNode node) =>
+        node is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
 
     private static InspectSceneRuntimeResult ToResult(
         RekallAgeRuntimeWorld world,

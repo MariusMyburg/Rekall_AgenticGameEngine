@@ -23,6 +23,8 @@ public sealed record RekallAgeLanguageModelAgentRequest(string Model, string Sys
 
     public bool RequireCompletionAudit { get; init; }
 
+    public bool RequireRuntimeBehaviorAssertions { get; init; }
+
     public IProgress<RekallAgeLanguageModelAgentProgress>? Progress { get; init; }
 
     public IReadOnlySet<string> TerminalSuccessTools { get; init; } = new HashSet<string>(StringComparer.Ordinal);
@@ -151,6 +153,13 @@ public sealed class RekallAgeLanguageModelAgent(
                     continue;
                 }
 
+                if (request.RequireRuntimeBehaviorAssertions
+                    && RequiresFreshRuntimeBehaviorAssertions(toolExecutions, out var runtimeEvidenceMessage))
+                {
+                    transcript.Add(new RekallAgeLanguageModelMessage("user", runtimeEvidenceMessage));
+                    continue;
+                }
+
                 if (request.RequireCompletionAudit && !completionAuditPending)
                 {
                     completionAuditPending = true;
@@ -254,6 +263,61 @@ public sealed class RekallAgeLanguageModelAgent(
         {
             ToolExecutions = toolExecutions.ToArray()
         };
+    }
+
+    private static bool RequiresFreshRuntimeBehaviorAssertions(
+        IReadOnlyList<RekallAgeLanguageModelToolExecution> executions,
+        out string message)
+    {
+        message = string.Empty;
+        var scaffoldedRuntime = executions.Any(execution =>
+            execution.Succeeded
+            && execution.Name.Equals("rekall.module.scaffold_runtime_system", StringComparison.Ordinal));
+        var inspectedRuntimeSdk = executions.Any(execution =>
+            execution.Succeeded
+            && execution.Name.Equals("rekall.module.inspect_runtime_sdk", StringComparison.Ordinal));
+        var wroteModuleSource = executions.Any(execution =>
+            execution.Succeeded
+            && execution.Name.Equals("rekall.module.write_source", StringComparison.Ordinal));
+        if (!scaffoldedRuntime && !(inspectedRuntimeSdk && wroteModuleSource))
+        {
+            return false;
+        }
+
+        var latestMutation = executions
+            .Where(execution => execution.Succeeded && InvalidatesRuntimeBehaviorEvidence(execution.Name))
+            .Select(execution => execution.Sequence)
+            .DefaultIfEmpty(0)
+            .Max();
+        var passingAssertionEvidence = executions.Any(execution =>
+            execution.Succeeded
+            && execution.Sequence > latestMutation
+            && execution.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
+            && HasNonemptyArrayArgument(execution.Arguments, "assertions"));
+        if (passingAssertionEvidence)
+        {
+            return false;
+        }
+
+        message =
+            "Deterministic gameplay evidence is still required. You authored a runtime-system module, so narrative source inspection, a successful build, zero validation issues, soak, capture, package, and package audit cannot complete the task by themselves. Call rekall.runtime.inspect_scene after the latest scene/module mutation with representative authored input frames and a non-empty assertions array. Require passing runtime behavior assertions for the exact relevant entities: attached agent-owned gameplay components, semantic-input movement or other requested state transition, progress/contact state, completion/HUD state when requested, and reset state when requested. Subjects are entity, visible, component, component.property, transform.position2d.x/y, transform.position3d.x/y/z, delta.position2d.x/y, and delta.position3d.x/y/z. Operators are exists, not-exists, equals, not-equals, contains, greater-than, greater-than-or-equal, less-than, and less-than-or-equal. A failed assertion is direct repair evidence. Do not claim completion until at least one assertion-bearing runtime inspection passes after the latest mutation.";
+        return true;
+    }
+
+    private static bool InvalidatesRuntimeBehaviorEvidence(string toolName) =>
+        toolName.Equals("rekall.module.scaffold_runtime_system", StringComparison.Ordinal)
+        || toolName.Equals("rekall.module.write_source", StringComparison.Ordinal)
+        || toolName.Equals("rekall.build.modules", StringComparison.Ordinal)
+        || toolName.Equals("rekall.scene.apply_blueprint", StringComparison.Ordinal)
+        || toolName.Equals("rekall.validation.repair_project", StringComparison.Ordinal)
+        || toolName.StartsWith("rekall.entity.", StringComparison.Ordinal)
+        || toolName.StartsWith("rekall.component.", StringComparison.Ordinal);
+
+    private static bool HasNonemptyArrayArgument(JsonObject arguments, string name)
+    {
+        var value = arguments.FirstOrDefault(property =>
+            property.Key.Equals(name, StringComparison.OrdinalIgnoreCase)).Value;
+        return value is JsonArray array && array.Count > 0;
     }
 
     private static IReadOnlyList<RekallAgeLanguageModelMessage> BuildContext(

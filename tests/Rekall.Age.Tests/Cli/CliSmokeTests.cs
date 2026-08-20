@@ -197,6 +197,21 @@ public sealed class CliSmokeTests
     }
 
     [Fact]
+    public async Task CliReportsInvalidRuntimeAssertionJsonWithoutUnhandledException()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var cliAssembly = FindCliAssemblyPath();
+
+        var inspection = await RunAsync(
+            cliAssembly,
+            "runtime", "inspect", root, "Main", "1", "[]", "[{bad]");
+
+        Assert.Equal(1, inspection.ExitCode);
+        Assert.Contains("Runtime assertions JSON is invalid", inspection.Output);
+        Assert.DoesNotContain("Unhandled exception", inspection.Output);
+    }
+
+    [Fact]
     public async Task CliPreservesExactModuleTrustRejectionCode()
     {
         var root = TestPaths.CreateTempDirectory();

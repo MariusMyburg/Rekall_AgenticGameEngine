@@ -30,6 +30,9 @@
             <Button Content="Create" Command="{Binding CreateCommand}" Padding="12,4" />
             <Button Content="Open" Command="{Binding OpenCommand}" Padding="12,4" />
             <Separator />
+            <Button Content="Undo" Command="{Binding UndoCommand}" Padding="12,4" />
+            <Button Content="Redo" Command="{Binding RedoCommand}" Padding="12,4" />
+            <Separator />
             <Button Content="Add Entity" Command="{Binding AddEntityCommand}" Padding="12,4" />
             <Separator />
             <Button Content="Play" Command="{Binding PlayCommand}" Padding="12,4" />

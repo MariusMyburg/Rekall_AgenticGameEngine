@@ -18,6 +18,8 @@ public sealed class RekallAgeWorkbenchSession
     private readonly RekallAgeWorkbenchModelBuilder _modelBuilder;
     private readonly RekallAgeTransactionLogStore _transactionStore;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly Stack<string> _undoTransactions = new();
+    private readonly Stack<string> _redoTransactions = new();
 
     public RekallAgeWorkbenchSession(RekallAgeCommandRegistry registry)
         : this(registry, new RekallAgeWorkbenchModelBuilder(), new RekallAgeTransactionLogStore())
@@ -44,6 +46,10 @@ public sealed class RekallAgeWorkbenchSession
     public string? SelectedEntityId { get; private set; }
 
     public RekallAgeWorkbenchModel? Model { get; private set; }
+
+    public bool CanUndo => _undoTransactions.Count > 0;
+
+    public bool CanRedo => _redoTransactions.Count > 0;
 
     public async ValueTask<RekallAgeWorkbenchOperationResult> CreateProjectAsync(
         string projectRoot,
@@ -95,6 +101,8 @@ public sealed class RekallAgeWorkbenchSession
             SceneName = sceneName;
             Model = model;
             SelectedEntityId = model.Inspector.SelectedEntityId;
+            _undoTransactions.Clear();
+            _redoTransactions.Clear();
             return new RekallAgeWorkbenchOperationResult(
                 true,
                 $"Created project '{projectName}' and scene '{sceneName}'.",
@@ -162,6 +170,7 @@ public sealed class RekallAgeWorkbenchSession
                     SelectedEntityId).ConfigureAwait(false);
                 Model = model;
                 SelectedEntityId = model.Inspector.SelectedEntityId;
+                await ResetHistoryAsync(ProjectRoot, cancellationToken).ConfigureAwait(false);
                 return new RekallAgeWorkbenchOperationResult(true, $"Reloaded scene '{SceneName}'.", model, []);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -231,6 +240,11 @@ public sealed class RekallAgeWorkbenchSession
             }
 
             await PersistIfChangedAsync(ProjectRoot, transaction, actor, cancellationToken).ConfigureAwait(false);
+            if (transaction.ResourcePreimages.Count > 0)
+            {
+                _undoTransactions.Push(transaction.Id);
+                _redoTransactions.Clear();
+            }
             var model = await _modelBuilder.BuildAsync(
                 ProjectRoot,
                 SceneName,
@@ -239,6 +253,66 @@ public sealed class RekallAgeWorkbenchSession
             Model = model;
             SelectedEntityId = model.Inspector.SelectedEntityId;
             return new RekallAgeWorkbenchOperationResult(true, result.Summary, result.Value, result.Errors);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async ValueTask<RekallAgeWorkbenchOperationResult> UndoAsync(
+        string actor,
+        CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_undoTransactions.Count == 0)
+            {
+                return Failure("REKALL_WORKBENCH_UNDO_EMPTY", "There is no authored transaction to undo.");
+            }
+
+            var targetId = _undoTransactions.Pop();
+            var restored = await RestoreHistoryEntryAsync(targetId, "Undo", actor + "-undo", cancellationToken).ConfigureAwait(false);
+            if (restored.Result.Ok)
+            {
+                _redoTransactions.Push(restored.InverseTransactionId!);
+            }
+            else
+            {
+                _undoTransactions.Push(targetId);
+            }
+            return restored.Result;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async ValueTask<RekallAgeWorkbenchOperationResult> RedoAsync(
+        string actor,
+        CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_redoTransactions.Count == 0)
+            {
+                return Failure("REKALL_WORKBENCH_REDO_EMPTY", "There is no undone transaction to redo.");
+            }
+
+            var targetId = _redoTransactions.Pop();
+            var restored = await RestoreHistoryEntryAsync(targetId, "Redo", actor + "-redo", cancellationToken).ConfigureAwait(false);
+            if (restored.Result.Ok)
+            {
+                _undoTransactions.Push(restored.InverseTransactionId!);
+            }
+            else
+            {
+                _redoTransactions.Push(targetId);
+            }
+            return restored.Result;
         }
         finally
         {
@@ -258,6 +332,7 @@ public sealed class RekallAgeWorkbenchSession
             SceneName = sceneName;
             Model = model;
             SelectedEntityId = model.Inspector.SelectedEntityId;
+            await ResetHistoryAsync(projectRoot, cancellationToken).ConfigureAwait(false);
             return new RekallAgeWorkbenchOperationResult(true, $"Opened scene '{sceneName}'.", model, []);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -279,6 +354,80 @@ public sealed class RekallAgeWorkbenchSession
         if (transaction.ChangedResources.Count > 0)
         {
             await _transactionStore.AppendAsync(projectRoot, transaction, actor, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask ResetHistoryAsync(string projectRoot, CancellationToken cancellationToken)
+    {
+        var history = await _transactionStore.LoadAsync(projectRoot, cancellationToken).ConfigureAwait(false);
+        _undoTransactions.Clear();
+        _redoTransactions.Clear();
+        foreach (var entry in history.Transactions.Where(entry =>
+                     entry.ResourcePreimages.Count > 0
+                     && !entry.Actor.EndsWith("-undo", StringComparison.Ordinal)
+                     && !entry.Actor.EndsWith("-redo", StringComparison.Ordinal)))
+        {
+            _undoTransactions.Push(entry.Id);
+        }
+    }
+
+    private async ValueTask<(RekallAgeWorkbenchOperationResult Result, string? InverseTransactionId)> RestoreHistoryEntryAsync(
+        string transactionId,
+        string operationName,
+        string actor,
+        CancellationToken cancellationToken)
+    {
+        if (ProjectRoot is null || SceneName is null || Model is null)
+        {
+            return (Failure("REKALL_WORKBENCH_PROJECT_NOT_OPEN", "Open a project before changing transaction history."), null);
+        }
+
+        var history = await _transactionStore.LoadAsync(ProjectRoot, cancellationToken).ConfigureAwait(false);
+        var target = history.Transactions.FirstOrDefault(entry => entry.Id.Equals(transactionId, StringComparison.Ordinal));
+        if (target is null || target.ResourcePreimages.Count == 0)
+        {
+            return (Failure("REKALL_WORKBENCH_HISTORY_NOT_RESTORABLE", "The selected transaction has no restorable preimage.", transactionId), null);
+        }
+
+        var inverse = RekallAgeTransaction.Begin($"{operationName} {target.Name}");
+        var context = new RekallAgeCommandContext(actor, inverse, cancellationToken);
+        foreach (var preimage in target.ResourcePreimages)
+        {
+            var restored = await _registry.ExecuteAsync<RestoreTransactionPreimageRequest, RestoreTransactionPreimageResult>(
+                "rekall.transaction.restore_preimage",
+                new RestoreTransactionPreimageRequest(ProjectRoot, target.Id, preimage.RelativePath),
+                context).ConfigureAwait(false);
+            if (!restored.Ok)
+            {
+                RollBackInMemoryPreimages(inverse);
+                return (new RekallAgeWorkbenchOperationResult(false, restored.Summary, null, restored.Errors), null);
+            }
+        }
+
+        await PersistIfChangedAsync(ProjectRoot, inverse, actor, cancellationToken).ConfigureAwait(false);
+        var model = await _modelBuilder.BuildAsync(ProjectRoot, SceneName, cancellationToken, SelectedEntityId).ConfigureAwait(false);
+        Model = model;
+        SelectedEntityId = model.Inspector.SelectedEntityId;
+        return (new RekallAgeWorkbenchOperationResult(
+            true,
+            $"{operationName} completed for '{target.Name}'.",
+            model,
+            []), inverse.Id);
+    }
+
+    private static void RollBackInMemoryPreimages(RekallAgeTransaction transaction)
+    {
+        foreach (var preimage in transaction.ResourcePreimages.Reverse())
+        {
+            if (preimage.ExistedBefore)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(preimage.Resource)!);
+                File.WriteAllBytes(preimage.Resource, preimage.Content);
+            }
+            else if (File.Exists(preimage.Resource))
+            {
+                File.Delete(preimage.Resource);
+            }
         }
     }
 

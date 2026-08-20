@@ -36,6 +36,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _switchSceneCommand;
     private readonly RekallAgeAsyncCommand _packageCommand;
     private readonly RekallAgeAsyncCommand _auditPackageCommand;
+    private readonly RekallAgeAsyncCommand _undoCommand;
+    private readonly RekallAgeAsyncCommand _redoCommand;
     private readonly RekallAgeAsyncCommand _discoverModelsCommand;
     private readonly RekallAgeAsyncCommand _runAgentCommand;
     private readonly RekallAgeAsyncCommand _cancelAgentCommand;
@@ -85,6 +87,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _switchSceneCommand = CreateAsyncCommand(SwitchSceneAsync, CanSwitchScene);
         _packageCommand = CreateAsyncCommand(PackageAsync, HasOpenProject);
         _auditPackageCommand = CreateAsyncCommand(AuditPackageAsync, CanAuditPackage);
+        _undoCommand = CreateAsyncCommand(UndoAsync, () => HasOpenProject() && _session.CanUndo);
+        _redoCommand = CreateAsyncCommand(RedoAsync, () => HasOpenProject() && _session.CanRedo);
         _discoverModelsCommand = CreateAsyncCommand(DiscoverModelsAsync, () => !IsBusy && !IsAgentRunning);
         _runAgentCommand = CreateAsyncCommand(RunAgentAsync, CanRunAgent);
         _cancelAgentCommand = CreateAsyncCommand(CancelAgentAsync, () => IsAgentRunning);
@@ -119,6 +123,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand SwitchSceneCommand => _switchSceneCommand;
     public ICommand PackageCommand => _packageCommand;
     public ICommand AuditPackageCommand => _auditPackageCommand;
+    public ICommand UndoCommand => _undoCommand;
+    public ICommand RedoCommand => _redoCommand;
     public ICommand DiscoverModelsCommand => _discoverModelsCommand;
     public ICommand RunAgentCommand => _runAgentCommand;
     public ICommand CancelAgentCommand => _cancelAgentCommand;
@@ -297,6 +303,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private Task SwitchSceneAsync() => RunAsync(
         () => _session.OpenSceneAsync(NormalizeSceneName(), CancellationToken.None).AsTask(),
+        captureAfter: true);
+
+    private Task UndoAsync() => RunAsync(
+        () => _session.UndoAsync("studio", CancellationToken.None).AsTask(),
+        captureAfter: true);
+
+    private Task RedoAsync() => RunAsync(
+        () => _session.RedoAsync("studio", CancellationToken.None).AsTask(),
         captureAfter: true);
 
     private Task AddEntityAsync()
@@ -740,6 +754,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _switchSceneCommand.RaiseCanExecuteChanged();
         _packageCommand.RaiseCanExecuteChanged();
         _auditPackageCommand.RaiseCanExecuteChanged();
+        _undoCommand.RaiseCanExecuteChanged();
+        _redoCommand.RaiseCanExecuteChanged();
         _discoverModelsCommand.RaiseCanExecuteChanged();
         _runAgentCommand.RaiseCanExecuteChanged();
         _cancelAgentCommand.RaiseCanExecuteChanged();

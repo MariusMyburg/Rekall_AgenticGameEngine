@@ -33,12 +33,14 @@ public sealed class CreateEntityCommand : IRekallAgeCommand<CreateEntityRequest,
         var scene = loaded.Value;
         var entity = RekallAgeEntityDocument.Create(request.Name, request.Tags);
         var updated = scene.AddEntity(entity);
+        var scenePath = _store.GetScenePath(request.ProjectRoot, request.SceneName);
+        context.Transaction.CaptureResourcePreimage(scenePath);
         await _store.SaveIfRevisionAsync(
             request.ProjectRoot,
             updated,
             request.ExpectedRevision ?? loaded.Revision,
             context.CancellationToken);
-        context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
+        context.Transaction.RecordChangedResource(scenePath);
         return RekallAgeCommandResult<CreateEntityResult>.Success(
             new CreateEntityResult(entity.Id, updated),
             $"Created entity '{entity.Name}'.");

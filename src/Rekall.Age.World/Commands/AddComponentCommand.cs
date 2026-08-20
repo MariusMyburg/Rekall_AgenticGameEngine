@@ -33,12 +33,14 @@ public sealed class AddComponentCommand : IRekallAgeCommand<AddComponentRequest,
         var scene = loaded.Value;
         var component = RekallAgeComponentDocument.Create(request.ComponentType, request.Properties ?? new JsonObject());
         var updated = scene.UpdateEntity(request.EntityId, entity => entity.AddComponent(component));
+        var scenePath = _store.GetScenePath(request.ProjectRoot, request.SceneName);
+        context.Transaction.CaptureResourcePreimage(scenePath);
         await _store.SaveIfRevisionAsync(
             request.ProjectRoot,
             updated,
             request.ExpectedRevision ?? loaded.Revision,
             context.CancellationToken);
-        context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
+        context.Transaction.RecordChangedResource(scenePath);
         return RekallAgeCommandResult<AddComponentResult>.Success(
             new AddComponentResult(updated),
             $"Added component '{component.Type}'.");

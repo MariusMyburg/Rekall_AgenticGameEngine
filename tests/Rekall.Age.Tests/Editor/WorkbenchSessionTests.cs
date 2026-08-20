@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor;
 using Rekall.Age.Project.Commands;
 using Rekall.Age.World.Commands;
@@ -202,6 +203,35 @@ public sealed class WorkbenchSessionTests
         Assert.DoesNotContain(session.Model!.Inspector.Components, item => item.Type == "Game.State");
     }
 
+    [Fact]
+    public async Task SessionUndoAndRedoRestoreCanonicalTransactionPreimages()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var session = CreateSession();
+        Assert.True((await session.CreateProjectAsync(
+            root, "Undoable", "Main", ["world"], ["world"], "studio", CancellationToken.None)).Ok);
+        Assert.True((await session.ExecuteAsync(
+            "rekall.entity.create",
+            JsonSerializer.Serialize(new { projectRoot = root, sceneName = "Main", name = "Undo Me", tags = Array.Empty<string>() }),
+            "Create Undo Me",
+            "studio",
+            CancellationToken.None)).Ok);
+        Assert.True(session.CanUndo);
+        Assert.Contains(session.Model!.Scene.RootEntities, entity => entity.Name == "Undo Me");
+
+        var undone = await session.UndoAsync("studio", CancellationToken.None);
+
+        Assert.True(undone.Ok, undone.Summary);
+        Assert.DoesNotContain(session.Model!.Scene.RootEntities, entity => entity.Name == "Undo Me");
+        Assert.True(session.CanRedo);
+
+        var redone = await session.RedoAsync("studio", CancellationToken.None);
+
+        Assert.True(redone.Ok, redone.Summary);
+        Assert.Contains(session.Model!.Scene.RootEntities, entity => entity.Name == "Undo Me");
+        Assert.True(session.CanUndo);
+    }
+
     private static RekallAgeWorkbenchSession CreateSession()
     {
         return new RekallAgeWorkbenchSession(CreateRegistry());
@@ -217,6 +247,7 @@ public sealed class WorkbenchSessionTests
         registry.Register(new SetComponentPropertyCommand());
         registry.Register(new RemoveComponentPropertyCommand());
         registry.Register(new RemoveComponentCommand());
+        registry.Register(new RestoreTransactionPreimageCommand());
         return registry;
     }
 }

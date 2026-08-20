@@ -22,6 +22,13 @@ public sealed record ValidateSceneSuggestedAction(
 
 public sealed class ValidateSceneCommand : IRekallAgeCommand<ValidateSceneRequest, ValidateSceneResult>
 {
+    private readonly IRekallAgeShaderPipelineValidationService? _shaderPipelineValidation;
+
+    public ValidateSceneCommand(IRekallAgeShaderPipelineValidationService? shaderPipelineValidation = null)
+    {
+        _shaderPipelineValidation = shaderPipelineValidation;
+    }
+
     public string Name => "rekall.validation.scene";
 
     public RekallAgeCommandSchema Schema => new(
@@ -34,7 +41,9 @@ public sealed class ValidateSceneCommand : IRekallAgeCommand<ValidateSceneReques
         ValidateSceneRequest request,
         RekallAgeCommandContext context)
     {
-        var validator = new RekallAgeProjectValidator(new RekallAgeSceneStore());
+        var validator = new RekallAgeProjectValidator(
+            new RekallAgeSceneStore(),
+            _shaderPipelineValidation);
         var report = await validator.ValidateSceneAsync(
             request.ProjectRoot,
             request.SceneName,

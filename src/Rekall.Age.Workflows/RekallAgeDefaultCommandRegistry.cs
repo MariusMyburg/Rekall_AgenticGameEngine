@@ -21,6 +21,7 @@ public static class RekallAgeDefaultCommandRegistry
     public static RekallAgeCommandRegistry Create()
     {
         var registry = new RekallAgeCommandRegistry();
+        var shaderPipelineValidation = new RekallAgeWorkflowShaderPipelineValidationService();
         registry.Register(new CreateProjectCommand());
         registry.Register(new AddCapabilityCommand());
         registry.Register(new CreateSceneCommand());
@@ -51,9 +52,9 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new InspectDocumentRecoveryCommand());
         registry.Register(new RestoreDocumentRecoveryCommand());
         registry.Register(new InspectEngineDoctorCommand());
-        registry.Register(new ValidateProjectCommand());
+        registry.Register(new ValidateProjectCommand(shaderPipelineValidation));
         registry.Register(new RepairProjectValidationCommand(registry));
-        registry.Register(new ValidateSceneCommand());
+        registry.Register(new ValidateSceneCommand(shaderPipelineValidation));
         registry.Register(new ListTransactionHistoryCommand());
         registry.Register(new RestoreTransactionPreimageCommand());
         registry.Register(new ListComponentSchemasCommand());

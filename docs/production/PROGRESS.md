@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 01:32 Africa/Johannesburg
+Last verified: 2026-08-21 01:43 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: agent-authored shader pipelines are inspectable through CLI,
-MCP, and the canonical command registry without exposing source text
+Latest milestone: assigned project shaders are now compile-validated through
+playable verification and survive package inventory, relocation, and semantic audit
 
 ## Product objective
 
@@ -82,6 +82,17 @@ Studio is important, but it does not define or reorder the engine foundation.
   without returning authored source. The command is registered for MCP and the
   focused locked Release command/catalog selection passes 12/12; the CLI build
   has zero warnings/errors.
+- Shader validation and package integrity: the Validation layer now owns a
+  dependency-inverted pipeline-validation contract, while the canonical
+  Workflows composition supplies the real Rendering resolver. Playable
+  verification blocks incompatible assigned pipelines and preserves their
+  entity-specific shader diagnostic instead of collapsing it into a generic
+  readiness failure. Packaging ships only vertex/fragment sources referenced
+  by packaged scenes, includes them in the immutable SHA-256 inventory, and
+  excludes unreferenced shader experiments. Consolidated audit recompiles the
+  packaged scene after integrity inspection, including relocated directories
+  and archives, so a shader cannot be made acceptable merely by rewriting its
+  inventory hash. The focused locked Release selection passes 43/43.
 - Persistent 3D physics: the runtime now retains a BEPU simulation across
   frames, incrementally synchronizes bodies and statics, preserves angular
   motion/orientation and sleep state, and lets BEPU own contact response.
@@ -1563,16 +1574,17 @@ now verified. Further physics breadth should be driven by the real Qwen
 benchmark, with likely candidates being exact contact evidence, collision
 filtering, constraints, or authored angular control rather than genre behavior.
 
-The programmable-rendering architecture is in execution. Tasks 1-4 are verified:
+The programmable-rendering architecture is in execution. Tasks 1-5 are verified:
 existing agent-visible shader authoring and assignment metadata now resolves to
 reflected, content-addressed, ABI-validated shader assets, and incompatible
 pairs cannot alter a scene, authored shader identity reaches each GPU draw,
 and native Vulkan capture executes the selected project pipeline with measured
 pixel proof. The windowed Windows player executes the same authored sources and
-retains its last valid pipeline across broken live edits. Task 5 is active:
-agent inspection is verified; dependency-inverted project validation and
-package integrity are next. End-to-end
-installed hardware proof follows. Custom post-processing, dynamic
+retains its last valid pipeline across broken live edits. Agent inspection,
+dependency-inverted validation, referenced-source packaging, relocation, and
+semantic package audit are verified. Task 6 is active: reconcile the declared
+frame/draw/material resource ABI across both GPU backends, then retain an
+end-to-end hardware and installed proof. Custom post-processing, dynamic
 geometry, and typed GPU resources are
 separate subsequent tranches; the first post-process proof will be an
 agent-authored raindrop shader rather than an engine rain feature.

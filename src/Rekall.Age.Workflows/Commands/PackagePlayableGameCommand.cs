@@ -230,6 +230,7 @@ public sealed class PackagePlayableGameCommand
         var sourceRoot = Path.GetFullPath(projectRoot);
         var destinationRoot = Path.GetFullPath(bundledGameRoot);
         var packageRoot = Path.GetFullPath(outputDirectory);
+        var referencedShaders = FindReferencedProjectShaders(sourceRoot);
         if (Directory.Exists(destinationRoot))
         {
             Directory.Delete(destinationRoot, recursive: true);
@@ -239,7 +240,7 @@ public sealed class PackagePlayableGameCommand
         foreach (var file in Directory.EnumerateFiles(sourceRoot, "*", SearchOption.AllDirectories))
         {
             var fullFile = Path.GetFullPath(file);
-            if (ShouldSkipFile(sourceRoot, fullFile, packageRoot))
+            if (ShouldSkipFile(sourceRoot, fullFile, packageRoot, referencedShaders))
             {
                 continue;
             }
@@ -255,7 +256,11 @@ public sealed class PackagePlayableGameCommand
         return Path.Combine(destinationRoot, Path.GetRelativePath(sourceRoot, path));
     }
 
-    private static bool ShouldSkipFile(string sourceRoot, string path, string packageRoot)
+    private static bool ShouldSkipFile(
+        string sourceRoot,
+        string path,
+        string packageRoot,
+        IReadOnlySet<string> referencedShaders)
     {
         if (IsSameOrInside(path, packageRoot))
         {
@@ -278,6 +283,14 @@ public sealed class PackagePlayableGameCommand
 
         var fileName = Path.GetFileName(path);
         var extension = Path.GetExtension(path);
+        var shaderRoot = Path.Combine(sourceRoot, "Shaders");
+        if (IsSameOrInside(path, shaderRoot)
+            && extension is ".vert" or ".frag"
+            && !referencedShaders.Contains(path))
+        {
+            return true;
+        }
+
         if (fileName.Equals(".env", StringComparison.OrdinalIgnoreCase) ||
             fileName.EndsWith(".env", StringComparison.OrdinalIgnoreCase) ||
             fileName.StartsWith("appsettings.", StringComparison.OrdinalIgnoreCase) &&
@@ -301,6 +314,80 @@ public sealed class PackagePlayableGameCommand
         return modulesIndex >= 0 && !ContainsSequence(
             segments[(modulesIndex + 1)..],
             ["bin", "rekall", "net10.0"]);
+    }
+
+    private static IReadOnlySet<string> FindReferencedProjectShaders(string projectRoot)
+    {
+        var comparer = OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+        var paths = new HashSet<string>(comparer);
+        var scenesRoot = Path.Combine(projectRoot, "Scenes");
+        if (!Directory.Exists(scenesRoot))
+        {
+            return paths;
+        }
+
+        foreach (var scenePath in Directory.EnumerateFiles(
+                     scenesRoot,
+                     "*.age.scene.json",
+                     SearchOption.AllDirectories))
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(scenePath));
+            if (!document.RootElement.TryGetProperty("entities", out var entities))
+            {
+                continue;
+            }
+
+            foreach (var entity in entities.EnumerateArray())
+            {
+                if (!entity.TryGetProperty("components", out var components))
+                {
+                    continue;
+                }
+
+                foreach (var component in components.EnumerateArray())
+                {
+                    var type = component.TryGetProperty("type", out var typeElement)
+                        ? typeElement.GetString()
+                        : null;
+                    if (type is not ("Rekall.MeshRenderer" or "Rekall.MeshSet")
+                        || !component.TryGetProperty("properties", out var properties))
+                    {
+                        continue;
+                    }
+
+                    AddReferencedShader(projectRoot, properties, "vertexShader", ".vert", paths);
+                    AddReferencedShader(projectRoot, properties, "fragmentShader", ".frag", paths);
+                }
+            }
+        }
+
+        return paths;
+    }
+
+    private static void AddReferencedShader(
+        string projectRoot,
+        JsonElement properties,
+        string propertyName,
+        string extension,
+        HashSet<string> paths)
+    {
+        if (!properties.TryGetProperty(propertyName, out var nameElement)
+            || string.IsNullOrWhiteSpace(nameElement.GetString()))
+        {
+            return;
+        }
+
+        var name = nameElement.GetString()!.Trim()
+            .Replace('/', Path.DirectorySeparatorChar)
+            .Replace('\\', Path.DirectorySeparatorChar);
+        var shaderRoot = Path.GetFullPath(Path.Combine(projectRoot, "Shaders"));
+        var path = Path.GetFullPath(Path.Combine(shaderRoot, name + extension));
+        if (IsSameOrInside(path, shaderRoot))
+        {
+            paths.Add(path);
+        }
     }
 
     private static async ValueTask SanitizePackagedAssetCatalogAsync(

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Modules;
@@ -12,6 +13,31 @@ namespace Rekall.Age.Tests.Workflows;
 
 public sealed class PlayablePackageIntegrityTests
 {
+    [Fact]
+    public async Task PackageRejectsSceneWithInvalidAssignedShaderPipeline()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var initialOutput = Path.Combine(TestPaths.CreateTempDirectory(), "InitialShaderPackage");
+        var output = Path.Combine(TestPaths.CreateTempDirectory(), "RejectedShaderPackage");
+        var context = new RekallAgeCommandContext(
+            "package-shader-validation-test",
+            RekallAgeTransaction.Begin("reject invalid packaged shader"),
+            CancellationToken.None);
+        var authored = await new RunAgentAuthoringGauntletCommand().ExecuteAsync(
+            new RunAgentAuthoringGauntletRequest(root, "Shader Validation Game", "Main", initialOutput),
+            context);
+        Assert.True(authored.Ok, authored.Summary);
+        await AddShaderMeshAsync(root, valid: false);
+
+        var packaged = await new PackagePlayableGameCommand().ExecuteAsync(
+            new PackagePlayableGameRequest(root, "Main", output),
+            context);
+
+        Assert.False(packaged.Ok);
+        Assert.Contains(packaged.Errors, error => error.Code == "REKALL_SHADER_VERTEX_ABI_MISMATCH");
+        Assert.False(Directory.Exists(Path.Combine(output, "Game")));
+    }
+
     [Fact]
     public async Task PackageCopyStopsWhenFinalModuleTrustPreflightFails()
     {
@@ -163,6 +189,8 @@ public sealed class PlayablePackageIntegrityTests
                 Path.Combine(TestPaths.CreateTempDirectory(), "InitialPackage")),
             context);
         Assert.True(authored.Ok, authored.Summary);
+        await AddShaderMeshAsync(root, valid: true);
+        await File.WriteAllTextAsync(Path.Combine(root, "Shaders", "agent", "unused.frag"), "#version 450\nvoid main() {}\n");
         Directory.CreateDirectory(Path.Combine(root, ".rekall", "cache"));
         await File.WriteAllTextAsync(Path.Combine(root, ".rekall", "cache", "sdk-cache.dll"), "cache");
         await File.WriteAllTextAsync(Path.Combine(root, "DevOnly.cs"), "// authored source");
@@ -293,6 +321,9 @@ public sealed class PlayablePackageIntegrityTests
         Assert.DoesNotContain(packagedFiles, path => path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(packagedFiles, path => path.EndsWith(".env", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packagedFiles, path => path.EndsWith("/AgentGauntlet.dll", StringComparison.Ordinal));
+        Assert.Contains("Game/Shaders/agent/material.vert", packagedFiles);
+        Assert.Contains("Game/Shaders/agent/material.frag", packagedFiles);
+        Assert.DoesNotContain("Game/Shaders/agent/unused.frag", packagedFiles);
         Assert.Single(RekallAgeProjectModuleAssemblyLoader.LoadBuiltModuleAssemblies(Path.Combine(output, "Game")));
         var packagedCatalogText = await File.ReadAllTextAsync(
             Path.Combine(output, "Game", "Assets", "assets.age.catalog.json"));
@@ -326,6 +357,15 @@ public sealed class PlayablePackageIntegrityTests
             new RunPlayablePackageRequest(relocation.Value.PackagePath, Frames: 30),
             context);
         Assert.True(relocatedDirectoryRun.Ok, relocatedDirectoryRun.Summary);
+        var relocatedAudit = await new AuditPlayablePackageCommand().ExecuteAsync(
+            new AuditPlayablePackageRequest(
+                relocation.Value.PackagePath,
+                Path.Combine(TestPaths.CreateTempDirectory(), "RelocatedShaderAudit")),
+            context);
+        Assert.True(relocatedAudit.Ok, relocatedAudit.Summary);
+        Assert.Contains(
+            relocatedAudit.Value.Checks,
+            check => check.Name == "packaged-scene-validation" && check.Passed);
 
         var relocationRoot = TestPaths.CreateTempDirectory();
         var relocatedArchive = Path.Combine(relocationRoot, "audio-game-relocated.zip");
@@ -339,7 +379,7 @@ public sealed class PlayablePackageIntegrityTests
         Assert.Equal(1, relocatedRuntimeState.AudioVoiceCount);
         Assert.DoesNotContain(relocatedRuntimeState.Observations, observation => observation.Subsystem == "audio");
 
-        await File.AppendAllTextAsync(Path.Combine(output, "Game", "rekall.project.json"), " ");
+        await File.AppendAllTextAsync(Path.Combine(output, "Game", "Shaders", "agent", "material.frag"), " ");
         await File.WriteAllTextAsync(Path.Combine(output, "unexpected.txt"), "not declared");
         var tampered = await new InspectPlayablePackageCommand().ExecuteAsync(
             new InspectPlayablePackageRequest(output),
@@ -348,6 +388,91 @@ public sealed class PlayablePackageIntegrityTests
         Assert.False(tampered.Ok);
         Assert.Contains(tampered.Errors, error => error.Code == "REKALL_PACKAGE_HASH_MISMATCH");
         Assert.Contains(tampered.Errors, error => error.Code == "REKALL_PACKAGE_UNEXPECTED_FILE");
+    }
+
+    [Fact]
+    public async Task AuditRejectsIntegrityValidPackageWhoseShaderAbiWasReplaced()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var output = Path.Combine(TestPaths.CreateTempDirectory(), "ShaderAuditPackage");
+        var context = new RekallAgeCommandContext(
+            "package-shader-audit-test",
+            RekallAgeTransaction.Begin("audit packaged shader"),
+            CancellationToken.None);
+        var authored = await new RunAgentAuthoringGauntletCommand().ExecuteAsync(
+            new RunAgentAuthoringGauntletRequest(
+                root,
+                "Shader Audit Game",
+                "Main",
+                Path.Combine(TestPaths.CreateTempDirectory(), "InitialPackage")),
+            context);
+        Assert.True(authored.Ok, authored.Summary);
+        await AddShaderMeshAsync(root, valid: true);
+        var packaged = await new PackagePlayableGameCommand().ExecuteAsync(
+            new PackagePlayableGameRequest(root, "Main", output),
+            context);
+        Assert.True(packaged.Ok, packaged.Summary);
+
+        var vertexPath = Path.Combine(output, "Game", "Shaders", "agent", "material.vert");
+        await File.WriteAllTextAsync(vertexPath, """
+            #version 450
+            layout(location = 0) in vec2 inPosition;
+            void main() { gl_Position = vec4(inPosition, 0.0, 1.0); }
+            """);
+        var manifestNode = JsonNode.Parse(await File.ReadAllTextAsync(packaged.Value.ManifestPath))!.AsObject();
+        var vertexEntry = manifestNode["files"]!.AsArray()
+            .Select(node => node!.AsObject())
+            .Single(file => file["path"]!.GetValue<string>() == "Game/Shaders/agent/material.vert");
+        var vertexBytes = await File.ReadAllBytesAsync(vertexPath);
+        vertexEntry["sizeBytes"] = vertexBytes.LongLength;
+        vertexEntry["sha256"] = Convert.ToHexString(SHA256.HashData(vertexBytes)).ToLowerInvariant();
+        await File.WriteAllTextAsync(packaged.Value.ManifestPath, manifestNode.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+
+        var audit = await new AuditPlayablePackageCommand().ExecuteAsync(
+            new AuditPlayablePackageRequest(
+                output,
+                Path.Combine(TestPaths.CreateTempDirectory(), "ShaderAuditProof")),
+            context);
+
+        Assert.False(audit.Ok);
+        Assert.Contains(
+            audit.Value.Checks,
+            check => check.Name == "packaged-scene-validation" && !check.Passed);
+        Assert.Contains(audit.Errors, error => error.Message.Contains("REKALL_SHADER_VERTEX_ABI_MISMATCH", StringComparison.Ordinal));
+    }
+
+    private static async Task AddShaderMeshAsync(string root, bool valid)
+    {
+        var shaderRoot = Path.Combine(root, "Shaders", "agent");
+        Directory.CreateDirectory(shaderRoot);
+        await File.WriteAllTextAsync(Path.Combine(shaderRoot, "material.vert"), valid
+            ? """
+              #version 450
+              layout(location = 0) in vec3 inPosition;
+              void main() { gl_Position = vec4(inPosition, 1.0); }
+              """
+            : """
+              #version 450
+              layout(location = 0) in vec2 inPosition;
+              void main() { gl_Position = vec4(inPosition, 0.0, 1.0); }
+              """);
+        await File.WriteAllTextAsync(Path.Combine(shaderRoot, "material.frag"), """
+            #version 450
+            layout(location = 0) out vec4 outColor;
+            void main() { outColor = vec4(0.9, 0.2, 0.7, 1.0); }
+            """);
+        var store = new RekallAgeSceneStore();
+        var scene = await store.LoadAsync(root, "Main", CancellationToken.None);
+        scene = scene.AddEntity(RekallAgeEntityDocument.Create("Shader Mesh", ["mesh"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.MeshRenderer",
+                new JsonObject
+                {
+                    ["mesh"] = "rekall.primitive.cube",
+                    ["vertexShader"] = "agent/material",
+                    ["fragmentShader"] = "agent/material"
+                })));
+        await store.SaveAsync(root, scene, CancellationToken.None);
     }
 
     [Fact]

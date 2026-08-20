@@ -21,10 +21,14 @@ public sealed class RekallAgeProjectValidator
             type => type,
             StringComparer.Ordinal);
     private readonly RekallAgeSceneStore _sceneStore;
+    private readonly IRekallAgeShaderPipelineValidationService? _shaderPipelineValidation;
 
-    public RekallAgeProjectValidator(RekallAgeSceneStore sceneStore)
+    public RekallAgeProjectValidator(
+        RekallAgeSceneStore sceneStore,
+        IRekallAgeShaderPipelineValidationService? shaderPipelineValidation = null)
     {
         _sceneStore = sceneStore;
+        _shaderPipelineValidation = shaderPipelineValidation;
     }
 
     public async ValueTask<RekallAgeValidationReport> ValidateSceneAsync(
@@ -35,6 +39,7 @@ public sealed class RekallAgeProjectValidator
         var scene = await _sceneStore.LoadAsync(projectRoot, sceneName, cancellationToken);
         var issues = new List<RekallAgeValidationIssue>();
         ValidateAuthoringContracts(projectRoot, scene, issues);
+        await ValidateShaderPipelinesAsync(projectRoot, scene, issues, cancellationToken);
 
         var cameras = scene.Entities
             .SelectMany(entity => entity.Components
@@ -85,6 +90,101 @@ public sealed class RekallAgeProjectValidator
 
         return new RekallAgeValidationReport(issues);
     }
+
+    private async ValueTask ValidateShaderPipelinesAsync(
+        string projectRoot,
+        RekallAgeSceneDocument scene,
+        List<RekallAgeValidationIssue> issues,
+        CancellationToken cancellationToken)
+    {
+        if (_shaderPipelineValidation is null)
+        {
+            return;
+        }
+
+        foreach (var entity in scene.Entities)
+        {
+            foreach (var renderer in entity.Components.Where(component =>
+                         component.Type is "Rekall.MeshRenderer" or "Rekall.MeshSet"))
+            {
+                var vertex = ReadString(renderer.Properties, "vertexShader");
+                var fragment = ReadString(renderer.Properties, "fragmentShader");
+                if (string.IsNullOrWhiteSpace(vertex) && string.IsNullOrWhiteSpace(fragment))
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(vertex) || string.IsNullOrWhiteSpace(fragment))
+                {
+                    issues.Add(CreateShaderIssue(
+                        "REKALL_SHADER_STAGE_MISSING",
+                        $"Entity '{entity.Name}' must assign both vertexShader and fragmentShader.",
+                        projectRoot,
+                        scene.Name,
+                        entity.Id,
+                        vertex ?? string.Empty,
+                        fragment ?? string.Empty));
+                    continue;
+                }
+
+                var validation = await _shaderPipelineValidation.ValidateAsync(
+                    projectRoot,
+                    vertex,
+                    fragment,
+                    cancellationToken);
+                foreach (var diagnostic in validation.Diagnostics.Take(32))
+                {
+                    var separator = diagnostic.IndexOf(':', StringComparison.Ordinal);
+                    var code = separator > 0 ? diagnostic[..separator] : "REKALL_SHADER_PIPELINE_INVALID";
+                    issues.Add(CreateShaderIssue(
+                        code.StartsWith("REKALL_SHADER_", StringComparison.Ordinal)
+                            ? code
+                            : "REKALL_SHADER_PIPELINE_INVALID",
+                        $"Entity '{entity.Name}' shader pipeline is invalid: {diagnostic}",
+                        projectRoot,
+                        scene.Name,
+                        entity.Id,
+                        vertex,
+                        fragment));
+                }
+            }
+        }
+    }
+
+    private static RekallAgeValidationIssue CreateShaderIssue(
+        string code,
+        string message,
+        string projectRoot,
+        string sceneName,
+        string entityId,
+        string vertex,
+        string fragment) =>
+        new(
+            code,
+            message,
+            "blocking",
+            entityId,
+            [
+                new RekallAgeSuggestedCommand(
+                    "rekall.shader.inspect_pipeline",
+                    new Dictionary<string, object?>
+                    {
+                        ["projectRoot"] = projectRoot,
+                        ["vertexShader"] = vertex,
+                        ["fragmentShader"] = fragment
+                    }),
+                new RekallAgeSuggestedCommand(
+                    "rekall.shader.assign_pipeline",
+                    new Dictionary<string, object?>
+                    {
+                        ["projectRoot"] = projectRoot,
+                        ["sceneName"] = sceneName,
+                        ["entityId"] = entityId,
+                        ["vertexShader"] = vertex,
+                        ["fragmentShader"] = fragment,
+                        ["validateBeforeAssign"] = true
+                    })
+            ]);
 
     private static void ValidateAuthoringContracts(
         string projectRoot,

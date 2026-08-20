@@ -35,7 +35,9 @@ public sealed class VerifyPlayableGameCommand
 {
     private readonly BuildModulesCommand _buildModules = new();
     private readonly PlaytestSceneCommand _playtestScene = new();
-    private readonly RekallAgeProjectValidator _validator = new(new RekallAgeSceneStore());
+    private readonly RekallAgeProjectValidator _validator = new(
+        new RekallAgeSceneStore(),
+        new RekallAgeWorkflowShaderPipelineValidationService());
     private readonly RekallAgeProjectModuleTrustInspector _moduleTrust = new();
 
     public string Name => "rekall.workflow.verify_playable_game";
@@ -72,7 +74,16 @@ public sealed class VerifyPlayableGameCommand
                 renderFrames: [],
                 drawAssertions: [],
                 request.SceneName,
-                build.Ok ? null : build.Errors);
+                !validationPassed
+                    ? validation.Issues
+                        .Where(issue => issue.Severity.Equals("blocking", StringComparison.OrdinalIgnoreCase))
+                        .Select(issue => new RekallAgeCommandError(
+                            issue.Code,
+                            issue.Message,
+                            issue.Target,
+                            issue.SuggestedCommands))
+                        .ToArray()
+                    : build.Errors);
         }
 
         var trust = _moduleTrust.Inspect(request.ProjectRoot);

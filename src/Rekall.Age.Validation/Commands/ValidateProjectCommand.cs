@@ -27,6 +27,12 @@ public sealed class ValidateProjectCommand
     : IRekallAgeCommand<ValidateProjectRequest, ValidateProjectResult>
 {
     private readonly RekallAgeSceneStore _sceneStore = new();
+    private readonly IRekallAgeShaderPipelineValidationService? _shaderPipelineValidation;
+
+    public ValidateProjectCommand(IRekallAgeShaderPipelineValidationService? shaderPipelineValidation = null)
+    {
+        _shaderPipelineValidation = shaderPipelineValidation;
+    }
 
     public string Name => "rekall.validation.project";
 
@@ -66,7 +72,7 @@ public sealed class ValidateProjectCommand
                 "Project validation found no authored scenes.");
         }
 
-        var validator = new RekallAgeProjectValidator(_sceneStore);
+        var validator = new RekallAgeProjectValidator(_sceneStore, _shaderPipelineValidation);
         var scenes = new List<ValidateProjectSceneResult>(sceneNames.Count);
         foreach (var sceneName in sceneNames)
         {

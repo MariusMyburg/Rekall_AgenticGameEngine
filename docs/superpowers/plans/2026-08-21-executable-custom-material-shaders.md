@@ -297,7 +297,7 @@ git commit -m "feat: run and hot reload project shaders in player"
 - Consumes: Task 1 resolver and capture pipeline-use evidence.
 - Produces: `rekall.shader.inspect_pipeline` / `shader inspect-pipeline <root> <vertex> <fragment>`.
 
-- [ ] **Step 1: Write failing command, validation, MCP, and package tests**
+- [x] **Step 1: Write failing command, validation, MCP, and package tests**
 
 Assert inspection reports logical names, ABI version, SHA-256 key, SPIR-V byte
 counts, four vertex elements, three resource layouts, and bounded diagnostics.
@@ -305,27 +305,27 @@ Assert project validation blocks an assigned ABI mismatch. Assert packaging
 copies referenced shader sources, inventories their hashes, and package audit
 executes a custom-shader proof frame.
 
-- [ ] **Step 2: Run focused contract tests and verify red**
+- [x] **Step 2: Run focused contract tests and verify red**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --no-restore -warnaserror --filter "FullyQualifiedName~ShaderAuthoringCommandTests|FullyQualifiedName~ProjectValidatorTests|FullyQualifiedName~PlayablePackageIntegrityTests|FullyQualifiedName~McpCatalogTests"
 ```
 
-- [ ] **Step 3: Implement bounded inspection and validator integration**
+- [x] **Step 3: Implement bounded inspection and validator integration**
 
 Return no source text from inspection. Return at most 32 vertex elements, 16
 resource layouts, 64 binding elements, and 32 diagnostics. Validate only
 pipelines actually referenced by scene renderers and report entity/scene,
 logical stage names, error code, and the exact inspect/write/assign action.
 
-- [ ] **Step 4: Inventory project shader sources in packages**
+- [x] **Step 4: Inventory project shader sources in packages**
 
 Copy only project-root-confined shader files referenced by packaged scenes.
 Include them in the existing immutable package manifest and hashes. Package
 audit must fail if a referenced source is absent/tampered or no longer compiles
 to the declared ABI. Preserve packages with no custom shaders unchanged.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
 Run Step 2 and expect pass, then:
 

@@ -108,11 +108,12 @@ public sealed class RepairProjectValidationCommand(RekallAgeCommandRegistry regi
             });
     }
 
-    private static async ValueTask<ValidateProjectResult> ValidateAsync(
+    private async ValueTask<ValidateProjectResult> ValidateAsync(
         string projectRoot,
         RekallAgeCommandContext context)
     {
-        var result = await new ValidateProjectCommand().ExecuteAsync(
+        var result = await registry.ExecuteAsync<ValidateProjectRequest, ValidateProjectResult>(
+            "rekall.validation.project",
             new ValidateProjectRequest(projectRoot),
             context);
         return result.Value;

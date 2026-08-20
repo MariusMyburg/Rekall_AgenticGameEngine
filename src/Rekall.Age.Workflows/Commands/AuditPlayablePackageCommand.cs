@@ -1,5 +1,7 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
+using Rekall.Age.Validation;
+using Rekall.Age.World;
 
 namespace Rekall.Age.Workflows.Commands;
 
@@ -40,6 +42,9 @@ public sealed class AuditPlayablePackageCommand
     private readonly InspectPlayablePackageCommand _inspectPackage = new();
     private readonly RunPlayablePackageCommand _runPackage = new();
     private readonly CapturePlayablePackageFrameCommand _captureFrame = new();
+    private readonly RekallAgeProjectValidator _validator = new(
+        new RekallAgeSceneStore(),
+        new RekallAgeWorkflowShaderPipelineValidationService());
 
     public string Name => "rekall.workflow.audit_playable_package";
 
@@ -91,6 +96,12 @@ public sealed class AuditPlayablePackageCommand
             new InspectPlayablePackageRequest(request.PackagePath),
             context);
         var missingKeyArtifacts = FindMissingKeyArtifacts(inspection.Value.Files);
+        var packagedValidation = inspection.Ok
+            ? await ValidatePackagedSceneAsync(
+                request.PackagePath,
+                inspection.Value.Manifest,
+                context.CancellationToken)
+            : new RekallAgeValidationReport([]);
 
         var run = await _runPackage.ExecuteAsync(
             new RunPlayablePackageRequest(request.PackagePath, frameCount, request.Inputs),
@@ -111,6 +122,14 @@ public sealed class AuditPlayablePackageCommand
                 missingKeyArtifacts.Count == 0
                     ? "All required package artifacts are present."
                     : $"Missing required package artifacts: {string.Join(", ", missingKeyArtifacts)}."),
+            new RekallAgePlayablePackageAuditCheck(
+                "packaged-scene-validation",
+                inspection.Ok && packagedValidation.BlockingMessages.Count == 0,
+                !inspection.Ok
+                    ? "Packaged scene validation was skipped because package integrity failed."
+                    : packagedValidation.BlockingMessages.Count == 0
+                        ? $"Packaged scene '{inspection.Value.Manifest.SceneName}' passed blocking validation."
+                        : string.Join(Environment.NewLine, packagedValidation.BlockingMessages)),
             new RekallAgePlayablePackageAuditCheck(
                 "run",
                 run.Value.Ready,
@@ -186,6 +205,64 @@ public sealed class AuditPlayablePackageCommand
         }
 
         return missing;
+    }
+
+    private async ValueTask<RekallAgeValidationReport> ValidatePackagedSceneAsync(
+        string packagePath,
+        RekallAgePlayablePackageManifest manifest,
+        CancellationToken cancellationToken)
+    {
+        var fullPath = Path.GetFullPath(packagePath);
+        string packageRoot;
+        string? extractionRoot = null;
+        if (Directory.Exists(fullPath))
+        {
+            packageRoot = fullPath;
+        }
+        else if (Path.GetExtension(fullPath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            extractionRoot = Path.Combine(
+                Path.GetTempPath(),
+                "RekallAgePackageAudits",
+                Guid.NewGuid().ToString("N"));
+            RekallAgeSafePackageExtraction.Extract(fullPath, extractionRoot);
+            packageRoot = extractionRoot;
+        }
+        else
+        {
+            packageRoot = Path.GetDirectoryName(fullPath)
+                ?? throw new InvalidOperationException($"Package manifest '{fullPath}' has no parent directory.");
+        }
+
+        try
+        {
+            if (!InspectPlayablePackageCommand.TryValidateRelativePath(manifest.GameRoot, out var normalizedGameRoot))
+            {
+                return new RekallAgeValidationReport(
+                [
+                    new RekallAgeValidationIssue(
+                        "REKALL_PACKAGE_GAME_ROOT_INVALID",
+                        $"Package game root '{manifest.GameRoot}' is unsafe.",
+                        "blocking",
+                        "gameRoot")
+                ]);
+            }
+
+            var gameRoot = Path.GetFullPath(Path.Combine(
+                packageRoot,
+                normalizedGameRoot.Replace('/', Path.DirectorySeparatorChar)));
+            return await _validator.ValidateSceneAsync(
+                gameRoot,
+                manifest.SceneName,
+                cancellationToken);
+        }
+        finally
+        {
+            if (extractionRoot is not null && Directory.Exists(extractionRoot))
+            {
+                Directory.Delete(extractionRoot, recursive: true);
+            }
+        }
     }
 
     private static RekallAgeCommandResult<AuditPlayablePackageResult> RejectUnsafeOutput(

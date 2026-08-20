@@ -3,6 +3,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Validation;
 using Rekall.Age.Validation.Commands;
+using Rekall.Age.Workflows;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
 
@@ -10,6 +11,45 @@ namespace Rekall.Age.Tests.Validation;
 
 public sealed class ProjectValidatorTests
 {
+    [Fact]
+    public async Task ValidateSceneRejectsAssignedShaderPipelineWithIncompatibleAbi()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var shaderRoot = Path.Combine(root, "Shaders", "agent");
+        Directory.CreateDirectory(shaderRoot);
+        await File.WriteAllTextAsync(Path.Combine(shaderRoot, "bad.vert"), """
+            #version 450
+            layout(location = 0) in vec2 inPosition;
+            void main() { gl_Position = vec4(inPosition, 0.0, 1.0); }
+            """);
+        await File.WriteAllTextAsync(Path.Combine(shaderRoot, "bad.frag"), """
+            #version 450
+            layout(location = 0) out vec4 outColor;
+            void main() { outColor = vec4(1.0); }
+            """);
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Bad Shader Mesh", ["mesh"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.MeshRenderer",
+                    new JsonObject
+                    {
+                        ["vertexShader"] = "agent/bad",
+                        ["fragmentShader"] = "agent/bad"
+                    })));
+        var store = new RekallAgeSceneStore();
+        await store.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(
+                store,
+                new RekallAgeWorkflowShaderPipelineValidationService())
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        var issue = Assert.Single(report.Issues, issue => issue.Code == "REKALL_SHADER_VERTEX_ABI_MISMATCH");
+        Assert.Equal("blocking", issue.Severity);
+        Assert.Equal(scene.Entities.Single().Id, issue.Target);
+        Assert.Contains(issue.SuggestedCommands!, command => command.Tool == "rekall.shader.inspect_pipeline");
+    }
+
     [Fact]
     public async Task ValidateSceneMissingCameraSuggestsRegisteredSchemaDiscovery()
     {

@@ -24,6 +24,8 @@ public sealed record RekallAgeLanguageModelAgentRequest(string Model, string Sys
     public bool RequireCompletionAudit { get; init; }
 
     public IProgress<RekallAgeLanguageModelAgentProgress>? Progress { get; init; }
+
+    public IReadOnlySet<string> TerminalSuccessTools { get; init; } = new HashSet<string>(StringComparer.Ordinal);
 }
 
 public sealed record RekallAgeLanguageModelAgentProgress(
@@ -208,6 +210,20 @@ public sealed class RekallAgeLanguageModelAgent(
                     $"{call.Name} {(succeeded ? "completed" : "failed")}.",
                     execution));
                 transcript.Add(new RekallAgeLanguageModelMessage("tool", outputText, call.Name));
+                var effectiveToolName = EffectiveToolName(call, request.TerminalSuccessTools);
+                if (succeeded && effectiveToolName is not null)
+                {
+                    var summary = output["summary"]?.GetValue<string>();
+                    finalContent = string.IsNullOrWhiteSpace(summary)
+                        ? $"Terminal workflow '{effectiveToolName}' completed successfully."
+                        : summary;
+                    var terminal = Result(true, "terminal_tool_success", finalContent, turn);
+                    request.Progress?.Report(new RekallAgeLanguageModelAgentProgress(
+                        turn,
+                        "run.completed",
+                        $"Terminal workflow {effectiveToolName} completed successfully."));
+                    return terminal;
+                }
             }
         }
 
@@ -288,4 +304,19 @@ public sealed class RekallAgeLanguageModelAgent(
         || name.StartsWith("rekall.workflow.relocate_", StringComparison.Ordinal)
         || name.StartsWith("rekall.workflow.capture_", StringComparison.Ordinal)
         || name.StartsWith("rekall.workflow.run_", StringComparison.Ordinal);
+
+    private static string? EffectiveToolName(
+        RekallAgeLanguageModelToolCall call,
+        IReadOnlySet<string> terminalTools)
+    {
+        if (terminalTools.Contains(call.Name)) return call.Name;
+        if (call.Arguments["name"] is JsonValue target
+            && target.TryGetValue<string>(out var targetName)
+            && terminalTools.Contains(targetName))
+        {
+            return targetName;
+        }
+
+        return null;
+    }
 }

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 15:25 Africa/Johannesburg
+Last verified: 2026-08-20 15:29 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: embedded project-scoped Ollama authoring checkpoint
+Latest milestone: embedded Ollama playable-game gauntlet checkpoint
 
 ## Product objective
 
@@ -63,6 +63,16 @@ Studio is important, but it does not define or reorder the engine foundation.
   captured an inspected nonblank 960x540 software frame at
   `Artifacts/StudioAgentProof/vout/Main_runtime_001.png` (3,419 bytes,
   SHA-256 `04CE4CFDC27FD73D50844FD3B3A81297A64CFF06C4870E37534395239463ED1C`).
+- Real playable-game proof: the project-scoped service now accepts configured
+  successful compound workflows as terminal evidence, so a model cannot waste
+  later turns or mutate after the gauntlet has already passed. On a fresh root,
+  `qwen3.5:35b` completed in two turns/two tools: engine status followed by
+  `rekall.workflow.agent_authoring_gauntlet`. The resulting manifest reports
+  passing scene-validation, module-build, restricted module-trust, and
+  playtest checks. The 1,279,705-byte archive SHA-256 is
+  `DECCAFEE7619D346DF48844374B80ECD31A32C999656277C3E896D3D194FC548`;
+  the audited proof frame SHA-256 is
+  `1D913CA3E7DB6204B7F48D04F4115B681722A129B20610BC7841FE258952C6C2`.
 - Agent authoring: both source and installed multi-subsystem benchmarks created
   and repaired UI, animation, and audio content using tool calls.
 - Runtime animation: generic clip playback, bounded Hermite interpolation,
@@ -946,6 +956,15 @@ composition attempts; schema descriptions now explicitly separate camera and
 light configuration from Transform3D pose. The repaired proof is clean and
 visually informative, but it is a scene-authoring proof rather than the final
 playable/package installed-game acceptance.
+
+The first complete-game attempt exposed a separate completion-control defect:
+after a passing gauntlet the model performed an unnecessary second audit and
+continued editing until its turn limit. The provider-neutral agent request now
+supports explicitly configured terminal-success tools, including gateway-
+wrapped targets. The Studio project session configures only the generic
+agent-authoring gauntlet as terminal; ordinary tools still require the normal
+completion audit. A fresh real rerun stopped immediately after the passing
+gauntlet and returned success.
 
 The restricted module-host tranche is paused at commit `4e43119`, a stable
 native containment and typed-broker checkpoint. Project-write denial and

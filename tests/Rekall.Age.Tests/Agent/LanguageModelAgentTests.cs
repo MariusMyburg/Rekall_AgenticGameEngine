@@ -93,6 +93,33 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task SuccessfulConfiguredTerminalWorkflowStopsWithoutAnotherModelTurn()
+    {
+        var model = new ScriptedModelClient(new RekallAgeLanguageModelResponse(
+            "test", "model", "", "",
+            [new RekallAgeLanguageModelToolCall("gateway", new JsonObject
+            {
+                ["name"] = "rekall.workflow.agent_authoring_gauntlet",
+                ["arguments"] = new JsonObject()
+            })],
+            "tool_calls", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 8,
+                TerminalSuccessTools = new HashSet<string>(["rekall.workflow.agent_authoring_gauntlet"], StringComparer.Ordinal)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal("terminal_tool_success", result.StopReason);
+        Assert.Equal(1, result.Turns);
+        Assert.Single(model.Requests);
+    }
+
+    [Fact]
     public async Task AgentStopsAtConfiguredTurnLimit()
     {
         var repeated = new RekallAgeLanguageModelResponse(

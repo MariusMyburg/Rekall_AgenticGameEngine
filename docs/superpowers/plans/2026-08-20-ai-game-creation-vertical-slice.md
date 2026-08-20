@@ -38,7 +38,7 @@ create, author, inspect, edit, render, play, and verify desktop workflow.
   tool-result transcript, failure diagnostics, and post-run refresh/validation.
 - [x] Prove with deterministic fake-model tests that agent tool calls mutate
   the open project through canonical commands only.
-- [ ] Run a real local `qwen3.5:35b` benchmark that creates and revises a small
+- [x] Run a real local `qwen3.5:35b` benchmark that creates and revises a small
   complete game from the Studio-facing service.
 
 ### Task 4: Game-creation acceptance and distribution

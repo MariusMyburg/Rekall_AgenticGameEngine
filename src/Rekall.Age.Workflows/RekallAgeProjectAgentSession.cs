@@ -73,7 +73,10 @@ public sealed class RekallAgeProjectAgentSession
                 Think = request.Think,
                 Temperature = request.Temperature,
                 RequireCompletionAudit = request.RequireCompletionAudit,
-                Progress = progress
+                Progress = progress,
+                TerminalSuccessTools = new HashSet<string>(
+                    ["rekall.workflow.agent_authoring_gauntlet"],
+                    StringComparer.Ordinal)
             },
             cancellationToken);
         var failedTools = result.ToolExecutions.Count(execution => !execution.Succeeded);

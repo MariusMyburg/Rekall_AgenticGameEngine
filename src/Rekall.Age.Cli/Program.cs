@@ -21,6 +21,7 @@ using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.Runtime.Commands;
 using Rekall.Age.Validation;
 using Rekall.Age.Validation.Commands;
+using Rekall.Age.Workflows;
 using Rekall.Age.Workflows.Commands;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
@@ -460,7 +461,10 @@ internal static class RekallAgeCli
         return args is ["mcp", "stdio", ..];
     }
 
-    private static RekallAgeCommandRegistry BuildRegistry()
+    private static RekallAgeCommandRegistry BuildRegistry() => RekallAgeDefaultCommandRegistry.Create();
+
+    // Retained temporarily while the shared catalog is verified against every CLI route.
+    private static RekallAgeCommandRegistry BuildLegacyRegistry()
     {
         var registry = new RekallAgeCommandRegistry();
         registry.Register(new CreateProjectCommand());

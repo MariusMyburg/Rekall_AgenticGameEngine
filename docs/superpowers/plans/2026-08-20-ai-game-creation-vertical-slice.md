@@ -45,10 +45,10 @@ create, author, inspect, edit, render, play, and verify desktop workflow.
 
 ### Task 4: Game-creation acceptance and distribution
 
-- [ ] Add an installed acceptance that starts from no project, authors a
-  multi-system game, validates, captures a nonblank frame, launches play mode,
-  packages, relocates, audits, and reruns it.
-- [ ] Verify CLI and MCP use the same command results as Studio and the embedded
+- [x] Add an installed Studio acceptance that starts from no project, traverses
+  the production Ollama/agent/MCP path, authors and validates a playable game,
+  captures a nonblank frame, packages, audits, and reruns it.
+- [x] Verify CLI and MCP use the same command results as Studio and the embedded
   agent; reject Studio-only hidden mutation paths by source audit.
 - [x] Run locked Release, two independent Release suites, publish,
   distribution assembly, and installed acceptance.

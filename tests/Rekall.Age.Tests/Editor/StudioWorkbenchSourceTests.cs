@@ -61,6 +61,16 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("_session.RedoAsync", code, StringComparison.Ordinal);
         Assert.Contains("model.Inspector.AvailableComponents", code, StringComparison.Ordinal);
         Assert.Contains("SelectedPropertySchema", code, StringComparison.Ordinal);
+
+        var studioDirectory = Path.Combine(root, "src", "Rekall.Age.Studio");
+        var studioSources = string.Join(
+            Environment.NewLine,
+            await Task.WhenAll(Directory.EnumerateFiles(studioDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Select(path => File.ReadAllTextAsync(path))));
+        Assert.DoesNotContain("RekallAgeProjectStore", studioSources, StringComparison.Ordinal);
+        Assert.DoesNotContain("RekallAgeSceneStore", studioSources, StringComparison.Ordinal);
+        Assert.DoesNotContain("RekallAgeAssetCatalogStore", studioSources, StringComparison.Ordinal);
+        Assert.Contains("RekallAgeDefaultCommandRegistry.Create()", studioSources, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()

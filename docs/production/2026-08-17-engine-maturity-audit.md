@@ -17,7 +17,7 @@ relocation.
 Evidence reviewed:
 
 - 24 engine and test projects, approximately 60,000 C# lines
-- 894 automated tests across authoring, runtime, rendering, packaging, MCP, and workflows
+- 897 automated tests across authoring, Studio, runtime, rendering, packaging, MCP, and workflows
 - the installed `win-x64` distribution and generic authoring gauntlet
 - runtime execution-system registration and subsystem projections
 - MCP schemas, transaction behavior, and agent context summaries
@@ -36,16 +36,22 @@ Maturity labels:
 ## Latest installed evidence
 
 The 2026-08-20 AI game-creation checkpoint completed a zero-warning locked
-Release build and two independent 894/894 Release suites, published the CLI,
+Release build and two independent passes of 894 engine plus 3 Studio tests,
+published the CLI,
 Studio, headless player, and Windows player as self-contained applications, and
 passed the installed distribution acceptance. The shipped engine completed the
 generic authoring gauntlet, rendered a nonblank proof, launched play, packaged,
 relocated, audited, and reran the game. The assembled directory contains 1,178
-files; its 200,832,939-byte archive has SHA-256
-`4553BF616B31461BCEF11679DA66177B46929B15829FB5F39CF00FED5FFC9D6D`.
+files; its 200,855,482-byte archive has SHA-256
+`EBC4864EB3D84355BA9560FA18314005FE743B290189CC57B1D6A960DDAF6F81`.
 The same installed run passed restricted module-trust/tamper, negative archive,
 runtime UI/audio, animation, compatibility, atomic persistence, optimistic
 revision, and damaged-document recovery checks.
+The installed Studio separately starts from no project, calls an
+Ollama-compatible model through its production adapter, executes the generic
+gauntlet through progressive MCP, and returns nonblank viewport and packaged
+game evidence. Real local `qwen3.5:35b` completed the same Studio entry point in
+four turns/four tools with zero validation issues.
 
 ## Capability matrix
 
@@ -70,10 +76,10 @@ revision, and damaged-document recovery checks.
 | Live editing | Partial | scene/assets/blueprint/diff local IPC operations | module hot reload, conflict/revision UX, reconnect/recovery, Studio integration |
 | Playable packaging | Proven | relative hashed manifest, minimal payload, forbidden-file checks, archive safety, relocation run/audit/capture, packaged runtime UI/animation/audio state | signing, delta patching/updater integration, broader clean-machine matrix |
 | Engine distribution | Proven | locked restore, two suites, self-contained applications, hashes, clean installed gauntlet | binary signing, installer/updater, release provenance/SBOM, clean-machine VM matrix |
-| Studio | Implemented | command-backed project create/open and scene switching; generic schema-guided hierarchy/inspector mutation; transactional undo/redo; engine viewport; real player ownership; package/audit actions; embedded project-scoped Ollama authoring; deterministic Windows view-model automation | asset/module workflow depth and dedicated installed Studio-to-Ollama UI acceptance |
+| Studio | Implemented | command-backed project create/open and scene switching; generic schema-guided hierarchy/inspector mutation; transactional undo/redo; engine viewport; real player ownership; package/audit actions; embedded project-scoped Ollama authoring; deterministic Windows view-model automation; installed headless Studio-to-agent game-creation proof | asset/module workflow depth, interactive UI automation, and broader installed game-description benchmarks |
 | Security | Partial | no currently known vulnerable NuGet dependency; AppContainer-restricted module execution posture; distribution forbidden-file checks; bounded metadata-first ZIP preflight and transactional exact-length extraction | fuzzing breadth, secret scanning, signed releases/packages and receipts, threat model |
-| Test platform | Implemented | 894 green tests; latest canonical two-pass Release acceptance covers Vulkan, relocation, SDL audio, runtime UI visual proof, animation limits, state graphs, cubic and morph sampling, exact final-mesh bounds, malformed corpus, long-run determinism, desktop recovery, persisted-document corruption recovery, compatibility, adversarial ZIP preflight, concurrent persisted-JSON readers, and stale-writer recovery | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
-| LLM providers/Ollama | Implemented | provider-neutral contracts, native Ollama chat/tools/model discovery, bounded project-scoped loop, `qwen3.5:35b` source and installed benchmarks, plus a fresh two-tool complete-game gauntlet proof that terminates on compound success | additional models/providers, dedicated installed Studio UI automation, lower token/correction cost, quality/cost routing policy |
+| Test platform | Implemented | 897 green tests across engine and Windows Studio projects; latest canonical two-pass Release acceptance retains separate TRX evidence and covers Studio agent creation, Vulkan, relocation, SDL audio, runtime UI visual proof, animation limits, state graphs, cubic and morph sampling, exact final-mesh bounds, malformed corpus, long-run determinism, desktop recovery, persisted-document corruption recovery, compatibility, adversarial ZIP preflight, concurrent persisted-JSON readers, and stale-writer recovery | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
+| LLM providers/Ollama | Implemented | provider-neutral contracts, native Ollama chat/tools/model discovery, bounded project-scoped loop, `qwen3.5:35b` source benchmarks, deterministic installed Studio adapter proof, and compound-workflow termination | additional models/providers, broader installed game-description benchmarks, lower token/correction cost, quality/cost routing policy |
 
 ## Material findings
 

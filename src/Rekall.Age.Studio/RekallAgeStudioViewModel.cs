@@ -20,7 +20,7 @@ namespace Rekall.Age.Studio;
 public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDisposable
 {
     private readonly RekallAgeWorkbenchSession _session;
-    private readonly HttpClient _ollamaHttpClient;
+    private readonly HttpClient? _ollamaHttpClient;
     private readonly RekallAgeProjectAgentSession _agentSession;
     private readonly RekallAgeAsyncCommand _openCommand;
     private readonly RekallAgeAsyncCommand _createCommand;
@@ -62,19 +62,29 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private RekallAgeWorkbenchModel? _currentModel;
 
     public RekallAgeStudioViewModel()
-        : this(new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()))
+        : this(new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()), null)
     {
     }
 
     internal RekallAgeStudioViewModel(RekallAgeWorkbenchSession session)
+        : this(session, null)
+    {
+    }
+
+    internal RekallAgeStudioViewModel(
+        RekallAgeWorkbenchSession session,
+        IRekallAgeLanguageModelClient? languageModelClient)
     {
         _session = session;
-        _ollamaHttpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
-        var configuredOllamaUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL");
-        var ollama = new RekallAgeOllamaLanguageModelClient(
-            _ollamaHttpClient,
-            new Uri(string.IsNullOrWhiteSpace(configuredOllamaUrl) ? "http://127.0.0.1:11434" : configuredOllamaUrl));
-        _agentSession = new RekallAgeProjectAgentSession(ollama, RekallAgeDefaultCommandRegistry.Create());
+        if (languageModelClient is null)
+        {
+            _ollamaHttpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
+            var configuredOllamaUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL");
+            languageModelClient = new RekallAgeOllamaLanguageModelClient(
+                _ollamaHttpClient,
+                new Uri(string.IsNullOrWhiteSpace(configuredOllamaUrl) ? "http://127.0.0.1:11434" : configuredOllamaUrl));
+        }
+        _agentSession = new RekallAgeProjectAgentSession(languageModelClient, RekallAgeDefaultCommandRegistry.Create());
         _openCommand = CreateAsyncCommand(OpenFromInputsAsync, CanOpenOrCreate);
         _createCommand = CreateAsyncCommand(CreateFromInputsAsync, CanOpenOrCreate);
         _addEntityCommand = CreateAsyncCommand(AddEntityAsync, HasOpenProject);
@@ -289,7 +299,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _agentCancellation?.Cancel();
         await StopAsync();
         _agentCancellation?.Dispose();
-        _ollamaHttpClient.Dispose();
+        _ollamaHttpClient?.Dispose();
     }
 
     private bool CanOpenOrCreate() => !IsBusy && !string.IsNullOrWhiteSpace(ProjectPathInput);
@@ -557,6 +567,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             ? string.Empty
             : $" #{progress.ToolExecution.Sequence} {(progress.ToolExecution.Succeeded ? "ok" : "failed")}";
         AppendAgentLine($"turn {progress.Turn}: {progress.Phase}{suffix} — {progress.Message}");
+        if (progress.ToolExecution is { Succeeded: false } failed)
+        {
+            AppendAgentLine($"tool failure: {Bound(failed.ResultPreview, 1_200)}");
+        }
         StatusText = progress.Message;
     }
 

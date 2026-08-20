@@ -29,6 +29,7 @@ $morphRoot = Join-Path $tempRoot ('rekall-age-installed-morph-proof-' + [Guid]::
 $atomicJsonRoot = Join-Path $tempRoot ('rekall-age-installed-atomic-json-' + [Guid]::NewGuid().ToString('N'))
 $documentRevisionRoot = Join-Path $tempRoot ('rekall-age-installed-document-revisions-' + [Guid]::NewGuid().ToString('N'))
 $documentRecoveryRoot = Join-Path $tempRoot ('rekall-age-installed-document-recovery-' + [Guid]::NewGuid().ToString('N'))
+$studioAgentRoot = Join-Path $tempRoot ('rekall-age-installed-studio-agent-' + [Guid]::NewGuid().ToString('N'))
 $succeeded = $false
 $previousSdlAudioDriver = $env:SDL_AUDIODRIVER
 $previousDiagnosticsRoot = $env:REKALL_AGE_DIAGNOSTICS_DIR
@@ -584,6 +585,9 @@ try {
     & (Join-Path $PSScriptRoot 'accept-installed-document-recovery.ps1') -DistributionRoot $distribution -ProjectRoot $documentRecoveryRoot
     if ($LASTEXITCODE -ne 0) { throw "Installed document recovery acceptance failed ($LASTEXITCODE)." }
 
+    & (Join-Path $PSScriptRoot 'accept-installed-studio-agent.ps1') -DistributionRoot $distribution -EvidenceRoot $studioAgentRoot
+    if ($LASTEXITCODE -ne 0) { throw "Installed Studio agent acceptance failed ($LASTEXITCODE)." }
+
     $succeeded = $true
     Write-Output "Installed distribution acceptance passed: $distribution"
 }
@@ -591,7 +595,7 @@ finally {
     $env:SDL_AUDIODRIVER = $previousSdlAudioDriver
     $env:REKALL_AGE_DIAGNOSTICS_DIR = $previousDiagnosticsRoot
     if ($succeeded) {
-        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot, $diagnosticsRoot, $compatibilityRoot, $archiveSecurityRoot, $animationGraphRoot, $morphRoot, $atomicJsonRoot, $documentRevisionRoot, $documentRecoveryRoot)) {
+        foreach ($path in @($proofRoot, $moduleTrustTamperRoot, $gauntletRoot, $relocationRoot, $audioRoot, $diagnosticsRoot, $compatibilityRoot, $archiveSecurityRoot, $animationGraphRoot, $morphRoot, $atomicJsonRoot, $documentRevisionRoot, $documentRecoveryRoot, $studioAgentRoot)) {
             $resolved = [IO.Path]::GetFullPath($path)
             if ($resolved.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and
                 (Test-Path -LiteralPath $resolved)) {
@@ -600,6 +604,6 @@ finally {
         }
     }
     else {
-        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', '$audioRoot', '$diagnosticsRoot', '$compatibilityRoot', '$archiveSecurityRoot', '$animationGraphRoot', '$morphRoot', '$atomicJsonRoot', '$documentRevisionRoot', and '$documentRecoveryRoot'."
+        Write-Error "Installed distribution acceptance failed. Evidence preserved at '$proofRoot', '$moduleTrustTamperRoot', '$gauntletRoot', '$relocationRoot', '$audioRoot', '$diagnosticsRoot', '$compatibilityRoot', '$archiveSecurityRoot', '$animationGraphRoot', '$morphRoot', '$atomicJsonRoot', '$documentRevisionRoot', '$documentRecoveryRoot', and '$studioAgentRoot'."
     }
 }

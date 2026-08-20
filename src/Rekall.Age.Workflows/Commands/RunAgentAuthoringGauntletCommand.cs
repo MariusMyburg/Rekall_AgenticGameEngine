@@ -3,7 +3,9 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Modules.Commands;
 using Rekall.Age.Playback;
 using Rekall.Age.Playback.Commands;
+using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
+using Rekall.Age.World;
 using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Workflows.Commands;
@@ -36,6 +38,8 @@ public sealed class RunAgentAuthoringGauntletCommand
 
     private readonly CreateProjectCommand _createProject = new();
     private readonly CreateSceneCommand _createScene = new();
+    private readonly RekallAgeProjectStore _projectStore = new();
+    private readonly RekallAgeSceneStore _sceneStore = new();
     private readonly ApplySceneBlueprintCommand _applyBlueprint = new();
     private readonly ScaffoldPlayableModuleCommand _scaffoldPlayableModule = new();
     private readonly WriteModuleSourceCommand _writeModuleSource = new();
@@ -77,18 +81,14 @@ public sealed class RunAgentAuthoringGauntletCommand
                 ? Path.Combine(projectRoot, "Builds", "AgentAuthoringGauntlet")
                 : request.OutputDirectory);
 
-        var project = await _createProject.ExecuteAsync(
-            new CreateProjectRequest(projectRoot, projectName, ["world", "rendering2d"]),
-            context);
+        var project = await EnsureProjectAsync(projectRoot, projectName, context);
         checks.Add(ToCheck("project-created", project));
         if (!project.Ok)
         {
             return Failure(request with { ProjectRoot = projectRoot, SceneName = sceneName }, checks, null, null, project.Summary, project.Errors);
         }
 
-        var scene = await _createScene.ExecuteAsync(
-            new CreateSceneRequest(projectRoot, sceneName, ["world", "rendering2d"]),
-            context);
+        var scene = await EnsureSceneAsync(projectRoot, sceneName, context);
         checks.Add(ToCheck("scene-created", scene));
         if (!scene.Ok)
         {
@@ -167,6 +167,58 @@ public sealed class RunAgentAuthoringGauntletCommand
         return RekallAgeCommandResult<RunAgentAuthoringGauntletResult>.Success(
             result,
             $"Agent authoring gauntlet proved generic playable project '{projectName}'.");
+    }
+
+    private async ValueTask<RekallAgeCommandResult<CreateProjectResult>> EnsureProjectAsync(
+        string projectRoot,
+        string projectName,
+        RekallAgeCommandContext context)
+    {
+        var manifestPath = Path.Combine(projectRoot, RekallAgeProjectStore.ManifestFileName);
+        if (!File.Exists(manifestPath))
+        {
+            return await _createProject.ExecuteAsync(
+                new CreateProjectRequest(projectRoot, projectName, ["world", "rendering2d"]),
+                context);
+        }
+
+        var manifest = await _projectStore.LoadAsync(projectRoot, context.CancellationToken);
+        var missingCapabilities = new[] { "world", "rendering2d" }
+            .Where(required => !manifest.Capabilities.Contains(required, StringComparer.OrdinalIgnoreCase))
+            .ToArray();
+        if (missingCapabilities.Length > 0)
+        {
+            return RekallAgeCommandResult<CreateProjectResult>.Failure(
+                new CreateProjectResult(manifestPath, manifest),
+                "The existing project is missing capabilities required by the generic gauntlet.",
+                [new RekallAgeCommandError(
+                    "REKALL_AGENT_GAUNTLET_CAPABILITY_MISSING",
+                    $"Existing project requires capabilities: {string.Join(", ", missingCapabilities)}.",
+                    manifestPath)]);
+        }
+
+        return RekallAgeCommandResult<CreateProjectResult>.Success(
+            new CreateProjectResult(manifestPath, manifest),
+            $"Using existing Rekall AGE project '{manifest.Name}'.");
+    }
+
+    private async ValueTask<RekallAgeCommandResult<CreateSceneResult>> EnsureSceneAsync(
+        string projectRoot,
+        string sceneName,
+        RekallAgeCommandContext context)
+    {
+        var scenePath = _sceneStore.GetScenePath(projectRoot, sceneName);
+        if (!File.Exists(scenePath))
+        {
+            return await _createScene.ExecuteAsync(
+                new CreateSceneRequest(projectRoot, sceneName, ["world", "rendering2d"]),
+                context);
+        }
+
+        var scene = await _sceneStore.LoadAsync(projectRoot, sceneName, context.CancellationToken);
+        return RekallAgeCommandResult<CreateSceneResult>.Success(
+            new CreateSceneResult(scenePath, scene),
+            $"Using existing scene '{scene.Name}'.");
     }
 
     private static IReadOnlyList<RekallAgeSceneBlueprintEntity> CreateGauntletBlueprint()

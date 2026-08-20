@@ -22,7 +22,7 @@ public partial class App : Application
 
     public static string StudioLogFilePattern => Path.Combine(StudioLogDirectory, "studio-.log");
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         try
         {
@@ -32,6 +32,27 @@ public partial class App : Application
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
             Log.Information("Rekall Studio starting. LogDirectory={LogDirectory}", StudioLogDirectory);
             base.OnStartup(e);
+            if (e.Args.Contains(RekallAgeStudioAutomation.AutomationSwitch, StringComparer.Ordinal))
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                if (!RekallAgeStudioAutomation.TryParse(e.Args, out var options, out var error))
+                {
+                    Log.Error("Studio automation arguments are invalid: {Error}", error);
+                    Shutdown(2);
+                    return;
+                }
+
+                var result = await RekallAgeStudioAutomation.RunAsync(options!, null, CancellationToken.None);
+                Log.Information(
+                    "Studio automation completed. Succeeded={Succeeded} Evidence={EvidencePath}",
+                    result.Succeeded,
+                    options!.EvidencePath);
+                Shutdown(result.Succeeded ? 0 : 3);
+                return;
+            }
+
+            MainWindow = new MainWindow();
+            MainWindow.Show();
         }
         catch (Exception exception)
         {

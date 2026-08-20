@@ -43,11 +43,18 @@ try {
         Remove-Item -LiteralPath $testResultRoot -Recurse -Force
     }
     New-Item -ItemType Directory -Path $testResultRoot -Force | Out-Null
+    $testProjects = @{
+        engine = 'tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj'
+        studio = 'tests\Rekall.Age.Studio.Tests\Rekall.Age.Studio.Tests.csproj'
+    }
     1..2 | ForEach-Object {
-        Write-Output "Release test pass $_ of 2"
-        Invoke-Checked dotnet @(
-            'test', $solution, '-c', $Configuration, '--no-build', '--no-restore', '--verbosity', 'minimal',
-            '--logger', "trx;LogFileName=release-pass-$_.trx", '--results-directory', $testResultRoot)
+        $pass = $_
+        Write-Output "Release test pass $pass of 2"
+        foreach ($testName in @('engine', 'studio')) {
+            Invoke-Checked dotnet @(
+                'test', $testProjects[$testName], '-c', $Configuration, '--no-build', '--no-restore', '--verbosity', 'minimal',
+                '--logger', "trx;LogFileName=release-pass-$pass-$testName.trx", '--results-directory', $testResultRoot)
+        }
     }
 
     Reset-Directory $stagingRoot

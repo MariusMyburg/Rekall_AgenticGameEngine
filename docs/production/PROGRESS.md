@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 15:55 Africa/Johannesburg
+Last verified: 2026-08-20 16:19 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: deterministic Studio view-model automation
+Latest milestone: installed Studio-to-agent game creation
 
 ## Product objective
 
@@ -30,11 +30,12 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 200,832,939-byte win-x64 archive assembled with
-  SHA-256 `4553BF616B31461BCEF11679DA66177B46929B15829FB5F39CF00FED5FFC9D6D`.
+- Windows distribution: fresh 200,855,482-byte win-x64 archive assembled with
+  SHA-256 `EBC4864EB3D84355BA9560FA18314005FE743B290189CC57B1D6A960DDAF6F81`.
   The assembled directory contains 1,178 files.
-- Canonical verification: 894/894 Release tests passed twice independently;
-  Release build completed with zero warnings and zero errors.
+- Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
+  passed twice independently with four distinct retained TRX files; Release
+  build completed with zero warnings and zero errors.
 - Current Debug verification: 840/840 tests pass after bounded project/scene
   recovery inspection, explicit restore, quarantine, path confinement, and
   agent/CLI/MCP exposure.
@@ -44,7 +45,10 @@ Studio is important, but it does not define or reorder the engine foundation.
   Windows play, negative archive preflight, runtime UI/audio, animation,
   compatibility, atomic persistence, optimistic revisions, and damaged-file
   recovery all have installed-binary proof. Module trust reports ready with
-  the `windows-appcontainer-restricted` posture.
+  the `windows-appcontainer-restricted` posture. The shipped Studio also
+  created a project from no prior files, traversed its Ollama adapter and agent
+  tool loop, completed the gauntlet, captured a nonblank viewport, and produced
+  a packaged game under deterministic model responses.
 - Local agent: Ollama currently uses `qwen3.5:35b` through its native API.
 - Studio authoring: project create/open, entity hierarchy/selection, generic
   entity/component/property mutation, scene validation, software-rendered
@@ -103,7 +107,20 @@ Studio is important, but it does not define or reorder the engine foundation.
   creates a project and entity, chooses a registered component/property schema,
   mutates the persisted scene through canonical commands, and proves undo/redo.
   Locked restore and the zero-warning Release solution build pass; the Release
-  checkpoint passes 894 engine tests plus the new Studio test (895 total).
+  checkpoint now passes 894 engine tests plus 3 Studio tests (897 total).
+- Studio agent automation and installed proof: the shipped Studio has an
+  explicit headless automation entry point that still drives its real view
+  model, Ollama adapter, project-scoped agent, progressive MCP executor,
+  validation, viewport, and packaging paths. A deterministic installed fixture
+  completes engine discovery plus the generic gauntlet in two tool calls and
+  produces a nonblank frame and audited archive. A separate real local
+  `qwen3.5:35b` run completed in four turns/four tools with zero validation
+  issues; its archive SHA-256 is
+  `7A2DB7E70FA763932F8347C41DFD7ED3CEAE13393D68B7EC4E9D70F3F670E881`
+  and viewport SHA-256 is
+  `23DCEE33EF1F4D8B2D322833ED6DB9CD0C5316E3F0138BE7ED8D101EA80E0FDF`.
+  The gauntlet now safely reuses a compatible open project/scene instead of
+  failing with a false missing-revision conflict.
 - Agent authoring: both source and installed multi-subsystem benchmarks created
   and repaired UI, animation, and audio content using tool calls.
 - Runtime animation: generic clip playback, bounded Hermite interpolation,
@@ -886,12 +903,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   animation, TANGENT/sparse/quantized morph accessors, broader complex
   transform fixtures, richer graph curves, and interruptible or hierarchical
   graph policies.
-- Complete a dedicated installed Studio-to-Ollama acceptance. Deterministic
-  WPF view-model automation, scene switching, schema-guided editing,
-  transactional undo/redo, embedded
-  Ollama authoring, real play/package/audit controls, and installed generic
-  game-creation acceptance are now present. The workbench is functional but
-  not yet a finished professional editor.
+- Expand Studio asset/module workflows and run broader installed game-creation
+  benchmarks beyond the fixed gauntlet. Deterministic WPF automation,
+  schema-guided editing, transactional undo/redo, embedded Ollama authoring,
+  real play/package/audit controls, and installed Studio-to-agent game creation
+  are now present. The workbench is functional but not yet a finished
+  professional editor.
 
 ## Recently completed
 
@@ -951,13 +968,14 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The active product priority remains the complete AI game-creation vertical
-slice, not cosmetic editor work. The source and installed paths now prove a
+The AI game-creation vertical slice is complete at its defined source and
+installed checkpoints. The paths prove a
 coherent route from an agent task through canonical tools to authored project
 files, validation, informative rendering, real play, packaging, clean
-relocation, and audit. The next tranche is a dedicated installed
-Studio-to-Ollama acceptance. Studio, embedded AI, MCP, and CLI must continue to
-consume the same generic contracts.
+relocation, and audit. The next product tranche is a broader installed
+AI-authored game benchmark spanning multiple arbitrary game descriptions and
+subsystems; measured failures will select the next generic engine contracts.
+Studio, embedded AI, MCP, and CLI must continue to consume the same contracts.
 
 AI game-creation Tasks 1-3 have a verified functional checkpoint. A new
 UI-independent workbench session creates projects
@@ -971,8 +989,8 @@ JSON properties, validate, capture a 960x540 software viewport after edits,
 and own a real Windows player process. Unexpected async command failures are
 reported in-product instead of escaping the UI dispatcher. Transactional
 undo/redo, scene switching, package/audit actions, and embedded Ollama
-authoring, schema-guided property editing, and deterministic WPF view-model
-automation are verified. Installed Studio-to-Ollama automation remains open.
+authoring, schema-guided property editing, deterministic WPF view-model
+automation, and installed Studio-to-agent automation are verified.
 
 The fresh installed-product checkpoint completed a zero-warning locked Release
 build, two independent 894/894 Release suites, four self-contained publishes,

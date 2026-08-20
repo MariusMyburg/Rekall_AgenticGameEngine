@@ -1,4 +1,6 @@
 using System.IO;
+using System.Text.Json.Nodes;
+using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Studio;
 using Rekall.Age.World;
 
@@ -6,6 +8,55 @@ namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioViewModelTests
 {
+    [Fact]
+    public void AutomationArgumentsRequireExplicitBoundedInputs()
+    {
+        var parsed = RekallAgeStudioAutomation.TryParse(
+            [
+                RekallAgeStudioAutomation.AutomationSwitch,
+                "--project", "game",
+                "--project-name", "Game",
+                "--scene", "Main",
+                "--model", "model",
+                "--task", "Author a game",
+                "--evidence", "evidence.json"
+            ],
+            out var options,
+            out var error);
+
+        Assert.True(parsed, error);
+        Assert.Equal("game", options!.ProjectRoot);
+        Assert.False(RekallAgeStudioAutomation.TryParse(
+            [RekallAgeStudioAutomation.AutomationSwitch, "--project", "game"],
+            out _, out var missing));
+        Assert.Contains("--model", missing, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HeadlessAutomationCreatesProjectAndCompletesAgentGauntlet()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-agent-" + Guid.NewGuid().ToString("N"));
+        var evidence = Path.Combine(root + "-evidence", "studio-agent.json");
+        try
+        {
+            var result = await RekallAgeStudioAutomation.RunAsync(
+                new RekallAgeStudioAutomationOptions(root, "Automated Agent Game", "Main", "deterministic", "Author and prove a playable game.", evidence),
+                new GauntletModel(root),
+                CancellationToken.None);
+
+            Assert.True(result.Succeeded, result.Status + Environment.NewLine + string.Join(Environment.NewLine, result.AgentTranscript));
+            Assert.True(result.NonblankViewport);
+            Assert.True(File.Exists(result.PackageArchivePath));
+            Assert.True(File.Exists(evidence));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            var evidenceRoot = Path.GetDirectoryName(evidence)!;
+            if (Directory.Exists(evidenceRoot)) Directory.Delete(evidenceRoot, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task ViewModelCreatesAndEditsProjectThroughSchemaGuidedCanonicalCommands()
     {
@@ -51,4 +102,37 @@ public sealed class StudioViewModelTests
 
     private static Task ExecuteAsync(System.Windows.Input.ICommand command) =>
         ((RekallAgeAsyncCommand)command).ExecuteAsync(null);
+
+    private sealed class GauntletModel(string projectRoot) : IRekallAgeLanguageModelClient
+    {
+        private int _calls;
+        public string ProviderId => "deterministic";
+
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([]);
+
+        public ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken)
+        {
+            var call = Interlocked.Increment(ref _calls) == 1
+                ? new RekallAgeLanguageModelToolCall("rekall.context.engine_status", new JsonObject())
+                : new RekallAgeLanguageModelToolCall(
+                    "rekall.workflow.agent_authoring_gauntlet",
+                    new JsonObject
+                    {
+                        ["projectRoot"] = projectRoot,
+                        ["projectName"] = "Automated Agent Game",
+                        ["sceneName"] = "Main"
+                    });
+            return ValueTask.FromResult(new RekallAgeLanguageModelResponse(
+                ProviderId,
+                request.Model,
+                string.Empty,
+                "Run the complete generic proof.",
+                [call],
+                "tool_calls",
+                new RekallAgeLanguageModelUsage(100, 10, 1)));
+        }
+    }
 }

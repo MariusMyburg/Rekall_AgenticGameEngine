@@ -196,7 +196,7 @@ public sealed class RekallAgeCollisionEventSystem : IRekallAgeRuntimeWorldSystem
 
     private static CollisionBody? CreateCollisionBody(RekallAgeRuntimeEntity entity)
     {
-        var collider = entity.Components.FirstOrDefault(Is3DCollider);
+        var collider = entity.Components.FirstOrDefault(IsCollider);
         if (collider is null)
         {
             return null;
@@ -205,9 +205,11 @@ public sealed class RekallAgeCollisionEventSystem : IRekallAgeRuntimeWorldSystem
         return new CollisionBody(entity, collider, EstimateBoundingRadius(entity, collider));
     }
 
-    private static bool Is3DCollider(RekallAgeRuntimeComponent component)
+    private static bool IsCollider(RekallAgeRuntimeComponent component)
     {
         return component.Type is
+            "Rekall.BoxCollider2D" or
+            "Rekall.CircleCollider2D" or
             "Rekall.BoxCollider3D" or
             "Rekall.SphereCollider3D" or
             "Rekall.CapsuleCollider3D" or
@@ -220,6 +222,9 @@ public sealed class RekallAgeCollisionEventSystem : IRekallAgeRuntimeWorldSystem
     {
         return collider.Type switch
         {
+            "Rekall.CircleCollider2D" => Math.Max(0.0001, ReadNumber(collider.Properties, "radius", 0.5))
+                * MaxPlanarScale(entity),
+            "Rekall.BoxCollider2D" => EstimateBox2DBoundingRadius(entity, collider),
             "Rekall.SphereCollider3D" => Math.Max(0.0001, ReadNumber(collider.Properties, "radius", 0.5))
                 * MaxScale(entity),
             "Rekall.CapsuleCollider3D" => (Math.Max(0.0001, ReadNumber(collider.Properties, "radius", 0.5))
@@ -228,6 +233,17 @@ public sealed class RekallAgeCollisionEventSystem : IRekallAgeRuntimeWorldSystem
             "Rekall.BoxCollider3D" => EstimateBoxBoundingRadius(entity, collider),
             _ => MaxScale(entity)
         };
+    }
+
+    private static double EstimateBox2DBoundingRadius(
+        RekallAgeRuntimeEntity entity,
+        RekallAgeRuntimeComponent collider)
+    {
+        var width = Math.Max(0.0001, ReadNumber(collider.Properties, "width", 1))
+            * Math.Abs(entity.Transform.Scale3D.X);
+        var height = Math.Max(0.0001, ReadNumber(collider.Properties, "height", 1))
+            * Math.Abs(entity.Transform.Scale3D.Y);
+        return Math.Sqrt(width * width + height * height) * 0.5;
     }
 
     private static double EstimateBoxBoundingRadius(
@@ -247,6 +263,13 @@ public sealed class RekallAgeCollisionEventSystem : IRekallAgeRuntimeWorldSystem
             Math.Max(
                 Math.Abs(entity.Transform.Scale3D.X),
                 Math.Max(Math.Abs(entity.Transform.Scale3D.Y), Math.Abs(entity.Transform.Scale3D.Z))));
+    }
+
+    private static double MaxPlanarScale(RekallAgeRuntimeEntity entity)
+    {
+        return Math.Max(
+            0.0001,
+            Math.Max(Math.Abs(entity.Transform.Scale3D.X), Math.Abs(entity.Transform.Scale3D.Y)));
     }
 
     private static bool Overlaps(CollisionBody left, CollisionBody right)

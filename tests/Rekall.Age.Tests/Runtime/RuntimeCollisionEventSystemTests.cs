@@ -37,6 +37,29 @@ public sealed class RuntimeCollisionEventSystemTests
     }
 
     [Fact]
+    public async Task CollisionSystemEmitsBeginForOverlapping2DColliders()
+    {
+        var world = CreateWorld(
+            CreateCircle2D(
+                "actor-a",
+                "Actor A",
+                x: 0,
+                [
+                    new JsonObject { ["event"] = "collision.begin", ["handler"] = "touchStarted" }
+                ]),
+            CreateCircle2D("actor-b", "Actor B", x: 0.75, []));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, 1, CancellationToken.None);
+
+        var collision = Assert.Single(result.World.Subsystems.Events.Events, runtimeEvent =>
+            runtimeEvent.Type == "collision.begin");
+        Assert.Equal("touchStarted", collision.Handler);
+        Assert.Equal("Rekall.CircleCollider2D", collision.Payload["colliderType"]!.GetValue<string>());
+        Assert.Equal("Rekall.CircleCollider2D", collision.Payload["otherColliderType"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task CollisionSystemEmitsStayForPersistingOverlaps()
     {
         var world = CreateWorld(
@@ -143,5 +166,33 @@ public sealed class RuntimeCollisionEventSystemTests
                 Position3D = new RekallAgeRuntimeVector3(x, 0, 0)
             },
             components);
+    }
+
+    private static RekallAgeRuntimeEntity CreateCircle2D(
+        string id,
+        string name,
+        double x,
+        JsonArray events)
+    {
+        return new RekallAgeRuntimeEntity(
+            id,
+            name,
+            [],
+            null,
+            null,
+            true,
+            false,
+            RekallAgeRuntimeTransform.Identity with
+            {
+                Position3D = new RekallAgeRuntimeVector3(x, 0, 0)
+            },
+            [
+                new RekallAgeRuntimeComponent(
+                    "Rekall.CircleCollider2D",
+                    new JsonObject { ["radius"] = 0.5 }),
+                new RekallAgeRuntimeComponent(
+                    "Rekall.EventBindings",
+                    new JsonObject { ["events"] = events })
+            ]);
     }
 }

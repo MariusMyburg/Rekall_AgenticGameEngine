@@ -37,6 +37,28 @@ public sealed class RuntimeTriggerEventSystemTests
     }
 
     [Fact]
+    public async Task TriggerSystemEmitsEnterForA2DCollider()
+    {
+        var world = CreateWorld(
+            CreateTrigger(
+                "zone",
+                "Zone",
+                x: 0,
+                [
+                    new JsonObject { ["event"] = "trigger.enter", ["handler"] = "enteredZone" }
+                ]),
+            CreateActor2D("actor", "Actor", x: 0.5));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, 1, CancellationToken.None);
+
+        var enter = Assert.Single(result.World.Subsystems.Events.Events, runtimeEvent =>
+            runtimeEvent.Type == "trigger.enter");
+        Assert.Equal("enteredZone", enter.Handler);
+        Assert.Equal("Rekall.CircleCollider2D", enter.Payload["otherColliderType"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task TriggerSystemEmitsStayForPersistingOccupants()
     {
         var world = CreateWorld(
@@ -169,6 +191,30 @@ public sealed class RuntimeTriggerEventSystemTests
             [
                 new RekallAgeRuntimeComponent(
                     "Rekall.SphereCollider3D",
+                    new JsonObject { ["radius"] = 0.5 })
+            ]);
+    }
+
+    private static RekallAgeRuntimeEntity CreateActor2D(
+        string id,
+        string name,
+        double x)
+    {
+        return new RekallAgeRuntimeEntity(
+            id,
+            name,
+            [],
+            null,
+            null,
+            true,
+            false,
+            RekallAgeRuntimeTransform.Identity with
+            {
+                Position3D = new RekallAgeRuntimeVector3(x, 0, 0)
+            },
+            [
+                new RekallAgeRuntimeComponent(
+                    "Rekall.CircleCollider2D",
                     new JsonObject { ["radius"] = 0.5 })
             ]);
     }

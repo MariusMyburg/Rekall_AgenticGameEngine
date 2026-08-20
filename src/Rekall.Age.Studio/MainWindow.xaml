@@ -83,15 +83,21 @@
                     <TextBlock DockPanel.Dock="Top" Text="Inspector" FontWeight="SemiBold" Margin="0,0,0,8" />
                     <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
                         <TextBlock Text="Component type" Foreground="#9FB0C4" />
-                        <TextBox Text="{Binding ComponentTypeInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,6" />
+                        <ComboBox ItemsSource="{Binding ComponentSchemas}" DisplayMemberPath="DisplayName" SelectedValuePath="Type"
+                                  SelectedValue="{Binding ComponentTypeInput, UpdateSourceTrigger=PropertyChanged}"
+                                  IsEditable="True" TextSearch.TextPath="Type" Margin="0,3,0,6" />
                         <UniformGrid Columns="2" Margin="0,0,0,8">
                             <Button Content="Add / Replace" Command="{Binding AddComponentCommand}" Padding="8,4" Margin="0,0,3,0" />
                             <Button Content="Remove" Command="{Binding RemoveComponentCommand}" Padding="8,4" Margin="3,0,0,0" />
                         </UniformGrid>
                         <TextBlock Text="Property name" Foreground="#9FB0C4" />
-                        <TextBox Text="{Binding PropertyNameInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,6" />
-                        <TextBlock Text="JSON value (plain text is accepted)" Foreground="#9FB0C4" />
-                        <TextBox Text="{Binding PropertyValueInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,6" />
+                        <ComboBox ItemsSource="{Binding PropertySchemas}" DisplayMemberPath="Name" SelectedValuePath="Name"
+                                  SelectedValue="{Binding PropertyNameInput, UpdateSourceTrigger=PropertyChanged}"
+                                  IsEditable="True" Margin="0,3,0,4" />
+                        <TextBlock Text="{Binding PropertySchemaHelp}" Foreground="#9FB0C4" TextWrapping="Wrap" Margin="0,0,0,3" />
+                        <ComboBox ItemsSource="{Binding PropertyValueChoices}"
+                                  Text="{Binding PropertyValueInput, UpdateSourceTrigger=PropertyChanged}"
+                                  IsEditable="True" Margin="0,3,0,6" />
                         <UniformGrid Columns="2">
                             <Button Content="Set" Command="{Binding SetPropertyCommand}" Padding="8,4" Margin="0,0,3,0" />
                             <Button Content="Remove" Command="{Binding RemovePropertyCommand}" Padding="8,4" Margin="3,0,0,0" />

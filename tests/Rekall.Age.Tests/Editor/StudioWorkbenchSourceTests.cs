@@ -26,6 +26,10 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("Command=\"{Binding UndoCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding RedoCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding SceneNames}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding ComponentSchemas}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding PropertySchemas}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding PropertyValueChoices}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding PropertySchemaHelp}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding DiscoverModelsCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding RunAgentCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding CancelAgentCommand}\"", xaml, StringComparison.Ordinal);
@@ -55,6 +59,8 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("rekall.workflow.audit_playable_package", code, StringComparison.Ordinal);
         Assert.Contains("_session.UndoAsync", code, StringComparison.Ordinal);
         Assert.Contains("_session.RedoAsync", code, StringComparison.Ordinal);
+        Assert.Contains("model.Inspector.AvailableComponents", code, StringComparison.Ordinal);
+        Assert.Contains("SelectedPropertySchema", code, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()

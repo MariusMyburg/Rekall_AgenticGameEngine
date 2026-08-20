@@ -26,6 +26,8 @@ create, author, inspect, edit, render, play, and verify desktop workflow.
   arguments.
 - [x] Bind hierarchy selection to a structured inspector and generic entity /
   component / property authoring actions.
+- [x] Project registered built-in and project-module schemas into generic
+  component/property selectors, constraints, and value choices.
 - [x] Display the engine-produced viewport PNG and refresh it after mutations.
 - [ ] Own real player launch/stop and close cleanup; add WPF-view-model tests.
 

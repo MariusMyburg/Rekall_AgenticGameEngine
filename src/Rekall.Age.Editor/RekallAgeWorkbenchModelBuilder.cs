@@ -3,6 +3,8 @@ using Rekall.Age.Assets;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor.Contracts;
+using Rekall.Age.Modules;
+using Rekall.Age.Modules.BuiltIns;
 using Rekall.Age.Project;
 using Rekall.Age.Runtime;
 using Rekall.Age.Runtime.Abstractions;
@@ -56,6 +58,10 @@ public sealed class RekallAgeWorkbenchModelBuilder
                 new RekallAgeRuntimeWorldBuilder(),
                 RekallAgeRuntimeExecutionLoop.CreateDefault())
             .InspectSceneAsync(projectRoot, activeSceneName, 0, cancellationToken);
+        var componentSchemas = RekallAgeModuleIndexer.IndexAssemblies(
+                new[] { typeof(RekallAgeBuiltInModule).Assembly }
+                    .Concat(RekallAgeProjectModuleAssemblyLoader.LoadBuiltModuleAssemblies(projectRoot)))
+            .Components;
 
         return new RekallAgeWorkbenchModel(
             new RekallAgeProjectTreeModel(
@@ -69,7 +75,7 @@ public sealed class RekallAgeWorkbenchModelBuilder
                         name.Equals(activeSceneName, StringComparison.Ordinal)))
                     .ToArray()),
             BuildSceneGraph(scene),
-            BuildInspector(scene, selectedEntityId),
+            BuildInspector(scene, selectedEntityId, componentSchemas),
             new RekallAgeAssetBrowserModel(
                 assets.Assets
                     .OrderBy(asset => asset.Kind, StringComparer.Ordinal)
@@ -141,32 +147,98 @@ public sealed class RekallAgeWorkbenchModelBuilder
 
     private static RekallAgeInspectorModel BuildInspector(
         RekallAgeSceneDocument scene,
-        string? selectedEntityId)
+        string? selectedEntityId,
+        IReadOnlyList<RekallAgeComponentSchema> schemas)
     {
+        var availableComponents = schemas.Select(ToInspectorSchema).ToArray();
         var selected = string.IsNullOrWhiteSpace(selectedEntityId)
             ? null
             : scene.Entities.FirstOrDefault(entity => entity.Id.Equals(selectedEntityId, StringComparison.Ordinal));
         selected ??= scene.Entities.OrderBy(entity => entity.Name, StringComparer.Ordinal).FirstOrDefault();
         if (selected is null)
         {
-            return new RekallAgeInspectorModel(null, null, Array.Empty<RekallAgeInspectorComponentModel>());
+            return new RekallAgeInspectorModel(null, null, Array.Empty<RekallAgeInspectorComponentModel>())
+            {
+                AvailableComponents = availableComponents
+            };
         }
 
         return new RekallAgeInspectorModel(
             selected.Id,
             selected.Name,
             selected.Components
-                .Select(component => new RekallAgeInspectorComponentModel(
-                    component.Type,
-                    component.Properties
-                        .OrderBy(property => property.Key, StringComparer.Ordinal)
-                        .Select(property => new RekallAgeInspectorPropertyModel(
-                            property.Key,
-                            ToDisplayValue(property.Value),
-                            property.Value?.GetValueKind().ToString() ?? "Null"))
-                        .ToArray()))
-                .ToArray());
+                .Select(component => BuildInspectorComponent(
+                    component,
+                    schemas.FirstOrDefault(schema => schema.TypeName.Equals(component.Type, StringComparison.Ordinal))))
+                .ToArray())
+        {
+            AvailableComponents = availableComponents
+        };
     }
+
+    private static RekallAgeInspectorComponentModel BuildInspectorComponent(
+        RekallAgeComponentDocument component,
+        RekallAgeComponentSchema? schema)
+    {
+        var properties = component.Properties
+            .OrderBy(property => property.Key, StringComparer.Ordinal)
+            .Select(property => BuildInspectorProperty(
+                property.Key,
+                property.Value,
+                schema?.Properties.FirstOrDefault(candidate => candidate.Name.Equals(property.Key, StringComparison.OrdinalIgnoreCase))))
+            .ToList();
+
+        if (schema is not null)
+        {
+            properties.AddRange(schema.Properties
+                .Where(candidate => !component.Properties.Any(property => property.Key.Equals(candidate.Name, StringComparison.OrdinalIgnoreCase)))
+                .Select(candidate => BuildInspectorProperty(ToEditorPropertyName(candidate.Name), null, candidate, isDefined: false)));
+        }
+
+        return new RekallAgeInspectorComponentModel(
+            component.Type,
+            properties.OrderBy(property => property.Name, StringComparer.Ordinal).ToArray())
+        {
+            DisplayName = schema?.DisplayName ?? component.Type,
+            Description = schema?.Description,
+            SchemaKnown = schema is not null
+        };
+    }
+
+    private static RekallAgeInspectorPropertyModel BuildInspectorProperty(
+        string name,
+        JsonNode? value,
+        RekallAgePropertySchema? schema,
+        bool isDefined = true) =>
+        new(name, isDefined ? ToDisplayValue(value) : string.Empty, isDefined ? value?.GetValueKind().ToString() ?? "Null" : "Undefined")
+        {
+            TypeName = schema?.TypeName ?? value?.GetValueKind().ToString() ?? "Object",
+            EditorKind = schema?.Kind ?? "json",
+            AssetKind = schema?.AssetKind,
+            Minimum = schema?.Minimum,
+            Maximum = schema?.Maximum,
+            Description = schema?.Description,
+            AllowedValues = schema?.AllowedValues ?? [],
+            IsDefined = isDefined
+        };
+
+    private static RekallAgeInspectorComponentSchemaModel ToInspectorSchema(RekallAgeComponentSchema schema) =>
+        new(
+            schema.TypeName,
+            schema.DisplayName,
+            schema.Description,
+            schema.Properties.Select(property => new RekallAgeInspectorPropertySchemaModel(
+                ToEditorPropertyName(property.Name),
+                property.TypeName,
+                property.Kind,
+                property.AssetKind,
+                property.Minimum,
+                property.Maximum,
+                property.Description,
+                property.AllowedValues)).ToArray());
+
+    private static string ToEditorPropertyName(string name) =>
+        name.Length == 0 ? name : char.ToLowerInvariant(name[0]) + name[1..];
 
     private static RekallAgeWorkbenchSceneSummaryModel BuildSceneSummary(RekallAgeSceneDocument scene)
     {

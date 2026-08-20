@@ -51,6 +51,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _componentTypeInput = "Rekall.Transform";
     private string _propertyNameInput = "position";
     private string _propertyValueInput = "[0, 0, 0]";
+    private string _propertySchemaHelp = "Select a registered property to see its type and constraints.";
     private string _selectedOllamaModel = "qwen3.5:35b";
     private string _agentTaskInput = "Describe the game feature you want the AI agent to create or revise.";
     private string? _lastPackagePath;
@@ -58,6 +59,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _viewportTitle = "Viewport";
     private string _viewportSummary = "No rendered frame yet.";
     private BitmapImage? _viewportImage;
+    private RekallAgeWorkbenchModel? _currentModel;
 
     public RekallAgeStudioViewModel()
         : this(new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()))
@@ -108,6 +110,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> RuntimeObservationLines { get; } = [];
     public ObservableCollection<string> OllamaModels { get; } = [];
     public ObservableCollection<string> AgentLines { get; } = [];
+    public ObservableCollection<RekallAgeInspectorComponentSchemaModel> ComponentSchemas { get; } = [];
+    public ObservableCollection<RekallAgeInspectorPropertySchemaModel> PropertySchemas { get; } = [];
+    public ObservableCollection<string> PropertyValueChoices { get; } = [];
 
     public ICommand OpenCommand => _openCommand;
     public ICommand CreateCommand => _createCommand;
@@ -158,7 +163,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         get => _componentTypeInput;
         set
         {
-            if (Set(ref _componentTypeInput, value)) RefreshCommands();
+            if (Set(ref _componentTypeInput, value))
+            {
+                RefreshPropertySchemas();
+                RefreshCommands();
+            }
         }
     }
 
@@ -167,7 +176,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         get => _propertyNameInput;
         set
         {
-            if (Set(ref _propertyNameInput, value)) RefreshCommands();
+            if (Set(ref _propertyNameInput, value))
+            {
+                RefreshSelectedPropertySchema();
+                RefreshCommands();
+            }
         }
     }
 
@@ -175,6 +188,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         get => _propertyValueInput;
         set => Set(ref _propertyValueInput, value);
+    }
+
+    public RekallAgeInspectorPropertySchemaModel? SelectedPropertySchema => PropertySchemas.FirstOrDefault(
+        property => property.Name.Equals(PropertyNameInput, StringComparison.OrdinalIgnoreCase));
+
+    public string PropertySchemaHelp
+    {
+        get => _propertySchemaHelp;
+        private set => Set(ref _propertySchemaHelp, value);
     }
 
     public string SelectedOllamaModel
@@ -655,11 +677,22 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private void ApplyModel(RekallAgeWorkbenchModel model)
     {
+        _currentModel = model;
         SceneNameInput = model.Scene.Name;
         Replace(EntityNodes, model.Scene.RootEntities);
         Replace(SceneNames, model.Project.Scenes.Select(scene => scene.Name));
         Replace(InspectorLines, model.Inspector.Components.SelectMany(component =>
-            new[] { component.Type }.Concat(component.Properties.Select(property => $"  {property.Name}: {property.Value}"))));
+            new[] { $"{component.DisplayName} ({component.Type})" }.Concat(component.Properties
+                .Where(property => property.IsDefined)
+                .Select(property => $"  {property.Name}: {property.Value}"))));
+        Replace(ComponentSchemas, model.Inspector.AvailableComponents);
+        if (!ComponentSchemas.Any(component => component.Type.Equals(ComponentTypeInput, StringComparison.Ordinal)))
+        {
+            ComponentTypeInput = model.Inspector.Components.FirstOrDefault()?.Type
+                ?? ComponentSchemas.FirstOrDefault()?.Type
+                ?? ComponentTypeInput;
+        }
+        RefreshPropertySchemas();
         Replace(AssetLines, model.Assets.Assets.Select(asset => $"{asset.Kind}: {asset.DisplayName} ({asset.AssetId})"));
         Replace(ValidationLines, model.Diagnostics.Issues.Select(issue => $"{issue.Severity}: {issue.Code} - {issue.Message}"));
         Replace(TransactionLines, model.Transactions.Transactions.Select(transaction => $"{transaction.Name}: {transaction.ChangedResources.Count} changes"));
@@ -672,6 +705,62 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (ViewportImage is null)
         {
             ViewportSummary = $"Camera {model.Runtime.ActiveCameraName ?? "none"} · {model.Runtime.RenderableCount} renderables";
+        }
+    }
+
+    private void RefreshPropertySchemas()
+    {
+        var component = ComponentSchemas.FirstOrDefault(
+            candidate => candidate.Type.Equals(ComponentTypeInput, StringComparison.Ordinal));
+        Replace(PropertySchemas, component?.Properties ?? []);
+        if (PropertySchemas.Count > 0
+            && !PropertySchemas.Any(property => property.Name.Equals(PropertyNameInput, StringComparison.OrdinalIgnoreCase)))
+        {
+            PropertyNameInput = PropertySchemas[0].Name;
+        }
+        else
+        {
+            RefreshSelectedPropertySchema();
+        }
+    }
+
+    private void RefreshSelectedPropertySchema()
+    {
+        OnPropertyChanged(nameof(SelectedPropertySchema));
+        var schema = SelectedPropertySchema;
+        if (schema is null)
+        {
+            PropertySchemaHelp = "Unregistered property: enter a JSON value. Validation will report unsupported fields.";
+            Replace(PropertyValueChoices, []);
+            return;
+        }
+
+        var range = schema.Minimum is not null || schema.Maximum is not null
+            ? $" Range: {schema.Minimum?.ToString() ?? "-∞"} to {schema.Maximum?.ToString() ?? "+∞"}."
+            : string.Empty;
+        var asset = schema.AssetKind is null ? string.Empty : $" Asset kind: {schema.AssetKind}.";
+        var allowed = schema.AllowedValues.Count == 0 ? string.Empty : $" Allowed: {string.Join(", ", schema.AllowedValues)}.";
+        PropertySchemaHelp = $"{schema.EditorKind} ({schema.TypeName}).{range}{asset}{allowed} {schema.Description}".Trim();
+
+        IEnumerable<string> choices = schema.AllowedValues;
+        if (schema.EditorKind.Equals("boolean", StringComparison.OrdinalIgnoreCase))
+        {
+            choices = ["true", "false"];
+        }
+        else if (schema.EditorKind.Equals("assetRef", StringComparison.OrdinalIgnoreCase) && _currentModel is not null)
+        {
+            choices = _currentModel.Assets.Assets
+                .Where(item => schema.AssetKind is null || item.Kind.Equals(schema.AssetKind, StringComparison.OrdinalIgnoreCase))
+                .Select(item => item.AssetId);
+        }
+        Replace(PropertyValueChoices, choices.Distinct(StringComparer.Ordinal));
+
+        var currentProperty = _currentModel?.Inspector.Components
+            .FirstOrDefault(component => component.Type.Equals(ComponentTypeInput, StringComparison.Ordinal))?
+            .Properties.FirstOrDefault(property => property.Name.Equals(schema.Name, StringComparison.OrdinalIgnoreCase));
+        if (currentProperty is { IsDefined: true })
+        {
+            PropertyValueInput = currentProperty.Value;
         }
     }
 

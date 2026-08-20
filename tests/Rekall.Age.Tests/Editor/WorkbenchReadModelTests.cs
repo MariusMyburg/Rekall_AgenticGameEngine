@@ -59,6 +59,18 @@ public sealed class WorkbenchReadModelTests
         Assert.Equal("Player", node.Name);
         var transform = model.Inspector.Components.Single(component => component.Type == "Rekall.Transform2D");
         Assert.Contains(transform.Properties, property => property.Name == "x" && property.Value == "4");
+        Assert.Equal("Transform 2D", transform.DisplayName);
+        Assert.True(transform.SchemaKnown);
+        var x = Assert.Single(transform.Properties, property => property.Name == "x");
+        Assert.Equal("number", x.EditorKind);
+        Assert.True(x.IsDefined);
+        var rotation = Assert.Single(transform.Properties, property => property.Name == "rotation");
+        Assert.Equal("number", rotation.EditorKind);
+        Assert.False(rotation.IsDefined);
+        Assert.Contains(
+            model.Inspector.AvailableComponents,
+            component => component.Type == "Rekall.AudioEmitter"
+                && component.Properties.Any(property => property.Name == "clip" && property.EditorKind == "assetRef" && property.AssetKind == "audio"));
         Assert.Equal("asset_player_12345678", Assert.Single(model.Assets.Assets).AssetId);
         Assert.Contains(model.Diagnostics.Issues, issue => issue.Code == "REKALL_CAMERA_MISSING");
         Assert.Equal("Main", model.Runtime.SceneName);

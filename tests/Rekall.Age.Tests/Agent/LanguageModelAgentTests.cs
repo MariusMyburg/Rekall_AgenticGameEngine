@@ -560,6 +560,67 @@ public sealed class LanguageModelAgentTests
             });
     }
 
+    [Fact]
+    public async Task RuntimeCheckpointReturnsCopyableRepairForInvertedAgentComponentArguments()
+    {
+        var malformedCheckpoint = new JsonObject
+        {
+            ["inputs"] = new JsonArray(new JsonObject { ["pressedKeys"] = new JsonArray("D") }),
+            ["assertions"] = new JsonArray(
+                new JsonObject
+                {
+                    ["entityName"] = "PlayerOrb",
+                    ["subject"] = "component",
+                    ["operator"] = "exists"
+                },
+                new JsonObject
+                {
+                    ["entityName"] = "Game.Modules.Rules.PlayerState",
+                    ["subject"] = "component.property",
+                    ["propertyName"] = "IsMoving",
+                    ["operator"] = "equals",
+                    ["expected"] = true
+                },
+                new JsonObject
+                {
+                    ["entityName"] = "PlayerOrb",
+                    ["subject"] = "delta.position3d.x",
+                    ["operator"] = "greater-than",
+                    ["expected"] = 0
+                })
+        };
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", malformedCheckpoint)],
+                "tool_calls", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 3,
+                RequireRuntimeBehaviorAssertions = true,
+                MaxToolResultCharacters = 12_000
+            },
+            CancellationToken.None);
+
+        var failure = Assert.Single(result.ToolExecutions, execution =>
+            execution.Name == "rekall.runtime.inspect_scene");
+        Assert.False(failure.Succeeded);
+        Assert.Contains("candidateAgentComponentAssertion", failure.ResultPreview, StringComparison.Ordinal);
+        Assert.Contains("Game.Modules.Rules.PlayerState", failure.ResultPreview, StringComparison.Ordinal);
+        Assert.Contains("\"componentType\"", failure.ResultPreview, StringComparison.Ordinal);
+    }
+
     private static JsonObject MeaningfulRuntimeCheckpointArguments() => new()
     {
         ["inputs"] = new JsonArray(new JsonObject { ["pressedKeys"] = new JsonArray("D") }),

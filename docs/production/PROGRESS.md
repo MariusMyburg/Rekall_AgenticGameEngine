@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 20:39 Africa/Johannesburg
+Last verified: 2026-08-20 20:51 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: bounded Ollama recovery and durable partial agent evidence
+Latest milestone: copyable gameplay-checkpoint argument repair
 
 ## Product objective
 
@@ -36,7 +36,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Release verification: 923/923 engine tests and 7/7 Windows Studio
+- Current Release verification: 924/924 engine tests and 7/7 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -1027,8 +1027,36 @@ Studio is important, but it does not define or reorder the engine foundation.
   gate, but its structured execution list was empty because the session did
   not return normally. No scene or package was produced. Evidence SHA-256 is
   `B5A8C70A041A1EDE99A325FF51AFB0DED301E0FBC6CA257D400AB5F761FB834D`.
+- Fresh arbitrary-game benchmark 11 used real local Ollama `qwen3.5:35b`
+  against the self-contained product built from `0e8d6d9`; its 200,964,267-byte
+  archive SHA-256 is
+  `81E86F266C7D888F213BB48C345CF9825F9BEA57344140CBE5F2BAC0427F0F30`.
+  The provider retry path avoided Benchmark 10's interruption and Studio
+  retained all 64 tool executions. The model authored a nine-entity scene,
+  compiled `LumenRules.dll`, and produced a nonblank seven-renderable viewport.
+  It still failed honestly: 28 tool attempts failed, no package was produced,
+  and repeated runtime checkpoints omitted `componentType` while sometimes
+  putting the exact `Game.Modules.LumenRules.PlayerState` type in `entityName`.
+  The checkpoint gate therefore never executed the malformed proof and the
+  model exhausted its turn bound. Final validation also reported invalid
+  guessed built-in component names/properties introduced by late wholesale
+  blueprint replacements. Evidence SHA-256 is
+  `CBFA0484D85CA1447191CF0FD23DF96C6AD843DADCC80D3DBFC0B643BBF76A59`.
 
 ## Recently completed
+
+Benchmark 11's repeated assertion-field inversion now receives a copyable,
+structured repair. Checkpoint failures expose the required four-field
+`component`/`exists` shape and, when malformed arguments unambiguously contain
+an ordinary entity name plus a `Game.*` type placed in `entityName`, derive a
+candidate assertion with those values in their correct fields. The engine does
+not execute, author, or accept that suggestion as evidence; the agent must
+still run the canonical inspection and pass the strict transition assertions.
+The human instruction also names `componentType` explicitly and prohibits
+putting types in `entityName`. The focused regression reproduces the exact
+inversion. The complete Release engine suite passes 924/924, Studio passes 7/7,
+and the warning-as-error solution build reports zero warnings and zero errors.
+Fresh Benchmark 12 is the next real-Ollama gate.
 
 Benchmark 10's provider interruption now has bounded generic recovery and
 durable partial evidence. The Ollama adapter retries request timeout, rate
@@ -1282,7 +1310,7 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 ## In progress
 
 The current item remains the actual AI game-creation loop. Assemble fresh
-binaries containing bounded Ollama recovery and durable partial evidence, then run Benchmark 11
+binaries containing copyable checkpoint argument repair, then run Benchmark 12
 through real local Ollama, then independently inspect its scene, source, input
 projection, and runtime transitions. Require clean validation, informative
 capture, compiled agent-authored behavior, a playable relocated package, and a

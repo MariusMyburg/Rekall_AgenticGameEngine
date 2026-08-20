@@ -391,6 +391,7 @@ public sealed class RekallAgeLanguageModelAgent(
             : !hasAssertions
                 ? "The first executable gameplay checkpoint requires representative input frames and a non-empty assertions array."
                 : $"Runtime checkpoint coverage is incomplete. Missing: {string.Join(", ", coverage.Missing)}.";
+        var candidateAgentComponentAssertion = BuildCandidateAgentComponentAssertion(call.Arguments);
         return new JsonObject
         {
             ["ok"] = false,
@@ -404,13 +405,53 @@ public sealed class RekallAgeLanguageModelAgent(
                     .Select(item => (JsonNode?)JsonValue.Create(item))
                     .ToArray())
             },
+            ["requiredAgentComponentAssertionShape"] = new JsonObject
+            {
+                ["entityName"] = "<runtime entity name>",
+                ["subject"] = "component",
+                ["operator"] = "exists",
+                ["componentType"] = "<exact attached Game.* type>"
+            },
+            ["candidateAgentComponentAssertion"] = candidateAgentComponentAssertion,
             ["errors"] = new JsonArray(new JsonObject
             {
                 ["code"] = code,
                 ["message"] = message,
                 ["target"] = "rekall.runtime.inspect_scene"
             }),
-            ["instruction"] = "Call rekall.runtime.inspect_scene now with a non-empty inputs array, a component/exists assertion for an attached Game.* component, and a transition assertion: a transform delta greater-than 0 or less-than 0, delta.component.property on Game.* strictly compared with 0, or changed.component.property on Game.* equals true. Do not weaken a failed transition assertion. A failed qualifying assertion opens targeted repair work; unrelated discovery, validation, polish, capture, and packaging remain deferred until this checkpoint executes."
+            ["instruction"] = "Call rekall.runtime.inspect_scene now with non-empty inputs. The Game.* existence assertion must put the runtime entity name in entityName and the exact attached agent-owned type in componentType: {\"entityName\":\"Player\",\"subject\":\"component\",\"operator\":\"exists\",\"componentType\":\"Game.Modules.Rules.PlayerState\"}. Also include a transition assertion: a transform delta greater-than 0 or less-than 0, delta.component.property with componentType set to Game.* strictly compared with 0, or changed.component.property with componentType set to Game.* equals true. Do not put a component type in entityName, omit componentType, or weaken a failed transition assertion. A failed qualifying assertion opens targeted repair work; unrelated discovery, validation, polish, capture, and packaging remain deferred until this checkpoint executes."
+        };
+    }
+
+    private static JsonObject? BuildCandidateAgentComponentAssertion(JsonObject arguments)
+    {
+        if (GetArgument(arguments, "assertions") is not JsonArray assertions)
+        {
+            return null;
+        }
+
+        var values = assertions.OfType<JsonObject>().ToArray();
+        var entityName = values
+            .Where(assertion =>
+                GetString(assertion, "subject").Equals("component", StringComparison.OrdinalIgnoreCase)
+                && GetString(assertion, "operator").Equals("exists", StringComparison.OrdinalIgnoreCase))
+            .Select(assertion => GetString(assertion, "entityName"))
+            .FirstOrDefault(value => value.Length > 0 && !IsAgentComponent(value));
+        var componentType = values
+            .Select(assertion => GetString(assertion, "componentType"))
+            .Concat(values.Select(assertion => GetString(assertion, "entityName")))
+            .FirstOrDefault(IsAgentComponent);
+        if (string.IsNullOrWhiteSpace(entityName) || string.IsNullOrWhiteSpace(componentType))
+        {
+            return null;
+        }
+
+        return new JsonObject
+        {
+            ["entityName"] = entityName,
+            ["subject"] = "component",
+            ["operator"] = "exists",
+            ["componentType"] = componentType
         };
     }
 

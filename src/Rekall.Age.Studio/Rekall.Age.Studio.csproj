@@ -9,6 +9,9 @@
     <LangVersion>13.0</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Rekall.Age.Studio.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Rekall.Age.Core\Rekall.Age.Core.csproj" />
     <ProjectReference Include="..\Rekall.Age.Agent\Rekall.Age.Agent.csproj" />
     <ProjectReference Include="..\Rekall.Age.Editor\Rekall.Age.Editor.csproj" />

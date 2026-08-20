@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 15:51 Africa/Johannesburg
+Last verified: 2026-08-20 15:55 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: generic schema-guided Studio inspector
+Latest milestone: deterministic Studio view-model automation
 
 ## Product objective
 
@@ -98,6 +98,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   help, and still commits through the canonical generic component commands.
   The combined editor/module/world selection passes 36/36, the Studio build has
   zero warnings/errors, and a hidden authored-project smoke remained healthy.
+- Deterministic Studio automation: a Windows-targeted test project now drives
+  the real Studio view model and async commands without UI timing races. It
+  creates a project and entity, chooses a registered component/property schema,
+  mutates the persisted scene through canonical commands, and proves undo/redo.
+  Locked restore and the zero-warning Release solution build pass; the Release
+  checkpoint passes 894 engine tests plus the new Studio test (895 total).
 - Agent authoring: both source and installed multi-subsystem benchmarks created
   and repaired UI, animation, and audio content using tool calls.
 - Runtime animation: generic clip playback, bounded Hermite interpolation,
@@ -880,8 +886,8 @@ Studio is important, but it does not define or reorder the engine foundation.
   animation, TANGENT/sparse/quantized morph accessors, broader complex
   transform fixtures, richer graph curves, and interruptible or hierarchical
   graph policies.
-- Complete deterministic WPF view-model automation and a dedicated installed
-  Studio-to-Ollama acceptance. Scene switching, schema-guided editing,
+- Complete a dedicated installed Studio-to-Ollama acceptance. Deterministic
+  WPF view-model automation, scene switching, schema-guided editing,
   transactional undo/redo, embedded
   Ollama authoring, real play/package/audit controls, and installed generic
   game-creation acceptance are now present. The workbench is functional but
@@ -949,9 +955,8 @@ The active product priority remains the complete AI game-creation vertical
 slice, not cosmetic editor work. The source and installed paths now prove a
 coherent route from an agent task through canonical tools to authored project
 files, validation, informative rendering, real play, packaging, clean
-relocation, and audit. The next tranche is deterministic WPF view-model
-automation, followed by a dedicated installed Studio-to-Ollama acceptance.
-Studio, embedded AI, MCP, and CLI must continue to
+relocation, and audit. The next tranche is a dedicated installed
+Studio-to-Ollama acceptance. Studio, embedded AI, MCP, and CLI must continue to
 consume the same generic contracts.
 
 AI game-creation Tasks 1-3 have a verified functional checkpoint. A new
@@ -966,8 +971,8 @@ JSON properties, validate, capture a 960x540 software viewport after edits,
 and own a real Windows player process. Unexpected async command failures are
 reported in-product instead of escaping the UI dispatcher. Transactional
 undo/redo, scene switching, package/audit actions, and embedded Ollama
-authoring and schema-guided property editing are verified. Deterministic WPF
-view-model automation remains open.
+authoring, schema-guided property editing, and deterministic WPF view-model
+automation are verified. Installed Studio-to-Ollama automation remains open.
 
 The fresh installed-product checkpoint completed a zero-warning locked Release
 build, two independent 894/894 Release suites, four self-contained publishes,

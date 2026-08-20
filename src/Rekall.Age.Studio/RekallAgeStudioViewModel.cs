@@ -870,7 +870,9 @@ internal sealed class RekallAgeAsyncCommand(
     public event EventHandler? CanExecuteChanged;
     public bool CanExecute(object? parameter) => !_executing && canExecute();
 
-    public async void Execute(object? parameter)
+    public async void Execute(object? parameter) => await ExecuteAsync(parameter);
+
+    internal async Task ExecuteAsync(object? parameter)
     {
         if (!CanExecute(parameter)) return;
         _executing = true;

@@ -222,6 +222,19 @@
         "resolved": "1.4.25",
         "contentHash": "V2yJMl/QKceXEjYEnf2EWcNkUJI5/zE04cNUnawHbdR0wjMHv1dVTLf0IUJk0D0w29FrCWdQQK/n4L4vx0HeQA=="
       },
+      "Vortice.SPIRV": {
+        "type": "Transitive",
+        "resolved": "1.0.5",
+        "contentHash": "+/d13hilxamYgHFrYr59hDf7Mh71JPNtgGaUjxpFuvGMJNG2+GqNZRkcOE9qO/1F6qG0FMrXdQkybW6xr5quWg=="
+      },
+      "Vortice.SPIRV.Reflect": {
+        "type": "Transitive",
+        "resolved": "1.0.6",
+        "contentHash": "2RQUmpWk/cwKM4IVLFr5Mefseb6oUa4VnJmW/trp1lC+jSU8X0jmvrUvl8JpJw6ukyVjrar3WzWBWNS3/J75JA==",
+        "dependencies": {
+          "Vortice.SPIRV": "1.0.5"
+        }
+      },
       "ZstdSharp.Port": {
         "type": "Transitive",
         "resolved": "0.8.8",
@@ -272,6 +285,7 @@
           "Silk.NET.Shaderc": "[2.23.0, )",
           "Silk.NET.Vulkan": "[2.23.0, )",
           "StbImageSharp": "[2.30.15, )",
+          "Vortice.SPIRV.Reflect": "[1.0.6, )",
           "ZstdSharp.Port": "[0.8.8, )"
         }
       },
@@ -341,6 +355,14 @@
         "contentHash": "uE0sYIzNOF2DPokzjRel2to3euBRikLfgoxx0f7iQVevbDDYlg0e/DBgG+tDhyNQWrB+ttKaQvR/csoa/R8UmA==",
         "dependencies": {
           "NativeLibraryLoader": "1.0.13"
+        }
+      },
+      "Vortice.SPIRV.Reflect": {
+        "type": "Transitive",
+        "resolved": "1.0.6",
+        "contentHash": "2RQUmpWk/cwKM4IVLFr5Mefseb6oUa4VnJmW/trp1lC+jSU8X0jmvrUvl8JpJw6ukyVjrar3WzWBWNS3/J75JA==",
+        "dependencies": {
+          "Vortice.SPIRV": "1.0.5"
         }
       }
     }

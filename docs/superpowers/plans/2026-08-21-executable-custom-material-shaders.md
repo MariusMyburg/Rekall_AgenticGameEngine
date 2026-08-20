@@ -4,9 +4,9 @@
 
 **Goal:** Make an agent-authored GLSL vertex/fragment pipeline assigned to a mesh execute identically in the Windows player and native Vulkan capture, with reflected ABI validation, diagnostics, hot reload safety, and package proof.
 
-**Architecture:** A project shader resolver compiles GLSL to SPIR-V, reflects it through Veldrid.SPIRV, validates a versioned scene-material ABI, and returns a content-addressed immutable pipeline asset. Render batching carries the pipeline key per draw. Native Vulkan capture and the Windows player cache backend pipelines by that key and fall back only with structured diagnostics.
+**Architecture:** A project shader resolver compiles GLSL to SPIR-V, reflects it through the maintained Vortice wrapper for Khronos SPIRV-Reflect, validates a versioned scene-material ABI, and returns a content-addressed immutable pipeline asset. Render batching carries the pipeline key per draw. Native Vulkan capture and the Windows player cache backend pipelines by that key and fall back only with structured diagnostics.
 
-**Tech Stack:** C# / .NET 10, Shaderc, Veldrid.SPIRV reflection, Veldrid Vulkan player, Silk.NET Vulkan capture, xUnit.
+**Tech Stack:** C# / .NET 10, Shaderc, Vortice.SPIRV.Reflect, Veldrid Vulkan player, Silk.NET Vulkan capture, xUnit.
 
 **Spec:** `docs/superpowers/specs/2026-08-21-programmable-rendering-and-gpu-resources-design.md`
 
@@ -34,10 +34,10 @@
 - Test: `tests/Rekall.Age.Tests/Rendering/VulkanShaderCompilerTests.cs`
 
 **Interfaces:**
-- Consumes: `RekallAgeRuntimeViewportShaderPipeline`, project-root-confined `ShaderSourcePaths`, `SpirvCompilation.CompileVertexFragment`.
+- Consumes: `RekallAgeRuntimeViewportShaderPipeline`, project-root-confined `ShaderSourcePaths`, and native SPIR-V reflection.
 - Produces: `RekallAgeResolvedShaderPipeline`, `RekallAgeShaderPipelineKey`, and `RekallAgeProjectShaderPipelineResolver.ResolveAsync(string, RekallAgeRuntimeViewportShaderPipeline, CancellationToken)`.
 
-- [ ] **Step 1: Write failing resolver and ABI tests**
+- [x] **Step 1: Write failing resolver and ABI tests**
 
 Create project vertex/fragment files that implement the current locations and
 sets, then assert successful resolution, stable SHA-256 keying, reflected
@@ -53,10 +53,10 @@ var result = await new RekallAgeProjectShaderPipelineResolver().ResolveAsync(
 Assert.True(result.Valid, string.Join(Environment.NewLine, result.Errors));
 Assert.Equal(64, result.Key.ContentHash.Length);
 Assert.Equal(RekallAgeSceneMaterialShaderAbi.Version, result.AbiVersion);
-Assert.Equal(3, result.Reflection.ResourceLayouts.Length);
+Assert.Contains(result.VertexElements, element => element.Location == 0 && element.Format == "Float3");
 ```
 
-- [ ] **Step 2: Run the focused tests and verify red**
+- [x] **Step 2: Run the focused tests and verify red**
 
 Run:
 
@@ -66,7 +66,7 @@ dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --no-resto
 
 Expected: failures because the resolver and ABI types do not exist.
 
-- [ ] **Step 3: Implement compilation, reflection, and exact ABI validation**
+- [x] **Step 3: Implement compilation, reflection, and exact ABI validation**
 
 Define immutable public records:
 
@@ -82,14 +82,14 @@ public sealed record RekallAgeResolvedShaderPipeline(
     string FragmentSource,
     byte[] VertexSpirv,
     byte[] FragmentSpirv,
-    SpirvReflection Reflection,
+    IReadOnlyList<RekallAgeShaderVertexElement> VertexElements,
+    IReadOnlyList<RekallAgeShaderResourceElement> Resources,
     bool Valid,
     IReadOnlyList<string> Errors);
 ```
 
-Compile both stages with the existing compiler, call
-`SpirvCompilation.CompileVertexFragment(vertexSpirv, fragmentSpirv,
-CrossCompileTarget.GLSL)` for reflection, and compare reflected locations,
+Compile both stages with the existing compiler, reflect the resulting SPIR-V
+through `Vortice.SPIRV.Reflect`, and compare reflected locations,
 formats, resource names, kinds, stages, and sets against ABI version 1. Hash
 ABI version, normalized names, source bytes, and SPIR-V bytes in deterministic
 order. Return bounded errors with codes embedded in messages:
@@ -97,14 +97,14 @@ order. Return bounded errors with codes embedded in messages:
 `REKALL_SHADER_VERTEX_ABI_MISMATCH`, and
 `REKALL_SHADER_RESOURCE_ABI_MISMATCH`.
 
-- [ ] **Step 4: Make validate/assign use the same resolver**
+- [x] **Step 4: Make validate/assign use the same resolver**
 
 When both project stages are known, `rekall.shader.assign_pipeline` must call
 the resolver and reject ABI-incompatible pairs before scene mutation. Preserve
 single-stage `rekall.shader.validate` for authoring feedback, but add the
 pair-level ABI diagnostics to assignment.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
 Run the command from Step 2 and expect all selected tests to pass, then commit:
 

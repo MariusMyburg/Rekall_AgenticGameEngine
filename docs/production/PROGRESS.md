@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 01:00 Africa/Johannesburg
+Last verified: 2026-08-21 01:08 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: persistent BEPU simulation, inspectable physics telemetry,
-and renderer-aligned 3D rotation
+Latest milestone: reflected, content-addressed project shader pipelines with
+scene-material ABI validation before assignment
 
 ## Product objective
 
@@ -41,6 +41,14 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Current Release verification: 950/950 engine tests and 7/7 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
+- Programmable material shader foundation: project vertex/fragment pairs now
+  compile to real SPIR-V, reflect bounded vertex and descriptor metadata through
+  Khronos SPIRV-Reflect, receive deterministic SHA-256 pipeline identities, and
+  are validated against scene-material ABI version 1. Assignment uses that same
+  resolver and rejects incompatible vertex formats or GPU resource sets before
+  scene mutation. The focused locked Release selection passes 11/11 with
+  warnings treated as errors; no vulnerable legacy reflection dependency was
+  accepted.
 - Persistent 3D physics: the runtime now retains a BEPU simulation across
   frames, incrementally synchronizes bodies and statics, preserves angular
   motion/orientation and sleep state, and lets BEPU own contact response.
@@ -1522,14 +1530,15 @@ now verified. Further physics breadth should be driven by the real Qwen
 benchmark, with likely candidates being exact contact evidence, collision
 filtering, constraints, or authored angular control rather than genre behavior.
 
-The programmable-rendering architecture and first executable-material-shader
-implementation plan are committed. The active rendering tranche turns existing
-agent-visible shader authoring and assignment metadata into reflected,
-ABI-validated pipelines that execute in native Vulkan capture and the Windows
-player. Custom post-processing, dynamic geometry, and typed GPU resources
-follow as separate independently verified tranches; the first post-process
-proof will be an agent-authored raindrop shader rather than an engine rain
-feature.
+The programmable-rendering architecture is in execution. Task 1 is verified:
+existing agent-visible shader authoring and assignment metadata now resolves to
+reflected, content-addressed, ABI-validated shader assets, and incompatible
+pairs cannot alter a scene. Task 2 is active: preserve each authored pipeline
+through mesh construction and draw batching. Native Vulkan execution, Windows
+pipeline caching/hot reload, inspection/package closure, and hardware proof
+follow. Custom post-processing, dynamic geometry, and typed GPU resources are
+separate subsequent tranches; the first post-process proof will be an
+agent-authored raindrop shader rather than an engine rain feature.
 
 AI game-creation Tasks 1-3 have a verified functional checkpoint. A new
 UI-independent workbench session creates projects

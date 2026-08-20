@@ -37,6 +37,15 @@
         "resolved": "2.30.15",
         "contentHash": "7QqbupVhz2kcFUPTgMw4iHR9rYDHGundzzee19Mwmd1typ2Lnv8EVJcLJxlkeBM2+4ex0NwsMtdbGSJctp1XCQ=="
       },
+      "Vortice.SPIRV.Reflect": {
+        "type": "Direct",
+        "requested": "[1.0.6, )",
+        "resolved": "1.0.6",
+        "contentHash": "2RQUmpWk/cwKM4IVLFr5Mefseb6oUa4VnJmW/trp1lC+jSU8X0jmvrUvl8JpJw6ukyVjrar3WzWBWNS3/J75JA==",
+        "dependencies": {
+          "Vortice.SPIRV": "1.0.5"
+        }
+      },
       "ZstdSharp.Port": {
         "type": "Direct",
         "requested": "[0.8.8, )",
@@ -84,6 +93,11 @@
         "type": "Transitive",
         "resolved": "2.23.0",
         "contentHash": "H6OMLIWdh2HITvkmj+ALs8LTIdQvQ2/JTtkDXinVbJ3xxrQIBXhVmc9jnuTQ67YDybGlENSMrgthzhLwK0rjnQ=="
+      },
+      "Vortice.SPIRV": {
+        "type": "Transitive",
+        "resolved": "1.0.5",
+        "contentHash": "+/d13hilxamYgHFrYr59hDf7Mh71JPNtgGaUjxpFuvGMJNG2+GqNZRkcOE9qO/1F6qG0FMrXdQkybW6xr5quWg=="
       },
       "rekall.age.assets": {
         "type": "Project",
@@ -157,6 +171,15 @@
       }
     },
     "net10.0/win-x64": {
+      "Vortice.SPIRV.Reflect": {
+        "type": "Direct",
+        "requested": "[1.0.6, )",
+        "resolved": "1.0.6",
+        "contentHash": "2RQUmpWk/cwKM4IVLFr5Mefseb6oUa4VnJmW/trp1lC+jSU8X0jmvrUvl8JpJw6ukyVjrar3WzWBWNS3/J75JA==",
+        "dependencies": {
+          "Vortice.SPIRV": "1.0.5"
+        }
+      },
       "Silk.NET.Shaderc.Native": {
         "type": "Transitive",
         "resolved": "2.23.0",

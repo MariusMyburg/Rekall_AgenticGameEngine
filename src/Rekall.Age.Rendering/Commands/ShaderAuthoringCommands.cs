@@ -332,20 +332,23 @@ public sealed class AssignShaderPipelineCommand : IRekallAgeCommand<AssignShader
         var diagnostics = new List<string>();
         if (request.ValidateBeforeAssign)
         {
-            var vertexSource = await File.ReadAllTextAsync(vertex.Path, context.CancellationToken);
-            var vertexValidation = ShaderSourceValidator.Validate(vertexSource, vertex.Path, vertex.Stage);
-            diagnostics.AddRange(vertexValidation.Errors.Select(error => $"vertex: {error}"));
-            var fragmentSource = await File.ReadAllTextAsync(fragment.Path, context.CancellationToken);
-            var fragmentValidation = ShaderSourceValidator.Validate(fragmentSource, fragment.Path, fragment.Stage);
-            diagnostics.AddRange(fragmentValidation.Errors.Select(error => $"fragment: {error}"));
-
-            if (!vertexValidation.Compiled || !fragmentValidation.Compiled)
+            var resolved = await new RekallAgeProjectShaderPipelineResolver().ResolveAsync(
+                request.ProjectRoot,
+                new(vertex.Name, fragment.Name),
+                context.CancellationToken);
+            diagnostics.AddRange(resolved.Errors);
+            if (!resolved.Valid)
             {
-                var error = new RekallAgeCommandError("REKALL_SHADER_COMPILE_FAILED", "Shader pipeline did not compile.", request.EntityId);
+                var errors = resolved.Errors
+                    .Select(message => new RekallAgeCommandError(
+                        ReadDiagnosticCode(message),
+                        message,
+                        request.EntityId))
+                    .ToArray();
                 return RekallAgeCommandResult<AssignShaderPipelineResult>.Failure(
                     Empty(request, request.ValidateBeforeAssign, diagnostics),
-                    error.Message,
-                    [error]);
+                    "Shader pipeline is not compatible with the scene-material ABI.",
+                    errors);
             }
         }
 
@@ -417,6 +420,15 @@ public sealed class AssignShaderPipelineCommand : IRekallAgeCommand<AssignShader
             validated,
             errors,
             null);
+    }
+
+    private static string ReadDiagnosticCode(string message)
+    {
+        var separator = message.IndexOf(':', StringComparison.Ordinal);
+        var candidate = separator > 0 ? message[..separator] : message;
+        return candidate.StartsWith("REKALL_SHADER_", StringComparison.Ordinal)
+            ? candidate
+            : "REKALL_SHADER_PIPELINE_INVALID";
     }
 }
 

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-18 12:55 Africa/Johannesburg
+Last verified: 2026-08-20 13:22 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: optimistic document revisions passed the installed conflict-recovery product gate
+Latest milestone: project/scene last-known-good recovery store passed the complete Debug suite
 
 ## Product objective
 
@@ -36,8 +36,8 @@ Studio is important, but it does not define or reorder the engine foundation.
   files including the distribution manifest itself.
 - Canonical verification: 818/818 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
-- Current Debug verification: 818/818 tests pass after optimistic document
-  revisions, serialized transaction append, and reader-contention hardening.
+- Current Debug verification: 830/830 tests pass after bounded project/scene
+  recovery inspection, explicit restore, quarantine, and path confinement.
 - Installed acceptance: canonical gate exited 0; project/module workflows,
   packaging and relocation, negative archive preflight, nonblank capture,
   runtime UI, and audible audio paths have installed-binary proof.
@@ -900,6 +900,19 @@ success replaces the recovery snapshot with exactly the immediately preceding
 version; stale writes preserve both live and recovery bytes; creation does not
 fabricate history; existing cancellation, busy, size, and cleanup guarantees
 remain green.
+
+Persisted document recovery Task 2 is verified in a 46/46 focused
+atomic/project/scene selection and the complete 830/830 Debug suite. Successful
+conditional manifest and scene replacements retain exactly the immediate prior
+bytes under a confined `.rekall/recovery` path. Read-only inspection reports
+primary/previous availability, exact revisions, schema/shape status, stable
+codes, recoverability, and a next action. Explicit restore validates the prior
+snapshot, requires the caller's current revision, atomically restores exact
+bytes, quarantines the displaced document with its revision, and retains at
+most four deterministic corrupt artifacts per document. Malformed prior data
+and escaping scene names fail closed; normal loads never silently fall back.
+The next step is to expose these generic contracts through agent commands, CLI,
+and MCP, then prove post-restore validation and mutation.
 
 The next risk-driven tranche is optimistic document revisions. Atomic files
 eliminate torn reads but do not prevent two valid agent/editor processes from

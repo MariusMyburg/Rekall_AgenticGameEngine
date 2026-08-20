@@ -17,9 +17,9 @@ from one bounded last-known-good version.
 
 ### Task 2: Project and scene recovery store
 
-- [ ] Retain previous validated bytes for conditional project/scene saves.
-- [ ] Add read-only inspection with primary/previous revisions and stable codes.
-- [ ] Add explicit revision-guarded restore and bounded corrupt quarantine.
+- [x] Retain previous validated bytes for conditional project/scene saves.
+- [x] Add read-only inspection with primary/previous revisions and stable codes.
+- [x] Add explicit revision-guarded restore and bounded corrupt quarantine.
 
 ### Task 3: Agent commands, CLI, and MCP
 

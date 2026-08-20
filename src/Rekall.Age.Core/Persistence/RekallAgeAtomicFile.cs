@@ -39,6 +39,24 @@ public static class RekallAgeAtomicFile
         string? previousVersionPath,
         CancellationToken cancellationToken)
     {
+        var bytes = PrepareBytes(contents, maximumBytes, cancellationToken);
+        return await WriteAllBytesIfRevisionAsync(
+            path,
+            bytes,
+            maximumBytes,
+            expectedRevision,
+            previousVersionPath,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<string> WriteAllBytesIfRevisionAsync(
+        string path,
+        ReadOnlyMemory<byte> contents,
+        long maximumBytes,
+        string expectedRevision,
+        string? previousVersionPath,
+        CancellationToken cancellationToken)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(expectedRevision);
         if (!RekallAgeDocumentRevision.IsValid(expectedRevision))
         {
@@ -100,19 +118,37 @@ public static class RekallAgeAtomicFile
         long maximumBytes,
         CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(contents);
-        if (maximumBytes < 1 || maximumBytes > int.MaxValue)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(maximumBytes),
-                maximumBytes,
-                $"Maximum document bytes must be between 1 and {int.MaxValue}.");
-        }
+        return Prepare(path, PrepareBytes(contents, maximumBytes, cancellationToken), maximumBytes, cancellationToken);
+    }
 
+    private static byte[] PrepareBytes(
+        string contents,
+        long maximumBytes,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(contents);
+        ValidateMaximumBytes(maximumBytes);
+        cancellationToken.ThrowIfCancellationRequested();
+        var bytes = Utf8WithoutBom.GetBytes(contents);
+        if (bytes.LongLength > maximumBytes)
+        {
+            throw new InvalidDataException($"Document is {bytes.LongLength} bytes; the limit is {maximumBytes} bytes.");
+        }
+        return bytes;
+    }
+
+    private static PreparedDocument Prepare(
+        string path,
+        ReadOnlyMemory<byte> contents,
+        long maximumBytes,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ValidateMaximumBytes(maximumBytes);
         cancellationToken.ThrowIfCancellationRequested();
         var fullPath = Path.GetFullPath(path);
-        var bytes = Utf8WithoutBom.GetBytes(contents);
+        var bytes = contents.ToArray();
         if (bytes.LongLength > maximumBytes)
         {
             throw new InvalidDataException(
@@ -123,6 +159,17 @@ public static class RekallAgeAtomicFile
             ?? throw new InvalidOperationException($"Document path '{fullPath}' has no parent directory.");
         Directory.CreateDirectory(directory);
         return new PreparedDocument(fullPath, directory, bytes);
+    }
+
+    private static void ValidateMaximumBytes(long maximumBytes)
+    {
+        if (maximumBytes < 1 || maximumBytes > int.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maximumBytes),
+                maximumBytes,
+                $"Maximum document bytes must be between 1 and {int.MaxValue}.");
+        }
     }
 
     private static async ValueTask WritePreparedAsync(

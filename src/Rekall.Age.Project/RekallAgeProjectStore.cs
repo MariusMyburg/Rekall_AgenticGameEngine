@@ -16,6 +16,16 @@ public sealed class RekallAgeProjectStore
 
     public const string ManifestFileName = "rekall.project.json";
 
+    public string GetRecoveryPath(string projectRoot) =>
+        RekallAgeDocumentRecoveryStore.GetPreviousPath(
+            projectRoot,
+            Path.Combine(projectRoot, ManifestFileName));
+
+    public string GetQuarantineDirectory(string projectRoot) =>
+        RekallAgeDocumentRecoveryStore.GetQuarantineDirectory(
+            projectRoot,
+            Path.Combine(projectRoot, ManifestFileName));
+
     public async ValueTask SaveAsync(
         string projectRoot,
         RekallAgeProjectManifest manifest,
@@ -42,7 +52,35 @@ public sealed class RekallAgeProjectStore
             Serialize(manifest),
             RekallAgeDocumentSchemaProbe.MaximumDocumentBytes,
             expectedRevision,
+            GetRecoveryPath(projectRoot),
             cancellationToken);
+    }
+
+    public ValueTask<RekallAgeDocumentRecoveryInspection> InspectRecoveryAsync(
+        string projectRoot,
+        CancellationToken cancellationToken) =>
+        RekallAgeDocumentRecoveryStore.InspectAsync(
+            projectRoot,
+            Path.Combine(projectRoot, ManifestFileName),
+            "project",
+            RekallAgeProductInfo.Current.ProjectSchemaVersion,
+            ValidateSnapshot,
+            cancellationToken);
+
+    public async ValueTask<RekallAgeVersionedDocument<RekallAgeProjectManifest>> RestorePreviousAsync(
+        string projectRoot,
+        string expectedRevision,
+        CancellationToken cancellationToken)
+    {
+        await RekallAgeDocumentRecoveryStore.RestorePreviousAsync(
+            projectRoot,
+            Path.Combine(projectRoot, ManifestFileName),
+            "project",
+            RekallAgeProductInfo.Current.ProjectSchemaVersion,
+            expectedRevision,
+            ValidateSnapshot,
+            cancellationToken).ConfigureAwait(false);
+        return await LoadVersionedAsync(projectRoot, cancellationToken).ConfigureAwait(false);
     }
 
     public string Serialize(RekallAgeProjectManifest manifest)
@@ -73,5 +111,14 @@ public sealed class RekallAgeProjectStore
         {
             SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion
         }, snapshot.File.Revision);
+    }
+
+    private static void ValidateSnapshot(RekallAgeDocumentSnapshot snapshot)
+    {
+        var manifest = snapshot.Deserialize<RekallAgeProjectManifest>(JsonOptions);
+        if (string.IsNullOrWhiteSpace(manifest.Name) || manifest.Capabilities is null)
+        {
+            throw new InvalidDataException($"Project document '{snapshot.File.Path}' has an invalid required shape.");
+        }
     }
 }

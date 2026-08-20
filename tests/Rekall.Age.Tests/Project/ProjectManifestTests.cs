@@ -205,4 +205,73 @@ public sealed class ProjectManifestTests
         Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", Assert.Single(result.Errors).Code);
         Assert.Equal("Existing", (await store.LoadAsync(root, CancellationToken.None)).Name);
     }
+
+    [Fact]
+    public async Task ConditionalManifestSaveRetainsExactlyTheImmediatePreviousDocument()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeProjectStore();
+        await store.SaveAsync(root, RekallAgeProjectManifest.Create("First", ["world"]), CancellationToken.None);
+        var first = await store.LoadVersionedAsync(root, CancellationToken.None);
+        var firstBytes = await File.ReadAllBytesAsync(Path.Combine(root, RekallAgeProjectStore.ManifestFileName));
+
+        await store.SaveIfRevisionAsync(root, first.Value with { Name = "Second" }, first.Revision, CancellationToken.None);
+
+        Assert.Equal(firstBytes, await File.ReadAllBytesAsync(store.GetRecoveryPath(root)));
+        var inspection = await store.InspectRecoveryAsync(root, CancellationToken.None);
+        Assert.True(inspection.Primary.Valid);
+        Assert.True(inspection.Previous.Valid);
+        Assert.True(inspection.Recoverable);
+        Assert.Equal(first.Revision, inspection.Previous.Revision);
+    }
+
+    [Fact]
+    public async Task CorruptManifestCanOnlyBeRestoredAtTheInspectedRevisionAndIsQuarantined()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeProjectStore();
+        await store.SaveAsync(root, RekallAgeProjectManifest.Create("Known Good", ["world"]), CancellationToken.None);
+        var knownGood = await store.LoadVersionedAsync(root, CancellationToken.None);
+        await store.SaveIfRevisionAsync(root, knownGood.Value with { Name = "Replacement" }, knownGood.Revision, CancellationToken.None);
+        var path = Path.Combine(root, RekallAgeProjectStore.ManifestFileName);
+        var corruptBytes = Encoding.UTF8.GetBytes("{ corrupt");
+        await File.WriteAllBytesAsync(path, corruptBytes);
+        var corruptRevision = RekallAgeDocumentRevision.Compute(corruptBytes);
+
+        var inspection = await store.InspectRecoveryAsync(root, CancellationToken.None);
+        Assert.False(inspection.Primary.Valid);
+        Assert.Equal("REKALL_DOCUMENT_JSON_MALFORMED", inspection.Primary.Code);
+        Assert.True(inspection.Recoverable);
+        await Assert.ThrowsAsync<RekallAgeDocumentRevisionException>(() =>
+            store.RestorePreviousAsync(root, knownGood.Revision, CancellationToken.None).AsTask());
+
+        var restored = await store.RestorePreviousAsync(root, corruptRevision, CancellationToken.None);
+
+        Assert.Equal("Known Good", restored.Value.Name);
+        Assert.Equal(knownGood.Revision, restored.Revision);
+        var quarantine = Assert.Single(Directory.GetFiles(store.GetQuarantineDirectory(root), "*.corrupt"));
+        Assert.Contains(corruptRevision, Path.GetFileName(quarantine), StringComparison.Ordinal);
+        Assert.Equal(corruptBytes, await File.ReadAllBytesAsync(quarantine));
+    }
+
+    [Fact]
+    public async Task InvalidPreviousManifestFailsClosedWithoutChangingThePrimary()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeProjectStore();
+        await store.SaveAsync(root, RekallAgeProjectManifest.Create("Primary", ["world"]), CancellationToken.None);
+        var primary = await store.LoadVersionedAsync(root, CancellationToken.None);
+        Directory.CreateDirectory(Path.GetDirectoryName(store.GetRecoveryPath(root))!);
+        await File.WriteAllTextAsync(store.GetRecoveryPath(root), "{\"schemaVersion\":1,\"name\":42}");
+
+        var inspection = await store.InspectRecoveryAsync(root, CancellationToken.None);
+
+        Assert.False(inspection.Previous.Valid);
+        Assert.Equal("REKALL_DOCUMENT_SHAPE_INVALID", inspection.Previous.Code);
+        Assert.False(inspection.Recoverable);
+        var error = await Assert.ThrowsAsync<RekallAgeDocumentRecoveryException>(() =>
+            store.RestorePreviousAsync(root, primary.Revision, CancellationToken.None).AsTask());
+        Assert.Equal("REKALL_DOCUMENT_RECOVERY_PREVIOUS_INVALID", error.Code);
+        Assert.Equal("Primary", (await store.LoadAsync(root, CancellationToken.None)).Name);
+    }
 }

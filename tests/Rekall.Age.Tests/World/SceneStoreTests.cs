@@ -248,4 +248,75 @@ public sealed class SceneStoreTests
         var current = await store.LoadAsync(root, "Main", CancellationToken.None);
         Assert.Equal("Intervening", Assert.Single(current.Entities).Name);
     }
+
+    [Fact]
+    public async Task ConditionalSceneSaveRetainsPreviousAndExplicitRestorePreservesCorruptBytes()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        await store.SaveAsync(root, RekallAgeSceneDocument.Create("Main", ["world"]), CancellationToken.None);
+        var first = await store.LoadVersionedAsync(root, "Main", CancellationToken.None);
+        var firstBytes = await File.ReadAllBytesAsync(store.GetScenePath(root, "Main"));
+        await store.SaveIfRevisionAsync(
+            root,
+            first.Value.AddEntity(RekallAgeEntityDocument.Create("Second", ["proof"])),
+            first.Revision,
+            CancellationToken.None);
+        Assert.Equal(firstBytes, await File.ReadAllBytesAsync(store.GetRecoveryPath(root, "Main")));
+
+        var corruptBytes = Encoding.UTF8.GetBytes("[]");
+        await File.WriteAllBytesAsync(store.GetScenePath(root, "Main"), corruptBytes);
+        var corruptRevision = RekallAgeDocumentRevision.Compute(corruptBytes);
+        var inspection = await store.InspectRecoveryAsync(root, "Main", CancellationToken.None);
+
+        Assert.False(inspection.Primary.Valid);
+        Assert.Equal("REKALL_DOCUMENT_SCHEMA_INVALID", inspection.Primary.Code);
+        Assert.True(inspection.Recoverable);
+        var restored = await store.RestorePreviousAsync(root, "Main", corruptRevision, CancellationToken.None);
+        Assert.Equal(first.Revision, restored.Revision);
+        Assert.Equal(first.Value.Id, restored.Value.Id);
+        var quarantine = Assert.Single(Directory.GetFiles(store.GetQuarantineDirectory(root, "Main"), "*.corrupt"));
+        Assert.Equal(corruptBytes, await File.ReadAllBytesAsync(quarantine));
+    }
+
+    [Theory]
+    [InlineData("../escape")]
+    [InlineData("..\\escape")]
+    [InlineData("C:\\escape")]
+    [InlineData("Main/Other")]
+    public void SceneAndRecoveryPathsRejectNamesThatCanEscapeTheirDirectories(string sceneName)
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+
+        Assert.Throws<ArgumentException>(() => store.GetScenePath(root, sceneName));
+        Assert.Throws<ArgumentException>(() => store.GetRecoveryPath(root, sceneName));
+    }
+
+    [Fact]
+    public async Task SceneRecoveryQuarantineIsDeterministicallyBounded()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        await store.SaveAsync(root, RekallAgeSceneDocument.Create("Main", ["world"]), CancellationToken.None);
+
+        for (var index = 0; index < RekallAgeDocumentRecoveryStore.MaximumQuarantinesPerDocument + 2; index++)
+        {
+            var loaded = await store.LoadVersionedAsync(root, "Main", CancellationToken.None);
+            await store.SaveIfRevisionAsync(root, loaded.Value with { Id = $"scene_{index}" }, loaded.Revision, CancellationToken.None);
+            var corrupt = Encoding.UTF8.GetBytes($"{{ corrupt {index}");
+            await File.WriteAllBytesAsync(store.GetScenePath(root, "Main"), corrupt);
+            await store.RestorePreviousAsync(
+                root,
+                "Main",
+                RekallAgeDocumentRevision.Compute(corrupt),
+                CancellationToken.None);
+        }
+
+        var quarantines = Directory.GetFiles(store.GetQuarantineDirectory(root, "Main"), "*.corrupt");
+        Assert.Equal(RekallAgeDocumentRecoveryStore.MaximumQuarantinesPerDocument, quarantines.Length);
+        Assert.DoesNotContain(quarantines, path => Path.GetFileName(path).Contains(
+            RekallAgeDocumentRevision.Compute(Encoding.UTF8.GetBytes("{ corrupt 0")),
+            StringComparison.Ordinal));
+    }
 }

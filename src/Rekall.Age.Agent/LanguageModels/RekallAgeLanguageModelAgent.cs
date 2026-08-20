@@ -190,18 +190,28 @@ public sealed class RekallAgeLanguageModelAgent(
                 completionAuditPending = false;
                 toolCallCount++;
                 JsonNode output;
-                try
+                if (request.RequireRuntimeBehaviorAssertions
+                    && RequiresImmediateRuntimeCheckpoint(toolExecutions)
+                    && (!call.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
+                        || !HasNonemptyArrayArgument(call.Arguments, "assertions")))
                 {
-                    output = await toolExecutor.ExecuteAsync(call.Name, call.Arguments, cancellationToken);
+                    output = RuntimeCheckpointRequired(call);
                 }
-                catch (Exception exception) when (exception is not OperationCanceledException)
+                else
                 {
-                    output = new JsonObject
+                    try
                     {
-                        ["ok"] = false,
-                        ["error"] = exception.Message,
-                        ["exceptionType"] = exception.GetType().Name
-                    };
+                        output = await toolExecutor.ExecuteAsync(call.Name, call.Arguments, cancellationToken);
+                    }
+                    catch (Exception exception) when (exception is not OperationCanceledException)
+                    {
+                        output = new JsonObject
+                        {
+                            ["ok"] = false,
+                            ["error"] = exception.Message,
+                            ["exceptionType"] = exception.GetType().Name
+                        };
+                    }
                 }
 
                 var outputText = output.ToJsonString();
@@ -329,6 +339,62 @@ public sealed class RekallAgeLanguageModelAgent(
         return !executions.Any(execution =>
             execution.Sequence > latestSuccessfulBuild
             && execution.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal));
+    }
+
+    private static bool RequiresImmediateRuntimeCheckpoint(
+        IReadOnlyList<RekallAgeLanguageModelToolExecution> executions)
+    {
+        var latestRuntimeAuthoring = executions
+            .Where(execution => execution.Succeeded
+                && (execution.Name.Equals("rekall.module.scaffold_runtime_system", StringComparison.Ordinal)
+                    || execution.Name.Equals("rekall.module.write_source", StringComparison.Ordinal)))
+            .Select(execution => execution.Sequence)
+            .DefaultIfEmpty(0)
+            .Max();
+        if (latestRuntimeAuthoring == 0)
+        {
+            return false;
+        }
+
+        var latestSuccessfulBuild = executions
+            .Where(execution => execution.Succeeded
+                && execution.Sequence > latestRuntimeAuthoring
+                && execution.Name.Equals("rekall.build.modules", StringComparison.Ordinal))
+            .Select(execution => execution.Sequence)
+            .DefaultIfEmpty(0)
+            .Max();
+        if (latestSuccessfulBuild == 0)
+        {
+            return false;
+        }
+
+        return !executions.Any(execution =>
+            execution.Sequence > latestSuccessfulBuild
+            && execution.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
+            && HasNonemptyArrayArgument(execution.Arguments, "assertions"));
+    }
+
+    private static JsonObject RuntimeCheckpointRequired(RekallAgeLanguageModelToolCall call)
+    {
+        var attemptedInspection = call.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal);
+        var code = attemptedInspection
+            ? "REKALL_RUNTIME_ASSERTIONS_REQUIRED"
+            : "REKALL_RUNTIME_CHECKPOINT_REQUIRED";
+        var message = attemptedInspection
+            ? "The first executable gameplay checkpoint requires representative input frames and a non-empty assertions array."
+            : $"Tool '{call.Name}' is deferred until the first executable gameplay checkpoint passes or returns direct repair evidence.";
+        return new JsonObject
+        {
+            ["ok"] = false,
+            ["summary"] = message,
+            ["errors"] = new JsonArray(new JsonObject
+            {
+                ["code"] = code,
+                ["message"] = message,
+                ["target"] = "rekall.runtime.inspect_scene"
+            }),
+            ["instruction"] = "Call rekall.runtime.inspect_scene now with representative semantic input frames and non-empty assertions for an attached agent-owned gameplay component and the first requested state transition. A failed assertion opens targeted repair work; unrelated discovery, validation, polish, capture, and packaging remain deferred until this checkpoint executes."
+        };
     }
 
     private static bool RequiresFreshRuntimeBehaviorAssertions(

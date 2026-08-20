@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 19:14 Africa/Johannesburg
+Last verified: 2026-08-20 19:33 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: executable gameplay checkpoints now reserve repair/retest budget
+Latest milestone: runtime builds now enforce assertion-bearing gameplay checkpoints
 
 ## Product objective
 
@@ -36,7 +36,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Debug verification: 917/917 engine tests and 6/6 Windows Studio
+- Current Debug verification: 918/918 engine tests and 6/6 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -955,6 +955,20 @@ Studio is important, but it does not define or reorder the engine foundation.
   components missing from module registration. This is retained as failure
   evidence with SHA-256
   `D6E8C09C180DB20ED4BB63EC6F1526A7303058152F3A111C6E4766787E5ACD32`.
+- Fresh arbitrary-game benchmark 5 used the real local Ollama
+  `qwen3.5:35b` through the freshly assembled installed Studio, not the
+  deterministic transport fixture. It compiled an agent-owned runtime module
+  and captured six visible renderables, but ignored the prompt-only gameplay
+  checkpoint, never called `rekall.runtime.inspect_scene`, exhausted 64 turns,
+  retained eight blocking unknown collider/rigidbody component types, and
+  produced no package. This is a product failure with evidence SHA-256
+  `8002393ED2AD7E566D649060FB5F2594F63A45445BBB8528C37C06E7244475B5`.
+  The staged 200,950,053-byte archive used for that real-model run has SHA-256
+  `00DDD9AF5E6BA4AF6E2D210D1717ABF627A5237FF9A240EEC6C363D33D0F1B36`.
+  Both canonical 917-test/6-Studio-test Release passes and all installed checks
+  before the final deterministic Studio/Ollama transport fixture passed; that
+  fixture failed before its first agent tool call and is not counted as AI or
+  gameplay evidence.
 
 ## Recently completed
 
@@ -999,6 +1013,20 @@ completes inside the reserve. The focused contract selection passes 20/20; the
 full engine suite passes 917/917, Studio passes 6/6, and the warning-as-error
 solution build reports zero warnings and zero errors. Benchmark 5 against a
 fresh distribution is next.
+
+Benchmark 5 proves that prompting alone is not a sufficient gameplay-testing
+contract for the current local model. The agent loop now enforces the first
+executable checkpoint after a successful agent-authored runtime-module build:
+unrelated validation, discovery, polish, capture, and packaging calls are not
+executed and return `REKALL_RUNTIME_CHECKPOINT_REQUIRED` until the model calls
+`rekall.runtime.inspect_scene` with representative input and a non-empty
+assertions array. Empty-assertion inspections return
+`REKALL_RUNTIME_ASSERTIONS_REQUIRED`. A failed assertion remains direct repair
+evidence and activates the protected repair/retest reserve. Focused agent tests
+pass 16/16; after one concurrent 250-ms isolation-test timeout, the exact test
+passed alone and the complete engine suite passed serially at 918/918. Studio
+passes 6/6 and the warning-as-error solution build reports zero warnings and
+zero errors. A fresh real-Ollama Benchmark 6 is the next gate.
 
 `Echo Foundry` is the first uninterrupted empty-project task-specific game
 creation pass. Local Ollama `qwen3.5:35b` authored the 3D industrial arena,

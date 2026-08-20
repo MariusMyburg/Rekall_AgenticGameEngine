@@ -336,6 +336,57 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task RuntimeBuildBlocksUnrelatedWorkUntilAssertionCheckpointRuns()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.validation.project", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", new JsonObject
+                {
+                    ["inputs"] = new JsonArray(new JsonObject { ["pressedKeys"] = new JsonArray("D") }),
+                    ["assertions"] = new JsonArray(new JsonObject
+                    {
+                        ["entityName"] = "Player",
+                        ["subject"] = "delta.position3d.x",
+                        ["operator"] = "greater-than",
+                        ["expected"] = 0
+                    })
+                })],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Gameplay is proven.", "", [], "stop", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+        var agent = new RekallAgeLanguageModelAgent(model, tools);
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 5,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.DoesNotContain(tools.Executions, execution => execution.Name == "rekall.validation.project");
+        Assert.Contains(result.ToolExecutions, execution =>
+            execution.Name == "rekall.validation.project"
+            && !execution.Succeeded
+            && execution.ResultPreview.Contains("REKALL_RUNTIME_CHECKPOINT_REQUIRED", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task FailedRuntimeAssertionUnlocksProtectedRepairAndRetestTurns()
     {
         var assertionArguments = new JsonObject

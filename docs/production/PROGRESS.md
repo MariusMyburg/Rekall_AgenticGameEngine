@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 13:34 Africa/Johannesburg
+Last verified: 2026-08-20 13:44 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: document recovery is exposed through agent, CLI, and MCP contracts
+Latest milestone: persisted document recovery passed the complete installed product gate
 
 ## Product objective
 
@@ -30,11 +30,11 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 195,300,134-byte win-x64 archive assembled with
-  SHA-256 `A222BB5ACD590E796F1CEEB920FAF96FBB5C509604273E5D360450DAE60B3005`.
+- Windows distribution: fresh 195,355,222-byte win-x64 archive assembled with
+  SHA-256 `8837F18945FDCEB4622DE5072D4A5FE0C518B2AE61B7F8A29E3E8527DFDD64CE`.
   Its manifest lists 1,149 payload files; the assembled directory has 1,150
   files including the distribution manifest itself.
-- Canonical verification: 818/818 Release tests passed twice independently;
+- Canonical verification: 840/840 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
 - Current Debug verification: 840/840 tests pass after bounded project/scene
   recovery inspection, explicit restore, quarantine, path confinement, and
@@ -928,8 +928,27 @@ and successfully perform an ordinary scene mutation afterward. A wider test
 found the engine-status payload crossing its 12,000-character agent-efficiency
 boundary; the top-level map was curated to retain high-priority recovery
 discovery while leaving low-level render-plan execution available through tool
-search. The next step is installed-distribution damage/recovery evidence and
-the locked complete product gate.
+search. Those portable contracts are now included in the installed product
+gate recorded in the next milestone.
+
+Persisted document recovery Task 4 passed the complete product gate. The fresh
+locked Release build completed in 8.78 seconds with zero warnings and zero
+errors; two independent Release passes completed 840/840 in 1m26s and 1m24s.
+The shipped CLI authored a scene, retained a prior version, then had its live
+scene deliberately malformed. An ordinary scene-summary command failed with
+exact code `REKALL_DOCUMENT_JSON_MALFORMED`; recovery inspection reported a
+valid previous version and exact damaged revision; a stale restore failed with
+`REKALL_DOCUMENT_REVISION_CONFLICT` without changing damage; and the exact
+restore quarantined one byte-identical damaged file, passed ordinary validation
+with zero issues, and accepted a normal post-restore entity mutation. It left
+zero temp/lock controls. The unchanged installed product matrix passed. Atomic
+JSON acceptance parsed 5,767 snapshots with two bounded transient opens, zero
+malformed snapshots, and zero temp files. Soak completed 600 frames and exactly
+10 seconds at 4,320.2 FPS with 713,600 retained bytes and all nine checks. The
+1,149-payload-file archive is 195,355,222 bytes with SHA-256
+`8837F18945FDCEB4622DE5072D4A5FE0C518B2AE61B7F8A29E3E8527DFDD64CE`.
+One-version rollback, not autosave/history/merge or external backup, remains the
+explicit supported boundary.
 
 The next risk-driven tranche is optimistic document revisions. Atomic files
 eliminate torn reads but do not prevent two valid agent/editor processes from
@@ -1230,6 +1249,7 @@ contracts instead of reordering the foundation roadmap.
 - `docs/superpowers/specs/2026-08-18-optimistic-document-revisions-design.md`
 - `docs/superpowers/plans/2026-08-18-optimistic-document-revisions.md`
 - `eng/accept-installed-document-revisions.ps1`
+- `eng/accept-installed-document-recovery.ps1`
 - `Artifacts/TestResults/release-pass-1.trx`
 - `Artifacts/TestResults/release-pass-2.trx`
 - `Artifacts/Distribution/Rekall-AGE-0.1.0-preview.1-win-x64.zip`

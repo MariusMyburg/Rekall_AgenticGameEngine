@@ -29,7 +29,7 @@ from one bounded last-known-good version.
 
 ### Task 4: Installed damage/recovery proof and complete gate
 
-- [ ] Damage a shipped-CLI-authored scene, inspect, restore, validate, mutate,
+- [x] Damage a shipped-CLI-authored scene, inspect, restore, validate, mutate,
   and verify bounded recovery artifacts.
-- [ ] Run complete Debug and locked two-pass Release/distribution verification.
-- [ ] Record exact evidence and remaining backup/history boundaries.
+- [x] Run complete Debug and locked two-pass Release/distribution verification.
+- [x] Record exact evidence and remaining backup/history boundaries.

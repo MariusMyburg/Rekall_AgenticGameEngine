@@ -1,6 +1,6 @@
 # Rekall AGE Production Maturity Audit
 
-**Audit date:** 2026-08-18
+**Audit date:** 2026-08-20
 
 **Product:** Rekall AGE `0.1.0-preview.1`
 **North star:** [Rekall AGE Product Vision](../PRODUCT-VISION.md)
@@ -17,7 +17,7 @@ relocation.
 Evidence reviewed:
 
 - 24 engine and test projects, approximately 60,000 C# lines
-- 818 automated tests across authoring, runtime, rendering, packaging, MCP, and workflows
+- 840 automated tests across authoring, runtime, rendering, packaging, MCP, and workflows
 - the installed `win-x64` distribution and generic authoring gauntlet
 - runtime execution-system registration and subsystem projections
 - MCP schemas, transaction behavior, and agent context summaries
@@ -37,9 +37,9 @@ Maturity labels:
 
 | Area | Current maturity | Evidence | Production gap |
 | --- | --- | --- | --- |
-| Project/world authoring | Implemented | deterministic project/scene stores; entity/component commands; blueprints; transactions; bounded immutable reads, durable atomic publication, exact optimistic revisions, stale-writer rejection, and serialized audit append with installed proof | automatic content merge/collaboration UX, corruption recovery, autosave, and large-project stress proof |
+| Project/world authoring | Implemented | deterministic project/scene stores; entity/component commands; blueprints; transactions; bounded immutable reads, durable atomic publication, exact optimistic revisions, stale-writer rejection, one-version explicit corruption recovery with bounded quarantine, and serialized audit append with installed proof | automatic content merge/collaboration UX, autosave/history, external backup, and large-project stress proof |
 | Portable C# modules | Proven | installed SDK scaffolds and builds without `src/`; isolated intermediates; runtime loading | explicit trust/sandbox policy, dependency policy, compatibility fixtures, module reload |
-| MCP command surface | Implemented | JSON-RPC tools with generated JSON schemas, structured content, priorities, transactions | richer field descriptions/constraints, pagination/filtering, capability benchmark, protocol conformance suite |
+| MCP command surface | Implemented | JSON-RPC tools with generated JSON schemas, structured content, priorities, transactions, and generic project/scene recovery inspection and explicit restore | richer field descriptions/constraints, pagination/filtering, capability benchmark, protocol conformance suite |
 | Agent context | Implemented | compact schema contracts, type-directed model-argument normalization, bounded failure previews and persistent tool ledger, source and installed Ollama authoring benchmarks | indexed queries for very large projects, more benchmark tasks, lower redundant-call rate |
 | Desktop runtime | Implemented | fixed-step runtime, generic events/input, module systems, windowed player | save/load state, crash recovery, lifecycle soak tests, frame pacing/telemetry |
 | Input and events | Implemented | semantic action maps, pointer, timer, collision, trigger, XR pose, custom module events | rebinding persistence, device hot-plug, gamepad breadth, accessibility proof |
@@ -58,7 +58,7 @@ Maturity labels:
 | Engine distribution | Proven | locked restore, two suites, self-contained applications, hashes, clean installed gauntlet | binary signing, installer/updater, release provenance/SBOM, clean-machine VM matrix |
 | Studio | Facade | real read models and a WPF shell | controls are unwired, viewport is text, no interactive open/edit/play workflow |
 | Security | Partial | no currently known vulnerable NuGet dependency; distribution forbidden-file checks; bounded metadata-first ZIP preflight and transactional exact-length extraction | restricted module hosting, fuzzing breadth, secret scanning, signed releases/packages, threat model |
-| Test platform | Implemented | 818 green tests; latest canonical two-pass Release acceptance covers Vulkan, relocation, SDL audio, runtime UI visual proof, animation limits, state graphs, cubic and morph sampling, exact final-mesh bounds, malformed corpus, long-run determinism, recovery, compatibility, adversarial ZIP preflight, concurrent persisted-JSON readers, and stale-writer recovery | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
+| Test platform | Implemented | 840 green tests; latest canonical two-pass Release acceptance covers Vulkan, relocation, SDL audio, runtime UI visual proof, animation limits, state graphs, cubic and morph sampling, exact final-mesh bounds, malformed corpus, long-run determinism, desktop recovery, persisted-document corruption recovery, compatibility, adversarial ZIP preflight, concurrent persisted-JSON readers, and stale-writer recovery | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
 | LLM providers/Ollama | Implemented | provider-neutral contracts, native Ollama chat/tools/model discovery, bounded loop, `qwen3.5:35b` source benchmark in 15 turns and expanded installed UI/audio/animation benchmark in 23 turns | additional models/providers and installed benchmark breadth, lower token/correction cost, quality/cost routing policy |
 
 ## Material findings
@@ -107,7 +107,19 @@ commands or handlers; the viewport is text; hierarchy and inspector are string
 lists. The underlying models are reusable, but Studio must remain experimental
 until it can complete a real authoring loop.
 
-### 5. Production quality needs non-functional gates
+### 5. Persisted corruption recovery is explicit and agent-operable
+
+Conditional manifest and scene mutation retains exactly one prior validated
+version. Agents can inspect primary and previous schema/shape/revision facts
+through the same direct, CLI, and MCP command contracts, then explicitly
+restore only at the inspected current revision. A restore atomically publishes
+the retained bytes, quarantines the displaced bytes under a bounded policy,
+and returns ordinary validation as its next action; normal reads never silently
+roll back. Installed proof covers malformed failure, stale restore rejection,
+exact recovery, validation, and post-restore mutation. This is not autosave,
+arbitrary history, merge, or external backup.
+
+### 6. Production quality needs non-functional gates
 
 The codebase has strong unit/contract coverage, especially rendering and runtime,
 but no production claim should omit device loss, soak, performance regression,

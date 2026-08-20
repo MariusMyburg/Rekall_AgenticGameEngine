@@ -156,6 +156,24 @@ public static class RekallAgeRuntimeModuleSdk
         return found ? world with { Entities = entities } : world;
     }
 
+    public static RekallAgeRuntimeWorld RemoveEntity(
+        this RekallAgeRuntimeWorld world,
+        string entityId)
+    {
+        if (string.IsNullOrWhiteSpace(entityId))
+        {
+            return world;
+        }
+
+        var id = entityId.Trim();
+        var entities = world.Entities
+            .Where(entity => !entity.Id.Equals(id, StringComparison.Ordinal))
+            .ToArray();
+        return entities.Length == world.Entities.Count
+            ? world
+            : world with { Entities = entities };
+    }
+
     public static RekallAgeRuntimeWorld UpdateEntity(
         this RekallAgeRuntimeWorld world,
         string entityId,

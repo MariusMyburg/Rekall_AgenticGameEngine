@@ -1,0 +1,200 @@
+using System.Globalization;
+using System.Reflection;
+using Rekall.Age.Core.Commands;
+using Rekall.Age.Runtime.Abstractions;
+
+namespace Rekall.Age.Modules.Commands;
+
+public sealed record InspectRuntimeSdkRequest(string Query, int Limit = 16);
+
+public sealed record RekallAgeRuntimeSdkContract(
+    string Category,
+    string Name,
+    string Signature,
+    string Description)
+{
+    public string? Usage { get; init; }
+}
+
+public sealed record InspectRuntimeSdkResult(IReadOnlyList<RekallAgeRuntimeSdkContract> Contracts);
+
+public sealed class InspectRuntimeSdkCommand
+    : IRekallAgeCommand<InspectRuntimeSdkRequest, InspectRuntimeSdkResult>
+{
+    public string Name => "rekall.module.inspect_runtime_sdk";
+
+    public RekallAgeCommandSchema Schema => new(
+        Name,
+        "Searches the compiled runtime-module SDK for exact C# signatures, usage patterns, immutable data contracts, and module source-topology rules. Query every needed concept together. Exact compact shape: {\"query\":\"input action vector entity component source topology\",\"limit\":24}.",
+        typeof(InspectRuntimeSdkRequest).FullName!,
+        typeof(InspectRuntimeSdkResult).FullName!);
+
+    public ValueTask<RekallAgeCommandResult<InspectRuntimeSdkResult>> ExecuteAsync(
+        InspectRuntimeSdkRequest request,
+        RekallAgeCommandContext context)
+    {
+        if (string.IsNullOrWhiteSpace(request.Query))
+        {
+            var error = new RekallAgeCommandError(
+                "REKALL_RUNTIME_SDK_QUERY_REQUIRED",
+                "Runtime SDK inspection requires a non-empty query containing all needed authoring concepts.",
+                Name);
+            return ValueTask.FromResult(RekallAgeCommandResult<InspectRuntimeSdkResult>.Failure(
+                new InspectRuntimeSdkResult([]),
+                error.Message,
+                [error]));
+        }
+
+        var terms = request.Query.Split(
+            [' ', '.', '_', '-', '/'],
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var contracts = CreateContracts()
+            .Select(contract => new
+            {
+                Contract = contract,
+                Score = terms.Sum(term => SearchText(contract).Contains(term, StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                    + (terms.Any(term => contract.Name.Contains(term, StringComparison.OrdinalIgnoreCase)) ? 3 : 0)
+            })
+            .Where(item => item.Score > 0)
+            .OrderByDescending(item => item.Score)
+            .ThenBy(item => item.Contract.Category, StringComparer.Ordinal)
+            .ThenBy(item => item.Contract.Name, StringComparer.Ordinal)
+            .Take(Math.Clamp(request.Limit, 1, 64))
+            .Select(item => item.Contract)
+            .ToArray();
+
+        return ValueTask.FromResult(RekallAgeCommandResult<InspectRuntimeSdkResult>.Success(
+            new InspectRuntimeSdkResult(contracts),
+            $"Found {contracts.Length} compiled runtime SDK contracts for '{request.Query}'."));
+    }
+
+    private static IReadOnlyList<RekallAgeRuntimeSdkContract> CreateContracts()
+    {
+        var methods = typeof(RekallAgeRuntimeModuleSdk)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Where(method => !method.IsSpecialName)
+            .Select(method => new RekallAgeRuntimeSdkContract(
+                "sdk-method",
+                method.Name,
+                FormatMethod(method),
+                DescribeMethod(method.Name))
+            {
+                Usage = UsageFor(method.Name)
+            });
+
+        return methods.Concat(
+        [
+            new RekallAgeRuntimeSdkContract(
+                "runtime-type",
+                nameof(IRekallAgeRuntimeModuleSystem),
+                "interface IRekallAgeRuntimeModuleSystem { string Id; int Priority; ValueTask<RekallAgeRuntimeWorld> UpdateAsync(RekallAgeRuntimeWorld world, RekallAgeRuntimeModuleFrameContext context); }",
+                "Implement exactly one uniquely named runtime system class for each registered system type."),
+            new RekallAgeRuntimeSdkContract(
+                "runtime-type",
+                nameof(RekallAgeRuntimeModuleFrameContext),
+                "record RekallAgeRuntimeModuleFrameContext(int FrameIndex, TimeSpan DeltaTime, TimeSpan ElapsedTime, CancellationToken CancellationToken) { RekallAgeRuntimeInputState Input; }",
+                "Frame facts are immutable. Semantic input actions are projected onto RekallAgeRuntimeWorld and consumed through world SDK helpers; do not invent context.InputActions."),
+            new RekallAgeRuntimeSdkContract(
+                "runtime-type",
+                nameof(RekallAgeRuntimeVector3),
+                "record RekallAgeRuntimeVector3(double X, double Y, double Z)",
+                "An immutable vector record. Compute scalar locals and construct a new vector; X, Y, and Z are not mutable fields.")
+            {
+                Usage = "var next = new RekallAgeRuntimeVector3(x, y, z);"
+            },
+            new RekallAgeRuntimeSdkContract(
+                "module-source",
+                "module-source-topology",
+                "Modules/<ModuleName>/<ModuleName>.csproj compiles every Modules/<ModuleName>/*.cs file",
+                "Call rekall.module.list_sources before scaffolding or rewriting. Every C# file in the module directory compiles into one assembly, so duplicate module, component, or system class definitions across files are build errors. rekall.module.scaffold_runtime_system writes a scaffold; it does not delete other source files.")
+            {
+                Usage = "rekall.module.list_sources -> rekall.module.read_source -> targeted rekall.module.write_source -> rekall.build.modules"
+            },
+            new RekallAgeRuntimeSdkContract(
+                "module-source",
+                nameof(RekallAgeComponent),
+                "class AgentOwnedComponent : RekallAgeComponent",
+                "Agent-owned component contracts inherit RekallAgeComponent and expose serializable properties marked with RekallAgeProperty."),
+            new RekallAgeRuntimeSdkContract(
+                "module-source",
+                nameof(RekallAgeModuleBuilder.RegisterRuntimeSystem),
+                "builder.RegisterRuntimeSystem<TSystem>() where TSystem : IRekallAgeRuntimeModuleSystem",
+                "Register the exact unique system class that implements IRekallAgeRuntimeModuleSystem.")
+        ]).ToArray();
+    }
+
+    private static string SearchText(RekallAgeRuntimeSdkContract contract) =>
+        $"{contract.Category} {contract.Name} {contract.Signature} {contract.Description} {contract.Usage}";
+
+    private static string FormatMethod(MethodInfo method)
+    {
+        var parameters = string.Join(", ", method.GetParameters().Select(parameter =>
+        {
+            var value = $"{FriendlyType(parameter.ParameterType)} {parameter.Name}";
+            return parameter.HasDefaultValue ? $"{value} = {FormatDefault(parameter.DefaultValue)}" : value;
+        }));
+        return $"{FriendlyType(method.ReturnType)} RekallAgeRuntimeModuleSdk.{method.Name}({parameters})";
+    }
+
+    private static string FriendlyType(Type type)
+    {
+        if (type == typeof(void)) return "void";
+        if (type == typeof(string)) return "string";
+        if (type == typeof(bool)) return "bool";
+        if (type == typeof(int)) return "int";
+        if (type == typeof(double)) return "double";
+        if (type == typeof(float)) return "float";
+        if (type.IsArray) return $"{FriendlyType(type.GetElementType()!)}[]";
+        if (!type.IsGenericType) return type.Name;
+        var name = type.Name[..type.Name.IndexOf('`')];
+        return $"{name}<{string.Join(", ", type.GetGenericArguments().Select(FriendlyType))}>";
+    }
+
+    private static string FormatDefault(object? value) => value switch
+    {
+        null => "null",
+        string text => $"\"{text}\"",
+        bool boolean => boolean ? "true" : "false",
+        double number => number.ToString("R", CultureInfo.InvariantCulture),
+        float number => number.ToString("R", CultureInfo.InvariantCulture),
+        _ => Convert.ToString(value, CultureInfo.InvariantCulture) ?? "null"
+    };
+
+    private static string DescribeMethod(string name) => name switch
+    {
+        nameof(RekallAgeRuntimeModuleSdk.InputActionValue) or
+        nameof(RekallAgeRuntimeModuleSdk.IsInputActionDown) or
+        nameof(RekallAgeRuntimeModuleSdk.WasInputActionPressed) or
+        nameof(RekallAgeRuntimeModuleSdk.WasInputActionReleased) =>
+            "Reads semantic actions projected from Rekall.InputActionMap. Call this extension on world, not frame context.",
+        nameof(RekallAgeRuntimeModuleSdk.WithPosition3D) or
+        nameof(RekallAgeRuntimeModuleSdk.WithRotation3D) or
+        nameof(RekallAgeRuntimeModuleSdk.WithScale3D) =>
+            "Returns a replacement immutable entity with the requested 3D transform value.",
+        nameof(RekallAgeRuntimeModuleSdk.UpdateEntity) or
+        nameof(RekallAgeRuntimeModuleSdk.ReplaceEntity) or
+        nameof(RekallAgeRuntimeModuleSdk.RemoveEntity) =>
+            "Returns a replacement immutable world after a generic entity mutation.",
+        nameof(RekallAgeRuntimeModuleSdk.UpdateComponent) or
+        nameof(RekallAgeRuntimeModuleSdk.UpsertComponent) =>
+            "Returns a replacement immutable entity after a JSON component mutation.",
+        _ => "Compiled generic runtime-module SDK helper. The signature is derived from the loaded engine assembly."
+    };
+
+    private static string? UsageFor(string name) => name switch
+    {
+        nameof(RekallAgeRuntimeModuleSdk.InputActionValue) =>
+            "var horizontal = world.InputActionValue(\"move.horizontal\");",
+        nameof(RekallAgeRuntimeModuleSdk.IsInputActionDown) =>
+            "var held = world.IsInputActionDown(\"agent.authored.action\");",
+        nameof(RekallAgeRuntimeModuleSdk.WasInputActionPressed) =>
+            "if (world.WasInputActionPressed(\"reset\")) { /* agent-authored rule */ }",
+        nameof(RekallAgeRuntimeModuleSdk.WithPosition3D) =>
+            "world = world.UpdateEntity(entity.Id, current => current.WithPosition3D(new RekallAgeRuntimeVector3(x, y, z)));",
+        nameof(RekallAgeRuntimeModuleSdk.UpdateComponent) =>
+            "var replacement = entity.UpdateComponent(componentType, properties => { properties[\"score\"] = score; return properties; });",
+        nameof(RekallAgeRuntimeModuleSdk.RemoveEntity) =>
+            "world = world.RemoveEntity(collectedEntity.Id);",
+        _ => null
+    };
+}

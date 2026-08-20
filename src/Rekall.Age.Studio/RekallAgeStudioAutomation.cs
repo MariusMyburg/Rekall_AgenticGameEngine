@@ -112,7 +112,10 @@ public static class RekallAgeStudioAutomation
         viewModel.TreatGauntletAsTerminalSuccess = options.TreatGauntletAsTerminalSuccess;
         viewModel.AgentMaxTurns = options.MaxTurns;
 
-        await ((RekallAgeAsyncCommand)viewModel.CreateCommand).ExecuteAsync(null);
+        var projectCommand = File.Exists(Path.Combine(projectRoot, "rekall.project.json"))
+            ? viewModel.OpenCommand
+            : viewModel.CreateCommand;
+        await ((RekallAgeAsyncCommand)projectCommand).ExecuteAsync(null);
         cancellationToken.ThrowIfCancellationRequested();
         await ((RekallAgeAsyncCommand)viewModel.RunAgentCommand).ExecuteAsync(null);
 

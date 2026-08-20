@@ -29,6 +29,10 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("every requested visible dynamic body has a renderer", prompt, StringComparison.Ordinal);
         Assert.Contains("scaffold the required module before the first packaging call", prompt, StringComparison.Ordinal);
         Assert.Contains("rekall.module.scaffold_runtime_system", prompt, StringComparison.Ordinal);
+        Assert.Contains("rekall.module.inspect_runtime_sdk", prompt, StringComparison.Ordinal);
+        Assert.Contains("module source topology", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("call the matched native tool directly", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("then call them through rekall.tools.execute", prompt, StringComparison.Ordinal);
         Assert.Contains("Do not replace its compilable SDK types", prompt, StringComparison.Ordinal);
         Assert.Contains("not a substitute for world gameplay", prompt, StringComparison.Ordinal);
         Assert.Contains("rekall.validation.repair_project", prompt, StringComparison.Ordinal);
@@ -219,6 +223,76 @@ public sealed class LanguageModelAgentTests
             model.Requests[4].Messages,
             message => message.Role == "user"
                 && message.Content.Contains("do not add new entities merely to exercise validation", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task SuccessfulDeliveryAuditPrimesTheNextEvidenceBackedFinalResponse()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.workflow.audit_playable_package", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "The playable package and its evidence are complete.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 2,
+                RequireCompletionAudit = true,
+                CompletionAuditPrimingTools = new HashSet<string>(
+                    ["rekall.workflow.audit_playable_package"],
+                    StringComparer.Ordinal)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(2, result.Turns);
+        Assert.Equal("The playable package and its evidence are complete.", result.FinalContent);
+        Assert.DoesNotContain(
+            model.Requests[1].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("Completion audit required", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ToolUseAfterPrimedDeliveryAuditInvalidatesTheCompletionProof()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.workflow.audit_playable_package", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Inspecting one more detail.", "",
+                [new RekallAgeLanguageModelToolCall("inspect", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Everything is complete.", "", [], "stop", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Confirmed after the fresh audit.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 4,
+                RequireCompletionAudit = true,
+                CompletionAuditPrimingTools = new HashSet<string>(
+                    ["rekall.workflow.audit_playable_package"],
+                    StringComparer.Ordinal)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(4, result.Turns);
+        Assert.Equal("Confirmed after the fresh audit.", result.FinalContent);
+        Assert.Contains(
+            model.Requests[3].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("Completion audit required", StringComparison.Ordinal));
     }
 
     [Fact]

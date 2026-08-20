@@ -198,6 +198,7 @@ public sealed class GetEngineStatusCommand
                     "Convenience helpers for agent-authored systems: component lookup, JSON property reads, transform edits, component upserts, and generic 3D ray queries over physics colliders.",
                     ["find-components", "read-properties", "write-components", "write-transforms", "raycast3d"],
                     [
+                        "rekall.module.inspect_runtime_sdk",
                         "rekall.module.scaffold_runtime_system",
                         "rekall.module.write_source",
                         "rekall.build.modules",

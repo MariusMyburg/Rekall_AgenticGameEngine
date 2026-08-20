@@ -207,7 +207,8 @@ public sealed class AgentContextCommandTests
             contract.Name == "runtime-module-sdk"
             && contract.PrimaryType == "RekallAgeRuntimeModuleSdk"
             && contract.Capabilities.Contains("raycast3d")
-            && contract.Capabilities.Contains("write-components"));
+            && contract.Capabilities.Contains("write-components")
+            && contract.RelatedTools.Contains("rekall.module.inspect_runtime_sdk"));
         Assert.Contains(result.Value.AuthoringContracts, contract =>
             contract.Name == "runtime-render-mesh"
             && contract.PrimaryType == "RekallAgeRuntimeRenderMesh"

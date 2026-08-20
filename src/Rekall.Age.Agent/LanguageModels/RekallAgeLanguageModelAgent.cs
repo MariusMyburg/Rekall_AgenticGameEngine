@@ -26,6 +26,8 @@ public sealed record RekallAgeLanguageModelAgentRequest(string Model, string Sys
     public IProgress<RekallAgeLanguageModelAgentProgress>? Progress { get; init; }
 
     public IReadOnlySet<string> TerminalSuccessTools { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+
+    public IReadOnlySet<string> CompletionAuditPrimingTools { get; init; } = new HashSet<string>(StringComparer.Ordinal);
 }
 
 public sealed record RekallAgeLanguageModelAgentProgress(
@@ -166,11 +168,10 @@ public sealed class RekallAgeLanguageModelAgent(
                 return completed;
             }
 
-            completionAuditPending = false;
-
             foreach (var call in response.ToolCalls)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                completionAuditPending = false;
                 toolCallCount++;
                 JsonNode output;
                 try
@@ -210,8 +211,16 @@ public sealed class RekallAgeLanguageModelAgent(
                     $"{call.Name} {(succeeded ? "completed" : "failed")}.",
                     execution));
                 transcript.Add(new RekallAgeLanguageModelMessage("tool", outputText, call.Name));
-                var effectiveToolName = EffectiveToolName(call, request.TerminalSuccessTools);
-                if (succeeded && effectiveToolName is not null)
+                var effectiveToolName = EffectiveToolName(
+                    call,
+                    request.TerminalSuccessTools,
+                    request.CompletionAuditPrimingTools);
+                if (succeeded && request.CompletionAuditPrimingTools.Contains(effectiveToolName))
+                {
+                    completionAuditPending = true;
+                }
+
+                if (succeeded && request.TerminalSuccessTools.Contains(effectiveToolName))
                 {
                     var summary = output["summary"]?.GetValue<string>();
                     finalContent = string.IsNullOrWhiteSpace(summary)
@@ -305,18 +314,23 @@ public sealed class RekallAgeLanguageModelAgent(
         || name.StartsWith("rekall.workflow.capture_", StringComparison.Ordinal)
         || name.StartsWith("rekall.workflow.run_", StringComparison.Ordinal);
 
-    private static string? EffectiveToolName(
+    private static string EffectiveToolName(
         RekallAgeLanguageModelToolCall call,
-        IReadOnlySet<string> terminalTools)
+        IReadOnlySet<string> terminalTools,
+        IReadOnlySet<string> completionAuditPrimingTools)
     {
-        if (terminalTools.Contains(call.Name)) return call.Name;
+        if ((terminalTools.Contains(call.Name) || completionAuditPrimingTools.Contains(call.Name)))
+        {
+            return call.Name;
+        }
+
         if (call.Arguments["name"] is JsonValue target
             && target.TryGetValue<string>(out var targetName)
-            && terminalTools.Contains(targetName))
+            && (terminalTools.Contains(targetName) || completionAuditPrimingTools.Contains(targetName)))
         {
             return targetName;
         }
 
-        return null;
+        return call.Name;
     }
 }

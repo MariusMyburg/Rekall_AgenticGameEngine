@@ -27,7 +27,7 @@ public sealed class ScaffoldRuntimeSystemModuleCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Scaffolds a compilable agent-owned C# component and IRekallAgeRuntimeModuleSystem. Exact compact shape: {\"projectRoot\":\"...\",\"moduleId\":\"game.rules\",\"displayName\":\"Game Rules\",\"moduleName\":\"GameRules\",\"componentName\":\"GameState\",\"systemName\":\"GameRulesSystem\"}. After scaffolding, call rekall.module.read_source and preserve its real SDK types/helpers while making targeted edits, then call rekall.module.write_source and rekall.build.modules.",
+        "Scaffolds a compilable agent-owned C# component and IRekallAgeRuntimeModuleSystem. Exact compact shape: {\"projectRoot\":\"...\",\"moduleId\":\"game.rules\",\"displayName\":\"Game Rules\",\"moduleName\":\"GameRules\",\"componentName\":\"GameState\",\"systemName\":\"GameRulesSystem\"}. Call rekall.module.inspect_runtime_sdk for exact signatures and source topology. After scaffolding, call rekall.module.list_sources and rekall.module.read_source, preserve the real SDK types/helpers, make targeted edits without duplicate definitions, then call rekall.module.write_source and rekall.build.modules.",
         typeof(ScaffoldRuntimeSystemModuleRequest).FullName!,
         typeof(ScaffoldRuntimeSystemModuleResult).FullName!);
 

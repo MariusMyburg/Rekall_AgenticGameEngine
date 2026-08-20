@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 16:56 Africa/Johannesburg
+Last verified: 2026-08-20 17:33 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: arbitrary-game authoring contract hardening
+Latest milestone: first task-specific Ollama-authored playable delivery accepted
 
 ## Product objective
 
@@ -36,7 +36,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Debug verification: 902/902 engine tests and 4/4 Windows Studio
+- Current Debug verification: 907/907 engine tests and 5/5 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -920,16 +920,44 @@ Studio is important, but it does not define or reorder the engine foundation.
   real play/package/audit controls, and installed Studio-to-agent game creation
   are now present. The workbench is functional but not yet a finished
   professional editor.
-- The first task-specific `Prism Relay` Ollama benchmarks are not accepted.
-  They proved the corrected open-project blueprint path, native tool exposure,
-  a 960x540 capture path in one run, and successful module repair/build in
-  another, but `qwen3.5:35b` still exhausted 24, 36, and 48-turn budgets after
-  replacing compiling scaffolds with guessed SDK types or duplicate system
-  definitions. No run produced clean validation plus package audit. The next
-  engine contract is an exact, queryable runtime-SDK/source-topology surface;
-  the engine must not author game rules on the agent's behalf.
+- Run a fresh installed, empty-project task-specific benchmark without a
+  continuation prompt. `Prism Relay` is now an accepted task-specific authored
+  artifact and delivery, but its original empty-project run needed a bounded
+  continuation after reaching the 64-turn limit. The continuation opened the
+  existing project, preserved it, and completed the consolidated package audit
+  in three turns. The next acceptance raises the standard from a successful
+  recoverable authoring session to a single uninterrupted installed-product
+  session.
 
 ## Recently completed
+
+The task-specific `Prism Relay` checkpoint is accepted from direct repository
+evidence. Local Ollama `qwen3.5:35b` authored a non-gauntlet 3D game with five
+visible renderables, semantic input, an agent-authored delta-time C# gameplay
+module, a playable adapter, and an inspectable HUD. The final project has zero
+validation issues, both module projects build, both receipts verify as
+`windows-appcontainer-restricted`, and the consolidated playable-package audit
+passed. Studio reports a 960x540 nonblank runtime viewport. The final
+continuation completed in three turns and two tool calls after a canonical tool
+search. The package SHA-256 is
+`E17A9F9830276FF940CD7082F35DABBFDE8AF6D26271CE69CCACDED59B01583E`;
+the Studio viewport SHA-256 is
+`13CC2332D50127370DABEE528FC824AFCBC398C3E187BDEB3CBED7C5A2CAC2B0`;
+the package-audit frame SHA-256 is
+`06192B3845A53BE229110C60B1050BE97166F3098A2ABC660A1B0EF099F58AFB`;
+and the final evidence SHA-256 is
+`4427B355EA5242BECE210F0AF311145BD89649DCB58E9D8A7BBFA7363F207AF8`.
+
+The generic authoring contract now exposes exact queryable runtime SDK method
+signatures and source-topology/build rules through
+`rekall.module.inspect_runtime_sdk`. Progressive discovery exposes matched
+native tools directly instead of steering the model through the compatibility
+gateway. The immutable module SDK gained generic `RemoveEntity`; successful
+playable-package audits prime the next evidence-backed completion while any
+later tool call invalidates that proof; and Studio automation can safely resume
+an existing project. These behaviors are covered by the current 907/907 engine
+and 5/5 Studio test suites, and the full Debug solution builds with zero
+warnings and zero errors.
 
 Implement the persisted compatibility design: central project/scene schema
 enforcement, deterministic read-only inspection, and explicit atomic legacy
@@ -987,13 +1015,14 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The current item is the task-specific AI game-creation loop, selected from real
-`Prism Relay` benchmark failures. Implement a generic queryable runtime-module
-SDK and source-topology contract, expose exact signatures and compilable usage
-patterns through the same MCP catalog, add bounded source-repair diagnostics,
-then rerun the unchanged task until clean validation, informative capture,
-package, and audit all pass. Studio, embedded AI, MCP, and CLI must continue to
-consume the same contracts.
+The current item remains the actual AI game-creation loop. Run a fresh
+installed-product benchmark from an empty project with a new arbitrary game
+brief and require one uninterrupted session to produce clean validation,
+informative capture, compiled agent-authored behavior, playable package, and a
+passing consolidated audit. Use its concrete failures to improve only generic
+authoring primitives, schemas, diagnostics, and repair efficiency. Studio,
+embedded AI, MCP, CLI, and packaged players must continue to consume the same
+contracts.
 
 AI game-creation Tasks 1-3 have a verified functional checkpoint. A new
 UI-independent workbench session creates projects

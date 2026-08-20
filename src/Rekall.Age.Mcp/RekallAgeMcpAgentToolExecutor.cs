@@ -44,7 +44,7 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
     public IReadOnlyList<RekallAgeLanguageModelTool> Tools => _exposedTools is null
         ? _allTools.Values.OrderBy(tool => tool.Name, StringComparer.Ordinal).ToArray()
         : _exposedTools.Select(name => _allTools[name])
-            .Concat([SearchTool, ExecuteTool])
+            .Concat([SearchTool])
             .OrderBy(tool => tool.Name, StringComparer.Ordinal)
             .ToArray();
 
@@ -266,7 +266,7 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
 
     private static RekallAgeLanguageModelTool SearchTool { get; } = new(
         SearchToolName,
-        "Search Rekall AGE tool schemas by capability or task words. Execute an exact match through rekall.tools.execute.",
+        "Search Rekall AGE tool schemas by capability or task words. Matched native tools are exposed on the next turn; call them directly.",
         new JsonObject
         {
             ["type"] = "object",

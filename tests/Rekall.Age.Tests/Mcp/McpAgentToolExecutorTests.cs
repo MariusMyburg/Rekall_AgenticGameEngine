@@ -38,7 +38,7 @@ public sealed class McpAgentToolExecutorTests
         var executor = new RekallAgeMcpAgentToolExecutor(registry, progressiveDiscovery: true);
 
         Assert.Equal(
-            ["rekall.context.engine_status", "rekall.tools.execute", "rekall.tools.search"],
+            ["rekall.context.engine_status", "rekall.tools.search"],
             executor.Tools.Select(tool => tool.Name));
 
         var result = await executor.ExecuteAsync(

@@ -1,0 +1,57 @@
+using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Transactions;
+using Rekall.Age.Modules.Commands;
+
+namespace Rekall.Age.Tests.Modules;
+
+public sealed class InspectRuntimeSdkCommandTests
+{
+    [Fact]
+    public async Task ReturnsExactCompiledSignaturesAndSourceTopologyForAgentQueries()
+    {
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("inspect runtime sdk"),
+            CancellationToken.None);
+
+        var result = await new InspectRuntimeSdkCommand().ExecuteAsync(
+            new InspectRuntimeSdkRequest(
+                "input action immutable vector entity component source duplicate system",
+                Limit: 32),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "InputActionValue"
+            && contract.Signature.Contains("RekallAgeRuntimeWorld world", StringComparison.Ordinal)
+            && contract.Signature.Contains("double fallback = 0", StringComparison.Ordinal)
+            && contract.Usage!.Contains("world.InputActionValue", StringComparison.Ordinal));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "WasInputActionPressed"
+            && contract.Signature.Contains("string name", StringComparison.Ordinal));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "RekallAgeRuntimeVector3"
+            && contract.Description.Contains("immutable", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "module-source-topology"
+            && contract.Description.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
+            && contract.Description.Contains("rekall.module.list_sources", StringComparison.Ordinal));
+        Assert.All(result.Value.Contracts, contract => Assert.False(string.IsNullOrWhiteSpace(contract.Signature)));
+    }
+
+    [Fact]
+    public async Task RejectsAnEmptySdkQueryWithStructuredError()
+    {
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("reject empty sdk query"),
+            CancellationToken.None);
+
+        var result = await new InspectRuntimeSdkCommand().ExecuteAsync(
+            new InspectRuntimeSdkRequest(" "),
+            context);
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, error => error.Code == "REKALL_RUNTIME_SDK_QUERY_REQUIRED");
+    }
+}

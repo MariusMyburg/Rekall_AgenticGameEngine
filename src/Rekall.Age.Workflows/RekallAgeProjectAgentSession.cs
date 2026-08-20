@@ -75,6 +75,9 @@ public sealed class RekallAgeProjectAgentSession
                 Temperature = request.Temperature,
                 RequireCompletionAudit = request.RequireCompletionAudit,
                 Progress = progress,
+                CompletionAuditPrimingTools = new HashSet<string>(
+                    ["rekall.workflow.audit_playable_package"],
+                    StringComparer.Ordinal),
                 TerminalSuccessTools = request.TreatGauntletAsTerminalSuccess
                     ? new HashSet<string>(["rekall.workflow.agent_authoring_gauntlet"], StringComparer.Ordinal)
                     : new HashSet<string>(StringComparer.Ordinal)

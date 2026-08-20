@@ -90,6 +90,41 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task HeadlessAutomationContinuesAnExistingStudioProject()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-existing-" + Guid.NewGuid().ToString("N"));
+        var evidence = Path.Combine(root + "-evidence", "studio-agent.json");
+        try
+        {
+            await using (var setup = new RekallAgeStudioViewModel())
+            {
+                setup.ProjectPathInput = root;
+                setup.ProjectNameInput = "Existing Game";
+                setup.SceneNameInput = "Main";
+                await ExecuteAsync(setup.CreateCommand);
+            }
+
+            var result = await RekallAgeStudioAutomation.RunAsync(
+                new RekallAgeStudioAutomationOptions(root, "Must Not Replace Existing Game", "Main", "deterministic", "Inspect the existing game.", evidence)
+                {
+                    TreatGauntletAsTerminalSuccess = false,
+                    MaxTurns = 2
+                },
+                new EmptyModel(),
+                CancellationToken.None);
+
+            Assert.StartsWith("AI authoring completed", result.Status, StringComparison.Ordinal);
+            Assert.True(File.Exists(evidence));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            var evidenceRoot = Path.GetDirectoryName(evidence)!;
+            if (Directory.Exists(evidenceRoot)) Directory.Delete(evidenceRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ViewModelCreatesAndEditsProjectThroughSchemaGuidedCanonicalCommands()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-vm-" + Guid.NewGuid().ToString("N"));

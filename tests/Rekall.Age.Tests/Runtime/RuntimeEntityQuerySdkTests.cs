@@ -90,6 +90,20 @@ public sealed class RuntimeEntityQuerySdkTests
         Assert.Same(updated, updated.ReplaceEntity(CreateEntity("missing", "Missing", [])));
     }
 
+    [Fact]
+    public void RuntimeModuleSdkRemovesAnEntityWithoutSentinelValuesOrManualListSurgery()
+    {
+        var world = CreateWorld(
+            CreateEntity("player", "Player", ["actor"]),
+            CreateEntity("pickup", "Pickup", ["collectible"]));
+
+        var updated = world.RemoveEntity("pickup");
+
+        Assert.Equal(["player"], updated.Entities.Select(entity => entity.Id));
+        Assert.Same(updated, updated.RemoveEntity("missing"));
+        Assert.Same(updated, updated.RemoveEntity(" "));
+    }
+
     private static RekallAgeRuntimeWorld CreateWorld(params RekallAgeRuntimeEntity[] entities)
     {
         return new RekallAgeRuntimeWorld(

@@ -827,8 +827,7 @@ public static class RekallAgeRuntimeModuleSdk
                         normalized,
                         range,
                         entity.Transform.Position2D,
-                        Math.Max(0.0001, collider.Properties.ReadNumber("radius", collider.Properties.ReadNumber("Radius", 0.5)))
-                            * Math.Max(Math.Abs(entity.Transform.Scale2D.X), Math.Abs(entity.Transform.Scale2D.Y)),
+                        Math.Max(0.0001, collider.Properties.ReadNumber("radius", collider.Properties.ReadNumber("Radius", 0.5))),
                         out distance,
                         out point),
                     _ => TryIntersectBox2D(
@@ -1194,12 +1193,10 @@ public static class RekallAgeRuntimeModuleSdk
         var localDirectionY = direction.X * sine + direction.Y * cosine;
         var halfWidth = Math.Max(
             0.0001,
-            Math.Abs(collider.Properties.ReadNumber("width", collider.Properties.ReadNumber("Width", 1))
-                * entity.Transform.Scale2D.X)) * 0.5;
+            Math.Abs(collider.Properties.ReadNumber("width", collider.Properties.ReadNumber("Width", 1)))) * 0.5;
         var halfHeight = Math.Max(
             0.0001,
-            Math.Abs(collider.Properties.ReadNumber("height", collider.Properties.ReadNumber("Height", 1))
-                * entity.Transform.Scale2D.Y)) * 0.5;
+            Math.Abs(collider.Properties.ReadNumber("height", collider.Properties.ReadNumber("Height", 1)))) * 0.5;
         var near = double.NegativeInfinity;
         var far = double.PositiveInfinity;
         if (!IntersectSlab(localOriginX, localDirectionX, halfWidth, ref near, ref far)
@@ -1296,7 +1293,7 @@ public static class RekallAgeRuntimeModuleSdk
                 direction,
                 range,
                 entity.Transform.Position3D,
-                EstimateBoxBoundingRadius(entity, collider),
+                EstimateBoxBoundingRadius(collider),
                 out distance,
                 out point),
             "Rekall.MeshCollider" => TryIntersectSphere(
@@ -1342,11 +1339,11 @@ public static class RekallAgeRuntimeModuleSdk
         return true;
     }
 
-    private static double EstimateBoxBoundingRadius(RekallAgeRuntimeEntity entity, RekallAgeRuntimeComponent collider)
+    private static double EstimateBoxBoundingRadius(RekallAgeRuntimeComponent collider)
     {
-        var width = collider.Properties.ReadNumber("width", collider.Properties.ReadNumber("Width", 1)) * entity.Transform.Scale3D.X;
-        var height = collider.Properties.ReadNumber("height", collider.Properties.ReadNumber("Height", 1)) * entity.Transform.Scale3D.Y;
-        var depth = collider.Properties.ReadNumber("depth", collider.Properties.ReadNumber("Depth", 1)) * entity.Transform.Scale3D.Z;
+        var width = collider.Properties.ReadNumber("width", collider.Properties.ReadNumber("Width", 1));
+        var height = collider.Properties.ReadNumber("height", collider.Properties.ReadNumber("Height", 1));
+        var depth = collider.Properties.ReadNumber("depth", collider.Properties.ReadNumber("Depth", 1));
         return Math.Sqrt(width * width + height * height + depth * depth) * 0.5;
     }
 

@@ -821,7 +821,7 @@ public sealed class RekallAgeRigidbody2DComponent : RekallAgeComponent
     public double Mass { get; init; } = 1;
 }
 
-[RekallAgeComponent("Trigger")]
+[RekallAgeComponent("Trigger", Description = "A generic overlap volume whose radius or box dimensions are explicit world-unit values. Transform2D/3D supplies position and rotation; transform scale does not resize the trigger.")]
 public sealed class RekallAgeTriggerComponent : RekallAgeComponent
 {
     [RekallAgeProperty]
@@ -849,7 +849,7 @@ public sealed class RekallAgeTriggerComponent : RekallAgeComponent
     public string TargetComponentType { get; init; } = string.Empty;
 }
 
-[RekallAgeComponent("Box Collider 2D", Description = "A planar box collision shape. Combine with Transform2D; add Rigidbody2D for a dynamic body or omit it for a static surface.")]
+[RekallAgeComponent("Box Collider 2D", Description = "A planar box collision shape with explicit world-unit width and height. Transform2D supplies position and rotation; transform scale does not resize the collider. Add Rigidbody2D for a dynamic body or omit it for a static surface.")]
 public sealed class RekallAgeBoxCollider2DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
@@ -859,14 +859,14 @@ public sealed class RekallAgeBoxCollider2DComponent : RekallAgeComponent
     public double Height { get; init; } = 1;
 }
 
-[RekallAgeComponent("Circle Collider 2D", Description = "A planar circle collision shape. Combine with Transform2D; add Rigidbody2D for a dynamic body or omit it for a static surface.")]
+[RekallAgeComponent("Circle Collider 2D", Description = "A planar circle collision shape with an explicit world-unit radius. Transform2D supplies position and rotation; transform scale does not resize the collider. Add Rigidbody2D for a dynamic body or omit it for a static surface.")]
 public sealed class RekallAgeCircleCollider2DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
     public double Radius { get; init; } = 0.5;
 }
 
-[RekallAgeComponent("Box Collider 3D", Description = "A 3D box collision shape. Combine with Transform3D; add Rigidbody3D for a dynamic body or omit it for static geometry.")]
+[RekallAgeComponent("Box Collider 3D", Description = "A 3D box collision shape with explicit world-unit dimensions. Transform3D supplies position and orientation; transform scale does not resize the collider. Add Rigidbody3D for a dynamic body or omit it for static geometry.")]
 public sealed class RekallAgeBoxCollider3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
@@ -879,14 +879,14 @@ public sealed class RekallAgeBoxCollider3DComponent : RekallAgeComponent
     public double Depth { get; init; } = 1;
 }
 
-[RekallAgeComponent("Sphere Collider 3D", Description = "A 3D sphere collision shape. Combine with Transform3D; add Rigidbody3D for a dynamic body or omit it for static geometry.")]
+[RekallAgeComponent("Sphere Collider 3D", Description = "A 3D sphere collision shape with an explicit world-unit radius. Transform3D supplies position and orientation; transform scale does not resize the collider. Add Rigidbody3D for a dynamic body or omit it for static geometry.")]
 public sealed class RekallAgeSphereCollider3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
     public double Radius { get; init; } = 0.5;
 }
 
-[RekallAgeComponent("Capsule Collider 3D", Description = "A 3D capsule collision shape. Combine with Transform3D; add Rigidbody3D for a dynamic body or omit it for static geometry.")]
+[RekallAgeComponent("Capsule Collider 3D", Description = "A 3D capsule collision shape with explicit world-unit radius and length. Transform3D supplies position and orientation; transform scale does not resize the collider. Add Rigidbody3D for a dynamic body or omit it for static geometry.")]
 public sealed class RekallAgeCapsuleCollider3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
@@ -896,7 +896,7 @@ public sealed class RekallAgeCapsuleCollider3DComponent : RekallAgeComponent
     public double Length { get; init; } = 1;
 }
 
-[RekallAgeComponent("Mesh Collider")]
+[RekallAgeComponent("Mesh Collider", Description = "Uses same-entity Rekall.GeometryMesh vertices as explicit local world-unit geometry. Transform3D supplies position and orientation; transform scale does not resize the collider. Static meshes are supported; dynamic meshes require Convex=true.")]
 public sealed class RekallAgeMeshColliderComponent : RekallAgeComponent
 {
     [RekallAgeProperty]

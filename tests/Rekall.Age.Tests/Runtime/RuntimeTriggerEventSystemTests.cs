@@ -235,8 +235,7 @@ public sealed class RuntimeTriggerEventSystemTests
             false,
             RekallAgeRuntimeTransform.Identity with
             {
-                Position2D = new RekallAgeRuntimeVector2(x, 0),
-                Scale2D = new RekallAgeRuntimeVector2(2, 2)
+                Position2D = new RekallAgeRuntimeVector2(x, 0)
             },
             [
                 new RekallAgeRuntimeComponent(
@@ -247,7 +246,7 @@ public sealed class RuntimeTriggerEventSystemTests
                     new JsonObject
                     {
                         ["shape"] = "sphere",
-                        ["radius"] = 0.25
+                        ["radius"] = 0.5
                     }),
                 new RekallAgeRuntimeComponent(
                     "Rekall.EventBindings",

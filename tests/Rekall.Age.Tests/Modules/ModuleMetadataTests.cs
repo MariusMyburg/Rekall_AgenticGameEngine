@@ -86,6 +86,9 @@ public sealed class ModuleMetadataTests
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Button");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Transform2D");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Transform3D");
+        var box2D = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.BoxCollider2D");
+        Assert.Contains("world-unit", box2D.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("does not resize", box2D.Description, StringComparison.OrdinalIgnoreCase);
         var eventBindings = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.EventBindings");
         Assert.Contains("agent-authored modules", eventBindings.Description, StringComparison.OrdinalIgnoreCase);
         var runtimeEvents = Assert.Single(eventBindings.Properties, property => property.Name == "Events" && property.Kind == "runtimeEvents");

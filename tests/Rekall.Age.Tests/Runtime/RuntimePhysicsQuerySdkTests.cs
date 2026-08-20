@@ -64,7 +64,8 @@ public sealed class RuntimePhysicsQuerySdkTests
             false,
             RekallAgeRuntimeTransform.Identity with
             {
-                Position2D = new RekallAgeRuntimeVector2(4, 0)
+                Position2D = new RekallAgeRuntimeVector2(4, 0),
+                Scale2D = new RekallAgeRuntimeVector2(2, 2)
             },
             [
                 new RekallAgeRuntimeComponent(

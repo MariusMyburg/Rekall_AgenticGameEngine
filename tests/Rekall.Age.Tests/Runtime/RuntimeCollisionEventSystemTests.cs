@@ -204,7 +204,8 @@ public sealed class RuntimeCollisionEventSystemTests
             false,
             RekallAgeRuntimeTransform.Identity with
             {
-                Position2D = new RekallAgeRuntimeVector2(x, 0)
+                Position2D = new RekallAgeRuntimeVector2(x, 0),
+                Scale2D = new RekallAgeRuntimeVector2(0.1, 0.1)
             },
             [
                 new RekallAgeRuntimeComponent(

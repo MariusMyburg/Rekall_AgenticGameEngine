@@ -54,7 +54,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
                 }
 
                 var description = new StaticDescription(
-                    new RigidPose(ToPhysicsPosition(item)),
+                    new RigidPose(ToPhysicsPosition(item), ToPhysicsOrientation(item)),
                     shape.Shape);
                 simulation.Statics.Add(description);
             }
@@ -62,7 +62,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
             var handles = new Dictionary<string, DynamicBodyState>(StringComparer.Ordinal);
             foreach (var item in dynamicBodies)
             {
-                var pose = new RigidPose(ToPhysicsPosition(item));
+                var pose = new RigidPose(ToPhysicsPosition(item), ToPhysicsOrientation(item));
                 var stateType = item.Is2D ? "Rekall.PhysicsState2D" : "Rekall.PhysicsState3D";
                 var velocity = new BodyVelocity(ReadVector3(FindComponent(item.Entity, stateType), "linearVelocity"));
                 if (item.Is2D)
@@ -587,6 +587,22 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
                 (float)item.Entity.Transform.Position2D.Y,
                 0)
             : ToVector3(item.Entity.Transform.Position3D);
+    }
+
+    private static Quaternion ToPhysicsOrientation(PhysicsEntity item)
+    {
+        if (item.Is2D)
+        {
+            return Quaternion.CreateFromAxisAngle(
+                Vector3.UnitZ,
+                (float)(item.Entity.Transform.Rotation2D * Math.PI / 180));
+        }
+
+        var rotation = item.Entity.Transform.Rotation3D;
+        return Quaternion.CreateFromYawPitchRoll(
+            (float)(rotation.Y * Math.PI / 180),
+            (float)(rotation.X * Math.PI / 180),
+            (float)(rotation.Z * Math.PI / 180));
     }
 
     private static Vector3 ReadVector3(RekallAgeRuntimeComponent? component, string name)

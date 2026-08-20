@@ -564,6 +564,84 @@ public sealed class SceneRuntimeFoundationTests
     }
 
     [Fact]
+    public async Task BepuPhysicsAppliesTransformRotationTo2DPrimitiveColliders()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics2d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Physics Settings", ["settings"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsWorld3D",
+                    new JsonObject { ["GravityY"] = 0 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Rotated Wall", ["level"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform2D",
+                    new JsonObject { ["Rotation"] = 90 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.BoxCollider2D",
+                    new JsonObject { ["Width"] = 4, ["Height"] = 0.2 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Moving Circle", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform2D",
+                    new JsonObject { ["X"] = -2, ["Y"] = 1.5 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Rigidbody2D",
+                    new JsonObject { ["Mass"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.CircleCollider2D",
+                    new JsonObject { ["Radius"] = 0.25 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsState2D",
+                    new JsonObject
+                    {
+                        ["linearVelocity"] = new JsonObject { ["x"] = 5, ["y"] = 0, ["z"] = 0 }
+                    })));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(new RekallAgeRuntimeWorldBuilder().Build(scene), 60, CancellationToken.None);
+
+        var circle = result.World.Entities.Single(entity => entity.Name == "Moving Circle");
+        Assert.InRange(circle.Transform.Position2D.X, -0.6, 0.5);
+    }
+
+    [Fact]
+    public async Task BepuPhysicsAppliesTransformRotationTo3DPrimitiveColliders()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Physics Settings", ["settings"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsWorld3D",
+                    new JsonObject { ["GravityY"] = 0 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Rotated Wall", ["level"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["Roll"] = 90 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.BoxCollider3D",
+                    new JsonObject { ["Width"] = 4, ["Height"] = 0.2, ["Depth"] = 4 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Moving Sphere", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["X"] = -2, ["Y"] = 1.5 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Rigidbody3D",
+                    new JsonObject { ["Mass"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.SphereCollider3D",
+                    new JsonObject { ["Radius"] = 0.25 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsState3D",
+                    new JsonObject
+                    {
+                        ["linearVelocity"] = new JsonObject { ["x"] = 5, ["y"] = 0, ["z"] = 0 }
+                    })));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(new RekallAgeRuntimeWorldBuilder().Build(scene), 60, CancellationToken.None);
+
+        var sphere = result.World.Entities.Single(entity => entity.Name == "Moving Sphere");
+        Assert.InRange(sphere.Transform.Position3D.X, -0.6, 0.5);
+    }
+
+    [Fact]
     public async Task InspectSceneRuntimeCommandExposesBoundedPostSimulationEntityState()
     {
         var root = TestPaths.CreateTempDirectory();

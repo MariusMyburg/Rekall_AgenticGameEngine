@@ -71,6 +71,9 @@ public sealed class ScaffoldRuntimeSystemModuleCommandTests
         Assert.Contains("move.horizontal", source);
         Assert.Contains("move.vertical", source);
         Assert.Contains("returns double, not a vector", source);
+        Assert.Contains("does not create bindings", source, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("RegisterComponent", source);
+        Assert.Contains("every agent-owned component", source, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("world.IsInputActionDown", source);
         Assert.Contains("world.WasInputActionPressed", source);
         Assert.Contains("new RekallAgeRuntimeVector3", source);

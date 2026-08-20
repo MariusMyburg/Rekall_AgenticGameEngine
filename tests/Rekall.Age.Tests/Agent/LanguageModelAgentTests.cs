@@ -37,8 +37,12 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("do not introduce JsonObject", prompt, StringComparison.Ordinal);
         Assert.Contains("two separate semantic scalar actions", prompt, StringComparison.Ordinal);
         Assert.Contains("InputActionValue returns double", prompt, StringComparison.Ordinal);
+        Assert.Contains("does not create semantic bindings", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("register every agent-owned component", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("never scaffold that module again", prompt, StringComparison.Ordinal);
         Assert.Contains("non-empty assertions array", prompt, StringComparison.Ordinal);
+        Assert.Contains("first runnable gameplay checkpoint", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("before visual polish", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("package audit does not prove world gameplay", prompt, StringComparison.Ordinal);
         Assert.Contains("call the matched native tool directly", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("then call them through rekall.tools.execute", prompt, StringComparison.Ordinal);
@@ -288,6 +292,101 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task SuccessfulRuntimeBuildPromptsAnImmediateGameplayCheckpoint()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", new JsonObject
+                {
+                    ["assertions"] = new JsonArray(new JsonObject
+                    {
+                        ["entityName"] = "Player",
+                        ["subject"] = "component",
+                        ["operator"] = "exists",
+                        ["componentType"] = "Game.PlayerState"
+                    })
+                })],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Gameplay is proven.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 4,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Contains(
+            model.Requests[2].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("first runnable gameplay checkpoint", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task FailedRuntimeAssertionUnlocksProtectedRepairAndRetestTurns()
+    {
+        var assertionArguments = new JsonObject
+        {
+            ["assertions"] = new JsonArray(new JsonObject
+            {
+                ["entityName"] = "Player",
+                ["subject"] = "component",
+                ["operator"] = "exists",
+                ["componentType"] = "Game.PlayerState"
+            })
+        };
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", assertionArguments)],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.write_source", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", assertionArguments)],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Gameplay now passes.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new FailsFirstRuntimeAssertionToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 3,
+                MaxRuntimeBehaviorRepairTurns = 3,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(5, result.Turns);
+        Assert.Contains(
+            model.Requests[2].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("protected repair", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task SuccessfulDeliveryAuditPrimesTheNextEvidenceBackedFinalResponse()
     {
         var model = new ScriptedModelClient(
@@ -436,6 +535,29 @@ public sealed class LanguageModelAgentTests
         {
             Executions.Add((name, arguments));
             return ValueTask.FromResult<JsonNode>(new JsonObject { ["ready"] = true });
+        }
+    }
+
+    private sealed class FailsFirstRuntimeAssertionToolExecutor : IRekallAgeAgentToolExecutor
+    {
+        private bool _failed;
+
+        public IReadOnlyList<RekallAgeLanguageModelTool> Tools { get; } =
+            [new("inspect", "Inspect", new JsonObject { ["type"] = "object" })];
+
+        public ValueTask<JsonNode> ExecuteAsync(string name, JsonObject arguments, CancellationToken cancellationToken)
+        {
+            if (name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal) && !_failed)
+            {
+                _failed = true;
+                return ValueTask.FromResult<JsonNode>(new JsonObject
+                {
+                    ["ok"] = false,
+                    ["summary"] = "Runtime inspection completed, but one behavior assertion failed."
+                });
+            }
+
+            return ValueTask.FromResult<JsonNode>(new JsonObject { ["ok"] = true });
         }
     }
 

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 18:51 Africa/Johannesburg
+Last verified: 2026-08-20 19:14 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: fresh installed gate passed; arbitrary-game SDK repair verified
+Latest milestone: executable gameplay checkpoints now reserve repair/retest budget
 
 ## Product objective
 
@@ -36,7 +36,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Debug verification: 915/915 engine tests and 6/6 Windows Studio
+- Current Debug verification: 917/917 engine tests and 6/6 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -945,6 +945,16 @@ Studio is important, but it does not define or reorder the engine foundation.
   are not accepted as game-completion proof. The new generic runtime assertion
   path rejects this exact project with `REKALL_RUNTIME_ASSERTION_FAILED` and
   reports the missing player component and bounded actual state.
+- Fresh arbitrary-game benchmark 4 proved that the executable evidence path is
+  real but exposed late-test orchestration. Ollama compiled its authored
+  runtime module, then delayed `rekall.runtime.inspect_scene` until turn 62 of
+  64. The command correctly failed two gameplay assertions and reported zero
+  projected semantic input actions, but only two turns remained and no repair
+  or retest occurred. Independent inspection confirmed no
+  `Rekall.InputActionMap` in the scene and two declared agent-owned state
+  components missing from module registration. This is retained as failure
+  evidence with SHA-256
+  `D6E8C09C180DB20ED4BB63EC6F1526A7303058152F3A111C6E4766787E5ACD32`.
 
 ## Recently completed
 
@@ -973,7 +983,22 @@ mutation; CLI and MCP share the same contract. Focused runtime/agent/CLI tests
 pass, and the malformed benchmark package is independently rejected by the
 new CLI assertion path. The full engine suite passes 915/915, Studio passes
 6/6, and the warning-as-error solution build reports zero warnings and zero
-errors. Benchmark 4 remains next.
+errors. Benchmark 4 then remained the next installed-agent gate.
+
+Benchmark 4's late-test failure is now converted into a generic repair-loop
+contract. The embedded agent receives an immediate first runnable gameplay
+checkpoint after the first successful runtime-module build, before polish,
+cleanup, packaging, or capture. A failed assertion-bearing inspection injects
+the bounded actual values as repair evidence and unlocks a protected 12-turn
+repair/retest reserve instead of ending at the ordinary turn limit. Runtime SDK
+inspection, scaffold comments, and the embedded prompt now state that input
+helpers do not create bindings—agents must author `Rekall.InputActionMap`—and
+that every attached/read/written agent component must be registered. A
+simulated end-of-budget failure now repairs source, reruns assertions, and
+completes inside the reserve. The focused contract selection passes 20/20; the
+full engine suite passes 917/917, Studio passes 6/6, and the warning-as-error
+solution build reports zero warnings and zero errors. Benchmark 5 against a
+fresh distribution is next.
 
 `Echo Foundry` is the first uninterrupted empty-project task-specific game
 creation pass. Local Ollama `qwen3.5:35b` authored the 3D industrial arena,

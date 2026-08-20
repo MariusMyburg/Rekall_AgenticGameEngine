@@ -119,6 +119,22 @@ public sealed class InspectRuntimeSdkCommand
                 Usage = "var horizontal = world.InputActionValue(\"move.horizontal\"); var vertical = world.InputActionValue(\"move.vertical\"); var seconds = context.DeltaTime.TotalSeconds; var nextX = position.X + horizontal * speed * seconds; var nextZ = position.Z + vertical * speed * seconds;"
             },
             new RekallAgeRuntimeSdkContract(
+                "authoring-recipe",
+                "semantic-input-map-recipe",
+                "Rekall.InputActionMap.Actions -> InputActionValue/IsInputActionDown/WasInputActionPressed",
+                "Runtime input helpers consume projected semantic actions; calling a helper does not create a binding. Attach the exact Rekall.InputActionMap component to a scene entity and define an Actions entry for every semantic name the module consumes. Use rekall.module.search_component_schemas for the exact authored component shape.")
+            {
+                Usage = "Author Rekall.InputActionMap Actions for move.horizontal, move.vertical, reset, or the module's own semantic names before runtime inspection."
+            },
+            new RekallAgeRuntimeSdkContract(
+                "module-source",
+                "agent-component-registration-recipe",
+                "builder.RegisterComponent<TComponent>() for each agent-owned component contract",
+                "Register every agent-owned component class that the scene attaches or a runtime system reads or writes. Declaring RekallAgeComponent and RekallAgeProperty attributes alone does not register the contract.")
+            {
+                Usage = "builder.RegisterComponent<PlayerState>(); builder.RegisterComponent<ProgressState>(); builder.RegisterComponent<CollectibleState>();"
+            },
+            new RekallAgeRuntimeSdkContract(
                 "module-source",
                 "module-source-topology",
                 "Modules/<ModuleName>/<ModuleName>.csproj compiles every Modules/<ModuleName>/*.cs file",

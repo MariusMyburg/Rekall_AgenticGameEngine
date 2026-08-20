@@ -52,6 +52,14 @@ public sealed class InspectRuntimeSdkCommandTests
             && contract.Usage.Contains("move.vertical", StringComparison.Ordinal)
             && contract.Description.Contains("returns double", StringComparison.Ordinal)
             && contract.Description.Contains("never access .X or .Y", StringComparison.Ordinal));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "semantic-input-map-recipe"
+            && contract.Description.Contains("Rekall.InputActionMap", StringComparison.Ordinal)
+            && contract.Description.Contains("does not create", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "agent-component-registration-recipe"
+            && contract.Usage!.Contains("RegisterComponent", StringComparison.Ordinal)
+            && contract.Description.Contains("every", StringComparison.OrdinalIgnoreCase));
         Assert.All(result.Value.Contracts, contract => Assert.False(string.IsNullOrWhiteSpace(contract.Signature)));
     }
 

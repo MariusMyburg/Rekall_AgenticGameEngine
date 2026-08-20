@@ -153,7 +153,9 @@ public sealed class ScaffoldRuntimeSystemModuleCommand
         source.AppendLine("        var seconds = context.DeltaTime.TotalSeconds;");
         source.AppendLine();
         source.AppendLine("        // Generic SDK patterns for agent-authored rules:");
+        source.AppendLine("        // Register every agent-owned component declared below and attached/read/written by this module with builder.RegisterComponent<T>().");
         source.AppendLine("        // InputActionValue returns double, not a vector; two-axis movement uses separate semantic actions:");
+        source.AppendLine("        // Calling an input helper does not create bindings; attach Rekall.InputActionMap with an Actions entry for every consumed semantic name.");
         source.AppendLine("        // var horizontal = world.InputActionValue(\"move.horizontal\");");
         source.AppendLine("        // var vertical = world.InputActionValue(\"move.vertical\");");
         source.AppendLine("        // var held = world.IsInputActionDown(\"agent.authored.action\");");

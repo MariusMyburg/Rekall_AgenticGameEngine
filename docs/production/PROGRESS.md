@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 20:51 Africa/Johannesburg
+Last verified: 2026-08-20 21:38 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: copyable gameplay-checkpoint argument repair
+Latest milestone: model-capability-aware Ollama requests
 
 ## Product objective
 
@@ -36,7 +36,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Release verification: 924/924 engine tests and 7/7 Windows Studio
+- Current Release verification: 925/925 engine tests and 7/7 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -49,7 +49,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   created a project from no prior files, traversed its Ollama adapter and agent
   tool loop, completed the gauntlet, captured a nonblank viewport, and produced
   a packaged game under deterministic model responses.
-- Local agent: Ollama currently uses `qwen3.5:35b` through its native API.
+- Local agent: the user-authorized model evaluation currently uses
+  `devstral-small-2:24b` through Ollama's native API. It is a 15 GB Q4 model
+  explicitly intended for tool-driven agentic software engineering and fits
+  inside this machine's 32 GB RTX 5090 VRAM. `qwen3.5:35b` was removed first
+  at the user's request to free disk space; it remains the fallback if direct
+  AGE evidence shows Devstral is worse.
 - Studio authoring: project create/open, entity hierarchy/selection, generic
   entity/component/property mutation, scene validation, software-rendered
   viewport capture, and Windows player launch/stop now execute through the
@@ -1042,8 +1047,31 @@ Studio is important, but it does not define or reorder the engine foundation.
   guessed built-in component names/properties introduced by late wholesale
   blueprint replacements. Evidence SHA-256 is
   `CBFA0484D85CA1447191CF0FD23DF96C6AD843DADCC80D3DBFC0B643BBF76A59`.
+- Fresh arbitrary-game benchmark 12 attempted the unchanged task with
+  `devstral-small-2:24b` against the 1,177-file product built from `ef6cf3d`;
+  its 200,965,841-byte archive SHA-256 is
+  `3A2B8744CFB95958B247EE35C10F97E48A069749DAB2A934AF4EC79B985FB40F`.
+  The run stopped before its first tool because AGE sent Ollama's optional
+  `think: medium` field and Devstral explicitly returned HTTP 400, "does not
+  support thinking." This is retained as provider-compatibility failure
+  evidence, not a comparison of game-authoring quality. Evidence SHA-256 is
+  `2AAB90FF76E7B1B2C60276979958166AD2AF12F2E4310F8B411B8594454E147A`.
+  Independent native-API smokes then proved Devstral selects a registered tool
+  and emits the exact four-field `Game.*` component assertion plus a strict
+  transform delta that Benchmark 11 repeatedly malformed.
 
 ## Recently completed
+
+Benchmark 12's model-capability mismatch now has a bounded adapter fallback.
+When—and only when—Ollama returns HTTP 400 stating that the selected model does
+not support thinking, the adapter removes the optional `think` field and
+retries once. Other 4xx failures still surface unchanged; existing bounded
+5xx/rate-limit/timeout recovery remains intact. The regression proves the
+first request contains `think`, the compatible retry omits it, and the response
+is retained. All four Ollama adapter tests pass. The complete Release engine
+suite passes 925/925, Studio passes 7/7, and the warning-as-error solution build
+reports zero warnings and zero errors. Fresh Benchmark 13 is Devstral's first
+valid full comparison gate.
 
 Benchmark 11's repeated assertion-field inversion now receives a copyable,
 structured repair. Checkpoint failures expose the required four-field
@@ -1310,7 +1338,7 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 ## In progress
 
 The current item remains the actual AI game-creation loop. Assemble fresh
-binaries containing copyable checkpoint argument repair, then run Benchmark 12
+binaries containing model-capability-aware Ollama fallback, then run Benchmark 13
 through real local Ollama, then independently inspect its scene, source, input
 projection, and runtime transitions. Require clean validation, informative
 capture, compiled agent-authored behavior, a playable relocated package, and a

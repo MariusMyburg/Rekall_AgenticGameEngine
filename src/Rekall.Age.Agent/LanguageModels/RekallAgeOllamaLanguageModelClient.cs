@@ -65,6 +65,7 @@ public sealed class RekallAgeOllamaLanguageModelClient : IRekallAgeLanguageModel
             payload["options"] = new JsonObject { ["temperature"] = temperature };
         }
 
+        var unsupportedThinkRecovered = false;
         for (var attempt = 0; ; attempt++)
         {
             using var response = await _httpClient.PostAsJsonAsync(
@@ -78,6 +79,19 @@ public sealed class RekallAgeOllamaLanguageModelClient : IRekallAgeLanguageModel
             {
                 await Task.Delay(RetryDelays[attempt], cancellationToken);
                 continue;
+            }
+
+            if (!unsupportedThinkRecovered
+                && payload.ContainsKey("think")
+                && response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (errorBody.Contains("does not support thinking", StringComparison.OrdinalIgnoreCase))
+                {
+                    payload.Remove("think");
+                    unsupportedThinkRecovered = true;
+                    continue;
+                }
             }
 
             await EnsureSuccessAsync(response, cancellationToken);

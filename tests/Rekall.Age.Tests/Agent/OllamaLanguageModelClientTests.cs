@@ -99,6 +99,39 @@ public sealed class OllamaLanguageModelClientTests
         Assert.Equal("recovered", response.Content);
     }
 
+    [Fact]
+    public async Task ChatRetriesWithoutThinkWhenModelDoesNotSupportThinking()
+    {
+        var requestBodies = new List<string>();
+        var handler = new StubHandler(async request =>
+        {
+            requestBodies.Add(await request.Content!.ReadAsStringAsync());
+            return requestBodies.Count == 1
+                ? JsonResponse(
+                    """{"error":"\"devstral-small-2:24b\" does not support thinking"}""",
+                    HttpStatusCode.BadRequest)
+                : JsonResponse("""
+                    {
+                      "model":"devstral-small-2:24b",
+                      "message":{"role":"assistant","content":"compatible","tool_calls":[]},
+                      "done":true,
+                      "done_reason":"stop"
+                    }
+                    """);
+        });
+        using var http = new HttpClient(handler);
+        var client = new RekallAgeOllamaLanguageModelClient(http, new Uri("http://localhost:11434"));
+
+        var response = await client.ChatAsync(
+            new RekallAgeLanguageModelRequest("devstral-small-2:24b", [], []) { Think = "medium" },
+            CancellationToken.None);
+
+        Assert.Equal(2, requestBodies.Count);
+        Assert.Equal("medium", JsonNode.Parse(requestBodies[0])!["think"]!.GetValue<string>());
+        Assert.Null(JsonNode.Parse(requestBodies[1])!["think"]);
+        Assert.Equal("compatible", response.Content);
+    }
+
     private static HttpResponseMessage JsonResponse(
         string json,
         HttpStatusCode statusCode = HttpStatusCode.OK) => new(statusCode)

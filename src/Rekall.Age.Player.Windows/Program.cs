@@ -219,12 +219,14 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly ConcurrentQueue<LiveEditWorkItem> _liveEditQueue = new();
     private readonly RekallAgeLivePlayerNamedPipeServer _liveServer;
     private FileSystemWatcher? _assetWatcher;
+    private FileSystemWatcher? _shaderWatcher;
     private readonly Sdl2Window _window;
     private readonly GraphicsDevice _device;
     private readonly ResourceFactory _factory;
     private readonly CommandList _commands;
     private readonly Pipeline _scenePipeline;
     private readonly Pipeline _sceneTransparentPipeline;
+    private readonly RekallAgeVeldridShaderPipelineCache _shaderPipelineCache;
     private readonly Pipeline _presentPipeline;
     private readonly Pipeline _hudPipeline;
     private readonly ResourceLayout _frameLayout;
@@ -298,6 +300,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private int _assetRevision = 1;
     private int _assetHotReloadPending;
     private long _lastAssetHotReloadRequestTicks;
+    private int _shaderHotReloadPending;
+    private long _lastShaderHotReloadRequestTicks;
     private CachedRenderGeometry? _cachedStaticGeometry;
     private bool _hudDirty = true;
     private RekallAgeSceneDocument _sceneDocument;
@@ -324,6 +328,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         CommandList commands,
         Pipeline scenePipeline,
         Pipeline sceneTransparentPipeline,
+        RekallAgeVeldridShaderPipelineCache shaderPipelineCache,
         Pipeline presentPipeline,
         Pipeline hudPipeline,
         ResourceLayout frameLayout,
@@ -371,6 +376,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _commands = commands;
         _scenePipeline = scenePipeline;
         _sceneTransparentPipeline = sceneTransparentPipeline;
+        _shaderPipelineCache = shaderPipelineCache;
         _presentPipeline = presentPipeline;
         _hudPipeline = hudPipeline;
         _frameLayout = frameLayout;
@@ -625,6 +631,14 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         {
             shader.Dispose();
         }
+        var shaderPipelineCache = new RekallAgeVeldridShaderPipelineCache(
+            projectRoot,
+            factory,
+            sceneVertexLayout,
+            [frameLayout, drawLayout, materialLayout],
+            initialSceneTarget.Framebuffer.OutputDescription,
+            device.WaitForIdle,
+            PlayerLog.Write);
 
         PlayerLog.Write("Creating GPU buffers.");
         var vertexBuffer = factory.CreateBuffer(new BufferDescription(
@@ -720,6 +734,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             commands,
             scenePipeline,
             sceneTransparentPipeline,
+            shaderPipelineCache,
             presentPipeline,
             hudPipeline,
             frameLayout,
@@ -755,6 +770,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             openXrEyeHeight);
         player.StartLiveEditServer();
         player.StartAssetHotReloadWatcher();
+        player.StartShaderHotReloadWatcher();
         var windowedVrPlan = RekallAgeWindowedPlayableVrSessionPlanner.Plan(
             openXrRequested,
             openXrStatus?.HeadsetSessionReady == true,
@@ -874,6 +890,27 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _assetWatcher.Renamed += (_, _) => MarkAssetHotReloadPending();
         _assetWatcher.EnableRaisingEvents = true;
         PlayerLog.Write($"Asset hot reload watching {assetsRoot}.");
+    }
+
+    private void StartShaderHotReloadWatcher()
+    {
+        var shadersRoot = Path.Combine(_projectRoot, "Shaders");
+        Directory.CreateDirectory(shadersRoot);
+        _shaderWatcher = new FileSystemWatcher(shadersRoot)
+        {
+            IncludeSubdirectories = true,
+            NotifyFilter = NotifyFilters.FileName
+                | NotifyFilters.DirectoryName
+                | NotifyFilters.LastWrite
+                | NotifyFilters.Size
+                | NotifyFilters.CreationTime
+        };
+        _shaderWatcher.Changed += (_, _) => MarkShaderHotReloadPending();
+        _shaderWatcher.Created += (_, _) => MarkShaderHotReloadPending();
+        _shaderWatcher.Deleted += (_, _) => MarkShaderHotReloadPending();
+        _shaderWatcher.Renamed += (_, _) => MarkShaderHotReloadPending();
+        _shaderWatcher.EnableRaisingEvents = true;
+        PlayerLog.Write($"Shader hot reload watching {shadersRoot}.");
     }
 
     public int Run(int frameLimit = 0, Action<int>? beforeFrame = null)
@@ -1084,6 +1121,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         }
 
         Cleanup("asset-watcher", () => _assetWatcher?.Dispose());
+        Cleanup("shader-watcher", () => _shaderWatcher?.Dispose());
         Cleanup("audio-output", () => _audioOutput?.Dispose());
         Cleanup("playable-game", () => _playableGame?.Dispose());
         Cleanup("runtime-loop", _runtimeLoop.Dispose);
@@ -1128,6 +1166,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Cleanup("flat-normal-texture", _flatNormalTexture.Dispose);
         Cleanup("metallic-roughness-texture", _defaultMetallicRoughnessTexture.Dispose);
         Cleanup("hud-texture", _hudTexture.Dispose);
+        Cleanup("project-shader-pipelines", _shaderPipelineCache.Dispose);
         Cleanup("scene-pipeline", _scenePipeline.Dispose);
         Cleanup("scene-transparent-pipeline", _sceneTransparentPipeline.Dispose);
         Cleanup("present-pipeline", _presentPipeline.Dispose);
@@ -1612,6 +1651,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
         ProcessLiveEditQueue();
         ProcessAssetHotReload();
+        ProcessShaderHotReload();
         var frameNumber = Interlocked.Increment(ref _frameIndex);
         AdvanceSimulationToWallClock();
         var frame = _frameBuilder.Build(
@@ -1816,11 +1856,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     private void DrawScenePacket(RenderPacket packet)
     {
-        _commands.SetPipeline(_scenePipeline);
-        _commands.SetGraphicsResourceSet(0, _frameSet);
         DrawScenePacketPass(packet, transparent: false);
-        _commands.SetPipeline(_sceneTransparentPipeline);
-        _commands.SetGraphicsResourceSet(0, _frameSet);
         DrawScenePacketPass(packet, transparent: true);
     }
 
@@ -1833,6 +1869,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             {
                 continue;
             }
+
+            var pipeline = draw.ShaderPipeline is null
+                ? transparent ? _sceneTransparentPipeline : _scenePipeline
+                : _shaderPipelineCache.Resolve(draw.ShaderPipeline, transparent).Pipeline;
+            _commands.SetPipeline(pipeline);
+            _commands.SetGraphicsResourceSet(0, _frameSet);
 
             var drawUniformOffset = checked(_drawUniformStrideBytes * (uint)i);
             _drawUniformDynamicOffsets[0] = drawUniformOffset;
@@ -1859,6 +1901,32 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _audioSubmissionLogged = true;
             PlayerLog.Write($"Audio output queued runtime mix frames={audioOutput.SubmittedFrameCount} bytes={audioOutput.QueuedBytes}.");
         }
+    }
+
+    private void MarkShaderHotReloadPending()
+    {
+        Interlocked.Exchange(ref _lastShaderHotReloadRequestTicks, Stopwatch.GetTimestamp());
+        Interlocked.Exchange(ref _shaderHotReloadPending, 1);
+    }
+
+    private void ProcessShaderHotReload()
+    {
+        if (Volatile.Read(ref _shaderHotReloadPending) == 0)
+        {
+            return;
+        }
+
+        var elapsedSeconds = (Stopwatch.GetTimestamp() - Volatile.Read(ref _lastShaderHotReloadRequestTicks))
+            / (double)Stopwatch.Frequency;
+        if (elapsedSeconds < 0.5
+            || Interlocked.Exchange(ref _shaderHotReloadPending, 0) == 0)
+        {
+            return;
+        }
+
+        _shaderPipelineCache.InvalidateAll();
+        _cachedStaticGeometry = null;
+        PlayerLog.Write("Project shader pipelines invalidated after debounced filesystem change.");
     }
 
     private RekallAgeRuntimeInputState ConsumeRuntimeInput()
@@ -2097,7 +2165,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 draw.CloudColor,
                 draw.CloudShadowFactors,
                 draw.SurfaceWaterFactors,
-                draw.Transparent));
+                draw.Transparent,
+                draw.ShaderPipeline));
         }
 
         var indices = cachedGeometry?.Indices;
@@ -3943,7 +4012,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Vector4 CloudColor,
         Vector4 CloudShadowFactors,
         Vector4 SurfaceWaterFactors,
-        bool Transparent);
+        bool Transparent,
+        RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline);
 
     private readonly record struct MaterialKey(
         string? BaseColorTextureId,

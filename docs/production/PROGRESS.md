@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 01:17 Africa/Johannesburg
+Last verified: 2026-08-21 01:27 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: agent-authored project shaders execute per draw in native
-Vulkan capture with fail-closed diagnostics
+Latest milestone: agent-authored project shaders execute and hot-reload safely
+in the windowed Windows Vulkan player
 
 ## Product objective
 
@@ -65,6 +65,16 @@ Studio is important, but it does not define or reorder the engine foundation.
   mixed two-draw frame retains both magenta custom output and green default
   output. The focused locked Release selection passes 45/45 with warnings
   treated as errors.
+- Windowed programmable-shader execution: the Veldrid player now resolves and
+  caches project pipelines by content hash, selects authored or default opaque
+  and transparent pipelines per draw, and keeps resource binding ordered after
+  pipeline selection. A recursive debounced `Shaders/` watcher invalidates live
+  entries; invalid edits retain the last valid pipeline with a structured log,
+  while a 64-pair bound prevents unbounded GPU residency. A real three-frame
+  Windows Vulkan process created and drew an assigned shader successfully, and
+  a real 300-frame process survived an intentionally corrupted live fragment
+  shader after startup. The Windows Release build has zero warnings/errors and
+  the focused locked Release selection passes 3/3.
 - Persistent 3D physics: the runtime now retains a BEPU simulation across
   frames, incrementally synchronizes bodies and statics, preserves angular
   motion/orientation and sleep state, and lets BEPU own contact response.
@@ -1546,14 +1556,15 @@ now verified. Further physics breadth should be driven by the real Qwen
 benchmark, with likely candidates being exact contact evidence, collision
 filtering, constraints, or authored angular control rather than genre behavior.
 
-The programmable-rendering architecture is in execution. Tasks 1-3 are verified:
+The programmable-rendering architecture is in execution. Tasks 1-4 are verified:
 existing agent-visible shader authoring and assignment metadata now resolves to
 reflected, content-addressed, ABI-validated shader assets, and incompatible
 pairs cannot alter a scene, authored shader identity reaches each GPU draw,
 and native Vulkan capture executes the selected project pipeline with measured
-pixel proof. Task 4 is active: execute, cache, and safely hot-reload the same
-pipelines in the windowed Windows player. Inspection/package closure and
-end-to-end installed hardware proof follow. Custom post-processing, dynamic
+pixel proof. The windowed Windows player executes the same authored sources and
+retains its last valid pipeline across broken live edits. Task 5 is active:
+agent inspection, project validation, and package integrity. End-to-end
+installed hardware proof follows. Custom post-processing, dynamic
 geometry, and typed GPU resources are
 separate subsequent tranches; the first post-process proof will be an
 agent-authored raindrop shader rather than an engine rain feature.

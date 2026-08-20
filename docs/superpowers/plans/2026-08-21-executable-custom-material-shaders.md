@@ -232,7 +232,7 @@ git commit -m "feat: execute project shaders in Vulkan capture"
 - Consumes: Task 1 resolved source/SPIR-V/reflection and Task 2 draw references.
 - Produces: `RekallAgeVeldridShaderPipelineCache.Resolve(...)`, `InvalidateChangedFiles(...)`, and retained-last-valid behavior.
 
-- [ ] **Step 1: Write failing cache and source-contract tests**
+- [x] **Step 1: Write failing cache and source-contract tests**
 
 Extract player pipeline creation behind a testable cache contract. Assert one
 creation per content key/transparency pair, correct pipeline selection per
@@ -247,13 +247,13 @@ cache.InvalidateChangedFiles([fragmentPath]);
 Assert.True(cache.Resolve(invalidReplacement, false).RetainedPreviousValid);
 ```
 
-- [ ] **Step 2: Run focused player contract tests and verify red**
+- [x] **Step 2: Run focused player contract tests and verify red**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --no-restore -warnaserror --filter "FullyQualifiedName~VeldridShaderPipelineContractTests|FullyQualifiedName~WindowsPlayerSourceTests"
 ```
 
-- [ ] **Step 3: Implement Veldrid pipeline caching and draw selection**
+- [x] **Step 3: Implement Veldrid pipeline caching and draw selection**
 
 Create project shaders with `ResourceFactory.CreateFromSpirv` from the resolved
 GLSL sources and the ABI version 1 vertex/resource layouts. Cache opaque and
@@ -261,7 +261,7 @@ transparent pipelines separately by content key. In `DrawScenePacketPass`,
 select the draw's cached pipeline or the engine default for `null`; keep frame,
 draw, and material resource-set binding unchanged.
 
-- [ ] **Step 4: Add bounded shader hot reload**
+- [x] **Step 4: Add bounded shader hot reload**
 
 Extend the existing project watcher to include `Shaders/**/*.vert` and
 `Shaders/**/*.frag`. Debounce changes, resolve on a worker, and enqueue only a
@@ -271,7 +271,7 @@ and compiler/ABI errors. Dispose superseded pipelines only after the current
 submitted frame is complete; the first implementation may use
 `GraphicsDevice.WaitForIdle()` at the debounced replacement boundary.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
 Run Step 2 and expect pass, then:
 

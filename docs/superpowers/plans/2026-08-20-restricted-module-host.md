@@ -111,16 +111,16 @@ PowerShell installed acceptance.
 
 **Steps:**
 
-- [ ] Write server tests using memory/anonymous streams and a verified fixture
+- [x] Write server tests using memory/anonymous streams and a verified fixture
   module for initialize, system priority/ID discovery, component schemas,
   runtime mutation, playable state/tick/render, shutdown, and state persistence.
-- [ ] Add adversarial tests for operation-before-initialize, duplicate init,
+- [x] Add adversarial tests for operation-before-initialize, duplicate init,
   unknown system, malformed module output, module throw, response bounds,
   bounded error projection, and sequence violations; run red.
-- [ ] Add the worker project and implement the single-request session loop with
+- [x] Add the worker project and implement the single-request session loop with
   source-generated serialization metadata.
-- [ ] Ensure stdout is protocol-only and bounded diagnostics go to stderr.
-- [ ] Run server/protocol/module tests, inspect process lifetime manually with a
+- [x] Ensure stdout is protocol-only and bounded diagnostics go to stderr.
+- [x] Run server/protocol/module tests, inspect process lifetime manually with a
   finite fixture, and commit the deterministic worker.
 
 ---

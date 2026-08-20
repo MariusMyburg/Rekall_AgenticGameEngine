@@ -55,6 +55,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rekall.Age.Player.Windows",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rekall.Age.Workflows", "src\Rekall.Age.Workflows\Rekall.Age.Workflows.csproj", "{5DCE9BB8-8B06-46E6-A49A-4E2508314551}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rekall.Age.ModuleHost", "src\Rekall.Age.ModuleHost\Rekall.Age.ModuleHost.csproj", "{E2B4BD55-05BE-438E-B54F-2912584627A5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -353,6 +355,18 @@ Global
 		{5DCE9BB8-8B06-46E6-A49A-4E2508314551}.Release|x64.Build.0 = Release|Any CPU
 		{5DCE9BB8-8B06-46E6-A49A-4E2508314551}.Release|x86.ActiveCfg = Release|Any CPU
 		{5DCE9BB8-8B06-46E6-A49A-4E2508314551}.Release|x86.Build.0 = Release|Any CPU
+		{E2B4BD55-05BE-438E-B54F-2912584627A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E2B4BD55-05BE-438E-B54F-2912584627A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E2B4BD55-05BE-438E-B54F-2912584627A5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E2B4BD55-05BE-438E-B54F-2912584627A5}.Debug|x64.Build.0 = Debug|Any CPU
+		{E2B4BD55-05BE-438E-B54F-2912584627A5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E2B4BD55-05BE-438E-B54F-2912584627A5}.Debug|x86.Build.0 = Debug|Any CPU
+		{E2B4BD55-05BE-438E-B54F-2912584627A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E2B4BD55-05BE-438E-B54F-2912584627A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E2B4BD55-05BE-438E-B54F-2912584627A5}.Release|x64.ActiveCfg = Release|Any CPU
+		{E2B4BD55-05BE-438E-B54F-2912584627A5}.Release|x64.Build.0 = Release|Any CPU
+		{E2B4BD55-05BE-438E-B54F-2912584627A5}.Release|x86.ActiveCfg = Release|Any CPU
+		{E2B4BD55-05BE-438E-B54F-2912584627A5}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -382,5 +396,6 @@ Global
 		{B82C48FC-3170-48BF-A31C-3F3A3BD3D74A} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{CAFDD0A3-61D2-4F06-9314-0A92EB731C00} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{5DCE9BB8-8B06-46E6-A49A-4E2508314551} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{E2B4BD55-05BE-438E-B54F-2912584627A5} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

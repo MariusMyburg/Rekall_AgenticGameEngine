@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 14:01 Africa/Johannesburg
+Last verified: 2026-08-20 14:19 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -906,6 +906,21 @@ and adversarial coverage for malformed, truncated, oversized, invalid UTF-8,
 unknown-version/operation, inconsistent response, and typed-payload cases. The
 next witnessed-red slice is the deterministic worker server; no production
 consumer has been cut over yet.
+
+Restricted module host Task 2 is verified by 23 focused protocol/worker tests,
+a zero-warning Debug solution build, and the complete 866/866 Debug suite. The
+new `Rekall.Age.ModuleHost.exe` runs a persistent single-request session over
+protocol-only standard output, independently rechecks its confined load plan
+and every artifact hash, discovers ordered system IDs/priorities and component
+schemas, retains playable state, and executes typed runtime/playable calls with
+source-generated JSON metadata. A real child-process test completed finite
+initialize/shutdown framing with clean stderr. Adversarial proof covers calls
+before initialization, duplicate initialization, unknown systems, traversal,
+post-plan DLL mutation, sequence violations, a 5,000-character module throw,
+and non-JSON `NaN` render output; failures are bounded, coded, stack-free, and
+terminate the session. This is still an ordinary diagnostic worker until Task
+3 adds immutable staging, AppContainer launch, explicit handle inheritance,
+job limits, timeouts, and broker lifecycle ownership.
 
 The completed persisted-document recovery tranche began because atomic
 publication and optimistic revisions now prevent torn and stale engine writes,

@@ -10,10 +10,10 @@ create, author, inspect, edit, render, play, and verify desktop workflow.
 
 ### Task 1: Command-backed workbench session
 
-- [ ] Add failing session tests for create/open/reload, scene switching,
+- [x] Add failing session tests for create/open/reload, scene switching,
   selection, command execution, transaction append, structured failures, and
   model refresh.
-- [ ] Implement a UI-independent async session in `Rekall.Age.Editor` over the
+- [x] Implement a UI-independent async session in `Rekall.Age.Editor` over the
   canonical command registry and workbench model builder.
 - [ ] Add validate, capture, undo, redo, play, and stop lifecycle operations;
   prove cancellation and failed-command state preservation.

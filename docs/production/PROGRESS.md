@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 14:44 Africa/Johannesburg
+Last verified: 2026-08-20 14:56 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: restricted module host checkpoint; game-creation vertical slice selected
+Latest milestone: command-backed game-creation workbench session foundation
 
 ## Product objective
 
@@ -899,6 +899,17 @@ description to agent-authored project files to an editable, validated,
 visually rendered, playable game. This is not a pivot to superficial Studio
 chrome; Studio and the embedded agent must consume the same generic command
 contracts exposed through MCP and CLI.
+
+AI game-creation Task 1 has its first verified checkpoint at 12/12 combined
+workbench tests. A new UI-independent workbench session now creates projects
+and scenes through canonical commands, opens and switches scenes, executes
+dynamic registered commands, appends their transactions, reloads external
+agent changes, refreshes the canonical read model, preserves the last valid
+model on failure, and carries explicit entity selection into the structured
+inspector. The model builder no longer silently resets selection to the first
+entity. This is reusable engine/application state rather than WPF-only logic;
+validate/capture, undo/redo, player ownership, and Studio wiring are the next
+active slice.
 
 The restricted module-host tranche is paused at commit `4e43119`, a stable
 native containment and typed-broker checkpoint. Project-write denial and

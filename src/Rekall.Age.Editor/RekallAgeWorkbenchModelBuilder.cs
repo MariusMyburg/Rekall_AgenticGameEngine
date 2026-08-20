@@ -42,7 +42,8 @@ public sealed class RekallAgeWorkbenchModelBuilder
     public async ValueTask<RekallAgeWorkbenchModel> BuildAsync(
         string projectRoot,
         string activeSceneName,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? selectedEntityId = null)
     {
         var manifest = await _projectStore.LoadAsync(projectRoot, cancellationToken);
         var scene = await _sceneStore.LoadAsync(projectRoot, activeSceneName, cancellationToken);
@@ -68,7 +69,7 @@ public sealed class RekallAgeWorkbenchModelBuilder
                         name.Equals(activeSceneName, StringComparison.Ordinal)))
                     .ToArray()),
             BuildSceneGraph(scene),
-            BuildInspector(scene),
+            BuildInspector(scene, selectedEntityId),
             new RekallAgeAssetBrowserModel(
                 assets.Assets
                     .OrderBy(asset => asset.Kind, StringComparer.Ordinal)
@@ -138,9 +139,14 @@ public sealed class RekallAgeWorkbenchModelBuilder
             children);
     }
 
-    private static RekallAgeInspectorModel BuildInspector(RekallAgeSceneDocument scene)
+    private static RekallAgeInspectorModel BuildInspector(
+        RekallAgeSceneDocument scene,
+        string? selectedEntityId)
     {
-        var selected = scene.Entities.OrderBy(entity => entity.Name, StringComparer.Ordinal).FirstOrDefault();
+        var selected = string.IsNullOrWhiteSpace(selectedEntityId)
+            ? null
+            : scene.Entities.FirstOrDefault(entity => entity.Id.Equals(selectedEntityId, StringComparison.Ordinal));
+        selected ??= scene.Entities.OrderBy(entity => entity.Name, StringComparer.Ordinal).FirstOrDefault();
         if (selected is null)
         {
             return new RekallAgeInspectorModel(null, null, Array.Empty<RekallAgeInspectorComponentModel>());

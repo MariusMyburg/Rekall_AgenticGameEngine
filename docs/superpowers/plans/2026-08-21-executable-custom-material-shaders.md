@@ -127,7 +127,7 @@ git commit -m "feat: validate reflected project shader pipelines"
 - Consumes: `RekallAgeRuntimeViewportRenderable.ShaderPipeline`.
 - Produces: nullable `RekallAgeRuntimeViewportShaderPipeline ShaderPipeline` on `RekallAgeVulkanSceneMesh` and `RekallAgeVulkanSceneDraw`.
 
-- [ ] **Step 1: Write failing propagation tests**
+- [x] **Step 1: Write failing propagation tests**
 
 ```csharp
 var pipeline = new RekallAgeRuntimeViewportShaderPipeline("agent/tint", "agent/tint");
@@ -138,20 +138,20 @@ var draw = Assert.Single(new RekallAgeVulkanSceneBatchBuilder().Build(frame, [me
 Assert.Equal(pipeline, draw.ShaderPipeline);
 ```
 
-- [ ] **Step 2: Run the focused batch tests and verify red**
+- [x] **Step 2: Run the focused batch tests and verify red**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --no-restore -warnaserror --filter "FullyQualifiedName~VulkanSceneMeshBuilderTests|FullyQualifiedName~VulkanSceneBatchBuilderTests"
 ```
 
-- [ ] **Step 3: Add immutable pipeline references to mesh and draw records**
+- [x] **Step 3: Add immutable pipeline references to mesh and draw records**
 
 Copy the viewport pipeline reference without resolving files in the pure mesh
 or batch builders. Preserve `null` as the engine default pipeline. Ensure mesh
 chunking, imported GLB primitives, virtual geometry, skinning, and morph paths
 copy the same reference to every derived mesh/draw.
 
-- [ ] **Step 4: Run focused tests and commit**
+- [x] **Step 4: Run focused tests and commit**
 
 Run Step 2 and expect pass, then:
 

@@ -1,4 +1,5 @@
 using System.Numerics;
+using Rekall.Age.Rendering.Abstractions;
 
 namespace Rekall.Age.Rendering;
 
@@ -33,7 +34,8 @@ public sealed record RekallAgeVulkanSceneDraw(
     Vector4 CloudColor = default,
     Vector4 CloudShadowFactors = default,
     Vector4 SurfaceWaterFactors = default,
-    bool Transparent = false);
+    bool Transparent = false,
+    RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null);
 
 public sealed record RekallAgeVulkanSceneFrameUniform(
     Matrix4x4 ViewProjection,

@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 01:08 Africa/Johannesburg
+Last verified: 2026-08-21 01:12 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: reflected, content-addressed project shader pipelines with
-scene-material ABI validation before assignment
+Latest milestone: authored shader identity preserved from viewport renderables
+through every mesh and draw batch
 
 ## Product objective
 
@@ -49,6 +49,12 @@ Studio is important, but it does not define or reorder the engine foundation.
   scene mutation. The focused locked Release selection passes 11/11 with
   warnings treated as errors; no vulnerable legacy reflection dependency was
   accepted.
+- Shader draw propagation: authored shader-pipeline references now survive the
+  generic viewport-to-mesh material binding path (including primitives,
+  authored geometry, imported models, morphs, skinning, and virtual geometry)
+  and are copied to the immutable draw range consumed by GPU backends. The
+  focused locked Release mesh/batch selection passes 44/44 with warnings
+  treated as errors.
 - Persistent 3D physics: the runtime now retains a BEPU simulation across
   frames, incrementally synchronizes bodies and statics, preserves angular
   motion/orientation and sleep state, and lets BEPU own contact response.
@@ -1530,11 +1536,12 @@ now verified. Further physics breadth should be driven by the real Qwen
 benchmark, with likely candidates being exact contact evidence, collision
 filtering, constraints, or authored angular control rather than genre behavior.
 
-The programmable-rendering architecture is in execution. Task 1 is verified:
+The programmable-rendering architecture is in execution. Tasks 1 and 2 are verified:
 existing agent-visible shader authoring and assignment metadata now resolves to
 reflected, content-addressed, ABI-validated shader assets, and incompatible
-pairs cannot alter a scene. Task 2 is active: preserve each authored pipeline
-through mesh construction and draw batching. Native Vulkan execution, Windows
+pairs cannot alter a scene, and authored shader identity now reaches each
+GPU draw. Task 3 is active: execute and cache those pipelines in native Vulkan
+capture. Windows
 pipeline caching/hot reload, inspection/package closure, and hardware proof
 follow. Custom post-processing, dynamic geometry, and typed GPU resources are
 separate subsequent tranches; the first post-process proof will be an

@@ -7,6 +7,28 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VulkanSceneBatchBuilderTests
 {
     [Fact]
+    public void BuildPreservesAuthoredShaderPipelineOnDraw()
+    {
+        var pipeline = new RekallAgeRuntimeViewportShaderPipeline("agent/tint", "agent/tint");
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "cube-1",
+            "Shader Cube",
+            "mesh",
+            "rekall.primitive.cube",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.geometry.cube",
+            ShaderPipeline: pipeline));
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame));
+
+        var draw = Assert.Single(new RekallAgeVulkanSceneBatchBuilder().Build(frame, [mesh]).Draws);
+
+        Assert.Equal(pipeline, draw.ShaderPipeline);
+    }
+
+    [Fact]
     public void BuildPreservesLocalVerticesAndCreatesPerMeshDraws()
     {
         var frame = CreateFrame(

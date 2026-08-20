@@ -117,7 +117,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
                 mesh.CloudLayer?.Color ?? Vector4.Zero,
                 mesh.CloudShadow?.Factors ?? Vector4.Zero,
                 mesh.SurfaceWater?.Factors ?? Vector4.Zero,
-                isTransparent));
+                isTransparent,
+                mesh.ShaderPipeline));
             foreach (var vertex in mesh.Vertices)
             {
                 var world = Vector3.Transform(new Vector3(vertex.X, vertex.Y, vertex.Z), model);

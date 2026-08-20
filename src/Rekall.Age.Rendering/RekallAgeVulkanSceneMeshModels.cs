@@ -1,4 +1,5 @@
 using System.Numerics;
+using Rekall.Age.Rendering.Abstractions;
 
 namespace Rekall.Age.Rendering;
 
@@ -37,6 +38,8 @@ public sealed record RekallAgeVulkanSceneMesh(
     public IReadOnlyList<float> DefaultMorphWeights { get; init; } = Array.Empty<float>();
 
     public string MorphWeightSource { get; init; } = "none";
+
+    public RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline { get; init; }
 }
 
 public sealed record RekallAgeVulkanSceneMorphTarget(

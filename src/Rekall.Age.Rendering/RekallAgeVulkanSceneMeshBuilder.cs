@@ -315,7 +315,8 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             Atmosphere = ResolveAtmosphere(renderable),
             CloudLayer = ResolveCloudLayer(renderable),
             CloudShadow = ResolveCloudShadow(renderable),
-            SurfaceWater = ResolveSurfaceWater(renderable)
+            SurfaceWater = ResolveSurfaceWater(renderable),
+            ShaderPipeline = renderable.ShaderPipeline
         };
     }
 

@@ -51,7 +51,9 @@ The production posture is `windows-appcontainer-restricted`. It means:
 - the derived package SID receives read/execute access only to the broker-owned
   staged host/runtime and module inventory;
 - the worker receives project/scene/runtime data only through inherited pipe
-  handles and cannot open the project root;
+  handles and cannot open the project root; the broker uses
+  `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` so no unrelated inheritable handle crosses
+  the boundary;
 - a job object enforces kill-on-close, active-process limit 1, and a 512 MiB
   process/job memory ceiling;
 - startup is limited to 10 seconds and each request to 250 milliseconds by

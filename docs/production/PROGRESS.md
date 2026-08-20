@@ -890,8 +890,9 @@ SDK, verified receipt admission, and runtime priority semantics, but moves all
 project-assembly execution and reflection into a no-network AppContainer worker
 with kill-on-close, one-process and memory job limits, bounded framed IPC,
 timeouts, and no silent in-process fallback. The reviewed design is
-`docs/superpowers/specs/2026-08-20-restricted-module-host-design.md`; its next
-step is a TDD implementation plan.
+`docs/superpowers/specs/2026-08-20-restricted-module-host-design.md`, with the
+TDD sequence in
+`docs/superpowers/plans/2026-08-20-restricted-module-host.md`.
 
 The completed persisted-document recovery tranche began because atomic
 publication and optimistic revisions now prevent torn and stale engine writes,

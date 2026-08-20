@@ -1,5 +1,5 @@
+using System.ComponentModel;
 using System.Windows;
-using Rekall.Age.Editor;
 using Rekall.Age.Editor.Contracts;
 using Serilog;
 
@@ -7,43 +7,43 @@ namespace Rekall.Age.Studio;
 
 public partial class MainWindow : Window
 {
+    private readonly RekallAgeStudioViewModel _viewModel = new();
+
     public MainWindow()
     {
         InitializeComponent();
-        DataContext = LoadInitialViewModelSafely();
+        DataContext = _viewModel;
+        Loaded += OnLoaded;
     }
 
-    private static RekallAgeStudioViewModel LoadInitialViewModelSafely()
+    private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         try
         {
-            return LoadInitialViewModel();
+            var args = Environment.GetCommandLineArgs();
+            var projectIndex = Array.IndexOf(args, "--project");
+            var sceneIndex = Array.IndexOf(args, "--scene");
+            var projectRoot = projectIndex >= 0 && projectIndex + 1 < args.Length ? args[projectIndex + 1] : null;
+            var sceneName = sceneIndex >= 0 && sceneIndex + 1 < args.Length ? args[sceneIndex + 1] : "Main";
+            await _viewModel.InitializeAsync(projectRoot, sceneName);
         }
         catch (Exception exception)
         {
-            Log.Error(exception, "Failed to load initial Studio workbench model.");
-            return RekallAgeStudioViewModel.ForLoadFailure(App.StudioLogDirectory);
+            Log.Error(exception, "Failed to initialize the Studio workspace.");
         }
     }
 
-    private static RekallAgeStudioViewModel LoadInitialViewModel()
+    private async void OnSelectedEntityChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        var args = Environment.GetCommandLineArgs();
-        var projectIndex = Array.IndexOf(args, "--project");
-        var sceneIndex = Array.IndexOf(args, "--scene");
-        if (projectIndex < 0 || projectIndex + 1 >= args.Length)
+        if (e.NewValue is RekallAgeSceneEntityNode entity)
         {
-            return new RekallAgeStudioViewModel(null);
+            await _viewModel.SelectEntityAsync(entity);
         }
+    }
 
-        var projectRoot = args[projectIndex + 1];
-        var sceneName = sceneIndex >= 0 && sceneIndex + 1 < args.Length ? args[sceneIndex + 1] : "Main";
-        Log.Information("Loading Studio project. ProjectRoot={ProjectRoot} SceneName={SceneName}", projectRoot, sceneName);
-        RekallAgeWorkbenchModel? model = new RekallAgeWorkbenchModelBuilder()
-            .BuildAsync(projectRoot, sceneName, CancellationToken.None)
-            .AsTask()
-            .GetAwaiter()
-            .GetResult();
-        return new RekallAgeStudioViewModel(model);
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        _viewModel.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        base.OnClosing(e);
     }
 }

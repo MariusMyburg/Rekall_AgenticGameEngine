@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 14:56 Africa/Johannesburg
+Last verified: 2026-08-20 15:12 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: command-backed game-creation workbench session foundation
+Latest milestone: command-backed functional Studio authoring checkpoint
 
 ## Product objective
 
@@ -43,6 +43,11 @@ Studio is important, but it does not define or reorder the engine foundation.
   packaging and relocation, negative archive preflight, nonblank capture,
   runtime UI, and audible audio paths have installed-binary proof.
 - Local agent: Ollama currently uses `qwen3.5:35b` through its native API.
+- Studio authoring: project create/open, entity hierarchy/selection, generic
+  entity/component/property mutation, scene validation, software-rendered
+  viewport capture, and Windows player launch/stop now execute through the
+  shared canonical command catalog. The focused checkpoint passes 7/7 tests;
+  the Studio build has zero warnings and zero errors.
 - Agent authoring: both source and installed multi-subsystem benchmarks created
   and repaired UI, animation, and audio content using tool calls.
 - Runtime animation: generic clip playback, bounded Hermite interpolation,
@@ -825,8 +830,10 @@ Studio is important, but it does not define or reorder the engine foundation.
   animation, TANGENT/sparse/quantized morph accessors, broader complex
   transform fixtures, richer graph curves, and interruptible or hierarchical
   graph policies.
-- Replace the current Studio facade with a professional workbench only after
-  its runtime/authoring contracts are stable and independently proven.
+- Complete Studio scene switching, undo/redo, schema-guided inspector fields,
+  embedded Ollama authoring, deterministic view-model automation, and
+  installed end-to-end game-creation acceptance. The current workbench is now
+  functional but not yet a finished professional editor.
 
 ## Recently completed
 
@@ -886,30 +893,31 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The active product priority is now the complete AI game-creation vertical
-slice. The engine already has substantial runtime, rendering, audio, UI,
-animation, physics, agent/MCP, player, and packaging foundations, but the
-human-visible workbench does not connect them into a usable product: Studio is
-still read-only, its viewport is text, and its toolbar is unwired. The next
-tranche therefore starts with a UI-independent command-backed workbench session
-and then connects project create/open, selection/editing, validation,
-undo/redo, rendered viewport capture, play lifecycle, and the existing Ollama
-agent loop into Studio. The acceptance target is one coherent flow from a game
-description to agent-authored project files to an editable, validated,
-visually rendered, playable game. This is not a pivot to superficial Studio
-chrome; Studio and the embedded agent must consume the same generic command
-contracts exposed through MCP and CLI.
+The active product priority is the complete AI game-creation vertical slice.
+Studio now connects project create/open, hierarchy selection, generic entity /
+component / property authoring, validation, an engine-rendered viewport, and
+real player ownership through the shared command catalog. The next tranche is
+the embedded project-scoped Ollama authoring service, followed by scene
+switching, undo/redo, schema-guided editing, and installed acceptance. The
+acceptance target remains one coherent flow from a game description to
+agent-authored project files to an editable, validated, visually rendered,
+playable, packaged game. Studio, embedded AI, MCP, and CLI must continue to
+consume the same generic contracts.
 
-AI game-creation Task 1 has its first verified checkpoint at 12/12 combined
-workbench tests. A new UI-independent workbench session now creates projects
+AI game-creation Tasks 1-2 have a verified functional checkpoint. A new
+UI-independent workbench session creates projects
 and scenes through canonical commands, opens and switches scenes, executes
 dynamic registered commands, appends their transactions, reloads external
 agent changes, refreshes the canonical read model, preserves the last valid
 model on failure, and carries explicit entity selection into the structured
-inspector. The model builder no longer silently resets selection to the first
-entity. This is reusable engine/application state rather than WPF-only logic;
-validate/capture, undo/redo, player ownership, and Studio wiring are the next
-active slice.
+inspector. Studio consumes that session and the centralized default command
+registry; it can create/open, select, mutate arbitrary generic components and
+JSON properties, validate, capture a 960x540 software viewport after edits,
+and own a real Windows player process. Unexpected async command failures are
+reported in-product instead of escaping the UI dispatcher. Seven focused
+functional/source tests pass and the Studio build is warning-free. Undo/redo,
+scene-selection interaction, schema-guided property widgets, embedded AI, and
+installed acceptance remain open.
 
 The restricted module-host tranche is paused at commit `4e43119`, a stable
 native containment and typed-broker checkpoint. Project-write denial and

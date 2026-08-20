@@ -21,12 +21,12 @@ create, author, inspect, edit, render, play, and verify desktop workflow.
 
 ### Task 2: Functional Studio workspace
 
-- [ ] Replace unwired toolbar controls with async commands and operation state.
+- [x] Replace unwired toolbar controls with async commands and operation state.
 - [ ] Add project create/open and scene selection without requiring launch
   arguments.
-- [ ] Bind hierarchy selection to a structured inspector and generic entity /
+- [x] Bind hierarchy selection to a structured inspector and generic entity /
   component / property authoring actions.
-- [ ] Display the engine-produced viewport PNG and refresh it after mutations.
+- [x] Display the engine-produced viewport PNG and refresh it after mutations.
 - [ ] Own real player launch/stop and close cleanup; add WPF-view-model tests.
 
 ### Task 3: Embedded AI authoring

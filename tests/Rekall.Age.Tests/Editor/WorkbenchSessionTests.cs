@@ -155,6 +155,53 @@ public sealed class WorkbenchSessionTests
         Assert.Contains(session.Model!.Scene.RootEntities, entity => entity.EntityId == created.Value.EntityId);
     }
 
+    [Fact]
+    public async Task SessionAuthorsGenericComponentsAndPropertiesThroughCanonicalCommands()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var session = CreateSession();
+        Assert.True((await session.CreateProjectAsync(
+            root, "Component Authoring", "Main", ["world"], ["world"], "studio", CancellationToken.None)).Ok);
+        var created = await session.ExecuteAsync(
+            "rekall.entity.create",
+            JsonSerializer.Serialize(new { projectRoot = root, sceneName = "Main", name = "Authored", tags = Array.Empty<string>() }),
+            "Create Authored",
+            "studio",
+            CancellationToken.None);
+        var entityId = Assert.IsType<CreateEntityResult>(created.Value).EntityId;
+        Assert.True((await session.SelectEntityAsync(entityId, CancellationToken.None)).Ok);
+
+        Assert.True((await session.ExecuteAsync(
+            "rekall.component.add",
+            JsonSerializer.Serialize(new { projectRoot = root, sceneName = "Main", entityId, componentType = "Game.State", properties = new { } }),
+            "Add State",
+            "studio",
+            CancellationToken.None)).Ok);
+        Assert.True((await session.ExecuteAsync(
+            "rekall.component.set_property",
+            JsonSerializer.Serialize(new { projectRoot = root, sceneName = "Main", entityId, componentType = "Game.State", propertyName = "score", value = 42 }),
+            "Set Score",
+            "studio",
+            CancellationToken.None)).Ok);
+
+        var component = Assert.Single(session.Model!.Inspector.Components, item => item.Type == "Game.State");
+        Assert.Contains(component.Properties, property => property.Name == "score" && property.Value == "42");
+
+        Assert.True((await session.ExecuteAsync(
+            "rekall.component.remove_property",
+            JsonSerializer.Serialize(new { projectRoot = root, sceneName = "Main", entityId, componentType = "Game.State", propertyName = "score" }),
+            "Remove Score",
+            "studio",
+            CancellationToken.None)).Ok);
+        Assert.True((await session.ExecuteAsync(
+            "rekall.component.remove",
+            JsonSerializer.Serialize(new { projectRoot = root, sceneName = "Main", entityId, componentType = "Game.State" }),
+            "Remove State",
+            "studio",
+            CancellationToken.None)).Ok);
+        Assert.DoesNotContain(session.Model!.Inspector.Components, item => item.Type == "Game.State");
+    }
+
     private static RekallAgeWorkbenchSession CreateSession()
     {
         return new RekallAgeWorkbenchSession(CreateRegistry());
@@ -166,6 +213,10 @@ public sealed class WorkbenchSessionTests
         registry.Register(new CreateProjectCommand());
         registry.Register(new CreateSceneCommand());
         registry.Register(new CreateEntityCommand());
+        registry.Register(new AddComponentCommand());
+        registry.Register(new SetComponentPropertyCommand());
+        registry.Register(new RemoveComponentPropertyCommand());
+        registry.Register(new RemoveComponentCommand());
         return registry;
     }
 }

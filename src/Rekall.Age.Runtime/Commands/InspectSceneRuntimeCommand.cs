@@ -7,7 +7,7 @@ namespace Rekall.Age.Runtime.Commands;
 public sealed record InspectSceneRuntimeRequest(
     string ProjectRoot,
     string SceneName,
-    int Frames,
+    int Frames = 1,
     IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null);
 
 public sealed record InspectSceneRuntimeResult(

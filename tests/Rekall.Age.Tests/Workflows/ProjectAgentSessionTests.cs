@@ -87,6 +87,41 @@ public sealed class ProjectAgentSessionTests
     }
 
     [Fact]
+    public async Task SessionSuppliesItsOwnedProjectAndSceneScopeToNativeTools()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = CreateRegistry();
+        await CreateProjectAsync(registry, root);
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.entity.create", new JsonObject
+                {
+                    ["name"] = "Scope Defaulted",
+                    ["tags"] = new JsonArray("agent-authored")
+                })],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "Created in the open scene.", "", [], "stop", new(1, 1, 1)));
+
+        var result = await new RekallAgeProjectAgentSession(model, registry).RunAsync(
+            new RekallAgeProjectAgentSessionRequest(root, "Main", "model", "Add one entity")
+            {
+                MaxTurns = 2,
+                RequireCompletionAudit = false
+            },
+            progress: null,
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded, result.Summary);
+        Assert.Contains(
+            (await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None)).Entities,
+            entity => entity.Name == "Scope Defaulted");
+        var execution = Assert.Single(result.AgentResult.ToolExecutions);
+        Assert.DoesNotContain("projectRoot", execution.Arguments.Select(property => property.Key));
+        Assert.DoesNotContain("sceneName", execution.Arguments.Select(property => property.Key));
+    }
+
+    [Fact]
     public async Task SessionRejectsToolArgumentsThatEscapeTheOpenProject()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -133,7 +168,10 @@ public sealed class ProjectAgentSessionTests
         var model = new ScriptedModelClient(
             new RekallAgeLanguageModelResponse(
                 "test", "model", "", "",
-                [new RekallAgeLanguageModelToolCall("rekall.entity.create", new JsonObject())],
+                [new RekallAgeLanguageModelToolCall("rekall.entity.create", new JsonObject
+                {
+                    ["tags"] = new JsonArray()
+                })],
                 "tool_calls", new(1, 1, 1)),
             new RekallAgeLanguageModelResponse(
                 "test", "model", "", "",

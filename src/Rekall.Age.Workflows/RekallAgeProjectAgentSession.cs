@@ -54,6 +54,8 @@ public sealed class RekallAgeProjectAgentSession
         var projectRoot = Path.GetFullPath(request.ProjectRoot);
         var tools = new ProjectScopedToolExecutor(
             projectRoot,
+            request.SceneName,
+            _registry,
             new RekallAgeMcpAgentToolExecutor(_registry, "rekall-studio-agent", progressiveDiscovery: true));
         var agent = new RekallAgeLanguageModelAgent(_modelClient, tools);
         var scopedTask = $"""
@@ -104,9 +106,14 @@ public sealed class RekallAgeProjectAgentSession
 
     private sealed class ProjectScopedToolExecutor(
         string projectRoot,
+        string sceneName,
+        RekallAgeCommandRegistry registry,
         IRekallAgeAgentToolExecutor inner) : IRekallAgeAgentToolExecutor
     {
         private readonly string _projectRoot = Normalize(projectRoot);
+        private readonly string _sceneName = sceneName;
+        private readonly IReadOnlySet<string> _projectScopedTools = ToolsWithProperty(registry, "ProjectRoot");
+        private readonly IReadOnlySet<string> _sceneScopedTools = ToolsWithProperty(registry, "SceneName");
 
         public IReadOnlyList<RekallAgeLanguageModelTool> Tools => inner.Tools;
 
@@ -115,7 +122,19 @@ public sealed class RekallAgeProjectAgentSession
             JsonObject arguments,
             CancellationToken cancellationToken)
         {
-            foreach (var candidate in FindProjectRoots(arguments))
+            var scopedArguments = (JsonObject)arguments.DeepClone();
+            if (_projectScopedTools.Contains(name)
+                && (!scopedArguments.TryGetPropertyValue("projectRoot", out var suppliedRoot) || suppliedRoot is null))
+            {
+                scopedArguments["projectRoot"] = _projectRoot;
+            }
+            if (_sceneScopedTools.Contains(name)
+                && (!scopedArguments.TryGetPropertyValue("sceneName", out var suppliedScene) || suppliedScene is null))
+            {
+                scopedArguments["sceneName"] = _sceneName;
+            }
+
+            foreach (var candidate in FindProjectRoots(scopedArguments))
             {
                 string normalized;
                 try
@@ -133,8 +152,17 @@ public sealed class RekallAgeProjectAgentSession
                 }
             }
 
-            return inner.ExecuteAsync(name, arguments, cancellationToken);
+            return inner.ExecuteAsync(name, scopedArguments, cancellationToken);
         }
+
+        private static IReadOnlySet<string> ToolsWithProperty(
+            RekallAgeCommandRegistry registry,
+            string propertyName) =>
+            registry.RegisteredCommands
+                .Where(command => command.RequestType.GetProperties().Any(property =>
+                    property.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase)))
+                .Select(command => command.Schema.Name)
+                .ToHashSet(StringComparer.Ordinal);
 
         private JsonObject ScopeViolation(string candidate) => new()
         {

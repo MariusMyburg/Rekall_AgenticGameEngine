@@ -27,7 +27,8 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("exact tool is rekall.module.search_component_schemas", prompt, StringComparison.Ordinal);
         Assert.Contains("do not call it more than once", prompt, StringComparison.Ordinal);
         Assert.Contains("every requested visible dynamic body has a renderer", prompt, StringComparison.Ordinal);
-        Assert.Contains("scaffold the required module before the first packaging call", prompt, StringComparison.Ordinal);
+        Assert.Contains("scaffold rekall.module.scaffold_playable early", prompt, StringComparison.Ordinal);
+        Assert.Contains("generic deterministic package-proof adapter", prompt, StringComparison.Ordinal);
         Assert.Contains("rekall.module.scaffold_runtime_system", prompt, StringComparison.Ordinal);
         Assert.Contains("rekall.module.inspect_runtime_sdk", prompt, StringComparison.Ordinal);
         Assert.Contains("module source topology", prompt, StringComparison.OrdinalIgnoreCase);
@@ -41,8 +42,8 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("retry once with the same named scenes and empty entities arrays", prompt, StringComparison.Ordinal);
         Assert.Contains("Never repeat substantially the same failed blueprint arguments", prompt, StringComparison.Ordinal);
         Assert.True(
-            prompt.IndexOf("scaffold the required module", StringComparison.Ordinal)
-            < prompt.IndexOf("first packaging call", StringComparison.Ordinal));
+            prompt.IndexOf("scaffold rekall.module.scaffold_playable early", StringComparison.Ordinal)
+            < prompt.IndexOf("rekall.workflow.package_playable_game", StringComparison.Ordinal));
     }
 
     [Fact]

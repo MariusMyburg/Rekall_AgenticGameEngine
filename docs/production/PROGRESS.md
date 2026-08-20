@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 17:33 Africa/Johannesburg
+Last verified: 2026-08-20 17:47 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: first task-specific Ollama-authored playable delivery accepted
+Latest milestone: second task-specific Ollama-authored playable delivery accepted
 
 ## Product objective
 
@@ -36,7 +36,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Debug verification: 907/907 engine tests and 5/5 Windows Studio
+- Current Debug verification: 908/908 engine tests and 5/5 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -921,15 +921,43 @@ Studio is important, but it does not define or reorder the engine foundation.
   are now present. The workbench is functional but not yet a finished
   professional editor.
 - Run a fresh installed, empty-project task-specific benchmark without a
-  continuation prompt. `Prism Relay` is now an accepted task-specific authored
-  artifact and delivery, but its original empty-project run needed a bounded
-  continuation after reaching the 64-turn limit. The continuation opened the
-  existing project, preserved it, and completed the consolidated package audit
-  in three turns. The next acceptance raises the standard from a successful
-  recoverable authoring session to a single uninterrupted installed-product
-  session.
+  continuation prompt. Both `Prism Relay` and `Signal Garden` are accepted
+  task-specific authored artifacts and deliveries, but their original
+  empty-project runs needed bounded continuations after reaching the 64-turn
+  limit. `Signal Garden` exposed avoidable repeated scope arguments and late
+  playable-adapter discovery; those generic contracts are now repaired. The
+  next acceptance raises the standard from successful recoverable authoring
+  sessions to a single uninterrupted installed-product session, while further
+  reducing empty or malformed non-scope tool arguments.
 
 ## Recently completed
+
+The task-specific `Signal Garden` checkpoint is accepted from direct repository
+evidence. Starting from an empty project, local Ollama `qwen3.5:35b` authored a
+3D night garden, semantic input, an agent-owned delta-time world gameplay
+system, bloom activation/score/reset logic, and HUD content. Its first 64-turn
+run produced the authored scene and compiling gameplay but stopped with stale
+module evidence before packaging. A bounded continuation preserved that game,
+added the generic playable package-proof adapter, built both modules, reached
+zero validation issues, captured a 960x540 Studio viewport with 16 renderables,
+packaged the player, and passed consolidated audit in 18 turns. The package
+SHA-256 is
+`65A2ABFD5B1B79D5CB28C9E5D8C45C83A1AB70C7CEF36D3B57E2AC18C4C0CBD0`;
+the Studio viewport SHA-256 is
+`C268B21F353DA442FEF869108861C6B8E007505C7D36242430540A2B5BDE0CB5`;
+the package-audit frame SHA-256 is
+`C0D8367533FBDA1628DEBD7A30A7759A31FBE10B2438EADFC224BA5C61F0D49F`;
+and the continuation evidence SHA-256 is
+`DED324F74DD1375C7CF359977B2D2A5533F9BA8E5E253FF3288DB532708FCA4D`.
+
+Project agent sessions now supply their already-owned project root and active
+scene to native tools when those scope fields are omitted, while still
+rejecting explicit out-of-scope paths. Runtime scene inspection has a safe
+one-frame default. The embedded contract now establishes the generic playable
+module as an early deterministic package-proof adapter while keeping actual
+world gameplay in the agent-authored runtime system; final builds therefore no
+longer become stale from late adapter scaffolding. Current verification is
+908/908 engine tests, 5/5 Studio tests, and a zero-warning full solution build.
 
 The task-specific `Prism Relay` checkpoint is accepted from direct repository
 evidence. Local Ollama `qwen3.5:35b` authored a non-gauntlet 3D game with five

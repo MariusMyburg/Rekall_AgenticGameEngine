@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 22:54 Africa/Johannesburg
+Last verified: 2026-08-20 22:58 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -30,8 +30,9 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 200,903,023-byte win-x64 archive assembled with
-  SHA-256 `72EBE0C844FFD628FCB94CCC45E3590C34A887E7C572C65269385625ED8E0097`.
+- Windows distribution: fresh 200,967,116-byte win-x64 archive assembled from
+  `3a84dbc` with SHA-256
+  `A989D5790695578B672320B4DC89347F599D02391B1AD03D25A437EC11EFEB32`.
   The assembled directory contains 1,178 files.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
@@ -1093,6 +1094,14 @@ Studio is important, but it does not define or reorder the engine foundation.
   `0CD2E7AA3AB10D941004E455A69E6EEAF532E47425B5DA52417D89F73A50EE9B`.
 
 ## Recently completed
+
+The repeated-failure recovery is now present in a fresh self-contained Windows
+product assembled from `3a84dbc`. Its manifest declares 1,177 payload files;
+the installed directory contains 1,178 files including the manifest. The
+200,967,116-byte archive SHA-256 is
+`A989D5790695578B672320B4DC89347F599D02391B1AD03D25A437EC11EFEB32`.
+This product is the next real-model benchmark subject; assembly alone is not a
+game-creation pass.
 
 Benchmark 15's 54-call trust-inspection loop now has a generic bounded
 intervention. After three consecutive failures of the same canonical tool with

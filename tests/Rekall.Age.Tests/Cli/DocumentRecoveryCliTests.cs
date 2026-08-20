@@ -18,6 +18,10 @@ public sealed class DocumentRecoveryCliTests
         await File.WriteAllBytesAsync(store.GetScenePath(root, "Main"), corrupt);
         var corruptRevision = RekallAgeDocumentRevision.Compute(corrupt);
 
+        var normalFailure = await RunAsync("context", "scene", root, "Main");
+        Assert.Equal(1, normalFailure.ExitCode);
+        Assert.Contains("REKALL_DOCUMENT_JSON_MALFORMED", normalFailure.Output);
+
         var inspect = await RunAsync("recovery", "inspect", "scene", root, "Main");
         Assert.Equal(0, inspect.ExitCode);
         Assert.Contains("REKALL_DOCUMENT_JSON_MALFORMED", inspect.Output);

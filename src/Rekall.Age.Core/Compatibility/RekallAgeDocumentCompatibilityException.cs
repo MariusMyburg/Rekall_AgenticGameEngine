@@ -1,6 +1,8 @@
+using Rekall.Age.Core.Commands;
+
 namespace Rekall.Age.Core.Compatibility;
 
-public sealed class RekallAgeDocumentCompatibilityException : Exception
+public sealed class RekallAgeDocumentCompatibilityException : RekallAgeCodedBoundaryException
 {
     public RekallAgeDocumentCompatibilityException(
         string code,
@@ -10,20 +12,17 @@ public sealed class RekallAgeDocumentCompatibilityException : Exception
         int currentVersion,
         string message,
         Exception? innerException = null)
-        : base(message, innerException)
+        : base(code, message, Path.GetFullPath(documentPath), innerException)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
         ArgumentException.ThrowIfNullOrWhiteSpace(documentKind);
         ArgumentException.ThrowIfNullOrWhiteSpace(documentPath);
 
-        Code = code;
         DocumentKind = documentKind;
         DocumentPath = Path.GetFullPath(documentPath);
         DetectedVersion = detectedVersion;
         CurrentVersion = currentVersion;
     }
-
-    public string Code { get; }
 
     public string DocumentKind { get; }
 

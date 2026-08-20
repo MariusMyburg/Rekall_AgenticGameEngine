@@ -4,11 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 23:36 Africa/Johannesburg
+Last verified: 2026-08-21 00:40 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: generic 2D/3D physics pose and agent-contract parity
+Latest milestone: persistent BEPU simulation, inspectable physics telemetry,
+and renderer-aligned 3D rotation
 
 ## Product objective
 
@@ -37,9 +38,35 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Release verification: 936/936 engine tests and 7/7 Windows Studio
+- Current Release verification: 949/949 engine tests and 7/7 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
+- Persistent 3D physics: the runtime now retains a BEPU simulation across
+  frames, incrementally synchronizes bodies and statics, preserves angular
+  motion/orientation and sleep state, and lets BEPU own contact response.
+  Authored material response is projected into native contact springs instead
+  of applying a second axis-aligned bounce pass after the solver. Generic world
+  settings expose bounded velocity-iteration and substep counts.
+- Inspectable physics evidence: `runtime inspect` reports bounded per-body
+  backend, awake state, linear/angular velocity, orientation quaternion, and
+  peak speeds with frame indices. The agent-authored `TumblingCubes` example
+  builds from a freshly installed project-local SDK, simulates five randomly
+  oriented falling cubes for 600 frames, and reports all settled bodies at
+  zero angular speed. Its 960x540 RTX 5090 Vulkan capture is informative with
+  zero missing assets, unsupported assets, fallbacks, or observations.
+- Unified rotation contract: BEPU pose conversion now exactly matches the
+  renderer's X/Y/Z matrix composition. A multi-axis regression proves the
+  published Euler representation recreates the physics quaternion rather than
+  producing visible flips near coupled rotations. The corrected Windows
+  Vulkan player was watched live and its tumbling and settling behavior was
+  confirmed visually.
+- Real-time playback: runtime-observed playable games use a bounded fixed-step
+  accumulator, so physics advances at 60 Hz from actual player delta time
+  instead of once per rendered frame. Playable games and runtime loops now
+  dispose their retained simulations deterministically.
+- Direct SDK repair: agents can explicitly run `rekall.module.install_sdk` or
+  `module install-sdk <root>` to install or repair the versioned project-local
+  module SDK before building, without silent mutation during ordinary builds.
 - Physics event parity: BEPU-backed 2D bodies now participate in the same
   generic `collision.begin`/`collision.stay`/`collision.end` and
   `trigger.enter`/`trigger.stay`/`trigger.exit` authoring contracts as 3D
@@ -940,14 +967,12 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 - Physics is functional but not yet production-complete. 2D is a planar BEPU
   projection with box/circle shapes and persisted linear velocity; 3D adds
-  box/sphere/capsule and static or convex mesh shapes. There are no generic
-  joints/constraints, dedicated 2D world/material contract, exposed angular
-  state/control, collision layers/masks, or exact contact manifold facts.
-  Authored initial orientation is applied, but angular velocity/orientation is
-  not persisted as runtime physics state across rebuilt frames.
-  The simulation is also rebuilt from authored/runtime state each frame, so
-  persistent-body broadphase/sleep performance needs a measured production
-  tranche.
+  box/sphere/capsule and static or convex mesh shapes. Persistent 3D bodies now
+  retain angular velocity, orientation, and sleep state, and native BEPU
+  contacts own friction/restitution response. Remaining breadth includes
+  generic joints/constraints, a dedicated 2D world/material contract, authored
+  angular control, collision layers/masks, exact contact manifold/impulse
+  facts, deformables, and measured large-world broadphase performance.
 - 3D rendering is substantial and hardware-backed: perspective/orthographic
   cameras, viewports/layers/stereo/OpenXR, primitives and authored/imported GLB
   meshes, PBR texture inputs, directional/point lighting, generic animation,
@@ -1456,8 +1481,9 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The current item remains the actual AI game-creation loop. Restore the proven
-`qwen3.5:35b`, then run a fresh unchanged benchmark through real local Ollama
+The current item remains the actual AI game-creation loop. The proven
+`qwen3.5:35b` is restored locally as a 23 GB Ollama model. Run a fresh unchanged
+benchmark through that real local model
 and independently inspect its scene, source, input projection, and runtime
 transitions. Require clean validation, informative
 capture, compiled agent-authored behavior, a playable relocated package, and a
@@ -1475,10 +1501,11 @@ renderer, light, rigidbody, collider, world, and material contracts, while
 semantic input, generic events/observations, camera vectors, and typed
 `Raycast2D`/`Raycast3D` queries.
 Runtime inspection, viewport capture diagnostics, validator repair actions,
-and MCP command schemas provide executable evidence. The next AI-first physics
-work should be driven by the real Qwen benchmark, with likely candidates being
-richer contact evidence, angular state, or persistent simulation rather than
-genre behavior.
+and MCP command schemas provide executable evidence. Persistent simulation,
+angular state, BEPU-native material response, and bounded physics telemetry are
+now verified. Further physics breadth should be driven by the real Qwen
+benchmark, with likely candidates being exact contact evidence, collision
+filtering, constraints, or authored angular control rather than genre behavior.
 
 AI game-creation Tasks 1-3 have a verified functional checkpoint. A new
 UI-independent workbench session creates projects

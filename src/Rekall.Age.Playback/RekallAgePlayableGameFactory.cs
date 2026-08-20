@@ -24,7 +24,10 @@ internal sealed class RekallAgeRuntimeObservedPlayableGame(
     Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeWorld runtimeWorld,
     RekallAgeRuntimeExecutionLoop runtimeLoop) : IRekallAgePlayableGame
 {
+    private const double FixedDeltaSeconds = 1.0 / 60.0;
+    private const double MaximumAccumulatedSeconds = 0.25;
     private Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeWorld _runtimeWorld = runtimeWorld;
+    private double _runtimeAccumulatorSeconds;
 
     public string Kind => inner.Kind;
 
@@ -33,7 +36,17 @@ internal sealed class RekallAgeRuntimeObservedPlayableGame(
     public void Tick(RekallAgePlaybackInput input)
     {
         inner.Tick(input);
-        _runtimeWorld = runtimeLoop.RunAsync(_runtimeWorld, 1, CancellationToken.None)
+        _runtimeAccumulatorSeconds = Math.Min(
+            MaximumAccumulatedSeconds,
+            _runtimeAccumulatorSeconds + Math.Max(0, input.DeltaSeconds));
+        var fixedSteps = (int)Math.Floor((_runtimeAccumulatorSeconds + 1e-9) / FixedDeltaSeconds);
+        if (fixedSteps <= 0)
+        {
+            return;
+        }
+
+        _runtimeAccumulatorSeconds -= fixedSteps * FixedDeltaSeconds;
+        _runtimeWorld = runtimeLoop.RunAsync(_runtimeWorld, fixedSteps, CancellationToken.None)
             .AsTask()
             .GetAwaiter()
             .GetResult()
@@ -70,5 +83,11 @@ internal sealed class RekallAgeRuntimeObservedPlayableGame(
                     observation.TargetId,
                     observation.Message)).ToArray())
         };
+    }
+
+    public void Dispose()
+    {
+        runtimeLoop.Dispose();
+        inner.Dispose();
     }
 }

@@ -11,9 +11,10 @@ using Rekall.Age.Runtime.Abstractions;
 
 namespace Rekall.Age.Runtime;
 
-public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
+public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, IDisposable
 {
     private const float DefaultGravityY = -9.81f;
+    private PersistentPhysicsWorld? _physicsWorld;
 
     public string Id => "runtime.physics.bepu";
 
@@ -36,88 +37,49 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
             return ValueTask.FromResult(world);
         }
 
-        using var pool = new BufferPool();
-        var gravity = ReadGravity(world);
-        var simulation = Simulation.Create(
-            pool,
-            new RekallAgeBepuNarrowPhaseCallbacks(CombineMaterials(dynamicBodies.Concat(staticBodies).Select(item => item.Material))),
-            new RekallAgeBepuPoseIntegratorCallbacks(gravity),
-            new SolveDescription(velocityIterationCount: 8, substepCount: 1));
-        try
+        var configuration = ReadPhysicsWorldConfiguration(world);
+        if (_physicsWorld is null
+            || !_physicsWorld.SceneId.Equals(world.SceneId, StringComparison.Ordinal)
+            || _physicsWorld.Configuration != configuration)
         {
-            foreach (var item in staticBodies)
-            {
-                var shape = CreateStaticShape(simulation, pool, item);
-                if (!shape.Created)
-                {
-                    continue;
-                }
-
-                var description = new StaticDescription(
-                    new RigidPose(ToPhysicsPosition(item), ToPhysicsOrientation(item)),
-                    shape.Shape);
-                simulation.Statics.Add(description);
-            }
-
-            var handles = new Dictionary<string, DynamicBodyState>(StringComparer.Ordinal);
-            foreach (var item in dynamicBodies)
-            {
-                var pose = new RigidPose(ToPhysicsPosition(item), ToPhysicsOrientation(item));
-                var stateType = item.Is2D ? "Rekall.PhysicsState2D" : "Rekall.PhysicsState3D";
-                var velocity = new BodyVelocity(ReadVector3(FindComponent(item.Entity, stateType), "linearVelocity"));
-                if (item.Is2D)
-                {
-                    velocity.Linear.Z = 0;
-                }
-                var mass = Math.Max(0.0001f, ReadSingle(item.Rigidbody!, "mass", 1));
-                if (TryCreateDynamicDescription(simulation, pool, item, pose, velocity, mass, out var created))
-                {
-                    handles[item.Entity.Id] = created with
-                    {
-                        Entity = item,
-                        InitialVelocity = velocity.Linear,
-                        Handle = simulation.Bodies.Add(created.Description)
-                    };
-                }
-            }
-
-            simulation.Timestep((float)context.DeltaTime.TotalSeconds);
-
-            var updated = world.Entities
-                .Select(entity => handles.TryGetValue(entity.Id, out var body)
-                    ? ApplyBodyState(
-                        entity,
-                        simulation.Bodies[body.Handle],
-                        body.CenterOffset,
-                        ApplyRestitution(body, simulation.Bodies[body.Handle], staticBodies),
-                        body.Entity?.Is2D == true)
-                    : entity)
-                .ToArray();
-
-            return ValueTask.FromResult(world with { Entities = updated });
+            _physicsWorld?.Dispose();
+            _physicsWorld = new PersistentPhysicsWorld(world.SceneId, configuration);
         }
-        finally
-        {
-            simulation.Dispose();
-        }
+
+        _physicsWorld.Reconcile(dynamicBodies, staticBodies);
+        _physicsWorld.SynchronizeAuthoredChanges(dynamicBodies);
+        var preStepBodies = _physicsWorld.CapturePreStepBodies(dynamicBodies);
+        _physicsWorld.Simulation.Timestep((float)context.DeltaTime.TotalSeconds);
+
+        var updated = world.Entities
+            .Select(entity => preStepBodies.TryGetValue(entity.Id, out var body)
+                ? ApplyBodyState(
+                    entity,
+                    _physicsWorld.Simulation.Bodies[body.Handle],
+                    body.CenterOffset,
+                    body.Entity?.Is2D == true)
+                : entity)
+            .ToArray();
+        _physicsWorld.RecordOutputs(updated);
+        return ValueTask.FromResult(world with { Entities = updated });
+    }
+
+    public void Dispose()
+    {
+        _physicsWorld?.Dispose();
+        _physicsWorld = null;
     }
 
     private static RekallAgeRuntimeEntity ApplyBodyState(
         RekallAgeRuntimeEntity entity,
         BodyReference body,
         Vector3 centerOffset,
-        RestitutionAdjustment adjustment,
         bool is2D)
     {
         var pose = body.Pose;
         var velocity = body.Velocity;
-        if (adjustment.Applied)
-        {
-            velocity.Linear = adjustment.LinearVelocity;
-        }
-        var position = adjustment.Applied
-            ? adjustment.Position
-            : pose.Position - centerOffset;
+        var position = pose.Position - centerOffset;
+        var angularDegrees = velocity.Angular * (180 / MathF.PI);
         return entity with
         {
             Transform = entity.Transform with
@@ -130,82 +92,54 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
                         entity.Transform.Position3D.X,
                         entity.Transform.Position3D.Y,
                         entity.Transform.Position3D.Z)
-                    : new RekallAgeRuntimeVector3(position.X, position.Y, position.Z)
+                    : new RekallAgeRuntimeVector3(position.X, position.Y, position.Z),
+                Rotation2D = is2D
+                    ? QuaternionToPlanarDegrees(pose.Orientation)
+                    : entity.Transform.Rotation2D,
+                Rotation3D = is2D
+                    ? entity.Transform.Rotation3D
+                    : QuaternionToRendererEulerDegrees(pose.Orientation)
             },
-            Components = UpsertPhysicsState(entity.Components, velocity.Linear, is2D)
+            Components = UpsertPhysicsState(
+                entity.Components,
+                velocity.Linear,
+                angularDegrees,
+                pose.Orientation,
+                body.Awake,
+                is2D)
         };
-    }
-
-    private static RestitutionAdjustment ApplyRestitution(
-        DynamicBodyState dynamicBody,
-        BodyReference body,
-        IReadOnlyList<PhysicsEntity> staticBodies)
-    {
-        var entity = dynamicBody.Entity;
-        if (entity is null)
-        {
-            return RestitutionAdjustment.None;
-        }
-
-        var material = entity.Material;
-        if (material.Restitution <= 0 || dynamicBody.InitialVelocity.Y >= -material.MinimumBounceSpeed)
-        {
-            return RestitutionAdjustment.None;
-        }
-
-        var pose = body.Pose;
-        var position = pose.Position - dynamicBody.CenterOffset;
-        var extent = EstimateVerticalExtent(entity);
-        if (extent <= 0)
-        {
-            return RestitutionAdjustment.None;
-        }
-
-        foreach (var support in staticBodies)
-        {
-            if (!TryGetSupportSurface(support, out var surface)
-                || position.X < surface.MinX
-                || position.X > surface.MaxX
-                || position.Z < surface.MinZ
-                || position.Z > surface.MaxZ)
-            {
-                continue;
-            }
-
-            var bottom = position.Y - extent;
-            if (bottom > surface.TopY + 0.1f)
-            {
-                continue;
-            }
-
-            var combined = CombineMaterials([material, support.Material]);
-            if (combined.Restitution <= 0)
-            {
-                return RestitutionAdjustment.None;
-            }
-
-            var velocity = body.Velocity.Linear;
-            velocity.Y = Math.Max(Math.Abs(dynamicBody.InitialVelocity.Y) * combined.Restitution, combined.MinimumBounceSpeed);
-            position.Y = surface.TopY + extent + 0.001f;
-            return new RestitutionAdjustment(true, position, velocity);
-        }
-
-        return RestitutionAdjustment.None;
     }
 
     private static IReadOnlyList<RekallAgeRuntimeComponent> UpsertPhysicsState(
         IReadOnlyList<RekallAgeRuntimeComponent> components,
         Vector3 linearVelocity,
+        Vector3 angularVelocity,
+        Quaternion orientation,
+        bool awake,
         bool is2D)
     {
         var state = new JsonObject
         {
             ["backend"] = "bepu",
+            ["awake"] = awake,
             ["linearVelocity"] = new JsonObject
             {
                 ["x"] = linearVelocity.X,
                 ["y"] = linearVelocity.Y,
                 ["z"] = linearVelocity.Z
+            },
+            ["angularVelocity"] = new JsonObject
+            {
+                ["x"] = angularVelocity.X,
+                ["y"] = angularVelocity.Y,
+                ["z"] = angularVelocity.Z
+            },
+            ["orientation"] = new JsonObject
+            {
+                ["x"] = orientation.X,
+                ["y"] = orientation.Y,
+                ["z"] = orientation.Z,
+                ["w"] = orientation.W
             }
         };
         var stateType = is2D ? "Rekall.PhysicsState2D" : "Rekall.PhysicsState3D";
@@ -493,15 +427,18 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
         return true;
     }
 
-    private static Vector3 ReadGravity(RekallAgeRuntimeWorld world)
+    private static PhysicsWorldConfiguration ReadPhysicsWorldConfiguration(RekallAgeRuntimeWorld world)
     {
         var settings = world.Entities
             .Select(entity => FindComponent(entity, "Rekall.PhysicsWorld3D"))
             .FirstOrDefault(component => component is not null);
-        return new Vector3(
-            ReadSingle(settings, "gravityX", 0),
-            ReadSingle(settings, "gravityY", DefaultGravityY),
-            ReadSingle(settings, "gravityZ", 0));
+        return new PhysicsWorldConfiguration(
+            new Vector3(
+                ReadSingle(settings, "gravityX", 0),
+                ReadSingle(settings, "gravityY", DefaultGravityY),
+                ReadSingle(settings, "gravityZ", 0)),
+            Math.Clamp((int)ReadSingle(settings, "velocityIterationCount", 4), 1, 32),
+            Math.Clamp((int)ReadSingle(settings, "substepCount", 4), 1, 16));
     }
 
     private static RekallAgeRuntimeComponent? FindComponent(RekallAgeRuntimeEntity entity, string type)
@@ -538,42 +475,6 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
             items.Select(item => item.DampingRatio).DefaultIfEmpty(1).Average());
     }
 
-    private static float EstimateVerticalExtent(PhysicsEntity item)
-    {
-        return item.Collider?.Type switch
-        {
-            "Rekall.BoxCollider3D" => Math.Max(0.0001f, ReadSingle(item.Collider, "height", 1)) * 0.5f,
-            "Rekall.SphereCollider3D" => Math.Max(0.0001f, ReadSingle(item.Collider, "radius", 0.5f)),
-            "Rekall.CapsuleCollider3D" => Math.Max(0.0001f, ReadSingle(item.Collider, "radius", 0.5f))
-                + Math.Max(0.0001f, ReadSingle(item.Collider, "length", 1)) * 0.5f,
-            _ => 0
-        };
-    }
-
-    private static bool TryGetSupportSurface(PhysicsEntity item, out SupportSurface surface)
-    {
-        surface = default;
-        if (item.Collider?.Type != "Rekall.BoxCollider3D")
-        {
-            return false;
-        }
-
-        var transform = item.Entity.Transform;
-        var width = Math.Max(0.0001f, ReadSingle(item.Collider, "width", 1));
-        var height = Math.Max(0.0001f, ReadSingle(item.Collider, "height", 1));
-        var depth = Math.Max(0.0001f, ReadSingle(item.Collider, "depth", 1));
-        var x = (float)transform.Position3D.X;
-        var y = (float)transform.Position3D.Y;
-        var z = (float)transform.Position3D.Z;
-        surface = new SupportSurface(
-            y + height * 0.5f,
-            x - width * 0.5f,
-            x + width * 0.5f,
-            z - depth * 0.5f,
-            z + depth * 0.5f);
-        return true;
-    }
-
     private static Vector3 ToVector3(RekallAgeRuntimeVector3 value)
     {
         return new Vector3((float)value.X, (float)value.Y, (float)value.Z);
@@ -591,6 +492,18 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
 
     private static Quaternion ToPhysicsOrientation(PhysicsEntity item)
     {
+        var stateType = item.Is2D ? "Rekall.PhysicsState2D" : "Rekall.PhysicsState3D";
+        if (TryReadQuaternion(FindComponent(item.Entity, stateType), "orientation", out var persisted))
+        {
+            return persisted;
+        }
+
+        return ToAuthoredOrientation(item);
+    }
+
+    private static Quaternion ToAuthoredOrientation(PhysicsEntity item)
+    {
+
         if (item.Is2D)
         {
             return Quaternion.CreateFromAxisAngle(
@@ -599,10 +512,85 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
         }
 
         var rotation = item.Entity.Transform.Rotation3D;
-        return Quaternion.CreateFromYawPitchRoll(
-            (float)(rotation.Y * Math.PI / 180),
-            (float)(rotation.X * Math.PI / 180),
-            (float)(rotation.Z * Math.PI / 180));
+        var radiansX = (float)(rotation.X * Math.PI / 180);
+        var radiansY = (float)(rotation.Y * Math.PI / 180);
+        var radiansZ = (float)(rotation.Z * Math.PI / 180);
+        return Quaternion.Normalize(Quaternion.CreateFromRotationMatrix(
+            Matrix4x4.CreateRotationX(radiansX)
+            * Matrix4x4.CreateRotationY(radiansY)
+            * Matrix4x4.CreateRotationZ(radiansZ)));
+    }
+
+    private static Vector3 ReadAuthoredLinearVelocity(RekallAgeRuntimeComponent rigidbody)
+    {
+        return new Vector3(
+            ReadSingle(rigidbody, "linearVelocityX", 0),
+            ReadSingle(rigidbody, "linearVelocityY", 0),
+            ReadSingle(rigidbody, "linearVelocityZ", 0));
+    }
+
+    private static Vector3 ReadAuthoredAngularVelocity(RekallAgeRuntimeComponent rigidbody)
+    {
+        return new Vector3(
+            ReadSingle(rigidbody, "angularVelocityX", 0),
+            ReadSingle(rigidbody, "angularVelocityY", 0),
+            ReadSingle(rigidbody, "angularVelocityZ", 0));
+    }
+
+    private static bool TryReadQuaternion(
+        RekallAgeRuntimeComponent? component,
+        string name,
+        out Quaternion orientation)
+    {
+        orientation = Quaternion.Identity;
+        if (component is null
+            || !component.Properties.TryGetPropertyValue(name, out var node)
+            || node is not JsonObject value)
+        {
+            return false;
+        }
+
+        orientation = Quaternion.Normalize(new Quaternion(
+            ReadSingle(value, "x", 0),
+            ReadSingle(value, "y", 0),
+            ReadSingle(value, "z", 0),
+            ReadSingle(value, "w", 1)));
+        return true;
+    }
+
+    private static double QuaternionToPlanarDegrees(Quaternion orientation)
+    {
+        return Math.Atan2(
+            2 * ((orientation.W * orientation.Z) + (orientation.X * orientation.Y)),
+            1 - (2 * ((orientation.Y * orientation.Y) + (orientation.Z * orientation.Z))))
+            * 180 / Math.PI;
+    }
+
+    private static RekallAgeRuntimeVector3 QuaternionToRendererEulerDegrees(Quaternion orientation)
+    {
+        orientation = Quaternion.Normalize(orientation);
+        var matrix = Matrix4x4.CreateFromQuaternion(orientation);
+        var yaw = Math.Asin(Math.Clamp(-matrix.M13, -1, 1));
+        var cosineYaw = Math.Cos(yaw);
+        double pitch;
+        double roll;
+        if (Math.Abs(cosineYaw) > 0.000001)
+        {
+            pitch = Math.Atan2(matrix.M23, matrix.M33);
+            roll = Math.Atan2(matrix.M12, matrix.M11);
+        }
+        else
+        {
+            pitch = -matrix.M13 > 0
+                ? Math.Atan2(matrix.M21, matrix.M22)
+                : Math.Atan2(-matrix.M21, matrix.M22);
+            roll = 0;
+        }
+        const double radiansToDegrees = 180 / Math.PI;
+        return new RekallAgeRuntimeVector3(
+            pitch * radiansToDegrees,
+            yaw * radiansToDegrees,
+            roll * radiansToDegrees);
     }
 
     private static Vector3 ReadVector3(RekallAgeRuntimeComponent? component, string name)
@@ -719,6 +707,261 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
         return false;
     }
 
+    private sealed class PersistentPhysicsWorld : IDisposable
+    {
+        private readonly BufferPool _pool = new();
+        private readonly CollidableProperty<PhysicsMaterial> _materials;
+        private readonly Dictionary<string, PersistentDynamicBody> _dynamicBodies = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, PersistentStaticBody> _staticBodies = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, BodyOutputSnapshot> _lastOutputs = new(StringComparer.Ordinal);
+
+        public PersistentPhysicsWorld(string sceneId, PhysicsWorldConfiguration configuration)
+        {
+            SceneId = sceneId;
+            Configuration = configuration;
+            _materials = new CollidableProperty<PhysicsMaterial>(_pool);
+            Simulation = Simulation.Create(
+                _pool,
+                new RekallAgeBepuNarrowPhaseCallbacks(_materials),
+                new RekallAgeBepuPoseIntegratorCallbacks(configuration.Gravity),
+                new SolveDescription(configuration.VelocityIterationCount, configuration.SubstepCount));
+        }
+
+        public string SceneId { get; }
+
+        public PhysicsWorldConfiguration Configuration { get; }
+
+        public Simulation Simulation { get; }
+
+        public void Reconcile(
+            IReadOnlyList<PhysicsEntity> dynamicBodies,
+            IReadOnlyList<PhysicsEntity> staticBodies)
+        {
+            var desiredDynamic = dynamicBodies.ToDictionary(item => item.Entity.Id, StringComparer.Ordinal);
+            foreach (var existing in _dynamicBodies.ToArray())
+            {
+                if (!desiredDynamic.TryGetValue(existing.Key, out var desired)
+                    || !existing.Value.Signature.Equals(ConfigurationSignature(desired, includeTransform: false), StringComparison.Ordinal))
+                {
+                    RemoveDynamic(existing.Key, existing.Value);
+                }
+            }
+
+            foreach (var item in dynamicBodies)
+            {
+                if (!_dynamicBodies.ContainsKey(item.Entity.Id))
+                {
+                    AddDynamic(item);
+                }
+            }
+
+            var desiredStatic = staticBodies.ToDictionary(item => item.Entity.Id, StringComparer.Ordinal);
+            foreach (var existing in _staticBodies.ToArray())
+            {
+                if (!desiredStatic.TryGetValue(existing.Key, out var desired)
+                    || !existing.Value.Signature.Equals(ConfigurationSignature(desired, includeTransform: true), StringComparison.Ordinal))
+                {
+                    RemoveStatic(existing.Key, existing.Value);
+                }
+            }
+
+            foreach (var item in staticBodies)
+            {
+                if (!_staticBodies.ContainsKey(item.Entity.Id))
+                {
+                    AddStatic(item);
+                }
+            }
+        }
+
+        public void SynchronizeAuthoredChanges(IReadOnlyList<PhysicsEntity> dynamicBodies)
+        {
+            foreach (var item in dynamicBodies)
+            {
+                if (!_dynamicBodies.TryGetValue(item.Entity.Id, out var persistent)
+                    || !_lastOutputs.TryGetValue(item.Entity.Id, out var previous)
+                    || previous.Matches(item.Entity))
+                {
+                    continue;
+                }
+
+                var body = Simulation.Bodies[persistent.Handle];
+                body.Pose = new RigidPose(
+                    ToPhysicsPosition(item) + persistent.CenterOffset,
+                    ToAuthoredOrientation(item));
+                body.Velocity = CreateVelocity(item);
+                body.Awake = true;
+                Simulation.Bodies.UpdateBounds(persistent.Handle);
+            }
+        }
+
+        public Dictionary<string, DynamicBodyState> CapturePreStepBodies(
+            IReadOnlyList<PhysicsEntity> dynamicBodies)
+        {
+            var current = dynamicBodies.ToDictionary(item => item.Entity.Id, StringComparer.Ordinal);
+            return _dynamicBodies
+                .Where(pair => current.ContainsKey(pair.Key))
+                .ToDictionary(
+                    pair => pair.Key,
+                    pair => new DynamicBodyState(
+                        pair.Value.Handle,
+                        default,
+                        pair.Value.CenterOffset,
+                        current[pair.Key],
+                        Simulation.Bodies[pair.Value.Handle].Velocity.Linear),
+                    StringComparer.Ordinal);
+        }
+
+        public void RecordOutputs(IReadOnlyList<RekallAgeRuntimeEntity> entities)
+        {
+            _lastOutputs.Clear();
+            foreach (var entity in entities)
+            {
+                if (_dynamicBodies.ContainsKey(entity.Id))
+                {
+                    _lastOutputs[entity.Id] = BodyOutputSnapshot.Create(entity);
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            Simulation.Dispose();
+            _pool.Clear();
+        }
+
+        private void AddDynamic(PhysicsEntity item)
+        {
+            var pose = CreatePose(item, Vector3.Zero);
+            var velocity = CreateVelocity(item);
+            var mass = Math.Max(0.0001f, ReadSingle(item.Rigidbody!, "mass", 1));
+            if (!TryCreateDynamicDescription(Simulation, _pool, item, pose, velocity, mass, out var created))
+            {
+                return;
+            }
+
+            var handle = Simulation.Bodies.Add(created.Description);
+            _materials.Allocate(handle) = item.Material;
+            _dynamicBodies[item.Entity.Id] = new PersistentDynamicBody(
+                handle,
+                created.Description.Collidable.Shape,
+                created.CenterOffset,
+                ConfigurationSignature(item, includeTransform: false));
+        }
+
+        private void AddStatic(PhysicsEntity item)
+        {
+            var shape = CreateStaticShape(Simulation, _pool, item);
+            if (!shape.Created)
+            {
+                return;
+            }
+
+            var handle = Simulation.Statics.Add(new StaticDescription(
+                CreatePose(item, Vector3.Zero),
+                shape.Shape));
+            _materials.Allocate(handle) = item.Material;
+            _staticBodies[item.Entity.Id] = new PersistentStaticBody(
+                handle,
+                shape.Shape,
+                ConfigurationSignature(item, includeTransform: true));
+        }
+
+        private void RemoveDynamic(string id, PersistentDynamicBody body)
+        {
+            Simulation.Bodies.Remove(body.Handle);
+            Simulation.Shapes.RemoveAndDispose(body.Shape, _pool);
+            _dynamicBodies.Remove(id);
+            _lastOutputs.Remove(id);
+        }
+
+        private void RemoveStatic(string id, PersistentStaticBody body)
+        {
+            Simulation.Statics.Remove(body.Handle);
+            Simulation.Shapes.RemoveAndDispose(body.Shape, _pool);
+            _staticBodies.Remove(id);
+        }
+
+        private static RigidPose CreatePose(PhysicsEntity item, Vector3 centerOffset)
+        {
+            return new RigidPose(ToPhysicsPosition(item) + centerOffset, ToPhysicsOrientation(item));
+        }
+
+        private static BodyVelocity CreateVelocity(PhysicsEntity item)
+        {
+            var stateType = item.Is2D ? "Rekall.PhysicsState2D" : "Rekall.PhysicsState3D";
+            var state = FindComponent(item.Entity, stateType);
+            var linearVelocity = state is null
+                ? ReadAuthoredLinearVelocity(item.Rigidbody!)
+                : ReadVector3(state, "linearVelocity");
+            var angularDegrees = state is null
+                ? ReadAuthoredAngularVelocity(item.Rigidbody!)
+                : ReadVector3(state, "angularVelocity");
+            var velocity = new BodyVelocity(linearVelocity)
+            {
+                Angular = angularDegrees * (MathF.PI / 180)
+            };
+            if (item.Is2D)
+            {
+                velocity.Linear.Z = 0;
+                velocity.Angular.X = 0;
+                velocity.Angular.Y = 0;
+            }
+
+            return velocity;
+        }
+
+        private static string ConfigurationSignature(PhysicsEntity item, bool includeTransform)
+        {
+            return string.Join(
+                "|",
+                item.Is2D,
+                item.Rigidbody?.Properties.ToJsonString() ?? string.Empty,
+                item.Collider?.Type ?? string.Empty,
+                item.Collider?.Properties.ToJsonString() ?? string.Empty,
+                item.GeometryMesh?.Properties.ToJsonString() ?? string.Empty,
+                item.Material,
+                includeTransform ? item.Entity.Transform : string.Empty);
+        }
+    }
+
+    private readonly record struct PersistentDynamicBody(
+        BodyHandle Handle,
+        TypedIndex Shape,
+        Vector3 CenterOffset,
+        string Signature);
+
+    private readonly record struct PersistentStaticBody(
+        StaticHandle Handle,
+        TypedIndex Shape,
+        string Signature);
+
+    private readonly record struct PhysicsWorldConfiguration(
+        Vector3 Gravity,
+        int VelocityIterationCount,
+        int SubstepCount);
+
+    private readonly record struct BodyOutputSnapshot(
+        RekallAgeRuntimeTransform Transform,
+        string PhysicsState)
+    {
+        public static BodyOutputSnapshot Create(RekallAgeRuntimeEntity entity)
+        {
+            var state = entity.Components.FirstOrDefault(component =>
+                component.Type is "Rekall.PhysicsState2D" or "Rekall.PhysicsState3D");
+            return new BodyOutputSnapshot(
+                entity.Transform,
+                state?.Properties.ToJsonString() ?? string.Empty);
+        }
+
+        public bool Matches(RekallAgeRuntimeEntity entity)
+        {
+            var current = Create(entity);
+            return Transform == current.Transform
+                && PhysicsState.Equals(current.PhysicsState, StringComparison.Ordinal);
+        }
+    }
+
     private readonly record struct StaticShape(bool Created, TypedIndex Shape);
 
     private readonly record struct DynamicBodyState(
@@ -747,25 +990,15 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
         public static PhysicsMaterial Default { get; } = new(1, 0, 0.5f, 2, 30, 1);
     }
 
-    private readonly record struct SupportSurface(
-        float TopY,
-        float MinX,
-        float MaxX,
-        float MinZ,
-        float MaxZ);
-
-    private readonly record struct RestitutionAdjustment(
-        bool Applied,
-        Vector3 Position,
-        Vector3 LinearVelocity)
+    private struct RekallAgeBepuNarrowPhaseCallbacks(
+        CollidableProperty<PhysicsMaterial> materials) : INarrowPhaseCallbacks
     {
-        public static RestitutionAdjustment None { get; } = new(false, default, default);
-    }
+        private Simulation? _simulation;
 
-    private struct RekallAgeBepuNarrowPhaseCallbacks(PhysicsMaterial material) : INarrowPhaseCallbacks
-    {
         public void Initialize(Simulation simulation)
         {
+            _simulation = simulation;
+            materials.Initialize(simulation);
         }
 
         public bool AllowContactGeneration(
@@ -784,13 +1017,73 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
             out PairMaterialProperties pairMaterial)
             where TManifold : unmanaged, IContactManifold<TManifold>
         {
+            var material = CombineMaterials([materials[pair.A], materials[pair.B]]);
+            var dampingRatio = material.DampingRatio;
+            var springFrequency = material.SpringFrequency;
+            if (material.Restitution > 0
+                && HasBounceImpact(pair, ref manifold, material.MinimumBounceSpeed))
+            {
+                dampingRatio = Math.Min(dampingRatio, RestitutionToDampingRatio(material.Restitution));
+                springFrequency = Math.Min(springFrequency, 10);
+            }
             pairMaterial = new PairMaterialProperties
             {
                 FrictionCoefficient = material.Friction,
                 MaximumRecoveryVelocity = material.MaximumRecoveryVelocity,
-                SpringSettings = new SpringSettings(material.SpringFrequency, material.DampingRatio)
+                SpringSettings = new SpringSettings(springFrequency, dampingRatio)
             };
             return true;
+        }
+
+        private bool HasBounceImpact<TManifold>(
+            CollidablePair pair,
+            ref TManifold manifold,
+            float minimumBounceSpeed)
+            where TManifold : unmanaged, IContactManifold<TManifold>
+        {
+            if (_simulation is null)
+            {
+                return false;
+            }
+
+            for (var contactIndex = 0; contactIndex < manifold.Count; contactIndex++)
+            {
+                manifold.GetContact(contactIndex, out var offsetFromA, out var normal, out _, out _);
+                var positionA = CollidablePosition(pair.A);
+                var contactPosition = positionA + offsetFromA;
+                var velocityA = PointVelocity(pair.A, contactPosition);
+                var velocityB = PointVelocity(pair.B, contactPosition);
+                if (Vector3.Dot(velocityA - velocityB, normal) <= -minimumBounceSpeed)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private Vector3 CollidablePosition(CollidableReference collidable)
+        {
+            return collidable.Mobility == CollidableMobility.Static
+                ? _simulation!.Statics[collidable.StaticHandle].Pose.Position
+                : _simulation!.Bodies[collidable.BodyHandle].Pose.Position;
+        }
+
+        private Vector3 PointVelocity(CollidableReference collidable, Vector3 contactPosition)
+        {
+            if (collidable.Mobility == CollidableMobility.Static)
+            {
+                return Vector3.Zero;
+            }
+
+            var body = _simulation!.Bodies[collidable.BodyHandle];
+            return body.Velocity.Linear
+                + Vector3.Cross(body.Velocity.Angular, contactPosition - body.Pose.Position);
+        }
+
+        private static float RestitutionToDampingRatio(float restitution)
+        {
+            return 1 - Math.Clamp(restitution, 0, 1);
         }
 
         public bool AllowContactGeneration(
@@ -814,6 +1107,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem
 
         public void Dispose()
         {
+            materials.Dispose();
         }
     }
 

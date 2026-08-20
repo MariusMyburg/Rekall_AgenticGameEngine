@@ -1085,6 +1085,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
         Cleanup("asset-watcher", () => _assetWatcher?.Dispose());
         Cleanup("audio-output", () => _audioOutput?.Dispose());
+        Cleanup("playable-game", () => _playableGame?.Dispose());
+        Cleanup("runtime-loop", _runtimeLoop.Dispose);
         try
         {
             var liveServerStarted = Stopwatch.GetTimestamp();

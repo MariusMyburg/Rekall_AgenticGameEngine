@@ -18,6 +18,27 @@ public sealed record RekallAgeRuntimeRaycast2DHit(
 
 public static class RekallAgeRuntimeModuleSdk
 {
+    public static RekallAgeRuntimeEntity CreateEntity(string id, string name)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            throw new ArgumentException("Runtime entity id must not be empty.", nameof(id));
+        }
+
+        var normalizedId = id.Trim();
+        var normalizedName = string.IsNullOrWhiteSpace(name) ? normalizedId : name.Trim();
+        return new RekallAgeRuntimeEntity(
+            normalizedId,
+            normalizedName,
+            [],
+            null,
+            null,
+            true,
+            false,
+            RekallAgeRuntimeTransform.Identity,
+            []);
+    }
+
     public static RekallAgeRuntimeComponent? FindComponent(
         this RekallAgeRuntimeEntity entity,
         string componentType)
@@ -160,6 +181,18 @@ public static class RekallAgeRuntimeModuleSdk
         }).ToArray();
 
         return found ? world with { Entities = entities } : world;
+    }
+
+    public static RekallAgeRuntimeWorld AddEntity(
+        this RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeEntity entity)
+    {
+        if (world.Entities.Any(existing => existing.Id.Equals(entity.Id, StringComparison.Ordinal)))
+        {
+            return world;
+        }
+
+        return world with { Entities = world.Entities.Append(entity).ToArray() };
     }
 
     public static RekallAgeRuntimeWorld RemoveEntity(
@@ -353,30 +386,51 @@ public static class RekallAgeRuntimeModuleSdk
         this RekallAgeRuntimeEntity entity,
         RekallAgeRuntimeVector3 position)
     {
-        return entity with
+        var updated = entity with
         {
             Transform = entity.Transform with { Position3D = position }
         };
+        return updated.UpdateComponent("Rekall.Transform3D", properties =>
+        {
+            properties["x"] = position.X;
+            properties["y"] = position.Y;
+            properties["z"] = position.Z;
+            return properties;
+        });
     }
 
     public static RekallAgeRuntimeEntity WithRotation3D(
         this RekallAgeRuntimeEntity entity,
         RekallAgeRuntimeVector3 rotation)
     {
-        return entity with
+        var updated = entity with
         {
             Transform = entity.Transform with { Rotation3D = rotation }
         };
+        return updated.UpdateComponent("Rekall.Transform3D", properties =>
+        {
+            properties["pitch"] = rotation.X;
+            properties["yaw"] = rotation.Y;
+            properties["roll"] = rotation.Z;
+            return properties;
+        });
     }
 
     public static RekallAgeRuntimeEntity WithScale3D(
         this RekallAgeRuntimeEntity entity,
         RekallAgeRuntimeVector3 scale)
     {
-        return entity with
+        var updated = entity with
         {
             Transform = entity.Transform with { Scale3D = scale }
         };
+        return updated.UpdateComponent("Rekall.Transform3D", properties =>
+        {
+            properties["scaleX"] = scale.X;
+            properties["scaleY"] = scale.Y;
+            properties["scaleZ"] = scale.Z;
+            return properties;
+        });
     }
 
     public static RekallAgeRuntimeEntity UpsertComponent(
@@ -472,6 +526,33 @@ public static class RekallAgeRuntimeModuleSdk
             properties[propertyName] = value;
             return properties;
         });
+
+    public static double DeterministicUnit(int seed, long sequence)
+    {
+        var value = unchecked((ulong)sequence + 0x9E3779B97F4A7C15UL);
+        value ^= unchecked((ulong)(uint)seed) * 0xD6E8FEB86659FD93UL;
+        value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
+        value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
+        value ^= value >> 31;
+        return (value >> 11) * (1.0 / 9007199254740992.0);
+    }
+
+    public static double DeterministicRange(
+        int seed,
+        long sequence,
+        double minimum,
+        double maximum)
+    {
+        if (!double.IsFinite(minimum) || !double.IsFinite(maximum) || maximum <= minimum)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maximum),
+                maximum,
+                "Maximum must be finite and greater than the finite minimum.");
+        }
+
+        return minimum + (DeterministicUnit(seed, sequence) * (maximum - minimum));
+    }
 
     public static IReadOnlyList<RekallAgeRuntimeInputAction> InputActions(
         this RekallAgeRuntimeWorld world,

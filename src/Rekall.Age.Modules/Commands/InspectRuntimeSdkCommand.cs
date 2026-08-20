@@ -182,6 +182,7 @@ public sealed class InspectRuntimeSdkCommand
         if (type == typeof(string)) return "string";
         if (type == typeof(bool)) return "bool";
         if (type == typeof(int)) return "int";
+        if (type == typeof(long)) return "long";
         if (type == typeof(double)) return "double";
         if (type == typeof(float)) return "float";
         if (type.IsArray) return $"{FriendlyType(type.GetElementType()!)}[]";
@@ -211,6 +212,13 @@ public sealed class InspectRuntimeSdkCommand
         nameof(RekallAgeRuntimeModuleSdk.WithRotation3D) or
         nameof(RekallAgeRuntimeModuleSdk.WithScale3D) =>
             "Returns a replacement immutable entity with the requested 3D transform value.",
+        nameof(RekallAgeRuntimeModuleSdk.CreateEntity) =>
+            "Creates a generic visible runtime entity with identity transforms and no components. Compose it with transform, tag, visibility, and typed component helpers before adding it to the world.",
+        nameof(RekallAgeRuntimeModuleSdk.AddEntity) =>
+            "Adds a generic runtime entity without manual world-list surgery. A duplicate stable id is rejected by returning the unchanged world.",
+        nameof(RekallAgeRuntimeModuleSdk.DeterministicUnit) or
+        nameof(RekallAgeRuntimeModuleSdk.DeterministicRange) =>
+            "Returns stateless deterministic pseudo-random values from an authored seed and stable sequence index, suitable for replayable spawning and procedural variation.",
         nameof(RekallAgeRuntimeModuleSdk.UpdateEntity) or
         nameof(RekallAgeRuntimeModuleSdk.ReplaceEntity) or
         nameof(RekallAgeRuntimeModuleSdk.RemoveEntity) =>
@@ -235,6 +243,14 @@ public sealed class InspectRuntimeSdkCommand
 
     private static string? UsageFor(string name) => name switch
     {
+        nameof(RekallAgeRuntimeModuleSdk.CreateEntity) =>
+            "var entity = RekallAgeRuntimeModuleSdk.CreateEntity(id, name).WithPosition3D(position).WithComponentNumber(\"Rekall.Rigidbody3D\", \"mass\", 1);",
+        nameof(RekallAgeRuntimeModuleSdk.AddEntity) =>
+            "world = world.AddEntity(entity); // unchanged when entity.Id already exists",
+        nameof(RekallAgeRuntimeModuleSdk.DeterministicUnit) =>
+            "var unit = RekallAgeRuntimeModuleSdk.DeterministicUnit(seed, spawnIndex);",
+        nameof(RekallAgeRuntimeModuleSdk.DeterministicRange) =>
+            "var yaw = RekallAgeRuntimeModuleSdk.DeterministicRange(seed, spawnIndex, -180, 180);",
         nameof(RekallAgeRuntimeModuleSdk.InputActionValue) =>
             "var horizontal = world.InputActionValue(\"move.horizontal\");",
         nameof(RekallAgeRuntimeModuleSdk.IsInputActionDown) =>

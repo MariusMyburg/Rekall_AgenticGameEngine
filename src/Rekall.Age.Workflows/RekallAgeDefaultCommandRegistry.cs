@@ -62,6 +62,7 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new InspectRuntimeSdkCommand());
         registry.Register(new ListModuleSourcesCommand());
         registry.Register(new ReadModuleSourceCommand());
+        registry.Register(new InstallModuleSdkCommand());
         registry.Register(new ScaffoldModuleCommand());
         registry.Register(new ScaffoldPlayableModuleCommand());
         registry.Register(new ScaffoldRuntimeSystemModuleCommand());

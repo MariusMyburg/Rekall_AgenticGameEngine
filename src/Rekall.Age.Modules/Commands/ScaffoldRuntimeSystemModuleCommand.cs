@@ -162,6 +162,8 @@ public sealed class ScaffoldRuntimeSystemModuleCommand
         source.AppendLine("        // var pressed = world.WasInputActionPressed(\"agent.authored.reset\");");
         source.AppendLine("        // Runtime vectors are immutable records: create new RekallAgeRuntimeVector3(x, y, z).");
         source.AppendLine("        // world = world.UpdateEntity(entity.Id, current => current.WithPosition3D(position));");
+        source.AppendLine("        // Runtime spawning: var entity = RekallAgeRuntimeModuleSdk.CreateEntity(id, name).WithPosition3D(position); world = world.AddEntity(entity);");
+        source.AppendLine("        // Replayable variation: var value = RekallAgeRuntimeModuleSdk.DeterministicRange(seed, sequence, minimum, maximum);");
         source.AppendLine("        // entity = entity.WithComponentNumber(componentType, \"valuePerSecond\", 2);");
         source.AppendLine("        var updatedWorld = world.UpdateEntitiesWithComponent(componentType, entity =>");
         source.AppendLine("        {");

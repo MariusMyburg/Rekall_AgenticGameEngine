@@ -45,6 +45,23 @@ public sealed class RekallAgeRuntimeSnapshotService
         IReadOnlyList<RekallAgeRuntimeInputFrame>? inputs,
         CancellationToken cancellationToken)
     {
+        return await InspectSceneTimelineAsync(
+            projectRoot,
+            sceneName,
+            frames,
+            inputs,
+            null,
+            cancellationToken);
+    }
+
+    public async ValueTask<RekallAgeRuntimeWorld> InspectSceneTimelineAsync(
+        string projectRoot,
+        string sceneName,
+        int frames,
+        IReadOnlyList<RekallAgeRuntimeInputFrame>? inputs,
+        Action<RekallAgeRuntimeWorld>? observeFrame,
+        CancellationToken cancellationToken)
+    {
         var scene = await _sceneStore.LoadAsync(projectRoot, sceneName, cancellationToken);
         var world = _worldBuilder.Build(scene);
         if (frames <= 0)
@@ -52,14 +69,26 @@ public sealed class RekallAgeRuntimeSnapshotService
             return world;
         }
 
+        var ownsExecutionLoop = _executionLoop is null;
         var executionLoop = _executionLoop ?? RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
-        for (var frame = 0; frame < frames; frame++)
+        try
         {
-            var input = inputs is { Count: > 0 } && frame < inputs.Count
-                ? inputs[frame].ToState()
-                : RekallAgeRuntimeInputState.Empty;
-            var result = await executionLoop.RunAsync(world, 1, cancellationToken, input);
-            world = result.World;
+            for (var frame = 0; frame < frames; frame++)
+            {
+                var input = inputs is { Count: > 0 } && frame < inputs.Count
+                    ? inputs[frame].ToState()
+                    : RekallAgeRuntimeInputState.Empty;
+                var result = await executionLoop.RunAsync(world, 1, cancellationToken, input);
+                world = result.World;
+                observeFrame?.Invoke(world);
+            }
+        }
+        finally
+        {
+            if (ownsExecutionLoop)
+            {
+                executionLoop.Dispose();
+            }
         }
 
         return world;

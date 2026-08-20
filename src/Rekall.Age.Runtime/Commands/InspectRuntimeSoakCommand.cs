@@ -95,7 +95,7 @@ public sealed class InspectRuntimeSoakCommand
             context.CancellationToken);
         var initialWorld = new RekallAgeRuntimeWorldBuilder().Build(scene);
         var world = initialWorld;
-        var loop = RekallAgeRuntimeExecutionLoop.CreateDefault(request.ProjectRoot);
+        using var loop = RekallAgeRuntimeExecutionLoop.CreateDefault(request.ProjectRoot);
         var checkpoints = new List<RuntimeSoakCheckpoint>();
         var baselineMemory = GC.GetTotalMemory(forceFullCollection: true);
         var peakSampledMemory = baselineMemory;

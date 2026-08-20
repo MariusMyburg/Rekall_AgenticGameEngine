@@ -116,7 +116,26 @@ public sealed record InspectSceneRuntimeEntityState(
     public RekallAgeRuntimeVector2 PositionDelta2D { get; init; } = new(0, 0);
 
     public RekallAgeRuntimeVector3 PositionDelta3D { get; init; } = new(0, 0, 0);
+
+    public InspectSceneRuntimePhysicsBodyState? Physics { get; init; }
 }
+
+public sealed record InspectSceneRuntimeQuaternion(double X, double Y, double Z, double W);
+
+public sealed record InspectSceneRuntimePhysicsBodyState(
+    string Backend,
+    bool Awake,
+    RekallAgeRuntimeVector3 LinearVelocity,
+    double LinearSpeed,
+    RekallAgeRuntimeVector3 AngularVelocityDegrees,
+    double AngularSpeedDegrees,
+    InspectSceneRuntimeQuaternion Orientation,
+    double PeakLinearSpeed,
+    int PeakLinearSpeedFrame,
+    RekallAgeRuntimeVector3 PeakLinearVelocity,
+    double PeakAngularSpeedDegrees,
+    int PeakAngularSpeedFrame,
+    RekallAgeRuntimeVector3 PeakAngularVelocityDegrees);
 
 public sealed record InspectSceneRuntimeCulledRenderable(
     string EntityId,
@@ -187,15 +206,17 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
             0,
             null,
             context.CancellationToken);
-        var world = await snapshotService.InspectSceneAsync(
+        var physicsTelemetry = new PhysicsTelemetryAccumulator();
+        var world = await snapshotService.InspectSceneTimelineAsync(
             request.ProjectRoot,
             request.SceneName,
             Math.Max(0, request.Frames),
             request.Inputs,
+            physicsTelemetry.Observe,
             context.CancellationToken);
         var assertionResults = EvaluateAssertions(world, initialWorld, request.Assertions ?? []);
         var assertionsPassed = assertionResults.All(assertion => assertion.Passed);
-        var result = ToResult(world, initialWorld) with
+        var result = ToResult(world, initialWorld, physicsTelemetry.Peaks) with
         {
             AssertionsPassed = assertionsPassed,
             AssertionResults = assertionResults
@@ -443,7 +464,8 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
 
     private static InspectSceneRuntimeResult ToResult(
         RekallAgeRuntimeWorld world,
-        RekallAgeRuntimeWorld initialWorld)
+        RekallAgeRuntimeWorld initialWorld,
+        IReadOnlyDictionary<string, PhysicsTelemetryPeak> physicsPeaks)
     {
         var rendering = world.Subsystems.Rendering;
         var physics = world.Subsystems.Physics;
@@ -482,7 +504,8 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
                     PositionDelta3D = new RekallAgeRuntimeVector3(
                         entity.Transform.Position3D.X - initial.Position3D.X,
                         entity.Transform.Position3D.Y - initial.Position3D.Y,
-                        entity.Transform.Position3D.Z - initial.Position3D.Z)
+                        entity.Transform.Position3D.Z - initial.Position3D.Z),
+                    Physics = BuildPhysicsBodyState(entity, physicsPeaks)
                 };
             })
             .ToArray();
@@ -537,6 +560,150 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
             UiElementsTruncated = ui.Elements.Count > maximumUiElements
         };
     }
+
+    private static InspectSceneRuntimePhysicsBodyState? BuildPhysicsBodyState(
+        RekallAgeRuntimeEntity entity,
+        IReadOnlyDictionary<string, PhysicsTelemetryPeak> peaks)
+    {
+        var component = entity.Components.FirstOrDefault(candidate =>
+            candidate.Type is "Rekall.PhysicsState2D" or "Rekall.PhysicsState3D");
+        if (component is null)
+        {
+            return null;
+        }
+
+        var linear = ReadTelemetryVector(component.Properties, "linearVelocity");
+        var angular = ReadTelemetryVector(component.Properties, "angularVelocity");
+        var orientation = component.Properties["orientation"] as JsonObject;
+        var peak = peaks.TryGetValue(entity.Id, out var observed)
+            ? observed
+            : new PhysicsTelemetryPeak(
+                Magnitude(linear),
+                0,
+                linear,
+                Magnitude(angular),
+                0,
+                angular);
+        return new InspectSceneRuntimePhysicsBodyState(
+            ReadTelemetryString(component.Properties, "backend", "unknown"),
+            ReadTelemetryBoolean(component.Properties, "awake", false),
+            linear,
+            Magnitude(linear),
+            angular,
+            Magnitude(angular),
+            new InspectSceneRuntimeQuaternion(
+                ReadTelemetryNumber(orientation, "x", 0),
+                ReadTelemetryNumber(orientation, "y", 0),
+                ReadTelemetryNumber(orientation, "z", 0),
+                ReadTelemetryNumber(orientation, "w", 1)),
+            peak.PeakLinearSpeed,
+            peak.PeakLinearSpeedFrame,
+            peak.PeakLinearVelocity,
+            peak.PeakAngularSpeedDegrees,
+            peak.PeakAngularSpeedFrame,
+            peak.PeakAngularVelocityDegrees);
+    }
+
+    private static RekallAgeRuntimeVector3 ReadTelemetryVector(JsonObject properties, string name)
+    {
+        var value = properties[name] as JsonObject;
+        return new RekallAgeRuntimeVector3(
+            ReadTelemetryNumber(value, "x", 0),
+            ReadTelemetryNumber(value, "y", 0),
+            ReadTelemetryNumber(value, "z", 0));
+    }
+
+    private static double ReadTelemetryNumber(JsonObject? properties, string name, double fallback)
+    {
+        if (properties?[name] is not JsonValue value)
+        {
+            return fallback;
+        }
+
+        if (value.TryGetValue<double>(out var doubleValue))
+        {
+            return doubleValue;
+        }
+
+        return value.TryGetValue<float>(out var singleValue) ? singleValue : fallback;
+    }
+
+    private static bool ReadTelemetryBoolean(JsonObject properties, string name, bool fallback) =>
+        properties[name] is JsonValue value && value.TryGetValue<bool>(out var result) ? result : fallback;
+
+    private static string ReadTelemetryString(JsonObject properties, string name, string fallback) =>
+        properties[name] is JsonValue value && value.TryGetValue<string>(out var result) ? result : fallback;
+
+    private static double Magnitude(RekallAgeRuntimeVector3 value) =>
+        Math.Sqrt((value.X * value.X) + (value.Y * value.Y) + (value.Z * value.Z));
+
+    private sealed class PhysicsTelemetryAccumulator
+    {
+        private const int MaximumTrackedBodies = 128;
+        private readonly Dictionary<string, PhysicsTelemetryPeak> _peaks = new(StringComparer.Ordinal);
+
+        public IReadOnlyDictionary<string, PhysicsTelemetryPeak> Peaks => _peaks;
+
+        public void Observe(RekallAgeRuntimeWorld world)
+        {
+            foreach (var entity in world.Entities)
+            {
+                var component = entity.Components.FirstOrDefault(candidate =>
+                    candidate.Type is "Rekall.PhysicsState2D" or "Rekall.PhysicsState3D");
+                if (component is null
+                    || (!_peaks.ContainsKey(entity.Id) && _peaks.Count >= MaximumTrackedBodies))
+                {
+                    continue;
+                }
+
+                var linear = ReadTelemetryVector(component.Properties, "linearVelocity");
+                var angular = ReadTelemetryVector(component.Properties, "angularVelocity");
+                var linearSpeed = Magnitude(linear);
+                var angularSpeed = Magnitude(angular);
+                if (!_peaks.TryGetValue(entity.Id, out var peak))
+                {
+                    _peaks[entity.Id] = new PhysicsTelemetryPeak(
+                        linearSpeed,
+                        world.FrameIndex,
+                        linear,
+                        angularSpeed,
+                        world.FrameIndex,
+                        angular);
+                    continue;
+                }
+
+                if (linearSpeed > peak.PeakLinearSpeed)
+                {
+                    peak = peak with
+                    {
+                        PeakLinearSpeed = linearSpeed,
+                        PeakLinearSpeedFrame = world.FrameIndex,
+                        PeakLinearVelocity = linear
+                    };
+                }
+
+                if (angularSpeed > peak.PeakAngularSpeedDegrees)
+                {
+                    peak = peak with
+                    {
+                        PeakAngularSpeedDegrees = angularSpeed,
+                        PeakAngularSpeedFrame = world.FrameIndex,
+                        PeakAngularVelocityDegrees = angular
+                    };
+                }
+
+                _peaks[entity.Id] = peak;
+            }
+        }
+    }
+
+    private sealed record PhysicsTelemetryPeak(
+        double PeakLinearSpeed,
+        int PeakLinearSpeedFrame,
+        RekallAgeRuntimeVector3 PeakLinearVelocity,
+        double PeakAngularSpeedDegrees,
+        int PeakAngularSpeedFrame,
+        RekallAgeRuntimeVector3 PeakAngularVelocityDegrees);
 
     private static RuntimeCullingSummary BuildCullingSummary(RekallAgeRuntimeRenderView rendering)
     {

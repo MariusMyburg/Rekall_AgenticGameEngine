@@ -1,3 +1,7 @@
+using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Transactions;
+using Rekall.Age.Modules.Commands;
+using Rekall.Age.Modules.Security;
 using Rekall.Age.Modules.Sdk;
 
 namespace Rekall.Age.Tests.Modules;
@@ -19,6 +23,43 @@ public sealed class ModuleSdkInstallerTests
         var props = await File.ReadAllTextAsync(result.PropsPath);
         Assert.Contains("Rekall.Age.Modules.dll", props);
         Assert.DoesNotContain(Path.GetFullPath("."), props, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task InstallSdkCommandExplicitlyRepairsAStaleProjectLocalSdk()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var installed = await new RekallAgeModuleSdkInstaller().InstallAsync(root, CancellationToken.None);
+        await File.AppendAllTextAsync(installed.PropsPath, "<!-- stale -->");
+        Assert.False(new RekallAgeModuleSdkIntegrityVerifier().Verify(root).Ready);
+
+        var result = await new InstallModuleSdkCommand().ExecuteAsync(
+            new InstallModuleSdkRequest(root),
+            new RekallAgeCommandContext(
+                "agent",
+                RekallAgeTransaction.Begin("refresh module sdk"),
+                CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(installed.SdkRoot, result.Value.SdkRoot);
+        Assert.True(new RekallAgeModuleSdkIntegrityVerifier().Verify(root).Ready);
+    }
+
+    [Fact]
+    public async Task InstallSdkCommandRejectsAMissingProjectRootWithoutCreatingIt()
+    {
+        var root = Path.Combine(TestPaths.CreateTempDirectory(), "missing");
+
+        var result = await new InstallModuleSdkCommand().ExecuteAsync(
+            new InstallModuleSdkRequest(root),
+            new RekallAgeCommandContext(
+                "agent",
+                RekallAgeTransaction.Begin("missing module sdk"),
+                CancellationToken.None));
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, error => error.Code == "REKALL_PROJECT_NOT_FOUND");
+        Assert.False(Directory.Exists(root));
     }
 
     [Fact]

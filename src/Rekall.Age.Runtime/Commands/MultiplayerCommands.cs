@@ -148,9 +148,8 @@ public sealed class MultiplayerHostCommand : IRekallAgeCommand<MultiplayerHostRe
             request.SceneName,
             0,
             context.CancellationToken).ConfigureAwait(false);
-        var session = new RekallAgeAuthoritativeMultiplayerSession(
-            world,
-            RekallAgeRuntimeExecutionLoop.CreateDefault(request.ProjectRoot));
+        using var runtimeLoop = RekallAgeRuntimeExecutionLoop.CreateDefault(request.ProjectRoot);
+        var session = new RekallAgeAuthoritativeMultiplayerSession(world, runtimeLoop);
         var host = new RekallAgeMultiplayerAuthorityHost(sessionId, session);
         if (transport.Equals("websocket", StringComparison.Ordinal))
         {

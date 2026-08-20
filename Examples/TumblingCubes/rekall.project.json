@@ -1,0 +1,9 @@
+{
+  "name": "Tumbling Cubes",
+  "schemaVersion": 1,
+  "capabilities": [
+    "physics3d",
+    "rendering3d",
+    "world"
+  ]
+}

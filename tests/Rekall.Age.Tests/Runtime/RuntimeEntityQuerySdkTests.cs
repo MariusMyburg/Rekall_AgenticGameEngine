@@ -105,6 +105,48 @@ public sealed class RuntimeEntityQuerySdkTests
     }
 
     [Fact]
+    public void RuntimeModuleSdkCreatesAndAddsAnEntityWithoutManualWorldListSurgery()
+    {
+        var world = CreateWorld(CreateEntity("player", "Player", ["actor"]));
+        var spawned = RekallAgeRuntimeModuleSdk.CreateEntity(" block_1 ", " Falling Block ")
+            .WithTag("spawned")
+            .WithPosition3D(new RekallAgeRuntimeVector3(0, 8, 0))
+            .WithRotation3D(new RekallAgeRuntimeVector3(10, 20, 30))
+            .WithComponentNumber("Rekall.BoxCollider3D", "width", 1)
+            .WithComponentNumber("Rekall.Rigidbody3D", "mass", 1);
+
+        var updated = world.AddEntity(spawned);
+
+        Assert.Equal(["player", "block_1"], updated.Entities.Select(entity => entity.Id));
+        Assert.Equal("Falling Block", updated.FindEntity("block_1")!.Name);
+        Assert.Equal(["spawned"], updated.FindEntity("block_1")!.Tags);
+        Assert.Equal(8, updated.FindEntity("block_1")!.Transform.Position3D.Y);
+        Assert.Equal(20, updated.FindEntity("block_1")!.Transform.Rotation3D.Y);
+        var authoredTransform = updated.FindEntity("block_1")!.FindComponent("Rekall.Transform3D");
+        Assert.NotNull(authoredTransform);
+        Assert.Equal(8, authoredTransform.Properties["y"]!.GetValue<double>());
+        Assert.Equal(20, authoredTransform.Properties["yaw"]!.GetValue<double>());
+        Assert.Equal(1, updated.FindEntity("block_1")!.ComponentNumber("Rekall.Rigidbody3D", "mass"));
+        Assert.Same(updated, updated.AddEntity(spawned));
+    }
+
+    [Fact]
+    public void RuntimeModuleSdkProvidesStatelessDeterministicRandomValues()
+    {
+        var first = RekallAgeRuntimeModuleSdk.DeterministicUnit(42, 7);
+        var repeated = RekallAgeRuntimeModuleSdk.DeterministicUnit(42, 7);
+        var next = RekallAgeRuntimeModuleSdk.DeterministicUnit(42, 8);
+        var ranged = RekallAgeRuntimeModuleSdk.DeterministicRange(42, 7, -180, 180);
+
+        Assert.Equal(first, repeated);
+        Assert.NotEqual(first, next);
+        Assert.InRange(first, 0, Math.BitDecrement(1d));
+        Assert.Equal(-180 + (first * 360), ranged);
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            RekallAgeRuntimeModuleSdk.DeterministicRange(42, 7, 1, 1));
+    }
+
+    [Fact]
     public void RuntimeModuleSdkReadsAndWritesComponentStateWithoutJsonBoilerplate()
     {
         var entity = CreateEntity(

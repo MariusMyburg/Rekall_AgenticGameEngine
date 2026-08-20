@@ -11,6 +11,7 @@ using Rekall.Age.Editor;
 using Rekall.Age.LevelDesign.Commands;
 using Rekall.Age.Mcp;
 using Rekall.Age.Modules.Commands;
+using Rekall.Age.Modules.Sdk;
 using Rekall.Age.Playback;
 using Rekall.Age.Playback.Commands;
 using Rekall.Age.Project;
@@ -225,6 +226,7 @@ internal static class RekallAgeCli
                 ["module", "sources", var root] => await ListModuleSourcesAsync(registry, context, root),
                 ["module", "read-source", var root, var moduleName, var fileName] =>
                     await ReadModuleSourceAsync(registry, context, root, moduleName, fileName),
+                ["module", "install-sdk", var root] => await InstallModuleSdkAsync(registry, context, root),
                 ["module", "scaffold", var root, var moduleId, var displayName, var moduleName, var componentName] =>
                     await ScaffoldModuleAsync(registry, context, root, moduleId, displayName, moduleName, componentName),
                 ["module", "scaffold-playable", var root, var moduleId, var displayName, var moduleName] =>
@@ -2492,6 +2494,32 @@ internal static class RekallAgeCli
         return result.Ok && result.Value.Ready ? 0 : 1;
     }
 
+    private static async Task<int> InstallModuleSdkAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root)
+    {
+        var result = await registry.ExecuteAsync<InstallModuleSdkRequest, RekallAgeModuleSdkInstallation>(
+            "rekall.module.install_sdk",
+            new InstallModuleSdkRequest(root),
+            context);
+        Console.WriteLine(result.Summary);
+        if (result.Ok)
+        {
+            Console.WriteLine($"SDK root: {result.Value.SdkRoot}");
+            Console.WriteLine($"Integrity manifest: {result.Value.ManifestPath}");
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+            {
+                Console.WriteLine($"{error.Code}: {error.Message}");
+            }
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
     private static async Task<int> RelocatePlayablePackageAsync(
         RekallAgeCommandRegistry registry,
         RekallAgeCommandContext context,
@@ -3353,6 +3381,11 @@ internal static class RekallAgeCli
         {
             Console.WriteLine(
                 $"  {state.EntityName}: position2D=({state.Transform.Position2D.X:F3},{state.Transform.Position2D.Y:F3}) delta2D=({state.PositionDelta2D.X:F3},{state.PositionDelta2D.Y:F3}) position3D=({state.Transform.Position3D.X:F3},{state.Transform.Position3D.Y:F3},{state.Transform.Position3D.Z:F3}) delta3D=({state.PositionDelta3D.X:F3},{state.PositionDelta3D.Y:F3},{state.PositionDelta3D.Z:F3}) rotation3D=({state.Transform.Rotation3D.X:F3},{state.Transform.Rotation3D.Y:F3},{state.Transform.Rotation3D.Z:F3}) components=[{string.Join(',', state.ComponentTypes)}]");
+            if (state.Physics is { } physicsState)
+            {
+                Console.WriteLine(
+                    $"    Physics {physicsState.Backend}: awake={physicsState.Awake} linear=({physicsState.LinearVelocity.X:F3},{physicsState.LinearVelocity.Y:F3},{physicsState.LinearVelocity.Z:F3}) speed={physicsState.LinearSpeed:F3} peak={physicsState.PeakLinearSpeed:F3}@{physicsState.PeakLinearSpeedFrame} angularDeg=({physicsState.AngularVelocityDegrees.X:F3},{physicsState.AngularVelocityDegrees.Y:F3},{physicsState.AngularVelocityDegrees.Z:F3}) angularSpeedDeg={physicsState.AngularSpeedDegrees:F3} peakAngularDeg={physicsState.PeakAngularSpeedDegrees:F3}@{physicsState.PeakAngularSpeedFrame} orientation=({physicsState.Orientation.X:F5},{physicsState.Orientation.Y:F5},{physicsState.Orientation.Z:F5},{physicsState.Orientation.W:F5})");
+            }
         }
         Console.WriteLine($"Input actions: {result.Value.InputActionCount}");
         foreach (var action in result.Value.InputActions)

@@ -73,4 +73,12 @@ public sealed class RekallAgeModulePlayableGame : IRekallAgePlayableGame
             .ToArray();
         return new RekallAgePlaybackRenderFrame(frameIndex, Kind, moduleFrame.Text + Environment.NewLine, drawCommands);
     }
+
+    public void Dispose()
+    {
+        if (_module is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+    }
 }

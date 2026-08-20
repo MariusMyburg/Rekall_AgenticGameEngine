@@ -100,4 +100,29 @@ public sealed class InspectRuntimeSdkCommandTests
             contract.Name == "RekallAgeRuntimeVector2"
             && contract.Description.Contains("planar", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public async Task ReturnsGenericRuntimeSpawningAndDeterministicRandomContracts()
+    {
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("inspect spawning sdk"),
+            CancellationToken.None);
+
+        var result = await new InspectRuntimeSdkCommand().ExecuteAsync(
+            new InspectRuntimeSdkRequest("create add spawn deterministic random range", Limit: 24),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "CreateEntity"
+            && contract.Usage!.Contains("WithComponentNumber", StringComparison.Ordinal));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "AddEntity"
+            && contract.Description.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "DeterministicRange"
+            && contract.Signature.Contains("long sequence", StringComparison.Ordinal)
+            && contract.Usage!.Contains("spawnIndex", StringComparison.Ordinal));
+    }
 }

@@ -43,7 +43,7 @@ public sealed record RekallAgePlaybackDrawCommand(
     string Fill,
     string Text);
 
-public interface IRekallAgePlayableGame
+public interface IRekallAgePlayableGame : IDisposable
 {
     string Kind { get; }
 

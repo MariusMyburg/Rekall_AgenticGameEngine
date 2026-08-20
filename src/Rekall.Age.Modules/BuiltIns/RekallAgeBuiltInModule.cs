@@ -740,7 +740,7 @@ public sealed class RekallAgeVirtualGeometryComponent : RekallAgeComponent
     public string DebugMode { get; init; } = "off";
 }
 
-[RekallAgeComponent("Physics World 3D")]
+[RekallAgeComponent("Physics World 3D", Description = "Configures the BEPU rigid-body world. Solver iteration and substep counts trade CPU cost for contact, stack, and bouncy-material stability.")]
 public sealed class RekallAgePhysicsWorld3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty]
@@ -751,35 +751,59 @@ public sealed class RekallAgePhysicsWorld3DComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public double GravityZ { get; init; }
+
+    [RekallAgeProperty(Minimum = 1, Maximum = 32, Description = "Velocity solver iterations per substep. Increase for difficult constraints or deep stacks.")]
+    public int VelocityIterationCount { get; init; } = 4;
+
+    [RekallAgeProperty(Minimum = 1, Maximum = 16, Description = "BEPU solver/integration substeps per fixed runtime tick. Higher values improve fast contacts and contact-spring bounce at additional CPU cost.")]
+    public int SubstepCount { get; init; } = 4;
 }
 
-[RekallAgeComponent("Physics Material 3D")]
+[RekallAgeComponent("Physics Material 3D", Description = "Defines per-collidable BEPU contact response. Restitution is implemented with BEPU contact springs rather than post-solve velocity or position correction.")]
 public sealed class RekallAgePhysicsMaterial3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0)]
     public double Friction { get; init; } = 1;
 
-    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    [RekallAgeProperty(Minimum = 0, Maximum = 1, Description = "Requested impact bounciness from 0 to 1. AGE maps this to BEPU contact-spring damping for impacts above MinimumBounceSpeed.")]
     public double Restitution { get; init; }
 
-    [RekallAgeProperty(Minimum = 0)]
+    [RekallAgeProperty(Minimum = 0, Description = "Minimum relative contact speed that activates the restitution response. Slower resting contacts use DampingRatio so stacks can settle.")]
     public double MinimumBounceSpeed { get; init; } = 0.5;
 
-    [RekallAgeProperty(Minimum = 0)]
+    [RekallAgeProperty(Minimum = 0, Description = "Maximum BEPU penetration-recovery speed in world units per second.")]
     public double MaximumRecoveryVelocity { get; init; } = 2;
 
-    [RekallAgeProperty(Minimum = 0.0001)]
+    [RekallAgeProperty(Minimum = 0.0001, Description = "BEPU contact-spring frequency. Lower frequencies preserve more bounce; higher frequencies make contacts firmer but require more substeps.")]
     public double SpringFrequency { get; init; } = 30;
 
-    [RekallAgeProperty(Minimum = 0)]
+    [RekallAgeProperty(Minimum = 0, Description = "BEPU damping ratio used for non-bouncy and resting contacts: 0 is undamped, 1 is critically damped, and values above 1 are overdamped.")]
     public double DampingRatio { get; init; } = 1;
 }
 
-[RekallAgeComponent("Rigidbody 3D", Description = "Makes an entity a dynamic 3D physics body. Requires a matching Transform3D and 3D collider on the same entity. For static geometry, use a collider without a rigid body.")]
+[RekallAgeComponent("Rigidbody 3D", Description = "Makes an entity a dynamic 3D physics body. Requires a matching Transform3D and 3D collider on the same entity. For static geometry, use a collider without a rigid body. Initial linear velocity is in world units per second; initial angular velocity is in authored degrees per second.")]
 public sealed class RekallAgeRigidbody3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
     public double Mass { get; init; } = 1;
+
+    [RekallAgeProperty]
+    public double LinearVelocityX { get; init; }
+
+    [RekallAgeProperty]
+    public double LinearVelocityY { get; init; }
+
+    [RekallAgeProperty]
+    public double LinearVelocityZ { get; init; }
+
+    [RekallAgeProperty]
+    public double AngularVelocityX { get; init; }
+
+    [RekallAgeProperty]
+    public double AngularVelocityY { get; init; }
+
+    [RekallAgeProperty]
+    public double AngularVelocityZ { get; init; }
 }
 
 [RekallAgeComponent("Sprite Renderer", Description = "Projects a texture or sprite asset as visible 2D runtime content.")]

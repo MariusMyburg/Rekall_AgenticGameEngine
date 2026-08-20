@@ -2,7 +2,7 @@ using Rekall.Age.Runtime.Abstractions;
 
 namespace Rekall.Age.Runtime;
 
-public sealed class RekallAgeRuntimeExecutionLoop
+public sealed class RekallAgeRuntimeExecutionLoop : IDisposable
 {
     private static readonly TimeSpan DefaultFixedDeltaTime = TimeSpan.FromSeconds(1.0 / 60.0);
     private const double DefaultFixedDeltaSeconds = 1.0 / 60.0;
@@ -137,6 +137,14 @@ public sealed class RekallAgeRuntimeExecutionLoop
             RekallAgeRuntimeWorldFrameContext context)
         {
             return ValueTask.FromResult(world);
+        }
+    }
+
+    public void Dispose()
+    {
+        foreach (var disposable in _systems.OfType<IDisposable>())
+        {
+            disposable.Dispose();
         }
     }
 }

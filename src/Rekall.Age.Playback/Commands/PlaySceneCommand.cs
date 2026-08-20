@@ -59,6 +59,7 @@ public sealed class PlaySceneCommand : IRekallAgeCommand<PlaySceneRequest, PlayS
                 error.Message,
                 [error]);
         }
+        using var ownedGame = game;
         var frames = new List<string>();
         var renderFrames = new List<RekallAgePlaybackRenderFrame>();
         var frameCount = Math.Clamp(request.Frames, 1, 600);

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "scene_tumbling_cubes_main",
+  "name": "Main",
+  "capabilities": ["physics3d", "rendering3d", "world"],
+  "entities": [
+    {
+      "id": "camera_main", "name": "Main Camera", "tags": ["camera"],
+      "components": [
+        {"type": "Rekall.Transform3D", "properties": {"x": 0, "y": 5.5, "z": -13, "pitch": 17, "yaw": 0, "roll": 0}},
+        {"type": "Rekall.Camera3D", "properties": {"active": true, "fieldOfView": 55}}
+      ],
+      "parentId": null, "prefabSourceId": null, "visible": true, "locked": false
+    },
+    {
+      "id": "light_key", "name": "Key Light", "tags": ["light"],
+      "components": [
+        {"type": "Rekall.Transform3D", "properties": {"pitch": -48, "yaw": -32, "roll": 0}},
+        {"type": "Rekall.DirectionalLight", "properties": {"intensity": 1.35}}
+      ],
+      "parentId": null, "prefabSourceId": null, "visible": true, "locked": false
+    },
+    {
+      "id": "floor", "name": "Solid Floor", "tags": ["floor", "geometry"],
+      "components": [
+        {"type": "Rekall.Transform3D", "properties": {"x": 0, "y": -0.1, "z": 0, "scaleX": 10, "scaleY": 0.2, "scaleZ": 8}},
+        {"type": "Rekall.GeometryPrimitive", "properties": {"primitive": "cube", "color": "#303846"}},
+        {"type": "Rekall.MeshRenderer", "properties": {"mesh": "rekall.geometry.cube"}},
+        {"type": "Rekall.BoxCollider3D", "properties": {"width": 10, "height": 0.2, "depth": 8}},
+        {"type": "Rekall.PhysicsMaterial3D", "properties": {"friction": 0.75, "restitution": 0.12, "springFrequency": 30, "dampingRatio": 0.9}}
+      ],
+      "parentId": null, "prefabSourceId": null, "visible": true, "locked": false
+    },
+    {
+      "id": "spawn_controller", "name": "Spawn Controller", "tags": ["gameplay"],
+      "components": [
+        {"type": "Game.Modules.TumblingCubes.SpawnState", "properties": {"enabled": true, "intervalSeconds": 2, "seed": 4201}}
+      ],
+      "parentId": null, "prefabSourceId": null, "visible": true, "locked": false
+    }
+  ]
+}

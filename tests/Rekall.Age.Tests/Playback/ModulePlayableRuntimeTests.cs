@@ -11,6 +11,25 @@ namespace Rekall.Age.Tests.Playback;
 public sealed class ModulePlayableRuntimeTests
 {
     [Fact]
+    public async Task RuntimeObservedPlayableUsesARealTimeFixedStepAccumulator()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("runtime accumulator"), CancellationToken.None);
+        await CreatePlayableProjectAsync(root, context);
+        var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        var game = RekallAgePlayableGameFactory.CreateWithRuntime(root, scene);
+
+        game.Tick(new RekallAgePlaybackInput(0, DeltaSeconds: 1.0 / 120.0));
+        Assert.Equal(0, game.RenderFrame(1).RuntimeState!.FrameIndex);
+
+        game.Tick(new RekallAgePlaybackInput(0, DeltaSeconds: 1.0 / 120.0));
+        Assert.Equal(1, game.RenderFrame(2).RuntimeState!.FrameIndex);
+
+        game.Tick(new RekallAgePlaybackInput(0, DeltaSeconds: 1.0 / 30.0));
+        Assert.Equal(3, game.RenderFrame(3).RuntimeState!.FrameIndex);
+    }
+
+    [Fact]
     public async Task PlaySceneRunsCompiledAgentPlayableModule()
     {
         var root = TestPaths.CreateTempDirectory();

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>TumblingCubes</AssemblyName>
+    <RekallAgeSdkCompatibilityVersion>1</RekallAgeSdkCompatibilityVersion>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+  <Import Project="..\..\.rekall\sdk\1\Rekall.Age.Sdk.props" Condition="Exists('..\..\.rekall\sdk\1\Rekall.Age.Sdk.props')" />
+  <Target Name="ValidateRekallAgeSdk" BeforeTargets="ResolveReferences" Condition="!Exists('..\..\.rekall\sdk\1\Rekall.Age.Sdk.props')">
+    <Error Code="REKALL_SDK_MISSING" Text="Rekall AGE module SDK compatibility version 1 is missing. Re-run a Rekall AGE module scaffold or SDK repair command." />
+  </Target>
+</Project>

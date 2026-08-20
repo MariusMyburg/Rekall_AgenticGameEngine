@@ -17,7 +17,7 @@ relocation.
 Evidence reviewed:
 
 - 24 engine and test projects, approximately 60,000 C# lines
-- 840 automated tests across authoring, runtime, rendering, packaging, MCP, and workflows
+- 894 automated tests across authoring, runtime, rendering, packaging, MCP, and workflows
 - the installed `win-x64` distribution and generic authoring gauntlet
 - runtime execution-system registration and subsystem projections
 - MCP schemas, transaction behavior, and agent context summaries
@@ -33,12 +33,26 @@ Maturity labels:
 - **Facade:** UI or API surface suggests behavior that is not wired
 - **Missing:** no credible implementation exists
 
+## Latest installed evidence
+
+The 2026-08-20 AI game-creation checkpoint completed a zero-warning locked
+Release build and two independent 894/894 Release suites, published the CLI,
+Studio, headless player, and Windows player as self-contained applications, and
+passed the installed distribution acceptance. The shipped engine completed the
+generic authoring gauntlet, rendered a nonblank proof, launched play, packaged,
+relocated, audited, and reran the game. The assembled directory contains 1,178
+files; its 200,832,939-byte archive has SHA-256
+`4553BF616B31461BCEF11679DA66177B46929B15829FB5F39CF00FED5FFC9D6D`.
+The same installed run passed restricted module-trust/tamper, negative archive,
+runtime UI/audio, animation, compatibility, atomic persistence, optimistic
+revision, and damaged-document recovery checks.
+
 ## Capability matrix
 
 | Area | Current maturity | Evidence | Production gap |
 | --- | --- | --- | --- |
 | Project/world authoring | Implemented | deterministic project/scene stores; entity/component commands; blueprints; transactions; bounded immutable reads, durable atomic publication, exact optimistic revisions, stale-writer rejection, one-version explicit corruption recovery with bounded quarantine, and serialized audit append with installed proof | automatic content merge/collaboration UX, autosave/history, external backup, and large-project stress proof |
-| Portable C# modules | Proven | installed SDK scaffolds and builds without `src/`; isolated intermediates; runtime loading | explicit trust/sandbox policy, dependency policy, compatibility fixtures, module reload |
+| Portable C# modules | Proven | installed SDK scaffolds and builds without `src/`; isolated intermediates; AppContainer-restricted execution posture; runtime loading | dependency policy, compatibility fixtures, module reload breadth, and signed receipts |
 | MCP command surface | Implemented | JSON-RPC tools with generated JSON schemas, structured content, priorities, transactions, and generic project/scene recovery inspection and explicit restore | richer field descriptions/constraints, pagination/filtering, capability benchmark, protocol conformance suite |
 | Agent context | Implemented | compact schema contracts, type-directed model-argument normalization, bounded failure previews and persistent tool ledger, source and installed Ollama authoring benchmarks | indexed queries for very large projects, more benchmark tasks, lower redundant-call rate |
 | Desktop runtime | Implemented | fixed-step runtime, generic events/input, module systems, windowed player | save/load state, crash recovery, lifecycle soak tests, frame pacing/telemetry |
@@ -56,10 +70,10 @@ Maturity labels:
 | Live editing | Partial | scene/assets/blueprint/diff local IPC operations | module hot reload, conflict/revision UX, reconnect/recovery, Studio integration |
 | Playable packaging | Proven | relative hashed manifest, minimal payload, forbidden-file checks, archive safety, relocation run/audit/capture, packaged runtime UI/animation/audio state | signing, delta patching/updater integration, broader clean-machine matrix |
 | Engine distribution | Proven | locked restore, two suites, self-contained applications, hashes, clean installed gauntlet | binary signing, installer/updater, release provenance/SBOM, clean-machine VM matrix |
-| Studio | Facade | real read models and a WPF shell | controls are unwired, viewport is text, no interactive open/edit/play workflow |
-| Security | Partial | no currently known vulnerable NuGet dependency; distribution forbidden-file checks; bounded metadata-first ZIP preflight and transactional exact-length extraction | restricted module hosting, fuzzing breadth, secret scanning, signed releases/packages, threat model |
-| Test platform | Implemented | 840 green tests; latest canonical two-pass Release acceptance covers Vulkan, relocation, SDL audio, runtime UI visual proof, animation limits, state graphs, cubic and morph sampling, exact final-mesh bounds, malformed corpus, long-run determinism, desktop recovery, persisted-document corruption recovery, compatibility, adversarial ZIP preflight, concurrent persisted-JSON readers, and stale-writer recovery | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
-| LLM providers/Ollama | Implemented | provider-neutral contracts, native Ollama chat/tools/model discovery, bounded loop, `qwen3.5:35b` source benchmark in 15 turns and expanded installed UI/audio/animation benchmark in 23 turns | additional models/providers and installed benchmark breadth, lower token/correction cost, quality/cost routing policy |
+| Studio | Implemented | command-backed project create/open and scene switching; generic hierarchy/inspector mutation; transactional undo/redo; engine viewport; real player ownership; package/audit actions; embedded project-scoped Ollama authoring | schema-guided property controls, deterministic WPF automation, asset/module workflow depth, and dedicated installed Studio-to-Ollama UI acceptance |
+| Security | Partial | no currently known vulnerable NuGet dependency; AppContainer-restricted module execution posture; distribution forbidden-file checks; bounded metadata-first ZIP preflight and transactional exact-length extraction | fuzzing breadth, secret scanning, signed releases/packages and receipts, threat model |
+| Test platform | Implemented | 894 green tests; latest canonical two-pass Release acceptance covers Vulkan, relocation, SDL audio, runtime UI visual proof, animation limits, state graphs, cubic and morph sampling, exact final-mesh bounds, malformed corpus, long-run determinism, desktop recovery, persisted-document corruption recovery, compatibility, adversarial ZIP preflight, concurrent persisted-JSON readers, and stale-writer recovery | deprecated xUnit v2 package, broader GPU/headset automation, soak/fuzz/performance regression suites |
+| LLM providers/Ollama | Implemented | provider-neutral contracts, native Ollama chat/tools/model discovery, bounded project-scoped loop, `qwen3.5:35b` source and installed benchmarks, plus a fresh two-tool complete-game gauntlet proof that terminates on compound success | additional models/providers, dedicated installed Studio UI automation, lower token/correction cost, quality/cost routing policy |
 
 ## Material findings
 

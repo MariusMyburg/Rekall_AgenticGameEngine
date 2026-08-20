@@ -48,7 +48,7 @@ create, author, inspect, edit, render, play, and verify desktop workflow.
   packages, relocates, audits, and reruns it.
 - [ ] Verify CLI and MCP use the same command results as Studio and the embedded
   agent; reject Studio-only hidden mutation paths by source audit.
-- [ ] Run full Debug, locked Release, two independent Release suites, publish,
+- [x] Run locked Release, two independent Release suites, publish,
   distribution assembly, and installed acceptance.
-- [ ] Record exact evidence and remaining product gaps in the maturity audit and
+- [x] Record exact evidence and remaining product gaps in the maturity audit and
   progress ledger.

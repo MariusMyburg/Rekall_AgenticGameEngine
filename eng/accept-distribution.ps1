@@ -164,8 +164,8 @@ try {
     Invoke-Rekall context doctor $proofRoot
     $trustOutput = Invoke-RekallOutput module trust $proofRoot
     if (-not $trustOutput.Contains('Ready: True', [StringComparison]::Ordinal) -or
-        -not $trustOutput.Contains('Trust posture: in-process-full-trust', [StringComparison]::Ordinal)) {
-        throw "Installed module trust inspection did not report ready full-trust evidence.`n$trustOutput"
+        -not $trustOutput.Contains('Trust posture: windows-appcontainer-restricted', [StringComparison]::Ordinal)) {
+        throw "Installed module trust inspection did not report ready AppContainer-restricted evidence.`n$trustOutput"
     }
     Write-Output $trustOutput
 

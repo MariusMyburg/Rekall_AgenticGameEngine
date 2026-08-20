@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 15:36 Africa/Johannesburg
+Last verified: 2026-08-20 16:05 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: transactional Studio undo/redo checkpoint
+Latest milestone: installed AI game-creation and distribution gate
 
 ## Product objective
 
@@ -30,18 +30,21 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 195,355,222-byte win-x64 archive assembled with
-  SHA-256 `8837F18945FDCEB4622DE5072D4A5FE0C518B2AE61B7F8A29E3E8527DFDD64CE`.
-  Its manifest lists 1,149 payload files; the assembled directory has 1,150
-  files including the distribution manifest itself.
-- Canonical verification: 840/840 Release tests passed twice independently;
+- Windows distribution: fresh 200,832,939-byte win-x64 archive assembled with
+  SHA-256 `4553BF616B31461BCEF11679DA66177B46929B15829FB5F39CF00FED5FFC9D6D`.
+  The assembled directory contains 1,178 files.
+- Canonical verification: 894/894 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
 - Current Debug verification: 840/840 tests pass after bounded project/scene
   recovery inspection, explicit restore, quarantine, path confinement, and
   agent/CLI/MCP exposure.
-- Installed acceptance: canonical gate exited 0; project/module workflows,
-  packaging and relocation, negative archive preflight, nonblank capture,
-  runtime UI, and audible audio paths have installed-binary proof.
+- Installed acceptance: canonical gate exited 0 against the freshly assembled
+  product. Shipped project/module workflows, the generic game-authoring
+  gauntlet, packaging and clean relocation, package audit, nonblank capture,
+  Windows play, negative archive preflight, runtime UI/audio, animation,
+  compatibility, atomic persistence, optimistic revisions, and damaged-file
+  recovery all have installed-binary proof. Module trust reports ready with
+  the `windows-appcontainer-restricted` posture.
 - Local agent: Ollama currently uses `qwen3.5:35b` through its native API.
 - Studio authoring: project create/open, entity hierarchy/selection, generic
   entity/component/property mutation, scene validation, software-rendered
@@ -869,10 +872,11 @@ Studio is important, but it does not define or reorder the engine foundation.
   animation, TANGENT/sparse/quantized morph accessors, broader complex
   transform fixtures, richer graph curves, and interruptible or hierarchical
   graph policies.
-- Complete Studio scene switching, undo/redo, schema-guided inspector fields,
-  embedded Ollama authoring, deterministic view-model automation, and
-  installed end-to-end game-creation acceptance. The current workbench is now
-  functional but not yet a finished professional editor.
+- Complete schema-guided Studio inspector fields and deterministic WPF
+  view-model automation. Scene switching, transactional undo/redo, embedded
+  Ollama authoring, real play/package/audit controls, and installed generic
+  game-creation acceptance are now present. The workbench is functional but
+  not yet a finished professional editor.
 
 ## Recently completed
 
@@ -932,15 +936,13 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The active product priority is the complete AI game-creation vertical slice.
-Studio now connects project create/open, hierarchy selection, generic entity /
-component / property authoring, validation, an engine-rendered viewport, and
-real player ownership through the shared command catalog. The next tranche is
-the embedded project-scoped Ollama authoring service, followed by scene
-switching, undo/redo, schema-guided editing, and installed acceptance. The
-acceptance target remains one coherent flow from a game description to
-agent-authored project files to an editable, validated, visually rendered,
-playable, packaged game. Studio, embedded AI, MCP, and CLI must continue to
+The active product priority remains the complete AI game-creation vertical
+slice, not cosmetic editor work. The source and installed paths now prove a
+coherent route from an agent task through canonical tools to authored project
+files, validation, informative rendering, real play, packaging, clean
+relocation, and audit. The next tranche is schema-guided Studio editing plus
+deterministic view-model automation, followed by a dedicated installed
+Studio-to-Ollama acceptance. Studio, embedded AI, MCP, and CLI must continue to
 consume the same generic contracts.
 
 AI game-creation Tasks 1-3 have a verified functional checkpoint. A new
@@ -953,9 +955,18 @@ inspector. Studio consumes that session and the centralized default command
 registry; it can create/open, select, mutate arbitrary generic components and
 JSON properties, validate, capture a 960x540 software viewport after edits,
 and own a real Windows player process. Unexpected async command failures are
-reported in-product instead of escaping the UI dispatcher. Seven focused
-functional/source tests pass and the Studio build is warning-free. Undo/redo,
-  schema-guided property widgets and installed acceptance remain open.
+reported in-product instead of escaping the UI dispatcher. Transactional
+undo/redo, scene switching, package/audit actions, and embedded Ollama
+authoring are verified; schema-guided property widgets and deterministic WPF
+view-model automation remain open.
+
+The fresh installed-product checkpoint completed a zero-warning locked Release
+build, two independent 894/894 Release suites, four self-contained publishes,
+and distribution assembly. The shipped acceptance then passed the generic
+agent-authoring gauntlet, clean package relocation/audit, nonblank capture,
+Windows play and the broader production matrix. The 1,178-file distribution
+archive is 200,832,939 bytes with SHA-256
+`4553BF616B31461BCEF11679DA66177B46929B15829FB5F39CF00FED5FFC9D6D`.
 
 The reusable project agent session uses the provider-neutral language-model
 agent, local Ollama adapter, progressive MCP executor, and shared default

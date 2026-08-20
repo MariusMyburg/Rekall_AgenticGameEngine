@@ -8,7 +8,7 @@ Last verified: 2026-08-20 14:44 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: restricted module host native containment and broker checkpoint
+Latest milestone: restricted module host checkpoint; game-creation vertical slice selected
 
 ## Product objective
 
@@ -885,6 +885,28 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 `7297CE4FCF52960F3217BE6A80CF7046E8052F9A3E12998602C807C0DA9A426D`.
 
 ## In progress
+
+The active product priority is now the complete AI game-creation vertical
+slice. The engine already has substantial runtime, rendering, audio, UI,
+animation, physics, agent/MCP, player, and packaging foundations, but the
+human-visible workbench does not connect them into a usable product: Studio is
+still read-only, its viewport is text, and its toolbar is unwired. The next
+tranche therefore starts with a UI-independent command-backed workbench session
+and then connects project create/open, selection/editing, validation,
+undo/redo, rendered viewport capture, play lifecycle, and the existing Ollama
+agent loop into Studio. The acceptance target is one coherent flow from a game
+description to agent-authored project files to an editable, validated,
+visually rendered, playable game. This is not a pivot to superficial Studio
+chrome; Studio and the embedded agent must consume the same generic command
+contracts exposed through MCP and CLI.
+
+The restricted module-host tranche is paused at commit `4e43119`, a stable
+native containment and typed-broker checkpoint. Project-write denial and
+64-KiB stderr-drain proof are also locally verified and will be preserved
+before the authoring tranche begins. Memory-limit classification, ten-pass
+timing, installed hostile fixtures, production consumer cutover, and shipped
+worker packaging remain explicitly unfinished and must be resumed after the
+game-creation loop is usable.
 
 The next audit-driven tranche is a restricted host for agent-authored C#
 modules. The selected Windows-first architecture keeps the existing generic C#

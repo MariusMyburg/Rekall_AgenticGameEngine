@@ -147,6 +147,8 @@ public sealed class ModuleHostWindowsIsolationTests
             $$"""
             var fileDenied = false;
                     try { _ = System.IO.File.ReadAllText("{{escapedPrivateFile}}"); } catch { fileDenied = true; }
+                    var writeDenied = false;
+                    try { System.IO.File.WriteAllText("{{escapedPrivateFile}}", "tampered"); } catch { writeDenied = true; }
                     var processDenied = false;
                     try
                     {
@@ -166,7 +168,7 @@ public sealed class ModuleHostWindowsIsolationTests
                         client.Connect("127.0.0.1", {{port}});
                     }
                     catch { networkDenied = true; }
-                    return new RekallAgePlayableModuleFrame($"file={(fileDenied ? "denied" : "ALLOWED")};process={(processDenied ? "denied" : "ALLOWED")};network={(networkDenied ? "denied" : "ALLOWED")}");
+                    return new RekallAgePlayableModuleFrame($"file={(fileDenied ? "denied" : "ALLOWED")};write={(writeDenied ? "denied" : "ALLOWED")};process={(processDenied ? "denied" : "ALLOWED")};network={(networkDenied ? "denied" : "ALLOWED")}");
             """,
             StringComparison.Ordinal));
         var responses = await RunRestrictedWorkerAsync(
@@ -186,8 +188,37 @@ public sealed class ModuleHostWindowsIsolationTests
 
         Assert.All(responses, response => Assert.True(response.Ok, response.Error?.Message));
         Assert.Equal(
-            "file=denied;process=denied;network=denied",
+            "file=denied;write=denied;process=denied;network=denied",
             responses[2].DeserializePayload<RekallAgeModuleHostPlayableRenderResponse>().Frame.Text);
+        Assert.Equal("outside-stage-secret", await File.ReadAllTextAsync(privateFile));
+    }
+
+    [Fact]
+    public async Task AppContainerWorkerDrainsAndBoundsExcessiveStandardError()
+    {
+        Assert.True(OperatingSystem.IsWindows());
+        var projectRoot = await CreateModuleAsync(source => source.Replace(
+            "var frame = (int)state.Numbers[\"frame\"];",
+            "System.Console.Error.Write(new string('x', 256 * 1024)); var frame = (int)state.Numbers[\"frame\"];",
+            StringComparison.Ordinal));
+        var result = await RunRestrictedWorkerWithDiagnosticsAsync(
+            projectRoot,
+            [
+                RekallAgeModuleHostEnvelope.Request(
+                    1,
+                    RekallAgeModuleHostOperations.Initialize,
+                    new RekallAgeModuleHostInitializeRequest("$LOAD_PLAN")),
+                RekallAgeModuleHostEnvelope.Request(
+                    2,
+                    RekallAgeModuleHostOperations.PlayableCreate,
+                    new RekallAgeModuleHostPlayableCreateRequest(new RekallAgePlayableModuleContext("Stderr", []))),
+                RekallAgeModuleHostEnvelope.Request(3, RekallAgeModuleHostOperations.PlayableRender, new { }),
+                RekallAgeModuleHostEnvelope.Request(4, RekallAgeModuleHostOperations.Shutdown, new { })
+            ]);
+
+        Assert.All(result.Responses, response => Assert.True(response.Ok, response.Error?.Message));
+        Assert.Equal(RekallAgeModuleHostProtocol.MaximumStandardErrorBytes, System.Text.Encoding.UTF8.GetByteCount(result.StandardError));
+        Assert.All(result.StandardError, character => Assert.Equal('x', character));
     }
 
     [Fact]
@@ -260,6 +291,15 @@ public sealed class ModuleHostWindowsIsolationTests
         string projectRoot,
         IReadOnlyList<RekallAgeModuleHostEnvelope> requests)
     {
+        var result = await RunRestrictedWorkerWithDiagnosticsAsync(projectRoot, requests);
+        Assert.Equal(string.Empty, result.StandardError);
+        return result.Responses;
+    }
+
+    private static async Task<RestrictedWorkerResult> RunRestrictedWorkerWithDiagnosticsAsync(
+        string projectRoot,
+        IReadOnlyList<RekallAgeModuleHostEnvelope> requests)
+    {
         var hostRoot = await CreateRealHostPayloadAsync();
         var sessionsRoot = TestPaths.CreateTempDirectory();
         await using var staged = await new RekallAgeModuleHostStager(sessionsRoot).StageAsync(
@@ -294,8 +334,8 @@ public sealed class ModuleHostWindowsIsolationTests
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         Assert.Equal(0, await process.WaitForExitAsync(timeout.Token));
-        Assert.Equal(string.Empty, await process.ReadBoundedStandardErrorAsync(timeout.Token));
-        return responses;
+        var standardError = await process.ReadBoundedStandardErrorAsync(timeout.Token);
+        return new RestrictedWorkerResult(responses, standardError);
     }
 
     private static async Task<string> CreateRealHostPayloadAsync()
@@ -337,4 +377,8 @@ public sealed class ModuleHostWindowsIsolationTests
             JsonSerializer.Serialize(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
         return root;
     }
+
+    private sealed record RestrictedWorkerResult(
+        IReadOnlyList<RekallAgeModuleHostEnvelope> Responses,
+        string StandardError);
 }

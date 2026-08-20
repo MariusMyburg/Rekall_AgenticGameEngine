@@ -884,7 +884,16 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The next risk-driven tranche is explicit persisted-document recovery. Atomic
+The next audit-driven tranche is a restricted host for agent-authored C#
+modules. The selected Windows-first architecture keeps the existing generic C#
+SDK, verified receipt admission, and runtime priority semantics, but moves all
+project-assembly execution and reflection into a no-network AppContainer worker
+with kill-on-close, one-process and memory job limits, bounded framed IPC,
+timeouts, and no silent in-process fallback. The reviewed design is
+`docs/superpowers/specs/2026-08-20-restricted-module-host-design.md`; its next
+step is a TDD implementation plan.
+
+The completed persisted-document recovery tranche began because atomic
 publication and optimistic revisions now prevent torn and stale engine writes,
 but storage damage or external/manual corruption still blocks a project. The
 reviewed design retains one exact previous validated project/scene version,

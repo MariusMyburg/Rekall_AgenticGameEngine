@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 13:22 Africa/Johannesburg
+Last verified: 2026-08-20 13:34 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: project/scene last-known-good recovery store passed the complete Debug suite
+Latest milestone: document recovery is exposed through agent, CLI, and MCP contracts
 
 ## Product objective
 
@@ -36,8 +36,9 @@ Studio is important, but it does not define or reorder the engine foundation.
   files including the distribution manifest itself.
 - Canonical verification: 818/818 Release tests passed twice independently;
   Release build completed with zero warnings and zero errors.
-- Current Debug verification: 830/830 tests pass after bounded project/scene
-  recovery inspection, explicit restore, quarantine, and path confinement.
+- Current Debug verification: 840/840 tests pass after bounded project/scene
+  recovery inspection, explicit restore, quarantine, path confinement, and
+  agent/CLI/MCP exposure.
 - Installed acceptance: canonical gate exited 0; project/module workflows,
   packaging and relocation, negative archive preflight, nonblank capture,
   runtime UI, and audible audio paths have installed-binary proof.
@@ -911,8 +912,24 @@ snapshot, requires the caller's current revision, atomically restores exact
 bytes, quarantines the displaced document with its revision, and retains at
 most four deterministic corrupt artifacts per document. Malformed prior data
 and escaping scene names fail closed; normal loads never silently fall back.
-The next step is to expose these generic contracts through agent commands, CLI,
-and MCP, then prove post-restore validation and mutation.
+That verified store is the foundation consumed by the portable agent commands,
+CLI routes, and MCP tools described in the next milestone.
+
+Persisted document recovery Task 3 is verified in the complete 92/92
+agent/MCP/CLI selection and the full 840/840 Debug suite. Generic
+`rekall.recovery.inspect_document` and `rekall.recovery.restore_document`
+commands target either the manifest or one named scene, expose portable MCP
+schemas, preserve read-only inspection, require an exact inspected revision for
+restore, return executable ordinary validation actions, and report stable
+failure codes plus a fresh inspection action after conflicts. CLI project and
+scene routes use the same registry commands. Direct, CLI, and JSON-RPC MCP tests
+damage real documents, observe structured recovery facts, explicitly restore,
+and successfully perform an ordinary scene mutation afterward. A wider test
+found the engine-status payload crossing its 12,000-character agent-efficiency
+boundary; the top-level map was curated to retain high-priority recovery
+discovery while leaving low-level render-plan execution available through tool
+search. The next step is installed-distribution damage/recovery evidence and
+the locked complete product gate.
 
 The next risk-driven tranche is optimistic document revisions. Atomic files
 eliminate torn reads but do not prevent two valid agent/editor processes from

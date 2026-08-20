@@ -66,6 +66,10 @@ public sealed class GetEngineStatusCommand
                     "Inspect persisted project and scene schema compatibility without changing files or executing project code.",
                     Recommended: true),
                 new RekallAgeAgentWorkflowTool(
+                    "rekall.recovery.inspect_document",
+                    "Inspect one project or scene document and its bounded last-known-good version without silently restoring content.",
+                    Recommended: true),
+                new RekallAgeAgentWorkflowTool(
                     "rekall.workflow.package_playable_game",
                     "Create a playable package and return its package OutputDirectory, ArchivePath, and separate LaunchPath.",
                     Recommended: true),
@@ -156,10 +160,6 @@ public sealed class GetEngineStatusCommand
                 new RekallAgeAgentWorkflowTool(
                     "rekall.shader.assign_pipeline",
                     "Attach validated project vertex and fragment shaders to a mesh renderer entity.",
-                    Recommended: false),
-                new RekallAgeAgentWorkflowTool(
-                    "rekall.render.plan.execute",
-                    "Execute backend-neutral render plans through software or Vulkan targets.",
                     Recommended: false),
                 new RekallAgeAgentWorkflowTool(
                     "rekall.render.performance.inspect_scene_budget",

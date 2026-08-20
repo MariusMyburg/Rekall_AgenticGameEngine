@@ -6,6 +6,7 @@ using Rekall.Age.Mcp;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Workflows.Commands;
 using Rekall.Age.World.Commands;
+using Rekall.Age.World;
 
 namespace Rekall.Age.Tests.Mcp;
 
@@ -66,6 +67,65 @@ public sealed class McpJsonRpcServerTests
         Assert.DoesNotContain(
             schema.GetProperty("required").EnumerateArray(),
             item => item.GetString() == "expectedRevision");
+    }
+
+    [Fact]
+    public async Task RecoverySchemasExposeGenericTargetAndRevisionContracts()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new InspectDocumentRecoveryCommand());
+        registry.Register(new RestoreDocumentRecoveryCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(
+            """{"jsonrpc":"2.0","id":22,"method":"tools/list"}""",
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var tools = document.RootElement.GetProperty("result").GetProperty("tools").EnumerateArray().ToArray();
+        var inspect = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.recovery.inspect_document");
+        var restore = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.recovery.restore_document");
+        Assert.Equal("recovery", inspect.GetProperty("rekallCategory").GetString());
+        Assert.True(inspect.GetProperty("rekallRecommended").GetBoolean());
+        Assert.Contains(inspect.GetProperty("inputSchema").GetProperty("required").EnumerateArray(), item => item.GetString() == "documentKind");
+        Assert.DoesNotContain(inspect.GetProperty("inputSchema").GetProperty("required").EnumerateArray(), item => item.GetString() == "sceneName");
+        Assert.Contains(restore.GetProperty("inputSchema").GetProperty("required").EnumerateArray(), item => item.GetString() == "expectedRevision");
+        Assert.DoesNotContain(restore.GetProperty("inputSchema").GetProperty("required").EnumerateArray(), item => item.GetString() == "sceneName");
+    }
+
+    [Fact]
+    public async Task McpExecutesReadOnlyRecoveryInspectionWithStructuredStatus()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        await store.SaveAsync(root, RekallAgeSceneDocument.Create("Main", ["world"]), CancellationToken.None);
+        var loaded = await store.LoadVersionedAsync(root, "Main", CancellationToken.None);
+        await store.SaveIfRevisionAsync(root, loaded.Value with { Id = "replacement" }, loaded.Revision, CancellationToken.None);
+        await File.WriteAllTextAsync(store.GetScenePath(root, "Main"), "{ mcp damage");
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new InspectDocumentRecoveryCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+        var request = JsonSerializer.Serialize(new
+        {
+            jsonrpc = "2.0",
+            id = 23,
+            method = "tools/call",
+            @params = new
+            {
+                name = "rekall.recovery.inspect_document",
+                arguments = new { projectRoot = root, documentKind = "scene", sceneName = "Main" }
+            }
+        });
+
+        var response = await server.HandleJsonLineAsync(request, CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var content = document.RootElement.GetProperty("result").GetProperty("structuredContent");
+        Assert.True(content.GetProperty("ok").GetBoolean());
+        Assert.True(content.GetProperty("value").GetProperty("recoverable").GetBoolean());
+        Assert.Equal(
+            "REKALL_DOCUMENT_JSON_MALFORMED",
+            content.GetProperty("value").GetProperty("primary").GetProperty("code").GetString());
     }
 
     [Fact]

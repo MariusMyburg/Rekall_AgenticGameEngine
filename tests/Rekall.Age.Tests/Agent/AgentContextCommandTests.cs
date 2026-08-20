@@ -164,6 +164,8 @@ public sealed class AgentContextCommandTests
         Assert.Contains(result.Value.WorkflowTools, workflow =>
             workflow.Tool == "rekall.compatibility.inspect_project" && workflow.Recommended);
         Assert.Contains(result.Value.WorkflowTools, workflow =>
+            workflow.Tool == "rekall.recovery.inspect_document" && workflow.Recommended);
+        Assert.Contains(result.Value.WorkflowTools, workflow =>
             workflow.Tool == "rekall.workflow.audit_playable_package"
             && workflow.Recommended
             && workflow.Purpose.Contains("one", StringComparison.OrdinalIgnoreCase)

@@ -23,9 +23,9 @@ from one bounded last-known-good version.
 
 ### Task 3: Agent commands, CLI, and MCP
 
-- [ ] Expose generic inspect/restore commands for manifest or named scene.
-- [ ] Return executable next actions without silent fallback.
-- [ ] Prove schemas, compatibility, validation, and post-restore mutation.
+- [x] Expose generic inspect/restore commands for manifest or named scene.
+- [x] Return executable next actions without silent fallback.
+- [x] Prove schemas, compatibility, validation, and post-restore mutation.
 
 ### Task 4: Installed damage/recovery proof and complete gate
 

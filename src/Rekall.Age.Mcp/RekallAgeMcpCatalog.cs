@@ -67,6 +67,11 @@ internal static class RekallAgeMcpToolClassifier
             return "compatibility";
         }
 
+        if (name.StartsWith("rekall.recovery.", StringComparison.Ordinal))
+        {
+            return "recovery";
+        }
+
         if (name.StartsWith("rekall.live.", StringComparison.Ordinal))
         {
             return "live";
@@ -107,6 +112,7 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.context.engine_status" or
             "rekall.diagnostics.inspect_failures" or
             "rekall.compatibility.inspect_project" or
+            "rekall.recovery.inspect_document" or
             "rekall.module.inspect_trust" or
             "rekall.live.status" or
             "rekall.live.reload_scene" or
@@ -133,6 +139,8 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.context.engine_status" => 5,
             "rekall.diagnostics.inspect_failures" => 6,
             "rekall.compatibility.inspect_project" => 7,
+            "rekall.recovery.inspect_document" => 8,
+            "rekall.recovery.restore_document" => 9,
             "rekall.module.inspect_trust" => 12,
             "rekall.workflow.create_blueprint_project" => 9,
             "rekall.workflow.agent_authoring_gauntlet" => 10,

@@ -39,7 +39,7 @@ internal static class RekallAgeCli
         Log.Information("Rekall AGE command starting. Args={Args}", string.Join(' ', args));
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <agent|game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|compatibility|diagnostics|transaction|capture|render|module|build|validation|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <agent|game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|compatibility|recovery|diagnostics|transaction|capture|render|module|build|validation|mcp> ...");
             Log.Information("Rekall AGE command finished with usage error. LogDirectory={LogDirectory}", logDirectory);
             Log.CloseAndFlush();
             return 2;
@@ -209,6 +209,14 @@ internal static class RekallAgeCli
                 ["compatibility", "inspect", var root] => await InspectProjectCompatibilityAsync(registry, context, root),
                 ["compatibility", "migrate", var root] => await MigrateProjectCompatibilityAsync(registry, context, root, apply: false),
                 ["compatibility", "migrate", var root, "--apply"] => await MigrateProjectCompatibilityAsync(registry, context, root, apply: true),
+                ["recovery", "inspect", "project", var root] =>
+                    await InspectDocumentRecoveryAsync(registry, context, root, "project", null),
+                ["recovery", "inspect", "scene", var root, var scene] =>
+                    await InspectDocumentRecoveryAsync(registry, context, root, "scene", scene),
+                ["recovery", "restore", "project", var root, var expectedRevision] =>
+                    await RestoreDocumentRecoveryAsync(registry, context, root, "project", null, expectedRevision),
+                ["recovery", "restore", "scene", var root, var scene, var expectedRevision] =>
+                    await RestoreDocumentRecoveryAsync(registry, context, root, "scene", scene, expectedRevision),
                 ["module", "sources", var root] => await ListModuleSourcesAsync(registry, context, root),
                 ["module", "read-source", var root, var moduleName, var fileName] =>
                     await ReadModuleSourceAsync(registry, context, root, moduleName, fileName),
@@ -482,6 +490,8 @@ internal static class RekallAgeCli
         registry.Register(new InspectFailureReportsCommand());
         registry.Register(new InspectProjectCompatibilityCommand());
         registry.Register(new MigrateProjectCompatibilityCommand());
+        registry.Register(new InspectDocumentRecoveryCommand());
+        registry.Register(new RestoreDocumentRecoveryCommand());
         registry.Register(new InspectEngineDoctorCommand());
         registry.Register(new ValidateProjectCommand());
         registry.Register(new RepairProjectValidationCommand(registry));
@@ -2938,6 +2948,56 @@ internal static class RekallAgeCli
             Console.WriteLine($"{blocker.Code}: {blocker.Message} [{blocker.Target}]");
         }
 
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectDocumentRecoveryAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string kind,
+        string? sceneName)
+    {
+        var result = await registry.ExecuteAsync<InspectDocumentRecoveryRequest, InspectDocumentRecoveryResult>(
+            "rekall.recovery.inspect_document",
+            new InspectDocumentRecoveryRequest(root, kind, sceneName),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Document: {result.Value.DocumentPath}");
+        Console.WriteLine($"Previous: {result.Value.PreviousPath}");
+        Console.WriteLine(
+            $"Primary: {result.Value.Primary.Code} revision={result.Value.Primary.Revision}; " +
+            $"previous: {result.Value.Previous.Code} revision={result.Value.Previous.Revision}; " +
+            $"recoverable: {result.Value.Recoverable}");
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message} [{error.Target}]");
+        }
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> RestoreDocumentRecoveryAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string kind,
+        string? sceneName,
+        string expectedRevision)
+    {
+        var result = await registry.ExecuteAsync<RestoreDocumentRecoveryRequest, RestoreDocumentRecoveryResult>(
+            "rekall.recovery.restore_document",
+            new RestoreDocumentRecoveryRequest(root, kind, expectedRevision, sceneName),
+            context);
+        Console.WriteLine(result.Summary);
+        if (result.Ok)
+        {
+            Console.WriteLine($"Restored revision: {result.Value.RestoredRevision}");
+            Console.WriteLine($"Quarantine directory: {result.Value.QuarantineDirectory}");
+        }
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message} [{error.Target}]");
+        }
         return result.Ok ? 0 : 1;
     }
 

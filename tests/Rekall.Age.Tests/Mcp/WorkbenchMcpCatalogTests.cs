@@ -33,6 +33,8 @@ public sealed class WorkbenchMcpCatalogTests
         registry.Register(new InspectFailureReportsCommand());
         registry.Register(new InspectProjectCompatibilityCommand());
         registry.Register(new MigrateProjectCompatibilityCommand());
+        registry.Register(new InspectDocumentRecoveryCommand());
+        registry.Register(new RestoreDocumentRecoveryCommand());
 
         var tools = RekallAgeMcpCatalog.FromRegistry(registry).Tools;
         var names = tools.Select(tool => tool.Name).ToArray();
@@ -64,5 +66,13 @@ public sealed class WorkbenchMcpCatalogTests
             tool.Name == "rekall.compatibility.migrate_project"
             && !tool.Recommended
             && tool.Category == "compatibility");
+        Assert.Contains(tools, tool =>
+            tool.Name == "rekall.recovery.inspect_document"
+            && tool.Recommended
+            && tool.Category == "recovery");
+        Assert.Contains(tools, tool =>
+            tool.Name == "rekall.recovery.restore_document"
+            && !tool.Recommended
+            && tool.Category == "recovery");
     }
 }

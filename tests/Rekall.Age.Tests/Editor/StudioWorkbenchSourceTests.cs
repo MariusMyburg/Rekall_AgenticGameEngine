@@ -20,6 +20,10 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("Command=\"{Binding CaptureCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding PlayCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding StopCommand}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding SwitchSceneCommand}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding PackageCommand}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding AuditPackageCommand}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding SceneNames}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding DiscoverModelsCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding RunAgentCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding CancelAgentCommand}\"", xaml, StringComparison.Ordinal);
@@ -44,6 +48,9 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("RekallAgeOllamaLanguageModelClient", code, StringComparison.Ordinal);
         Assert.Contains("qwen3.5:35b", code, StringComparison.Ordinal);
         Assert.Contains("_session.ReloadAsync", code, StringComparison.Ordinal);
+        Assert.Contains("_session.OpenSceneAsync", code, StringComparison.Ordinal);
+        Assert.Contains("rekall.workflow.package_playable_game", code, StringComparison.Ordinal);
+        Assert.Contains("rekall.workflow.audit_playable_package", code, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()

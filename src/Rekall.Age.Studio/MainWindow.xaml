@@ -10,6 +10,7 @@
                     <ColumnDefinition Width="Auto" /><ColumnDefinition Width="260" />
                     <ColumnDefinition Width="Auto" /><ColumnDefinition Width="180" />
                     <ColumnDefinition Width="Auto" /><ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="Project" VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -17,8 +18,10 @@
                 <TextBlock Grid.Column="2" Text="Name" VerticalAlignment="Center" Margin="0,0,8,0" />
                 <TextBox Grid.Column="3" Text="{Binding ProjectNameInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0" />
                 <TextBlock Grid.Column="4" Text="Scene" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <TextBox Grid.Column="5" Text="{Binding SceneNameInput, UpdateSourceTrigger=PropertyChanged}" />
-                <TextBlock Grid.Column="6" Text="{Binding StatusText}" VerticalAlignment="Center" TextAlignment="Right"
+                <ComboBox Grid.Column="5" ItemsSource="{Binding SceneNames}" SelectedItem="{Binding SceneNameInput}"
+                          IsEditable="True" />
+                <Button Grid.Column="6" Content="Switch" Command="{Binding SwitchSceneCommand}" Padding="8,2" Margin="6,0" />
+                <TextBlock Grid.Column="7" Text="{Binding StatusText}" VerticalAlignment="Center" TextAlignment="Right"
                            Foreground="#9FB0C4" TextTrimming="CharacterEllipsis" />
             </Grid>
         </Border>
@@ -34,6 +37,9 @@
             <Separator />
             <Button Content="Capture" Command="{Binding CaptureCommand}" Padding="12,4" />
             <Button Content="Validate" Command="{Binding ValidateCommand}" Padding="12,4" />
+            <Separator />
+            <Button Content="Package" Command="{Binding PackageCommand}" Padding="12,4" />
+            <Button Content="Audit Package" Command="{Binding AuditPackageCommand}" Padding="12,4" />
         </ToolBar>
 
         <Grid>

@@ -13,6 +13,7 @@ using Rekall.Age.Editor;
 using Rekall.Age.Editor.Contracts;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Workflows;
+using Rekall.Age.Workflows.Commands;
 
 namespace Rekall.Age.Studio;
 
@@ -32,6 +33,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _captureCommand;
     private readonly RekallAgeAsyncCommand _playCommand;
     private readonly RekallAgeAsyncCommand _stopCommand;
+    private readonly RekallAgeAsyncCommand _switchSceneCommand;
+    private readonly RekallAgeAsyncCommand _packageCommand;
+    private readonly RekallAgeAsyncCommand _auditPackageCommand;
     private readonly RekallAgeAsyncCommand _discoverModelsCommand;
     private readonly RekallAgeAsyncCommand _runAgentCommand;
     private readonly RekallAgeAsyncCommand _cancelAgentCommand;
@@ -47,6 +51,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _propertyValueInput = "[0, 0, 0]";
     private string _selectedOllamaModel = "qwen3.5:35b";
     private string _agentTaskInput = "Describe the game feature you want the AI agent to create or revise.";
+    private string? _lastPackagePath;
     private string _statusText = "Create or open a Rekall AGE project to begin.";
     private string _viewportTitle = "Viewport";
     private string _viewportSummary = "No rendered frame yet.";
@@ -77,6 +82,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _captureCommand = CreateAsyncCommand(CaptureAsync, HasOpenProject);
         _playCommand = CreateAsyncCommand(PlayAsync, () => HasOpenProject() && !IsPlaying);
         _stopCommand = CreateAsyncCommand(StopAsync, () => IsPlaying);
+        _switchSceneCommand = CreateAsyncCommand(SwitchSceneAsync, CanSwitchScene);
+        _packageCommand = CreateAsyncCommand(PackageAsync, HasOpenProject);
+        _auditPackageCommand = CreateAsyncCommand(AuditPackageAsync, CanAuditPackage);
         _discoverModelsCommand = CreateAsyncCommand(DiscoverModelsAsync, () => !IsBusy && !IsAgentRunning);
         _runAgentCommand = CreateAsyncCommand(RunAgentAsync, CanRunAgent);
         _cancelAgentCommand = CreateAsyncCommand(CancelAgentAsync, () => IsAgentRunning);
@@ -108,6 +116,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand CaptureCommand => _captureCommand;
     public ICommand PlayCommand => _playCommand;
     public ICommand StopCommand => _stopCommand;
+    public ICommand SwitchSceneCommand => _switchSceneCommand;
+    public ICommand PackageCommand => _packageCommand;
+    public ICommand AuditPackageCommand => _auditPackageCommand;
     public ICommand DiscoverModelsCommand => _discoverModelsCommand;
     public ICommand RunAgentCommand => _runAgentCommand;
     public ICommand CancelAgentCommand => _cancelAgentCommand;
@@ -130,7 +141,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public string SceneNameInput
     {
         get => _sceneNameInput;
-        set => Set(ref _sceneNameInput, value);
+        set
+        {
+            if (Set(ref _sceneNameInput, value)) RefreshCommands();
+        }
     }
 
     public string ComponentTypeInput
@@ -172,6 +186,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         set
         {
             if (Set(ref _agentTaskInput, value)) RefreshCommands();
+        }
+    }
+
+    public string? LastPackagePath
+    {
+        get => _lastPackagePath;
+        private set
+        {
+            if (Set(ref _lastPackagePath, value)) RefreshCommands();
         }
     }
 
@@ -251,6 +274,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         && !IsAgentRunning
         && !string.IsNullOrWhiteSpace(SelectedOllamaModel)
         && !string.IsNullOrWhiteSpace(AgentTaskInput);
+    private bool CanSwitchScene() => HasOpenProject()
+        && !string.IsNullOrWhiteSpace(SceneNameInput)
+        && !_session.SceneName!.Equals(SceneNameInput.Trim(), StringComparison.Ordinal);
+    private bool CanAuditPackage() => HasOpenProject()
+        && LastPackagePath is not null
+        && (File.Exists(LastPackagePath) || Directory.Exists(LastPackagePath));
 
     private Task OpenFromInputsAsync() => RunAsync(
         () => _session.OpenAsync(ProjectPathInput, NormalizeSceneName(), CancellationToken.None).AsTask(),
@@ -265,6 +294,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             ["world", "rendering2d", "rendering3d", "input", "audio", "ui", "animation", "physics"],
             "studio",
             CancellationToken.None).AsTask());
+
+    private Task SwitchSceneAsync() => RunAsync(
+        () => _session.OpenSceneAsync(NormalizeSceneName(), CancellationToken.None).AsTask(),
+        captureAfter: true);
 
     private Task AddEntityAsync()
     {
@@ -347,6 +380,46 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         "rekall.validation.scene",
         JsonSerializer.Serialize(new { projectRoot = _session.ProjectRoot, sceneName = _session.SceneName }),
         "Validate Scene",
+        "studio",
+        CancellationToken.None).AsTask());
+
+    private Task PackageAsync() => RunAsync(PackageOperationAsync);
+
+    private async Task<RekallAgeWorkbenchOperationResult> PackageOperationAsync()
+    {
+        var result = await _session.ExecuteAsync(
+            "rekall.workflow.package_playable_game",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                outputDirectory = Path.Combine(_session.ProjectRoot!, "Builds", "StudioPackage"),
+                frames = 2,
+                graphics = false
+            }),
+            "Package playable game",
+            "studio",
+            CancellationToken.None);
+        if (result.Ok && result.Value is PackagePlayableGameResult package && package.Ready)
+        {
+            LastPackagePath = package.ArchivePath;
+            AppendAgentLine($"package: {package.ArchivePath}");
+        }
+        return result;
+    }
+
+    private Task AuditPackageAsync() => RunAsync(() => _session.ExecuteAsync(
+        "rekall.workflow.audit_playable_package",
+        JsonSerializer.Serialize(new
+        {
+            packagePath = LastPackagePath,
+            outputDirectory = Path.Combine(_session.ProjectRoot!, "Builds", "StudioPackageAudit"),
+            frames = 1,
+            frameIndex = 1,
+            width = 960,
+            height = 540
+        }),
+        "Audit playable package",
         "studio",
         CancellationToken.None).AsTask());
 
@@ -568,6 +641,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private void ApplyModel(RekallAgeWorkbenchModel model)
     {
+        SceneNameInput = model.Scene.Name;
         Replace(EntityNodes, model.Scene.RootEntities);
         Replace(SceneNames, model.Project.Scenes.Select(scene => scene.Name));
         Replace(InspectorLines, model.Inspector.Components.SelectMany(component =>
@@ -663,6 +737,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _captureCommand.RaiseCanExecuteChanged();
         _playCommand.RaiseCanExecuteChanged();
         _stopCommand.RaiseCanExecuteChanged();
+        _switchSceneCommand.RaiseCanExecuteChanged();
+        _packageCommand.RaiseCanExecuteChanged();
+        _auditPackageCommand.RaiseCanExecuteChanged();
         _discoverModelsCommand.RaiseCanExecuteChanged();
         _runAgentCommand.RaiseCanExecuteChanged();
         _cancelAgentCommand.RaiseCanExecuteChanged();

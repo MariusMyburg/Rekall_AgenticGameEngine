@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 15:29 Africa/Johannesburg
+Last verified: 2026-08-20 15:33 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: embedded Ollama playable-game gauntlet checkpoint
+Latest milestone: portable AI-created game and Studio packaging checkpoint
 
 ## Product objective
 
@@ -73,6 +73,13 @@ Studio is important, but it does not define or reorder the engine foundation.
   `DECCAFEE7619D346DF48844374B80ECD31A32C999656277C3E896D3D194FC548`;
   the audited proof frame SHA-256 is
   `1D913CA3E7DB6204B7F48D04F4115B681722A129B20610BC7841FE258952C6C2`.
+- Portable-game proof: the AI-created archive relocated to a clean 31-file
+  destination, inspected ready, ran its packaged player for two frames with
+  agent-authored module output, passed a full audit, and produced a second
+  nonblank informative runtime capture with four distinct colors. Studio now
+  exposes editable scene selection/Switch plus canonical Package and Audit
+  Package actions, retaining the returned archive path for the audit. The
+  warning-as-error Studio build and 7/7 focused workbench checks pass.
 - Agent authoring: both source and installed multi-subsystem benchmarks created
   and repaired UI, animation, and audio content using tool calls.
 - Runtime animation: generic clip playback, bounded Hermite interpolation,
@@ -941,8 +948,8 @@ JSON properties, validate, capture a 960x540 software viewport after edits,
 and own a real Windows player process. Unexpected async command failures are
 reported in-product instead of escaping the UI dispatcher. Seven focused
 functional/source tests pass and the Studio build is warning-free. Undo/redo,
-scene-selection interaction, schema-guided property widgets, embedded AI, and
-installed acceptance remain open.
+  undo/redo, schema-guided property widgets, and
+  installed acceptance remain open.
 
 The reusable project agent session uses the provider-neutral language-model
 agent, local Ollama adapter, progressive MCP executor, and shared default

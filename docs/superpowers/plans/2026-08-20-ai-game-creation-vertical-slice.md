@@ -22,7 +22,7 @@ create, author, inspect, edit, render, play, and verify desktop workflow.
 ### Task 2: Functional Studio workspace
 
 - [x] Replace unwired toolbar controls with async commands and operation state.
-- [ ] Add project create/open and scene selection without requiring launch
+- [x] Add project create/open and scene selection without requiring launch
   arguments.
 - [x] Bind hierarchy selection to a structured inspector and generic entity /
   component / property authoring actions.

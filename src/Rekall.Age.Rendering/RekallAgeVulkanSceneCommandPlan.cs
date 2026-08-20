@@ -1,4 +1,5 @@
 using System.Numerics;
+using Rekall.Age.Rendering.Abstractions;
 
 namespace Rekall.Age.Rendering;
 
@@ -8,7 +9,8 @@ public sealed record RekallAgeVulkanSceneCommandDraw(
     int VertexOffset,
     RekallAgeVulkanSceneMaterialKey MaterialKey,
     RekallAgeVulkanSceneGpuDrawPushConstants PushConstants,
-    bool Transparent = false);
+    bool Transparent = false,
+    RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null);
 
 public sealed record RekallAgeVulkanSceneRenderPassCommand(
     uint FramebufferIndex,
@@ -147,7 +149,8 @@ public static class RekallAgeVulkanSceneCommandPlanBuilder
                     draw.CloudColor,
                     draw.CloudShadowFactors,
                     draw.SurfaceWaterFactors),
-                draw.Transparent))
+                draw.Transparent,
+                draw.ShaderPipeline))
             .ToArray();
     }
 }

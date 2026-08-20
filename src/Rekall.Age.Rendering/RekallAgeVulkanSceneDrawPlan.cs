@@ -1,4 +1,5 @@
 using System.Numerics;
+using Rekall.Age.Rendering.Abstractions;
 
 namespace Rekall.Age.Rendering;
 
@@ -38,7 +39,8 @@ public sealed record RekallAgeVulkanScenePreparedDraw(
     Vector4 CloudColor,
     Vector4 CloudShadowFactors,
     Vector4 SurfaceWaterFactors,
-    bool Transparent = false)
+    bool Transparent = false,
+    RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null)
 {
     public RekallAgeVulkanSceneMaterialKey MaterialKey => new(
         BaseColorTextureId,
@@ -88,7 +90,8 @@ public static class RekallAgeVulkanSceneDrawPlanBuilder
                 draw.CloudColor,
                 draw.CloudShadowFactors,
                 draw.SurfaceWaterFactors,
-                draw.Transparent))
+                draw.Transparent,
+                draw.ShaderPipeline))
             .ToArray();
         var materialKeys = draws
             .Select(draw => draw.MaterialKey)

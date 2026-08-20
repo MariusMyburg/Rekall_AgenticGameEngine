@@ -10,4 +10,13 @@ public interface IRekallAgeVulkanSceneCapture
         string outputDirectory,
         string? preferredDeviceType,
         CancellationToken cancellationToken);
+
+    ValueTask<RekallAgeVulkanSceneCaptureResult> CaptureProjectSceneAsync(
+        string projectRoot,
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
+        string outputDirectory,
+        string? preferredDeviceType,
+        CancellationToken cancellationToken) =>
+        CaptureSceneAsync(frame, assets, outputDirectory, preferredDeviceType, cancellationToken);
 }

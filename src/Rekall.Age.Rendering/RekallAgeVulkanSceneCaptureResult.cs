@@ -28,4 +28,19 @@ public sealed record RekallAgeVulkanSceneCaptureResult(
     bool PipelineLayoutCreated,
     bool GraphicsPipelineCreated,
     bool TextureResourcesCreated,
-    IReadOnlyList<string> Errors);
+    IReadOnlyList<string> Errors)
+{
+    public IReadOnlyList<RekallAgeVulkanShaderPipelineUse> ShaderPipelines { get; init; } =
+        Array.Empty<RekallAgeVulkanShaderPipelineUse>();
+}
+
+public sealed record RekallAgeVulkanShaderPipelineUse(
+    string EntityId,
+    string EntityName,
+    string VertexShader,
+    string FragmentShader,
+    string Scope,
+    string ContentHash,
+    bool Valid,
+    bool Fallback,
+    IReadOnlyList<string> Diagnostics);

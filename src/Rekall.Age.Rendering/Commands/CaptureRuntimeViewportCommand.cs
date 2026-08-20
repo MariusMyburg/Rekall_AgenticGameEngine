@@ -218,7 +218,8 @@ public sealed class CaptureRuntimeViewportCommand
             return await CaptureVulkanClearViewportAsync(request, context, frame);
         }
 
-        var capture = await _vulkanSceneCapture.CaptureSceneAsync(
+        var capture = await _vulkanSceneCapture.CaptureProjectSceneAsync(
+            request.ProjectRoot,
             frame,
             assets,
             request.OutputDirectory,

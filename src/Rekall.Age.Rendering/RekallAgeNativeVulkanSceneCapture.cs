@@ -26,6 +26,36 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         RekallAgeRuntimeViewportAssetSet assets,
         string outputDirectory,
         string? preferredDeviceType,
+        CancellationToken cancellationToken) =>
+        await CaptureSceneCoreAsync(
+            null,
+            frame,
+            assets,
+            outputDirectory,
+            preferredDeviceType,
+            cancellationToken);
+
+    public async ValueTask<RekallAgeVulkanSceneCaptureResult> CaptureProjectSceneAsync(
+        string projectRoot,
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
+        string outputDirectory,
+        string? preferredDeviceType,
+        CancellationToken cancellationToken) =>
+        await CaptureSceneCoreAsync(
+            projectRoot,
+            frame,
+            assets,
+            outputDirectory,
+            preferredDeviceType,
+            cancellationToken);
+
+    private async ValueTask<RekallAgeVulkanSceneCaptureResult> CaptureSceneCoreAsync(
+        string? projectRoot,
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
+        string outputDirectory,
+        string? preferredDeviceType,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -63,7 +93,102 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             return FromClearCapture(frame, assets, clear);
         }
 
-        return VulkanSceneRenderer.TryCapture(frame, assets, meshes, outputDirectory, preferredDeviceType, cancellationToken);
+        var (resolvedPipelines, pipelineUses) = await ResolveProjectPipelinesAsync(
+            projectRoot,
+            frame,
+            cancellationToken);
+        var invalidUses = pipelineUses.Where(use => !use.Valid).ToArray();
+        if (invalidUses.Length > 0)
+        {
+            var pipelineErrors = invalidUses
+                .SelectMany(use => use.Diagnostics.Select(diagnostic =>
+                    $"Entity '{use.EntityName}' ({use.EntityId}) shader pipeline failed: {diagnostic}"))
+                .Take(128)
+                .ToArray();
+            return Unavailable(
+                frame,
+                string.Empty,
+                null,
+                null,
+                assets,
+                meshes.Count,
+                0,
+                0,
+                [],
+                pipelineErrors) with
+            {
+                ShaderPipelines = pipelineUses
+            };
+        }
+
+        return VulkanSceneRenderer.TryCapture(
+            frame,
+            assets,
+            meshes,
+            outputDirectory,
+            preferredDeviceType,
+            cancellationToken,
+            resolvedPipelines) with
+        {
+            ShaderPipelines = pipelineUses
+        };
+    }
+
+    private static async ValueTask<(
+        IReadOnlyDictionary<RekallAgeRuntimeViewportShaderPipeline, RekallAgeResolvedShaderPipeline> Resolved,
+        IReadOnlyList<RekallAgeVulkanShaderPipelineUse> Uses)> ResolveProjectPipelinesAsync(
+        string? projectRoot,
+        RekallAgeRuntimeViewportFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var authored = frame.Renderables
+            .Where(renderable => renderable.ShaderPipeline is not null)
+            .Take(128)
+            .ToArray();
+        if (authored.Length == 0)
+        {
+            return (new Dictionary<RekallAgeRuntimeViewportShaderPipeline, RekallAgeResolvedShaderPipeline>(), []);
+        }
+
+        if (string.IsNullOrWhiteSpace(projectRoot))
+        {
+            var unavailable = authored.Select(renderable => new RekallAgeVulkanShaderPipelineUse(
+                renderable.EntityId,
+                renderable.EntityName,
+                renderable.ShaderPipeline!.VertexShader,
+                renderable.ShaderPipeline.FragmentShader,
+                "project",
+                string.Empty,
+                false,
+                false,
+                ["REKALL_SHADER_PROJECT_ROOT_REQUIRED: Project-root context is required to execute an authored shader pipeline."]))
+                .ToArray();
+            return (new Dictionary<RekallAgeRuntimeViewportShaderPipeline, RekallAgeResolvedShaderPipeline>(), unavailable);
+        }
+
+        var resolver = new RekallAgeProjectShaderPipelineResolver();
+        var resolved = new Dictionary<RekallAgeRuntimeViewportShaderPipeline, RekallAgeResolvedShaderPipeline>();
+        foreach (var pipeline in authored.Select(renderable => renderable.ShaderPipeline!).Distinct())
+        {
+            resolved[pipeline] = await resolver.ResolveAsync(projectRoot, pipeline, cancellationToken);
+        }
+
+        var uses = authored.Select(renderable =>
+        {
+            var pipeline = renderable.ShaderPipeline!;
+            var asset = resolved[pipeline];
+            return new RekallAgeVulkanShaderPipelineUse(
+                renderable.EntityId,
+                renderable.EntityName,
+                pipeline.VertexShader,
+                pipeline.FragmentShader,
+                "project",
+                asset.Key.ContentHash,
+                asset.Valid,
+                false,
+                asset.Errors);
+        }).ToArray();
+        return (resolved, uses);
     }
 
     private static bool IsSupportedRenderable(
@@ -187,7 +312,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             IReadOnlyList<RekallAgeVulkanSceneMesh> meshes,
             string outputDirectory,
             string? preferredDeviceType,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IReadOnlyDictionary<RekallAgeRuntimeViewportShaderPipeline, RekallAgeResolvedShaderPipeline>? resolvedPipelines = null)
         {
             var errors = new List<string>();
             var state = new VulkanState(Vk.GetApi());
@@ -249,6 +375,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 }
 
                 CreatePipeline(state, frame, shaders);
+                CreateProjectPipelines(state, frame, resolvedPipelines);
                 CreateCommandPoolAndBuffer(state);
                 RecordCommands(state, commandPlan);
                 SubmitAndWait(state);
@@ -1390,6 +1517,89 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             }
         }
 
+        private static void CreateProjectPipelines(
+            VulkanState state,
+            RekallAgeRuntimeViewportFrame frame,
+            IReadOnlyDictionary<RekallAgeRuntimeViewportShaderPipeline, RekallAgeResolvedShaderPipeline>? resolvedPipelines)
+        {
+            if (resolvedPipelines is null || resolvedPipelines.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var (reference, asset) in resolvedPipelines)
+            {
+                if (!asset.Valid)
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot create invalid project shader pipeline '{reference.VertexShader}' + '{reference.FragmentShader}'.");
+                }
+
+                if (state.ProjectPipelineByContentHash.TryGetValue(asset.Key.ContentHash, out var cached))
+                {
+                    state.ProjectPipelines.Add(reference, cached);
+                    continue;
+                }
+
+                var defaultLayout = state.PipelineLayout;
+                var defaultOpaque = state.Pipeline;
+                var defaultTransparent = state.TransparentPipeline;
+                var defaultVertex = state.VertexShader;
+                var defaultFragment = state.FragmentShader;
+                state.PipelineLayout = default;
+                state.Pipeline = default;
+                state.TransparentPipeline = default;
+                state.VertexShader = default;
+                state.FragmentShader = default;
+                var transferred = false;
+                try
+                {
+                    CreatePipeline(
+                        state,
+                        frame,
+                        new RekallAgeVulkanSceneShaderCompilationResult(
+                            true,
+                            new RekallAgeVulkanCompiledShader(
+                                RekallAgeVulkanShaderStage.Vertex,
+                                asset.VertexName,
+                                asset.VertexSpirv),
+                            new RekallAgeVulkanCompiledShader(
+                                RekallAgeVulkanShaderStage.Fragment,
+                                asset.FragmentName,
+                                asset.FragmentSpirv),
+                            []));
+                    var resource = new VulkanProjectPipelineResource(
+                        state.PipelineLayout,
+                        state.Pipeline,
+                        state.TransparentPipeline,
+                        state.VertexShader,
+                        state.FragmentShader);
+                    state.ProjectPipelineResources.Add(resource);
+                    state.ProjectPipelineByContentHash.Add(asset.Key.ContentHash, resource);
+                    state.ProjectPipelines.Add(reference, resource);
+                    transferred = true;
+                }
+                finally
+                {
+                    if (!transferred)
+                    {
+                        new VulkanProjectPipelineResource(
+                            state.PipelineLayout,
+                            state.Pipeline,
+                            state.TransparentPipeline,
+                            state.VertexShader,
+                            state.FragmentShader).Dispose(state.Vk, state.Device);
+                    }
+
+                    state.PipelineLayout = defaultLayout;
+                    state.Pipeline = defaultOpaque;
+                    state.TransparentPipeline = defaultTransparent;
+                    state.VertexShader = defaultVertex;
+                    state.FragmentShader = defaultFragment;
+                }
+            }
+        }
+
         private static ShaderModule CreateShaderModule(VulkanState state, byte* code, int length)
         {
             var createInfo = new ShaderModuleCreateInfo
@@ -1522,11 +1732,6 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             IReadOnlyList<RekallAgeVulkanSceneCommandDraw> ranges,
             bool transparent)
         {
-            state.Vk.CmdBindPipeline(
-                state.CommandBuffer,
-                PipelineBindPoint.Graphics,
-                transparent ? state.TransparentPipeline : state.Pipeline);
-
             foreach (var range in ranges)
             {
                 if (range.Transparent != transparent)
@@ -1534,12 +1739,28 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     continue;
                 }
 
+                var pipeline = range.ShaderPipeline is not null
+                    ? state.ProjectPipelines.TryGetValue(range.ShaderPipeline, out var projectPipeline)
+                        ? projectPipeline
+                        : throw new InvalidOperationException(
+                            $"Resolved Vulkan pipeline was not created for '{range.ShaderPipeline.VertexShader}' + '{range.ShaderPipeline.FragmentShader}'.")
+                    : new VulkanProjectPipelineResource(
+                        state.PipelineLayout,
+                        state.Pipeline,
+                        state.TransparentPipeline,
+                        state.VertexShader,
+                        state.FragmentShader);
+                state.Vk.CmdBindPipeline(
+                    state.CommandBuffer,
+                    PipelineBindPoint.Graphics,
+                    transparent ? pipeline.TransparentPipeline : pipeline.OpaquePipeline);
+
                 var descriptorSet = ResolveDescriptorSet(state, passIndex, range.MaterialKey);
-                state.Vk.CmdBindDescriptorSets(state.CommandBuffer, PipelineBindPoint.Graphics, state.PipelineLayout, 0, 1, &descriptorSet, 0, null);
+                state.Vk.CmdBindDescriptorSets(state.CommandBuffer, PipelineBindPoint.Graphics, pipeline.Layout, 0, 1, &descriptorSet, 0, null);
                 var draw = range.PushConstants;
                 state.Vk.CmdPushConstants(
                     state.CommandBuffer,
-                    state.PipelineLayout,
+                    pipeline.Layout,
                     ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
                     0,
                     (uint)Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>(),
@@ -1915,6 +2136,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public readonly List<VulkanTextureResource> Textures = [];
             public readonly Dictionary<string, VulkanTextureResource> TextureById = new(StringComparer.Ordinal);
             public readonly Dictionary<(int UniformIndex, RekallAgeVulkanSceneMaterialKey Key), DescriptorSet> MaterialDescriptorSets = [];
+            public readonly Dictionary<RekallAgeRuntimeViewportShaderPipeline, VulkanProjectPipelineResource> ProjectPipelines = [];
+            public readonly Dictionary<string, VulkanProjectPipelineResource> ProjectPipelineByContentHash = new(StringComparer.Ordinal);
+            public readonly List<VulkanProjectPipelineResource> ProjectPipelineResources = [];
             public VulkanTextureResource? WhiteTexture;
             public VulkanTextureResource? FlatNormalTexture;
             public VulkanTextureResource? DefaultMetallicRoughnessTexture;
@@ -1944,6 +2168,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     if (CommandPool.Handle != 0)
                     {
                         Vk.DestroyCommandPool(Device, CommandPool, null);
+                    }
+
+                    foreach (var projectPipeline in ProjectPipelineResources.AsEnumerable().Reverse())
+                    {
+                        projectPipeline.Dispose(Vk, Device);
                     }
 
                     if (Pipeline.Handle != 0)
@@ -2087,6 +2316,23 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 {
                     Vk.FreeMemory(Device, memory, null);
                 }
+            }
+        }
+
+        private sealed record VulkanProjectPipelineResource(
+            PipelineLayout Layout,
+            Pipeline OpaquePipeline,
+            Pipeline TransparentPipeline,
+            ShaderModule VertexShader,
+            ShaderModule FragmentShader)
+        {
+            public unsafe void Dispose(Vk vk, Device device)
+            {
+                if (OpaquePipeline.Handle != 0) vk.DestroyPipeline(device, OpaquePipeline, null);
+                if (TransparentPipeline.Handle != 0) vk.DestroyPipeline(device, TransparentPipeline, null);
+                if (Layout.Handle != 0) vk.DestroyPipelineLayout(device, Layout, null);
+                if (FragmentShader.Handle != 0) vk.DestroyShaderModule(device, FragmentShader, null);
+                if (VertexShader.Handle != 0) vk.DestroyShaderModule(device, VertexShader, null);
             }
         }
 

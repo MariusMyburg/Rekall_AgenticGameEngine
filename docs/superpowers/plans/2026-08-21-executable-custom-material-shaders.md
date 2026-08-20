@@ -174,7 +174,7 @@ git commit -m "feat: carry authored shader pipelines into draw batches"
 - Consumes: resolver from Task 1 and draw pipeline references from Task 2.
 - Produces: capture overload accepting `projectRoot`; bounded `RekallAgeVulkanShaderPipelineUse` records in the capture result.
 
-- [ ] **Step 1: Write failing native-capture tests**
+- [x] **Step 1: Write failing native-capture tests**
 
 Use an authored fragment shader that outputs a constant magenta color while
 retaining ABI declarations. Capture a scene with one assigned cube and assert
@@ -188,13 +188,13 @@ Assert.Contains(result.ShaderPipelines, item =>
 Assert.Empty(result.Errors);
 ```
 
-- [ ] **Step 2: Run native-capture tests and verify red**
+- [x] **Step 2: Run native-capture tests and verify red**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --no-restore -warnaserror --filter "FullyQualifiedName~VulkanSceneCaptureTests|FullyQualifiedName~RuntimeInspectCliTests"
 ```
 
-- [ ] **Step 3: Build a per-capture Vulkan pipeline cache**
+- [x] **Step 3: Build a per-capture Vulkan pipeline cache**
 
 Resolve every distinct non-null pipeline before allocating GPU resources.
 Create a `VkPipeline` for each valid key using the existing descriptor-set
@@ -203,14 +203,14 @@ Cache by `(RekallAgeShaderPipelineKey, bool transparent)`. During draw command
 recording, bind the selected pipeline before its draw. Dispose all custom
 pipelines and shader modules in reverse creation order.
 
-- [ ] **Step 4: Fail closed and report bounded pipeline use**
+- [x] **Step 4: Fail closed and report bounded pipeline use**
 
 If a referenced project pipeline is missing, invalid, or incompatible, return
 a failed hardware capture with the resolver diagnostics; do not silently use
 the default pipeline. Include at most 128 pipeline-use records containing
 entity id/name, logical stages, hash, validity, and fallback status.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
 Run Step 2 and expect pass, then:
 

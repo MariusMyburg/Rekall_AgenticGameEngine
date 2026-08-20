@@ -6,6 +6,153 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VulkanSceneCaptureTests
 {
     [Fact]
+    public async Task NativeSceneCaptureExecutesValidProjectShaderPipelineWhenVulkanIsAvailable()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var shaderRoot = Path.Combine(root, "Shaders", "agent");
+        Directory.CreateDirectory(shaderRoot);
+        await File.WriteAllTextAsync(Path.Combine(shaderRoot, "magenta.vert"), """
+            #version 450
+            layout(location = 0) in vec3 inPosition;
+            void main() { gl_Position = vec4(inPosition, 1.0); }
+            """);
+        await File.WriteAllTextAsync(Path.Combine(shaderRoot, "magenta.frag"), """
+            #version 450
+            layout(location = 0) out vec4 outColor;
+            void main() { outColor = vec4(1.0, 0.0, 1.0, 1.0); }
+            """);
+        var pipeline = new RekallAgeRuntimeViewportShaderPipeline("agent/magenta", "agent/magenta");
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "cube-1",
+            "Magenta Cube",
+            "mesh",
+            "rekall.primitive.cube",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.geometry.cube",
+            ShaderPipeline: pipeline));
+
+        var result = await new RekallAgeNativeVulkanSceneCapture(new FakeClearCapture()).CaptureProjectSceneAsync(
+            root,
+            frame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            TestPaths.CreateTempDirectory(),
+            "discrete-gpu",
+            CancellationToken.None);
+
+        var use = Assert.Single(result.ShaderPipelines);
+        Assert.Equal("cube-1", use.EntityId);
+        Assert.Equal("agent/magenta", use.VertexShader);
+        Assert.True(use.Valid, string.Join(Environment.NewLine, use.Diagnostics));
+        Assert.Equal(64, use.ContentHash.Length);
+        if (!result.Captured)
+        {
+            Assert.NotEmpty(result.Errors);
+            return;
+        }
+
+        var image = await RekallAgePngReader.ReadRgbaAsync(result.OutputPath, CancellationToken.None);
+        Assert.True(CountMagentaPixels(image) > 0);
+    }
+
+    [Fact]
+    public async Task NativeSceneCaptureRejectsInvalidProjectPipelineBeforeGpuWork()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var shaderRoot = Path.Combine(root, "Shaders", "agent");
+        Directory.CreateDirectory(shaderRoot);
+        await File.WriteAllTextAsync(Path.Combine(shaderRoot, "invalid.vert"), """
+            #version 450
+            layout(location = 0) in vec2 inPosition;
+            void main() { gl_Position = vec4(inPosition, 0.0, 1.0); }
+            """);
+        await File.WriteAllTextAsync(Path.Combine(shaderRoot, "invalid.frag"), """
+            #version 450
+            layout(location = 0) out vec4 outColor;
+            void main() { outColor = vec4(1.0); }
+            """);
+        var pipeline = new RekallAgeRuntimeViewportShaderPipeline("agent/invalid", "agent/invalid");
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "bad-cube",
+            "Invalid Shader Cube",
+            "mesh",
+            "rekall.primitive.cube",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.geometry.cube",
+            ShaderPipeline: pipeline));
+
+        var result = await new RekallAgeNativeVulkanSceneCapture(new FakeClearCapture()).CaptureProjectSceneAsync(
+            root,
+            frame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            TestPaths.CreateTempDirectory(),
+            "discrete-gpu",
+            CancellationToken.None);
+
+        Assert.False(result.Captured);
+        var use = Assert.Single(result.ShaderPipelines);
+        Assert.False(use.Valid);
+        Assert.False(use.Fallback);
+        Assert.Contains(use.Diagnostics, diagnostic => diagnostic.Contains("REKALL_SHADER_VERTEX_ABI_MISMATCH", StringComparison.Ordinal));
+        Assert.Contains(result.Errors, error => error.Contains("Invalid Shader Cube", StringComparison.Ordinal));
+        Assert.False(result.GraphicsPipelineCreated);
+    }
+
+    [Fact]
+    public async Task NativeSceneCaptureSelectsDefaultAndProjectPipelinesPerDrawWhenVulkanIsAvailable()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var shaderRoot = Path.Combine(root, "Shaders", "agent");
+        Directory.CreateDirectory(shaderRoot);
+        await File.WriteAllTextAsync(Path.Combine(shaderRoot, "magenta.vert"), """
+            #version 450
+            layout(location = 0) in vec3 inPosition;
+            void main() { gl_Position = vec4(inPosition * 0.45 + vec3(-0.45, 0.0, 0.0), 1.0); }
+            """);
+        await File.WriteAllTextAsync(Path.Combine(shaderRoot, "magenta.frag"), """
+            #version 450
+            layout(location = 0) out vec4 outColor;
+            void main() { outColor = vec4(1.0, 0.0, 1.0, 1.0); }
+            """);
+        var pipeline = new RekallAgeRuntimeViewportShaderPipeline("agent/magenta", "agent/magenta");
+        var frame = CreateFrame(
+            new RekallAgeRuntimeViewportRenderable(
+                "custom-cube", "Custom Cube", "mesh", "rekall.primitive.cube",
+                0, 0, 0, 1,
+                Variant: "rekall.geometry.cube",
+                ShaderPipeline: pipeline),
+            new RekallAgeRuntimeViewportRenderable(
+                "default-cube", "Default Cube", "mesh", "rekall.primitive.cube",
+                1.1, 0, 0, 2,
+                Variant: "rekall.geometry.cube",
+                MaterialColor: "#00ff00"));
+
+        var result = await new RekallAgeNativeVulkanSceneCapture(new FakeClearCapture()).CaptureProjectSceneAsync(
+            root,
+            frame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            TestPaths.CreateTempDirectory(),
+            "discrete-gpu",
+            CancellationToken.None);
+
+        if (!result.Captured)
+        {
+            Assert.NotEmpty(result.Errors);
+            return;
+        }
+
+        Assert.Equal(2, result.DrawCallCount);
+        var image = await RekallAgePngReader.ReadRgbaAsync(result.OutputPath, CancellationToken.None);
+        Assert.True(CountMagentaPixels(image) > 0);
+        Assert.True(CountGreenDominantPixels(image) > 0);
+    }
+
+    [Fact]
     public async Task NativeSceneCaptureReportsUnsupportedRenderableKindsWithoutThrowing()
     {
         var frame = CreateFrame(
@@ -248,6 +395,37 @@ public sealed class VulkanSceneCaptureTests
         {
             if (image.Rgba[offset] > image.Rgba[offset + 1] + 20
                 && image.Rgba[offset] > image.Rgba[offset + 2] + 20)
+            {
+                changed++;
+            }
+        }
+
+        return changed;
+    }
+
+    private static int CountMagentaPixels(RekallAgeRgbaImage image)
+    {
+        var changed = 0;
+        for (var offset = 0; offset + 3 < image.Rgba.Length; offset += 4)
+        {
+            if (image.Rgba[offset] > 220
+                && image.Rgba[offset + 1] < 30
+                && image.Rgba[offset + 2] > 220)
+            {
+                changed++;
+            }
+        }
+
+        return changed;
+    }
+
+    private static int CountGreenDominantPixels(RekallAgeRgbaImage image)
+    {
+        var changed = 0;
+        for (var offset = 0; offset + 3 < image.Rgba.Length; offset += 4)
+        {
+            if (image.Rgba[offset + 1] > image.Rgba[offset] + 20
+                && image.Rgba[offset + 1] > image.Rgba[offset + 2] + 20)
             {
                 changed++;
             }

@@ -236,12 +236,18 @@
       "rekall.age.workflows": {
         "type": "Project",
         "dependencies": {
+          "Rekall.Age.Agent": "[0.1.0-preview.1, )",
+          "Rekall.Age.AssetPipeline": "[0.1.0-preview.1, )",
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
           "Rekall.Age.Build": "[0.1.0-preview.1, )",
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.LevelDesign": "[0.1.0-preview.1, )",
+          "Rekall.Age.Mcp": "[0.1.0-preview.1, )",
           "Rekall.Age.Modules": "[0.1.0-preview.1, )",
           "Rekall.Age.Playback": "[0.1.0-preview.1, )",
           "Rekall.Age.Project": "[0.1.0-preview.1, )",
           "Rekall.Age.Rendering": "[0.1.0-preview.1, )",
+          "Rekall.Age.Runtime": "[0.1.0-preview.1, )",
           "Rekall.Age.Validation": "[0.1.0-preview.1, )",
           "Rekall.Age.World": "[0.1.0-preview.1, )"
         }

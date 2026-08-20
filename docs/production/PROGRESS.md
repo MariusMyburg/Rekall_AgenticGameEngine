@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 21:38 Africa/Johannesburg
+Last verified: 2026-08-20 22:47 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: model-capability-aware Ollama requests
+Latest milestone: evidence-driven local-model selection
 
 ## Product objective
 
@@ -49,12 +49,14 @@ Studio is important, but it does not define or reorder the engine foundation.
   created a project from no prior files, traversed its Ollama adapter and agent
   tool loop, completed the gauntlet, captured a nonblank viewport, and produced
   a packaged game under deterministic model responses.
-- Local agent: the user-authorized model evaluation currently uses
-  `devstral-small-2:24b` through Ollama's native API. It is a 15 GB Q4 model
-  explicitly intended for tool-driven agentic software engineering and fits
-  inside this machine's 32 GB RTX 5090 VRAM. `qwen3.5:35b` was removed first
-  at the user's request to free disk space; it remains the fallback if direct
-  AGE evidence shows Devstral is worse.
+- Local agent: direct installed-AGE evidence rejected both
+  `devstral-small-2:24b` and `qwen3-coder:30b` as replacements for the proven
+  `qwen3.5:35b`. Devstral completed only two status calls in its fair full run;
+  Qwen Coder made materially more progress at its normal temperature but did
+  not complete, and a 0.15-temperature profile regressed into a 55-failure
+  loop. Both Qwen Coder tags were removed. `qwen3.5:35b` is being restored as
+  the default because it remains the only evaluated local model with repeated
+  task-specific AGE game/package passes on this 32 GB RTX 5090.
 - Studio authoring: project create/open, entity hierarchy/selection, generic
   entity/component/property mutation, scene validation, software-rendered
   viewport capture, and Windows player launch/stop now execute through the
@@ -1059,8 +1061,48 @@ Studio is important, but it does not define or reorder the engine foundation.
   Independent native-API smokes then proved Devstral selects a registered tool
   and emits the exact four-field `Game.*` component assertion plus a strict
   transform delta that Benchmark 11 repeatedly malformed.
+- Fresh arbitrary-game benchmark 13 was Devstral's fair full comparison after
+  the model-capability fallback shipped in product `8e57cb9`. The unchanged
+  1,177-file product archive is 200,966,057 bytes with SHA-256
+  `FA15362BB75D7FF972AB6DA287D85BF711ECC59B1C04A3EB7F697E286528E678`.
+  Devstral stopped after six turns and two successful engine-status calls,
+  authored no project content, and ended by promising to begin. Evidence
+  SHA-256 is
+  `FE7446128D32E048CAA254BA3C0C02E485505CF5A844277C25121DEED26524DC`.
+- Fresh arbitrary-game benchmark 14 evaluated real local
+  `qwen3-coder:30b` against the same installed product. It made 87 executions
+  including the protected repair reserve, authored eight renderables, compiled
+  two modules, fixed validation, and passed a strict runtime inspection at
+  execution 75. Later scene/playable repairs invalidated that evidence and it
+  exhausted the reserve before packaging: 30 calls failed and no archive was
+  produced. Evidence SHA-256 is
+  `50779E136539B1C32260C5A3BE970FC5FE6EB81E8EA5E8A16E51722881DA5C61`.
+  A bounded continuation made the existing project worse by replacing it with
+  five entities and invalid `Rekall.Collider3D` content; continuation evidence
+  SHA-256 is
+  `09537B03240050F762047C45776D26AD983E3268A8B520D7F9D37FED359FB872`.
+- Fresh arbitrary-game benchmark 15 evaluated the same Qwen Coder weights with
+  temperature 0.15, top-p 0.8, and top-k 20 from an empty project. Native API
+  smokes selected the exact status tool and emitted a correctly structured
+  component-existence plus strict movement assertion, but full authoring
+  regressed decisively: 64 executions contained 55 failures, the final scene
+  had only two renderables and 15 blocking validation issues, the module never
+  produced a receipt, and the last turns repeated trust inspection instead of
+  the returned build action. No runtime checkpoint or package was produced.
+  Evidence SHA-256 is
+  `0CD2E7AA3AB10D941004E455A69E6EEAF532E47425B5DA52417D89F73A50EE9B`.
 
 ## Recently completed
+
+The replacement-model experiment is complete. Devstral was decisively worse
+than Qwen Coder, while normal-temperature Qwen Coder was much closer to the
+closed loop than its low-temperature profile. Neither matched the strongest
+real `qwen3.5:35b` AGE evidence: Qwen 3.5 previously completed `Prism Relay`,
+`Signal Garden`, and uninterrupted `Echo Foundry` task-specific sessions with
+compiled gameplay, nonblank captures, packages, relocation, and audits. The
+experiment therefore removed the Qwen Coder tags and selected Qwen 3.5 for
+restoration. This is a measured model-quality decision, not an engine success;
+the current Lumen Vault loop remains red.
 
 Benchmark 12's model-capability mismatch now has a bounded adapter fallback.
 When—and only when—Ollama returns HTTP 400 stating that the selected model does
@@ -1337,10 +1379,10 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The current item remains the actual AI game-creation loop. Assemble fresh
-binaries containing model-capability-aware Ollama fallback, then run Benchmark 13
-through real local Ollama, then independently inspect its scene, source, input
-projection, and runtime transitions. Require clean validation, informative
+The current item remains the actual AI game-creation loop. Restore the proven
+`qwen3.5:35b`, then run a fresh unchanged benchmark through real local Ollama
+and independently inspect its scene, source, input projection, and runtime
+transitions. Require clean validation, informative
 capture, compiled agent-authored behavior, a playable relocated package, and a
 passing consolidated audit. Only after this generic loop is honestly green,
 run a fresh Pong brief as the compact fully playable proof before using Galaga

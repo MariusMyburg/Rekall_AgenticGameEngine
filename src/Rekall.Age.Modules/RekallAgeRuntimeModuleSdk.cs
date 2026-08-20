@@ -413,6 +413,60 @@ public static class RekallAgeRuntimeModuleSdk
             update((entity.FindComponent(componentType)?.Properties.DeepClone() as JsonObject) ?? new JsonObject()));
     }
 
+    public static double ComponentNumber(
+        this RekallAgeRuntimeEntity entity,
+        string componentType,
+        string propertyName,
+        double fallback = 0) =>
+        entity.FindComponent(componentType)?.Properties.ReadNumber(propertyName, fallback) ?? fallback;
+
+    public static bool ComponentBoolean(
+        this RekallAgeRuntimeEntity entity,
+        string componentType,
+        string propertyName,
+        bool fallback = false) =>
+        entity.FindComponent(componentType)?.Properties.ReadBoolean(propertyName, fallback) ?? fallback;
+
+    public static string? ComponentString(
+        this RekallAgeRuntimeEntity entity,
+        string componentType,
+        string propertyName,
+        string? fallback = null) =>
+        entity.FindComponent(componentType)?.Properties.ReadString(propertyName, fallback) ?? fallback;
+
+    public static RekallAgeRuntimeEntity WithComponentNumber(
+        this RekallAgeRuntimeEntity entity,
+        string componentType,
+        string propertyName,
+        double value) =>
+        entity.UpdateComponent(componentType, properties =>
+        {
+            properties[propertyName] = value;
+            return properties;
+        });
+
+    public static RekallAgeRuntimeEntity WithComponentBoolean(
+        this RekallAgeRuntimeEntity entity,
+        string componentType,
+        string propertyName,
+        bool value) =>
+        entity.UpdateComponent(componentType, properties =>
+        {
+            properties[propertyName] = value;
+            return properties;
+        });
+
+    public static RekallAgeRuntimeEntity WithComponentString(
+        this RekallAgeRuntimeEntity entity,
+        string componentType,
+        string propertyName,
+        string? value) =>
+        entity.UpdateComponent(componentType, properties =>
+        {
+            properties[propertyName] = value;
+            return properties;
+        });
+
     public static IReadOnlyList<RekallAgeRuntimeInputAction> InputActions(
         this RekallAgeRuntimeWorld world,
         string name)

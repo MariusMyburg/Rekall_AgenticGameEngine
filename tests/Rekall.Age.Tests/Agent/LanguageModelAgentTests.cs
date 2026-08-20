@@ -32,6 +32,12 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("rekall.module.scaffold_runtime_system", prompt, StringComparison.Ordinal);
         Assert.Contains("rekall.module.inspect_runtime_sdk", prompt, StringComparison.Ordinal);
         Assert.Contains("module source topology", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ComponentNumber", prompt, StringComparison.Ordinal);
+        Assert.Contains("entity.Transform.Position3D", prompt, StringComparison.Ordinal);
+        Assert.Contains("do not introduce JsonObject", prompt, StringComparison.Ordinal);
+        Assert.Contains("two separate semantic scalar actions", prompt, StringComparison.Ordinal);
+        Assert.Contains("InputActionValue returns double", prompt, StringComparison.Ordinal);
+        Assert.Contains("never scaffold that module again", prompt, StringComparison.Ordinal);
         Assert.Contains("call the matched native tool directly", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("then call them through rekall.tools.execute", prompt, StringComparison.Ordinal);
         Assert.Contains("Do not replace its compilable SDK types", prompt, StringComparison.Ordinal);

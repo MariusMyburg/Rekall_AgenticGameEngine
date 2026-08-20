@@ -27,7 +27,7 @@ public sealed class ScaffoldRuntimeSystemModuleCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Scaffolds a compilable agent-owned C# component and IRekallAgeRuntimeModuleSystem. Exact compact shape: {\"projectRoot\":\"...\",\"moduleId\":\"game.rules\",\"displayName\":\"Game Rules\",\"moduleName\":\"GameRules\",\"componentName\":\"GameState\",\"systemName\":\"GameRulesSystem\"}. Call rekall.module.inspect_runtime_sdk for exact signatures and source topology. After scaffolding, call rekall.module.list_sources and rekall.module.read_source, preserve the real SDK types/helpers, make targeted edits without duplicate definitions, then call rekall.module.write_source and rekall.build.modules.",
+        "Scaffolds a compilable agent-owned C# component and IRekallAgeRuntimeModuleSystem without overwriting an existing module. Exact compact shape: {\"projectRoot\":\"...\",\"moduleId\":\"game.rules\",\"displayName\":\"Game Rules\",\"moduleName\":\"GameRules\",\"componentName\":\"GameState\",\"systemName\":\"GameRulesSystem\"}. Call rekall.module.inspect_runtime_sdk for exact signatures and source topology. After scaffolding, call rekall.module.list_sources and rekall.module.read_source, preserve the real SDK types/helpers, make targeted edits without duplicate definitions, then call rekall.module.write_source and rekall.build.modules. If the module exists, read and edit it; never scaffold it again.",
         typeof(ScaffoldRuntimeSystemModuleRequest).FullName!,
         typeof(ScaffoldRuntimeSystemModuleResult).FullName!);
 
@@ -46,10 +46,46 @@ public sealed class ScaffoldRuntimeSystemModuleCommand
             : $"{systemName}System";
         var namespaceName = $"Game.Modules.{moduleName}";
         var directory = Path.Combine(request.ProjectRoot, "Modules", moduleName);
-        Directory.CreateDirectory(directory);
-
         var sourcePath = Path.Combine(directory, $"{moduleClass}.cs");
         var projectPath = Path.Combine(directory, $"{moduleName}.csproj");
+        var result = new ScaffoldRuntimeSystemModuleResult(
+            sourcePath,
+            projectPath,
+            namespaceName,
+            moduleClass,
+            componentName,
+            systemClass);
+        if (File.Exists(sourcePath) || File.Exists(projectPath))
+        {
+            var error = new RekallAgeCommandError(
+                "REKALL_MODULE_SCAFFOLD_ALREADY_EXISTS",
+                $"Runtime module '{moduleName}' already exists. Existing agent-authored source was preserved; use module source inspection and targeted writes instead of scaffolding again.",
+                sourcePath,
+                [
+                    new RekallAgeSuggestedCommand(
+                        "rekall.module.read_source",
+                        new Dictionary<string, object?>
+                        {
+                            ["projectRoot"] = request.ProjectRoot,
+                            ["moduleName"] = moduleName,
+                            ["fileName"] = $"{moduleClass}.cs"
+                        }),
+                    new RekallAgeSuggestedCommand(
+                        "rekall.module.write_source",
+                        new Dictionary<string, object?>
+                        {
+                            ["projectRoot"] = request.ProjectRoot,
+                            ["moduleName"] = moduleName,
+                            ["fileName"] = $"{moduleClass}.cs"
+                        })
+                ]);
+            return RekallAgeCommandResult<ScaffoldRuntimeSystemModuleResult>.Failure(
+                result,
+                error.Message,
+                [error]);
+        }
+
+        Directory.CreateDirectory(directory);
         var sdk = await new RekallAgeModuleSdkInstaller().InstallAsync(request.ProjectRoot, context.CancellationToken);
         await File.WriteAllTextAsync(
             sourcePath,
@@ -64,13 +100,7 @@ public sealed class ScaffoldRuntimeSystemModuleCommand
         }
 
         return RekallAgeCommandResult<ScaffoldRuntimeSystemModuleResult>.Success(
-            new ScaffoldRuntimeSystemModuleResult(
-                sourcePath,
-                projectPath,
-                namespaceName,
-                moduleClass,
-                componentName,
-                systemClass),
+            result,
             $"Scaffolded runtime system module '{request.ModuleId}'.");
     }
 
@@ -123,29 +153,30 @@ public sealed class ScaffoldRuntimeSystemModuleCommand
         source.AppendLine("        var seconds = context.DeltaTime.TotalSeconds;");
         source.AppendLine();
         source.AppendLine("        // Generic SDK patterns for agent-authored rules:");
-        source.AppendLine("        // var axis = world.InputActionValue(\"agent.authored.axis\");");
+        source.AppendLine("        // InputActionValue returns double, not a vector; two-axis movement uses separate semantic actions:");
+        source.AppendLine("        // var horizontal = world.InputActionValue(\"move.horizontal\");");
+        source.AppendLine("        // var vertical = world.InputActionValue(\"move.vertical\");");
         source.AppendLine("        // var held = world.IsInputActionDown(\"agent.authored.action\");");
         source.AppendLine("        // var pressed = world.WasInputActionPressed(\"agent.authored.reset\");");
         source.AppendLine("        // Runtime vectors are immutable records: create new RekallAgeRuntimeVector3(x, y, z).");
         source.AppendLine("        // world = world.UpdateEntity(entity.Id, current => current.WithPosition3D(position));");
-        source.AppendLine("        // entity.UpdateComponent(componentType, properties => { properties[\"value\"] = 1; return properties; });");
-        source.AppendLine("        var entities = world.Entities.Select(entity =>");
+        source.AppendLine("        // entity = entity.WithComponentNumber(componentType, \"valuePerSecond\", 2);");
+        source.AppendLine("        var updatedWorld = world.UpdateEntitiesWithComponent(componentType, entity =>");
         source.AppendLine("        {");
-        source.AppendLine("            var component = entity.FindComponent(componentType);");
-        source.AppendLine("            if (component is null || !component.Properties.ReadBoolean(\"enabled\", true))");
+        source.AppendLine("            if (!entity.ComponentBoolean(componentType, \"enabled\", true))");
         source.AppendLine("            {");
         source.AppendLine("                return entity;");
         source.AppendLine("            }");
         source.AppendLine();
-        source.AppendLine("            var valuePerSecond = component.Properties.ReadNumber(\"valuePerSecond\", 1);");
-        source.AppendLine("            var transform = entity.Transform;");
+        source.AppendLine("            var valuePerSecond = entity.ComponentNumber(componentType, \"valuePerSecond\", 1);");
+        source.AppendLine("            var position = entity.Transform.Position3D;");
         source.AppendLine("            return entity.WithPosition3D(new RekallAgeRuntimeVector3(");
-        source.AppendLine("                transform.Position3D.X + valuePerSecond * seconds,");
-        source.AppendLine("                transform.Position3D.Y,");
-        source.AppendLine("                transform.Position3D.Z));");
-        source.AppendLine("        }).ToArray();");
+        source.AppendLine("                position.X + valuePerSecond * seconds,");
+        source.AppendLine("                position.Y,");
+        source.AppendLine("                position.Z));");
+        source.AppendLine("        });");
         source.AppendLine();
-        source.AppendLine("        return ValueTask.FromResult(world with { Entities = entities });");
+        source.AppendLine("        return ValueTask.FromResult(updatedWorld);");
         source.AppendLine("    }");
         source.AppendLine("}");
         return source.ToString();

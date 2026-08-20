@@ -104,6 +104,36 @@ public sealed class RuntimeEntityQuerySdkTests
         Assert.Same(updated, updated.RemoveEntity(" "));
     }
 
+    [Fact]
+    public void RuntimeModuleSdkReadsAndWritesComponentStateWithoutJsonBoilerplate()
+    {
+        var entity = CreateEntity(
+            "runner",
+            "Runner",
+            ["actor"],
+            new RekallAgeRuntimeComponent("Game.Runner", new JsonObject
+            {
+                ["speed"] = 12.5,
+                ["enabled"] = true,
+                ["label"] = "ready"
+            }));
+
+        Assert.Equal(12.5, entity.ComponentNumber("Game.Runner", "speed", 1));
+        Assert.True(entity.ComponentBoolean("Game.Runner", "enabled", false));
+        Assert.Equal("ready", entity.ComponentString("Game.Runner", "label", "missing"));
+        Assert.Equal(7, entity.ComponentNumber("Missing", "speed", 7));
+
+        var updated = entity
+            .WithComponentNumber("Game.Runner", "score", 3)
+            .WithComponentBoolean("Game.Runner", "enabled", false)
+            .WithComponentString("Game.Runner", "label", "charged");
+
+        Assert.Equal(3, updated.ComponentNumber("Game.Runner", "score", 0));
+        Assert.False(updated.ComponentBoolean("Game.Runner", "enabled", true));
+        Assert.Equal("charged", updated.ComponentString("Game.Runner", "label"));
+        Assert.Equal(new RekallAgeRuntimeVector3(0, 0, 0), updated.Transform.Position3D);
+    }
+
     private static RekallAgeRuntimeWorld CreateWorld(params RekallAgeRuntimeEntity[] entities)
     {
         return new RekallAgeRuntimeWorld(

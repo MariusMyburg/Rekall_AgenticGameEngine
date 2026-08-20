@@ -23,7 +23,7 @@ public sealed class ScaffoldPlayableModuleCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Scaffolds an agent-editable C# playable module shell without engine-authored game behavior.",
+        "Scaffolds an agent-editable C# playable module shell without engine-authored game behavior and refuses to overwrite an existing module. If the module exists, read and edit it; never scaffold it again.",
         typeof(ScaffoldPlayableModuleRequest).FullName!,
         typeof(ScaffoldPlayableModuleResult).FullName!);
 
@@ -37,10 +37,40 @@ public sealed class ScaffoldPlayableModuleCommand
             : $"{moduleName}Module";
         var namespaceName = $"Game.Modules.{moduleName}";
         var directory = Path.Combine(request.ProjectRoot, "Modules", moduleName);
-        Directory.CreateDirectory(directory);
-
         var sourcePath = Path.Combine(directory, $"{moduleClass}.cs");
         var projectPath = Path.Combine(directory, $"{moduleName}.csproj");
+        var result = new ScaffoldPlayableModuleResult(sourcePath, projectPath, namespaceName, moduleClass);
+        if (File.Exists(sourcePath) || File.Exists(projectPath))
+        {
+            var error = new RekallAgeCommandError(
+                "REKALL_MODULE_SCAFFOLD_ALREADY_EXISTS",
+                $"Playable module '{moduleName}' already exists. Existing agent-authored source was preserved; use module source inspection and targeted writes instead of scaffolding again.",
+                sourcePath,
+                [
+                    new RekallAgeSuggestedCommand(
+                        "rekall.module.read_source",
+                        new Dictionary<string, object?>
+                        {
+                            ["projectRoot"] = request.ProjectRoot,
+                            ["moduleName"] = moduleName,
+                            ["fileName"] = $"{moduleClass}.cs"
+                        }),
+                    new RekallAgeSuggestedCommand(
+                        "rekall.module.write_source",
+                        new Dictionary<string, object?>
+                        {
+                            ["projectRoot"] = request.ProjectRoot,
+                            ["moduleName"] = moduleName,
+                            ["fileName"] = $"{moduleClass}.cs"
+                        })
+                ]);
+            return RekallAgeCommandResult<ScaffoldPlayableModuleResult>.Failure(
+                result,
+                error.Message,
+                [error]);
+        }
+
+        Directory.CreateDirectory(directory);
         var sdk = await new RekallAgeModuleSdkInstaller().InstallAsync(request.ProjectRoot, context.CancellationToken);
         await File.WriteAllTextAsync(
             sourcePath,
@@ -56,7 +86,7 @@ public sealed class ScaffoldPlayableModuleCommand
         }
 
         return RekallAgeCommandResult<ScaffoldPlayableModuleResult>.Success(
-            new ScaffoldPlayableModuleResult(sourcePath, projectPath, namespaceName, moduleClass),
+            result,
             $"Scaffolded playable module shell '{request.ModuleId}'.");
     }
 

@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 17:56 Africa/Johannesburg
+Last verified: 2026-08-20 18:30 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: uninterrupted task-specific Ollama game creation passed
+Latest milestone: fresh installed gate passed; arbitrary-game SDK repair verified
 
 ## Product objective
 
@@ -30,13 +30,13 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
-- Windows distribution: fresh 200,855,482-byte win-x64 archive assembled with
-  SHA-256 `EBC4864EB3D84355BA9560FA18314005FE743B290189CC57B1D6A960DDAF6F81`.
+- Windows distribution: fresh 200,903,023-byte win-x64 archive assembled with
+  SHA-256 `72EBE0C844FFD628FCB94CCC45E3590C34A887E7C572C65269385625ED8E0097`.
   The assembled directory contains 1,178 files.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Debug verification: 908/908 engine tests and 6/6 Windows Studio
+- Current Debug verification: 911/911 engine tests and 6/6 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -925,8 +925,29 @@ Studio is important, but it does not define or reorder the engine foundation.
   the complete `Echo Foundry` authoring and audit session in 49 turns. The next
   bar is distribution parity, followed by reducing the six recovered malformed
   or initially incomplete non-scope tool calls without hiding real errors.
+- Fresh arbitrary-game benchmark 2 (`Lumen Vault`) reached eight visible
+  renderables and a valid active camera, and compiled an initial generic
+  delta-time gameplay system, but exhausted 64 turns after destructive
+  re-scaffolding replaced that working source. The final blockers were numeric
+  SDK misuse, unremoved schema-invalid properties, a missing final module
+  receipt, and no package. This is retained as failure evidence rather than a
+  product pass; evidence SHA-256 is
+  `7B5A618D19D8C7D07FFAF51183732BD19D3976CAC469072BA3D6164B89092FB3`.
 
 ## Recently completed
+
+The measured `Lumen Vault` failures now have generic TDD coverage. Runtime
+entities expose typed number/boolean/string component readers and immutable
+writers without `JsonObject`; SDK inspection returns an exact transform/state
+recipe plus a scalar two-axis/double-math recipe; the runtime-system scaffold
+uses typed entity/world helpers rather than rebuilding `world.Entities`; and
+both runtime and playable scaffolds now fail with an executable source-edit
+diagnostic instead of overwriting existing agent work. The embedded contract
+also fixes scalar semantic-action and numeric-type guidance. The combined
+authoring-contract selection passes 29/29. The full engine suite passes
+911/911, Studio passes 6/6, and the warning-as-error solution build reports
+zero warnings and zero errors. The next gate is another fresh empty-project
+game, not subsystem expansion.
 
 `Echo Foundry` is the first uninterrupted empty-project task-specific game
 creation pass. Local Ollama `qwen3.5:35b` authored the 3D industrial arena,
@@ -1063,11 +1084,12 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The current item remains the actual AI game-creation loop. Assemble fresh
-installed binaries and repeat an empty-project arbitrary-game brief through the
-installed Studio in one uninterrupted session, requiring clean validation,
-informative capture, compiled agent-authored behavior, playable package, and a
-passing consolidated audit. Use concrete failures to improve only generic
+The current item remains the actual AI game-creation loop. Complete full-suite
+verification of the benchmark-driven SDK/scaffold repair, then run another
+fresh empty-project arbitrary-game brief through repository Studio. Require
+clean validation, informative capture, compiled agent-authored behavior,
+playable package, and a passing consolidated audit before rebuilding the
+installed distribution. Use concrete failures to improve only generic
 authoring primitives, schemas, diagnostics, and repair efficiency. Studio,
 embedded AI, MCP, CLI, and packaged players must continue to consume the same
 contracts.

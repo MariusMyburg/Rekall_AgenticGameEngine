@@ -103,10 +103,26 @@ public sealed class InspectRuntimeSdkCommand
                 Usage = "var next = new RekallAgeRuntimeVector3(x, y, z);"
             },
             new RekallAgeRuntimeSdkContract(
+                "authoring-recipe",
+                "entity-transform-and-component-state-recipe",
+                "RekallAgeRuntimeEntity.Transform + ComponentNumber/ComponentBoolean/ComponentString + WithComponentNumber/WithComponentBoolean/WithComponentString",
+                "Read transforms directly from the immutable entity and use typed component-state helpers. These helpers require only Rekall.Age.Modules and Rekall.Age.Runtime.Abstractions; do not invent entity.Properties, entity.Transform3D, ReadVector3, ToMutable, or JsonObject boilerplate.")
+            {
+                Usage = "var position = entity.Transform.Position3D; var speed = entity.ComponentNumber(componentType, \"movementSpeed\", 5); entity = entity.WithComponentBoolean(componentType, \"charged\", true); // no JsonObject required"
+            },
+            new RekallAgeRuntimeSdkContract(
+                "authoring-recipe",
+                "scalar-two-axis-input-and-double-math-recipe",
+                "InputActionValue returns double; RekallAgeRuntimeVector3 coordinates and ComponentNumber values are double",
+                "InputActionValue returns double, not a vector: use two separately named semantic scalar actions for two-axis movement and never access .X or .Y on an action value. Keep transform, component-number, delta-time, distance, and movement locals as var or double; cast only at an explicit authored integer boundary.")
+            {
+                Usage = "var horizontal = world.InputActionValue(\"move.horizontal\"); var vertical = world.InputActionValue(\"move.vertical\"); var seconds = context.DeltaTime.TotalSeconds; var nextX = position.X + horizontal * speed * seconds; var nextZ = position.Z + vertical * speed * seconds;"
+            },
+            new RekallAgeRuntimeSdkContract(
                 "module-source",
                 "module-source-topology",
                 "Modules/<ModuleName>/<ModuleName>.csproj compiles every Modules/<ModuleName>/*.cs file",
-                "Call rekall.module.list_sources before scaffolding or rewriting. Every C# file in the module directory compiles into one assembly, so duplicate module, component, or system class definitions across files are build errors. rekall.module.scaffold_runtime_system writes a scaffold; it does not delete other source files.")
+                "Call rekall.module.list_sources before scaffolding or rewriting. Every C# file in the module directory compiles into one assembly, so duplicate module, component, or system class definitions across files are build errors. rekall.module.scaffold_runtime_system refuses to overwrite an existing module: read and edit existing source instead of scaffolding it again.")
             {
                 Usage = "rekall.module.list_sources -> rekall.module.read_source -> targeted rekall.module.write_source -> rekall.build.modules"
             },
@@ -178,6 +194,14 @@ public sealed class InspectRuntimeSdkCommand
         nameof(RekallAgeRuntimeModuleSdk.UpdateComponent) or
         nameof(RekallAgeRuntimeModuleSdk.UpsertComponent) =>
             "Returns a replacement immutable entity after a JSON component mutation.",
+        nameof(RekallAgeRuntimeModuleSdk.ComponentNumber) or
+        nameof(RekallAgeRuntimeModuleSdk.ComponentBoolean) or
+        nameof(RekallAgeRuntimeModuleSdk.ComponentString) =>
+            "Reads one typed property from an entity component without direct JsonObject access.",
+        nameof(RekallAgeRuntimeModuleSdk.WithComponentNumber) or
+        nameof(RekallAgeRuntimeModuleSdk.WithComponentBoolean) or
+        nameof(RekallAgeRuntimeModuleSdk.WithComponentString) =>
+            "Returns a replacement immutable entity with one typed component property changed; no JsonObject namespace is required.",
         _ => "Compiled generic runtime-module SDK helper. The signature is derived from the loaded engine assembly."
     };
 
@@ -195,6 +219,18 @@ public sealed class InspectRuntimeSdkCommand
             "var replacement = entity.UpdateComponent(componentType, properties => { properties[\"score\"] = score; return properties; });",
         nameof(RekallAgeRuntimeModuleSdk.RemoveEntity) =>
             "world = world.RemoveEntity(collectedEntity.Id);",
+        nameof(RekallAgeRuntimeModuleSdk.ComponentNumber) =>
+            "var speed = entity.ComponentNumber(componentType, \"movementSpeed\", 5);",
+        nameof(RekallAgeRuntimeModuleSdk.ComponentBoolean) =>
+            "var charged = entity.ComponentBoolean(componentType, \"charged\", false);",
+        nameof(RekallAgeRuntimeModuleSdk.ComponentString) =>
+            "var state = entity.ComponentString(componentType, \"state\", \"idle\");",
+        nameof(RekallAgeRuntimeModuleSdk.WithComponentNumber) =>
+            "entity = entity.WithComponentNumber(componentType, \"score\", score);",
+        nameof(RekallAgeRuntimeModuleSdk.WithComponentBoolean) =>
+            "entity = entity.WithComponentBoolean(componentType, \"charged\", true);",
+        nameof(RekallAgeRuntimeModuleSdk.WithComponentString) =>
+            "entity = entity.WithComponentString(componentType, \"state\", \"complete\");",
         _ => null
     };
 }

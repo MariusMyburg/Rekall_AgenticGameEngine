@@ -66,6 +66,34 @@ public sealed class ScaffoldPlayableModuleCommandTests
     }
 
     [Fact]
+    public async Task ScaffoldPlayableModuleRefusesToOverwriteExistingAgentSource()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var command = new ScaffoldPlayableModuleCommand();
+        var request = new ScaffoldPlayableModuleRequest(root, "module.agent", "Agent Module", "AgentModule");
+        var first = await command.ExecuteAsync(
+            request,
+            new RekallAgeCommandContext(
+                "agent",
+                RekallAgeTransaction.Begin("first playable scaffold"),
+                CancellationToken.None));
+        const string authoredSource = "// irreplaceable agent-authored playable";
+        await File.WriteAllTextAsync(first.Value.SourcePath, authoredSource);
+        var secondTransaction = RekallAgeTransaction.Begin("duplicate playable scaffold");
+
+        var second = await command.ExecuteAsync(
+            request,
+            new RekallAgeCommandContext("agent", secondTransaction, CancellationToken.None));
+
+        Assert.False(second.Ok);
+        var error = Assert.Single(second.Errors);
+        Assert.Equal("REKALL_MODULE_SCAFFOLD_ALREADY_EXISTS", error.Code);
+        Assert.Contains("rekall.module.read_source", error.SuggestedCommands!.Select(item => item.Tool));
+        Assert.Equal(authoredSource, await File.ReadAllTextAsync(first.Value.SourcePath));
+        Assert.Empty(secondTransaction.ChangedResources);
+    }
+
+    [Fact]
     public async Task ProjectModuleLoaderCanLoadSameModuleNameFromDifferentProjects()
     {
         var firstRoot = TestPaths.CreateTempDirectory();

@@ -36,6 +36,22 @@ public sealed class InspectRuntimeSdkCommandTests
             contract.Name == "module-source-topology"
             && contract.Description.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
             && contract.Description.Contains("rekall.module.list_sources", StringComparison.Ordinal));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "ComponentNumber"
+            && contract.Usage!.Contains("entity.ComponentNumber", StringComparison.Ordinal));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "WithComponentBoolean"
+            && contract.Usage!.Contains("entity.WithComponentBoolean", StringComparison.Ordinal));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "entity-transform-and-component-state-recipe"
+            && contract.Usage!.Contains("entity.Transform.Position3D", StringComparison.Ordinal)
+            && contract.Usage.Contains("no JsonObject", StringComparison.Ordinal));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "scalar-two-axis-input-and-double-math-recipe"
+            && contract.Usage!.Contains("move.horizontal", StringComparison.Ordinal)
+            && contract.Usage.Contains("move.vertical", StringComparison.Ordinal)
+            && contract.Description.Contains("returns double", StringComparison.Ordinal)
+            && contract.Description.Contains("never access .X or .Y", StringComparison.Ordinal));
         Assert.All(result.Value.Contracts, contract => Assert.False(string.IsNullOrWhiteSpace(contract.Signature)));
     }
 

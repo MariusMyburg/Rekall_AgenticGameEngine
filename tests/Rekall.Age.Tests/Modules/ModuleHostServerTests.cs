@@ -331,7 +331,7 @@ public sealed class ModuleHostServerTests
         var source = await File.ReadAllTextAsync(scaffold.Value.SourcePath);
         source = source.Replace("public int Priority => 0;", "public int Priority => 7;", StringComparison.Ordinal);
         source = source.Replace(
-            "return ValueTask.FromResult(world with { Entities = entities });",
+            "return ValueTask.FromResult(updatedWorld);",
             "if (context.FrameIndex == 99) throw new InvalidOperationException(new string('x', 5000));\n        return ValueTask.FromResult(world with { FrameIndex = world.FrameIndex + context.FrameIndex });",
             StringComparison.Ordinal);
         await File.WriteAllTextAsync(scaffold.Value.SourcePath, source);

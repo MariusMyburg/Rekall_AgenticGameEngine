@@ -62,20 +62,62 @@ public sealed class ScaffoldRuntimeSystemModuleCommandTests
         Assert.Contains("public sealed class OrbitMotion : RekallAgeComponent", source);
         Assert.Contains("public sealed class OrbitMotionSystem : IRekallAgeRuntimeModuleSystem", source);
         Assert.Contains("ValueTask<RekallAgeRuntimeWorld> UpdateAsync", source);
-        Assert.Contains("entity.FindComponent(componentType)", source);
-        Assert.Contains("component.Properties.ReadNumber(\"valuePerSecond\", 1)", source);
+        Assert.Contains("world.UpdateEntitiesWithComponent(componentType", source);
+        Assert.Contains("entity.ComponentBoolean(componentType, \"enabled\", true)", source);
+        Assert.Contains("entity.ComponentNumber(componentType, \"valuePerSecond\", 1)", source);
+        Assert.Contains("entity.Transform.Position3D", source);
         Assert.Contains("entity.WithPosition3D", source);
         Assert.Contains("world.InputActionValue", source);
+        Assert.Contains("move.horizontal", source);
+        Assert.Contains("move.vertical", source);
+        Assert.Contains("returns double, not a vector", source);
         Assert.Contains("world.IsInputActionDown", source);
         Assert.Contains("world.WasInputActionPressed", source);
         Assert.Contains("new RekallAgeRuntimeVector3", source);
         Assert.Contains("world.UpdateEntity", source);
-        Assert.Contains("entity.UpdateComponent", source);
+        Assert.Contains("entity.WithComponentNumber", source);
+        Assert.DoesNotContain("component.Properties", source);
+        Assert.DoesNotContain("world with { Entities =", source);
+        Assert.DoesNotContain("JsonObject", source);
 
         Assert.True(build.Ok, build.Summary);
         Assert.True(schemas.Ok, schemas.Summary);
         Assert.Contains(
             schemas.Value.Components,
             component => component.TypeName == $"{scaffold.Value.Namespace}.OrbitMotion");
+    }
+
+    [Fact]
+    public async Task ScaffoldRuntimeSystemModuleRefusesToOverwriteExistingAgentSource()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var command = new ScaffoldRuntimeSystemModuleCommand();
+        var request = new ScaffoldRuntimeSystemModuleRequest(
+            root,
+            "game.rules",
+            "Game Rules",
+            "GameRules",
+            "GameState",
+            "GameRulesSystem");
+        var first = await command.ExecuteAsync(
+            request,
+            new RekallAgeCommandContext(
+                "agent",
+                RekallAgeTransaction.Begin("first runtime scaffold"),
+                CancellationToken.None));
+        const string authoredSource = "// irreplaceable agent-authored gameplay";
+        await File.WriteAllTextAsync(first.Value.SourcePath, authoredSource);
+        var secondTransaction = RekallAgeTransaction.Begin("duplicate runtime scaffold");
+
+        var second = await command.ExecuteAsync(
+            request,
+            new RekallAgeCommandContext("agent", secondTransaction, CancellationToken.None));
+
+        Assert.False(second.Ok);
+        var error = Assert.Single(second.Errors);
+        Assert.Equal("REKALL_MODULE_SCAFFOLD_ALREADY_EXISTS", error.Code);
+        Assert.Contains("rekall.module.read_source", error.SuggestedCommands!.Select(item => item.Tool));
+        Assert.Equal(authoredSource, await File.ReadAllTextAsync(first.Value.SourcePath));
+        Assert.Empty(secondTransaction.ChangedResources);
     }
 }

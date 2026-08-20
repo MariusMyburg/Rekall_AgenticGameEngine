@@ -1,5 +1,7 @@
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
+using Rekall.Age.World;
 using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Workflows.Commands;
@@ -33,6 +35,9 @@ public sealed record CreateBlueprintProjectResult(
 public sealed class CreateBlueprintProjectCommand
     : IRekallAgeCommand<CreateBlueprintProjectRequest, CreateBlueprintProjectResult>
 {
+    private readonly RekallAgeProjectStore _projectStore = new();
+    private readonly RekallAgeSceneStore _sceneStore = new();
+
     public string Name => "rekall.workflow.create_blueprint_project";
 
     public RekallAgeCommandSchema Schema => new(
@@ -77,9 +82,7 @@ public sealed class CreateBlueprintProjectCommand
                 validationErrors);
         }
 
-        var project = await new CreateProjectCommand().ExecuteAsync(
-            new CreateProjectRequest(request.ProjectRoot, request.ProjectName, request.ProjectCapabilities),
-            context);
+        var project = await EnsureProjectAsync(request, context);
         if (!project.Ok)
         {
             return RekallAgeCommandResult<CreateBlueprintProjectResult>.Failure(
@@ -91,9 +94,7 @@ public sealed class CreateBlueprintProjectCommand
         var createdScenes = new List<RekallAgeCreatedBlueprintScene>();
         foreach (var requestedScene in requestedScenes)
         {
-            var scene = await new CreateSceneCommand().ExecuteAsync(
-                new CreateSceneRequest(request.ProjectRoot, requestedScene.Name, requestedScene.Capabilities),
-                context);
+            var scene = await EnsureSceneAsync(request.ProjectRoot, requestedScene, context);
             if (!scene.Ok)
             {
                 return RekallAgeCommandResult<CreateBlueprintProjectResult>.Failure(default!, scene.Summary, scene.Errors);
@@ -115,11 +116,84 @@ public sealed class CreateBlueprintProjectCommand
         }
 
         var first = createdScenes[0];
+        var reusedExistingDocuments = !context.Transaction.ChangedResources.Contains(
+            project.Value.ManifestPath,
+            StringComparer.OrdinalIgnoreCase);
         return RekallAgeCommandResult<CreateBlueprintProjectResult>.Success(
             new CreateBlueprintProjectResult(project.Value, first.Scene, first.Blueprint)
             {
                 Scenes = createdScenes
             },
-            $"Created project '{request.ProjectName}' with {createdScenes.Count} scene(s) and {requestedScenes.Sum(scene => scene.Entities.Count)} generic blueprint entities.");
+            $"{(reusedExistingDocuments ? "Updated existing" : "Created")} project '{project.Value.Manifest.Name}' with {createdScenes.Count} scene(s) and {requestedScenes.Sum(scene => scene.Entities.Count)} generic blueprint entities.");
     }
+
+    private async ValueTask<RekallAgeCommandResult<CreateProjectResult>> EnsureProjectAsync(
+        CreateBlueprintProjectRequest request,
+        RekallAgeCommandContext context)
+    {
+        var manifestPath = Path.Combine(request.ProjectRoot, RekallAgeProjectStore.ManifestFileName);
+        if (!File.Exists(manifestPath))
+        {
+            return await new CreateProjectCommand().ExecuteAsync(
+                new CreateProjectRequest(request.ProjectRoot, request.ProjectName, request.ProjectCapabilities),
+                context);
+        }
+
+        var manifest = await _projectStore.LoadAsync(request.ProjectRoot, context.CancellationToken);
+        var missingCapabilities = MissingCapabilities(request.ProjectCapabilities, manifest.Capabilities);
+        if (missingCapabilities.Length > 0)
+        {
+            return RekallAgeCommandResult<CreateProjectResult>.Failure(
+                new CreateProjectResult(manifestPath, manifest),
+                "The existing project is missing capabilities required by the supplied blueprint.",
+                [new RekallAgeCommandError(
+                    "REKALL_BLUEPRINT_PROJECT_CAPABILITY_MISSING",
+                    $"Existing project requires capabilities: {string.Join(", ", missingCapabilities)}.",
+                    manifestPath)]);
+        }
+
+        return RekallAgeCommandResult<CreateProjectResult>.Success(
+            new CreateProjectResult(manifestPath, manifest),
+            $"Using existing Rekall AGE project '{manifest.Name}'.");
+    }
+
+    private async ValueTask<RekallAgeCommandResult<CreateSceneResult>> EnsureSceneAsync(
+        string projectRoot,
+        RekallAgeProjectBlueprintScene requestedScene,
+        RekallAgeCommandContext context)
+    {
+        var scenePath = _sceneStore.GetScenePath(projectRoot, requestedScene.Name);
+        if (!File.Exists(scenePath))
+        {
+            return await new CreateSceneCommand().ExecuteAsync(
+                new CreateSceneRequest(projectRoot, requestedScene.Name, requestedScene.Capabilities),
+                context);
+        }
+
+        var scene = await _sceneStore.LoadAsync(projectRoot, requestedScene.Name, context.CancellationToken);
+        var missingCapabilities = MissingCapabilities(requestedScene.Capabilities, scene.Capabilities);
+        if (missingCapabilities.Length > 0)
+        {
+            return RekallAgeCommandResult<CreateSceneResult>.Failure(
+                new CreateSceneResult(scenePath, scene),
+                $"The existing scene '{scene.Name}' is missing capabilities required by the supplied blueprint.",
+                [new RekallAgeCommandError(
+                    "REKALL_BLUEPRINT_SCENE_CAPABILITY_MISSING",
+                    $"Existing scene requires capabilities: {string.Join(", ", missingCapabilities)}.",
+                    scenePath)]);
+        }
+
+        return RekallAgeCommandResult<CreateSceneResult>.Success(
+            new CreateSceneResult(scenePath, scene),
+            $"Using existing scene '{scene.Name}'.");
+    }
+
+    private static string[] MissingCapabilities(
+        IEnumerable<string> requested,
+        IReadOnlyList<string> available) =>
+        requested
+            .Where(required => !available.Contains(required, StringComparer.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(capability => capability, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 }

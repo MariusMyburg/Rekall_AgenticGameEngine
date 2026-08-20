@@ -148,6 +148,34 @@ public sealed class ModuleMetadataTests
     }
 
     [Fact]
+    public async Task ComponentSchemaSearchKeepsBuiltInsAvailableWhileAuthoredModuleNeedsRepair()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var moduleDirectory = Path.Combine(root, "Modules", "BrokenModule");
+        Directory.CreateDirectory(moduleDirectory);
+        await File.WriteAllTextAsync(
+            Path.Combine(moduleDirectory, "BrokenModule.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+        var command = new SearchComponentSchemasCommand(typeof(RekallAgeBuiltInModule).Assembly);
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("search while repairing module"),
+            CancellationToken.None);
+
+        var result = await command.ExecuteAsync(
+            new SearchComponentSchemasRequest("camera transform visible", root, 24),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.False(result.Value.ProjectSchemasComplete);
+        Assert.Contains(
+            result.Value.Diagnostics,
+            diagnostic => diagnostic.Code == "REKALL_MODULE_RECEIPT_MISSING");
+        Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Camera3D");
+        Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Transform3D");
+    }
+
+    [Fact]
     public void BuiltInModuleProvidesCoreSchemas()
     {
         var index = RekallAgeModuleIndexer.IndexAssembly(typeof(RekallAgeBuiltInModule).Assembly);

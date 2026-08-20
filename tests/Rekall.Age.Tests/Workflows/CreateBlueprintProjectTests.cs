@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
+using Rekall.Age.Project.Commands;
 using Rekall.Age.Workflows.Commands;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
@@ -111,6 +112,80 @@ public sealed class CreateBlueprintProjectTests
         var store = new RekallAgeSceneStore();
         Assert.Empty((await store.LoadAsync(root, "Main", CancellationToken.None)).Entities);
         Assert.Empty((await store.LoadAsync(root, "Physics2D", CancellationToken.None)).Entities);
+    }
+
+    [Fact]
+    public async Task ReusesCompatibleExistingStudioProjectAndScene()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var setup = new RekallAgeCommandContext(
+            "studio",
+            RekallAgeTransaction.Begin("open project"),
+            CancellationToken.None);
+        await new CreateProjectCommand().ExecuteAsync(
+            new CreateProjectRequest(root, "Studio Project", ["world", "ui"]),
+            setup);
+        await new CreateSceneCommand().ExecuteAsync(
+            new CreateSceneRequest(root, "Main", ["world", "ui"]),
+            setup);
+
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("author open project"),
+            CancellationToken.None);
+        var result = await new CreateBlueprintProjectCommand().ExecuteAsync(
+            new CreateBlueprintProjectRequest(
+                root,
+                "Studio Project",
+                ["world", "ui"],
+                "Main",
+                ["world", "ui"],
+                [new RekallAgeSceneBlueprintEntity("HUD", ["ui"], [])]),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains("existing", result.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("HUD", Assert.Single(
+            (await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None)).Entities).Name);
+        Assert.DoesNotContain(
+            context.Transaction.ChangedResources,
+            path => path.EndsWith("rekall.project.json", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task RejectsExistingProjectOrSceneMissingRequestedCapabilitiesWithoutRewritingThem()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var setup = new RekallAgeCommandContext(
+            "studio",
+            RekallAgeTransaction.Begin("open limited project"),
+            CancellationToken.None);
+        await new CreateProjectCommand().ExecuteAsync(
+            new CreateProjectRequest(root, "Limited Project", ["world"]),
+            setup);
+        await new CreateSceneCommand().ExecuteAsync(
+            new CreateSceneRequest(root, "Main", ["world"]),
+            setup);
+
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("reject incompatible project"),
+            CancellationToken.None);
+        var result = await new CreateBlueprintProjectCommand().ExecuteAsync(
+            new CreateBlueprintProjectRequest(
+                root,
+                "Limited Project",
+                ["world", "ui"],
+                "Main",
+                ["world", "ui"],
+                [new RekallAgeSceneBlueprintEntity("HUD")]),
+            context);
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, error => error.Code == "REKALL_BLUEPRINT_PROJECT_CAPABILITY_MISSING");
+        Assert.Empty(context.Transaction.ChangedResources);
+        var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        Assert.Empty(scene.Entities);
     }
 
     [Fact]

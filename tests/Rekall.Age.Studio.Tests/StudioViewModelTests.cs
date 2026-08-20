@@ -19,13 +19,17 @@ public sealed class StudioViewModelTests
                 "--scene", "Main",
                 "--model", "model",
                 "--task", "Author a game",
-                "--evidence", "evidence.json"
+                "--evidence", "evidence.json",
+                "--max-turns", "40",
+                "--require-task-specific-completion"
             ],
             out var options,
             out var error);
 
         Assert.True(parsed, error);
         Assert.Equal("game", options!.ProjectRoot);
+        Assert.False(options.TreatGauntletAsTerminalSuccess);
+        Assert.Equal(40, options.MaxTurns);
         Assert.False(RekallAgeStudioAutomation.TryParse(
             [RekallAgeStudioAutomation.AutomationSwitch, "--project", "game"],
             out _, out var missing));
@@ -46,8 +50,36 @@ public sealed class StudioViewModelTests
 
             Assert.True(result.Succeeded, result.Status + Environment.NewLine + string.Join(Environment.NewLine, result.AgentTranscript));
             Assert.True(result.NonblankViewport);
+            Assert.True(result.ViewportRenderableCount > 0);
             Assert.True(File.Exists(result.PackageArchivePath));
             Assert.True(File.Exists(evidence));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            var evidenceRoot = Path.GetDirectoryName(evidence)!;
+            if (Directory.Exists(evidenceRoot)) Directory.Delete(evidenceRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task HeadlessAutomationDoesNotCallAnEmptyDebugFrameNonblank()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-empty-" + Guid.NewGuid().ToString("N"));
+        var evidence = Path.Combine(root + "-evidence", "studio-agent.json");
+        try
+        {
+            var result = await RekallAgeStudioAutomation.RunAsync(
+                new RekallAgeStudioAutomationOptions(root, "Empty", "Main", "deterministic", "Inspect only.", evidence)
+                {
+                    TreatGauntletAsTerminalSuccess = false,
+                    MaxTurns = 2
+                },
+                new EmptyModel(),
+                CancellationToken.None);
+
+            Assert.Equal(0, result.ViewportRenderableCount);
+            Assert.False(result.NonblankViewport);
         }
         finally
         {
@@ -134,5 +166,25 @@ public sealed class StudioViewModelTests
                 "tool_calls",
                 new RekallAgeLanguageModelUsage(100, 10, 1)));
         }
+    }
+
+    private sealed class EmptyModel : IRekallAgeLanguageModelClient
+    {
+        public string ProviderId => "deterministic";
+
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([]);
+
+        public ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new RekallAgeLanguageModelResponse(
+                ProviderId,
+                request.Model,
+                "No content authored.",
+                string.Empty,
+                [],
+                "stop",
+                new RekallAgeLanguageModelUsage(1, 1, 1)));
     }
 }

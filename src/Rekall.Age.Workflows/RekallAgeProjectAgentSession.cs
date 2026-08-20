@@ -16,6 +16,7 @@ public sealed record RekallAgeProjectAgentSessionRequest(
     public string? Think { get; init; } = "medium";
     public double? Temperature { get; init; }
     public bool RequireCompletionAudit { get; init; } = true;
+    public bool TreatGauntletAsTerminalSuccess { get; init; }
 }
 
 public sealed record RekallAgeProjectAgentSessionResult(
@@ -74,15 +75,24 @@ public sealed class RekallAgeProjectAgentSession
                 Temperature = request.Temperature,
                 RequireCompletionAudit = request.RequireCompletionAudit,
                 Progress = progress,
-                TerminalSuccessTools = new HashSet<string>(
-                    ["rekall.workflow.agent_authoring_gauntlet"],
-                    StringComparer.Ordinal)
+                TerminalSuccessTools = request.TreatGauntletAsTerminalSuccess
+                    ? new HashSet<string>(["rekall.workflow.agent_authoring_gauntlet"], StringComparer.Ordinal)
+                    : new HashSet<string>(StringComparer.Ordinal)
             },
             cancellationToken);
         var failedTools = result.ToolExecutions.Count(execution => !execution.Succeeded);
-        var succeeded = result.Completed && failedTools == 0;
+        var securityBoundaryFailures = result.ToolExecutions.Count(execution =>
+            !execution.Succeeded
+            && execution.ResultPreview.Contains(
+                "REKALL_AGENT_PROJECT_SCOPE_VIOLATION",
+                StringComparison.Ordinal));
+        var succeeded = result.Completed
+            && securityBoundaryFailures == 0
+            && (request.RequireCompletionAudit || failedTools == 0);
         var summary = succeeded
-            ? $"AI authoring completed in {result.Turns} turns with {result.ToolCallCount} tool calls."
+            ? failedTools == 0
+                ? $"AI authoring completed in {result.Turns} turns with {result.ToolCallCount} tool calls."
+                : $"AI authoring completed its evidence audit after recovering from {failedTools} failed tool call{(failedTools == 1 ? string.Empty : "s")}."
             : result.Completed
                 ? $"AI authoring stopped with {failedTools} failed tool call{(failedTools == 1 ? string.Empty : "s")}."
                 : $"AI authoring stopped: {result.StopReason}.";

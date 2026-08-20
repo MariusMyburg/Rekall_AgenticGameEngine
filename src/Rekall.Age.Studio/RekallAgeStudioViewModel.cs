@@ -59,7 +59,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _viewportTitle = "Viewport";
     private string _viewportSummary = "No rendered frame yet.";
     private BitmapImage? _viewportImage;
+    private int _viewportRenderableCount;
     private RekallAgeWorkbenchModel? _currentModel;
+    internal bool TreatGauntletAsTerminalSuccess { get; set; }
+
+    internal int AgentMaxTurns { get; set; } = 36;
 
     public RekallAgeStudioViewModel()
         : this(new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()), null)
@@ -258,6 +262,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         get => _viewportImage;
         private set => Set(ref _viewportImage, value);
+    }
+
+    public int ViewportRenderableCount
+    {
+        get => _viewportRenderableCount;
+        private set => Set(ref _viewportRenderableCount, value);
     }
 
     public bool IsBusy
@@ -515,8 +525,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                     SelectedOllamaModel,
                     AgentTaskInput)
                 {
-                    MaxTurns = 24,
-                    RequireCompletionAudit = true
+                    MaxTurns = AgentMaxTurns,
+                    RequireCompletionAudit = true,
+                    TreatGauntletAsTerminalSuccess = TreatGauntletAsTerminalSuccess
                 },
                 progress,
                 cancellationToken);
@@ -606,6 +617,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (result.Ok && result.Value is CaptureRuntimeViewportResult capture && capture.Captured)
         {
             ViewportImage = LoadBitmap(capture.ScreenshotPath);
+            ViewportRenderableCount = capture.RenderableCount;
             ViewportSummary = $"{capture.Width}×{capture.Height} · frame {capture.FrameIndex} · {capture.RenderableCount} renderables";
         }
         return result;
@@ -716,6 +728,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         Replace(RuntimeObservationLines, model.Runtime.Observations.Select(observation =>
             $"{observation.Severity}: {observation.Code} - {observation.Message}"));
         ViewportTitle = $"{model.Scene.Name} Viewport";
+        ViewportRenderableCount = model.Runtime.RenderableCount;
         if (ViewportImage is null)
         {
             ViewportSummary = $"Camera {model.Runtime.ActiveCameraName ?? "none"} · {model.Runtime.RenderableCount} renderables";

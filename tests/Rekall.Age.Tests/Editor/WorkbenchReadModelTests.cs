@@ -12,6 +12,30 @@ namespace Rekall.Age.Tests.Editor;
 public sealed class WorkbenchReadModelTests
 {
     [Fact]
+    public async Task WorkbenchRemainsInspectableWhenAnAuthoredModuleNeedsRepair()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Repairable", ["world", "modules"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"]),
+            CancellationToken.None);
+        var moduleRoot = Path.Combine(root, "Modules", "BrokenModule");
+        Directory.CreateDirectory(moduleRoot);
+        await File.WriteAllTextAsync(
+            Path.Combine(moduleRoot, "BrokenModule.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+
+        var model = await new RekallAgeWorkbenchModelBuilder().BuildAsync(root, "Main", CancellationToken.None);
+
+        Assert.Contains(model.Inspector.AvailableComponents, component => component.Type == "Rekall.Transform3D");
+        Assert.Contains(model.Diagnostics.Issues, issue => issue.Code == "REKALL_MODULE_RECEIPT_MISSING" && issue.Severity == "blocking");
+    }
+
+    [Fact]
     public async Task WorkbenchModelUsesStableIdsAndInspectorProperties()
     {
         var root = TestPaths.CreateTempDirectory();

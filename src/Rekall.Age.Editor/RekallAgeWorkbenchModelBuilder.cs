@@ -5,6 +5,7 @@ using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor.Contracts;
 using Rekall.Age.Modules;
 using Rekall.Age.Modules.BuiltIns;
+using Rekall.Age.Modules.Security;
 using Rekall.Age.Project;
 using Rekall.Age.Runtime;
 using Rekall.Age.Runtime.Abstractions;
@@ -58,10 +59,39 @@ public sealed class RekallAgeWorkbenchModelBuilder
                 new RekallAgeRuntimeWorldBuilder(),
                 RekallAgeRuntimeExecutionLoop.CreateDefault())
             .InspectSceneAsync(projectRoot, activeSceneName, 0, cancellationToken);
-        var componentSchemas = RekallAgeModuleIndexer.IndexAssemblies(
-                new[] { typeof(RekallAgeBuiltInModule).Assembly }
-                    .Concat(RekallAgeProjectModuleAssemblyLoader.LoadBuiltModuleAssemblies(projectRoot)))
-            .Components;
+        RekallAgeModuleTrustException? moduleSchemaIssue = null;
+        IReadOnlyList<RekallAgeComponentSchema> componentSchemas;
+        try
+        {
+            componentSchemas = RekallAgeModuleIndexer.IndexAssemblies(
+                    new[] { typeof(RekallAgeBuiltInModule).Assembly }
+                        .Concat(RekallAgeProjectModuleAssemblyLoader.LoadBuiltModuleAssemblies(projectRoot)))
+                .Components;
+        }
+        catch (RekallAgeModuleTrustException exception)
+        {
+            moduleSchemaIssue = exception;
+            componentSchemas = RekallAgeModuleIndexer.IndexAssembly(typeof(RekallAgeBuiltInModule).Assembly).Components;
+        }
+        var validationIssues = validation.Issues
+            .Select(issue => new RekallAgeValidationPanelIssue(
+                issue.Code,
+                issue.Severity,
+                issue.Message,
+                issue.Target ?? string.Empty,
+                (issue.SuggestedCommands ?? Array.Empty<RekallAgeSuggestedCommand>())
+                    .Select(command => command.Tool)
+                    .ToArray()))
+            .ToList();
+        if (moduleSchemaIssue is not null)
+        {
+            validationIssues.Add(new RekallAgeValidationPanelIssue(
+                moduleSchemaIssue.Code,
+                "blocking",
+                moduleSchemaIssue.Message,
+                moduleSchemaIssue.Target,
+                ["rekall.build.modules", "rekall.module.read_source"]));
+        }
 
         return new RekallAgeWorkbenchModel(
             new RekallAgeProjectTreeModel(
@@ -88,16 +118,7 @@ public sealed class RekallAgeWorkbenchModelBuilder
                         asset.ContentHash))
                     .ToArray()),
             new RekallAgeValidationPanelModel(
-                validation.Issues
-                    .Select(issue => new RekallAgeValidationPanelIssue(
-                        issue.Code,
-                        issue.Severity,
-                        issue.Message,
-                        issue.Target ?? string.Empty,
-                        (issue.SuggestedCommands ?? Array.Empty<RekallAgeSuggestedCommand>())
-                            .Select(command => command.Tool)
-                            .ToArray()))
-                    .ToArray()),
+                validationIssues),
             new RekallAgeTransactionPanelModel(
                 transactions.Transactions
                     .Select(transaction => new RekallAgeTransactionPanelItem(

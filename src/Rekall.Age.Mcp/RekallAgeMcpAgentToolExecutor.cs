@@ -158,6 +158,7 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
             .Take(Math.Min(maxResults, Math.Max(0, 24 - _exposedTools!.Count)))
             .Select(item => item.Tool)
             .ToArray();
+        _exposedTools.UnionWith(matches.Select(tool => tool.Name));
         return new JsonObject
         {
             ["ok"] = true,
@@ -169,7 +170,7 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
                 ["description"] = tool.Description,
                 ["parameters"] = tool.Parameters.DeepClone()
             }).ToArray()),
-            ["instruction"] = "Call rekall.tools.execute with an exact matched name and arguments conforming to its parameters schema."
+            ["instruction"] = "On the next turn, call the matched native tool directly with arguments conforming to its parameters schema. rekall.tools.execute remains available as a compatibility gateway."
         };
     }
 

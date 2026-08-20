@@ -48,7 +48,8 @@ public sealed class McpAgentToolExecutorTests
 
         Assert.True(result["ok"]!.GetValue<bool>());
         Assert.Contains("parameters", result["tools"]![0]!.AsObject());
-        Assert.Equal(3, executor.Tools.Count);
+        Assert.Contains(executor.Tools, tool => tool.Name == "rekall.project.create");
+        Assert.Contains("call the matched native tool directly", result["instruction"]!.GetValue<string>(), StringComparison.OrdinalIgnoreCase);
 
         var executed = await executor.ExecuteAsync(
             "rekall.tools.execute",

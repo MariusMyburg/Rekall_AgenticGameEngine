@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 16:19 Africa/Johannesburg
+Last verified: 2026-08-20 16:56 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: installed Studio-to-agent game creation
+Latest milestone: arbitrary-game authoring contract hardening
 
 ## Product objective
 
@@ -36,9 +36,9 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Debug verification: 840/840 tests pass after bounded project/scene
-  recovery inspection, explicit restore, quarantine, path confinement, and
-  agent/CLI/MCP exposure.
+- Current Debug verification: 902/902 engine tests and 4/4 Windows Studio
+  tests pass. The full solution builds with warnings treated as errors and
+  reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
   product. Shipped project/module workflows, the generic game-authoring
   gauntlet, packaging and clean relocation, package audit, nonblank capture,
@@ -121,6 +121,17 @@ Studio is important, but it does not define or reorder the engine foundation.
   `23DCEE33EF1F4D8B2D322833ED6DB9CD0C5316E3F0138BE7ED8D101EA80E0FDF`.
   The gauntlet now safely reuses a compatible open project/scene instead of
   failing with a false missing-revision conflict.
+- Arbitrary-game authoring hardening: task-specific Studio sessions no longer
+  accept the fixed gauntlet as terminal completion. The blueprint workflow
+  safely reuses compatible open project/scene documents and rejects missing
+  capabilities without rewriting them. Studio and agent schema discovery keep
+  built-ins inspectable while a project module needs repair, while low-level
+  module loading remains fail-closed. Tool search exposes matched native tools
+  on the next turn, the runtime-system scaffold documents exact semantic-input
+  and immutable-world SDK patterns, completion audits may accept repaired
+  non-security failures, and Studio automation discovers the actual produced
+  archive with a configurable bounded turn budget. Empty zero-renderable debug
+  frames no longer satisfy its nonblank viewport gate.
 - Agent authoring: both source and installed multi-subsystem benchmarks created
   and repaired UI, animation, and audio content using tool calls.
 - Runtime animation: generic clip playback, bounded Hermite interpolation,
@@ -909,6 +920,14 @@ Studio is important, but it does not define or reorder the engine foundation.
   real play/package/audit controls, and installed Studio-to-agent game creation
   are now present. The workbench is functional but not yet a finished
   professional editor.
+- The first task-specific `Prism Relay` Ollama benchmarks are not accepted.
+  They proved the corrected open-project blueprint path, native tool exposure,
+  a 960x540 capture path in one run, and successful module repair/build in
+  another, but `qwen3.5:35b` still exhausted 24, 36, and 48-turn budgets after
+  replacing compiling scaffolds with guessed SDK types or duplicate system
+  definitions. No run produced clean validation plus package audit. The next
+  engine contract is an exact, queryable runtime-SDK/source-topology surface;
+  the engine must not author game rules on the agent's behalf.
 
 ## Recently completed
 
@@ -968,14 +987,13 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The AI game-creation vertical slice is complete at its defined source and
-installed checkpoints. The paths prove a
-coherent route from an agent task through canonical tools to authored project
-files, validation, informative rendering, real play, packaging, clean
-relocation, and audit. The next product tranche is a broader installed
-AI-authored game benchmark spanning multiple arbitrary game descriptions and
-subsystems; measured failures will select the next generic engine contracts.
-Studio, embedded AI, MCP, and CLI must continue to consume the same contracts.
+The current item is the task-specific AI game-creation loop, selected from real
+`Prism Relay` benchmark failures. Implement a generic queryable runtime-module
+SDK and source-topology contract, expose exact signatures and compilable usage
+patterns through the same MCP catalog, add bounded source-repair diagnostics,
+then rerun the unchanged task until clean validation, informative capture,
+package, and audit all pass. Studio, embedded AI, MCP, and CLI must continue to
+consume the same contracts.
 
 AI game-creation Tasks 1-3 have a verified functional checkpoint. A new
 UI-independent workbench session creates projects
@@ -1434,11 +1452,11 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
-Compare the now-verified animation/renderer and revisioned-persistence
-foundations against the remaining corruption recovery, diagnostic-store, and
-full-trust module-isolation risks, then select the highest-leverage generic
-production-hardening tranche. Studio continues to follow proven engine
-contracts instead of reordering the foundation roadmap.
+After the queryable module-SDK/source-topology contract, rerun the unchanged
+task-specific benchmark. Use its next measured blocker to choose between
+bounded module source repair, scene-schema call ergonomics, or package/audit
+completion evidence. Do not return to broad subsystem or CI expansion until an
+arbitrary described game completes this loop.
 
 ## Evidence index
 

@@ -12,7 +12,12 @@ public sealed record RekallAgeStudioAutomationOptions(
     string SceneName,
     string Model,
     string Task,
-    string EvidencePath);
+    string EvidencePath)
+{
+    public bool TreatGauntletAsTerminalSuccess { get; init; } = true;
+
+    public int MaxTurns { get; init; } = 36;
+}
 
 public sealed record RekallAgeStudioAutomationResult(
     bool Succeeded,
@@ -21,6 +26,7 @@ public sealed record RekallAgeStudioAutomationResult(
     string SceneName,
     bool NonblankViewport,
     string ViewportSummary,
+    int ViewportRenderableCount,
     string PackageArchivePath,
     IReadOnlyList<string> Validation,
     IReadOnlyList<string> AgentTranscript);
@@ -54,6 +60,7 @@ public static class RekallAgeStudioAutomation
         var model = Read("--model");
         var task = Read("--task");
         var evidencePath = Read("--evidence");
+        var maxTurnsText = Read("--max-turns");
         var missing = new[]
         {
             ("--project", projectRoot),
@@ -68,8 +75,20 @@ public static class RekallAgeStudioAutomation
             return false;
         }
 
+        var maxTurns = 36;
+        if (maxTurnsText is not null
+            && (!int.TryParse(maxTurnsText, out maxTurns) || maxTurns is < 1 or > 64))
+        {
+            error = "--max-turns must be an integer from 1 through 64.";
+            return false;
+        }
+
         options = new RekallAgeStudioAutomationOptions(
-            projectRoot!, projectName!, sceneName, model!, task!, evidencePath!);
+            projectRoot!, projectName!, sceneName, model!, task!, evidencePath!)
+        {
+            TreatGauntletAsTerminalSuccess = !arguments.Contains("--require-task-specific-completion", StringComparer.Ordinal),
+            MaxTurns = maxTurns
+        };
         return true;
     }
 
@@ -90,23 +109,28 @@ public static class RekallAgeStudioAutomation
         viewModel.SceneNameInput = options.SceneName;
         viewModel.SelectedOllamaModel = options.Model;
         viewModel.AgentTaskInput = options.Task;
+        viewModel.TreatGauntletAsTerminalSuccess = options.TreatGauntletAsTerminalSuccess;
+        viewModel.AgentMaxTurns = options.MaxTurns;
 
         await ((RekallAgeAsyncCommand)viewModel.CreateCommand).ExecuteAsync(null);
         cancellationToken.ThrowIfCancellationRequested();
         await ((RekallAgeAsyncCommand)viewModel.RunAgentCommand).ExecuteAsync(null);
 
-        var packageArchivePath = Path.Combine(projectRoot, "Builds", "AgentAuthoringGauntlet.zip");
-        var nonblankViewport = viewModel.ViewportImage is { PixelWidth: > 0, PixelHeight: > 0 };
+        var packageArchivePath = ResolvePackageArchivePath(projectRoot);
+        var nonblankViewport = viewModel.ViewportImage is { PixelWidth: > 0, PixelHeight: > 0 }
+            && viewModel.ViewportRenderableCount > 0;
         var result = new RekallAgeStudioAutomationResult(
             viewModel.StatusText.StartsWith("AI authoring completed", StringComparison.Ordinal)
                 && nonblankViewport
+                && packageArchivePath is not null
                 && File.Exists(packageArchivePath),
             viewModel.StatusText,
             projectRoot,
             options.SceneName,
             nonblankViewport,
             viewModel.ViewportSummary,
-            packageArchivePath,
+            viewModel.ViewportRenderableCount,
+            packageArchivePath ?? string.Empty,
             viewModel.ValidationLines.ToArray(),
             viewModel.AgentLines.ToArray());
 
@@ -127,6 +151,15 @@ public static class RekallAgeStudioAutomation
             if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
         }
         return result;
+    }
+
+    private static string? ResolvePackageArchivePath(string projectRoot)
+    {
+        var builds = Path.Combine(projectRoot, "Builds");
+        if (!Directory.Exists(builds)) return null;
+        return Directory.EnumerateFiles(builds, "*.zip", SearchOption.TopDirectoryOnly)
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
     }
 }
 

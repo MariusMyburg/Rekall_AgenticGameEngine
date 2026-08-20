@@ -1,12 +1,18 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Modules.Security;
 
 namespace Rekall.Age.Modules.Commands;
 
 public sealed record SearchComponentSchemasRequest(string Query, string? ProjectRoot = null, int Limit = 12);
 
-public sealed record SearchComponentSchemasResult(IReadOnlyList<RekallAgeCompactComponentSchema> Components);
+public sealed record SearchComponentSchemasResult(IReadOnlyList<RekallAgeCompactComponentSchema> Components)
+{
+    public bool ProjectSchemasComplete { get; init; } = true;
+
+    public IReadOnlyList<RekallAgeCommandError> Diagnostics { get; init; } = [];
+}
 
 public sealed record RekallAgeCompactComponentSchema(
     string TypeName,
@@ -74,9 +80,21 @@ public sealed class SearchComponentSchemasCommand
                 [error]);
         }
 
-        var listed = await new ListComponentSchemasCommand(_assemblies).ExecuteAsync(
-            new ListComponentSchemasRequest(ProjectRoot: request.ProjectRoot),
-            context);
+        RekallAgeModuleTrustException? projectModuleIssue = null;
+        RekallAgeCommandResult<ListComponentSchemasResult> listed;
+        try
+        {
+            listed = await new ListComponentSchemasCommand(_assemblies).ExecuteAsync(
+                new ListComponentSchemasRequest(ProjectRoot: request.ProjectRoot),
+                context);
+        }
+        catch (RekallAgeModuleTrustException exception)
+        {
+            projectModuleIssue = exception;
+            listed = await new ListComponentSchemasCommand(_assemblies).ExecuteAsync(
+                new ListComponentSchemasRequest(),
+                context);
+        }
         if (!listed.Ok)
         {
             return RekallAgeCommandResult<SearchComponentSchemasResult>.Failure(
@@ -110,8 +128,23 @@ public sealed class SearchComponentSchemasCommand
             .Select(item => Compact(item.Component))
             .ToArray();
         return RekallAgeCommandResult<SearchComponentSchemasResult>.Success(
-            new SearchComponentSchemasResult(matches),
-            $"Found {matches.Length} component schemas for '{request.Query}'.");
+            new SearchComponentSchemasResult(matches)
+            {
+                ProjectSchemasComplete = projectModuleIssue is null,
+                Diagnostics = projectModuleIssue is null
+                    ? []
+                    : [new RekallAgeCommandError(
+                        projectModuleIssue.Code,
+                        projectModuleIssue.Message,
+                        projectModuleIssue.Target,
+                        [new RekallAgeSuggestedCommand("rekall.build.modules", new Dictionary<string, object?>
+                        {
+                            ["projectRoot"] = request.ProjectRoot
+                        })])]
+            },
+            projectModuleIssue is null
+                ? $"Found {matches.Length} component schemas for '{request.Query}'."
+                : $"Found {matches.Length} available component schemas for '{request.Query}'; project module schemas need repair.");
     }
 
     private static int RequestedNameScore(RekallAgeComponentSchema component, IReadOnlyList<string> terms)

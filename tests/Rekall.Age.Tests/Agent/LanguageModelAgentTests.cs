@@ -27,14 +27,17 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("exact tool is rekall.module.search_component_schemas", prompt, StringComparison.Ordinal);
         Assert.Contains("do not call it more than once", prompt, StringComparison.Ordinal);
         Assert.Contains("every requested visible dynamic body has a renderer", prompt, StringComparison.Ordinal);
-        Assert.Contains("scaffold the required playable module before the first packaging call", prompt, StringComparison.Ordinal);
+        Assert.Contains("scaffold the required module before the first packaging call", prompt, StringComparison.Ordinal);
+        Assert.Contains("rekall.module.scaffold_runtime_system", prompt, StringComparison.Ordinal);
+        Assert.Contains("Do not replace its compilable SDK types", prompt, StringComparison.Ordinal);
+        Assert.Contains("not a substitute for world gameplay", prompt, StringComparison.Ordinal);
         Assert.Contains("rekall.validation.repair_project", prompt, StringComparison.Ordinal);
         Assert.Contains("immediately after the first complete scene authoring", prompt, StringComparison.Ordinal);
         Assert.Contains("never add new entities merely to exercise validation", prompt, StringComparison.Ordinal);
         Assert.Contains("retry once with the same named scenes and empty entities arrays", prompt, StringComparison.Ordinal);
         Assert.Contains("Never repeat substantially the same failed blueprint arguments", prompt, StringComparison.Ordinal);
         Assert.True(
-            prompt.IndexOf("scaffold the required playable module", StringComparison.Ordinal)
+            prompt.IndexOf("scaffold the required module", StringComparison.Ordinal)
             < prompt.IndexOf("first packaging call", StringComparison.Ordinal));
     }
 

@@ -27,7 +27,7 @@ public sealed class ScaffoldRuntimeSystemModuleCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Scaffolds a C# module with an editable component and runtime system.",
+        "Scaffolds a compilable agent-owned C# component and IRekallAgeRuntimeModuleSystem. Exact compact shape: {\"projectRoot\":\"...\",\"moduleId\":\"game.rules\",\"displayName\":\"Game Rules\",\"moduleName\":\"GameRules\",\"componentName\":\"GameState\",\"systemName\":\"GameRulesSystem\"}. After scaffolding, call rekall.module.read_source and preserve its real SDK types/helpers while making targeted edits, then call rekall.module.write_source and rekall.build.modules.",
         typeof(ScaffoldRuntimeSystemModuleRequest).FullName!,
         typeof(ScaffoldRuntimeSystemModuleResult).FullName!);
 
@@ -121,6 +121,14 @@ public sealed class ScaffoldRuntimeSystemModuleCommand
         source.AppendLine("    {");
         source.AppendLine($"        var componentType = \"{namespaceName}.{componentClass}\";");
         source.AppendLine("        var seconds = context.DeltaTime.TotalSeconds;");
+        source.AppendLine();
+        source.AppendLine("        // Generic SDK patterns for agent-authored rules:");
+        source.AppendLine("        // var axis = world.InputActionValue(\"agent.authored.axis\");");
+        source.AppendLine("        // var held = world.IsInputActionDown(\"agent.authored.action\");");
+        source.AppendLine("        // var pressed = world.WasInputActionPressed(\"agent.authored.reset\");");
+        source.AppendLine("        // Runtime vectors are immutable records: create new RekallAgeRuntimeVector3(x, y, z).");
+        source.AppendLine("        // world = world.UpdateEntity(entity.Id, current => current.WithPosition3D(position));");
+        source.AppendLine("        // entity.UpdateComponent(componentType, properties => { properties[\"value\"] = 1; return properties; });");
         source.AppendLine("        var entities = world.Entities.Select(entity =>");
         source.AppendLine("        {");
         source.AppendLine("            var component = entity.FindComponent(componentType);");

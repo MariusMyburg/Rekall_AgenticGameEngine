@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 19:54 Africa/Johannesburg
+Last verified: 2026-08-20 20:10 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: gameplay checkpoints now require meaningful state transitions
+Latest milestone: gameplay checkpoints preserve prerequisite authoring access
 
 ## Product objective
 
@@ -36,7 +36,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Release verification: 919/919 engine tests and 6/6 Windows Studio
+- Current Release verification: 920/920 engine tests and 6/6 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -984,8 +984,31 @@ Studio is important, but it does not define or reorder the engine foundation.
   `05D7AF9CEF33B0385EB9D94BEF3CDE3A430A6EA3D10D1343E7F7F17F12AA500E`;
   the benchmark product archive SHA-256 is
   `61935BAB1D47E86B11DDEC303BCB4C1EE649C39D59BCFF2818C4BF633439CD43`.
+- Fresh arbitrary-game benchmark 7 used real local Ollama `qwen3.5:35b`
+  against the self-contained product built from commit `5137685`; its
+  200,956,173-byte archive SHA-256 is
+  `E05F83A8A6852C6BE4A0970B8BF20A0EA6C2EF903E961FBF2D9D5B9166C1E0E1`.
+  It exposed an orchestration deadlock rather than a gameplay pass. The model
+  compiled `GameRules` before populating the scene, so the immediate checkpoint
+  correctly required attached state and a transition but incorrectly deferred
+  `create_blueprint_project`, `scene.apply_blueprint`, and component discovery.
+  The scene remained empty, all 64 turns were exhausted, and no package was
+  produced. This is retained as failure evidence with SHA-256
+  `65A805689F53C13E81DA2ED32184606B7B73F7E4E3A7B476889210E80CA260DE`.
 
 ## Recently completed
+
+Benchmark 7's deadlock is now covered by a generic checkpoint-preparation
+contract. After a successful runtime build, the agent may still use bounded
+tool discovery, project/scene summaries, blueprint/scene/entity/component
+authoring, exact component/SDK discovery, module source inspection/repair, and
+module build operations needed to construct executable evidence. Validation,
+capture, package, audit, and other delivery work remain deferred until a
+qualifying runtime inspection executes. Focused TDD proves prerequisite scene
+authoring executes while premature packaging does not. The complete Release
+engine suite passes 920/920, Studio passes 6/6, and the warning-as-error
+solution build reports zero warnings and zero errors. Fresh Benchmark 8 is the
+next real-Ollama gate.
 
 Benchmark 6's false-positive assertion path is now a generic executable
 coverage contract. The first gameplay checkpoint requires a non-empty input
@@ -1192,7 +1215,7 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 ## In progress
 
 The current item remains the actual AI game-creation loop. Assemble fresh
-binaries containing the meaningful-transition checkpoint and run Benchmark 7
+binaries containing the prerequisite-authoring checkpoint fix and run Benchmark 8
 through real local Ollama, then independently inspect its scene, source, input
 projection, and runtime transitions. Require clean validation, informative
 capture, compiled agent-authored behavior, a playable relocated package, and a

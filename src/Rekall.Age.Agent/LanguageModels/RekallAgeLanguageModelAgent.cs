@@ -193,8 +193,7 @@ public sealed class RekallAgeLanguageModelAgent(
                 JsonNode output;
                 if (request.RequireRuntimeBehaviorAssertions
                     && RequiresImmediateRuntimeCheckpoint(toolExecutions)
-                    && (!call.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
-                        || !HasRuntimeCheckpointCoverage(call.Arguments)))
+                    && ShouldDeferUntilRuntimeCheckpoint(call))
                 {
                     output = RuntimeCheckpointRequired(call);
                 }
@@ -402,6 +401,32 @@ public sealed class RekallAgeLanguageModelAgent(
             ["instruction"] = "Call rekall.runtime.inspect_scene now with a non-empty inputs array, a component/exists assertion for an attached Game.* component, and a transition assertion: a transform delta greater-than 0 or less-than 0, delta.component.property on Game.* strictly compared with 0, or changed.component.property on Game.* equals true. Do not weaken a failed transition assertion. A failed qualifying assertion opens targeted repair work; unrelated discovery, validation, polish, capture, and packaging remain deferred until this checkpoint executes."
         };
     }
+
+    private static bool ShouldDeferUntilRuntimeCheckpoint(RekallAgeLanguageModelToolCall call)
+    {
+        if (call.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal))
+        {
+            return !HasRuntimeCheckpointCoverage(call.Arguments);
+        }
+
+        return !IsRuntimeCheckpointPreparationTool(call.Name);
+    }
+
+    private static bool IsRuntimeCheckpointPreparationTool(string toolName) =>
+        toolName.Equals("rekall.tools.search", StringComparison.Ordinal)
+        || toolName.Equals("rekall.context.project_summary", StringComparison.Ordinal)
+        || toolName.Equals("rekall.context.scene_summary", StringComparison.Ordinal)
+        || toolName.Equals("rekall.workflow.create_blueprint_project", StringComparison.Ordinal)
+        || toolName.StartsWith("rekall.scene.", StringComparison.Ordinal)
+        || toolName.StartsWith("rekall.entity.", StringComparison.Ordinal)
+        || toolName.StartsWith("rekall.component.", StringComparison.Ordinal)
+        || toolName.Equals("rekall.module.search_component_schemas", StringComparison.Ordinal)
+        || toolName.Equals("rekall.module.component_schemas", StringComparison.Ordinal)
+        || toolName.Equals("rekall.module.inspect_runtime_sdk", StringComparison.Ordinal)
+        || toolName.Equals("rekall.module.list_sources", StringComparison.Ordinal)
+        || toolName.Equals("rekall.module.read_source", StringComparison.Ordinal)
+        || toolName.Equals("rekall.module.write_source", StringComparison.Ordinal)
+        || toolName.Equals("rekall.build.modules", StringComparison.Ordinal);
 
     private static bool RequiresFreshRuntimeBehaviorAssertions(
         IReadOnlyList<RekallAgeLanguageModelToolExecution> executions,

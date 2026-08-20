@@ -412,6 +412,52 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task RuntimeCheckpointAllowsSceneAuthoringNeededToCreateItsEvidence()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.scene.apply_blueprint", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.workflow.package_playable_game", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", MeaningfulRuntimeCheckpointArguments())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Gameplay is proven.", "", [], "stop", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+        var agent = new RekallAgeLanguageModelAgent(model, tools);
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 6,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Contains(tools.Executions, execution => execution.Name == "rekall.scene.apply_blueprint");
+        Assert.DoesNotContain(tools.Executions, execution => execution.Name == "rekall.workflow.package_playable_game");
+        Assert.Contains(result.ToolExecutions, execution =>
+            execution.Name == "rekall.workflow.package_playable_game"
+            && !execution.Succeeded
+            && execution.ResultPreview.Contains("REKALL_RUNTIME_CHECKPOINT_REQUIRED", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task RuntimeCheckpointRejectsExistenceOnlyAssertionsAsInsufficientCoverage()
     {
         var model = new ScriptedModelClient(
@@ -501,6 +547,26 @@ public sealed class LanguageModelAgentTests
             && !execution.Succeeded
             && execution.ResultPreview.Contains("REKALL_RUNTIME_CHECKPOINT_COVERAGE_REQUIRED", StringComparison.Ordinal)));
     }
+
+    private static JsonObject MeaningfulRuntimeCheckpointArguments() => new()
+    {
+        ["inputs"] = new JsonArray(new JsonObject { ["pressedKeys"] = new JsonArray("D") }),
+        ["assertions"] = new JsonArray(
+            new JsonObject
+            {
+                ["entityName"] = "Player",
+                ["subject"] = "component",
+                ["operator"] = "exists",
+                ["componentType"] = "Game.PlayerState"
+            },
+            new JsonObject
+            {
+                ["entityName"] = "Player",
+                ["subject"] = "delta.position3d.x",
+                ["operator"] = "greater-than",
+                ["expected"] = 0
+            })
+    };
 
     [Fact]
     public async Task FailedRuntimeAssertionUnlocksProtectedRepairAndRetestTurns()

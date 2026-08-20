@@ -666,6 +666,18 @@ public sealed class SceneRuntimeFoundationTests
             {
                 Expected = JsonValue.Create(2.9)
             },
+            new InspectSceneRuntimeAssertion("Animated", "delta.component.property", "greater-than-or-equal")
+            {
+                ComponentType = "Rekall.Transform3D",
+                PropertyName = "X",
+                Expected = JsonValue.Create(2.9)
+            },
+            new InspectSceneRuntimeAssertion("Animated", "changed.component.property", "equals")
+            {
+                ComponentType = "Rekall.Transform3D",
+                PropertyName = "X",
+                Expected = JsonValue.Create(true)
+            },
             new InspectSceneRuntimeAssertion("Missing", "entity", "not-exists")
         };
 
@@ -675,7 +687,7 @@ public sealed class SceneRuntimeFoundationTests
 
         Assert.True(result.Ok, result.Summary);
         Assert.True(result.Value.AssertionsPassed);
-        Assert.Equal(4, result.Value.AssertionResults.Count);
+        Assert.Equal(6, result.Value.AssertionResults.Count);
         Assert.All(result.Value.AssertionResults, assertion => Assert.True(assertion.Passed, assertion.Summary));
     }
 

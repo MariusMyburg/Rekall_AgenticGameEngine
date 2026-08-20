@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 19:33 Africa/Johannesburg
+Last verified: 2026-08-20 19:54 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: runtime builds now enforce assertion-bearing gameplay checkpoints
+Latest milestone: gameplay checkpoints now require meaningful state transitions
 
 ## Product objective
 
@@ -36,7 +36,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Debug verification: 918/918 engine tests and 6/6 Windows Studio
+- Current Release verification: 919/919 engine tests and 6/6 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -969,8 +969,36 @@ Studio is important, but it does not define or reorder the engine foundation.
   before the final deterministic Studio/Ollama transport fixture passed; that
   fixture failed before its first agent tool call and is not counted as AI or
   gameplay evidence.
+- Fresh arbitrary-game benchmark 6 used the real local Ollama `qwen3.5:35b`
+  through a newly assembled 1,177-file product. The checkpoint enforcement
+  worked: unrelated calls and an empty-assertion inspection were blocked, a
+  qualifying failed inspection unlocked the 12-turn repair reserve, and the
+  model later produced a relocated audited package with ten renderables. It is
+  retained as failure evidence, not a playable-game pass. Independent source
+  and scene inspection found zero projected input actions because the action
+  map was encoded as a JSON string, no seal state component was attached, and
+  the module queried the exact name `Energy Seal` while authored entities were
+  named `Energy Seal 1` through `3`; the module therefore returned before its
+  gameplay logic. The model weakened a later assertion and exhausted turn 76
+  after audit. Evidence SHA-256 is
+  `05D7AF9CEF33B0385EB9D94BEF3CDE3A430A6EA3D10D1343E7F7F17F12AA500E`;
+  the benchmark product archive SHA-256 is
+  `61935BAB1D47E86B11DDEC303BCB4C1EE649C39D59BCFF2818C4BF633439CD43`.
 
 ## Recently completed
+
+Benchmark 6's false-positive assertion path is now a generic executable
+coverage contract. The first gameplay checkpoint requires a non-empty input
+sequence, an existence assertion for an attached agent-owned `Game.*`
+component, and a strict proof of either a nonzero transform delta or changed
+agent-owned component state. Existence-only checks and non-strict zero
+thresholds return `REKALL_RUNTIME_CHECKPOINT_COVERAGE_REQUIRED` without
+executing. Runtime inspection adds generic `delta.component.property` and
+`changed.component.property` subjects over initial/final bounded state. The
+embedded contract explicitly forbids weakening a failed assertion. Focused TDD
+passes 6/6; the complete Release engine suite passes 919/919, Studio passes
+6/6, and the warning-as-error solution build reports zero warnings and zero
+errors. A fresh real-Ollama Benchmark 7 is the next gate.
 
 The measured `Lumen Vault` failures now have generic TDD coverage. Runtime
 entities expose typed number/boolean/string component readers and immutable
@@ -1163,15 +1191,17 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 
 ## In progress
 
-The current item remains the actual AI game-creation loop. Complete full-suite
-verification of the benchmark-driven SDK/scaffold repair, then run another
-fresh empty-project arbitrary-game brief through repository Studio. Require
-clean validation, informative capture, compiled agent-authored behavior,
-playable package, and a passing consolidated audit before rebuilding the
-installed distribution. Use concrete failures to improve only generic
-authoring primitives, schemas, diagnostics, and repair efficiency. Studio,
-embedded AI, MCP, CLI, and packaged players must continue to consume the same
-contracts.
+The current item remains the actual AI game-creation loop. Assemble fresh
+binaries containing the meaningful-transition checkpoint and run Benchmark 7
+through real local Ollama, then independently inspect its scene, source, input
+projection, and runtime transitions. Require clean validation, informative
+capture, compiled agent-authored behavior, a playable relocated package, and a
+passing consolidated audit. Only after this generic loop is honestly green,
+run a fresh Pong brief as the compact fully playable proof before using Galaga
+as the broader multi-entity gameplay benchmark. Use concrete failures to
+improve only generic authoring primitives, schemas, diagnostics, and repair
+efficiency. Studio, embedded AI, MCP, CLI, and packaged players must continue
+to consume the same contracts.
 
 AI game-creation Tasks 1-3 have a verified functional checkpoint. A new
 UI-independent workbench session creates projects
@@ -1630,11 +1660,12 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
-After the queryable module-SDK/source-topology contract, rerun the unchanged
-task-specific benchmark. Use its next measured blocker to choose between
-bounded module source repair, scene-schema call ergonomics, or package/audit
-completion evidence. Do not return to broad subsystem or CI expansion until an
-arbitrary described game completes this loop.
+Rerun the unchanged task-specific benchmark with real Ollama. Use its next
+measured blocker to choose between bounded module source repair, scene-schema
+call ergonomics, or protected finalization after successful package audit. Do
+not return to broad subsystem or CI expansion until an arbitrary described
+game completes the full executable loop; then prove a fully playable Pong game
+through the same generic contracts.
 
 ## Evidence index
 

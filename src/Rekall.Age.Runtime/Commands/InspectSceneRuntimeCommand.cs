@@ -133,7 +133,7 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Inspects deterministic scene simulation after a requested frame count without requiring a compiled playable adapter; reports physics, animation, UI, audio, events, systems, and bounded entity states. For executable behavior proof, pass representative input frames plus 1-64 assertions. Assertion shape: {\"entityName\":\"Player\",\"subject\":\"component.property\",\"operator\":\"greater-than-or-equal\",\"componentType\":\"Game.Modules.Rules.PlayerState\",\"propertyName\":\"Score\",\"expected\":1}. Subjects: entity, visible, component, component.property, transform.position2d.x/y, transform.position3d.x/y/z, delta.position2d.x/y, delta.position3d.x/y/z. Operators: exists, not-exists, equals, not-equals, contains, greater-than, greater-than-or-equal, less-than, less-than-or-equal. Any failed assertion fails the command with actual bounded values.",
+        "Inspects deterministic scene simulation after a requested frame count without requiring a compiled playable adapter; reports physics, animation, UI, audio, events, systems, and bounded entity states. For executable behavior proof, pass representative input frames plus 1-64 assertions. Assertion shape: {\"entityName\":\"Player\",\"subject\":\"component.property\",\"operator\":\"greater-than-or-equal\",\"componentType\":\"Game.Modules.Rules.PlayerState\",\"propertyName\":\"Score\",\"expected\":1}. Subjects: entity, visible, component, component.property, delta.component.property, changed.component.property, transform.position2d.x/y, transform.position3d.x/y/z, delta.position2d.x/y, delta.position3d.x/y/z. delta.component.property reports numeric final-minus-initial state; changed.component.property reports whether the bounded JSON value changed. Operators: exists, not-exists, equals, not-equals, contains, greater-than, greater-than-or-equal, less-than, less-than-or-equal. Any failed assertion fails the command with actual bounded values.",
         typeof(InspectSceneRuntimeRequest).FullName!,
         typeof(InspectSceneRuntimeResult).FullName!);
 
@@ -292,15 +292,14 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
         var subject = assertion.Subject.Trim().ToLowerInvariant();
         if (subject == "entity") return (true, JsonValue.Create(entity.Id), string.Empty);
         if (subject == "visible") return (true, JsonValue.Create(entity.Visible), string.Empty);
-        if (subject is "component" or "component.property")
+        if (subject is "component" or "component.property" or "delta.component.property" or "changed.component.property")
         {
             if (string.IsNullOrWhiteSpace(assertion.ComponentType))
             {
                 return (false, null, "Component assertions require componentType.");
             }
 
-            var component = entity.Components.FirstOrDefault(candidate =>
-                candidate.Type.Equals(assertion.ComponentType, StringComparison.Ordinal));
+            var component = FindComponent(entity, assertion.ComponentType);
             if (subject == "component")
             {
                 return component is null
@@ -317,9 +316,32 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
                 return (false, null, "component.property assertions require propertyName.");
             }
 
-            var property = component.Properties.FirstOrDefault(candidate =>
-                candidate.Key.Equals(assertion.PropertyName, StringComparison.OrdinalIgnoreCase));
-            return (true, property.Value?.DeepClone(), string.Empty);
+            var finalProperty = FindProperty(component, assertion.PropertyName);
+            if (subject == "component.property")
+            {
+                return (true, finalProperty?.DeepClone(), string.Empty);
+            }
+
+            var initialComponent = initialEntity is null
+                ? null
+                : FindComponent(initialEntity, assertion.ComponentType);
+            var initialProperty = initialComponent is null
+                ? null
+                : FindProperty(initialComponent, assertion.PropertyName);
+            if (subject == "changed.component.property")
+            {
+                return (true, JsonValue.Create(!JsonNode.DeepEquals(finalProperty, initialProperty)), string.Empty);
+            }
+
+            if (finalProperty is null || initialProperty is null
+                || !TryNumber(finalProperty, out var finalNumber)
+                || !TryNumber(initialProperty, out var initialNumber))
+            {
+                return (false, null,
+                    $"delta.component.property requires numeric initial and final values for '{assertion.ComponentType}.{assertion.PropertyName}'.");
+            }
+
+            return (true, JsonValue.Create(finalNumber - initialNumber), string.Empty);
         }
 
         var initial = initialEntity?.Transform ?? entity.Transform;
@@ -340,6 +362,14 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
 
         static (bool Valid, JsonNode? Actual, string Summary) Number(double value) =>
             (true, JsonValue.Create(value), string.Empty);
+
+        static RekallAgeRuntimeComponent? FindComponent(RekallAgeRuntimeEntity candidate, string componentType) =>
+            candidate.Components.FirstOrDefault(component =>
+                component.Type.Equals(componentType, StringComparison.Ordinal));
+
+        static JsonNode? FindProperty(RekallAgeRuntimeComponent component, string propertyName) =>
+            component.Properties.FirstOrDefault(property =>
+                property.Key.Equals(propertyName, StringComparison.OrdinalIgnoreCase)).Value;
     }
 
     private static bool Compare(JsonNode? actual, JsonNode? expected, string comparisonOperator, out string summary)

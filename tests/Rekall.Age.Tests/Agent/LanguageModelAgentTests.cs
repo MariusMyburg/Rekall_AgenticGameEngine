@@ -252,6 +252,7 @@ public sealed class LanguageModelAgentTests
                 "test", "model", "", "",
                 [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", new JsonObject
                 {
+                    ["inputs"] = new JsonArray(new JsonObject { ["pressedKeys"] = new JsonArray("D") }),
                     ["assertions"] = new JsonArray
                     {
                         new JsonObject
@@ -260,6 +261,13 @@ public sealed class LanguageModelAgentTests
                             ["subject"] = "component",
                             ["operator"] = "exists",
                             ["componentType"] = "Game.PlayerState"
+                        },
+                        new JsonObject
+                        {
+                            ["entityName"] = "Player",
+                            ["subject"] = "delta.position3d.x",
+                            ["operator"] = "greater-than",
+                            ["expected"] = 0
                         }
                     }
                 })],
@@ -307,12 +315,21 @@ public sealed class LanguageModelAgentTests
                 "test", "model", "", "",
                 [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", new JsonObject
                 {
-                    ["assertions"] = new JsonArray(new JsonObject
+                    ["inputs"] = new JsonArray(new JsonObject { ["pressedKeys"] = new JsonArray("D") }),
+                    ["assertions"] = new JsonArray(
+                    new JsonObject
                     {
                         ["entityName"] = "Player",
                         ["subject"] = "component",
                         ["operator"] = "exists",
                         ["componentType"] = "Game.PlayerState"
+                    },
+                    new JsonObject
+                    {
+                        ["entityName"] = "Player",
+                        ["subject"] = "delta.position3d.x",
+                        ["operator"] = "greater-than",
+                        ["expected"] = 0
                     })
                 })],
                 "tool_calls", new(1, 1, 1)),
@@ -356,13 +373,21 @@ public sealed class LanguageModelAgentTests
                 [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", new JsonObject
                 {
                     ["inputs"] = new JsonArray(new JsonObject { ["pressedKeys"] = new JsonArray("D") }),
-                    ["assertions"] = new JsonArray(new JsonObject
-                    {
-                        ["entityName"] = "Player",
-                        ["subject"] = "delta.position3d.x",
-                        ["operator"] = "greater-than",
-                        ["expected"] = 0
-                    })
+                    ["assertions"] = new JsonArray(
+                        new JsonObject
+                        {
+                            ["entityName"] = "Player",
+                            ["subject"] = "component",
+                            ["operator"] = "exists",
+                            ["componentType"] = "Game.PlayerState"
+                        },
+                        new JsonObject
+                        {
+                            ["entityName"] = "Player",
+                            ["subject"] = "delta.position3d.x",
+                            ["operator"] = "greater-than",
+                            ["expected"] = 0
+                        })
                 })],
                 "tool_calls", new(1, 1, 1)),
             new RekallAgeLanguageModelResponse(
@@ -387,17 +412,117 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task RuntimeCheckpointRejectsExistenceOnlyAssertionsAsInsufficientCoverage()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", new JsonObject
+                {
+                    ["inputs"] = new JsonArray(new JsonObject { ["pressedKeys"] = new JsonArray("D") }),
+                    ["assertions"] = new JsonArray(new JsonObject
+                    {
+                        ["entityName"] = "Player",
+                        ["subject"] = "component",
+                        ["operator"] = "exists",
+                        ["componentType"] = "Game.PlayerState"
+                    })
+                })],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", new JsonObject
+                {
+                    ["inputs"] = new JsonArray(new JsonObject { ["pressedKeys"] = new JsonArray("D") }),
+                    ["assertions"] = new JsonArray(
+                        new JsonObject
+                        {
+                            ["entityName"] = "Player",
+                            ["subject"] = "component",
+                            ["operator"] = "exists",
+                            ["componentType"] = "Game.PlayerState"
+                        },
+                        new JsonObject
+                        {
+                            ["entityName"] = "Player",
+                            ["subject"] = "delta.position3d.x",
+                            ["operator"] = "greater-than-or-equal",
+                            ["expected"] = 0
+                        })
+                })],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", new JsonObject
+                {
+                    ["inputs"] = new JsonArray(new JsonObject { ["pressedKeys"] = new JsonArray("D") }),
+                    ["assertions"] = new JsonArray(
+                        new JsonObject
+                        {
+                            ["entityName"] = "Player",
+                            ["subject"] = "component",
+                            ["operator"] = "exists",
+                            ["componentType"] = "Game.PlayerState"
+                        },
+                        new JsonObject
+                        {
+                            ["entityName"] = "Player",
+                            ["subject"] = "delta.position3d.x",
+                            ["operator"] = "greater-than",
+                            ["expected"] = 0
+                        })
+                })],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Gameplay is proven.", "", [], "stop", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+        var agent = new RekallAgeLanguageModelAgent(model, tools);
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 6,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Single(tools.Executions, execution => execution.Name == "rekall.runtime.inspect_scene");
+        Assert.Equal(2, result.ToolExecutions.Count(execution =>
+            execution.Name == "rekall.runtime.inspect_scene"
+            && !execution.Succeeded
+            && execution.ResultPreview.Contains("REKALL_RUNTIME_CHECKPOINT_COVERAGE_REQUIRED", StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public async Task FailedRuntimeAssertionUnlocksProtectedRepairAndRetestTurns()
     {
         var assertionArguments = new JsonObject
         {
-            ["assertions"] = new JsonArray(new JsonObject
-            {
-                ["entityName"] = "Player",
-                ["subject"] = "component",
-                ["operator"] = "exists",
-                ["componentType"] = "Game.PlayerState"
-            })
+            ["inputs"] = new JsonArray(new JsonObject { ["pressedKeys"] = new JsonArray("D") }),
+            ["assertions"] = new JsonArray(
+                new JsonObject
+                {
+                    ["entityName"] = "Player",
+                    ["subject"] = "component",
+                    ["operator"] = "exists",
+                    ["componentType"] = "Game.PlayerState"
+                },
+                new JsonObject
+                {
+                    ["entityName"] = "Player",
+                    ["subject"] = "delta.position3d.x",
+                    ["operator"] = "greater-than",
+                    ["expected"] = 0
+                })
         };
         var model = new ScriptedModelClient(
             new RekallAgeLanguageModelResponse(

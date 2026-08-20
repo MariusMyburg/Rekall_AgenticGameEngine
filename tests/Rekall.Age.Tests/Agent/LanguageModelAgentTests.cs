@@ -157,6 +157,44 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task AgentInterruptsThreeIdenticalFailedCallsWithReturnedRecoveryAction()
+    {
+        var inspectTrust = new RekallAgeLanguageModelResponse(
+            "test", "model", "", "",
+            [new RekallAgeLanguageModelToolCall(
+                "rekall.module.inspect_trust",
+                new JsonObject { ["projectRoot"] = "game" })],
+            "tool_calls", new(1, 1, 1));
+        var model = new ScriptedModelClient(
+            inspectTrust,
+            inspectTrust,
+            inspectTrust,
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall(
+                    "rekall.build.modules",
+                    new JsonObject { ["projectRoot"] = "game" })],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Recovered.", "", [], "stop", new(1, 1, 1)));
+        var tools = new RepeatedFailureToolExecutor();
+        var agent = new RekallAgeLanguageModelAgent(model, tools);
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task") { MaxTurns = 5 },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(5, result.Turns);
+        Assert.Contains(
+            model.Requests[3].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("three consecutive times", StringComparison.Ordinal)
+                && message.Content.Contains("rekall.module.inspect_trust", StringComparison.Ordinal)
+                && message.Content.Contains("rekall.build.modules", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task AgentContinuesAfterEmptyFinalResponseInsteadOfClaimingCompletion()
     {
         var model = new ScriptedModelClient(
@@ -851,6 +889,32 @@ public sealed class LanguageModelAgentTests
             Executions.Add((name, arguments));
             return ValueTask.FromResult<JsonNode>(new JsonObject { ["ready"] = true });
         }
+    }
+
+    private sealed class RepeatedFailureToolExecutor : IRekallAgeAgentToolExecutor
+    {
+        public IReadOnlyList<RekallAgeLanguageModelTool> Tools { get; } =
+        [
+            new("rekall.module.inspect_trust", "Inspect trust", new JsonObject { ["type"] = "object" }),
+            new("rekall.build.modules", "Build modules", new JsonObject { ["type"] = "object" })
+        ];
+
+        public ValueTask<JsonNode> ExecuteAsync(string name, JsonObject arguments, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<JsonNode>(name.Equals("rekall.module.inspect_trust", StringComparison.Ordinal)
+                ? new JsonObject
+                {
+                    ["ok"] = false,
+                    ["summary"] = "Module receipt is missing.",
+                    ["value"] = new JsonObject
+                    {
+                        ["nextActions"] = new JsonArray(new JsonObject
+                        {
+                            ["tool"] = "rekall.build.modules",
+                            ["arguments"] = new JsonObject { ["projectRoot"] = "game" }
+                        })
+                    }
+                }
+                : new JsonObject { ["ok"] = true });
     }
 
     private sealed class FailsFirstRuntimeAssertionToolExecutor : IRekallAgeAgentToolExecutor

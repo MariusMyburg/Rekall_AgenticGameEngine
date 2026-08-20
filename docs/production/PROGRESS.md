@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 22:47 Africa/Johannesburg
+Last verified: 2026-08-20 22:54 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: evidence-driven local-model selection
+Latest milestone: repeated failed-tool recovery
 
 ## Product objective
 
@@ -36,7 +36,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Release verification: 925/925 engine tests and 7/7 Windows Studio
+- Current Release verification: 926/926 engine tests and 7/7 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -1093,6 +1093,18 @@ Studio is important, but it does not define or reorder the engine foundation.
   `0CD2E7AA3AB10D941004E455A69E6EEAF532E47425B5DA52417D89F73A50EE9B`.
 
 ## Recently completed
+
+Benchmark 15's 54-call trust-inspection loop now has a generic bounded
+intervention. After three consecutive failures of the same canonical tool with
+identical arguments, the language-model agent injects the failed call, exact
+arguments, consecutive count, and any engine-returned `nextActions` into a
+direct recovery message. It explicitly does not execute the suggested action
+for the model, and a later different or successful call clears the intervention
+for that turn. The regression reproduces three identical missing-receipt trust
+failures and proves the next model request receives the exact
+`rekall.build.modules` recovery action. The focused agent loop passes 20/20;
+the complete Release engine suite passes 926/926, Studio passes 7/7, and the
+warning-as-error solution build reports zero warnings and zero errors.
 
 The replacement-model experiment is complete. Devstral was decisively worse
 than Qwen Coder, while normal-temperature Qwen Coder was much closer to the

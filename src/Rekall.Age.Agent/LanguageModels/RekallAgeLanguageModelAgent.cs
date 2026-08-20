@@ -185,6 +185,7 @@ public sealed class RekallAgeLanguageModelAgent(
             }
 
             var failedRuntimeAssertionThisTurn = false;
+            string? repeatedFailureRecovery = null;
             foreach (var call in response.ToolCalls)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -232,6 +233,10 @@ public sealed class RekallAgeLanguageModelAgent(
                     succeeded,
                     outputText.Length <= 1_200 ? outputText : outputText[..1_200] + "…");
                 toolExecutions.Add(execution);
+                var identicalFailureCount = CountConsecutiveIdenticalFailures(toolExecutions);
+                repeatedFailureRecovery = identicalFailureCount >= 3
+                    ? BuildRepeatedFailureRecovery(execution, output, identicalFailureCount)
+                    : null;
                 request.Progress?.Report(new RekallAgeLanguageModelAgentProgress(
                     turn,
                     "tool.completed",
@@ -266,6 +271,11 @@ public sealed class RekallAgeLanguageModelAgent(
                         $"Terminal workflow {effectiveToolName} completed successfully."));
                     return terminal;
                 }
+            }
+
+            if (repeatedFailureRecovery is not null)
+            {
+                transcript.Add(new RekallAgeLanguageModelMessage("user", repeatedFailureRecovery));
             }
 
             if (failedRuntimeAssertionThisTurn)
@@ -340,6 +350,55 @@ public sealed class RekallAgeLanguageModelAgent(
         return !executions.Any(execution =>
             execution.Sequence > latestSuccessfulBuild
             && execution.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal));
+    }
+
+    private static int CountConsecutiveIdenticalFailures(
+        IReadOnlyList<RekallAgeLanguageModelToolExecution> executions)
+    {
+        if (executions.Count == 0 || executions[^1].Succeeded)
+        {
+            return 0;
+        }
+
+        var latest = executions[^1];
+        var count = 0;
+        for (var index = executions.Count - 1; index >= 0; index--)
+        {
+            var candidate = executions[index];
+            if (candidate.Succeeded
+                || !candidate.Name.Equals(latest.Name, StringComparison.Ordinal)
+                || !JsonNode.DeepEquals(candidate.Arguments, latest.Arguments))
+            {
+                break;
+            }
+
+            count++;
+        }
+
+        return count;
+    }
+
+    private static string BuildRepeatedFailureRecovery(
+        RekallAgeLanguageModelToolExecution execution,
+        JsonNode output,
+        int identicalFailureCount)
+    {
+        var suggestedActions = output["value"]?["nextActions"]
+            ?? output["nextActions"];
+        var actionText = suggestedActions is null
+            ? "No structured recovery action was returned; inspect the failure facts and make a different targeted call."
+            : $"Execute one of these engine-returned recovery actions exactly: {suggestedActions.ToJsonString()}";
+        if (actionText.Length > 4_000)
+        {
+            actionText = actionText[..4_000] + "…";
+        }
+
+        return
+            $"The same failed tool call has now been attempted three consecutive times or more (current count: {identicalFailureCount}): "
+            + $"{execution.Name} args={execution.Arguments.ToJsonString()}. "
+            + "Do not call it again with the same arguments until another operation changes the relevant state. "
+            + actionText
+            + " Rekall AGE has not executed that recovery action for you; you must select and call it.";
     }
 
     private static bool RequiresImmediateRuntimeCheckpoint(

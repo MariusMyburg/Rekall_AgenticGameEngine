@@ -51,7 +51,8 @@ public static class RekallAgeModuleHostVerifiedAssemblyLoader
         {
             if (string.IsNullOrWhiteSpace(module.ModuleName)
                 || !names.Add(module.ModuleName)
-                || !IsSafeDirectory(module.RelativeDirectory)
+                || (module.RelativeDirectory != "."
+                    && !RekallAgeModuleHostStager.IsSafeRelative(module.RelativeDirectory))
                 || !IsSafeLeaf(module.MainAssembly)
                 || module.Artifacts is null
                 || module.Artifacts.Count == 0
@@ -130,8 +131,6 @@ public static class RekallAgeModuleHostVerifiedAssemblyLoader
             throw;
         }
     }
-
-    private static bool IsSafeDirectory(string value) => value == "." || IsSafeLeaf(value);
 
     private static bool IsSafeLeaf(string? value) =>
         !string.IsNullOrWhiteSpace(value)

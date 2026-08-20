@@ -151,11 +151,11 @@ PowerShell installed acceptance.
 
 **Steps:**
 
-- [ ] Write staging red tests for exact inventory copies, hash recheck, changed
+- [x] Write staging red tests for exact inventory copies, hash recheck, changed
   source/artifact, reparse/path/case escapes, host manifest mismatch, no source
   or project copy, read-only AppContainer ACL, failure cleanup, and success
   cleanup.
-- [ ] Implement resolver/load plan/stager with immutable snapshot checks and run
+- [x] Implement resolver/load plan/stager with immutable snapshot checks and run
   focused tests green.
 - [ ] Write Windows-only red integration fixtures that try to read a sentinel,
   write the project, connect to loopback, start/retain a child, allocate beyond

@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 14:19 Africa/Johannesburg
+Last verified: 2026-08-20 14:24 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -921,6 +921,19 @@ and non-JSON `NaN` render output; failures are bounded, coded, stack-free, and
 terminate the session. This is still an ordinary diagnostic worker until Task
 3 adds immutable staging, AppContainer launch, explicit handle inheritance,
 job limits, timeouts, and broker lifecycle ownership.
+
+Restricted module host Task 3 staging is verified in an 18/18 combined
+worker/staging selection. The broker now admits a product/protocol-matched host
+manifest, copies only manifest-verified worker files and receipt-verified
+module artifacts into a unique session tree, rechecks source and destination
+size/SHA-256 around every copy, writes the confined load plan, marks all staged
+files read-only, and removes the exact session tree after success or failure.
+Tests prove source, project files, PDBs, build receipts, and unmanifested host
+files do not cross the boundary; altered host/project artifacts leave no
+session tree. Windows alias forms including alternate data streams, device
+names, duplicate separators, and trailing-dot paths are rejected before copy.
+The next active slice is AppContainer SID/ACL creation and job-bounded native
+process launch; staging alone is not treated as sandbox activation.
 
 The completed persisted-document recovery tranche began because atomic
 publication and optimistic revisions now prevent torn and stale engine writes,

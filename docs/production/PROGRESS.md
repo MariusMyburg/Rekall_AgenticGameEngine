@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 22:58 Africa/Johannesburg
+Last verified: 2026-08-20 23:04 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -1094,6 +1094,18 @@ Studio is important, but it does not define or reorder the engine foundation.
   `0CD2E7AA3AB10D941004E455A69E6EEAF532E47425B5DA52417D89F73A50EE9B`.
 
 ## Recently completed
+
+The freshly assembled `3a84dbc` product now passes the complete installed
+distribution acceptance in one clean run. The first attempt isolated a bug in
+the deterministic Studio transport fixture: its raw HTTP reader handled
+`Content-Length` but treated a chunked JSON POST as header-only, closed the
+socket while Studio was still sending, and correctly caused Studio to fail
+without tools or a package. The fixture now consumes bounded chunk framing;
+the exact focused check went red then passed with two tool calls, a nonblank
+viewport, and a package, after which the complete installed matrix exited 0.
+This fixture proves shipped Studio/Ollama protocol wiring only. It is not a
+language-model or autonomous-authoring proof; Benchmark 16 still requires real
+local Qwen 3.5.
 
 The repeated-failure recovery is now present in a fresh self-contained Windows
 product assembled from `3a84dbc`. Its manifest declares 1,177 payload files;

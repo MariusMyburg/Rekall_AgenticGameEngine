@@ -6,6 +6,54 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+function Test-ChunkedBodyComplete {
+    param(
+        [Parameter(Mandatory = $true)][byte[]]$Bytes,
+        [Parameter(Mandatory = $true)][int]$BodyOffset
+    )
+
+    $cursor = $BodyOffset
+    while ($true) {
+        $lineEnd = -1
+        for ($index = $cursor; $index -le $Bytes.Length - 2; $index++) {
+            if ($Bytes[$index] -eq 13 -and $Bytes[$index + 1] -eq 10) {
+                $lineEnd = $index
+                break
+            }
+        }
+        if ($lineEnd -lt 0) { return $false }
+
+        $sizeText = [Text.Encoding]::ASCII.GetString($Bytes, $cursor, $lineEnd - $cursor)
+        $extensionIndex = $sizeText.IndexOf(';')
+        if ($extensionIndex -ge 0) { $sizeText = $sizeText.Substring(0, $extensionIndex) }
+        [long]$chunkSize = 0
+        if (-not [long]::TryParse(
+            $sizeText.Trim(),
+            [Globalization.NumberStyles]::HexNumber,
+            [Globalization.CultureInfo]::InvariantCulture,
+            [ref]$chunkSize)) {
+            throw 'Ollama fixture received a malformed chunk size.'
+        }
+        if ($chunkSize -lt 0 -or $chunkSize -gt 4MB) {
+            throw 'Ollama fixture received an out-of-range chunk size.'
+        }
+
+        $cursor = $lineEnd + 2
+        if ($chunkSize -eq 0) {
+            return $Bytes.Length -ge $cursor + 2 -and
+                $Bytes[$cursor] -eq 13 -and $Bytes[$cursor + 1] -eq 10
+        }
+
+        $chunkEnd = $cursor + [int]$chunkSize
+        if ($Bytes.Length -lt $chunkEnd + 2) { return $false }
+        if ($Bytes[$chunkEnd] -ne 13 -or $Bytes[$chunkEnd + 1] -ne 10) {
+            throw 'Ollama fixture received malformed chunk framing.'
+        }
+        $cursor = $chunkEnd + 2
+    }
+}
+
 $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $Port)
 try {
     $listener.Start()
@@ -21,6 +69,7 @@ try {
             $buffer = [byte[]]::new(8192)
             $headerEnd = -1
             $contentLength = 0
+            $chunked = $false
             while ($true) {
                 $count = $stream.Read($buffer, 0, $buffer.Length)
                 if ($count -le 0) { throw 'Ollama fixture client closed before sending a complete request.' }
@@ -37,13 +86,18 @@ try {
                                 if ($line.StartsWith('Content-Length:', [StringComparison]::OrdinalIgnoreCase)) {
                                     $contentLength = [int]$line.Substring($line.IndexOf(':') + 1).Trim()
                                 }
+                                if ($line.StartsWith('Transfer-Encoding:', [StringComparison]::OrdinalIgnoreCase) -and
+                                    $line.Contains('chunked', [StringComparison]::OrdinalIgnoreCase)) {
+                                    $chunked = $true
+                                }
                             }
                             break
                         }
                     }
                 }
-                if ($headerEnd -ge 0 -and $request.Length -ge $headerEnd + $contentLength) {
-                    break
+                if ($headerEnd -ge 0) {
+                    if ($chunked -and (Test-ChunkedBodyComplete -Bytes $bytes -BodyOffset $headerEnd)) { break }
+                    if (-not $chunked -and $request.Length -ge $headerEnd + $contentLength) { break }
                 }
             }
             $request.Dispose()

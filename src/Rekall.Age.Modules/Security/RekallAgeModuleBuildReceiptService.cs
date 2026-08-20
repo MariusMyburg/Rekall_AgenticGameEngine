@@ -96,8 +96,8 @@ public sealed class RekallAgeModuleBuildReceiptService
         }
         var sourcePaths = SourcePaths(candidate);
         var receipt = new RekallAgeModuleBuildReceipt(
-            1,
-            RekallAgeModuleTrustPostures.InProcessFullTrust,
+            2,
+            RekallAgeModuleTrustPostures.WindowsAppContainerRestricted,
             RekallAgeProductInfo.Current.Version,
             RekallAgeProductInfo.Current.ModuleSdkCompatibilityVersion,
             candidate.ModuleName,

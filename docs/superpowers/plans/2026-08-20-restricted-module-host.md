@@ -67,17 +67,17 @@ PowerShell installed acceptance.
 
 **Steps:**
 
-- [ ] Write framing tests for partial reads/writes, exact UTF-8 round trip,
+- [x] Write framing tests for partial reads/writes, exact UTF-8 round trip,
   little-endian length, 0/oversized/truncated/trailing data, depth, cancellation,
   unknown protocol/operation, and monotonically increasing sequence checks.
-- [ ] Run the focused tests and retain the expected compile/behavior failures.
-- [ ] Implement minimal contracts, coded exception, and frame codec; keep JSON
+- [x] Run the focused tests and retain the expected compile/behavior failures.
+- [x] Implement minimal contracts, coded exception, and frame codec; keep JSON
   options deterministic and bounded.
-- [ ] Run the focused protocol tests until green.
-- [ ] Write failing receipt tests for the new posture, legacy mismatch, rebuild
+- [x] Run the focused protocol tests until green.
+- [x] Write failing receipt tests for the new posture, legacy mismatch, rebuild
   next action, malformed/unknown posture, and unchanged artifact hash bounds.
-- [ ] Implement receipt schema/posture migration and inspector diagnostics.
-- [ ] Run module trust/build/protocol tests and commit the independently usable
+- [x] Implement receipt schema/posture migration and inspector diagnostics.
+- [x] Run module trust/build/protocol tests and commit the independently usable
   admission/protocol layer.
 
 ---
@@ -90,6 +90,7 @@ PowerShell installed acceptance.
 - Create: `src/Rekall.Age.ModuleHost/Program.cs`
 - Create: `src/Rekall.Age.ModuleHost/RekallAgeModuleHostServer.cs`
 - Create: `src/Rekall.Age.ModuleHost/RekallAgeModuleHostSession.cs`
+- Create: `src/Rekall.Age.Modules/Hosting/RekallAgeModuleHostLoadPlan.cs`
 - Create: `src/Rekall.Age.ModuleHost/RekallAgeModuleHostJsonContext.cs`
 - Modify: `Rekall.AGE.sln`
 - Modify: `tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj`
@@ -99,6 +100,8 @@ PowerShell installed acceptance.
 
 - Consume Task 1 framing/contracts and the existing verified assembly loader,
   module indexer, runtime-system interfaces, and playable interfaces.
+- Define the serialized confined-load-plan contract here so the server can
+  independently validate it; Task 3's broker stager produces this exact format.
 - Produce `RekallAgeModuleHostServer.RunAsync(input, output, error,
   cancellationToken)`.
 - Initialize returns ordered system descriptors, component schemas, playable
@@ -126,7 +129,7 @@ PowerShell installed acceptance.
 
 **Files:**
 
-- Create: `src/Rekall.Age.Modules/Hosting/RekallAgeModuleHostLoadPlan.cs`
+- Modify: `src/Rekall.Age.Modules/Hosting/RekallAgeModuleHostLoadPlan.cs`
 - Create: `src/Rekall.Age.Modules/Hosting/RekallAgeModuleHostStager.cs`
 - Create: `src/Rekall.Age.Modules/Hosting/RekallAgeModuleHostResolver.cs`
 - Create: `src/Rekall.Age.Modules/Hosting/RekallAgeRestrictedModuleHostClient.cs`

@@ -43,7 +43,7 @@ public sealed class RekallAgeProjectModuleTrustInspector
 
         return new RekallAgeProjectModuleTrustInspection(
             issues.Count == 0 && modules.All(module => module.Ready),
-            RekallAgeModuleTrustPostures.InProcessFullTrust,
+            RekallAgeModuleTrustPostures.WindowsAppContainerRestricted,
             modules,
             issues);
     }
@@ -127,9 +127,21 @@ public sealed class RekallAgeProjectModuleTrustInspector
             return;
         }
 
-        if (receipt is null
-            || receipt.SchemaVersion != 1
-            || !string.Equals(receipt.TrustPosture, RekallAgeModuleTrustPostures.InProcessFullTrust, StringComparison.Ordinal)
+        if (receipt is null)
+        {
+            Add(issues, "REKALL_MODULE_RECEIPT_INCOMPATIBLE", "Module build receipt is incompatible with the running engine.", receiptPath);
+            modules.Add(Empty(moduleName, moduleDirectory, receiptPath));
+            return;
+        }
+
+        if (!string.Equals(receipt.TrustPosture, RekallAgeModuleTrustPostures.WindowsAppContainerRestricted, StringComparison.Ordinal))
+        {
+            Add(issues, "REKALL_MODULE_RECEIPT_HOST_POSTURE_MISMATCH", "Module build receipt requires an obsolete or unknown execution posture. Rebuild the module for the restricted host.", receiptPath);
+            modules.Add(Empty(moduleName, moduleDirectory, receiptPath));
+            return;
+        }
+
+        if (receipt.SchemaVersion != 2
             || !string.Equals(receipt.ProductVersion, RekallAgeProductInfo.Current.Version, StringComparison.Ordinal)
             || receipt.SdkCompatibilityVersion != RekallAgeProductInfo.Current.ModuleSdkCompatibilityVersion
             || !string.Equals(receipt.ModuleName, moduleName, StringComparison.Ordinal)
@@ -329,7 +341,7 @@ public sealed class RekallAgeProjectModuleTrustInspector
         value is { Length: 64 } && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
 
     private static RekallAgeModuleTrustInspection Empty(string moduleName, string moduleDirectory, string receiptPath) =>
-        new(moduleName, moduleDirectory, receiptPath, RekallAgeModuleTrustPostures.InProcessFullTrust, string.Empty, [], false);
+        new(moduleName, moduleDirectory, receiptPath, RekallAgeModuleTrustPostures.WindowsAppContainerRestricted, string.Empty, [], false);
 
     private static void Add(ICollection<RekallAgeModuleTrustIssue> issues, string code, string message, string target) =>
         issues.Add(new RekallAgeModuleTrustIssue(code, message, target));

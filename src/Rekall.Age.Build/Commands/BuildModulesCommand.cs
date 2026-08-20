@@ -157,7 +157,7 @@ public sealed class BuildModulesCommand
                 result = result with
                 {
                     ReceiptPath = receiptPath,
-                    TrustPosture = RekallAgeModuleTrustPostures.InProcessFullTrust
+                    TrustPosture = RekallAgeModuleTrustPostures.WindowsAppContainerRestricted
                 };
             }
             results.Add(result);

@@ -31,7 +31,7 @@ public sealed class InspectModuleTrustCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Inspects bounded build receipts and module artifacts without loading code. Reports the honest in-process full-trust posture; receipts prove integrity consistency, not sandboxing or publisher identity.",
+        "Inspects bounded build receipts and module artifacts without loading code. Reports the restricted host posture required at execution; receipts prove integrity consistency, not sandbox activation or publisher identity.",
         typeof(InspectModuleTrustRequest).FullName!,
         typeof(InspectModuleTrustResult).FullName!);
 

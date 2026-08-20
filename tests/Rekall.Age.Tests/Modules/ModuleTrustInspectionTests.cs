@@ -19,7 +19,7 @@ public sealed class ModuleTrustInspectionTests
         var ready = await command.ExecuteAsync(new InspectModuleTrustRequest(readyRoot), readyContext);
 
         Assert.True(ready.Ok, ready.Summary);
-        Assert.Equal("in-process-full-trust", ready.Value.TrustPosture);
+        Assert.Equal("windows-appcontainer-restricted", ready.Value.TrustPosture);
         Assert.Empty(readyContext.Transaction.ChangedResources);
 
         var (staleRoot, staleModule) = await ScaffoldAndBuildAsync("TrustCommandStaleModule");
@@ -36,7 +36,7 @@ public sealed class ModuleTrustInspectionTests
     }
 
     [Fact]
-    public async Task CanonicalBuildWritesInspectableFullTrustReceipt()
+    public async Task CanonicalBuildWritesInspectableRestrictedHostReceipt()
     {
         var (root, moduleDirectory) = await ScaffoldAndBuildAsync("ReceiptModule");
 
@@ -44,7 +44,7 @@ public sealed class ModuleTrustInspectionTests
 
         Assert.True(inspection.Ready, string.Join(Environment.NewLine, inspection.Issues.Select(issue => issue.Message)));
         var module = Assert.Single(inspection.Modules);
-        Assert.Equal("in-process-full-trust", module.TrustPosture);
+        Assert.Equal("windows-appcontainer-restricted", module.TrustPosture);
         Assert.Equal("ReceiptModule", module.ModuleName);
         Assert.Matches("^[0-9a-f]{64}$", module.SourceFingerprint);
         Assert.NotEmpty(module.OutputFiles);
@@ -55,7 +55,11 @@ public sealed class ModuleTrustInspectionTests
             Assert.DoesNotContain("..", file.Path, StringComparison.Ordinal);
             Assert.Matches("^[0-9a-f]{64}$", file.Sha256);
         });
-        Assert.True(File.Exists(Path.Combine(moduleDirectory, "bin", "rekall", "net10.0", "rekall.module.build.json")));
+        var receiptPath = Path.Combine(moduleDirectory, "bin", "rekall", "net10.0", "rekall.module.build.json");
+        Assert.True(File.Exists(receiptPath));
+        var receipt = JsonNode.Parse(await File.ReadAllTextAsync(receiptPath))!.AsObject();
+        Assert.Equal(2, receipt["schemaVersion"]!.GetValue<int>());
+        Assert.Equal("windows-appcontainer-restricted", receipt["trustPosture"]!.GetValue<string>());
     }
 
     [Fact]
@@ -171,6 +175,29 @@ public sealed class ModuleTrustInspectionTests
         Assert.Contains(identityInspection.Issues, issue => issue.Code == "REKALL_MODULE_ASSEMBLY_IDENTITY_MISMATCH");
     }
 
+    [Theory]
+    [InlineData("in-process-full-trust")]
+    [InlineData("unknown-posture")]
+    [InlineData("")]
+    public async Task LegacyMalformedOrUnknownHostPostureRequiresRebuild(string posture)
+    {
+        var (root, moduleDirectory) = await ScaffoldAndBuildAsync("HostPostureModule");
+        var receiptPath = ReceiptPath(moduleDirectory);
+        var receipt = JsonNode.Parse(await File.ReadAllTextAsync(receiptPath))!.AsObject();
+        receipt["trustPosture"] = posture;
+        await File.WriteAllTextAsync(receiptPath, receipt.ToJsonString());
+
+        var inspection = new RekallAgeProjectModuleTrustInspector().Inspect(root);
+        var command = await new InspectModuleTrustCommand().ExecuteAsync(
+            new InspectModuleTrustRequest(root),
+            CreateContext("legacy posture"));
+
+        Assert.False(inspection.Ready);
+        Assert.Contains(inspection.Issues, issue => issue.Code == "REKALL_MODULE_RECEIPT_HOST_POSTURE_MISMATCH");
+        Assert.False(command.Ok);
+        Assert.Contains(command.Value.NextActions, action => action.Tool == "rekall.build.modules");
+    }
+
     [Fact]
     public async Task InjectedInspectionBoundsAndReparsePointFailClosed()
     {
@@ -216,7 +243,7 @@ public sealed class ModuleTrustInspectionTests
             CreateContext("trust build"));
         Assert.True(build.Ok, build.Summary);
         var result = Assert.Single(build.Value.Modules);
-        Assert.Equal("in-process-full-trust", result.TrustPosture);
+        Assert.Equal("windows-appcontainer-restricted", result.TrustPosture);
         Assert.True(File.Exists(result.ReceiptPath), result.ReceiptPath);
         return (root, Path.GetDirectoryName(scaffold.Value.ProjectPath)!);
     }

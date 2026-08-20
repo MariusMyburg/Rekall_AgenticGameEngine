@@ -152,7 +152,7 @@ public sealed class CliSmokeTests
         var trust = await RunAsync(cliAssembly, "module", "trust", root);
         Assert.Equal(0, trust.ExitCode);
         Assert.Contains("Ready: True", trust.Output);
-        Assert.Contains("Trust posture: in-process-full-trust", trust.Output);
+        Assert.Contains("Trust posture: windows-appcontainer-restricted", trust.Output);
         Assert.Contains("Module CrystalMining: ready=True", trust.Output);
 
         var capture = await RunAsync(cliAssembly, "capture", "screenshot", root, "Main");

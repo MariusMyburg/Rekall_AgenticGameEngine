@@ -76,6 +76,7 @@ public sealed class BuildModulesCommandTests
         Assert.True(result.Ok, result.Summary);
         var module = Assert.Single(result.Value.Modules);
         Assert.Equal("CrystalMining", module.ModuleName);
+        Assert.Equal("windows-appcontainer-restricted", module.TrustPosture);
         Assert.True(File.Exists(module.AssemblyPath));
         Assert.EndsWith("CrystalMining.dll", module.AssemblyPath, StringComparison.Ordinal);
     }

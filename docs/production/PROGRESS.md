@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 13:44 Africa/Johannesburg
+Last verified: 2026-08-20 14:01 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -893,6 +893,19 @@ timeouts, and no silent in-process fallback. The reviewed design is
 `docs/superpowers/specs/2026-08-20-restricted-module-host-design.md`, with the
 TDD sequence in
 `docs/superpowers/plans/2026-08-20-restricted-module-host.md`.
+
+Restricted module host Task 1 is verified in 42 focused module/build/CLI tests
+after the complete 855/855 Debug suite. New schema-2 module receipts require the
+`windows-appcontainer-restricted` execution posture; legacy, empty, and unknown
+postures fail with `REKALL_MODULE_RECEIPT_HOST_POSTURE_MISMATCH` plus an
+executable rebuild action. The generic protocol layer now supplies typed
+initialize/runtime/playable contracts and versioned little-endian JSON frames
+with exact 64 MiB message and depth-128 bounds, strict monotonic sequences,
+duplicate-field rejection, cancellation preservation, stable coded failures,
+and adversarial coverage for malformed, truncated, oversized, invalid UTF-8,
+unknown-version/operation, inconsistent response, and typed-payload cases. The
+next witnessed-red slice is the deterministic worker server; no production
+consumer has been cut over yet.
 
 The completed persisted-document recovery tranche began because atomic
 publication and optimistic revisions now prevent torn and stale engine writes,

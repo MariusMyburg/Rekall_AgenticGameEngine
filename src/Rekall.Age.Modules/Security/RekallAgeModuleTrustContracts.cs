@@ -3,6 +3,7 @@ namespace Rekall.Age.Modules.Security;
 public static class RekallAgeModuleTrustPostures
 {
     public const string InProcessFullTrust = "in-process-full-trust";
+    public const string WindowsAppContainerRestricted = "windows-appcontainer-restricted";
 }
 
 public sealed record RekallAgeModuleArtifactIntegrity(

@@ -221,12 +221,13 @@ public sealed class RekallAgeLanguageModelAgent(
                         + $"\n[tool result truncated at {maxToolResultCharacters} of {outputText.Length} characters; use a narrower inspect tool if more detail is required]";
                 }
 
+                var executedToolName = CanonicalToolName(call.Name, output);
                 var succeeded = output["ok"] is not JsonValue okValue
                     || !okValue.TryGetValue<bool>(out var ok)
                     || ok;
                 var execution = new RekallAgeLanguageModelToolExecution(
                     toolCallCount,
-                    call.Name,
+                    executedToolName,
                     (JsonObject)call.Arguments.DeepClone(),
                     succeeded,
                     outputText.Length <= 1_200 ? outputText : outputText[..1_200] + "…");
@@ -234,17 +235,17 @@ public sealed class RekallAgeLanguageModelAgent(
                 request.Progress?.Report(new RekallAgeLanguageModelAgentProgress(
                     turn,
                     "tool.completed",
-                    $"{call.Name} {(succeeded ? "completed" : "failed")}.",
+                    $"{executedToolName} {(succeeded ? "completed" : "failed")}.",
                     execution));
-                transcript.Add(new RekallAgeLanguageModelMessage("tool", outputText, call.Name));
+                transcript.Add(new RekallAgeLanguageModelMessage("tool", outputText, executedToolName));
                 if (!succeeded
-                    && call.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
+                    && executedToolName.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
                     && HasRuntimeCheckpointCoverage(call.Arguments))
                 {
                     failedRuntimeAssertionThisTurn = true;
                 }
                 var effectiveToolName = EffectiveToolName(
-                    call,
+                    call with { Name = executedToolName },
                     request.TerminalSuccessTools,
                     request.CompletionAuditPrimingTools);
                 if (succeeded && request.CompletionAuditPrimingTools.Contains(effectiveToolName))
@@ -376,7 +377,8 @@ public sealed class RekallAgeLanguageModelAgent(
 
     private static JsonObject RuntimeCheckpointRequired(RekallAgeLanguageModelToolCall call)
     {
-        var attemptedInspection = call.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal);
+        var attemptedInspection = CanonicalPolicyToolName(call.Name)
+            .Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal);
         var hasAssertions = attemptedInspection && HasNonemptyArrayArgument(call.Arguments, "assertions");
         var coverage = EvaluateRuntimeCheckpointCoverage(call.Arguments);
         var code = !attemptedInspection
@@ -414,12 +416,13 @@ public sealed class RekallAgeLanguageModelAgent(
 
     private static bool ShouldDeferUntilRuntimeCheckpoint(RekallAgeLanguageModelToolCall call)
     {
-        if (call.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal))
+        var toolName = CanonicalPolicyToolName(call.Name);
+        if (toolName.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal))
         {
             return !HasRuntimeCheckpointCoverage(call.Arguments);
         }
 
-        return !IsRuntimeCheckpointPreparationTool(call.Name);
+        return !IsRuntimeCheckpointPreparationTool(toolName);
     }
 
     private static bool IsRuntimeCheckpointPreparationTool(string toolName) =>
@@ -437,6 +440,18 @@ public sealed class RekallAgeLanguageModelAgent(
         || toolName.Equals("rekall.module.read_source", StringComparison.Ordinal)
         || toolName.Equals("rekall.module.write_source", StringComparison.Ordinal)
         || toolName.Equals("rekall.build.modules", StringComparison.Ordinal);
+
+    private static string CanonicalToolName(string attemptedName, JsonNode output) =>
+        output["toolNameCorrection"]?["canonical"] is JsonValue canonical
+        && canonical.TryGetValue<string>(out var corrected)
+        && !string.IsNullOrWhiteSpace(corrected)
+            ? corrected
+            : CanonicalPolicyToolName(attemptedName);
+
+    private static string CanonicalPolicyToolName(string toolName) =>
+        toolName.StartsWith("rekal.", StringComparison.Ordinal)
+            ? "rekall." + toolName["rekal.".Length..]
+            : toolName;
 
     private static bool RequiresFreshRuntimeBehaviorAssertions(
         IReadOnlyList<RekallAgeLanguageModelToolExecution> executions,

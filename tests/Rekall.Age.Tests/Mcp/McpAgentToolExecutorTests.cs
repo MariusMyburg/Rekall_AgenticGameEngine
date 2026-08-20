@@ -79,6 +79,41 @@ public sealed class McpAgentToolExecutorTests
     }
 
     [Fact]
+    public async Task ProgressiveDiscoveryCanonicalizesUniqueSingleEditToolName()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new GetEngineStatusCommand());
+        registry.Register(new CreateProjectCommand());
+        var executor = new RekallAgeMcpAgentToolExecutor(registry, progressiveDiscovery: true);
+
+        var result = await executor.ExecuteAsync(
+            "rekal.tools.search",
+            new JsonObject { ["query"] = "create project" },
+            CancellationToken.None);
+
+        Assert.True(result["ok"]!.GetValue<bool>());
+        Assert.Equal("rekal.tools.search", result["toolNameCorrection"]!["attempted"]!.GetValue<string>());
+        Assert.Equal("rekall.tools.search", result["toolNameCorrection"]!["canonical"]!.GetValue<string>());
+        Assert.Contains(executor.Tools, tool => tool.Name == "rekall.project.create");
+    }
+
+    [Fact]
+    public async Task ToolCanonicalizationRejectsNamesMoreThanOneEditAway()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new GetEngineStatusCommand());
+        var executor = new RekallAgeMcpAgentToolExecutor(registry, progressiveDiscovery: true);
+
+        var result = await executor.ExecuteAsync(
+            "rek.context.engine_status",
+            new JsonObject(),
+            CancellationToken.None);
+
+        Assert.False(result["ok"]!.GetValue<bool>());
+        Assert.Null(result["toolNameCorrection"]);
+    }
+
+    [Fact]
     public async Task BroadComponentSearchFitsTheAgentToolBudgetWithoutLosingRequestedContracts()
     {
         var registry = new RekallAgeCommandRegistry();

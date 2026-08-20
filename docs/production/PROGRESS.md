@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 20:22 Africa/Johannesburg
+Last verified: 2026-08-20 20:30 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: gameplay checkpoint failures expose exact missing coverage
+Latest milestone: unique one-edit tool-name recovery prevents typo loops
 
 ## Product objective
 
@@ -36,7 +36,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 - Canonical verification: 894/894 engine tests and 3/3 Windows Studio tests
   passed twice independently with four distinct retained TRX files; Release
   build completed with zero warnings and zero errors.
-- Current Release verification: 920/920 engine tests and 6/6 Windows Studio
+- Current Release verification: 922/922 engine tests and 6/6 Windows Studio
   tests pass. The full solution builds with warnings treated as errors and
   reports zero warnings and zero errors.
 - Installed acceptance: canonical gate exited 0 against the freshly assembled
@@ -1006,8 +1006,30 @@ Studio is important, but it does not define or reorder the engine foundation.
   supplied insufficient coverage, it exhausted 64 turns, Studio saw only one
   renderable, and no package was produced. Evidence SHA-256 is
   `45C783F1C4355D72755068382305E06B93DB0B251EE7139EE3A6B10222E596D4`.
+- Fresh arbitrary-game benchmark 9 used real local Ollama `qwen3.5:35b`
+  against the self-contained product built from `ae73d20`; its 200,959,555-byte
+  archive SHA-256 is
+  `6660FC1370811713440E1C48D03012CE9515A6723F2385FC466FAEAF4E9FA874`.
+  Structured evidence exposed a pure tool-name failure: after one correct
+  engine-status call, the model emitted `rekal.*` instead of `rekall.*` for 25
+  consecutive calls despite exact suggested names. The project remained empty
+  and no package was produced; Studio correctly reported failure. Evidence
+  SHA-256 is
+  `8FB9F93685B3E4F70B5431D8F136227CB1359A4732A6E17D2A281254319E8F61`.
 
 ## Recently completed
+
+Benchmark 9's systematic namespace typo now has bounded deterministic recovery.
+The progressive MCP executor canonicalizes only a unique registered tool name
+exactly one insertion, deletion, or substitution away; ambiguous names and
+names two or more edits away still fail closed. Successful results record the
+attempted name, canonical name, and edit distance. The language-model agent
+uses the canonical name for gameplay checkpoint, repair-reserve, completion-
+audit, terminal-tool, progress, and retained-execution policy, including the
+observed `rekal.runtime.inspect_scene` case. The focused MCP/agent selection
+passes 10/10; the complete Release engine suite passes 922/922, Studio passes
+6/6, and the warning-as-error solution build reports zero warnings and zero
+errors. Fresh Benchmark 10 is the next real-Ollama gate.
 
 Benchmark 8's repeated malformed checkpoint attempts now receive structured,
 fact-specific repair evidence. Synthetic checkpoint failures report booleans
@@ -1237,7 +1259,7 @@ passed, including all recovery outcomes. Its 600-frame soak simulated exactly
 ## In progress
 
 The current item remains the actual AI game-creation loop. Assemble fresh
-binaries containing fact-specific checkpoint diagnostics and run Benchmark 9
+binaries containing bounded tool-name recovery and run Benchmark 10
 through real local Ollama, then independently inspect its scene, source, input
 projection, and runtime transitions. Require clean validation, informative
 capture, compiled agent-authored behavior, a playable relocated package, and a

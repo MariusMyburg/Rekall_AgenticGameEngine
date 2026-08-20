@@ -53,9 +53,16 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
         JsonObject arguments,
         CancellationToken cancellationToken)
     {
+        var attemptedName = name;
+        var correctedName = TryCanonicalizeToolName(name, out var canonicalName);
+        if (correctedName)
+        {
+            name = canonicalName;
+        }
+
         if (_exposedTools is not null && name.Equals(SearchToolName, StringComparison.Ordinal))
         {
-            return SearchTools(arguments);
+            return WithToolNameCorrection(SearchTools(arguments));
         }
 
         if (_exposedTools is not null && name.Equals(ExecuteToolName, StringComparison.Ordinal))
@@ -63,19 +70,20 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
             var targetName = arguments["name"]?.GetValue<string>() ?? string.Empty;
             if (!_allTools.ContainsKey(targetName))
             {
-                return UnknownTool(targetName);
+                return WithToolNameCorrection(UnknownTool(targetName));
             }
             if (!TryReadTargetArguments(arguments["arguments"], out var targetArguments, out var argumentError))
             {
-                return argumentError;
+                return WithToolNameCorrection(argumentError);
             }
 
-            return await ExecuteRegisteredToolAsync(targetName, targetArguments, cancellationToken);
+            return WithToolNameCorrection(
+                await ExecuteRegisteredToolAsync(targetName, targetArguments, cancellationToken));
         }
 
         if (!_allTools.ContainsKey(name))
         {
-            return UnknownTool(name);
+            return WithToolNameCorrection(UnknownTool(name));
         }
 
         if (arguments.ContainsKey("arguments")
@@ -85,13 +93,106 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
         {
             if (!TryReadTargetArguments(arguments["arguments"], out var unwrapped, out var argumentError))
             {
-                return argumentError;
+                return WithToolNameCorrection(argumentError);
             }
 
             arguments = unwrapped;
         }
 
-        return await ExecuteRegisteredToolAsync(name, arguments, cancellationToken);
+        return WithToolNameCorrection(await ExecuteRegisteredToolAsync(name, arguments, cancellationToken));
+
+        JsonNode WithToolNameCorrection(JsonNode result)
+        {
+            if (correctedName && result is JsonObject objectResult)
+            {
+                objectResult["toolNameCorrection"] = new JsonObject
+                {
+                    ["attempted"] = attemptedName,
+                    ["canonical"] = canonicalName,
+                    ["editDistance"] = 1
+                };
+            }
+
+            return result;
+        }
+    }
+
+    private bool TryCanonicalizeToolName(string attemptedName, out string canonicalName)
+    {
+        canonicalName = string.Empty;
+        if (_allTools.ContainsKey(attemptedName)
+            || _exposedTools is not null
+            && attemptedName is SearchToolName or ExecuteToolName)
+        {
+            return false;
+        }
+
+        var candidates = _allTools.Keys.AsEnumerable();
+        if (_exposedTools is not null)
+        {
+            candidates = candidates.Concat([SearchToolName, ExecuteToolName]);
+        }
+
+        var matches = candidates
+            .Distinct(StringComparer.Ordinal)
+            .Where(candidate => IsSingleEditAway(attemptedName, candidate))
+            .Take(2)
+            .ToArray();
+        if (matches.Length != 1)
+        {
+            return false;
+        }
+
+        canonicalName = matches[0];
+        return true;
+    }
+
+    private static bool IsSingleEditAway(string attempted, string candidate)
+    {
+        if (attempted.Equals(candidate, StringComparison.Ordinal)
+            || Math.Abs(attempted.Length - candidate.Length) > 1)
+        {
+            return false;
+        }
+
+        var attemptedIndex = 0;
+        var candidateIndex = 0;
+        var edits = 0;
+        while (attemptedIndex < attempted.Length && candidateIndex < candidate.Length)
+        {
+            if (attempted[attemptedIndex] == candidate[candidateIndex])
+            {
+                attemptedIndex++;
+                candidateIndex++;
+                continue;
+            }
+
+            if (++edits > 1)
+            {
+                return false;
+            }
+
+            if (attempted.Length > candidate.Length)
+            {
+                attemptedIndex++;
+            }
+            else if (candidate.Length > attempted.Length)
+            {
+                candidateIndex++;
+            }
+            else
+            {
+                attemptedIndex++;
+                candidateIndex++;
+            }
+        }
+
+        if (attemptedIndex < attempted.Length || candidateIndex < candidate.Length)
+        {
+            edits++;
+        }
+
+        return edits == 1;
     }
 
     private async ValueTask<JsonNode> ExecuteRegisteredToolAsync(

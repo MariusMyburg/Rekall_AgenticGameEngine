@@ -433,7 +433,7 @@ public sealed class LanguageModelAgentTests
                 "tool_calls", new(1, 1, 1)),
             new RekallAgeLanguageModelResponse(
                 "test", "model", "", "",
-                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", MeaningfulRuntimeCheckpointArguments())],
+                [new RekallAgeLanguageModelToolCall("rekal.runtime.inspect_scene", MeaningfulRuntimeCheckpointArguments())],
                 "tool_calls", new(1, 1, 1)),
             new RekallAgeLanguageModelResponse(
                 "test", "model", "Gameplay is proven.", "", [], "stop", new(1, 1, 1)));
@@ -450,6 +450,8 @@ public sealed class LanguageModelAgentTests
 
         Assert.True(result.Completed);
         Assert.Contains(tools.Executions, execution => execution.Name == "rekall.scene.apply_blueprint");
+        Assert.Contains(tools.Executions, execution => execution.Name == "rekal.runtime.inspect_scene");
+        Assert.Contains(result.ToolExecutions, execution => execution.Name == "rekall.runtime.inspect_scene");
         Assert.DoesNotContain(tools.Executions, execution => execution.Name == "rekall.workflow.package_playable_game");
         Assert.Contains(result.ToolExecutions, execution =>
             execution.Name == "rekall.workflow.package_playable_game"

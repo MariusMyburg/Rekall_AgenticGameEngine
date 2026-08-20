@@ -333,16 +333,34 @@ public sealed class RekallAgeModuleHostStagedSession : IAsyncDisposable
 
     internal static void DeleteTree(string root)
     {
-        if (!Directory.Exists(root))
+        for (var attempt = 0; attempt < 200; attempt++)
         {
-            return;
-        }
+            if (!Directory.Exists(root))
+            {
+                return;
+            }
 
-        foreach (var path in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
-        {
-            File.SetAttributes(path, FileAttributes.Normal);
-        }
+            try
+            {
+                foreach (var path in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+                {
+                    File.SetAttributes(path, FileAttributes.Normal);
+                }
 
-        Directory.Delete(root, recursive: true);
+                foreach (var path in Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories))
+                {
+                    File.SetAttributes(path, FileAttributes.Directory);
+                }
+
+                Directory.Delete(root, recursive: true);
+                return;
+            }
+            catch (Exception ex) when (
+                ex is IOException or UnauthorizedAccessException
+                && attempt < 199)
+            {
+                Thread.Sleep(25);
+            }
+        }
     }
 }

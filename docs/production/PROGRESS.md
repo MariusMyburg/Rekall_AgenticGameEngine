@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-20 14:24 Africa/Johannesburg
+Last verified: 2026-08-20 14:44 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: persisted document recovery passed the complete installed product gate
+Latest milestone: restricted module host native containment and broker checkpoint
 
 ## Product objective
 
@@ -816,9 +816,11 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 - Expand adversarial security tests around authored JSON, migration races,
   diagnostic stores, and full-trust module inputs.
-- In-process C# modules intentionally remain full trust and receipts remain
-  unsigned; a future restricted/out-of-process host and publisher signatures
-  are separate security capabilities, not claims of the current boundary.
+- Production consumers still execute C# modules in-process until the active
+  restricted-host consumer cutover is complete. The AppContainer worker and
+  broker now exist with adversarial local proof, but are not yet a shipped
+  product claim. Build receipts also remain unsigned; publisher signatures are
+  a separate future security capability.
 - Complete advanced animation breadth such as native glTF weight-channel
   animation, TANGENT/sparse/quantized morph accessors, broader complex
   transform fixtures, richer graph curves, and interruptible or hierarchical
@@ -934,6 +936,23 @@ session tree. Windows alias forms including alternate data streams, device
 names, duplicate separators, and trailing-dot paths are rejected before copy.
 The next active slice is AppContainer SID/ACL creation and job-bounded native
 process launch; staging alone is not treated as sandbox activation.
+
+Restricted module host Task 3 now has a verified native-containment checkpoint.
+The launcher creates or derives the stable no-capability AppContainer profile,
+grants read/execute only to the immutable staged tree, inherits exactly three
+protocol pipe handles, starts suspended, assigns a kill-on-close job before
+resume, limits the job to one process and 512 MiB, and supplies a deliberately
+  scrubbed, alphabetically sorted Unicode environment instead of inheriting
+  broker secrets. A 37/37 module-host selection and zero-warning Debug solution
+  build pass; six of those tests are native Windows integration cases. They prove typed broker
+initialize/playable calls, a 250 ms fail-closed hang deadline, exact abrupt
+crash reporting, absent injected environment secrets, and denial of an
+unstaged sentinel read, child-process creation, and loopback networking. The
+broker owns staging/profile/process disposal and distinguishes crash from
+timeout without exposing module diagnostics. Remaining Task 3 work is the
+project-write, memory-limit, excessive-stderr, repeated-timing, orphan-process,
+and orphan-staging matrix plus final stable-code consolidation; no runtime,
+playable, schema, Studio, CLI, or MCP consumer has been cut over yet.
 
 The completed persisted-document recovery tranche began because atomic
 publication and optimistic revisions now prevent torn and stale engine writes,

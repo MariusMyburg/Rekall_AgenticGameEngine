@@ -167,7 +167,9 @@ public sealed class RekallAgeModuleHostFrameCodec
             var count = await stream.ReadAsync(buffer[read..], cancellationToken);
             if (count == 0)
             {
-                throw Invalid("Module-host frame ended before its declared length.");
+                throw Invalid(
+                    "Module-host frame ended before its declared length.",
+                    new EndOfStreamException("The module-host transport closed."));
             }
 
             read += count;

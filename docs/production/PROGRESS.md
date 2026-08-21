@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 07:35 Africa/Johannesburg
+Last verified: 2026-08-21 07:55 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: compiler failures return exact bounded runtime SDK repair;
-assertion results must survive bounded agent output
+Latest milestone: failed runtime assertion evidence survives bounded agent
+output; input maps must not be disabled by visual visibility
 
 ## Product objective
 
@@ -31,6 +31,31 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Front-loaded runtime assertion evidence: failed inspection summaries now lead
+  with bounded entity, subject, component/property, operator, expected value,
+  actual value, and comparison explanation before large subsystem/entity data.
+  At most eight details are included, every field and the 4,000-character total
+  are bounded, overflow is counted, and all structured results remain intact.
+  Runtime/CLI/agent regression coverage passed 84/84. The locked zero-warning/
+  error gate passed 1,007/1,007 engine and 7/7 Studio tests twice and the
+  complete installed matrix. Its 1,186-file archive is 201,581,877 bytes with
+  SHA-256
+  `A985056BB845D5E9ED4267058DA79447162DC7AAD5C17B3B1881B0BAF72585D7`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+- Clean installed real-Qwen benchmark 33 proved the diagnostic contract: its
+  failed runtime summaries exposed the exact missing `PlayerState`, missing
+  component-type arguments, missing numeric state, and `delta.position3d.x`
+  actual value `0`. Qwen used those facts to reduce four failed assertions to
+  one and used the populated compiler recovery to return to successful builds.
+  The run remained red at 55/75 successful calls, with one renderable, no
+  nonblank proof, and no package; its final source repair was not rebuilt or
+  retested before the protected limit. The next generic runtime defect is exact:
+  its valid `Rekall.InputActionMap` lived on an intentionally non-rendered
+  `visible:false` configuration entity, but `runtime.input.actions` discarded
+  the whole entity and reported `inputActionCount: 0`. Input maps already have
+  an explicit `Active` property, so visual visibility must not silently disable
+  semantic controls. Evidence SHA-256 is
+  `D1B03B427B90A2E7DF61D97AEA2943C98A40EA587518FC1CEE4EB7BDD7C966AB`.
 - Runtime SDK compiler recovery: failed runtime-module builds now put exact
   immutable entity/transform/component/update patterns before verbose compiler
   diagnostics and return populated SDK-inspection plus source-list suggestions.

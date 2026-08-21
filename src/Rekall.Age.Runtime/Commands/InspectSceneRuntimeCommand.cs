@@ -200,7 +200,7 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
             var failedCount = assertionResults.Count(assertion => !assertion.Passed);
             return RekallAgeCommandResult<InspectSceneRuntimeResult>.Failure(
                 result,
-                $"Runtime inspection completed, but {failedCount} behavior assertion(s) failed.",
+                BuildFailedAssertionSummary(assertionResults),
                 [
                     new RekallAgeCommandError(
                         "REKALL_RUNTIME_ASSERTION_FAILED",
@@ -220,6 +220,45 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
         return RekallAgeCommandResult<InspectSceneRuntimeResult>.Success(
             result,
             $"Runtime {result.SceneName} frame {result.FrameIndex}: {result.EntityCount} entities, {result.RenderableCount} renderable, {assertionResults.Count} behavior assertion(s) passed.");
+    }
+
+    private static string BuildFailedAssertionSummary(
+        IReadOnlyList<InspectSceneRuntimeAssertionResult> assertionResults)
+    {
+        const int maximumDetailedFailures = 8;
+        const int maximumFieldCharacters = 160;
+        const int maximumSummaryCharacters = 4_000;
+        var failed = assertionResults.Where(result => !result.Passed).ToArray();
+        var details = failed
+            .Take(maximumDetailedFailures)
+            .Select(result =>
+            {
+                var assertion = result.Assertion;
+                var target = assertion.ComponentType is null
+                    ? assertion.Subject
+                    : assertion.PropertyName is null
+                        ? $"{assertion.Subject} {assertion.ComponentType}"
+                        : $"{assertion.Subject} {assertion.ComponentType}.{assertion.PropertyName}";
+                var expected = Bound(assertion.Expected is null
+                    ? assertion.Operator
+                    : $"{assertion.Operator} {Bound(assertion.Expected.ToJsonString(), maximumFieldCharacters)}",
+                    maximumFieldCharacters);
+                var actual = result.Actual is null
+                    ? "(missing)"
+                    : Bound(result.Actual.ToJsonString(), maximumFieldCharacters);
+                var explanation = Bound(result.Summary, maximumFieldCharacters);
+                return $"{Bound(assertion.EntityName, maximumFieldCharacters)} {Bound(target, maximumFieldCharacters)}: expected {expected}; actual {actual}; {explanation}";
+            });
+        var omitted = failed.Length - maximumDetailedFailures;
+        var summary = $"Runtime inspection completed, but {failed.Length} behavior assertion(s) failed. Failed assertion evidence: {string.Join(" | ", details)}";
+        if (omitted > 0)
+        {
+            summary += $" | {omitted} more failed assertion(s) retained in structured results.";
+        }
+        return Bound(summary, maximumSummaryCharacters);
+
+        static string Bound(string value, int maximumCharacters) =>
+            value.Length <= maximumCharacters ? value : value[..maximumCharacters] + "…";
     }
 
     private static IReadOnlyList<RekallAgeCommandError> ValidateInputs(

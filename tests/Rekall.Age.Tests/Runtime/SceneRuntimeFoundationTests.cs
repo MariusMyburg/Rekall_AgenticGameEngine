@@ -1140,7 +1140,47 @@ public sealed class SceneRuntimeFoundationTests
         var assertion = Assert.Single(result.Value.AssertionResults);
         Assert.False(assertion.Passed);
         Assert.Contains("Game.Modules.Rules.PlayerState", assertion.Summary, StringComparison.Ordinal);
+        Assert.Contains("Player", result.Summary, StringComparison.Ordinal);
+        Assert.Contains("component", result.Summary, StringComparison.Ordinal);
+        Assert.Contains("Game.Modules.Rules.PlayerState", result.Summary, StringComparison.Ordinal);
+        Assert.Contains("actual (missing)", result.Summary, StringComparison.Ordinal);
         Assert.Contains(result.Errors, error => error.Code == "REKALL_RUNTIME_ASSERTION_FAILED");
+    }
+
+    [Fact]
+    public async Task InspectSceneRuntimeCommandFrontLoadsBoundedNumericAssertionEvidence()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var player = RekallAgeEntityDocument.Create("Player", ["player"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["X"] = 0 }));
+        var diagnostic = RekallAgeEntityDocument.Create(new string('E', 512), ["diagnostic"]);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity(player)
+                .AddEntity(diagnostic),
+            CancellationToken.None);
+        var assertions = Enumerable.Range(0, 16)
+            .Select(_ => new InspectSceneRuntimeAssertion("Player", "delta.position3d.x", "greater-than")
+            {
+                Expected = JsonValue.Create(0)
+            })
+            .ToArray();
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(root, "Main", 1, Assertions: assertions),
+            new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("front-load assertion evidence"), CancellationToken.None));
+
+        Assert.False(result.Ok);
+        Assert.Contains("Player", result.Summary, StringComparison.Ordinal);
+        Assert.Contains("delta.position3d.x", result.Summary, StringComparison.Ordinal);
+        Assert.Contains("expected greater-than 0", result.Summary, StringComparison.Ordinal);
+        Assert.Contains("actual 0", result.Summary, StringComparison.Ordinal);
+        Assert.Contains("8 more", result.Summary, StringComparison.Ordinal);
+        Assert.InRange(result.Summary.Length, 1, 4_000);
+        Assert.Equal(16, result.Value.AssertionResults.Count);
     }
 
     [Fact]

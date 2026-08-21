@@ -355,6 +355,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 CreateBuffers(
                     state,
                     commandPlan.RenderPasses.Select(pass => pass.FrameUniform).ToArray(),
+                    commandPlan.RenderPasses[0].Draws.Select(draw => draw.PushConstants).ToArray(),
                     prepared.GeometryUpload,
                     prepared.ReadbackByteCount);
                 CreateTextures(state, meshes);
@@ -511,6 +512,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 CreateBuffers(
                     state,
                     commandPlan.RenderPasses.Select(pass => pass.FrameUniform).ToArray(),
+                    commandPlan.RenderPasses[0].Draws.Select(draw => draw.PushConstants).ToArray(),
                     prepared.GeometryUpload,
                     0);
                 CreateTextures(state, prepared.Meshes);
@@ -544,6 +546,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             private readonly uint _targetHeight;
             private readonly int _vertexByteCount;
             private readonly int _indexByteCount;
+            private readonly int _drawCount;
             private readonly string _materialSignature;
             private bool _texturesUploaded;
             private bool _disposed;
@@ -557,6 +560,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 _targetHeight = commandPlan.PreparedFrame.Target.Height;
                 _vertexByteCount = commandPlan.PreparedFrame.GeometryUpload.VertexBytes.Length;
                 _indexByteCount = commandPlan.PreparedFrame.GeometryUpload.IndexBytes.Length;
+                _drawCount = commandPlan.RenderPasses[0].Draws.Count;
                 _materialSignature = BuildMaterialSignature(commandPlan.PreparedFrame.DrawPlan.MaterialKeys);
             }
 
@@ -570,6 +574,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     && commandPlan.PreparedFrame.Target.Height == _targetHeight
                     && commandPlan.PreparedFrame.GeometryUpload.VertexBytes.Length == _vertexByteCount
                     && commandPlan.PreparedFrame.GeometryUpload.IndexBytes.Length == _indexByteCount
+                    && commandPlan.RenderPasses[0].Draws.Count == _drawCount
                     && string.Equals(BuildMaterialSignature(commandPlan.PreparedFrame.DrawPlan.MaterialKeys), _materialSignature, StringComparison.Ordinal);
             }
 
@@ -645,6 +650,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     CreateBuffers(
                         state,
                         commandPlan.RenderPasses.Select(pass => pass.FrameUniform).ToArray(),
+                        commandPlan.RenderPasses[0].Draws.Select(draw => draw.PushConstants).ToArray(),
                         prepared.GeometryUpload,
                         0);
                     CreateTextures(state, prepared.Meshes);
@@ -683,6 +689,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 try
                 {
                     UpdateFrameUniformBuffers(_state, commandPlan.RenderPasses.Select(pass => pass.FrameUniform).ToArray());
+                    UpdateDrawUniformBuffer(
+                        _state,
+                        commandPlan.RenderPasses[0].Draws.Select(draw => draw.PushConstants).ToArray());
                     RecordCommands(_state, commandPlan, uploadTextures: !_texturesUploaded);
                     _texturesUploaded = true;
                     SubmitAndWait(_state);
@@ -1017,6 +1026,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         private static void CreateBuffers(
             VulkanState state,
             IReadOnlyList<RekallAgeVulkanSceneGpuFrameUniform> frameUniforms,
+            IReadOnlyList<RekallAgeVulkanSceneGpuDrawPushConstants> drawUniforms,
             RekallAgeVulkanSceneGeometryUpload geometryUpload,
             ulong readbackBytes)
         {
@@ -1041,6 +1051,28 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
             state.UniformBuffer = state.UniformBuffers[0];
             state.UniformMemory = state.UniformMemories[0];
+            state.Vk.GetPhysicalDeviceProperties(state.PhysicalDevice, out var physicalDeviceProperties);
+            var drawUniformBytes = checked((uint)Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>());
+            var minimumAlignment = Math.Max(1UL, physicalDeviceProperties.Limits.MinUniformBufferOffsetAlignment);
+            var alignedStride = checked((uint)(((ulong)drawUniformBytes + minimumAlignment - 1) / minimumAlignment * minimumAlignment));
+            var drawCount = Math.Max(1, drawUniforms.Count);
+            var packedDrawUniforms = new byte[checked((int)alignedStride * drawCount)];
+            for (var index = 0; index < drawUniforms.Count; index++)
+            {
+                var drawUniform = drawUniforms[index];
+                MemoryMarshal.Write(
+                    packedDrawUniforms.AsSpan(checked((int)alignedStride * index), checked((int)drawUniformBytes)),
+                    in drawUniform);
+            }
+
+            CreateHostBuffer(
+                state,
+                packedDrawUniforms,
+                BufferUsageFlags.UniformBufferBit,
+                out state.DrawUniformBuffer,
+                out state.DrawUniformMemory);
+            state.DrawUniformStrideBytes = alignedStride;
+
             if (readbackBytes > 0)
             {
                 CreateHostBuffer(state, new byte[checked((int)readbackBytes)], BufferUsageFlags.TransferDstBit, out state.ReadbackBuffer, out state.ReadbackMemory);
@@ -1226,122 +1258,178 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             VulkanState state,
             IReadOnlyList<RekallAgeVulkanSceneMaterialKey> materialKeys)
         {
-            var bindings = stackalloc DescriptorSetLayoutBinding[8];
-            bindings[0] = new DescriptorSetLayoutBinding
+            var uniformBinding = new DescriptorSetLayoutBinding
             {
                 Binding = 0,
                 DescriptorCount = 1,
                 DescriptorType = DescriptorType.UniformBuffer,
                 StageFlags = ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit
             };
-            for (var i = 1u; i <= 7; i++)
+            var uniformLayoutInfo = new DescriptorSetLayoutCreateInfo
             {
-                bindings[i] = new DescriptorSetLayoutBinding
+                SType = StructureType.DescriptorSetLayoutCreateInfo,
+                BindingCount = 1,
+                PBindings = &uniformBinding
+            };
+            ThrowIfFailed(
+                state.Vk.CreateDescriptorSetLayout(state.Device, &uniformLayoutInfo, null, out state.DescriptorSetLayout),
+                "vkCreateDescriptorSetLayout frame");
+            var drawBinding = uniformBinding;
+            drawBinding.DescriptorType = DescriptorType.UniformBufferDynamic;
+            var drawLayoutInfo = uniformLayoutInfo;
+            drawLayoutInfo.PBindings = &drawBinding;
+            ThrowIfFailed(
+                state.Vk.CreateDescriptorSetLayout(state.Device, &drawLayoutInfo, null, out state.DrawDescriptorSetLayout),
+                "vkCreateDescriptorSetLayout draw");
+
+            var materialBindings = stackalloc DescriptorSetLayoutBinding[14];
+            for (var binding = 0u; binding < 14; binding++)
+            {
+                materialBindings[binding] = new DescriptorSetLayoutBinding
                 {
-                    Binding = i,
+                    Binding = binding,
                     DescriptorCount = 1,
-                    DescriptorType = DescriptorType.CombinedImageSampler,
+                    DescriptorType = binding % 2 == 0
+                        ? DescriptorType.SampledImage
+                        : DescriptorType.Sampler,
                     StageFlags = ShaderStageFlags.FragmentBit
                 };
             }
 
-            var layoutInfo = new DescriptorSetLayoutCreateInfo
+            var materialLayoutInfo = new DescriptorSetLayoutCreateInfo
             {
                 SType = StructureType.DescriptorSetLayoutCreateInfo,
-                BindingCount = 8,
-                PBindings = bindings
+                BindingCount = 14,
+                PBindings = materialBindings
             };
-            ThrowIfFailed(state.Vk.CreateDescriptorSetLayout(state.Device, &layoutInfo, null, out state.DescriptorSetLayout), "vkCreateDescriptorSetLayout");
+            ThrowIfFailed(
+                state.Vk.CreateDescriptorSetLayout(state.Device, &materialLayoutInfo, null, out state.MaterialDescriptorSetLayout),
+                "vkCreateDescriptorSetLayout material");
 
-            var descriptorSetCount = checked((uint)Math.Max(1, materialKeys.Count) * (uint)Math.Max(1, state.UniformBuffers.Length));
+            var frameSetCount = checked((uint)state.UniformBuffers.Length);
+            var materialSetCount = checked((uint)Math.Max(1, materialKeys.Count));
             var poolSizes = stackalloc DescriptorPoolSize[]
             {
-                new(DescriptorType.UniformBuffer, descriptorSetCount),
-                new(DescriptorType.CombinedImageSampler, checked(descriptorSetCount * 7))
+                new(DescriptorType.UniformBuffer, frameSetCount),
+                new(DescriptorType.UniformBufferDynamic, 1),
+                new(DescriptorType.SampledImage, checked(materialSetCount * 7)),
+                new(DescriptorType.Sampler, checked(materialSetCount * 7))
             };
             var poolInfo = new DescriptorPoolCreateInfo
             {
                 SType = StructureType.DescriptorPoolCreateInfo,
-                MaxSets = descriptorSetCount,
-                PoolSizeCount = 2,
+                MaxSets = checked(frameSetCount + 1 + materialSetCount),
+                PoolSizeCount = 4,
                 PPoolSizes = poolSizes
             };
             ThrowIfFailed(state.Vk.CreateDescriptorPool(state.Device, &poolInfo, null, out state.DescriptorPool), "vkCreateDescriptorPool");
 
+            state.FrameDescriptorSets = new DescriptorSet[state.UniformBuffers.Length];
+            for (var index = 0; index < state.UniformBuffers.Length; index++)
+            {
+                var descriptorSet = AllocateDescriptorSet(state, state.DescriptorSetLayout);
+                var bufferInfo = new DescriptorBufferInfo(
+                    state.UniformBuffers[index],
+                    0,
+                    (ulong)Marshal.SizeOf<RekallAgeVulkanSceneGpuFrameUniform>());
+                var write = UniformWrite(descriptorSet, &bufferInfo);
+                state.Vk.UpdateDescriptorSets(state.Device, 1, &write, 0, null);
+                state.FrameDescriptorSets[index] = descriptorSet;
+                if (index == 0)
+                {
+                    state.DescriptorSet = descriptorSet;
+                }
+            }
+
+            state.DrawDescriptorSet = AllocateDescriptorSet(state, state.DrawDescriptorSetLayout);
+            var drawBufferInfo = new DescriptorBufferInfo(
+                state.DrawUniformBuffer,
+                0,
+                (ulong)Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>());
+            var drawWrite = UniformWrite(
+                state.DrawDescriptorSet,
+                &drawBufferInfo,
+                DescriptorType.UniformBufferDynamic);
+            state.Vk.UpdateDescriptorSets(state.Device, 1, &drawWrite, 0, null);
+
             foreach (var key in materialKeys)
             {
-                for (var uniformIndex = 0; uniformIndex < state.UniformBuffers.Length; uniformIndex++)
+                var descriptorSet = AllocateDescriptorSet(state, state.MaterialDescriptorSetLayout);
+                var textures = new[]
                 {
-                    var setLayout = state.DescriptorSetLayout;
-                    var allocateInfo = new DescriptorSetAllocateInfo
-                    {
-                        SType = StructureType.DescriptorSetAllocateInfo,
-                        DescriptorPool = state.DescriptorPool,
-                        DescriptorSetCount = 1,
-                        PSetLayouts = &setLayout
-                    };
-                    ThrowIfFailed(state.Vk.AllocateDescriptorSets(state.Device, &allocateInfo, out var descriptorSet), "vkAllocateDescriptorSets");
-
-                    var bufferInfo = new DescriptorBufferInfo(state.UniformBuffers[uniformIndex], 0, (ulong)Marshal.SizeOf<RekallAgeVulkanSceneGpuFrameUniform>());
-                    var baseColor = ResolveTextureResource(state, key.BaseColorTextureId, state.WhiteTexture!);
-                    var normal = ResolveTextureResource(state, key.NormalTextureId, state.FlatNormalTexture!);
-                    var metallicRoughness = ResolveTextureResource(state, key.MetallicRoughnessTextureId, state.DefaultMetallicRoughnessTexture!);
-                    var occlusion = ResolveTextureResource(state, key.OcclusionTextureId, state.WhiteTexture!);
-                    var emissive = ResolveTextureResource(state, key.EmissiveTextureId, state.WhiteTexture!);
-                    var cloudShadow = ResolveTextureResource(state, key.CloudShadowTextureId, state.WhiteTexture!);
-                    var surfaceWater = ResolveTextureResource(state, key.SurfaceWaterTextureId, state.WhiteTexture!);
-                    var baseColorInfo = new DescriptorImageInfo(baseColor.Sampler, baseColor.View, ImageLayout.ShaderReadOnlyOptimal);
-                    var normalInfo = new DescriptorImageInfo(normal.Sampler, normal.View, ImageLayout.ShaderReadOnlyOptimal);
-                    var metallicRoughnessInfo = new DescriptorImageInfo(metallicRoughness.Sampler, metallicRoughness.View, ImageLayout.ShaderReadOnlyOptimal);
-                    var occlusionInfo = new DescriptorImageInfo(occlusion.Sampler, occlusion.View, ImageLayout.ShaderReadOnlyOptimal);
-                    var emissiveInfo = new DescriptorImageInfo(emissive.Sampler, emissive.View, ImageLayout.ShaderReadOnlyOptimal);
-                    var cloudShadowInfo = new DescriptorImageInfo(cloudShadow.Sampler, cloudShadow.View, ImageLayout.ShaderReadOnlyOptimal);
-                    var surfaceWaterInfo = new DescriptorImageInfo(surfaceWater.Sampler, surfaceWater.View, ImageLayout.ShaderReadOnlyOptimal);
-                    var writes = new WriteDescriptorSet[8];
-                    writes[0] = new WriteDescriptorSet
-                    {
-                        SType = StructureType.WriteDescriptorSet,
-                        DstSet = descriptorSet,
-                        DstBinding = 0,
-                        DescriptorCount = 1,
-                        DescriptorType = DescriptorType.UniformBuffer,
-                        PBufferInfo = &bufferInfo
-                    };
-                    writes[1] = ImageWrite(descriptorSet, 1, &baseColorInfo);
-                    writes[2] = ImageWrite(descriptorSet, 2, &normalInfo);
-                    writes[3] = ImageWrite(descriptorSet, 3, &metallicRoughnessInfo);
-                    writes[4] = ImageWrite(descriptorSet, 4, &occlusionInfo);
-                    writes[5] = ImageWrite(descriptorSet, 5, &emissiveInfo);
-                    writes[6] = ImageWrite(descriptorSet, 6, &cloudShadowInfo);
-                    writes[7] = ImageWrite(descriptorSet, 7, &surfaceWaterInfo);
-                    fixed (WriteDescriptorSet* writesPtr = writes)
-                    {
-                        state.Vk.UpdateDescriptorSets(state.Device, 8, writesPtr, 0, null);
-                    }
-
-                    state.MaterialDescriptorSets[(uniformIndex, key)] = descriptorSet;
-                    if (uniformIndex == 0)
-                    {
-                        state.MaterialDescriptorSets[(-1, key)] = descriptorSet;
-                        if (key.Equals(RekallAgeVulkanSceneMaterialKey.Default))
-                        {
-                            state.DescriptorSet = descriptorSet;
-                        }
-                    }
+                    ResolveTextureResource(state, key.BaseColorTextureId, state.WhiteTexture!),
+                    ResolveTextureResource(state, key.NormalTextureId, state.FlatNormalTexture!),
+                    ResolveTextureResource(state, key.MetallicRoughnessTextureId, state.DefaultMetallicRoughnessTexture!),
+                    ResolveTextureResource(state, key.OcclusionTextureId, state.WhiteTexture!),
+                    ResolveTextureResource(state, key.EmissiveTextureId, state.WhiteTexture!),
+                    ResolveTextureResource(state, key.CloudShadowTextureId, state.WhiteTexture!),
+                    ResolveTextureResource(state, key.SurfaceWaterTextureId, state.WhiteTexture!)
+                };
+                var imageInfos = new DescriptorImageInfo[14];
+                var writes = new WriteDescriptorSet[14];
+                for (var textureIndex = 0; textureIndex < textures.Length; textureIndex++)
+                {
+                    imageInfos[textureIndex * 2] = new DescriptorImageInfo(
+                        default,
+                        textures[textureIndex].View,
+                        ImageLayout.ShaderReadOnlyOptimal);
+                    imageInfos[textureIndex * 2 + 1] = new DescriptorImageInfo(
+                        textures[textureIndex].Sampler,
+                        default,
+                        ImageLayout.Undefined);
                 }
+
+                fixed (DescriptorImageInfo* imageInfosPtr = imageInfos)
+                fixed (WriteDescriptorSet* writesPtr = writes)
+                {
+                    for (var binding = 0; binding < writes.Length; binding++)
+                    {
+                        writes[binding] = new WriteDescriptorSet
+                        {
+                            SType = StructureType.WriteDescriptorSet,
+                            DstSet = descriptorSet,
+                            DstBinding = checked((uint)binding),
+                            DescriptorCount = 1,
+                            DescriptorType = binding % 2 == 0
+                                ? DescriptorType.SampledImage
+                                : DescriptorType.Sampler,
+                            PImageInfo = &imageInfosPtr[binding]
+                        };
+                    }
+
+                    state.Vk.UpdateDescriptorSets(state.Device, 14, writesPtr, 0, null);
+                }
+
+                state.MaterialDescriptorSets[key] = descriptorSet;
             }
         }
 
-        private static unsafe WriteDescriptorSet ImageWrite(DescriptorSet descriptorSet, uint binding, DescriptorImageInfo* imageInfo)
+        private static DescriptorSet AllocateDescriptorSet(VulkanState state, DescriptorSetLayout setLayout)
+        {
+            var allocateInfo = new DescriptorSetAllocateInfo
+            {
+                SType = StructureType.DescriptorSetAllocateInfo,
+                DescriptorPool = state.DescriptorPool,
+                DescriptorSetCount = 1,
+                PSetLayouts = &setLayout
+            };
+            ThrowIfFailed(state.Vk.AllocateDescriptorSets(state.Device, &allocateInfo, out var descriptorSet), "vkAllocateDescriptorSets");
+            return descriptorSet;
+        }
+
+        private static unsafe WriteDescriptorSet UniformWrite(
+            DescriptorSet descriptorSet,
+            DescriptorBufferInfo* bufferInfo,
+            DescriptorType descriptorType = DescriptorType.UniformBuffer)
         {
             return new WriteDescriptorSet
             {
                 SType = StructureType.WriteDescriptorSet,
                 DstSet = descriptorSet,
-                DstBinding = binding,
+                DstBinding = 0,
                 DescriptorCount = 1,
-                DescriptorType = DescriptorType.CombinedImageSampler,
-                PImageInfo = imageInfo
+                DescriptorType = descriptorType,
+                PBufferInfo = bufferInfo
             };
         }
 
@@ -1479,20 +1567,17 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     AttachmentCount = 1,
                     PAttachments = &colorBlendAttachment
                 };
-                var setLayout = state.DescriptorSetLayout;
-                var pushConstant = new PushConstantRange
+                var setLayouts = stackalloc DescriptorSetLayout[]
                 {
-                    StageFlags = ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
-                    Offset = 0,
-                    Size = (uint)Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>()
+                    state.DescriptorSetLayout,
+                    state.DrawDescriptorSetLayout,
+                    state.MaterialDescriptorSetLayout
                 };
                 var layoutInfo = new PipelineLayoutCreateInfo
                 {
                     SType = StructureType.PipelineLayoutCreateInfo,
-                    SetLayoutCount = 1,
-                    PSetLayouts = &setLayout,
-                    PushConstantRangeCount = 1,
-                    PPushConstantRanges = &pushConstant
+                    SetLayoutCount = 3,
+                    PSetLayouts = setLayouts
                 };
                 ThrowIfFailed(state.Vk.CreatePipelineLayout(state.Device, &layoutInfo, null, out state.PipelineLayout), "vkCreatePipelineLayout");
 
@@ -1732,8 +1817,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             IReadOnlyList<RekallAgeVulkanSceneCommandDraw> ranges,
             bool transparent)
         {
-            foreach (var range in ranges)
+            for (var drawIndex = 0; drawIndex < ranges.Count; drawIndex++)
             {
+                var range = ranges[drawIndex];
                 if (range.Transparent != transparent)
                 {
                     continue;
@@ -1755,35 +1841,40 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     PipelineBindPoint.Graphics,
                     transparent ? pipeline.TransparentPipeline : pipeline.OpaquePipeline);
 
-                var descriptorSet = ResolveDescriptorSet(state, passIndex, range.MaterialKey);
-                state.Vk.CmdBindDescriptorSets(state.CommandBuffer, PipelineBindPoint.Graphics, pipeline.Layout, 0, 1, &descriptorSet, 0, null);
-                var draw = range.PushConstants;
-                state.Vk.CmdPushConstants(
-                    state.CommandBuffer,
-                    pipeline.Layout,
-                    ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
-                    0,
-                    (uint)Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>(),
-                    &draw);
+                var descriptorSets = new DescriptorSet[]
+                {
+                    state.FrameDescriptorSets[Math.Min(passIndex, state.FrameDescriptorSets.Length - 1)],
+                    state.DrawDescriptorSet,
+                    ResolveMaterialDescriptorSet(state, range.MaterialKey)
+                };
+                var dynamicOffset = checked(state.DrawUniformStrideBytes * (uint)drawIndex);
+                fixed (DescriptorSet* descriptorSetsPtr = descriptorSets)
+                {
+                    state.Vk.CmdBindDescriptorSets(
+                        state.CommandBuffer,
+                        PipelineBindPoint.Graphics,
+                        pipeline.Layout,
+                        0,
+                        3,
+                        descriptorSetsPtr,
+                        1,
+                        &dynamicOffset);
+                }
                 state.Vk.CmdDrawIndexed(state.CommandBuffer, range.IndexCount, 1, range.FirstIndex, range.VertexOffset, 0);
             }
         }
 
-        private static DescriptorSet ResolveDescriptorSet(VulkanState state, int uniformIndex, RekallAgeVulkanSceneMaterialKey key)
+        private static DescriptorSet ResolveMaterialDescriptorSet(
+            VulkanState state,
+            RekallAgeVulkanSceneMaterialKey key)
         {
-            if (state.MaterialDescriptorSets.TryGetValue((uniformIndex, key), out var descriptorSet)
+            if (state.MaterialDescriptorSets.TryGetValue(key, out var descriptorSet)
                 && descriptorSet.Handle != 0)
             {
                 return descriptorSet;
             }
 
-            if (state.MaterialDescriptorSets.TryGetValue((-1, key), out descriptorSet)
-                && descriptorSet.Handle != 0)
-            {
-                return descriptorSet;
-            }
-
-            return state.DescriptorSet;
+            return state.MaterialDescriptorSets[RekallAgeVulkanSceneMaterialKey.Default];
         }
 
         private static void RecordTextureUploads(VulkanState state)
@@ -2128,14 +2219,21 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public DeviceMemory UniformMemory;
             public Buffer[] UniformBuffers = [];
             public DeviceMemory[] UniformMemories = [];
+            public Buffer DrawUniformBuffer;
+            public DeviceMemory DrawUniformMemory;
+            public uint DrawUniformStrideBytes;
             public Buffer ReadbackBuffer;
             public DeviceMemory ReadbackMemory;
             public DescriptorSetLayout DescriptorSetLayout;
+            public DescriptorSetLayout DrawDescriptorSetLayout;
+            public DescriptorSetLayout MaterialDescriptorSetLayout;
             public DescriptorPool DescriptorPool;
             public DescriptorSet DescriptorSet;
+            public DescriptorSet[] FrameDescriptorSets = [];
+            public DescriptorSet DrawDescriptorSet;
             public readonly List<VulkanTextureResource> Textures = [];
             public readonly Dictionary<string, VulkanTextureResource> TextureById = new(StringComparer.Ordinal);
-            public readonly Dictionary<(int UniformIndex, RekallAgeVulkanSceneMaterialKey Key), DescriptorSet> MaterialDescriptorSets = [];
+            public readonly Dictionary<RekallAgeVulkanSceneMaterialKey, DescriptorSet> MaterialDescriptorSets = [];
             public readonly Dictionary<RekallAgeRuntimeViewportShaderPipeline, VulkanProjectPipelineResource> ProjectPipelines = [];
             public readonly Dictionary<string, VulkanProjectPipelineResource> ProjectPipelineByContentHash = new(StringComparer.Ordinal);
             public readonly List<VulkanProjectPipelineResource> ProjectPipelineResources = [];
@@ -2210,6 +2308,16 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         Vk.DestroyDescriptorSetLayout(Device, DescriptorSetLayout, null);
                     }
 
+                    if (DrawDescriptorSetLayout.Handle != 0)
+                    {
+                        Vk.DestroyDescriptorSetLayout(Device, DrawDescriptorSetLayout, null);
+                    }
+
+                    if (MaterialDescriptorSetLayout.Handle != 0)
+                    {
+                        Vk.DestroyDescriptorSetLayout(Device, MaterialDescriptorSetLayout, null);
+                    }
+
                     foreach (var texture in Textures)
                     {
                         texture.Dispose(Vk, Device);
@@ -2229,6 +2337,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     {
                         DestroyBuffer(UniformBuffer, UniformMemory);
                     }
+
+                    DestroyBuffer(DrawUniformBuffer, DrawUniformMemory);
 
                     DestroyBuffer(ReadbackBuffer, ReadbackMemory);
 
@@ -2316,6 +2426,38 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 {
                     Vk.FreeMemory(Device, memory, null);
                 }
+            }
+        }
+
+        private static void UpdateDrawUniformBuffer(
+            VulkanState state,
+            IReadOnlyList<RekallAgeVulkanSceneGpuDrawPushConstants> drawUniforms)
+        {
+            var drawUniformBytes = checked((int)Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>());
+            var packedBytes = checked((ulong)state.DrawUniformStrideBytes * (ulong)Math.Max(1, drawUniforms.Count));
+            void* mapped;
+            ThrowIfFailed(
+                state.Vk.MapMemory(state.Device, state.DrawUniformMemory, 0, packedBytes, 0, &mapped),
+                "vkMapMemory draw uniforms");
+            try
+            {
+                for (var index = 0; index < drawUniforms.Count; index++)
+                {
+                    var drawUniform = drawUniforms[index];
+                    var bytes = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(in drawUniform, 1));
+                    fixed (byte* sourcePointer = bytes)
+                    {
+                        System.Buffer.MemoryCopy(
+                            sourcePointer,
+                            (byte*)mapped + checked((nint)(state.DrawUniformStrideBytes * (uint)index)),
+                            drawUniformBytes,
+                            drawUniformBytes);
+                    }
+                }
+            }
+            finally
+            {
+                state.Vk.UnmapMemory(state.Device, state.DrawUniformMemory);
             }
         }
 

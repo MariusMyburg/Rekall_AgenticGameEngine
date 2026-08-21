@@ -1,0 +1,195 @@
+{
+  "schemaVersion": 1,
+  "id": "scene_6dd9a18df38446eeb0bf407dbde91e15",
+  "name": "Main",
+  "capabilities": [
+    "rendering3d",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "ent_293191a6d79b472a8dafb44a0dc3b1d3",
+      "name": "Authored Material Cube",
+      "tags": [
+        "cube",
+        "geometry",
+        "primitive"
+      ],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#ffffff"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cube",
+            "vertexShader": "agent/tint",
+            "fragmentShader": "agent/tint"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -1,
+            "y": 0,
+            "z": 1,
+            "pitch": 0,
+            "yaw": 24,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_703a1e7704124ab4b8062d86af55935b",
+      "name": "Default Material Cube",
+      "tags": [
+        "cube",
+        "geometry",
+        "primitive"
+      ],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#39c67a"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 1,
+            "y": 0,
+            "z": 1,
+            "pitch": 0,
+            "yaw": -24,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ab8a4e24ea674fe2bd45f988f035c42a",
+      "name": "Floor",
+      "tags": [
+        "cube",
+        "geometry",
+        "primitive"
+      ],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#253044"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": -0.7,
+            "z": 1,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 7,
+            "scaleY": 0.25,
+            "scaleZ": 5
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_71bbafe9b1cf44b9b4e8a2e369bf0fa1",
+      "name": "Key Light",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": {
+            "intensity": 1.4,
+            "color": "#fff0d0"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "pitch": -42,
+            "yaw": -35
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_dee93d893beb4fe38cc2ce2ee4c4240d",
+      "name": "Main Camera",
+      "tags": [
+        "camera"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "active": true,
+            "fieldOfView": 52
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 1.8,
+            "z": -7,
+            "pitch": 8
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

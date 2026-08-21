@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 01:43 Africa/Johannesburg
+Last verified: 2026-08-21 02:04 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: assigned project shaders are now compile-validated through
-playable verification and survive package inventory, relocation, and semantic audit
+Latest milestone: portable frame/draw/material shader resources execute on
+native Vulkan and the Windows player with retained hardware and package proof
 
 ## Product objective
 
@@ -93,6 +93,34 @@ Studio is important, but it does not define or reorder the engine foundation.
   packaged scene after integrity inspection, including relocated directories
   and archives, so a shader cannot be made acceptable merely by rewriting its
   inventory hash. The focused locked Release selection passes 43/43.
+- Portable material-resource ABI: native Vulkan no longer uses its legacy
+  combined frame/material descriptor set and draw push constants. It now binds
+  the same ABI v1 sets as the Windows player: frame uniform at set 0, an
+  alignment-correct dynamic draw-uniform buffer at set 1, and seven separate
+  sampled-image/sampler pairs at set 2. The default engine shaders were migrated
+  to the same contract; persistent OpenXR renderers refresh both frame and draw
+  uniforms on every compatible frame. The backend description now reports set
+  indices and zero push-constant bytes honestly. The Vulkan scene tranche passes 80/80,
+  including a real resourceful project shader on the local RTX 5090.
+- Retained custom-material acceptance: `Examples/CustomMaterialShader` was
+  created through public project, scene, entity, component, geometry, shader
+  write, and shader assignment commands. `agent/tint` reflects all four vertex
+  attributes plus frame/draw/material resources and resolves to pipeline SHA-256
+  `B364F777B8DCD9D368DE9853C5A833F6D515CCCC8DB46A9B0F9CC03F787C04BF`.
+  The 960x540 native Vulkan capture on `NVIDIA GeForce RTX 5090` is informative,
+  uses no fallback/missing/unsupported assets or runtime observations, visibly
+  separates the purple authored cube from the green default cube, and has
+  SHA-256 `01AC5884D0B6E5535D2E4EEE8A109B82FCD424DA769D5DFD438EAAB3C27A12EB`.
+  The resourceful Windows player completed 30/30 frames. Its graphics package
+  contains 119 inventoried files, including both referenced shader sources;
+  relocation and consolidated audit passed every check. The source archive has
+  SHA-256 `82814A36867E3B2A55C601B460AAEBF67DBF02538BF825127215F6651ADA369D`.
+- Full product gate after material acceptance: 967/967 engine tests and 7/7
+  Windows Studio tests pass; the Release solution build reports zero warnings
+  and zero errors. The gate initially exposed a headless Studio progress race:
+  a later model failure could arrive before queued `Progress<T>` evidence. The
+  headless path now reports immediately while WPF retains UI-context marshalling;
+  the exact regression passed five consecutive focused runs before the full gate.
 - Persistent 3D physics: the runtime now retains a BEPU simulation across
   frames, incrementally synchronizes bodies and statics, preserves angular
   motion/orientation and sleep state, and lets BEPU own contact response.
@@ -1574,7 +1602,8 @@ now verified. Further physics breadth should be driven by the real Qwen
 benchmark, with likely candidates being exact contact evidence, collision
 filtering, constraints, or authored angular control rather than genre behavior.
 
-The programmable-rendering architecture is in execution. Tasks 1-5 are verified:
+The programmable-rendering architecture's executable-material plan is complete.
+Tasks 1-6 are verified:
 existing agent-visible shader authoring and assignment metadata now resolves to
 reflected, content-addressed, ABI-validated shader assets, and incompatible
 pairs cannot alter a scene, authored shader identity reaches each GPU draw,
@@ -1582,9 +1611,9 @@ and native Vulkan capture executes the selected project pipeline with measured
 pixel proof. The windowed Windows player executes the same authored sources and
 retains its last valid pipeline across broken live edits. Agent inspection,
 dependency-inverted validation, referenced-source packaging, relocation, and
-semantic package audit are verified. Task 6 is active: reconcile the declared
-frame/draw/material resource ABI across both GPU backends, then retain an
-end-to-end hardware and installed proof. Custom post-processing, dynamic
+semantic package audit are verified. The declared frame/draw/material resource
+ABI is now common to both GPU backends, and the retained example proves native
+hardware, Windows player, package relocation, and audit. Custom post-processing, dynamic
 geometry, and typed GPU resources are
 separate subsequent tranches; the first post-process proof will be an
 agent-authored raindrop shader rather than an engine rain feature.

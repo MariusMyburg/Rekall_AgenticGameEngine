@@ -14,15 +14,7 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 cameraPosition;
 } frame;
 
-layout(set = 0, binding = 1) uniform sampler2D baseColorTexture;
-layout(set = 0, binding = 2) uniform sampler2D normalTexture;
-layout(set = 0, binding = 3) uniform sampler2D metallicRoughnessTexture;
-layout(set = 0, binding = 4) uniform sampler2D occlusionTexture;
-layout(set = 0, binding = 5) uniform sampler2D emissiveTexture;
-layout(set = 0, binding = 6) uniform sampler2D cloudShadowTexture;
-layout(set = 0, binding = 7) uniform sampler2D surfaceWaterTexture;
-
-layout(push_constant) uniform DrawPushConstants
+layout(set = 1, binding = 0) uniform DrawUniformBuffer
 {
     mat4 model;
     vec4 materialFactors;
@@ -38,6 +30,21 @@ layout(push_constant) uniform DrawPushConstants
     vec4 surfaceWaterFactors;
 } draw;
 
+layout(set = 2, binding = 0) uniform texture2D baseColorTexture;
+layout(set = 2, binding = 1) uniform sampler baseColorSampler;
+layout(set = 2, binding = 2) uniform texture2D normalTexture;
+layout(set = 2, binding = 3) uniform sampler normalSampler;
+layout(set = 2, binding = 4) uniform texture2D metallicRoughnessTexture;
+layout(set = 2, binding = 5) uniform sampler metallicRoughnessSampler;
+layout(set = 2, binding = 6) uniform texture2D occlusionTexture;
+layout(set = 2, binding = 7) uniform sampler occlusionSampler;
+layout(set = 2, binding = 8) uniform texture2D emissiveTexture;
+layout(set = 2, binding = 9) uniform sampler emissiveSampler;
+layout(set = 2, binding = 10) uniform texture2D cloudShadowTexture;
+layout(set = 2, binding = 11) uniform sampler cloudShadowSampler;
+layout(set = 2, binding = 12) uniform texture2D surfaceWaterTexture;
+layout(set = 2, binding = 13) uniform sampler surfaceWaterSampler;
+
 layout(location = 0) out vec4 outColor;
 
 const float PI = 3.14159265359;
@@ -46,7 +53,7 @@ const int MAX_LIGHT_SAMPLE_COUNT = 16;
 
 vec3 perturbNormal(vec3 normal)
 {
-    vec3 tangentNormal = texture(normalTexture, fragUv).xyz * 2.0 - 1.0;
+    vec3 tangentNormal = texture(sampler2D(normalTexture, normalSampler), fragUv).xyz * 2.0 - 1.0;
     tangentNormal.xy *= draw.materialFactors.z;
     vec3 q1 = dFdx(fragWorldPosition);
     vec3 q2 = dFdy(fragWorldPosition);
@@ -276,7 +283,7 @@ float sampleCloudShadow(vec3 surfacePosition, vec3 lightDirection)
 
     float hitDistance = cloudHit.x > 0.0 ? cloudHit.x : cloudHit.y;
     vec3 cloudPoint = rayOrigin + normalize(lightDirection) * hitDistance;
-    float coverage = texture(cloudShadowTexture, sphericalUv(cloudPoint - planetCenter)).a;
+    float coverage = texture(sampler2D(cloudShadowTexture, cloudShadowSampler), sphericalUv(cloudPoint - planetCenter)).a;
     float strength = clamp(draw.cloudShadowFactors.z, 0.0, 1.0);
     float daylight = planetShadowFactor(surfacePosition, normalize(lightDirection), planetCenter);
     return clamp(1.0 - coverage * strength * daylight, 0.0, 1.0);
@@ -294,7 +301,7 @@ float surfaceWaterSpecularStrength()
 
 float sampleSurfaceWaterCoverage(vec2 uv, vec3 baseTextureColor, out vec3 waterTint)
 {
-    vec4 water = texture(surfaceWaterTexture, uv);
+    vec4 water = texture(sampler2D(surfaceWaterTexture, surfaceWaterSampler), uv);
     waterTint = mix(vec3(0.006, 0.075, 0.34), pow(max(water.rgb, vec3(0.0)), vec3(2.2)), 0.35);
     float waterColorPresence = max(max(water.r, water.g), water.b) * water.a;
     float baseBlueDominance = baseTextureColor.b - max(baseTextureColor.r, baseTextureColor.g);
@@ -544,7 +551,7 @@ vec4 renderCloudLayer()
     float lambertian = max(dot(normal, light), 0.0);
     float skyVisibility = cloudSkyVisibility(fragWorldPosition, light, planetCenter);
 
-    vec4 textureColor = texture(baseColorTexture, fragUv);
+    vec4 textureColor = texture(sampler2D(baseColorTexture, baseColorSampler), fragUv);
     float textureCoverage = cloudAlphaFromTextureOnly()
         ? textureColor.a
         : max(max(textureColor.r, textureColor.g), textureColor.b) * textureColor.a;
@@ -586,9 +593,9 @@ void main()
         return;
     }
 
-    vec4 textureColor = texture(baseColorTexture, fragUv);
+    vec4 textureColor = texture(sampler2D(baseColorTexture, baseColorSampler), fragUv);
     vec3 albedo = pow(max(fragColor.rgb * textureColor.rgb, vec3(0.0)), vec3(2.2));
-    vec4 metalRough = texture(metallicRoughnessTexture, fragUv);
+    vec4 metalRough = texture(sampler2D(metallicRoughnessTexture, metallicRoughnessSampler), fragUv);
     float metallic = clamp(metalRough.b * draw.materialFactors.x, 0.0, 1.0);
     float roughness = clamp(metalRough.g * draw.materialFactors.y, 0.04, 1.0);
     vec3 waterTint = vec3(0.0);
@@ -602,7 +609,7 @@ void main()
     float occlusion = 1.0;
     if (draw.materialFactors.w > 0.0001)
     {
-        occlusion = mix(1.0, texture(occlusionTexture, fragUv).r, draw.materialFactors.w);
+        occlusion = mix(1.0, texture(sampler2D(occlusionTexture, occlusionSampler), fragUv).r, draw.materialFactors.w);
     }
     vec3 light = frame.lightPosition.w > 0.5
         ? normalize(frame.lightPosition.xyz - fragWorldPosition)
@@ -636,7 +643,7 @@ void main()
     vec3 ambient = albedo * ambientStrength * occlusion;
     vec3 waterFresnel = fresnelSchlick(ndotv, vec3(0.02));
     ambient += waterFresnel * frame.lightColor.rgb * directTransmittance * waterCoverage * 0.018;
-    vec3 emissive = pow(max(texture(emissiveTexture, fragUv).rgb * draw.emissiveFactors.rgb, vec3(0.0)), vec3(2.2)) * draw.emissiveFactors.a;
+    vec3 emissive = pow(max(texture(sampler2D(emissiveTexture, emissiveSampler), fragUv).rgb * draw.emissiveFactors.rgb, vec3(0.0)), vec3(2.2)) * draw.emissiveFactors.a;
     float cloudShadow = sampleCloudShadow(fragWorldPosition, light);
     vec3 color = emissive + ambient + (diffuse + specular) * frame.lightColor.rgb * directTransmittance * cloudShadow * ndotl * 1.8;
     color = applySurfaceAerialPerspective(color, fragWorldPosition, light);

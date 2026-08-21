@@ -1,0 +1,8 @@
+{
+  "name": "Custom Material Shader",
+  "schemaVersion": 1,
+  "capabilities": [
+    "rendering3d",
+    "world"
+  ]
+}

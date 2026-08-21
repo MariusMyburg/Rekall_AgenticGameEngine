@@ -348,13 +348,13 @@ git commit -m "feat: inspect and package custom shader pipelines"
 - Consumes: all prior tasks.
 - Produces: a generic custom-material example and retained native/player/package evidence.
 
-- [ ] **Step 1: Create the example through public authoring commands**
+- [x] **Step 1: Create the example through public authoring commands**
 
 Create a camera, light, floor, and two meshes. Assign the project shader only
 to one mesh. The shader must use the ABI's frame/draw/material resources and
 produce an unmistakable time-independent tint so captures are deterministic.
 
-- [ ] **Step 2: Verify headless inspection and native Vulkan output**
+- [x] **Step 2: Verify headless inspection and native Vulkan output**
 
 ```powershell
 dotnet run --project src/Rekall.Age.Cli -c Release -- shader inspect-pipeline Examples/CustomMaterialShader agent/tint agent/tint
@@ -365,7 +365,7 @@ Expected: ABI version 1, valid reflected layout, hardware acceleration true,
 RTX 5090 selected on this machine, informative frame, and one reported project
 pipeline with no fallback.
 
-- [ ] **Step 3: Launch and visually verify the Windows player**
+- [x] **Step 3: Launch and visually verify the Windows player**
 
 ```powershell
 dotnet build src/Rekall.Age.Player.Windows/Rekall.Age.Player.Windows.csproj -c Release --no-restore -warnaserror
@@ -376,7 +376,7 @@ Keep the window open long enough to confirm the default and authored materials
 differ. Edit the fragment shader once to prove valid hot reload, then introduce
 and repair one compile error to prove last-valid retention.
 
-- [ ] **Step 4: Run the complete product gate**
+- [x] **Step 4: Run the complete product gate**
 
 ```powershell
 dotnet test Rekall.AGE.sln -c Release --no-restore -warnaserror
@@ -385,7 +385,7 @@ dotnet build Rekall.AGE.sln -c Release --no-restore -warnaserror
 
 Expected: all engine and Studio tests pass; build has zero warnings/errors.
 
-- [ ] **Step 5: Package, relocate, audit, and record evidence**
+- [x] **Step 5: Package, relocate, audit, and record evidence**
 
 Use the existing game package, relocation, and consolidated audit workflows.
 Verify the relocated package contains inventoried shader sources, runs its
@@ -393,7 +393,7 @@ Windows player, captures the custom result, and passes audit. Record test
 counts, capture path/hash, package path/hash, device, pipeline key, hot-reload
 result, and remaining render-resource tranches in `PROGRESS.md`.
 
-- [ ] **Step 6: Commit and push the tranche**
+- [x] **Step 6: Commit and push the tranche**
 
 ```powershell
 git add Examples/CustomMaterialShader docs src tests

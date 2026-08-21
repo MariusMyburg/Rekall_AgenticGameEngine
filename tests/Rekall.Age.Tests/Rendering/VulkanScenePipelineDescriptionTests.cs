@@ -5,7 +5,7 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VulkanScenePipelineDescriptionTests
 {
     [Fact]
-    public void DefaultPipelineDeclaresShaderVertexDescriptorPushConstantAndDepthContracts()
+    public void DefaultPipelineDeclaresCanonicalShaderResourceAndDepthContracts()
     {
         var pipeline = RekallAgeVulkanScenePipelineDescription.Default;
 
@@ -17,30 +17,41 @@ public sealed class VulkanScenePipelineDescriptionTests
         Assert.Equal(["position", "normal", "color", "uv"], pipeline.VertexAttributes.Select(attribute => attribute.Name));
         Assert.Contains(pipeline.DescriptorBindings, binding =>
             binding.Name == "FrameUniform"
+            && binding.Set == 0
             && binding.Binding == 0
             && binding.DescriptorType == "uniform-buffer"
             && binding.ShaderStage == "vertex+fragment");
         Assert.Contains(pipeline.DescriptorBindings, binding =>
+            binding.Name == "DrawUniform"
+            && binding.Set == 1
+            && binding.Binding == 0
+            && binding.DescriptorType == "dynamic-uniform-buffer"
+            && binding.ShaderStage == "vertex+fragment");
+        Assert.Contains(pipeline.DescriptorBindings, binding =>
             binding.Name == "BaseColorTexture"
-            && binding.Binding == 1
-            && binding.DescriptorType == "combined-image-sampler"
+            && binding.Set == 2
+            && binding.Binding == 0
+            && binding.DescriptorType == "sampled-image"
             && binding.ShaderStage == "fragment");
         Assert.Contains(pipeline.DescriptorBindings, binding =>
             binding.Name == "EmissiveTexture"
-            && binding.Binding == 5
-            && binding.DescriptorType == "combined-image-sampler"
+            && binding.Set == 2
+            && binding.Binding == 8
+            && binding.DescriptorType == "sampled-image"
             && binding.ShaderStage == "fragment");
         Assert.Contains(pipeline.DescriptorBindings, binding =>
             binding.Name == "CloudShadowTexture"
-            && binding.Binding == 6
-            && binding.DescriptorType == "combined-image-sampler"
+            && binding.Set == 2
+            && binding.Binding == 10
+            && binding.DescriptorType == "sampled-image"
             && binding.ShaderStage == "fragment");
         Assert.Contains(pipeline.DescriptorBindings, binding =>
             binding.Name == "SurfaceWaterTexture"
-            && binding.Binding == 7
-            && binding.DescriptorType == "combined-image-sampler"
+            && binding.Set == 2
+            && binding.Binding == 12
+            && binding.DescriptorType == "sampled-image"
             && binding.ShaderStage == "fragment");
-        Assert.True(pipeline.PushConstantBytes >= 240);
+        Assert.Equal(0u, pipeline.PushConstantBytes);
     }
 
     [Fact]
@@ -57,13 +68,15 @@ public sealed class VulkanScenePipelineDescriptionTests
         Assert.Contains("layout(location = 3) in vec2 inUv;", vertex);
         Assert.Contains("layout(set = 0, binding = 0) uniform FrameUniform", vertex);
         Assert.Contains("mat4 viewProjection;", vertex);
-        Assert.Contains("layout(push_constant) uniform DrawPushConstants", vertex);
+        Assert.Contains("layout(set = 1, binding = 0) uniform DrawUniformBuffer", vertex);
         Assert.Contains("mat4 model;", vertex);
         Assert.Contains("layout(set = 0, binding = 0) uniform FrameUniform", fragment);
-        Assert.Contains("layout(set = 0, binding = 1) uniform sampler2D baseColorTexture;", fragment);
-        Assert.Contains("layout(set = 0, binding = 5) uniform sampler2D emissiveTexture;", fragment);
-        Assert.Contains("layout(set = 0, binding = 6) uniform sampler2D cloudShadowTexture;", fragment);
-        Assert.Contains("layout(set = 0, binding = 7) uniform sampler2D surfaceWaterTexture;", fragment);
+        Assert.Contains("layout(set = 1, binding = 0) uniform DrawUniformBuffer", fragment);
+        Assert.Contains("layout(set = 2, binding = 0) uniform texture2D baseColorTexture;", fragment);
+        Assert.Contains("layout(set = 2, binding = 1) uniform sampler baseColorSampler;", fragment);
+        Assert.Contains("layout(set = 2, binding = 8) uniform texture2D emissiveTexture;", fragment);
+        Assert.Contains("layout(set = 2, binding = 10) uniform texture2D cloudShadowTexture;", fragment);
+        Assert.Contains("layout(set = 2, binding = 12) uniform texture2D surfaceWaterTexture;", fragment);
         Assert.Contains("vec4 lightPosition;", fragment);
         Assert.Contains("frame.lightPosition.w > 0.5", fragment);
         Assert.Contains("vec4 emissiveFactors;", fragment);

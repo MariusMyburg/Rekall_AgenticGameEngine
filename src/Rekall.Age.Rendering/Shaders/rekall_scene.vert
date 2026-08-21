@@ -14,7 +14,7 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 cameraPosition;
 } frame;
 
-layout(push_constant) uniform DrawPushConstants
+layout(set = 1, binding = 0) uniform DrawUniformBuffer
 {
     mat4 model;
     vec4 materialFactors;

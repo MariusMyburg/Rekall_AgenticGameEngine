@@ -131,13 +131,48 @@ public sealed class WindowsPlayerSourceTests
         await File.WriteAllTextAsync(Path.Combine(shaderRoot, "magenta.vert"), """
             #version 450
             layout(location = 0) in vec3 inPosition;
-            void main() { gl_Position = vec4(inPosition, 1.0); }
+            layout(set = 0, binding = 0) uniform FrameUniformBuffer
+            {
+                mat4 ViewProjection;
+                vec4 LightDirection;
+                vec4 LightColor;
+                vec4 LightPosition;
+                vec4 CameraPosition;
+            } Frame;
+            layout(set = 1, binding = 0) uniform DrawUniformBuffer
+            {
+                mat4 Model;
+                vec4 MaterialFactors;
+                vec4 EmissiveFactors;
+                vec4 AtmosphereFactors0;
+                vec4 AtmosphereFactors1;
+                vec4 AtmosphereColor0;
+                vec4 AtmosphereColor1;
+                vec4 AtmosphereColor2;
+                vec4 CloudFactors;
+                vec4 CloudColor;
+                vec4 CloudShadowFactors;
+                vec4 SurfaceWaterFactors;
+            } Draw;
+            layout(location = 0) out vec2 fragUv;
+            void main()
+            {
+                gl_Position = Frame.ViewProjection * Draw.Model * vec4(inPosition, 1.0);
+                fragUv = inPosition.xy * 0.5 + 0.5;
+            }
             """);
         var fragmentPath = Path.Combine(shaderRoot, "magenta.frag");
         await File.WriteAllTextAsync(fragmentPath, """
             #version 450
+            layout(location = 0) in vec2 fragUv;
+            layout(set = 2, binding = 0) uniform texture2D BaseColorTexture;
+            layout(set = 2, binding = 1) uniform sampler BaseColorSampler;
             layout(location = 0) out vec4 outColor;
-            void main() { outColor = vec4(1.0, 0.0, 1.0, 1.0); }
+            void main()
+            {
+                float sampledAlpha = texture(sampler2D(BaseColorTexture, BaseColorSampler), fragUv).a;
+                outColor = vec4(1.0, 0.0, 1.0, sampledAlpha);
+            }
             """);
         var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
             .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])

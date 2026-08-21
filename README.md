@@ -1148,7 +1148,25 @@ Runtime render meshes can reference `RekallAgeRuntimeRenderShaderPipeline`.
 
 Shader validation uses the Vulkan shader compiler path so agents can catch shader errors before runtime.
 
-These shader commands are currently part of the command bus and MCP catalog. They are intended for agent use through MCP `tools/call`; dedicated CLI route aliases can be added later without changing the underlying command contracts.
+The scene-material ABI is versioned and portable across native Vulkan capture
+and the Windows player: set 0 contains the frame uniform, set 1 contains the
+draw uniform, and set 2 contains separate material textures and samplers.
+Reflection rejects incompatible vertex inputs or resource bindings before a
+scene is changed. Project validation, packaging, relocation, and consolidated
+package audit recompile every referenced pair.
+
+CLI aliases expose the same command contracts:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- shader write <project> agent/tint vertex <glsl-source>
+dotnet run --project src/Rekall.Age.Cli -- shader assign-pipeline <project> Main <entity-id> agent/tint agent/tint
+dotnet run --project src/Rekall.Age.Cli -- shader inspect-pipeline <project> agent/tint agent/tint
+```
+
+`Examples/CustomMaterialShader` is the retained resourceful proof. It uses all
+four vertex attributes plus frame, draw, sampled-image, and sampler resources;
+one cube uses the authored purple material while the adjacent green cube stays
+on the engine material.
 
 ## Geometry Authoring
 

@@ -520,7 +520,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         AppendAgentLine($"task: {AgentTaskInput.Trim()}");
         try
         {
-            var progress = new Progress<RekallAgeLanguageModelAgentProgress>(ReportAgentProgress);
+            IProgress<RekallAgeLanguageModelAgentProgress> progress = SynchronizationContext.Current is null
+                ? new ImmediateProgress<RekallAgeLanguageModelAgentProgress>(ReportAgentProgress)
+                : new Progress<RekallAgeLanguageModelAgentProgress>(ReportAgentProgress);
             var result = await _agentSession.RunAsync(
                 new RekallAgeProjectAgentSessionRequest(
                     _session.ProjectRoot,
@@ -897,6 +899,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         Replace(ValidationLines, [$"error: REKALL_STUDIO_UNEXPECTED_FAILURE - {exception.Message}"]);
         IsBusy = false;
     }
+}
+
+internal sealed class ImmediateProgress<T>(Action<T> report) : IProgress<T>
+{
+    public void Report(T value) => report(value);
 }
 
 internal sealed class RekallAgeAsyncCommand(

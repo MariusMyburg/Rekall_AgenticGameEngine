@@ -41,7 +41,7 @@ internal static class RekallAgeCli
         Log.Information("Rekall AGE command starting. Args={Args}", string.Join(' ', args));
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <agent|game|project|capability|scene|entity|component|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|compatibility|recovery|diagnostics|transaction|capture|render|module|build|validation|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <agent|game|project|capability|scene|entity|component|shader|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|compatibility|recovery|diagnostics|transaction|capture|render|module|build|validation|mcp> ...");
             Log.Information("Rekall AGE command finished with usage error. LogDirectory={LogDirectory}", logDirectory);
             Log.CloseAndFlush();
             return 2;
@@ -69,6 +69,10 @@ internal static class RekallAgeCli
                 ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
                 ["shader", "inspect-pipeline", var root, var vertex, var fragment] =>
                     await InspectShaderPipelineAsync(registry, context, root, vertex, fragment),
+                ["shader", "write", var root, var name, var stage, var source] =>
+                    await WriteShaderSourceAsync(registry, context, root, name, stage, source),
+                ["shader", "assign-pipeline", var root, var scene, var entityId, var vertex, var fragment] =>
+                    await AssignShaderPipelineAsync(registry, context, root, scene, entityId, vertex, fragment),
                 ["render", "mesh", "inspect", var root, var scene] =>
                     await InspectSceneMeshGeometryAsync(registry, context, root, scene, "0"),
                 ["render", "mesh", "inspect", var root, var scene, var frames] =>
@@ -283,6 +287,8 @@ internal static class RekallAgeCli
                 ["entity", "inspect", var root, var scene, var entityId] => await InspectEntityAsync(registry, context, root, scene, entityId),
                 ["component", "set", var root, var scene, var entityId, var componentType, var propertyName, var value] =>
                     await SetComponentPropertyAsync(registry, context, root, scene, entityId, componentType, propertyName, value),
+                ["component", "add", var root, var scene, var entityId, var componentType, var propertiesJson] =>
+                    await AddComponentAsync(registry, context, root, scene, entityId, componentType, propertiesJson),
                 ["component", "remove-property", var root, var scene, var entityId, var componentType, var propertyName] =>
                     await RemoveComponentPropertyAsync(registry, context, root, scene, entityId, componentType, propertyName),
                 ["level", "entity", "duplicate", var root, var scene, var entityId, var name] =>
@@ -697,6 +703,41 @@ internal static class RekallAgeCli
             Console.WriteLine($"Diagnostic: {diagnostic}");
         }
         return result.Value.Valid ? 0 : 1;
+    }
+
+    private static async Task<int> WriteShaderSourceAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string name,
+        string stage,
+        string source)
+    {
+        var result = await registry.ExecuteAsync<WriteShaderSourceRequest, WriteShaderSourceResult>(
+            "rekall.shader.write",
+            new WriteShaderSourceRequest(root, name, stage, source),
+            context);
+        Console.WriteLine(result.Summary);
+        foreach (var error in result.Value.Errors) Console.WriteLine($"Diagnostic: {error}");
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> AssignShaderPipelineAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string entityId,
+        string vertex,
+        string fragment)
+    {
+        var result = await registry.ExecuteAsync<AssignShaderPipelineRequest, AssignShaderPipelineResult>(
+            "rekall.shader.assign_pipeline",
+            new AssignShaderPipelineRequest(root, scene, entityId, vertex, fragment),
+            context);
+        Console.WriteLine(result.Summary);
+        foreach (var error in result.Value.Errors) Console.WriteLine($"Diagnostic: {error}");
+        return result.Ok ? 0 : 1;
     }
 
     private static async Task<int> InspectVirtualGeometrySceneAsync(
@@ -2548,6 +2589,25 @@ internal static class RekallAgeCli
             }
         }
 
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> AddComponentAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string entityId,
+        string componentType,
+        string propertiesJson)
+    {
+        var properties = JsonNode.Parse(propertiesJson) as JsonObject
+            ?? throw new ArgumentException("Component properties must be a JSON object.", nameof(propertiesJson));
+        var result = await registry.ExecuteAsync<AddComponentRequest, AddComponentResult>(
+            "rekall.component.add",
+            new AddComponentRequest(root, scene, entityId, componentType, properties),
+            context);
+        Console.WriteLine(result.Summary);
         return result.Ok ? 0 : 1;
     }
 

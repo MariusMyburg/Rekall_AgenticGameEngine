@@ -57,7 +57,14 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
             .Distinct(StringComparer.Ordinal)
             .OrderBy(assetId => assetId, StringComparer.Ordinal)
             .ToArray();
-        if (spriteAssetIds.Length == 0 && textureAssetIds.Length == 0 && modelAssetIds.Length == 0)
+        var fontAssetIds = frame.Renderables
+            .Select(renderable => renderable.UiVisual?.FontAssetId)
+            .Where(assetId => !string.IsNullOrWhiteSpace(assetId))
+            .Select(assetId => assetId!)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(assetId => assetId, StringComparer.Ordinal)
+            .ToArray();
+        if (spriteAssetIds.Length == 0 && textureAssetIds.Length == 0 && modelAssetIds.Length == 0 && fontAssetIds.Length == 0)
         {
             return RekallAgeRuntimeViewportAssetSet.Empty;
         }
@@ -67,7 +74,40 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
         var images = new Dictionary<string, RekallAgeRgbaImage>(StringComparer.Ordinal);
         var textures = new Dictionary<string, RekallAgeRuntimeTextureAsset>(StringComparer.Ordinal);
         var models = new Dictionary<string, IReadOnlyList<RekallAgeVulkanSceneMesh>>(StringComparer.Ordinal);
+        var fonts = new Dictionary<string, RekallAgeRuntimeFontAsset>(StringComparer.Ordinal);
         var issues = new List<RekallAgeRuntimeViewportAssetIssue>();
+
+        foreach (var assetId in fontAssetIds)
+        {
+            if (!catalogById.TryGetValue(assetId, out var asset))
+            {
+                issues.Add(new RekallAgeRuntimeViewportAssetIssue(
+                    assetId,
+                    "REKALL_RENDER_FONT_MISSING",
+                    "Font asset was not found in the project catalog."));
+                continue;
+            }
+
+            if (!asset.Kind.Equals("font", StringComparison.Ordinal))
+            {
+                issues.Add(new RekallAgeRuntimeViewportAssetIssue(
+                    assetId,
+                    "REKALL_RENDER_FONT_UNSUPPORTED",
+                    $"Asset kind '{asset.Kind}' cannot be used as a font."));
+                continue;
+            }
+
+            if (!File.Exists(asset.ImportedPath))
+            {
+                issues.Add(new RekallAgeRuntimeViewportAssetIssue(
+                    assetId,
+                    "REKALL_RENDER_FONT_MISSING",
+                    "Font asset imported file was not found."));
+                continue;
+            }
+
+            fonts[assetId] = new RekallAgeRuntimeFontAsset(assetId, asset.ImportedPath);
+        }
 
         foreach (var assetId in spriteAssetIds.Concat(textureAssetIds).Distinct(StringComparer.Ordinal))
         {
@@ -221,7 +261,8 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
 
         return new RekallAgeRuntimeViewportAssetSet(images, models, issues.ToArray())
         {
-            Textures = textures
+            Textures = textures,
+            Fonts = fonts
         };
     }
 

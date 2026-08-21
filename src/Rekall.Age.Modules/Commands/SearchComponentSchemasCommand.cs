@@ -125,7 +125,7 @@ public sealed class SearchComponentSchemasCommand
             .OrderByDescending(item => item.Score)
             .ThenBy(item => item.Component.TypeName, StringComparer.Ordinal)
             .Take(Math.Clamp(request.Limit, 1, 64))
-            .Select(item => Compact(item.Component))
+            .Select(item => Compact(item.Component, terms))
             .ToArray();
         return RekallAgeCommandResult<SearchComponentSchemasResult>.Success(
             new SearchComponentSchemasResult(matches)
@@ -222,7 +222,9 @@ public sealed class SearchComponentSchemasCommand
         return score;
     }
 
-    private static RekallAgeCompactComponentSchema Compact(RekallAgeComponentSchema component)
+    private static RekallAgeCompactComponentSchema Compact(
+        RekallAgeComponentSchema component,
+        IReadOnlyList<string> queryTerms)
     {
         return new RekallAgeCompactComponentSchema(
             component.TypeName,
@@ -232,7 +234,10 @@ public sealed class SearchComponentSchemasCommand
                 AssetKind = property.AssetKind,
                 Minimum = property.Minimum,
                 Maximum = property.Maximum,
-                Description = property.Description,
+                Description = queryTerms.Any(term => string.Join(' ', property.Name, property.Kind, property.Description)
+                    .Contains(term, StringComparison.OrdinalIgnoreCase))
+                        ? property.Description
+                        : null,
                 AllowedValues = property.AllowedValues.Count == 0 ? null : property.AllowedValues
             }).ToArray())
         {

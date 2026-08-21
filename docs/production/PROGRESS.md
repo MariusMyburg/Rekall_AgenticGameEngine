@@ -4,17 +4,14 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 21:31 Africa/Johannesburg
+Last verified: 2026-08-21 21:59 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: the rebuilt Windows distribution is green at 1,091/1,091
-engine and 11/11 Studio tests twice plus the full installed-product matrix. A
-second Rain Glass diagnostic was rejected honestly for omitting the requested
-internet image and full-window composition. Generic task-derived prompt and
-completion-evidence enforcement is implemented test-first. Per the user's
-explicit priority correction, Pong is now the active acceptance, Galaga is
-next, and Rain Glass resumes only after both games are complete.
+Latest milestone: the engine-owned graphics/agent tranche is green at
+1,101/1,101 engine tests, 11/11 Studio tests, and a zero-warning, zero-error
+Release solution build. Pong is still the active acceptance, Galaga is next,
+and Rain Glass resumes only after both games are complete.
 
 The first installed-Studio Pong run reached mechanical package, relocation,
 and audit success, but independent frame review rejected it: the court rendered
@@ -55,9 +52,26 @@ and recomputes output metrics. Direct RTX 5090 captures prove Vulkan world+HUD
 output and expose the same 44% excessive-HUD warning as software. All 315
 rendering-namespace tests pass, including the new perspective backdrop,
 anisotropic primitive, UI coverage, and Vulkan UI composition regressions; the
-complete Release solution builds with zero warnings/errors. The next action is
-to run the broader engine suite, checkpoint this graphics tranche, then resume
-Pong through Studio against these tested contracts.
+complete Release solution builds with zero warnings/errors.
+
+The preserved Pong repair exposed two more generic contracts before acceptance.
+First, a pruned long-running agent conversation inserted its durable tool ledger
+as a new system message after the original user request and could retain orphaned
+tool results; Qwen 3.8 then failed with `no user query found in messages`. The
+ledger is now a user-role continuation and pruning starts only at a complete
+message boundary. Second, UI text used only a five-pixel bitmap alphabet. The
+Windows renderer now defaults to antialiased Segoe UI, exposes generic
+`FontFamily`, `FontWeight`, `FontStyle`, and imported `FontAssetId` contracts,
+resolves project `font` assets, supports distinct system families such as
+Georgia and Consolas, and retains the bitmap alphabet only as a deterministic
+fallback. The text surface is bounded to each clipped element rather than a
+full-frame allocation. A fresh 960x540 Pong capture shows the compact score,
+serve prompt, and controls in the modern default while preserving the full
+court. Font-family, font-asset, message-pruning, module-reflection, locked player
+publish, package publish, and bounded MCP schema regressions are all included in
+the 1,101-test green run. The next action is to checkpoint/merge this tranche,
+then resume Pong through Studio and require fresh runtime behavior evidence,
+package relocation, audit, and independent play/visual inspection.
 
 ## Product objective
 

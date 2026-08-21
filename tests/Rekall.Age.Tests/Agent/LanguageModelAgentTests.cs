@@ -2011,8 +2011,12 @@ public sealed class LanguageModelAgentTests
 
         Assert.True(result.Completed);
         var ledger = Assert.Single(model.Requests[1].Messages, message =>
-            message.Role == "system"
+            message.Role == "user"
             && message.Content.StartsWith("Persistent Rekall tool ledger", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            model.Requests[1].Messages.SkipWhile(message => message != ledger),
+            message => message.Role == "system");
+        Assert.DoesNotContain(model.Requests[1].Messages, message => message.Role == "tool");
         Assert.Contains("#1 rekall.validation.project ok", ledger.Content, StringComparison.Ordinal);
         Assert.Contains("#14 noise.14 ok", ledger.Content, StringComparison.Ordinal);
     }

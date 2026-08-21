@@ -288,7 +288,11 @@ public sealed record RekallAgeRuntimeViewportUiVisual(
     string BorderColor,
     int BorderWidth,
     int FontSize,
-    string? AssetId = null);
+    string? AssetId = null,
+    string FontFamily = "Segoe UI",
+    string FontWeight = "normal",
+    string FontStyle = "normal",
+    string? FontAssetId = null);
 
 public sealed record RekallAgeRuntimeViewportVirtualGeometry(
     bool Enabled = true,

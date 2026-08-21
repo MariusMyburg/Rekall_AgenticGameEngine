@@ -562,6 +562,14 @@ public sealed record RekallAgeRuntimeUiElement(
 
     public double FontSize { get; init; } = 16;
 
+    public string FontFamily { get; init; } = "Segoe UI";
+
+    public string FontWeight { get; init; } = "normal";
+
+    public string FontStyle { get; init; } = "normal";
+
+    public string? FontAssetId { get; init; }
+
     public string? AssetId { get; init; }
 }
 

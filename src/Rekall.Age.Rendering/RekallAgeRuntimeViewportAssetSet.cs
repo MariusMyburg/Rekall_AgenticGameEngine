@@ -8,11 +8,16 @@ public sealed record RekallAgeRuntimeViewportAssetSet(
     public IReadOnlyDictionary<string, RekallAgeRuntimeTextureAsset> Textures { get; init; } =
         new Dictionary<string, RekallAgeRuntimeTextureAsset>(StringComparer.Ordinal);
 
+    public IReadOnlyDictionary<string, RekallAgeRuntimeFontAsset> Fonts { get; init; } =
+        new Dictionary<string, RekallAgeRuntimeFontAsset>(StringComparer.Ordinal);
+
     public static RekallAgeRuntimeViewportAssetSet Empty { get; } = new(
         new Dictionary<string, RekallAgeRgbaImage>(StringComparer.Ordinal),
         new Dictionary<string, IReadOnlyList<RekallAgeVulkanSceneMesh>>(StringComparer.Ordinal),
         Array.Empty<RekallAgeRuntimeViewportAssetIssue>());
 }
+
+public sealed record RekallAgeRuntimeFontAsset(string AssetId, string Path);
 
 public sealed record RekallAgeRuntimeTextureAsset(
     string AssetId,

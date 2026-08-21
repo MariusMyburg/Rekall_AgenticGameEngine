@@ -657,7 +657,11 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     element.BorderColor,
                     Math.Max(0, (int)Math.Round(element.BorderWidth * Math.Min(scaleX, scaleY))),
                     Math.Max(1, (int)Math.Round(element.FontSize * Math.Min(scaleX, scaleY))),
-                    element.AssetId));
+                    element.AssetId,
+                    element.FontFamily,
+                    element.FontWeight,
+                    element.FontStyle,
+                    element.FontAssetId));
         }
     }
 

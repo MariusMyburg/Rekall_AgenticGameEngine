@@ -157,6 +157,12 @@ public abstract class RekallAgeUiElementBase : RekallAgeComponent
     [RekallAgeProperty(Kind = "color")] public string BorderColor { get; init; } = "#00000000";
     [RekallAgeProperty(Minimum = 0)] public double BorderWidth { get; init; }
     [RekallAgeProperty(Minimum = 1)] public double FontSize { get; init; } = 16;
+    [RekallAgeProperty(Description = "Installed font family; defaults to Segoe UI.")]
+    public string FontFamily { get; init; } = "Segoe UI";
+    [RekallAgeProperty(AllowedValues = ["normal", "bold"])] public string FontWeight { get; init; } = "normal";
+    [RekallAgeProperty(AllowedValues = ["normal", "italic"])] public string FontStyle { get; init; } = "normal";
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "font", Description = "Optional imported TTF/OTF; overrides FontFamily.")]
+    public string FontAssetId { get; init; } = string.Empty;
     [RekallAgeProperty(Kind = "assetRef", AssetKind = "image")] public string AssetId { get; init; } = string.Empty;
     [RekallAgeProperty] public bool Interactive { get; init; }
     [RekallAgeProperty(AllowedValues = ["none", "horizontal", "vertical"])] public string LayoutDirection { get; init; } = "none";

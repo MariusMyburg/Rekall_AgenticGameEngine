@@ -6,7 +6,7 @@ public static class RekallAgeModuleIndexer
 {
     public static RekallAgeModuleIndex IndexAssembly(Assembly assembly)
     {
-        var modules = assembly.GetTypes()
+        var modules = GetLoadableTypes(assembly)
             .Where(type => !type.IsAbstract && typeof(RekallAgeModule).IsAssignableFrom(type))
             .Select(IndexModule)
             .Where(module => module is not null)
@@ -15,6 +15,18 @@ public static class RekallAgeModuleIndexer
             .ToArray();
 
         return new RekallAgeModuleIndex(modules);
+    }
+
+    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException exception)
+        {
+            return exception.Types.OfType<Type>();
+        }
     }
 
     public static RekallAgeModuleIndex IndexAssemblies(IEnumerable<Assembly> assemblies)

@@ -1315,9 +1315,20 @@ public sealed class RekallAgeLanguageModelAgent(
         }
 
         var prefixCount = Math.Min(2, transcript.Count);
+        var tail = transcript.Skip(transcript.Count - (maxMessages - prefixCount - 1)).ToArray();
+        var firstCompleteMessage = Array.FindIndex(tail, message => !message.Role.Equals("tool", StringComparison.Ordinal));
+        if (firstCompleteMessage < 0)
+        {
+            tail = [];
+        }
+        else if (firstCompleteMessage > 0)
+        {
+            tail = tail[firstCompleteMessage..];
+        }
+
         return transcript.Take(prefixCount)
             .Append(CreateLedgerMessage(executions))
-            .Concat(transcript.Skip(transcript.Count - (maxMessages - prefixCount - 1)))
+            .Concat(tail)
             .ToArray();
     }
 
@@ -1347,7 +1358,7 @@ public sealed class RekallAgeLanguageModelAgent(
             return $"#{execution.Sequence} {execution.Name} {(execution.Succeeded ? "ok" : "failed")} args={arguments} result={execution.ResultPreview}";
         });
         return new RekallAgeLanguageModelMessage(
-            "system",
+            "user",
             "Persistent Rekall tool ledger (older raw tool messages may have been pruned; trust this ledger and inspect current state when uncertain):\n"
             + string.Join('\n', lines));
     }

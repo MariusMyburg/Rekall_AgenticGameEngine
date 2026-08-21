@@ -246,7 +246,10 @@ public sealed class RuntimeUiTests
                 ["foregroundColor"] = "#ffffff",
                 ["borderColor"] = "#88ccff",
                 ["borderWidth"] = 2,
-                ["fontSize"] = 12
+                ["fontSize"] = 12,
+                ["fontFamily"] = "Georgia",
+                ["fontWeight"] = "bold",
+                ["fontStyle"] = "italic"
             }))
             .AddComponent(RekallAgeComponentDocument.Create(
                 "Rekall.EventBindings",
@@ -278,6 +281,9 @@ public sealed class RuntimeUiTests
         var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(result.World, 200, 100, debugOverlay: false);
         var uiRenderable = Assert.Single(frame.Renderables, renderable => renderable.UiVisual is not null);
         Assert.Equal("Launch", uiRenderable.UiVisual!.Text);
+        Assert.Equal("Georgia", uiRenderable.UiVisual.FontFamily);
+        Assert.Equal("bold", uiRenderable.UiVisual.FontWeight);
+        Assert.Equal("italic", uiRenderable.UiVisual.FontStyle);
         var rendered = new RekallAgeRuntimeSoftwareRenderer().RenderRgba(
             frame,
             RekallAgeRuntimeViewportAssetSet.Empty);
@@ -312,5 +318,69 @@ public sealed class RuntimeUiTests
             runtimeEvent.Type == "pointer.click" && runtimeEvent.Handler == "launch-game");
         Assert.Contains(released.World.Subsystems.Events.Events, runtimeEvent =>
             runtimeEvent.Type == "ui.focus" && runtimeEvent.Handler == "focus-control");
+    }
+
+    [Fact]
+    public async Task SoftwareUiRendererUsesModernDefaultAndAuthoredFontFamilies()
+    {
+        async Task<(byte[] Pixels, string Family)> RenderAsync(
+            string? family,
+            RekallAgeRuntimeViewportAssetSet? assets = null,
+            string? fontAssetId = null)
+        {
+            var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.UiCanvas",
+                    new JsonObject { ["ReferenceWidth"] = 320, ["ReferenceHeight"] = 100 }));
+            var properties = new JsonObject
+            {
+                ["X"] = 8,
+                ["Y"] = 8,
+                ["Width"] = 300,
+                ["Height"] = 60,
+                ["Text"] = "Rekall AGE",
+                ["FontSize"] = 32,
+                ["ForegroundColor"] = "#ffffff"
+            };
+            if (family is not null)
+            {
+                properties["FontFamily"] = family;
+            }
+            if (fontAssetId is not null)
+            {
+                properties["FontAssetId"] = fontAssetId;
+            }
+
+            var label = RekallAgeEntityDocument.Create("Title", ["ui"]) with { ParentId = canvas.Id };
+            label = label.AddComponent(RekallAgeComponentDocument.Create("Rekall.Label", properties));
+            var scene = RekallAgeSceneDocument.Create("Main", ["ui"]).AddEntity(canvas).AddEntity(label);
+            var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+                .RunAsync(new RekallAgeRuntimeWorldBuilder().Build(scene), 1, CancellationToken.None);
+            var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(result.World, 320, 100, debugOverlay: false);
+            var visual = Assert.Single(frame.Renderables, renderable => renderable.UiVisual is not null).UiVisual!;
+            return (new RekallAgeRuntimeSoftwareRenderer()
+                .RenderUiOverlayRgba(frame, assets ?? RekallAgeRuntimeViewportAssetSet.Empty), visual.FontFamily);
+        }
+
+        var modernDefault = await RenderAsync(null);
+        var serif = await RenderAsync("Georgia");
+        var segoePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "segoeui.ttf");
+        Assert.True(File.Exists(segoePath), $"Expected Windows UI font at {segoePath}.");
+        var customFontAssets = RekallAgeRuntimeViewportAssetSet.Empty with
+        {
+            Fonts = new Dictionary<string, RekallAgeRuntimeFontAsset>(StringComparer.Ordinal)
+            {
+                ["asset_segoe"] = new("asset_segoe", segoePath)
+            }
+        };
+        var assetOverride = await RenderAsync("Georgia", customFontAssets, "asset_segoe");
+
+        Assert.Equal("Segoe UI", modernDefault.Family);
+        Assert.Equal("Georgia", serif.Family);
+        Assert.NotEqual(modernDefault.Pixels, serif.Pixels);
+        Assert.Equal(modernDefault.Pixels, assetOverride.Pixels);
+        Assert.True(
+            modernDefault.Pixels.Chunk(4).Select(Convert.ToHexString).Distinct(StringComparer.Ordinal).Count() > 2,
+            "Modern antialiased text should contain more than transparent and solid glyph pixels.");
     }
 }

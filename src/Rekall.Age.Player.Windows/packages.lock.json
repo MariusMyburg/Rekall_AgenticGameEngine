@@ -285,6 +285,7 @@
           "Silk.NET.Shaderc": "[2.23.0, )",
           "Silk.NET.Vulkan": "[2.23.0, )",
           "StbImageSharp": "[2.30.15, )",
+          "System.Drawing.Common": "[10.0.8, )",
           "Vortice.SPIRV.Reflect": "[1.0.6, )",
           "ZstdSharp.Port": "[0.8.8, )"
         }

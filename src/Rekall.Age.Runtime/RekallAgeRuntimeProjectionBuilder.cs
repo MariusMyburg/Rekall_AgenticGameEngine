@@ -437,6 +437,10 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             BorderColor = ReadString(component.Properties, "borderColor") ?? "#00000000",
                             BorderWidth = Math.Max(0, ReadNumber(component.Properties, "borderWidth", 0)),
                             FontSize = Math.Max(1, ReadNumber(component.Properties, "fontSize", 16)),
+                            FontFamily = ReadString(component.Properties, "fontFamily") ?? "Segoe UI",
+                            FontWeight = ReadString(component.Properties, "fontWeight") ?? "normal",
+                            FontStyle = ReadString(component.Properties, "fontStyle") ?? "normal",
+                            FontAssetId = ReadString(component.Properties, "fontAssetId"),
                             AssetId = ReadString(component.Properties, "assetId") ?? ReadString(component.Properties, "image")
                         });
                         break;

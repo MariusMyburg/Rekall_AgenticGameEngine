@@ -23,7 +23,7 @@ public sealed class SetComponentPropertyCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Sets one component property without replacing the rest of the component.",
+        "Sets one component property without replacing the rest of the component. Value is native JSON: pass arrays and objects directly, never as JSON-encoded strings. Use rekall.module.search_component_schemas first for the exact property kind and shape.",
         typeof(SetComponentPropertyRequest).FullName!,
         typeof(SetComponentPropertyResult).FullName!);
 

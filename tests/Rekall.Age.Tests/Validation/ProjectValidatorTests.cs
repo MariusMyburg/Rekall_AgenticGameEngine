@@ -207,6 +207,36 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneRejectsJsonEncodedStructuredPropertyWithNativeJsonRepair()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var input = RekallAgeEntityDocument.Create("Input", ["input"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.InputActionMap",
+                new JsonObject
+                {
+                    ["Actions"] = "[{\"name\":\"move.horizontal\",\"positiveKey\":\"D\",\"negativeKey\":\"A\"}]"
+                }));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["input"]).AddEntity(input),
+            CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        var issue = Assert.Single(report.Issues, item =>
+            item.Code == "REKALL_COMPONENT_PROPERTY_SHAPE_INVALID");
+        Assert.Equal("blocking", issue.Severity);
+        Assert.Contains("native JSON array", issue.Message, StringComparison.Ordinal);
+        var repair = Assert.Single(issue.SuggestedCommands!, command =>
+            command.Tool == "rekall.component.set_property");
+        var repairedValue = Assert.IsType<JsonArray>(repair.Arguments["value"]);
+        Assert.Equal("move.horizontal", repairedValue[0]!["name"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task ValidateSceneRequiresDimensionMatchingTransformForPhysicsBodies()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -668,6 +698,42 @@ public sealed class ProjectValidatorTests
         Assert.Equal(2, result.Value.ExecutedRepairCount);
         Assert.Equal(0, result.Value.Validation.IssueCount);
         Assert.Equal("ok", result.Value.Validation.Status);
+    }
+
+    [Fact]
+    public async Task RepairProjectValidationConvertsEncodedStructuredPropertyToNativeJson()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["input"])
+                .AddEntity(RekallAgeEntityDocument.Create("Input", ["input"])
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.InputActionMap",
+                        new JsonObject
+                        {
+                            ["Actions"] = "[{\"name\":\"move.horizontal\",\"positiveKey\":\"D\"}]"
+                        }))),
+            CancellationToken.None);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new ValidateProjectCommand());
+        registry.Register(new SetComponentPropertyCommand());
+        registry.Register(new RepairProjectValidationCommand(registry));
+
+        var result = await registry.ExecuteAsync<RepairProjectValidationRequest, RepairProjectValidationResult>(
+            "rekall.validation.repair_project",
+            new RepairProjectValidationRequest(root),
+            new RekallAgeCommandContext(
+                "agent",
+                RekallAgeTransaction.Begin("structured property repair"),
+                CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal("clean", result.Value.TerminationReason);
+        Assert.Equal(["rekall.component.set_property"], result.Value.ExecutedTools);
+        var repaired = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        var actions = Assert.IsType<JsonArray>(Assert.Single(repaired.Entities).Components.Single().Properties["Actions"]);
+        Assert.Equal("move.horizontal", actions[0]!["name"]!.GetValue<string>());
     }
 
     [Fact]

@@ -15,6 +15,7 @@ public sealed class RekallAgeInputActionSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeWorldFrameContext context)
     {
         var actions = new List<RekallAgeRuntimeInputAction>();
+        var observations = new List<RekallAgeRuntimeObservation>();
         foreach (var entity in world.Entities)
         {
             if (!entity.Visible)
@@ -25,10 +26,24 @@ public sealed class RekallAgeInputActionSystem : IRekallAgeRuntimeWorldSystem
             foreach (var component in entity.Components.Where(component =>
                          component.Type.Equals("Rekall.InputActionMap", StringComparison.Ordinal)))
             {
-                if (!ReadBoolean(component.Properties, "active", true)
-                    || !TryGetPropertyValue(component.Properties, "actions", out var node)
+                if (!ReadBoolean(component.Properties, "active", true))
+                {
+                    continue;
+                }
+
+                if (!TryGetPropertyValue(component.Properties, "actions", out var node)
                     || node is not JsonArray actionNodes)
                 {
+                    observations.Add(new RekallAgeRuntimeObservation(
+                        context.FrameIndex,
+                        "runtime.input.action_map_actions_invalid",
+                        "error",
+                        "input",
+                        entity.Id,
+                        entity.Name,
+                        Id,
+                        "Rekall.InputActionMap.Actions must be a native JSON array, not a JSON-encoded string. Use bindings such as [{\"name\":\"move.horizontal\",\"positiveKey\":\"D\",\"negativeKey\":\"A\"}].",
+                        ["rekall.component.set_property", "rekall.module.search_component_schemas"]));
                     continue;
                 }
 
@@ -42,6 +57,31 @@ public sealed class RekallAgeInputActionSystem : IRekallAgeRuntimeWorldSystem
             }
         }
 
+        var declaredNames = actions
+            .Select(action => action.Name)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+        foreach (var sample in context.Input.SemanticActions ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(sample.Name)
+                || declaredNames.Contains(sample.Name.Trim(), StringComparer.Ordinal))
+            {
+                continue;
+            }
+
+            observations.Add(new RekallAgeRuntimeObservation(
+                context.FrameIndex,
+                "runtime.input.semantic_action_undeclared",
+                "error",
+                "input",
+                sample.Name.Trim(),
+                sample.Name.Trim(),
+                Id,
+                $"Injected semantic action '{sample.Name.Trim()}' has no exact declaration in an active Rekall.InputActionMap. Declared actions: {(declaredNames.Length == 0 ? "(none)" : string.Join(", ", declaredNames))}.",
+                ["rekall.entity.inspect", "rekall.component.set_property", "rekall.module.search_component_schemas"]));
+        }
+
         return ValueTask.FromResult(world with
         {
             Subsystems = world.Subsystems with
@@ -51,7 +91,8 @@ public sealed class RekallAgeInputActionSystem : IRekallAgeRuntimeWorldSystem
                         .OrderBy(action => action.Name, StringComparer.Ordinal)
                         .ThenBy(action => action.SourceEntityName, StringComparer.Ordinal)
                         .ToArray())
-            }
+            },
+            Observations = world.Observations.Concat(observations).ToArray()
         });
     }
 

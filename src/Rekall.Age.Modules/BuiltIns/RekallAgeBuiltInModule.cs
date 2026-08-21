@@ -97,7 +97,9 @@ public sealed class RekallAgeInputActionMapComponent : RekallAgeComponent
     [RekallAgeProperty]
     public bool Active { get; init; } = true;
 
-    [RekallAgeProperty(Kind = "inputActions")]
+    [RekallAgeProperty(
+        Kind = "inputActions",
+        Description = "Native JSON array of semantic input bindings. Each object requires name and may use key, button/mouseButton, positiveKey, negativeKey, positiveButton, negativeButton, mouseWheelScale, mouseAxis/mouseDeltaAxis, and mouseScale. Example: [{name:\"move.horizontal\",positiveKey:\"D\",negativeKey:\"A\"},{name:\"reset\",key:\"R\"}]. Pass the array itself; never encode JSON inside a string. Runtime values such as value/isDown are evidence samples, not bindings.")]
     public RekallAgeInputActionBinding[] Actions { get; init; } =
     [
         new("primary", Key: "Space")

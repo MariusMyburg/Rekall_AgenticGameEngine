@@ -1631,6 +1631,34 @@ The next generic target is fail-closed structured component-property authoring
 and a direct runtime diagnostic with the exact valid action-map shape; no
 Lumen-Vault-specific behavior belongs in the engine.
 
+The structured component-authoring tranche is now implemented and
+installed-product verified. Component schema and mutation guidance require
+native JSON arrays/objects and give an exact semantic binding example. Runtime
+emits bounded error observations for malformed action maps and injected action
+names absent from active maps. Project validation blocks structured CLR array
+properties stored with the wrong JSON shape, losslessly parses an encoded
+array/object when possible, and supplies its ordinary
+`rekall.component.set_property` repair so the bounded project repair workflow
+can reach zero issues without hand-editing files. The full Release solution
+passed 975 engine and 7 Studio tests; the locked distribution repeated 975/975
+and 7/7 twice with zero warnings and zero errors. All installed-product checks
+passed against the 1,186-file distribution. Its 201,521,262-byte archive has
+SHA-256
+`8540332C94F139382D5AAE0BD5BB1AD31696839E4E48E84AADD12B317B902DB8`.
+
+Fresh installed Lumen Vault benchmark 19 is retained as the next honest
+failure. The unchanged brief and real `qwen3.5:35b` used 65 tool executions
+(39 successful, 26 failed), compiled an agent-authored runtime system, and
+produced a nonblank 960x540 viewport with 17 renderables. Native structured
+binding authoring worked: runtime exposed 13 action projections rather than
+the zero actions in benchmark 18. Independent one-frame replay proved injected
+`move.horizontal=1` reached all matching declarations. Movement still remained
+zero because the authored module called `FindEntity(world, "OrbPlayer")`;
+AGE's generically named helper only accepted an opaque entity id, returned
+null for the exact unique name, and the authored system exited silently. The
+next generic target is an unambiguous, observable entity query contract that
+preserves id lookup while making unique-name lookup safe and agent-efficient.
+
 The 2026-08-20 capability audit verified that built-in component schemas and
 `rekall.module.search_component_schemas` expose exact 2D/3D transform, camera,
 renderer, light, rigidbody, collider, world, and material contracts, while

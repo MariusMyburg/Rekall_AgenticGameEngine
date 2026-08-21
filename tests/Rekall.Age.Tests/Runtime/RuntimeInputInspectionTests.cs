@@ -127,6 +127,72 @@ public sealed class RuntimeInputInspectionTests
     }
 
     [Fact]
+    public async Task RuntimeInspectionExplainsJsonEncodedActionMapInsteadOfSilentlyDroppingActions()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"])
+            .AddEntity(RekallAgeEntityDocument.Create("Input", ["input"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.InputActionMap",
+                    new JsonObject
+                    {
+                        ["Actions"] = "[{\"name\":\"move.horizontal\",\"positiveKey\":\"D\"}]"
+                    })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(
+                root,
+                "Main",
+                1,
+                [new RekallAgeRuntimeInputFrame(SemanticActions: [new("move.horizontal")])]),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("malformed-action-map"), CancellationToken.None));
+
+        Assert.True(result.Ok);
+        Assert.Empty(result.Value.InputActions);
+        var malformed = Assert.Single(result.Value.Observations, observation =>
+            observation.Code == "runtime.input.action_map_actions_invalid");
+        Assert.Equal("error", malformed.Severity);
+        Assert.Contains("JSON array", malformed.Message, StringComparison.Ordinal);
+        Assert.Contains("not a JSON-encoded string", malformed.Message, StringComparison.Ordinal);
+        Assert.Contains("positiveKey", malformed.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RuntimeInspectionReportsInjectedSemanticActionMissingFromDeclaredMap()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"])
+            .AddEntity(RekallAgeEntityDocument.Create("Input", ["input"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.InputActionMap",
+                    new JsonObject
+                    {
+                        ["Actions"] = new JsonArray(new JsonObject
+                        {
+                            ["name"] = "move.horizontal",
+                            ["positiveKey"] = "D",
+                            ["negativeKey"] = "A"
+                        })
+                    })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(
+                root,
+                "Main",
+                1,
+                [new RekallAgeRuntimeInputFrame(SemanticActions: [new("move.vertical")])]),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("undeclared-semantic-action"), CancellationToken.None));
+
+        Assert.True(result.Ok);
+        var undeclared = Assert.Single(result.Value.Observations, observation =>
+            observation.Code == "runtime.input.semantic_action_undeclared");
+        Assert.Contains("move.vertical", undeclared.Message, StringComparison.Ordinal);
+        Assert.Contains("move.horizontal", undeclared.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RuntimeInspectionReportsRuntimeEventsForAgents()
     {
         var root = TestPaths.CreateTempDirectory();

@@ -4,6 +4,7 @@ using Rekall.Age.Modules;
 using Rekall.Age.Modules.BuiltIns;
 using Rekall.Age.World;
 using System.Globalization;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace Rekall.Age.Validation;
@@ -317,6 +318,35 @@ public sealed class RekallAgeProjectValidator
 
                 foreach (var propertySchema in schema.Properties)
                 {
+                    if (TryGetPropertyValue(component.Properties, propertySchema.Name, out var structuredNode)
+                        && ExpectedStructuredShape(propertySchema) is { } expectedShape
+                        && !HasStructuredShape(structuredNode, expectedShape))
+                    {
+                        var suggestions = new List<RekallAgeSuggestedCommand>();
+                        if (TryParseEncodedStructure(structuredNode, expectedShape, out var repairedValue))
+                        {
+                            suggestions.Add(new RekallAgeSuggestedCommand(
+                                "rekall.component.set_property",
+                                ComponentPropertyArguments(
+                                    projectRoot,
+                                    scene.Name,
+                                    entity.Id,
+                                    component.Type,
+                                    propertySchema.Name,
+                                    repairedValue)));
+                        }
+                        suggestions.Add(new RekallAgeSuggestedCommand(
+                            "rekall.module.search_component_schemas",
+                            new Dictionary<string, object?> { ["query"] = component.Type }));
+                        issues.Add(new RekallAgeValidationIssue(
+                            "REKALL_COMPONENT_PROPERTY_SHAPE_INVALID",
+                            $"Entity '{entity.Name}' component '{component.Type}' property '{propertySchema.Name}' must be a native JSON {expectedShape}, not {DescribeJsonShape(structuredNode)}. Pass arrays and objects directly; never encode structured JSON inside a string.",
+                            "blocking",
+                            entity.Id,
+                            suggestions));
+                        continue;
+                    }
+
                     if (!TryGetPropertyValue(component.Properties, propertySchema.Name, out var node)
                         || !TryReadNumber(node, out var number)
                         || (propertySchema.Minimum is null || number >= propertySchema.Minimum)
@@ -342,6 +372,55 @@ public sealed class RekallAgeProjectValidator
             }
         }
     }
+
+    private static string? ExpectedStructuredShape(RekallAgePropertySchema property) =>
+        property.TypeName.EndsWith("[]", StringComparison.Ordinal)
+            ? "array"
+            : property.TypeName.Equals(nameof(JsonObject), StringComparison.Ordinal)
+                || property.Kind.Equals("animationGraphParameters", StringComparison.Ordinal)
+                ? "object"
+                : null;
+
+    private static bool HasStructuredShape(JsonNode? node, string expectedShape) =>
+        expectedShape == "array" ? node is JsonArray : node is JsonObject;
+
+    private static bool TryParseEncodedStructure(
+        JsonNode? node,
+        string expectedShape,
+        out JsonNode? repairedValue)
+    {
+        repairedValue = null;
+        if (node is not JsonValue value
+            || !value.TryGetValue<string>(out var text)
+            || string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        try
+        {
+            repairedValue = JsonNode.Parse(text);
+            if (HasStructuredShape(repairedValue, expectedShape))
+            {
+                return true;
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        repairedValue = null;
+        return false;
+    }
+
+    private static string DescribeJsonShape(JsonNode? node) => node switch
+    {
+        JsonArray => "a JSON array",
+        JsonObject => "a JSON object",
+        JsonValue value when value.TryGetValue<string>(out _) => "a string",
+        JsonValue => "a scalar",
+        _ => "null"
+    };
 
     private static void ValidateUnqualifiedBuiltInAliases(
         string projectRoot,

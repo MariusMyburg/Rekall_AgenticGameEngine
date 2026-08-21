@@ -208,6 +208,7 @@ public sealed class RekallAgeLanguageModelAgent(
             var failedRuntimeAssertionThisTurn = false;
             var successfulRuntimeCheckpointThisTurn = false;
             string? repeatedFailureRecovery = null;
+            string? packageAuditRecovery = null;
             foreach (var call in response.ToolCalls)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -265,6 +266,13 @@ public sealed class RekallAgeLanguageModelAgent(
                 repeatedFailureRecovery = identicalFailureCount >= 3
                     ? BuildRepeatedFailureRecovery(execution, output, identicalFailureCount)
                     : null;
+                if (!succeeded
+                    && executedToolName.Equals(
+                        "rekall.workflow.audit_playable_package",
+                        StringComparison.Ordinal))
+                {
+                    packageAuditRecovery = BuildPackageAuditRecovery(output);
+                }
                 request.Progress?.Report(new RekallAgeLanguageModelAgentProgress(
                     turn,
                     "tool.completed",
@@ -305,6 +313,11 @@ public sealed class RekallAgeLanguageModelAgent(
                         $"Terminal workflow {effectiveToolName} completed successfully."));
                     return terminal;
                 }
+            }
+
+            if (packageAuditRecovery is not null)
+            {
+                transcript.Add(new RekallAgeLanguageModelMessage("user", packageAuditRecovery));
             }
 
             if (repeatedFailureRecovery is not null)
@@ -464,6 +477,29 @@ public sealed class RekallAgeLanguageModelAgent(
             + "Do not call it again with the same arguments until another operation changes the relevant state. "
             + actionText
             + " Rekall AGE has not executed that recovery action for you; you must select and call it.";
+    }
+
+    private static string BuildPackageAuditRecovery(JsonNode output)
+    {
+        var summary = output["summary"]?.GetValue<string>() ?? "Package audit failed.";
+        var firstError = output["errors"] is JsonArray errors && errors.Count > 0
+            ? errors[0]?["message"]?.GetValue<string>()
+            : null;
+        var reason = string.IsNullOrWhiteSpace(firstError)
+            ? summary
+            : $"{summary} {firstError}";
+        if (reason.Length > 1_200)
+        {
+            reason = reason[..1_200] + "…";
+        }
+
+        return
+            $"Package audit recovery required. Direct evidence: {reason} "
+            + "Re-read the original task and repair only its requested entities, visuals, HUD, and behavior. "
+            + "Do not add generic Cube/Test/Demo/Fault entities or unrelated validation/showcase filler merely to change pixels or satisfy a metric. "
+            + "Use exact registered generic component schemas to improve the requested content itself. "
+            + "After any scene or module mutation, obtain clean validation, rerun the original task's runtime assertions for every requested transition, rebuild if source changed, create a fresh package, and audit that fresh package. "
+            + "The failed or now-stale package is not completion evidence.";
     }
 
     private static bool RequiresImmediateRuntimeCheckpoint(

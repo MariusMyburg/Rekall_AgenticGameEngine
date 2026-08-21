@@ -1284,6 +1284,42 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task FailedPackageAuditAnchorsRecoveryToOriginalTaskInsteadOfFillerContent()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall(
+                    "rekall.workflow.audit_playable_package",
+                    new JsonObject { ["packagePath"] = "game.zip" })],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Repairing the requested game.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new FailedPackageAuditToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest(
+                "model",
+                "system",
+                "Create an arena with a player, objectives, HUD, and completion behavior.")
+            {
+                MaxTurns = 2
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Contains(
+            model.Requests[1].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("original task", StringComparison.OrdinalIgnoreCase)
+                && message.Content.Contains("Cube/Test/Demo/Fault", StringComparison.Ordinal)
+                && message.Content.Contains("requested entities", StringComparison.OrdinalIgnoreCase)
+                && message.Content.Contains("runtime assertions", StringComparison.OrdinalIgnoreCase)
+                && message.Content.Contains("package", StringComparison.OrdinalIgnoreCase)
+                && message.Content.Contains("audit", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void DiagnosticsExposeBoundedFailedToolResultsInsteadOfOnlyToolNames()
     {
         var failures = RekallAgeLanguageModelAgentDiagnostics.FormatFailures(
@@ -1412,6 +1448,25 @@ public sealed class LanguageModelAgentTests
 
             return ValueTask.FromResult<JsonNode>(new JsonObject { ["ok"] = true });
         }
+    }
+
+    private sealed class FailedPackageAuditToolExecutor : IRekallAgeAgentToolExecutor
+    {
+        public IReadOnlyList<RekallAgeLanguageModelTool> Tools { get; } =
+            [new("rekall.workflow.audit_playable_package", "Audit package", new JsonObject { ["type"] = "object" })];
+
+        public ValueTask<JsonNode> ExecuteAsync(string name, JsonObject arguments, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<JsonNode>(new JsonObject
+            {
+                ["ok"] = false,
+                ["summary"] = "Playable package audit failed.",
+                ["errors"] = new JsonArray(new JsonObject
+                {
+                    ["code"] = "REKALL_PLAYABLE_PACKAGE_AUDIT_FAILED",
+                    ["message"] = "Package proof frame is not informative.",
+                    ["target"] = "informative-frame"
+                })
+            });
     }
 
     private sealed class RecordingProgress<T> : IProgress<T>

@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 08:50 Africa/Johannesburg
+Last verified: 2026-08-21 09:02 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: complex delivery has a bounded 16-turn reserve; failed visual
-audits must redirect repairs to the original requested game
+Latest milestone: failed package audits are task-anchored; task-specific Studio
+completion must require successful audit-tool evidence
 
 ## Product objective
 
@@ -31,6 +31,30 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Failed package audits now inject bounded, task-anchored recovery: agents must
+  repair the original requested entities, visuals, HUD, and behavior; generic
+  `Cube/Test/Demo/Fault` filler is explicitly rejected; and scene/module changes
+  require fresh validation, requested runtime assertions, package creation, and
+  package audit. The audit reason remains direct tool evidence and AGE does not
+  author content for the agent. All 33 language-agent tests passed. The locked
+  zero-warning/error gate passed 1,012/1,012 engine and 7/7 Studio tests twice
+  and the complete installed matrix. Its 1,186-file archive is 201,583,675
+  bytes with SHA-256
+  `6DD3F185B7A3156354955F876ACC9E47CBFE1AFE2344E40F3BE3ADCC05D96BBB`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+- Clean installed real-Qwen benchmark 37 stopped before package audit recovery
+  could apply. It compiled `GameplayModule` and passed two semantic movement
+  assertions, but had zero renderables, no package, and no package audit. Qwen
+  then emitted a completion narrative; the ordinary completion-audit prompt was
+  followed only by `rekall.context.engine_status` and another narrative, which
+  the agent loop incorrectly accepted as completed after 26 calls. Studio's
+  outer acceptance correctly remained red and reported a blank viewport. The
+  exact fail-open defect is that `completionAuditPending` conflates a requested
+  narrative self-audit with successful configured audit-tool evidence.
+  Task-specific Studio automation must require a successful
+  `rekall.workflow.audit_playable_package` before narrative termination.
+  Evidence SHA-256 is
+  `31670F495385DD5318859BB1951FBB6AE378EFC6DBF6AC5443D73A2ECDBE4C66`.
 - The post-runtime delivery reserve is now 16 bounded turns. It activates only
   once after a qualifying successful gameplay checkpoint, does not increase the
   general authoring budget, and retains the global 256-turn hard ceiling. A

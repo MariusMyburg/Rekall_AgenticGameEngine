@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 02:04 Africa/Johannesburg
+Last verified: 2026-08-21 03:35 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: portable frame/draw/material shader resources execute on
-native Vulkan and the Windows player with retained hardware and package proof
+Latest milestone: runtime entity lookup is safe for opaque ids and unique
+authored names; the next real-Qwen blocker is typed complex tool arguments
 
 ## Product objective
 
@@ -30,6 +30,24 @@ agents author the game.
 Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
+
+- Agent entity query contract: `FindEntity` preserves exact opaque-id
+  precedence, then resolves one unique case-insensitive exact authored name;
+  duplicate names fail closed and `EntitiesNamed` remains the explicit
+  multi-match primitive. A compiled project module proves name-based mutation.
+  Focused TDD passed 7/7, full verification passed 976/976 engine and 7/7
+  Studio tests, and the locked Release/distribution matrix passed twice with
+  zero warnings/errors. The 1,186-file archive is 201,523,273 bytes with
+  SHA-256
+  `F8AF2C5D45182FF3FB5BB7A663BA05F74734ABDFD545435883784784AF5740A7`.
+- Fresh installed real-`qwen3.5:35b` Lumen Vault benchmark 20 remained red at
+  the 64-turn bound: 32/64 tool calls succeeded, the viewport was nonblank at
+  960x540 but contained only two renderables, and no package was produced.
+  Qwen compiled a real runtime system and authored semantic actions, but
+  repeatedly JSON-encoded the typed `inputs` and `assertions` arrays. The
+  mandatory gameplay checkpoint therefore never ran. The next work item is a
+  generic, bounded typed-argument normalization/diagnostic contract, followed
+  by the unchanged benchmark—not Studio polish or broader CI work.
 
 - Windows distribution: fresh 200,967,116-byte win-x64 archive assembled from
   `3a84dbc` with SHA-256

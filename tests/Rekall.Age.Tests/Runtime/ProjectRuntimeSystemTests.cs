@@ -420,21 +420,25 @@ public sealed class InputDrivenSystem : IRekallAgeRuntimeModuleSystem
             return ValueTask.FromResult(world);
         }
 
-        var entities = world.Entities.Select(entity =>
+        var entity = world.FindEntity("Input Actor");
+        if (entity is null)
         {
-            var motor = entity.FindComponent(MotorType);
-            if (motor is null)
-            {
-                return entity;
-            }
+            return ValueTask.FromResult(world);
+        }
 
-            var move = motor.Properties.ReadNumber("moveZPerFrame", 1);
-            return entity.WithPosition3D(entity.Transform.Position3D with
+        var motor = entity.FindComponent(MotorType);
+        if (motor is null)
+        {
+            return ValueTask.FromResult(world);
+        }
+
+        var move = motor.Properties.ReadNumber("moveZPerFrame", 1);
+        return ValueTask.FromResult(world.UpdateEntity(
+            entity.Id,
+            current => current.WithPosition3D(current.Transform.Position3D with
             {
-                Z = entity.Transform.Position3D.Z + move
-            });
-        }).ToArray();
-        return ValueTask.FromResult(world with { Entities = entities });
+                Z = current.Transform.Position3D.Z + move
+            })));
     }
 }
 """;

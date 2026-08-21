@@ -234,6 +234,10 @@ public sealed class InspectRuntimeSdkCommand
         nameof(RekallAgeRuntimeModuleSdk.WithComponentBoolean) or
         nameof(RekallAgeRuntimeModuleSdk.WithComponentString) =>
             "Returns a replacement immutable entity with one typed component property changed; no JsonObject namespace is required.",
+        nameof(RekallAgeRuntimeModuleSdk.FindEntity) =>
+            "Returns the exact-id match first, otherwise the single case-insensitive exact-name match. Returns null for no match or an ambiguous duplicate name; use EntitiesNamed when names may repeat.",
+        nameof(RekallAgeRuntimeModuleSdk.EntitiesNamed) =>
+            "Returns every case-insensitive exact-name match in stable entity-id order. Use this for duplicate authored names; FindEntity is the single-result id-or-unique-name helper.",
         nameof(RekallAgeRuntimeModuleSdk.Raycast2D) =>
             "Returns stable distance-ordered hits against visible Rekall.BoxCollider2D and Rekall.CircleCollider2D entities, with optional tag and component filters.",
         nameof(RekallAgeRuntimeModuleSdk.Raycast3D) =>
@@ -259,6 +263,10 @@ public sealed class InspectRuntimeSdkCommand
             "if (world.WasInputActionPressed(\"reset\")) { /* agent-authored rule */ }",
         nameof(RekallAgeRuntimeModuleSdk.WithPosition3D) =>
             "world = world.UpdateEntity(entity.Id, current => current.WithPosition3D(new RekallAgeRuntimeVector3(x, y, z)));",
+        nameof(RekallAgeRuntimeModuleSdk.FindEntity) =>
+            "var player = world.FindEntity(\"Player\"); // exact id first, then one unique exact name; null when ambiguous",
+        nameof(RekallAgeRuntimeModuleSdk.EntitiesNamed) =>
+            "var doors = world.EntitiesNamed(\"Door\"); // stable collection when authored names may repeat",
         nameof(RekallAgeRuntimeModuleSdk.UpdateComponent) =>
             "var replacement = entity.UpdateComponent(componentType, properties => { properties[\"score\"] = score; return properties; });",
         nameof(RekallAgeRuntimeModuleSdk.RemoveEntity) =>

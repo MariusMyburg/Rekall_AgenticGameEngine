@@ -42,9 +42,22 @@ public sealed class RuntimeEntityQuerySdkTests
             CreateEntity("player", "Player", ["actor"]));
 
         Assert.Equal("door", world.FindEntity("door")?.Id);
+        Assert.Equal("player", world.FindEntity("PLAYER")?.Id);
         Assert.Equal(["door", "door_clone"], world.EntitiesNamed("Door").Select(entity => entity.Id));
+        Assert.Null(world.FindEntity("Door"));
         Assert.Null(world.FindEntity("missing"));
         Assert.Empty(world.EntitiesNamed(""));
+    }
+
+    [Fact]
+    public void RuntimeModuleSdkFindEntityGivesExactIdPrecedenceOverUniqueNameFallback()
+    {
+        var world = CreateWorld(
+            CreateEntity("target", "By Id", []),
+            CreateEntity("other", "target", []));
+
+        Assert.Equal("target", world.FindEntity("target")?.Id);
+        Assert.Equal("other", world.FindEntity("TARGET")?.Id);
     }
 
     [Fact]

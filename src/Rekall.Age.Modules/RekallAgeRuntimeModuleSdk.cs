@@ -90,16 +90,26 @@ public static class RekallAgeRuntimeModuleSdk
 
     public static RekallAgeRuntimeEntity? FindEntity(
         this RekallAgeRuntimeWorld world,
-        string entityId)
+        string entityIdOrUniqueName)
     {
-        if (string.IsNullOrWhiteSpace(entityId))
+        if (string.IsNullOrWhiteSpace(entityIdOrUniqueName))
         {
             return null;
         }
 
-        var id = entityId.Trim();
-        return world.Entities.FirstOrDefault(entity =>
-            entity.Id.Equals(id, StringComparison.Ordinal));
+        var query = entityIdOrUniqueName.Trim();
+        var byId = world.Entities.FirstOrDefault(entity =>
+            entity.Id.Equals(query, StringComparison.Ordinal));
+        if (byId is not null)
+        {
+            return byId;
+        }
+
+        var byName = StableEntities(world)
+            .Where(entity => entity.Name.Equals(query, StringComparison.OrdinalIgnoreCase))
+            .Take(2)
+            .ToArray();
+        return byName.Length == 1 ? byName[0] : null;
     }
 
     public static IReadOnlyList<RekallAgeRuntimeEntity> EntitiesNamed(

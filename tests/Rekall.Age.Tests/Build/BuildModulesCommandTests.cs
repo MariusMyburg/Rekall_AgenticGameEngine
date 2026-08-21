@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
@@ -7,6 +8,116 @@ namespace Rekall.Age.Tests.Build;
 
 public sealed class BuildModulesCommandTests
 {
+    [Fact]
+    public async Task WedgedCompilerTimesOutAndIsTerminatedWithoutReceipt()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("timeout module"),
+            CancellationToken.None);
+        await new ScaffoldModuleCommand().ExecuteAsync(
+            new ScaffoldModuleRequest(root, "timeout.module", "Timeout Module", "TimeoutModule", "TimeoutComponent"),
+            context);
+        int? compilerProcessId = null;
+        Process? StartWedgedCompiler(ProcessStartInfo _)
+        {
+            var helper = new ProcessStartInfo("pwsh")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            helper.ArgumentList.Add("-NoProfile");
+            helper.ArgumentList.Add("-Command");
+            helper.ArgumentList.Add("Start-Sleep -Seconds 30");
+            var process = Process.Start(helper);
+            compilerProcessId = process?.Id;
+            return process;
+        }
+        var command = new BuildModulesCommand(
+            TimeSpan.FromMilliseconds(200),
+            StartWedgedCompiler);
+
+        var result = await command.ExecuteAsync(new BuildModulesRequest(root), context);
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal("REKALL_MODULE_BUILD_TIMEOUT", error.Code);
+        var module = Assert.Single(result.Value.Modules);
+        Assert.True(module.TimedOut);
+        Assert.Equal(-1, module.ExitCode);
+        Assert.Empty(module.ReceiptPath);
+        Assert.NotNull(compilerProcessId);
+        Assert.False(IsProcessAlive(compilerProcessId!.Value));
+
+        static bool IsProcessAlive(int processId)
+        {
+            try
+            {
+                using var process = Process.GetProcessById(processId);
+                return !process.HasExited;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExternalCancellationTerminatesWedgedCompilerAndRemainsCancellation()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("cancel module"),
+            cancellation.Token);
+        await new ScaffoldModuleCommand().ExecuteAsync(
+            new ScaffoldModuleRequest(root, "cancel.module", "Cancel Module", "CancelModule", "CancelComponent"),
+            new RekallAgeCommandContext(
+                "agent",
+                RekallAgeTransaction.Begin("scaffold cancel module"),
+                CancellationToken.None));
+        int? compilerProcessId = null;
+        Process? StartWedgedCompiler(ProcessStartInfo _)
+        {
+            var helper = new ProcessStartInfo("pwsh")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            helper.ArgumentList.Add("-NoProfile");
+            helper.ArgumentList.Add("-Command");
+            helper.ArgumentList.Add("Start-Sleep -Seconds 30");
+            var process = Process.Start(helper);
+            compilerProcessId = process?.Id;
+            return process;
+        }
+        var command = new BuildModulesCommand(TimeSpan.FromSeconds(30), StartWedgedCompiler);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await command.ExecuteAsync(new BuildModulesRequest(root), context));
+
+        Assert.NotNull(compilerProcessId);
+        Assert.False(IsProcessAlive(compilerProcessId!.Value));
+
+        static bool IsProcessAlive(int processId)
+        {
+            try
+            {
+                using var process = Process.GetProcessById(processId);
+                return !process.HasExited;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+    }
+
     [Fact]
     public async Task MissingModuleProjectSuggestsExecutablePlayableScaffold()
     {

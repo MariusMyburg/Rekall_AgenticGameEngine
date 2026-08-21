@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 04:05 Africa/Johannesburg
+Last verified: 2026-08-21 04:24 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: protected runtime evidence accepts the same bounded encoded
-typed arrays as command dispatch; compiler process lifecycle is next
+Latest milestone: module compilation has a bounded recoverable process
+lifecycle; reserved component validation must now fail closed
 
 ## Product objective
 
@@ -30,6 +30,25 @@ agents author the game.
 Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
+
+- Bounded module compiler lifecycle: every module build has a two-minute
+  engine-owned deadline. Timeout and external cancellation terminate the whole
+  process tree with five-second cleanup bounds; timeout returns
+  `REKALL_MODULE_BUILD_TIMEOUT`, exit `-1`, and no trust receipt. Six focused
+  tests include real wedged processes. The locked zero-warning/error gate passed
+  980/980 engine and 7/7 Studio tests twice and the full installed matrix. The
+  1,186-payload-file archive is 201,528,876 bytes with SHA-256
+  `5DE2A82788093487520C6B9E33DA42AF0DAB19038512D9B340225D57D285A4A4`.
+- Clean real-Qwen benchmark 22 had no compiler hang; successful module builds
+  completed in under one second with `timedOut:false`. It still failed at 64
+  turns (45/76 successful calls, zero final renderables, no package). A new
+  generic validator defect was measured: distant unknown reserved types such
+  as `Rekall.Components.Transform3D` are silently skipped because reserved-type
+  reporting currently requires edit distance <=3. Seven such hallucinations
+  were hidden while only `Rekall.UICanvas` was reported. The next tranche makes
+  every unknown `Rekall.*` type blocking and adds safe exact-suffix repair.
+  Benchmark evidence SHA-256 is
+  `2D43EAC81EAC088DC2EF0CF0DBDE175CDBE9B4E7A5C205DA3A99B8453F269CA9`.
 
 - Runtime checkpoint argument normalization: the protected agent policy now
   evaluates bounded JSON-encoded arrays consistently with generic typed command

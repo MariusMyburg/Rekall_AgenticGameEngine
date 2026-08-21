@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Runtime.Abstractions;
 
@@ -98,6 +99,8 @@ public sealed class RekallAgeLanguageModelAgent(
     IRekallAgeLanguageModelClient modelClient,
     IRekallAgeAgentToolExecutor toolExecutor)
 {
+    private const int MaxEncodedStructuredArgumentCharacters = 1_000_000;
+
     public async ValueTask<RekallAgeLanguageModelAgentResult> RunAsync(
         RekallAgeLanguageModelAgentRequest request,
         CancellationToken cancellationToken)
@@ -494,7 +497,7 @@ public sealed class RekallAgeLanguageModelAgent(
 
     private static JsonObject? BuildCandidateAgentComponentAssertion(JsonObject arguments)
     {
-        if (GetArgument(arguments, "assertions") is not JsonArray assertions)
+        if (GetArrayArgument(arguments, "assertions") is not { } assertions)
         {
             return null;
         }
@@ -613,9 +616,7 @@ public sealed class RekallAgeLanguageModelAgent(
 
     private static bool HasNonemptyArrayArgument(JsonObject arguments, string name)
     {
-        var value = arguments.FirstOrDefault(property =>
-            property.Key.Equals(name, StringComparison.OrdinalIgnoreCase)).Value;
-        return value is JsonArray array && array.Count > 0;
+        return GetArrayArgument(arguments, name) is { Count: > 0 };
     }
 
     private static bool HasRuntimeCheckpointCoverage(JsonObject arguments)
@@ -627,7 +628,7 @@ public sealed class RekallAgeLanguageModelAgent(
     private static RuntimeCheckpointCoverage EvaluateRuntimeCheckpointCoverage(JsonObject arguments)
     {
         var hasInputs = HasEffectiveRuntimeInputs(arguments);
-        if (GetArgument(arguments, "assertions") is not JsonArray assertions)
+        if (GetArrayArgument(arguments, "assertions") is not { } assertions)
         {
             return new RuntimeCheckpointCoverage(hasInputs, false, false);
         }
@@ -642,7 +643,7 @@ public sealed class RekallAgeLanguageModelAgent(
 
     private static bool HasEffectiveRuntimeInputs(JsonObject arguments)
     {
-        if (GetArgument(arguments, "inputs") is not JsonArray inputs)
+        if (GetArrayArgument(arguments, "inputs") is not { } inputs)
         {
             return false;
         }
@@ -669,7 +670,7 @@ public sealed class RekallAgeLanguageModelAgent(
 
         foreach (var frame in inputs.OfType<JsonObject>())
         {
-            if (rawArrayNames.Any(name => GetArgument(frame, name) is JsonArray { Count: > 0 }))
+            if (rawArrayNames.Any(name => GetArrayArgument(frame, name) is { Count: > 0 }))
             {
                 return true;
             }
@@ -682,7 +683,7 @@ public sealed class RekallAgeLanguageModelAgent(
                 return true;
             }
 
-            if (GetArgument(frame, "semanticActions") is JsonArray semanticActions
+            if (GetArrayArgument(frame, "semanticActions") is { } semanticActions
                 && semanticActions.OfType<JsonObject>().Any(sample =>
                     !string.IsNullOrWhiteSpace(GetString(sample, "name"))))
             {
@@ -724,6 +725,31 @@ public sealed class RekallAgeLanguageModelAgent(
     private static JsonNode? GetArgument(JsonObject arguments, string name) =>
         arguments.FirstOrDefault(property =>
             property.Key.Equals(name, StringComparison.OrdinalIgnoreCase)).Value;
+
+    private static JsonArray? GetArrayArgument(JsonObject arguments, string name)
+    {
+        var node = GetArgument(arguments, name);
+        if (node is JsonArray array)
+        {
+            return array;
+        }
+
+        if (node is not JsonValue scalar
+            || !scalar.TryGetValue<string>(out var encoded)
+            || encoded.Length > MaxEncodedStructuredArgumentCharacters)
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonNode.Parse(encoded) as JsonArray;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
     private static string GetString(JsonObject arguments, string name) =>
         GetArgument(arguments, name) is JsonValue value

@@ -642,6 +642,91 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task RuntimeCheckpointAcceptsLosslesslyEncodedTypedArrays()
+    {
+        var checkpoint = MeaningfulRuntimeCheckpointArguments();
+        checkpoint["inputs"] = checkpoint["inputs"]!.ToJsonString();
+        checkpoint["assertions"] = checkpoint["assertions"]!.ToJsonString();
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", checkpoint)],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Gameplay is proven.", "", [], "stop", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+        var agent = new RekallAgeLanguageModelAgent(model, tools);
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 4,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Single(tools.Executions, execution => execution.Name == "rekall.runtime.inspect_scene");
+        Assert.DoesNotContain(result.ToolExecutions, execution =>
+            execution.Name == "rekall.runtime.inspect_scene"
+            && execution.ResultPreview.Contains("REKALL_RUNTIME_", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RuntimeCheckpointRejectsMalformedScalarAndOversizedEncodedArrays()
+    {
+        var invalidInputs = new[]
+        {
+            "not-json",
+            "{\"pressedKeys\":[\"D\"]}",
+            new string(' ', 1_000_001)
+        };
+
+        foreach (var invalidInput in invalidInputs)
+        {
+            var checkpoint = MeaningfulRuntimeCheckpointArguments();
+            checkpoint["inputs"] = invalidInput;
+            checkpoint["assertions"] = checkpoint["assertions"]!.ToJsonString();
+            var model = new ScriptedModelClient(
+                new RekallAgeLanguageModelResponse(
+                    "test", "model", "", "",
+                    [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                    "tool_calls", new(1, 1, 1)),
+                new RekallAgeLanguageModelResponse(
+                    "test", "model", "", "",
+                    [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                    "tool_calls", new(1, 1, 1)),
+                new RekallAgeLanguageModelResponse(
+                    "test", "model", "", "",
+                    [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", checkpoint)],
+                    "tool_calls", new(1, 1, 1)));
+            var tools = new RecordingToolExecutor();
+            var agent = new RekallAgeLanguageModelAgent(model, tools);
+
+            var result = await agent.RunAsync(
+                new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+                {
+                    MaxTurns = 3,
+                    RequireRuntimeBehaviorAssertions = true
+                },
+                CancellationToken.None);
+
+            Assert.DoesNotContain(tools.Executions, execution => execution.Name == "rekall.runtime.inspect_scene");
+            Assert.Contains(result.ToolExecutions, execution =>
+                execution.Name == "rekall.runtime.inspect_scene"
+                && execution.ResultPreview.Contains("REKALL_RUNTIME_CHECKPOINT_COVERAGE_REQUIRED", StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
     public async Task RuntimeCheckpointAcceptsIntuitiveDeltaTransformSubjectAlias()
     {
         var checkpoint = new JsonObject

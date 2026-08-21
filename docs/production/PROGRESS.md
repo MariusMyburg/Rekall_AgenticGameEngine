@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 03:35 Africa/Johannesburg
+Last verified: 2026-08-21 04:05 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: runtime entity lookup is safe for opaque ids and unique
-authored names; the next real-Qwen blocker is typed complex tool arguments
+Latest milestone: protected runtime evidence accepts the same bounded encoded
+typed arrays as command dispatch; compiler process lifecycle is next
 
 ## Product objective
 
@@ -30,6 +30,25 @@ agents author the game.
 Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
+
+- Runtime checkpoint argument normalization: the protected agent policy now
+  evaluates bounded JSON-encoded arrays consistently with generic typed command
+  dispatch, including nested input arrays, without mutating calls. Malformed,
+  scalar/object-shaped, and over-1,000,000-character values fail closed. The
+  focused policy selection passes 7/7. The zero-warning/error locked Release
+  pipeline passed 978/978 engine and 7/7 Studio tests twice and completed the
+  installed matrix. Its 1,186-payload-file archive is 201,524,293 bytes with
+  SHA-256
+  `6EC4582475E075B27E8E2E99383B37AD1D4E3076B535361AFDA39111E03020DF`.
+- Fresh installed real-Qwen Lumen Vault benchmark 21 proved encoded arrays
+  reached actual runtime inspection; semantic input projected and call 67
+  passed three authored gameplay assertions. It is retained as diagnostic, not
+  acceptance: a child `dotnet build` wedged without a timeout and required
+  manual termination, then the recovered 64-turn run ended with one blocking
+  UI-canvas issue, six renderables, and no package. The evidence SHA-256 is
+  `BC644243E78375936006D3E907890B18FE93541642F48650083EF10312F2BE4C`.
+  The immediate next tranche is bounded compiler timeout and process-tree
+  cleanup, followed by another unchanged empty-project run.
 
 - Agent entity query contract: `FindEntity` preserves exact opaque-id
   precedence, then resolves one unique case-insensitive exact authored name;

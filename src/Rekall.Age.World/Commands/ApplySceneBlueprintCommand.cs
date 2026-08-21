@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Rekall.Age.Core.Commands;
 
 namespace Rekall.Age.World.Commands;
@@ -19,6 +20,7 @@ public sealed record RekallAgeSceneBlueprintEntity(
     bool? Visible = null,
     bool? Locked = null);
 
+[JsonConverter(typeof(RekallAgeSceneBlueprintComponentJsonConverter))]
 public sealed record RekallAgeSceneBlueprintComponent(
     string Type,
     JsonObject? Properties = null);

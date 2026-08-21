@@ -141,9 +141,13 @@ public sealed class RekallAgeCommandRegistry
             }
             catch (JsonException ex)
             {
+                var message = string.IsNullOrWhiteSpace(ex.Path)
+                    || ex.Message.Contains(ex.Path, StringComparison.Ordinal)
+                    ? ex.Message
+                    : $"{ex.Message} Path: {ex.Path}.";
                 var error = new RekallAgeCommandError(
                     "REKALL_COMMAND_ARGUMENTS_INVALID",
-                    ex.Message,
+                    message,
                     Command.Name);
                 return new RekallAgeDynamicCommandResult(false, error.Message, null, [error], CreateTransactionSummary(context));
             }

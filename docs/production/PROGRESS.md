@@ -4,12 +4,13 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 04:42 Africa/Johannesburg
+Last verified: 2026-08-21 06:12 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: reserved engine component validation fails closed with
-bounded safe repair; scene blueprint normalization is the next measured blocker
+Latest milestone: scene blueprint components normalize through one strict,
+inspectable contract; bounded post-runtime delivery reserve is the next measured
+blocker
 
 ## Product objective
 
@@ -31,6 +32,32 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Scene blueprint component normalization now accepts the canonical
+  `{type, properties}` shape plus deterministic flat, `typeName`, and strict
+  name/value-list representations while rejecting conflicts with precise JSON
+  paths. Runtime property names remain case-sensitive, including `Type` beside
+  the reserved lowercase discriminator. Focused dispatch coverage passed 26/26.
+  The locked zero-warning/error gate passed 986/986 engine and 7/7 Studio tests
+  twice and the complete installed matrix. The 1,186-payload-file archive is
+  201,543,401 bytes with SHA-256
+  `7DB2F19581316C9FACAF7263463BEF516E492865AFE3D56918C7717BE5E66ECB`.
+- The locked gate now disables reusable MSBuild nodes for every outer operation
+  and gives each engine-test run a unique, automatically cleaned temp root.
+  This eliminated 15 orphan compiler nodes (previously consuming about 2.55 GB)
+  and prevents accumulation under the shared test-temp directory. A one-time
+  cleanup removed 290,083 stale Rekall test files totaling 47,936,807,924 bytes.
+  The verified full gate ended with zero reusable nodes and zero run-scoped temp
+  directories.
+- Clean installed real-Qwen benchmark 25 made 49/73 successful tool calls and
+  completed five real runtime inspections. Its final call passed three behavior
+  assertions with semantic input and the authored `VaultGameplaySystem`; final
+  validation had only `REKALL_UI_ELEMENT_NO_CANVAS`, and the viewport was a
+  nonblank 960x540 frame with two renderables. It remains red: the successful
+  final runtime checkpoint consumed the last protected turn, leaving no bounded
+  opportunity to repair, package, and audit. No package was produced. The next
+  generic tranche is a one-shot post-checkpoint delivery reserve, not additional
+  scene-format tolerance. Evidence SHA-256 is
+  `1797A54E8DA7353343BF3A94A6508938F51C283132ECE4FFECBB6A8EFCC170B3`.
 - Reserved component fail-closed validation: every unknown `Rekall.*` component
   is now blocking. Repair suggestions are emitted only for a unique exact final
   segment match or a full-name edit distance of at most three; otherwise the

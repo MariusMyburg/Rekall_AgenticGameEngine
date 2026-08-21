@@ -13,6 +13,9 @@ $artifactRoot = Join-Path $repoRoot 'Artifacts\Distribution'
 $testResultRoot = Join-Path $repoRoot 'Artifacts\TestResults'
 $stagingRoot = Join-Path $artifactRoot 'Staging'
 $outputRoot = Join-Path $artifactRoot "Rekall-AGE-0.1.0-preview.1-$RuntimeIdentifier"
+$systemTempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/')
+$testTempRoot = [IO.Path]::GetFullPath((Join-Path $systemTempRoot ("rekall-age-build-" + [Guid]::NewGuid().ToString('N'))))
+$priorTestTempRoot = [Environment]::GetEnvironmentVariable('REKALL_AGE_TEST_TEMP_ROOT', 'Process')
 
 function Invoke-Checked {
     param([string]$FilePath, [string[]]$ArgumentList)
@@ -37,8 +40,14 @@ function Reset-Directory {
 
 Push-Location $repoRoot
 try {
-    Invoke-Checked dotnet @('restore', $solution, '--locked-mode', '-r', $RuntimeIdentifier)
-    Invoke-Checked dotnet @('build', $solution, '-c', $Configuration, '--no-restore')
+    if (-not $testTempRoot.StartsWith($systemTempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or
+        -not [IO.Path]::GetFileName($testTempRoot).StartsWith('rekall-age-build-', [StringComparison]::Ordinal)) {
+        throw "Refusing unsafe test temp root '$testTempRoot'."
+    }
+    New-Item -ItemType Directory -Path $testTempRoot -Force | Out-Null
+    [Environment]::SetEnvironmentVariable('REKALL_AGE_TEST_TEMP_ROOT', $testTempRoot, 'Process')
+    Invoke-Checked dotnet @('restore', $solution, '--locked-mode', '-r', $RuntimeIdentifier, '/nr:false')
+    Invoke-Checked dotnet @('build', $solution, '-c', $Configuration, '--no-restore', '/nr:false')
     if (Test-Path -LiteralPath $testResultRoot) {
         Remove-Item -LiteralPath $testResultRoot -Recurse -Force
     }
@@ -53,7 +62,8 @@ try {
         foreach ($testName in @('engine', 'studio')) {
             Invoke-Checked dotnet @(
                 'test', $testProjects[$testName], '-c', $Configuration, '--no-build', '--no-restore', '--verbosity', 'minimal',
-                '--logger', "trx;LogFileName=release-pass-$pass-$testName.trx", '--results-directory', $testResultRoot)
+                '--logger', "trx;LogFileName=release-pass-$pass-$testName.trx", '--results-directory', $testResultRoot,
+                '/nr:false')
         }
     }
 
@@ -68,7 +78,7 @@ try {
         $project, $destination = $publishes[$name]
         Invoke-Checked dotnet @(
             'publish', $project, '-c', $Configuration, '-r', $RuntimeIdentifier,
-            '--self-contained', 'true', '--no-restore', '-p:PublishSingleFile=false', '-o', $destination)
+            '--self-contained', 'true', '--no-restore', '-p:PublishSingleFile=false', '-o', $destination, '/nr:false')
     }
 
     $cli = Join-Path $stagingRoot 'cli\Rekall.Age.Cli.exe'
@@ -95,5 +105,14 @@ try {
     Write-Output "Archive: $outputRoot.zip"
 }
 finally {
+    [Environment]::SetEnvironmentVariable('REKALL_AGE_TEST_TEMP_ROOT', $priorTestTempRoot, 'Process')
+    if ([IO.Directory]::Exists($testTempRoot)) {
+        try {
+            [IO.Directory]::Delete($testTempRoot, $true)
+        }
+        catch {
+            Write-Warning "Could not completely remove run-scoped test temp root '$testTempRoot': $($_.Exception.Message)"
+        }
+    }
     Pop-Location
 }

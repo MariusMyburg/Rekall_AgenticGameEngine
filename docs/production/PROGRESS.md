@@ -4,13 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 06:55 Africa/Johannesburg
+Last verified: 2026-08-21 07:16 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: runtime-behavior tasks establish an early compiled gameplay
-slice; custom component identity in runtime checkpoint policy is the next
-measured blocker
+Latest milestone: runtime checkpoints accept exact agent-owned component
+identities; bounded SDK source repair is the next measured blocker
 
 ## Product objective
 
@@ -32,6 +31,32 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Runtime checkpoint component identity now matches generic module authoring:
+  exact non-`Rekall.*` runtime identities are eligible agent-owned state whether
+  scaffold-qualified (`Game.*`) or exact authored CLR names, while canonical
+  engine-owned components cannot substitute for game state. Actual component
+  attachment and assertion truth remain enforced by runtime inspection. Focused
+  red/green coverage passed 2/2 and the complete language-agent selection passed
+  31/31. The locked zero-warning/error gate passed 1,005/1,005 engine and 7/7
+  Studio tests twice and the complete installed matrix. Its 1,186-file archive
+  is 201,575,773 bytes with SHA-256
+  `5C9262D403586F19E21D8D13B6EFE04F3A656DCB02B6BD51E5042A864ED0099B`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+- Clean installed real-Qwen benchmark 31 preserved the early gameplay priority:
+  it scaffolded `GameRules` immediately after its first successful scene slice
+  and produced a camera plan with nine renderables. It remained red at 43/57
+  successful tool calls with no successful module build, runtime inspection,
+  proof frame, or package. Qwen replaced correct scaffold/SDK patterns across
+  eight source writes with invented calls including `Transform3D`,
+  `ReadTransform3D`, `GetTransform3D`, `GetComponentNumber`, and an invalid
+  two-argument `WithPosition3D`; six compiler attempts failed. The initial SDK
+  inspection had returned the correct entity-transform/component-state recipe,
+  but later repair attempts repeatedly omitted the required query and searched
+  component schemas instead. The next generic tranche provides bounded,
+  compiler-directed rejection/recovery for known nonexistent runtime SDK call
+  shapes at source-write time, preserving valid authored C# rather than adding
+  game-specific code. Evidence SHA-256 is
+  `B1728ADCC42B5A62FAE4E64D638F48A3EFDDAF360F9A1B2C93A658DD3AFB0C00`.
 - Early runtime authoring checkpoint: tasks that require runtime behavior now
   allow at most four successful world-authoring mutations before deferring
   further non-module work until runtime-system scaffold/source authoring begins.

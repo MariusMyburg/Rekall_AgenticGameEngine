@@ -842,6 +842,75 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("\"componentType\"", failure.ResultPreview, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task RuntimeCheckpointAcceptsUnqualifiedAgentOwnedClrComponentIdentity()
+    {
+        var checkpoint = MeaningfulRuntimeCheckpointArguments();
+        ((JsonObject)((JsonArray)checkpoint["assertions"]!)[0]!)["componentType"] = "OrbitMotion";
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", checkpoint)],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "Gameplay is proven.", "", [], "stop", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+        var agent = new RekallAgeLanguageModelAgent(model, tools);
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 4,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Single(tools.Executions, execution => execution.Name == "rekall.runtime.inspect_scene");
+    }
+
+    [Fact]
+    public async Task RuntimeCheckpointRejectsEngineOwnedComponentAsAgentStateProof()
+    {
+        var checkpoint = MeaningfulRuntimeCheckpointArguments();
+        ((JsonObject)((JsonArray)checkpoint["assertions"]!)[0]!)["componentType"] = "Rekall.SphereCollider3D";
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", checkpoint)],
+                "tool_calls", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+        var agent = new RekallAgeLanguageModelAgent(model, tools);
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 3,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.DoesNotContain(tools.Executions, execution => execution.Name == "rekall.runtime.inspect_scene");
+        var failure = Assert.Single(result.ToolExecutions, execution =>
+            execution.Name == "rekall.runtime.inspect_scene");
+        Assert.Contains("\"agentComponent\":false", failure.ResultPreview, StringComparison.Ordinal);
+    }
+
     private static JsonObject MeaningfulRuntimeCheckpointArguments() => new()
     {
         ["inputs"] = new JsonArray(new JsonObject { ["pressedKeys"] = new JsonArray("D") }),

@@ -16,7 +16,7 @@ public sealed record RekallAgeStudioAutomationOptions(
 {
     public bool TreatGauntletAsTerminalSuccess { get; init; } = true;
 
-    public int MaxTurns { get; init; } = 36;
+    public int? MaxTurns { get; init; }
 }
 
 public sealed record RekallAgeStudioAutomationResult(
@@ -25,6 +25,7 @@ public sealed record RekallAgeStudioAutomationResult(
     string ProjectRoot,
     string SceneName,
     bool NonblankViewport,
+    bool VisuallyInformativeViewport,
     string ViewportSummary,
     int ViewportRenderableCount,
     string PackageArchivePath,
@@ -78,12 +79,15 @@ public static class RekallAgeStudioAutomation
             return false;
         }
 
-        var maxTurns = 36;
-        if (maxTurnsText is not null
-            && (!int.TryParse(maxTurnsText, out maxTurns) || maxTurns is < 1 or > 64))
+        int? maxTurns = null;
+        if (maxTurnsText is not null)
         {
-            error = "--max-turns must be an integer from 1 through 64.";
-            return false;
+            if (!int.TryParse(maxTurnsText, out var parsedMaxTurns) || parsedMaxTurns is < 1 or > 64)
+            {
+                error = "--max-turns must be an integer from 1 through 64.";
+                return false;
+            }
+            maxTurns = parsedMaxTurns;
         }
 
         options = new RekallAgeStudioAutomationOptions(
@@ -126,14 +130,17 @@ public static class RekallAgeStudioAutomation
         var nonblankViewport = viewModel.ViewportImage is { PixelWidth: > 0, PixelHeight: > 0 }
             && viewModel.ViewportRenderableCount > 0;
         var result = new RekallAgeStudioAutomationResult(
-            viewModel.StatusText.StartsWith("AI authoring completed", StringComparison.Ordinal)
-                && nonblankViewport
-                && packageArchivePath is not null
-                && File.Exists(packageArchivePath),
+            IsSuccessful(
+                viewModel.StatusText,
+                nonblankViewport,
+                viewModel.ViewportVisuallyInformative,
+                !options.TreatGauntletAsTerminalSuccess,
+                packageArchivePath),
             viewModel.StatusText,
             projectRoot,
             options.SceneName,
             nonblankViewport,
+            viewModel.ViewportVisuallyInformative,
             viewModel.ViewportSummary,
             viewModel.ViewportRenderableCount,
             packageArchivePath ?? string.Empty,
@@ -161,6 +168,18 @@ public static class RekallAgeStudioAutomation
         }
         return result;
     }
+
+    internal static bool IsSuccessful(
+        string status,
+        bool nonblankViewport,
+        bool visuallyInformativeViewport,
+        bool requireVisuallyInformativeViewport,
+        string? packageArchivePath) =>
+        status.StartsWith("AI authoring completed", StringComparison.Ordinal)
+        && nonblankViewport
+        && (!requireVisuallyInformativeViewport || visuallyInformativeViewport)
+        && packageArchivePath is not null
+        && File.Exists(packageArchivePath);
 
     internal static string? ResolvePackageArchivePath(string projectRoot)
     {

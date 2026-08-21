@@ -11,6 +11,60 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioViewModelTests
 {
     [Fact]
+    public void AutomationRejectsANonInformativeViewportEvenWhenItIsNonblankAndPackaged()
+    {
+        var archive = Path.GetTempFileName();
+        try
+        {
+            Assert.False(RekallAgeStudioAutomation.IsSuccessful(
+                "AI authoring completed with evidence.",
+                nonblankViewport: true,
+                visuallyInformativeViewport: false,
+                requireVisuallyInformativeViewport: true,
+                archive));
+            Assert.True(RekallAgeStudioAutomation.IsSuccessful(
+                "AI authoring completed with evidence.",
+                nonblankViewport: true,
+                visuallyInformativeViewport: true,
+                requireVisuallyInformativeViewport: true,
+                archive));
+        }
+        finally
+        {
+            File.Delete(archive);
+        }
+    }
+
+    [Fact]
+    public void StudioAutomationLeavesTurnLimitDisabledWhenItIsNotRequested()
+    {
+        Assert.True(RekallAgeStudioAutomation.TryParse(
+            [
+                "--studio-agent-automation",
+                "--project", "C:\\Game",
+                "--project-name", "Game",
+                "--model", "model",
+                "--task", "Create a game",
+                "--evidence", "C:\\Evidence\\result.json"
+            ],
+            out var options,
+            out var error), error);
+
+        Assert.Equal(default(int?), (int?)options!.MaxTurns);
+    }
+
+    [Fact]
+    public async Task StudioStartsWithAnEmptyOrdinaryLanguageAuthoringRequest()
+    {
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            new EmptyModel());
+
+        Assert.Empty(viewModel.AgentTaskInput);
+        Assert.False(viewModel.RunAgentCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void AutomationArgumentsRequireExplicitBoundedInputs()
     {
         var parsed = RekallAgeStudioAutomation.TryParse(
@@ -50,7 +104,7 @@ public sealed class StudioViewModelTests
                 new GauntletModel(root),
                 CancellationToken.None);
 
-            Assert.True(result.Succeeded, result.Status + Environment.NewLine + string.Join(Environment.NewLine, result.AgentTranscript));
+            Assert.True(result.Succeeded, result.Status + Environment.NewLine + result.ViewportSummary + Environment.NewLine + string.Join(Environment.NewLine, result.AgentTranscript));
             Assert.True(result.NonblankViewport);
             Assert.True(result.ViewportRenderableCount > 0);
             Assert.NotEmpty(result.AgentToolExecutions);
@@ -83,6 +137,7 @@ public sealed class StudioViewModelTests
 
             Assert.Equal(0, result.ViewportRenderableCount);
             Assert.False(result.NonblankViewport);
+            Assert.False(result.VisuallyInformativeViewport);
         }
         finally
         {

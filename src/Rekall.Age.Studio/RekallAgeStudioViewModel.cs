@@ -53,18 +53,19 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _propertyValueInput = "[0, 0, 0]";
     private string _propertySchemaHelp = "Select a registered property to see its type and constraints.";
     private string _selectedOllamaModel = "qwen3.5:35b";
-    private string _agentTaskInput = "Describe the game feature you want the AI agent to create or revise.";
+    private string _agentTaskInput = string.Empty;
     private string? _lastPackagePath;
     private string _statusText = "Create or open a Rekall AGE project to begin.";
     private string _viewportTitle = "Viewport";
     private string _viewportSummary = "No rendered frame yet.";
     private BitmapImage? _viewportImage;
     private int _viewportRenderableCount;
+    private bool _viewportVisuallyInformative;
     private RekallAgeWorkbenchModel? _currentModel;
     private readonly List<RekallAgeLanguageModelToolExecution> _lastAgentToolExecutions = [];
     internal bool TreatGauntletAsTerminalSuccess { get; set; }
 
-    internal int AgentMaxTurns { get; set; } = 36;
+    internal int? AgentMaxTurns { get; set; }
 
     public RekallAgeStudioViewModel()
         : this(new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()), null)
@@ -270,6 +271,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         get => _viewportRenderableCount;
         private set => Set(ref _viewportRenderableCount, value);
+    }
+
+    public bool ViewportVisuallyInformative
+    {
+        get => _viewportVisuallyInformative;
+        private set => Set(ref _viewportVisuallyInformative, value);
     }
 
     public bool IsBusy
@@ -612,6 +619,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private async Task<RekallAgeWorkbenchOperationResult> CaptureOperationAsync()
     {
+        ViewportVisuallyInformative = false;
         var result = await _session.ExecuteAsync(
             "rekall.render.capture_runtime_viewport",
             JsonSerializer.Serialize(new
@@ -632,7 +640,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             ViewportImage = LoadBitmap(capture.ScreenshotPath);
             ViewportRenderableCount = capture.RenderableCount;
-            ViewportSummary = $"{capture.Width}×{capture.Height} · frame {capture.FrameIndex} · {capture.RenderableCount} renderables";
+            ViewportVisuallyInformative = capture.FrameAnalysis.Analyzed
+                && capture.FrameAnalysis.VisuallyInformative;
+            ViewportSummary = $"{capture.Width}×{capture.Height} · frame {capture.FrameIndex} · {capture.RenderableCount} renderables · "
+                + (ViewportVisuallyInformative ? "visually informative" : "visual repair required");
         }
         return result;
     }

@@ -104,6 +104,8 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new BuildModulesCommand());
         registry.Register(new BuildPlayerCommand());
         registry.Register(new ImportAssetCommand());
+        registry.Register(new ImportRemoteAssetCommand());
+        registry.Register(new SearchRemoteImagesCommand());
         registry.Register(new ImportAssetWithReportCommand());
         registry.Register(new GenerateTripoModelCommand());
         registry.Register(new ListAssetsCommand());

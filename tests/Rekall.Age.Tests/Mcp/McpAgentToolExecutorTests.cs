@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Agent.Commands;
+using Rekall.Age.Assets.Commands;
 using Rekall.Age.Project.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Mcp;
@@ -11,6 +12,45 @@ namespace Rekall.Age.Tests.Mcp;
 
 public sealed class McpAgentToolExecutorTests
 {
+    [Fact]
+    public async Task ProgressiveDiscoveryFindsRemoteAssetImportByUrlAndProvenanceIntent()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new ImportAssetCommand());
+        registry.Register(new ImportRemoteAssetCommand());
+        var executor = new RekallAgeMcpAgentToolExecutor(registry, progressiveDiscovery: true);
+
+        var result = await executor.ExecuteAsync(
+            "rekall.tools.search",
+            new JsonObject { ["query"] = "download remote image HTTPS URL with attribution license provenance" },
+            CancellationToken.None);
+
+        Assert.True(result["ok"]!.GetValue<bool>());
+        Assert.Contains(
+            result["tools"]!.AsArray(),
+            tool => tool!["name"]!.GetValue<string>() == "rekall.asset.import_remote");
+        Assert.Contains(executor.Tools, tool => tool.Name == "rekall.asset.import_remote");
+    }
+
+    [Fact]
+    public async Task ProgressiveDiscoveryFindsInternetImageSearchFromOrdinaryUserIntent()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new SearchRemoteImagesCommand());
+        var executor = new RekallAgeMcpAgentToolExecutor(registry, progressiveDiscovery: true);
+
+        var result = await executor.ExecuteAsync(
+            "rekall.tools.search",
+            new JsonObject { ["query"] = "find nature image on internet with reusable license" },
+            CancellationToken.None);
+
+        Assert.True(result["ok"]!.GetValue<bool>());
+        Assert.Contains(
+            result["tools"]!.AsArray(),
+            tool => tool!["name"]!.GetValue<string>() == "rekall.asset.search_remote_images");
+    }
+
+
     [Fact]
     public async Task ExecutorProjectsCommandSchemasAndExecutesStructuredResults()
     {

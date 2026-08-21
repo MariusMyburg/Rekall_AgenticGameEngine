@@ -10,7 +10,7 @@ public sealed class RekallAgeTransform2DComponent : RekallAgeComponent
     [RekallAgeProperty] public double ScaleY { get; init; } = 1;
 }
 
-[RekallAgeComponent("Transform 3D", Description = "Generic three-dimensional position, Euler rotation in degrees, and scale.")]
+[RekallAgeComponent("Transform 3D", Description = "Generic right-handed three-dimensional position, Euler rotation in degrees, and scale. Unrotated local forward is +Z, right is +X, and up is +Y. Pitch rotates around X, yaw around Y, and roll around Z; positive pitch looks downward from +Z. A camera positioned at positive Z and aimed toward lower Z normally needs yaw 180 degrees.")]
 public sealed class RekallAgeTransform3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty] public double X { get; init; }

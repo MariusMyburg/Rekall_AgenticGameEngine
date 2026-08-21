@@ -14,7 +14,7 @@ public interface IRekallAgeAgentToolExecutor
 
 public sealed record RekallAgeLanguageModelAgentRequest(string Model, string SystemPrompt, string Task)
 {
-    public int MaxTurns { get; init; } = 24;
+    public int? MaxTurns { get; init; } = 24;
 
     public string? Think { get; init; } = "medium";
 
@@ -122,7 +122,10 @@ public sealed class RekallAgeLanguageModelAgent(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Model);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Task);
-        var maxTurns = Math.Clamp(request.MaxTurns, 1, 256);
+        var hasTurnLimit = request.MaxTurns is not null;
+        var maxTurns = request.MaxTurns is { } requestedMaxTurns
+            ? Math.Clamp(requestedMaxTurns, 1, 256)
+            : int.MaxValue;
         var maxContextMessages = Math.Clamp(request.MaxContextMessages, 4, 128);
         var maxToolResultCharacters = Math.Clamp(request.MaxToolResultCharacters, 1_000, 100_000);
         int? contextWindowTokens = request.ContextWindowTokens is { } requestedContextWindowTokens
@@ -162,13 +165,15 @@ public sealed class RekallAgeLanguageModelAgent(
         var requireAgentStateTransitionProof = request.RequireRuntimeBehaviorAssertions
             && RequiresAgentStateTransitionProof(request.Task);
         var turnLimit = maxTurns;
-        for (var turn = 1; turn <= turnLimit; turn++)
+        for (var turn = 1; !hasTurnLimit || turn <= turnLimit; turn++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             request.Progress?.Report(new RekallAgeLanguageModelAgentProgress(
                 turn,
                 "turn.started",
-                $"Running agent turn {turn} of {turnLimit}."));
+                hasTurnLimit
+                    ? $"Running agent turn {turn} of {turnLimit}."
+                    : $"Running agent turn {turn} with no configured turn limit."));
             RekallAgeLanguageModelResponse response;
             using (var turnCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
             {
@@ -473,14 +478,21 @@ public sealed class RekallAgeLanguageModelAgent(
                     toolExecutions,
                     requireAgentStateTransitionProof))
             {
-                var extendedTurnLimit = Math.Min(256, checked(turn + maxPostRuntimeDeliveryTurns));
-                if (extendedTurnLimit > turnLimit)
+                var extendedTurnLimit = hasTurnLimit
+                    ? Math.Min(256, checked(turn + maxPostRuntimeDeliveryTurns))
+                    : turnLimit;
+                if (!postRuntimeDeliveryReserveActivated
+                    && (!hasTurnLimit || extendedTurnLimit > turnLimit))
                 {
                     postRuntimeDeliveryReserveActivated = true;
                     turnLimit = extendedTurnLimit;
                     transcript.Add(new RekallAgeLanguageModelMessage(
                         "user",
-                        $"The executable gameplay checkpoint passed. You now have a protected delivery reserve through turn {turnLimit}. If this task requires a packaged deliverable and no compiled package-proof adapter exists, call rekall.module.scaffold_playable now, before the final build; it is only the generic deterministic package adapter, so keep all requested world gameplay in the runtime-system module. Then perform the final build and refresh runtime proof once because module changes stale the prior checkpoint. Validate the current project, apply only the smallest evidence-backed repairs, then package, capture proof, and audit the deliverable. Do not reopen broad authoring or spend this finite reserve on optional polish."));
+                        "The executable gameplay checkpoint passed. "
+                        + (hasTurnLimit
+                            ? $"You now have a protected delivery reserve through turn {turnLimit}. "
+                            : "There is no configured overall turn limit; continue until delivery is actually proven. ")
+                        + "If this task requires a packaged deliverable and no compiled package-proof adapter exists, call rekall.module.scaffold_playable now, before the final build; it is only the generic deterministic package adapter, so keep all requested world gameplay in the runtime-system module. Then perform the final build and refresh runtime proof once because module changes stale the prior checkpoint. Validate the current project, apply only the smallest evidence-backed repairs, then package, capture proof, and audit the deliverable. Do not reopen broad authoring or spend time on optional polish before the requested deliverable is proven."));
                 }
             }
 
@@ -497,7 +509,11 @@ public sealed class RekallAgeLanguageModelAgent(
                 runtimeCheckpointPrompted = true;
                 transcript.Add(new RekallAgeLanguageModelMessage(
                     "user",
-                    $"The executable gameplay checkpoint failed. Treat the returned assertion results and actual bounded values as direct repair evidence. You now have a protected repair-and-retest reserve through turn {turnLimit}. Make the smallest targeted scene or module correction, rebuild only if source changed, and rerun representative input with non-empty assertions immediately. Do not spend this reserve on polish, broad discovery, packaging, capture, or repeated validation until the failed gameplay transition passes."));
+                    "The executable gameplay checkpoint failed. Treat the returned assertion results and actual bounded values as direct repair evidence. "
+                    + (hasTurnLimit
+                        ? $"You now have a protected repair-and-retest reserve through turn {turnLimit}. "
+                        : "There is no configured overall turn limit; repair and retest until the gameplay transition passes. ")
+                    + "Make the smallest targeted scene or module correction, rebuild only if source changed, and rerun representative input with non-empty assertions immediately. Do not spend time on polish, broad discovery, packaging, capture, or repeated validation until the failed gameplay transition passes."));
             }
             else if (request.RequireRuntimeBehaviorAssertions
                 && !runtimeCheckpointPrompted
@@ -1337,7 +1353,7 @@ public sealed class RekallAgeLanguageModelAgent(
     private static int? ReduceOutputTokensForAction(int? maxOutputTokens) =>
         maxOutputTokens is { } configured
             ? Math.Min(configured, 2_048)
-            : 2_048;
+            : null;
 
     private static string EffectiveToolName(
         RekallAgeLanguageModelToolCall call,

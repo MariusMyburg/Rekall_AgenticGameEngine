@@ -6,6 +6,20 @@ namespace Rekall.Age.Tests.Agent;
 public sealed class LanguageModelAgentTests
 {
     [Fact]
+    public void EmbeddedAgentContractExpandsOrdinaryUserIntentWithoutInventingRequirements()
+    {
+        var prompt = RekallAgeEmbeddedAgentContract.SystemPrompt;
+
+        Assert.Contains("ordinary authoritative product intent", prompt, StringComparison.Ordinal);
+        Assert.Contains("do not require the user to supply engine tool names", prompt, StringComparison.Ordinal);
+        Assert.Contains("rekall.asset.search_remote_images", prompt, StringComparison.Ordinal);
+        Assert.Contains("rekall.asset.import_remote", prompt, StringComparison.Ordinal);
+        Assert.Contains("distinct-time frames", prompt, StringComparison.Ordinal);
+        Assert.Contains("Do not add unrelated gameplay requirements", prompt, StringComparison.Ordinal);
+        Assert.Contains("unrotated camera faces +Z", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void EmbeddedAgentContractOrdersAuthoringEvidenceBeforeDeliverableProof()
     {
         var prompt = RekallAgeEmbeddedAgentContract.SystemPrompt;

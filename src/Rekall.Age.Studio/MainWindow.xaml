@@ -124,8 +124,23 @@
                                       IsEditable="True" Margin="0,3,0,6" />
                             <Button Content="Discover Models" Command="{Binding DiscoverModelsCommand}" Padding="8,4" Margin="0,0,0,8" />
                             <TextBlock Text="Game-authoring task" Foreground="#9FB0C4" />
-                            <TextBox Text="{Binding AgentTaskInput, UpdateSourceTrigger=PropertyChanged}"
-                                     AcceptsReturn="True" TextWrapping="Wrap" Height="86" Margin="0,3,0,6" />
+                            <Grid Height="86" Margin="0,3,0,6">
+                                <TextBox Text="{Binding AgentTaskInput, UpdateSourceTrigger=PropertyChanged}"
+                                         AcceptsReturn="True" TextWrapping="Wrap" Padding="4" />
+                                <TextBlock Text="Describe the game you want in ordinary language. AGE handles tools, implementation, testing, and delivery."
+                                           Foreground="#75869A" Margin="8,6" TextWrapping="Wrap" IsHitTestVisible="False">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding AgentTaskInput}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
                             <UniformGrid Columns="2">
                                 <Button Content="Run Agent" Command="{Binding RunAgentCommand}" Padding="8,4" Margin="0,0,3,0" />
                                 <Button Content="Cancel" Command="{Binding CancelAgentCommand}" Padding="8,4" Margin="3,0,0,0" />

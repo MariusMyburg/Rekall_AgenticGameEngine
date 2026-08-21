@@ -5,6 +5,7 @@ namespace Rekall.Age.Assets;
 
 public static class RekallAgeTextureMetadataReader
 {
+    private const int MaximumJpegHeaderBytes = 1024 * 1024;
     private static readonly byte[] Ktx2Identifier = [0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A];
 
     public static async ValueTask<RekallAgeTextureMetadata?> ReadAsync(
@@ -22,6 +23,7 @@ public static class RekallAgeTextureMetadataReader
             ".ktx2" => 80,
             ".dds" => 148,
             ".png" => 32,
+            ".jpg" or ".jpeg" => checked((int)Math.Min(new FileInfo(path).Length, MaximumJpegHeaderBytes)),
             _ => 0
         };
         if (bytesToRead == 0)
@@ -37,6 +39,7 @@ public static class RekallAgeTextureMetadataReader
             ".ktx2" => TryReadKtx2(bytes.AsSpan(0, read), out var ktx2) ? ktx2 : null,
             ".dds" => TryReadDds(bytes.AsSpan(0, read), out var dds) ? dds : null,
             ".png" => TryReadPng(bytes.AsSpan(0, read), out var png) ? png : null,
+            ".jpg" or ".jpeg" => TryReadJpeg(bytes.AsSpan(0, read), out var jpeg) ? jpeg : null,
             _ => null
         };
     }
@@ -138,6 +141,95 @@ public static class RekallAgeTextureMetadataReader
             null,
             false);
         return true;
+    }
+
+    private static bool TryReadJpeg(
+        ReadOnlySpan<byte> bytes,
+        out RekallAgeTextureMetadata metadata)
+    {
+        metadata = default!;
+        if (bytes.Length < 4 || bytes[0] != 0xff || bytes[1] != 0xd8)
+        {
+            return false;
+        }
+
+        var offset = 2;
+        while (offset < bytes.Length)
+        {
+            while (offset < bytes.Length && bytes[offset] != 0xff)
+            {
+                offset++;
+            }
+
+            while (offset < bytes.Length && bytes[offset] == 0xff)
+            {
+                offset++;
+            }
+
+            if (offset >= bytes.Length)
+            {
+                return false;
+            }
+
+            var marker = bytes[offset++];
+            if (marker is 0xd9 or 0xda)
+            {
+                return false;
+            }
+
+            if (marker is 0x01 or >= 0xd0 and <= 0xd7)
+            {
+                continue;
+            }
+
+            if (offset + 2 > bytes.Length)
+            {
+                return false;
+            }
+
+            var segmentLength = BinaryPrimitives.ReadUInt16BigEndian(bytes.Slice(offset, 2));
+            if (segmentLength < 2 || offset + segmentLength > bytes.Length)
+            {
+                return false;
+            }
+
+            if (IsJpegStartOfFrame(marker))
+            {
+                if (segmentLength < 8)
+                {
+                    return false;
+                }
+
+                var height = BinaryPrimitives.ReadUInt16BigEndian(bytes.Slice(offset + 3, 2));
+                var width = BinaryPrimitives.ReadUInt16BigEndian(bytes.Slice(offset + 5, 2));
+                if (width == 0 || height == 0)
+                {
+                    return false;
+                }
+
+                metadata = new RekallAgeTextureMetadata(
+                    "jpeg",
+                    width,
+                    height,
+                    1,
+                    "R8G8B8_UNorm",
+                    null,
+                    false);
+                return true;
+            }
+
+            offset += segmentLength;
+        }
+
+        return false;
+    }
+
+    private static bool IsJpegStartOfFrame(byte marker)
+    {
+        return marker is 0xc0 or 0xc1 or 0xc2 or 0xc3
+            or 0xc5 or 0xc6 or 0xc7
+            or 0xc9 or 0xca or 0xcb
+            or 0xcd or 0xce or 0xcf;
     }
 
     private static string ToVulkanFormatName(uint vkFormat)

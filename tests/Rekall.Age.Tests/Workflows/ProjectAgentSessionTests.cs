@@ -52,8 +52,56 @@ public sealed class ProjectAgentSessionTests
         Assert.True(result.Succeeded, result.Summary);
         Assert.Equal(1, result.AgentResult.Turns);
         Assert.Equal("terminal_tool_success", result.AgentResult.StopReason);
-        Assert.Equal("low", model.Requests[0].Think);
-        Assert.Equal(1_024, model.Requests[0].MaxOutputTokens);
+        Assert.Null(model.Requests[0].Think);
+        Assert.Null(model.Requests[0].MaxOutputTokens);
+        Assert.Null(new RekallAgeProjectAgentSessionRequest(root, "Main", "model", "task").MaxTurnDuration);
+    }
+
+    [Fact]
+    public async Task DefaultSessionDoesNotCapStructuredAuthoringOutput()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = CreateRegistry();
+        registry.Register(new GauntletProofCommand());
+        await CreateProjectAsync(registry, root);
+        var model = new UnboundedOutputModelClient(root);
+
+        var result = await new RekallAgeProjectAgentSession(model, registry).RunAsync(
+            new RekallAgeProjectAgentSessionRequest(root, "Main", "model", "Create the requested game")
+            {
+                MaxTurns = 1,
+                TreatGauntletAsTerminalSuccess = true
+            },
+            progress: null,
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded, result.Summary);
+        Assert.Equal("terminal_tool_success", result.AgentResult.StopReason);
+    }
+
+    [Fact]
+    public async Task DefaultSessionDoesNotStopAtAnArbitraryTurnCount()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = CreateRegistry();
+        registry.Register(new GauntletProofCommand());
+        await CreateProjectAsync(registry, root);
+        var responses = Enumerable.Range(1, 24)
+            .Select(_ => new RekallAgeLanguageModelResponse("test", "model", "", "", [], "stop", new(1, 1, 1)))
+            .Append(GauntletCall(root))
+            .ToArray();
+
+        var result = await new RekallAgeProjectAgentSession(new ScriptedModelClient(responses), registry).RunAsync(
+            new RekallAgeProjectAgentSessionRequest(root, "Main", "model", "Create the requested game")
+            {
+                TreatGauntletAsTerminalSuccess = true
+            },
+            progress: null,
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded, result.Summary);
+        Assert.Equal(25, result.AgentResult.Turns);
+        Assert.Equal("terminal_tool_success", result.AgentResult.StopReason);
     }
 
     [Fact]
@@ -478,6 +526,29 @@ public sealed class ProjectAgentSessionTests
             Requests.Add(request);
             return ValueTask.FromResult(responses[Math.Min(_index++, responses.Length - 1)]);
         }
+    }
+
+    private sealed class UnboundedOutputModelClient(string projectRoot)
+        : IRekallAgeLanguageModelClient
+    {
+        public string ProviderId => "test";
+
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([new("model", 1)]);
+
+        public ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(request.MaxOutputTokens is null
+                ? GauntletCall(projectRoot)
+                : new RekallAgeLanguageModelResponse(
+                    "test",
+                    "model",
+                    "",
+                    "unfinished structured authoring call",
+                    [],
+                    "length",
+                    new(1, request.MaxOutputTokens ?? 0, 1)));
     }
 
     private sealed class RecordingProgress<T> : IProgress<T>

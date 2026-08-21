@@ -12,7 +12,20 @@ public sealed record RekallAgeAssetDocument(
     public RekallAgeGlbMetadata? GlbMetadata { get; init; }
 
     public RekallAgeTextureMetadata? TextureMetadata { get; init; }
+
+    public RekallAgeAssetProvenance? Provenance { get; init; }
 }
+
+public sealed record RekallAgeAssetProvenance(
+    string OriginalUrl,
+    string FinalUrl,
+    DateTimeOffset RetrievedAtUtc,
+    string? MediaType,
+    long ByteCount,
+    string Sha256,
+    string? Attribution,
+    string? License,
+    string? LicenseUrl);
 
 public sealed record RekallAgeTextureMetadata(
     string Container,

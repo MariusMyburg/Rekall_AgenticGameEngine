@@ -19,6 +19,27 @@ This remains an authoring primitive: AGE fetches the exact resource selected by
 the agent, but does not search for, select, generate, or license content on the
 agent's behalf.
 
+After the first installed Studio rerun, the direct Wikimedia host returned HTTP
+429 and a user review exposed a more important authoring-contract flaw: the
+Studio task field had been filled with internal tool, URL, provenance, testing,
+and packaging instructions. Those details must not be user-authored.
+
+The complete decision therefore also adds:
+
+- `rekall.asset.search_remote_images`, a bounded Openverse catalog adapter that
+  returns agent-selectable open-license candidates with direct URL, landing
+  page, creator, attribution, and license metadata. AGE exposes evidence; the
+  agent chooses and verifies a result, so the engine still does not author or
+  select content.
+- a lower-level agent task envelope and embedded contract that preserve the
+  user's short ordinary-language request as authoritative intent and inject the
+  generic tool discovery, rights/provenance, validation, runtime evidence,
+  revision, packaging, and audit discipline beneath Studio;
+- standards-compliant remote-host behavior: optional operator contact in the
+  User-Agent, bounded `Retry-After` handling, and a stable rate-limit diagnostic
+  that tells the agent to wait or select another licensed source rather than
+  circumventing the host.
+
 ## Command contract
 
 `ImportRemoteAssetRequest` contains:
@@ -86,3 +107,9 @@ distinct frames, package inspection/audit, and provenance visible in the asset
 catalog. Any new failure is treated as evidence for the next generic contract
 repair rather than hidden with manual game authoring.
 
+The final Studio rerun must put only a normal request in the game-authoring
+field: “Create a game that uses a suitable openly licensed nature image from
+the internet as a full-window background, with moving raindrops on glass over
+it.” AGE and the embedded LLM contract—not the user—must expand that into the
+required internal workflow. The Studio field starts empty and displays a
+watermark explaining this responsibility split.

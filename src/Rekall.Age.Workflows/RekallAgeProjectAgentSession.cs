@@ -12,11 +12,11 @@ public sealed record RekallAgeProjectAgentSessionRequest(
     string Model,
     string Task)
 {
-    public int MaxTurns { get; init; } = 24;
-    public string? Think { get; init; } = "low";
+    public int? MaxTurns { get; init; }
+    public string? Think { get; init; }
     public double? Temperature { get; init; }
-    public int? MaxOutputTokens { get; init; } = 1_024;
-    public TimeSpan? MaxTurnDuration { get; init; } = TimeSpan.FromMinutes(2);
+    public int? MaxOutputTokens { get; init; }
+    public TimeSpan? MaxTurnDuration { get; init; }
     public bool RequireCompletionAudit { get; init; } = true;
     public bool RequireCompletionAuditToolEvidence { get; init; }
     public bool TreatGauntletAsTerminalSuccess { get; init; }
@@ -62,14 +62,7 @@ public sealed class RekallAgeProjectAgentSession
             _registry,
             new RekallAgeMcpAgentToolExecutor(_registry, "rekall-studio-agent", progressiveDiscovery: true));
         var agent = new RekallAgeLanguageModelAgent(_modelClient, tools);
-        var scopedTask = $"""
-            Open project root: {projectRoot}
-            Active scene: {request.SceneName}
-
-            {request.Task.Trim()}
-
-            Work only inside the open project root above. Use canonical Rekall AGE tools to inspect and author the game; do not invent engine operations or author outside that root. Preserve generic engine architecture and put game-specific behavior in project modules or authored scene content.
-            """;
+        var scopedTask = RekallAgeAgentTaskComposer.Compose(projectRoot, request.SceneName, request.Task);
         var result = await agent.RunAsync(
             new RekallAgeLanguageModelAgentRequest(
                 request.Model,

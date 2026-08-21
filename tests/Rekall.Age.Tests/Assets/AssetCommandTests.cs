@@ -1,5 +1,6 @@
 using Rekall.Age.Assets;
 using Rekall.Age.Assets.Commands;
+using Rekall.Age.Assets.Remote;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 
@@ -7,6 +8,66 @@ namespace Rekall.Age.Tests.Assets;
 
 public sealed class AssetCommandTests
 {
+    [Fact]
+    public async Task ImportRemoteAssetPersistsIntegrityAndLicenseProvenance()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var bytes = new byte[] { 1, 2, 3, 4, 5 };
+        using var http = new HttpClient(new RemoteHandler(bytes));
+        var acquisition = new RekallAgeRemoteAssetAcquisition(
+            http,
+            new RemoteResolver(System.Net.IPAddress.Parse("93.184.216.34")));
+        var command = new ImportRemoteAssetCommand(acquisition);
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("remote asset"), CancellationToken.None);
+
+        var result = await command.ExecuteAsync(
+            new ImportRemoteAssetRequest(
+                root,
+                "https://assets.example/rain.png",
+                "texture",
+                "Rain Forest",
+                "74f81fe167d99b4cb41d6d0ccda82278caee9f3e2f25d5e5a3936ff3dcec60d0",
+                "Pixel.la / PierreAndreRoy",
+                "CC0 1.0",
+                "https://creativecommons.org/publicdomain/zero/1.0/",
+                "https://operator.example/rekall-age"),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal("https://assets.example/rain.png", result.Value.Asset.SourcePath);
+        Assert.True(File.Exists(result.Value.Asset.ImportedPath));
+        var provenance = Assert.IsType<RekallAgeAssetProvenance>(result.Value.Asset.Provenance);
+        Assert.Equal("Pixel.la / PierreAndreRoy", provenance.Attribution);
+        Assert.Equal("CC0 1.0", provenance.License);
+        Assert.Equal(bytes.Length, provenance.ByteCount);
+        Assert.Contains(result.Value.Asset.ImportedPath, context.Transaction.ChangedResources);
+        Assert.Contains(new RekallAgeAssetCatalogStore().GetCatalogPath(root), context.Transaction.ChangedResources);
+        Assert.Empty(Directory.GetFiles(Path.Combine(root, ".age-cache", "remote-assets")));
+
+        var catalog = await new RekallAgeAssetCatalogStore().LoadAsync(root, CancellationToken.None);
+        Assert.Equal(provenance, Assert.Single(catalog.Assets).Provenance);
+    }
+
+    [Fact]
+    public async Task ImportRemoteAssetRejectsDigestMismatchWithoutCatalogMutation()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        using var http = new HttpClient(new RemoteHandler([1, 2, 3]));
+        var command = new ImportRemoteAssetCommand(new RekallAgeRemoteAssetAcquisition(
+            http,
+            new RemoteResolver(System.Net.IPAddress.Parse("93.184.216.34"))));
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("remote mismatch"), CancellationToken.None);
+
+        var result = await command.ExecuteAsync(
+            new ImportRemoteAssetRequest(root, "https://assets.example/rain.png", "texture", ExpectedSha256: new string('0', 64)),
+            context);
+
+        Assert.False(result.Ok);
+        Assert.Equal("REKALL_ASSET_REMOTE_DIGEST_MISMATCH", Assert.Single(result.Errors).Code);
+        Assert.False(File.Exists(Path.Combine(root, "Assets", "catalog.json")));
+        Assert.Empty(Directory.GetFiles(Path.Combine(root, ".age-cache", "remote-assets")));
+    }
+
     [Fact]
     public async Task ImportAssetCopiesFileAndAddsCatalogEntry()
     {
@@ -98,6 +159,31 @@ public sealed class AssetCommandTests
 
         var catalog = await new RekallAgeAssetCatalogStore().LoadAsync(root, CancellationToken.None);
         Assert.Equal("VK_FORMAT_BC7_SRGB_BLOCK", Assert.Single(catalog.Assets).TextureMetadata?.Format);
+    }
+
+    [Fact]
+    public async Task ImportAssetStoresJpegTextureMetadataInCatalog()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var source = Path.Combine(root, "landscape.jpg");
+        await File.WriteAllBytesAsync(source, CreateJpegHeader(1024, 683));
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("import jpeg"), CancellationToken.None);
+
+        var result = await new ImportAssetCommand().ExecuteAsync(
+            new ImportAssetRequest(root, source, "texture", "Landscape"),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.NotNull(result.Value.Asset.TextureMetadata);
+        Assert.Equal("jpeg", result.Value.Asset.TextureMetadata.Container);
+        Assert.Equal(1024, result.Value.Asset.TextureMetadata.Width);
+        Assert.Equal(683, result.Value.Asset.TextureMetadata.Height);
+        Assert.Equal(1, result.Value.Asset.TextureMetadata.MipLevelCount);
+        Assert.Equal("R8G8B8_UNorm", result.Value.Asset.TextureMetadata.Format);
+        Assert.False(result.Value.Asset.TextureMetadata.GpuCompressed);
+
+        var catalog = await new RekallAgeAssetCatalogStore().LoadAsync(root, CancellationToken.None);
+        Assert.Equal(1024, Assert.Single(catalog.Assets).TextureMetadata?.Width);
     }
 
     [Fact]
@@ -199,6 +285,20 @@ public sealed class AssetCommandTests
         return bytes;
     }
 
+    private static byte[] CreateJpegHeader(ushort width, ushort height)
+    {
+        return
+        [
+            0xff, 0xd8,
+            0xff, 0xe0, 0x00, 0x04, 0x00, 0x00,
+            0xff, 0xc0, 0x00, 0x0b, 0x08,
+            (byte)(height >> 8), (byte)height,
+            (byte)(width >> 8), (byte)width,
+            0x01, 0x01, 0x11, 0x00,
+            0xff, 0xd9
+        ];
+    }
+
     private static byte[] CreateDdsDx10Header(uint width, uint height, uint mipLevels, uint dxgiFormat)
     {
         var bytes = new byte[148];
@@ -215,5 +315,24 @@ public sealed class AssetCommandTests
         bytes[offset + 1] = (byte)((value >> 8) & 0xff);
         bytes[offset + 2] = (byte)((value >> 16) & 0xff);
         bytes[offset + 3] = (byte)((value >> 24) & 0xff);
+    }
+
+    private sealed class RemoteHandler(byte[] bytes) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var response = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(bytes)
+            };
+            response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+            return Task.FromResult(response);
+        }
+    }
+
+    private sealed class RemoteResolver(params System.Net.IPAddress[] addresses) : IRekallAgeHostAddressResolver
+    {
+        public ValueTask<IReadOnlyList<System.Net.IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<System.Net.IPAddress>>(addresses);
     }
 }

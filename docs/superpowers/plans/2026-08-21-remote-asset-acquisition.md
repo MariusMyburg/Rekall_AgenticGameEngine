@@ -69,6 +69,29 @@
 - [ ] If schema description alone is insufficient, adjust only generic search metadata/tokenization; do not add game-specific prompt rules.
 - [ ] Rerun agent discovery tests, record the initial Studio `turn_limit` evidence and completed repair in `docs/production/PROGRESS.md`, and confirm the ledger names the same Studio rerun as next acceptance.
 
+### Task 3A: Ordinary-language Studio requests and agent-owned asset discovery
+
+**Files:**
+- Create: `src/Rekall.Age.Assets/Commands/SearchRemoteImagesCommand.cs`
+- Create: `src/Rekall.Age.Workflows/RekallAgeAgentTaskComposer.cs`
+- Modify: `src/Rekall.Age.Agent/LanguageModels/RekallAgeEmbeddedAgentContract.cs`
+- Modify: `src/Rekall.Age.Studio/RekallAgeStudioViewModel.cs`
+- Modify: `src/Rekall.Age.Studio/MainWindow.xaml`
+- Test: `tests/Rekall.Age.Tests/Assets/RemoteImageSearchCommandTests.cs`
+- Test: `tests/Rekall.Age.Tests/Agent/AgentTaskComposerTests.cs`
+- Modify: `tests/Rekall.Age.Tests/Agent/LanguageModelAgentTests.cs`
+- Modify: `tests/Rekall.Age.Studio.Tests/StudioViewModelTests.cs`
+
+**Interfaces:**
+- Produces: `rekall.asset.search_remote_images`, returning agent-selectable direct URL and complete license/provenance evidence from a bounded open-license catalog query.
+- Produces: `RekallAgeAgentTaskComposer.Compose(projectRoot, sceneName, userRequest)`, preserving the short user request once inside an engine-owned execution envelope.
+
+- [ ] Prove by failing tests that ordinary internet-image intent discovers a bounded catalog search, returns selectable provenance without project mutation, and rejects oversized/provider-failure responses.
+- [ ] Implement the fixed-endpoint Openverse adapter with a 30-second timeout, 1 MiB response ceiling, 1–12 result bound, commercial/modification filters, stable diagnostics, and explicit license-verification warning.
+- [ ] Add failing contract/composer tests proving a short natural request is preserved once while AGE injects tool independence, rights/provenance, runtime evidence, and delivery discipline without inventing unrelated gameplay.
+- [ ] Make the Studio task value empty by default and add a non-value watermark stating that ordinary language is sufficient; prove Run Agent is disabled until the user enters intent.
+- [ ] Rerun the Studio acceptance with only the ordinary request in the visible field; the embedded contract must search, select, verify, import, author, test, and deliver.
+
 ### Task 4: Verification, distribution, and repeated Studio acceptance
 
 **Files:**
@@ -80,7 +103,7 @@
 
 - [ ] Run the affected tests, locked Release build, then complete engine and Studio suites twice; record exact totals.
 - [ ] Assemble the Windows distribution, calculate archive SHA-256/file count, and launch its Studio executable.
-- [ ] Through Studio UI only, open the existing `Artifacts/StudioRaindrops` project and rerun the original prompt with the real CC0 Wikimedia URL and provenance.
+- [ ] Through Studio UI only, create a clean project and enter only the ordinary request: `Create a game that uses a suitable openly licensed nature image from the internet as a full-window background, with moving raindrops on glass over it.` The embedded contract must independently search for a suitable reusable image, verify and preserve its license/provenance, import it, and derive every internal implementation and evidence step.
 - [ ] Verify the agent created the asset/scene/shader/module without manual game-file edits, then use Studio to validate and play/capture two distinct runtime frames.
 - [ ] Inspect and audit the packaged game, verify catalog provenance and package relocation, and update the ledger with hashes and evidence paths.
 - [ ] If acceptance exposes a new generic engine deficiency, preserve the failed evidence, repair that contract test-first, and repeat this task rather than substituting a hand-authored demo.
@@ -90,4 +113,3 @@
 - Spec coverage: command contract, SSRF/DNS-rebinding policy, resource bounds, provenance, compatibility, discovery, Studio rerun, runtime evidence, and package audit each map to a task.
 - Placeholder scan: no deferred implementation markers or unspecified error-handling steps remain.
 - Type consistency: the acquisition receipt and command/provenance names are identical across producing and consuming tasks.
-

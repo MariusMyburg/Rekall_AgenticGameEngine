@@ -191,13 +191,16 @@ public sealed class ModuleMetadataTests
         var module = Assert.Single(index.Modules, item => item.Id == "rekall.builtins");
 
         Assert.Contains(module.Components, component => component.DisplayName == "Transform 2D");
-        Assert.Contains(module.Components, component => component.DisplayName == "Transform 3D");
+        var transform3D = Assert.Single(module.Components, component => component.DisplayName == "Transform 3D");
+        Assert.Contains("local forward is +Z", transform3D.Description, StringComparison.Ordinal);
+        Assert.Contains("positive pitch looks downward", transform3D.Description, StringComparison.Ordinal);
         Assert.DoesNotContain(module.Components, component => component.DisplayName == "Playable Loop");
         var inputActionMap = Assert.Single(module.Components, component => component.DisplayName == "Input Action Map");
         Assert.Contains(inputActionMap.Properties, property => property.Name == "Actions" && property.Kind == "inputActions");
         Assert.Contains(module.Components, component => component.DisplayName == "Camera 2D");
         var camera3D = Assert.Single(module.Components, component => component.DisplayName == "Camera 3D");
         Assert.Contains("separate Rekall.Transform3D", camera3D.Description, StringComparison.Ordinal);
+        Assert.Contains("faces +Z", camera3D.Description, StringComparison.Ordinal);
         Assert.Contains(camera3D.Properties, property => property.Name == "StereoMode" && property.Kind == "string");
         Assert.Contains(camera3D.Properties, property => property.Name == "StereoRenderMode" && property.Kind == "string");
         Assert.Contains(camera3D.Properties, property => property.Name == "InterpupillaryDistance" && property.Minimum == 0);

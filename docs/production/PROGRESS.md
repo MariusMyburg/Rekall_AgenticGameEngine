@@ -4,13 +4,13 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 16:49 Africa/Johannesburg
+Last verified: 2026-08-21 18:54 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: real Qwen revised and delivered Lumen Vault from runtime
-visual evidence; the reviewed Studio/agent path now has fail-closed bounded
-gateway policy, project scope, provider deadlines, and camera proof
+Latest milestone: Studio/project authoring no longer has a default turn count,
+generated-output ceiling, or per-turn deadline; the installed short-request
+Rain Glass acceptance is running without those limits
 
 ## Product objective
 
@@ -45,6 +45,13 @@ Studio is important, but it does not define or reorder the engine foundation.
    entirely through Rekall.Age.Studio so prompt entry, tool execution, project
    mutation, play, capture, packaging, and audit prove the UI as a real consumer
    of the same portable authoring contracts.
+   After this base remote-image path passes, generalize it into a provider-neutral
+   asset catalog with Poly Haven first (official API; CC0 HDRIs, PBR textures,
+   and 3D models), then ambientCG, and approved manifest-based Kenney/Quaternius
+   packs. Preserve variant/dependency manifests, hashes, source/license/author
+   provenance, and generated package credits; do not scrape providers without a
+   supported API or permission. Mixed-license catalogs remain opt-in and
+   policy-filtered.
 2. After the arbitrary described-game path is reliable, prove a complete
    playable Pong game through the same generic contracts.
 3. Then prove a Galaga-class game entirely through Studio and broaden the 3D
@@ -58,6 +65,61 @@ Studio is important, but it does not define or reorder the engine foundation.
    platform.
 
 ## Verified status
+
+- User-facing Studio and project-agent sessions now leave maximum turns,
+  generated output, per-turn duration, and Ollama reasoning mode unspecified by
+  default. Explicit bounds remain available for deterministic tests and
+  automation, and Studio retains its user-operated Cancel command. Regressions
+  first failed under the former 24/36-turn, 1,024-token, two-minute, and `low`
+  reasoning defaults; the changed surface now passes 111/111 engine and 9/9
+  Studio tests. Before the final reasoning-default removal, the locked Release
+  workflow built with zero warnings/errors, passed 1,087/1,087 engine and 9/9
+  Studio tests twice, and passed the complete installed-distribution matrix.
+  A diagnostic installed-Studio run pursued only `Create a nature scene viewed
+  through moving raindrops on glass.` with real `qwen3.8:27b`, no turn, output,
+  or turn-duration limit, and task-specific completion required. That wording
+  incorrectly permitted a procedural scene: Qwen authored 30 coherent entities
+  but no remote asset, then aimed its +Z-facing camera away from the negative-Z
+  landscape. Independent capture reported zero asset-backed renderables and
+  `REKALL_VIEWPORT_DOMINATED_BY_ONE_COLOR`. AGE now exposes its right-handed
+  +Z-forward camera convention through Transform3D/Camera3D schemas and the
+  embedded contract, and task-specific Studio automation requires a visually
+  informative frame. The corrected clean-project acceptance request is:
+  `Create a game that uses a suitable openly licensed nature image from the
+  internet as a full-window background, with moving raindrops on glass over
+  it.` The final package rebuild and repeated acceptance will also include the
+  newly unspecified reasoning mode.
+
+- The first `Rain Glass Reverie` run was performed through the installed Studio
+  with Qwen 3.8 27B and stopped honestly at `turn_limit`: Qwen found only the
+  local-file asset importer, passed it the requested HTTPS URL, received `Asset
+  source file was not found`, and created no game files. AGE now has a generic
+  `rekall.asset.import_remote` command with HTTPS-only public-address policy,
+  per-hop redirect/DNS revalidation and connection pinning, 32 MiB/30-second
+  limits, SHA-256 verification, project-confined staging/cleanup, catalogued
+  creator/license/source provenance, stable diagnostics, optional operator
+  contact, and bounded `Retry-After` handling. Focused asset/MCP coverage passed
+  56/56 before the protocol/task-contract expansion; the expanded selection is
+  currently green at 31/31 engine and 1/1 Studio tests.
+- The first rebuilt installed-Studio retry proved the new command was naturally
+  discoverable and called it on turn 2, but Wikimedia returned a real HTTP 429.
+  Qwen did not fabricate a replacement and made no game mutation; the attempt
+  was deliberately cancelled and preserved. AGE now distinguishes host rate
+  limits, respects bounded retry instructions, and tells agents to wait or
+  select another licensed source rather than bypass a provider.
+- A user review correctly rejected the long internal acceptance specification
+  in Studio's visible task field. The field now starts empty with an ordinary-
+  language watermark. `RekallAgeAgentTaskComposer` preserves the user's short
+  request once as authoritative intent, while the embedded engine contract owns
+  tool discovery, implementation, rights/provenance, validation, runtime
+  evidence, revision, packaging, and audit requirements without inventing
+  unrelated gameplay. New `rekall.asset.search_remote_images` provides bounded
+  agent-selectable Openverse results with URL, landing page, creator,
+  attribution, and license metadata; AGE exposes evidence while the agent—not
+  the engine—chooses content. A live anonymous Openverse probe returned 200 and
+  a CC BY forest-lake result; its direct Flickr image host returned 200 without
+  a proxy. The next Studio rerun must contain only the corrected ordinary image-
+  background request recorded above.
 
 - Real `qwen3.8:27b` repaired and delivered the preserved benchmark-48 Lumen
   Vault instead of replacing it. Qwen separated the three HUD rows, balanced

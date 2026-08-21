@@ -231,7 +231,7 @@ public sealed class RekallAgeCamera2DComponent : RekallAgeComponent
     public double FarClip { get; init; } = 1000;
 }
 
-[RekallAgeComponent("Camera 3D", Description = "Projects a 3D view. Put position, rotation, and scale on a separate Rekall.Transform3D component on the same entity; Camera3D properties configure projection, clipping, viewport, render layers, and stereo behavior only.")]
+[RekallAgeComponent("Camera 3D", Description = "Projects a 3D view. Put position, rotation, and scale on a separate Rekall.Transform3D component on the same entity; an unrotated camera faces +Z, so use the Transform3D Euler convention to aim it. Camera3D properties configure projection, clipping, viewport, render layers, and stereo behavior only.")]
 public sealed class RekallAgeCamera3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty]

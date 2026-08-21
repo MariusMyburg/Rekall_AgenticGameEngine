@@ -51,7 +51,8 @@ public sealed class DynamicCommandDispatchTests
         Assert.False(result.Ok);
         var error = Assert.Single(result.Errors);
         Assert.Equal("REKALL_COMMAND_ARGUMENT_REQUIRED", error.Code);
-        Assert.Contains("message", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("'message'", error.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("'Message'", error.Message, StringComparison.Ordinal);
         Assert.Empty(context.Transaction.ChangedResources);
     }
 

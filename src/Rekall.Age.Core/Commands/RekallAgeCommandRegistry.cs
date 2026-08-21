@@ -151,6 +151,7 @@ public sealed class RekallAgeCommandRegistry
                     .Where(parameter => !parameter.HasDefaultValue)
                     .Select(parameter => parameter.Name ?? string.Empty)
                     .Where(parameterName => parameterName.Length > 0)
+                    .Select(JsonNamingPolicy.CamelCase.ConvertName)
                     .Where(parameterName => !document.RootElement.EnumerateObject().Any(property =>
                         property.Name.Equals(parameterName, StringComparison.OrdinalIgnoreCase)
                         && property.Value.ValueKind is not JsonValueKind.Null))

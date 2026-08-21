@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 12:29 Africa/Johannesburg
+Last verified: 2026-08-21 12:40 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -63,7 +63,11 @@ Studio is important, but it does not define or reorder the engine foundation.
   Supported aliases are replaced by their canonical fields during
   normalization, so strict binding does not break documented compatibility.
   Malformed runtime-inspection calls reach typed binding before checkpoint
-  policy can hide the defect. Focused dispatcher/agent coverage passed 51/51.
+  policy can hide the defect. Missing-required-field errors now also project C#
+  constructor parameters through the command JSON naming policy, returning
+  exact copyable names such as `projectName` rather than `ProjectName`. The
+  new casing regression failed first and all 12 dispatcher tests then passed.
+  Focused dispatcher/agent coverage passed 51/51.
   The production gate also exposed a real scheduler-contention boundary: the
   prior one-second restricted-module request deadline rejected a valid
   400-millisecond module during the full suite while Ollama downloaded a large
@@ -73,8 +77,8 @@ Studio is important, but it does not define or reorder the engine foundation.
   build completed with zero warnings/errors; both independent passes completed
   1,028/1,028 engine and 7/7 Studio tests, and the complete installed matrix
   passed under the continuing download load. The 1,186-payload archive is
-  201,619,003 bytes with SHA-256
-  `7E55AF4EB2B5FF9B0F8DF9F7C453D9822B226DC9B56DE7C166A4D60C762417CC`.
+  201,618,693 bytes with SHA-256
+  `5122140FE8B74065EE349EC23F9A94284DD048DB6FFD5B7C9BECB08606AB0FB8`.
   Qwen 3.8 benchmark 47 is next after the model pull completes.
 - Browser game publishing is architecturally viable but not implemented. The
   managed world/runtime and generic authoring contracts are the reusable base;

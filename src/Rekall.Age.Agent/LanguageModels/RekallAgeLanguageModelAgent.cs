@@ -30,6 +30,8 @@ public sealed record RekallAgeLanguageModelAgentRequest(string Model, string Sys
 
     public int MaxRuntimeBehaviorRepairTurns { get; init; } = 12;
 
+    public int MaxPostRuntimeDeliveryTurns { get; init; } = 8;
+
     public IProgress<RekallAgeLanguageModelAgentProgress>? Progress { get; init; }
 
     public IReadOnlySet<string> TerminalSuccessTools { get; init; } = new HashSet<string>(StringComparer.Ordinal);
@@ -111,6 +113,7 @@ public sealed class RekallAgeLanguageModelAgent(
         var maxContextMessages = Math.Clamp(request.MaxContextMessages, 4, 128);
         var maxToolResultCharacters = Math.Clamp(request.MaxToolResultCharacters, 1_000, 100_000);
         var maxRuntimeBehaviorRepairTurns = Math.Clamp(request.MaxRuntimeBehaviorRepairTurns, 0, 64);
+        var maxPostRuntimeDeliveryTurns = Math.Clamp(request.MaxPostRuntimeDeliveryTurns, 0, 32);
         var transcript = new List<RekallAgeLanguageModelMessage>();
         if (!string.IsNullOrWhiteSpace(request.SystemPrompt))
         {
@@ -127,6 +130,7 @@ public sealed class RekallAgeLanguageModelAgent(
         var completionAuditPending = false;
         var runtimeCheckpointPrompted = false;
         var runtimeRepairReserveActivated = false;
+        var postRuntimeDeliveryReserveActivated = false;
         var turnLimit = maxTurns;
         for (var turn = 1; turn <= turnLimit; turn++)
         {
@@ -189,6 +193,7 @@ public sealed class RekallAgeLanguageModelAgent(
             }
 
             var failedRuntimeAssertionThisTurn = false;
+            var successfulRuntimeCheckpointThisTurn = false;
             string? repeatedFailureRecovery = null;
             foreach (var call in response.ToolCalls)
             {
@@ -253,6 +258,12 @@ public sealed class RekallAgeLanguageModelAgent(
                 {
                     failedRuntimeAssertionThisTurn = true;
                 }
+                else if (succeeded
+                    && executedToolName.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
+                    && HasRuntimeCheckpointCoverage(call.Arguments))
+                {
+                    successfulRuntimeCheckpointThisTurn = true;
+                }
                 var effectiveToolName = EffectiveToolName(
                     call with { Name = executedToolName },
                     request.TerminalSuccessTools,
@@ -282,12 +293,31 @@ public sealed class RekallAgeLanguageModelAgent(
                 transcript.Add(new RekallAgeLanguageModelMessage("user", repeatedFailureRecovery));
             }
 
+            if (request.RequireRuntimeBehaviorAssertions
+                && !postRuntimeDeliveryReserveActivated
+                && maxPostRuntimeDeliveryTurns > 0
+                && successfulRuntimeCheckpointThisTurn
+                && HasFreshSuccessfulRuntimeCheckpoint(toolExecutions))
+            {
+                var extendedTurnLimit = Math.Min(256, checked(turn + maxPostRuntimeDeliveryTurns));
+                if (extendedTurnLimit > turnLimit)
+                {
+                    postRuntimeDeliveryReserveActivated = true;
+                    turnLimit = extendedTurnLimit;
+                    transcript.Add(new RekallAgeLanguageModelMessage(
+                        "user",
+                        $"The executable gameplay checkpoint passed. You now have a protected delivery reserve through turn {turnLimit}. Validate the current project, apply only the smallest evidence-backed repairs, refresh runtime proof after any mutation, then package, capture proof, and audit the deliverable. Do not reopen broad authoring or spend this finite reserve on optional polish."));
+                }
+            }
+
             if (failedRuntimeAssertionThisTurn)
             {
                 if (!runtimeRepairReserveActivated && maxRuntimeBehaviorRepairTurns > 0)
                 {
                     runtimeRepairReserveActivated = true;
-                    turnLimit = checked(maxTurns + maxRuntimeBehaviorRepairTurns);
+                    turnLimit = Math.Max(
+                        turnLimit,
+                        Math.Min(256, checked(maxTurns + maxRuntimeBehaviorRepairTurns)));
                 }
 
                 runtimeCheckpointPrompted = true;
@@ -312,6 +342,8 @@ public sealed class RekallAgeLanguageModelAgent(
             "run.stopped",
             runtimeRepairReserveActivated
                 ? $"Agent reached the {turnLimit}-turn limit after using its protected runtime repair reserve."
+                : postRuntimeDeliveryReserveActivated
+                    ? $"Agent reached the {turnLimit}-turn limit after using its protected post-runtime delivery reserve."
                 : $"Agent reached the {turnLimit}-turn limit."));
         return limited;
 
@@ -603,6 +635,21 @@ public sealed class RekallAgeLanguageModelAgent(
         message =
             "Deterministic gameplay evidence is still required. You authored a runtime-system module, so narrative source inspection, a successful build, zero validation issues, soak, capture, package, and package audit cannot complete the task by themselves. Call rekall.runtime.inspect_scene after the latest scene/module mutation with representative authored input frames. Minimum passing runtime behavior assertions are: an exists assertion for an attached Game.* component, plus a strict assertion proving either a nonzero transform delta or a changed Game.* component property. Require additional passing assertions for the exact requested progress/contact, completion/HUD, and reset transitions. Subjects include component, component.property, delta.component.property, changed.component.property, transform.position2d.x/y, transform.position3d.x/y/z, delta.position2d.x/y, and delta.position3d.x/y/z. Do not weaken a failed assertion merely to make it pass; repair the authored behavior from the actual bounded values and rerun the same intended transition. Do not claim completion until qualifying runtime evidence passes after the latest mutation.";
         return true;
+    }
+
+    private static bool HasFreshSuccessfulRuntimeCheckpoint(
+        IReadOnlyList<RekallAgeLanguageModelToolExecution> executions)
+    {
+        var latestMutation = executions
+            .Where(execution => execution.Succeeded && InvalidatesRuntimeBehaviorEvidence(execution.Name))
+            .Select(execution => execution.Sequence)
+            .DefaultIfEmpty(0)
+            .Max();
+        return executions.Any(execution =>
+            execution.Succeeded
+            && execution.Sequence > latestMutation
+            && execution.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
+            && HasRuntimeCheckpointCoverage(execution.Arguments));
     }
 
     private static bool InvalidatesRuntimeBehaviorEvidence(string toolName) =>

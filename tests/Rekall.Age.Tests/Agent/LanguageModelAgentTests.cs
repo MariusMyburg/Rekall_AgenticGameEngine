@@ -923,6 +923,118 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task LateSuccessfulRuntimeCheckpointUnlocksBoundedDeliveryTurns()
+    {
+        var checkpoint = MeaningfulRuntimeCheckpointArguments();
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("inspect", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", checkpoint)],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.validation.repair_project", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.workflow.package_playable_game", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Delivered", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 2,
+                MaxPostRuntimeDeliveryTurns = 3,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(5, result.Turns);
+        Assert.Contains(
+            model.Requests[2].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("protected delivery", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task PostRuntimeDeliveryReserveActivatesOnlyOnce()
+    {
+        var checkpoint = MeaningfulRuntimeCheckpointArguments();
+        var runtimeCall = new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", checkpoint);
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("inspect", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [runtimeCall], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [runtimeCall], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [runtimeCall], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [runtimeCall], "tool_calls", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 2,
+                MaxPostRuntimeDeliveryTurns = 2,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.False(result.Completed);
+        Assert.Equal("turn_limit", result.StopReason);
+        Assert.Equal(4, result.Turns);
+        Assert.Equal(4, model.Requests.Count);
+    }
+
+    [Fact]
+    public async Task EarlyRuntimeCheckpointDoesNotArmDeliveryReserveLaterAsBudgetElapses()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall(
+                    "rekall.runtime.inspect_scene",
+                    MeaningfulRuntimeCheckpointArguments())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("inspect", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("inspect", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("inspect", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "Unexpected extra turn", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 4,
+                MaxPostRuntimeDeliveryTurns = 2,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.False(result.Completed);
+        Assert.Equal(4, result.Turns);
+        Assert.Equal(4, model.Requests.Count);
+    }
+
+    [Fact]
     public async Task SuccessfulDeliveryAuditPrimesTheNextEvidenceBackedFinalResponse()
     {
         var model = new ScriptedModelClient(

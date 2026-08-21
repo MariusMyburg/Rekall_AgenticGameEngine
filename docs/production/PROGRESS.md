@@ -4,13 +4,13 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 06:12 Africa/Johannesburg
+Last verified: 2026-08-21 05:59 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: scene blueprint components normalize through one strict,
-inspectable contract; bounded post-runtime delivery reserve is the next measured
-blocker
+Latest milestone: late passing gameplay checkpoints receive a one-shot bounded
+delivery reserve; direct component mutation must now fail closed on unknown
+reserved types
 
 ## Product objective
 
@@ -32,6 +32,33 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Post-runtime delivery reserve: a qualifying successful runtime inspection can
+  extend an agent run by at most eight delivery turns, only on the turn that
+  produces the fresh evidence and only once. Early checkpoints cannot arm the
+  reserve later merely because budget elapsed; later mutations still invalidate
+  runtime proof, and all agent/repair limits share the absolute 256-turn ceiling.
+  Red-first policy coverage passes 27/27. The locked zero-warning/error gate
+  passed 989/989 engine and 7/7 Studio tests twice and the complete installed
+  matrix. The 1,186-payload-file archive is 201,545,117 bytes with SHA-256
+  `3DC30C9445105B09ED0E5C252EB470F1DCD52F1A2BB8701EFDB1CACD5AD91567`;
+  it left zero reusable compiler nodes and zero run-scoped temp directories.
+- Clean installed real-Qwen benchmark 26 compiled authored gameplay, passed
+  four runtime inspections, and produced a nonblank 960x540 viewport with 14
+  renderables. It remained red at 48/78 successful tool calls with two invented
+  HUD types and no package. The first reserve implementation armed from an old
+  checkpoint as its remaining budget elapsed and added only one turn; the fresh
+  post-repair checkpoint therefore could not arm it. That timing defect is now
+  fixed by the verified current-turn requirement. Evidence SHA-256 is
+  `FDE2804B1BB1D15D1924CA6B447679C75A306820EB612510BEE466335D820A0A`.
+- Clean installed real-Qwen benchmark 27 remained red at 46/76 successful tool
+  calls. It compiled `LumenVaultRules` and produced a nonblank 960x540 viewport
+  with three renderables, but no runtime inspection passed and no package was
+  produced. The measured generic defect is earlier in the loop:
+  `rekall.component.add` accepted invented reserved `Rekall.Collider3D`, so the
+  runtime reported zero compatible colliders and only final validation exposed
+  the invalid type. Direct component mutation must reject unknown reserved
+  types immediately and return exact schema recovery guidance. Evidence SHA-256
+  is `9F3978D410ABF2F2ABB2B70D723C7A910F79DFD27E274955BAAE6D2D85BE131C`.
 - Scene blueprint component normalization now accepts the canonical
   `{type, properties}` shape plus deterministic flat, `typeName`, and strict
   name/value-list representations while rejecting conflicts with precise JSON

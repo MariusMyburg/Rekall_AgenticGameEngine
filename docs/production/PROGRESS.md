@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 20:44 Africa/Johannesburg
+Last verified: 2026-08-21 21:31 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -31,6 +31,33 @@ captures/runtime transitions. The focused plane/schema and task-evidence tests
 are green, and the complete Release solution builds with zero warnings/errors.
 Pong remains active until its repaired Studio output is independently playable
 and recognizable; the failed V1 package is diagnostic evidence only.
+
+The user correctly required engine-owned graphics verification before another
+LLM acceptance attempt. The in-progress Pong repair was stopped after preserving
+its module, scene, transactions, and diagnostic captures. A direct regression
+fixture reproduced the missing-world failure without an LLM: the software
+renderer multiplied primitive scale twice, used the largest axis as every
+screen axis, and had name/order-dependent opaque composition. Wide thin walls
+therefore became screen-covering bands and erased foreground geometry. The
+software path now derives pixels-per-world-unit from the active perspective or
+orthographic camera, applies primitive scale per axis exactly once, and draws
+same-sort opaque content far-to-near before UI. A fresh Pong capture immediately
+made the backdrop, boundaries, center line, ball, and both paddles visible.
+
+The same audit found two UI/backend defects. Runtime capture now emits
+`REKALL_VIEWPORT_UI_LARGE_COVERAGE` when UI layout bounds cover at least 35% of
+a viewport that also contains world renderables, with reference-space guidance;
+the built-in UI Canvas schema now explicitly explains viewport scaling and why
+Width=100 on a 100-wide reference canvas fills the full window. Native Vulkan
+scene capture previously reported UI renderables but omitted them from the PNG;
+it now composites the exact runtime software UI overlay into hardware capture
+and recomputes output metrics. Direct RTX 5090 captures prove Vulkan world+HUD
+output and expose the same 44% excessive-HUD warning as software. All 315
+rendering-namespace tests pass, including the new perspective backdrop,
+anisotropic primitive, UI coverage, and Vulkan UI composition regressions; the
+complete Release solution builds with zero warnings/errors. The next action is
+to run the broader engine suite, checkpoint this graphics tranche, then resume
+Pong through Studio against these tested contracts.
 
 ## Product objective
 

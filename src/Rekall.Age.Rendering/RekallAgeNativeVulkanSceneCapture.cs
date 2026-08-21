@@ -90,7 +90,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 outputDirectory,
                 RekallAgeVulkanClearColor.Default,
                 cancellationToken);
-            return FromClearCapture(frame, assets, clear);
+            return await CompositeUiOverlayAsync(
+                FromClearCapture(frame, assets, clear),
+                frame,
+                assets,
+                cancellationToken);
         }
 
         var (resolvedPipelines, pipelineUses) = await ResolveProjectPipelinesAsync(
@@ -121,7 +125,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             };
         }
 
-        return VulkanSceneRenderer.TryCapture(
+        var capture = VulkanSceneRenderer.TryCapture(
             frame,
             assets,
             meshes,
@@ -132,6 +136,86 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         {
             ShaderPipelines = pipelineUses
         };
+        return await CompositeUiOverlayAsync(capture, frame, assets, cancellationToken);
+    }
+
+    internal static async ValueTask<RekallAgeVulkanSceneCaptureResult> CompositeUiOverlayAsync(
+        RekallAgeVulkanSceneCaptureResult capture,
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
+        CancellationToken cancellationToken)
+    {
+        if (!capture.Captured
+            || string.IsNullOrWhiteSpace(capture.OutputPath)
+            || !frame.Renderables.Any(renderable => renderable.UiVisual is not null))
+        {
+            return capture;
+        }
+
+        var image = await RekallAgePngReader.ReadRgbaAsync(capture.OutputPath, cancellationToken);
+        if (image.Width != frame.Width || image.Height != frame.Height)
+        {
+            return capture with
+            {
+                Errors = capture.Errors
+                    .Append("Vulkan UI composition skipped because the captured image dimensions do not match the runtime frame.")
+                    .ToArray()
+            };
+        }
+
+        var overlay = new RekallAgeRuntimeSoftwareRenderer().RenderUiOverlayRgba(frame, assets);
+        for (var index = 0; index + 3 < image.Rgba.Length; index += 4)
+        {
+            var sourceAlpha = overlay[index + 3];
+            if (sourceAlpha == 0)
+            {
+                continue;
+            }
+
+            var inverseAlpha = 255 - sourceAlpha;
+            image.Rgba[index] = BlendChannel(overlay[index], image.Rgba[index], sourceAlpha, inverseAlpha);
+            image.Rgba[index + 1] = BlendChannel(overlay[index + 1], image.Rgba[index + 1], sourceAlpha, inverseAlpha);
+            image.Rgba[index + 2] = BlendChannel(overlay[index + 2], image.Rgba[index + 2], sourceAlpha, inverseAlpha);
+            image.Rgba[index + 3] = (byte)Math.Min(255, sourceAlpha + image.Rgba[index + 3] * inverseAlpha / 255);
+        }
+
+        await RekallAgePngWriter.WriteRgbaAsync(
+            capture.OutputPath,
+            image.Width,
+            image.Height,
+            image.Rgba,
+            cancellationToken);
+        var (nonZero, firstPixel, checksum) = AnalyzeCompositedRgba(image.Rgba);
+        return capture with
+        {
+            BytesRead = checked((ulong)image.Rgba.Length),
+            NonZeroBytes = nonZero,
+            FirstPixel = firstPixel,
+            ByteChecksum = checksum
+        };
+    }
+
+    private static byte BlendChannel(byte source, byte destination, int sourceAlpha, int inverseAlpha) =>
+        (byte)Math.Clamp((source * sourceAlpha + destination * inverseAlpha + 127) / 255, 0, 255);
+
+    private static (ulong NonZero, RekallAgeVulkanReadbackPixel FirstPixel, ulong Checksum) AnalyzeCompositedRgba(
+        byte[] rgba)
+    {
+        ulong nonZero = 0;
+        ulong checksum = 0;
+        foreach (var value in rgba)
+        {
+            if (value != 0)
+            {
+                nonZero++;
+            }
+            checksum = unchecked((checksum * 16777619) ^ value);
+        }
+
+        var firstPixel = rgba.Length >= 4
+            ? new RekallAgeVulkanReadbackPixel(rgba[0], rgba[1], rgba[2], rgba[3])
+            : default;
+        return (nonZero, firstPixel, checksum);
     }
 
     private static async ValueTask<(

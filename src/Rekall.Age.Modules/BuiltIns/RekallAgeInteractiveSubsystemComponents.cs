@@ -122,13 +122,16 @@ public sealed class RekallAgeMorphWeightsComponent : RekallAgeComponent
     public double[] Weights { get; init; } = [];
 }
 
-[RekallAgeComponent("UI Canvas", Description = "Defines a resolution-independent reference canvas and draw layer.")]
+[RekallAgeComponent("UI Canvas", Description = "Defines the reference-coordinate space scaled to the entire viewport and a draw layer. Child X/Y/Width/Height/FontSize values use this reference space: on a 100-wide canvas, Width=100 fills the full viewport width. For a conventional 16:9 HUD, prefer a reference such as 1920x1080 or 960x540 and compact child bounds.")]
 public sealed class RekallAgeUiCanvasComponent : RekallAgeComponent
 {
-    [RekallAgeProperty(Minimum = 1)] public double ReferenceWidth { get; init; } = 1920;
-    [RekallAgeProperty(Minimum = 1)] public double ReferenceHeight { get; init; } = 1080;
+    [RekallAgeProperty(Minimum = 1, Description = "Reference-space width scaled to the viewport width; every child horizontal coordinate and size is multiplied by viewportWidth / ReferenceWidth.")]
+    public double ReferenceWidth { get; init; } = 1920;
+    [RekallAgeProperty(Minimum = 1, Description = "Reference-space height scaled to the viewport height; every child vertical coordinate, size, and font size is multiplied by viewportHeight / ReferenceHeight.")]
+    public double ReferenceHeight { get; init; } = 1080;
     [RekallAgeProperty] public int Layer { get; init; }
-    [RekallAgeProperty(AllowedValues = ["none", "horizontal", "vertical"])] public string LayoutDirection { get; init; } = "none";
+    [RekallAgeProperty(AllowedValues = ["none", "horizontal", "vertical"], Description = "Optional automatic child flow. Use none for independently anchored HUD elements; horizontal/vertical stacks children by LayoutOrder and their authored sizes.")]
+    public string LayoutDirection { get; init; } = "none";
     [RekallAgeProperty(Minimum = 0)] public double Gap { get; init; }
     [RekallAgeProperty(Minimum = 0)] public double PaddingLeft { get; init; }
     [RekallAgeProperty(Minimum = 0)] public double PaddingTop { get; init; }

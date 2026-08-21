@@ -82,7 +82,14 @@ public sealed class ModuleMetadataTests
         Assert.Contains("not clamped", weights.Description, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("AnimationClip", weights.Description, StringComparison.Ordinal);
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.AudioEmitter");
-        Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.UiCanvas");
+        var uiCanvas = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.UiCanvas");
+        var uiCanvasDescription = Assert.IsType<string>(uiCanvas.Description);
+        Assert.Contains("viewport", uiCanvasDescription, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("100", uiCanvasDescription, StringComparison.Ordinal);
+        Assert.Contains("full viewport width", uiCanvasDescription, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(uiCanvas.Properties, property =>
+            property.Name == "ReferenceWidth"
+            && property.Description?.Contains("scale", StringComparison.OrdinalIgnoreCase) == true);
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Button");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Transform2D");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Transform3D");

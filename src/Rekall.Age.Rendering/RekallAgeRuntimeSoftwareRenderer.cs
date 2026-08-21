@@ -139,7 +139,7 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
     {
         var assetBackedCount = 0;
         var fallbackCount = 0;
-        foreach (var renderable in frame.Renderables)
+        foreach (var renderable in OrderSoftwareRenderables(frame))
         {
             if (renderable.UiVisual is not null)
             {
@@ -171,6 +171,35 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         }
 
         return new SoftwareRenderCounts(assetBackedCount, fallbackCount);
+    }
+
+    private static IEnumerable<RekallAgeRuntimeViewportRenderable> OrderSoftwareRenderables(
+        RekallAgeRuntimeViewportFrame frame) =>
+        frame.Renderables
+            .OrderBy(renderable => renderable.UiVisual is null ? 0 : 1)
+            .ThenBy(renderable => renderable.SortKey)
+            .ThenByDescending(renderable => ResolveCameraDepth(frame, renderable));
+
+    private static double ResolveCameraDepth(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable)
+    {
+        var camera = frame.ActiveCamera;
+        if (camera is null || !camera.Kind.Equals("Camera3D", StringComparison.OrdinalIgnoreCase))
+        {
+            return 0;
+        }
+
+        var delta = new SoftwareVec3(
+            renderable.X - camera.X,
+            renderable.Y - camera.Y,
+            renderable.Z - camera.Z);
+        var forward = Normalize(Rotate(
+            new SoftwareVec3(0, 0, 1),
+            camera.RotationX,
+            camera.RotationY,
+            camera.RotationZ));
+        return Dot(delta, forward);
     }
 
     private static void CopyCameraViewPixels(
@@ -640,8 +669,8 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
     {
         var (centerX, centerY) = ResolveRenderableCenter(frame, renderable);
         var size = ResolvePrimitiveSize(frame, renderable);
-        var radiusX = Math.Max(7, size * 0.48);
-        var radiusY = Math.Max(7, size * 0.48);
+        var radiusX = Math.Max(2, size * Math.Max(0.1, renderable.ScaleX) * 0.5);
+        var radiusY = Math.Max(2, size * Math.Max(0.1, renderable.ScaleY) * 0.5);
         var minX = Math.Max(0, (int)Math.Floor(centerX - radiusX));
         var maxX = Math.Min(frame.Width - 1, (int)Math.Ceiling(centerX + radiusX));
         var minY = Math.Max(0, (int)Math.Floor(centerY - radiusY));
@@ -674,9 +703,9 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
     {
         var (centerX, centerY) = ResolveRenderableCenter(frame, renderable);
         var size = ResolvePrimitiveSize(frame, renderable);
-        var radiusX = Math.Max(7, size * 0.38);
-        var radiusY = Math.Max(4, size * 0.13);
-        var halfHeight = Math.Max(10, size * 0.44);
+        var radiusX = Math.Max(2, size * Math.Max(0.1, renderable.ScaleX) * 0.5);
+        var radiusY = Math.Max(1, size * Math.Max(0.1, renderable.ScaleZ) * 0.18);
+        var halfHeight = Math.Max(2, size * Math.Max(0.1, renderable.ScaleY) * 0.5);
         var topY = (int)Math.Round(centerY - halfHeight);
         var bottomY = (int)Math.Round(centerY + halfHeight);
         var left = Math.Max(0, (int)Math.Floor(centerX - radiusX));
@@ -708,14 +737,15 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
     {
         var (centerX, centerY) = ResolveRenderableCenter(frame, renderable);
         var size = ResolvePrimitiveSize(frame, renderable);
-        var radiusX = Math.Max(8, size * 0.42);
-        var radiusY = Math.Max(4, size * 0.13);
-        var apex = new SoftwarePoint(centerX, centerY - size * 0.58);
-        var left = new SoftwarePoint(centerX - radiusX, centerY + size * 0.38);
-        var right = new SoftwarePoint(centerX + radiusX, centerY + size * 0.38);
+        var radiusX = Math.Max(2, size * Math.Max(0.1, renderable.ScaleX) * 0.5);
+        var radiusY = Math.Max(1, size * Math.Max(0.1, renderable.ScaleZ) * 0.18);
+        var halfHeight = Math.Max(2, size * Math.Max(0.1, renderable.ScaleY) * 0.5);
+        var apex = new SoftwarePoint(centerX, centerY - halfHeight);
+        var left = new SoftwarePoint(centerX - radiusX, centerY + halfHeight);
+        var right = new SoftwarePoint(centerX + radiusX, centerY + halfHeight);
         var (r, g, b) = Shade(material, 0.8);
         FillTriangle(frame, pixels, apex, left, right, r, g, b);
-        FillEllipse(frame, pixels, centerX, (int)Math.Round(centerY + size * 0.38), radiusX, radiusY, material, 0.58);
+        FillEllipse(frame, pixels, centerX, (int)Math.Round(centerY + halfHeight), radiusX, radiusY, material, 0.58);
     }
 
     private static void DrawPrimitivePlane(
@@ -741,8 +771,27 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeRuntimeViewportRenderable renderable)
     {
-        var scale = Math.Max(0.1, Math.Max(renderable.ScaleX, Math.Max(renderable.ScaleY, renderable.ScaleZ)));
-        return Math.Max(14, Math.Min(frame.Width, frame.Height) * 0.18 * scale);
+        var camera = frame.ActiveCamera;
+        if (camera is not null
+            && camera.Kind.Equals("Camera3D", StringComparison.OrdinalIgnoreCase)
+            && !IsDefaultCameraPose(camera))
+        {
+            var depth = ResolveCameraDepth(frame, renderable);
+            if (depth > Math.Max(0.001, camera.NearClip))
+            {
+                var rect = RekallAgeRuntimeViewportCameraRect.FromFrame(frame);
+                if (camera.ProjectionMode.Equals("orthographic", StringComparison.OrdinalIgnoreCase))
+                {
+                    return rect.Height / Math.Max(0.001, camera.OrthographicSize);
+                }
+
+                var fieldOfView = Math.Clamp(camera.FieldOfViewDegrees, 1, 179);
+                var focalLength = rect.Height / (2 * Math.Tan(DegreesToRadians(fieldOfView) / 2));
+                return focalLength / depth;
+            }
+        }
+
+        return Math.Max(14, Math.Min(frame.Width, frame.Height) * 0.18);
     }
 
     private static double ResolveAuthoredMeshSize(

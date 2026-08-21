@@ -6,6 +6,99 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VulkanSceneCaptureTests
 {
     [Fact]
+    public async Task VulkanCaptureCompositesRuntimeUiIntoTheCapturedImage()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var outputPath = Path.Combine(root, "vulkan-base.png");
+        var rgba = Enumerable.Range(0, 64 * 32)
+            .SelectMany(_ => new byte[] { 16, 24, 32, 255 })
+            .ToArray();
+        await RekallAgePngWriter.WriteRgbaAsync(outputPath, 64, 32, rgba, CancellationToken.None);
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main",
+            0,
+            0,
+            64,
+            32,
+            null,
+            [],
+            [
+                new RekallAgeRuntimeViewportRenderable(
+                    "hud",
+                    "HUD",
+                    "ui",
+                    null,
+                    0,
+                    0,
+                    0,
+                    400,
+                    UiVisual: new RekallAgeRuntimeViewportUiVisual(
+                        "Label",
+                        2,
+                        2,
+                        60,
+                        20,
+                        0,
+                        0,
+                        64,
+                        32,
+                        "HUD",
+                        "#203040ff",
+                        "#ffffffff",
+                        "#00000000",
+                        0,
+                        10,
+                        null))
+            ],
+            1,
+            new RekallAgeRuntimeViewportOverlay(false, 0),
+            []);
+        var capture = new RekallAgeVulkanSceneCaptureResult(
+            true,
+            outputPath,
+            "test",
+            null,
+            64,
+            32,
+            "R8G8B8A8_UNorm",
+            (ulong)rgba.Length,
+            (ulong)rgba.Length,
+            new RekallAgeVulkanReadbackPixel(16, 24, 32, 255),
+            1,
+            0,
+            0,
+            0,
+            0,
+            [],
+            true,
+            true,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            []);
+
+        var composited = await RekallAgeNativeVulkanSceneCapture.CompositeUiOverlayAsync(
+            capture,
+            frame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            CancellationToken.None);
+        var image = await RekallAgePngReader.ReadRgbaAsync(outputPath, CancellationToken.None);
+
+        Assert.NotEqual((ulong)1, composited.ByteChecksum);
+        Assert.Contains(Enumerable.Range(0, image.Rgba.Length / 4), pixel =>
+        {
+            var index = pixel * 4;
+            return image.Rgba[index] > 200 && image.Rgba[index + 1] > 200 && image.Rgba[index + 2] > 200;
+        });
+    }
+
+    [Fact]
     public async Task NativeSceneCaptureExecutesCanonicalFrameDrawAndMaterialResourceAbiWhenVulkanIsAvailable()
     {
         var root = TestPaths.CreateTempDirectory();

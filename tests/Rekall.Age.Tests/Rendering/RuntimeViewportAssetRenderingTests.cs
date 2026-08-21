@@ -936,6 +936,92 @@ public sealed class RuntimeViewportAssetRenderingTests
     }
 
     [Fact]
+    public async Task SoftwareRendererPreservesForegroundGeometryOverLargeBackdropWithPerspectiveCamera()
+    {
+        static RekallAgeEntityDocument Box(
+            string name,
+            string primitive,
+            string color,
+            double x,
+            double y,
+            double z,
+            double scaleX,
+            double scaleY,
+            double scaleZ) =>
+            RekallAgeEntityDocument.Create(name, ["geometry"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+                {
+                    ["primitive"] = primitive,
+                    ["color"] = color
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer", new JsonObject
+                {
+                    ["mesh"] = $"rekall.geometry.{primitive}"
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = x,
+                    ["y"] = y,
+                    ["z"] = z,
+                    ["scaleX"] = scaleX,
+                    ["scaleY"] = scaleY,
+                    ["scaleZ"] = scaleZ
+                }));
+
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["projectionMode"] = "perspective",
+                    ["fieldOfView"] = 55,
+                    ["clearColor"] = "#000000"
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["z"] = 20,
+                    ["yaw"] = 180
+                })))
+            .AddEntity(Box("ZBackdrop", "cube", "#0a1a2a", 0, 0, -0.5, 40, 24, 0.1))
+            .AddEntity(Box("Center", "sphere", "#ffffff", 0, 0, 0, 0.4, 0.4, 0.4))
+            .AddEntity(Box("Left", "cube", "#e8e8ff", -5.5, 0, 0, 0.3, 1.4, 0.4))
+            .AddEntity(Box("Right", "cube", "#e8e8ff", 5.5, 0, 0, 0.3, 1.4, 0.4))
+            .AddEntity(Box("Top", "cube", "#405080", 0, 3.2, 0, 12, 0.3, 0.3))
+            .AddEntity(Box("Bottom", "cube", "#405080", 0, -3.2, 0, 12, 0.3, 0.3));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 960, 540, debugOverlay: false);
+
+        var capture = await new RekallAgeRuntimeSoftwareRenderer().CaptureAsync(
+            frame,
+            Path.Combine(root, "captures"),
+            "layered.png",
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            CancellationToken.None);
+        var output = await RekallAgePngReader.ReadRgbaAsync(capture.ScreenshotPath, CancellationToken.None);
+        var lightForegroundPixels = Enumerable.Range(0, output.Rgba.Length / 4).Count(pixel =>
+        {
+            var index = pixel * 4;
+            return output.Rgba[index] > 100
+                && output.Rgba[index + 1] > 100
+                && output.Rgba[index + 2] > 100;
+        });
+        var blueBoundaryPixels = Enumerable.Range(0, output.Rgba.Length / 4).Count(pixel =>
+        {
+            var index = pixel * 4;
+            return output.Rgba[index + 2] > 70
+                && output.Rgba[index + 2] > output.Rgba[index] * 1.25
+                && output.Rgba[index + 2] > output.Rgba[index + 1] * 1.1;
+        });
+
+        Assert.True(capture.NonBlank);
+        var renderableSummary = string.Join(" | ", frame.Renderables.Select(renderable =>
+            $"{renderable.EntityName}:{renderable.Variant}:{renderable.MaterialColor}:z={renderable.Z}:sort={renderable.SortKey}"));
+        Assert.True(lightForegroundPixels > 100, $"Expected visible light foreground geometry, found {lightForegroundPixels} pixels at {capture.ScreenshotPath}. {renderableSummary}");
+        Assert.True(blueBoundaryPixels > 100, $"Expected visible colored boundary geometry, found {blueBoundaryPixels} pixels.");
+    }
+
+    [Fact]
     public async Task SoftwareRendererRasterizesPlanetShellVariantsWithoutFallback()
     {
         var root = TestPaths.CreateTempDirectory();

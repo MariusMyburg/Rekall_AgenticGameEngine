@@ -418,6 +418,52 @@ public sealed class CaptureRuntimeViewportCommandTests
     }
 
     [Fact]
+    public async Task CaptureRuntimeViewportCommandWarnsWhenHudConsumesMostOfAWorldViewport()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject
+                {
+                    ["ReferenceWidth"] = 100,
+                    ["ReferenceHeight"] = 100,
+                    ["LayoutDirection"] = "vertical",
+                    ["Gap"] = 4
+                }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "ui"])
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("World", ["geometry"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })))
+            .AddEntity(canvas);
+        foreach (var (name, order) in new[] { ("Score", 0), ("Status", 1), ("Controls", 2) })
+        {
+            var label = RekallAgeEntityDocument.Create(name, ["ui"]) with { ParentId = canvas.Id };
+            scene = scene.AddEntity(label.AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Label",
+                new JsonObject
+                {
+                    ["Width"] = 100,
+                    ["Height"] = 18,
+                    ["LayoutOrder"] = order,
+                    ["Text"] = name
+                })));
+        }
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 1, Path.Combine(root, "Viewport"), 960, 540, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("hud coverage diagnostics"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains("REKALL_VIEWPORT_UI_LARGE_COVERAGE", result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.Contains(result.Value.LayoutDiagnostics.AuthoringHints, hint =>
+            hint.Contains("reference", StringComparison.OrdinalIgnoreCase)
+            && hint.Contains("world", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task CaptureRuntimeViewportCommandCanUseVulkanForClearOnlyRuntimeFrames()
     {
         var root = TestPaths.CreateTempDirectory();

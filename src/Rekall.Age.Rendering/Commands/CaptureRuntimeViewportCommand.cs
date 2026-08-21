@@ -511,7 +511,8 @@ public sealed class CaptureRuntimeViewportCommand
         List<string> hints)
     {
         const int maximumHints = 8;
-        foreach (var renderable in frame.Renderables.Where(item => item.UiVisual is not null))
+        var uiRenderables = frame.Renderables.Where(item => item.UiVisual is not null).ToArray();
+        foreach (var renderable in uiRenderables)
         {
             var visual = renderable.UiVisual!;
             var visibleWidth = IntersectionLength(
@@ -559,7 +560,23 @@ public sealed class CaptureRuntimeViewportCommand
             }
         }
 
-        var textGeometry = frame.Renderables
+        var spatialRenderableCount = frame.Renderables.Count(item =>
+            item.UiVisual is null && !item.Kind.Equals("light", StringComparison.Ordinal));
+        var uiCoverageArea = CalculateUiCoverageArea(frame, uiRenderables);
+        var viewportArea = (long)frame.Width * frame.Height;
+        if (spatialRenderableCount > 0
+            && viewportArea > 0
+            && uiCoverageArea * 100 >= viewportArea * 35)
+        {
+            warnings.Add("REKALL_VIEWPORT_UI_LARGE_COVERAGE");
+            if (hints.Count < maximumHints)
+            {
+                var percent = (int)Math.Round(uiCoverageArea * 100d / viewportArea);
+                hints.Add($"UI layout bounds cover {percent}% of a viewport that also contains world renderables. Use an intentional canvas reference width/height and compact anchored bounds so the HUD preserves the playable world view, then recapture.");
+            }
+        }
+
+        var textGeometry = uiRenderables
             .Where(item => !string.IsNullOrEmpty(item.UiVisual?.Text))
             .Select(item => (item.EntityName, Geometry: CalculateVisibleTextGeometry(frame, item.UiVisual!)))
             .Where(item => item.Geometry.VisibleArea > 0)
@@ -595,6 +612,65 @@ public sealed class CaptureRuntimeViewportCommand
                 }
             }
         }
+    }
+
+    private static long CalculateUiCoverageArea(
+        RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyList<RekallAgeRuntimeViewportRenderable> renderables)
+    {
+        var rectangles = renderables
+            .Select(item => item.UiVisual!)
+            .Select(visual =>
+            {
+                var left = Math.Max(0, Math.Max(visual.X, visual.ClipX));
+                var top = Math.Max(0, Math.Max(visual.Y, visual.ClipY));
+                var right = Math.Min(frame.Width, Math.Min(visual.X + visual.Width, visual.ClipX + visual.ClipWidth));
+                var bottom = Math.Min(frame.Height, Math.Min(visual.Y + visual.Height, visual.ClipY + visual.ClipHeight));
+                return (Left: left, Top: top, Right: right, Bottom: bottom);
+            })
+            .Where(rectangle => rectangle.Right > rectangle.Left && rectangle.Bottom > rectangle.Top)
+            .ToArray();
+        var xCoordinates = rectangles
+            .SelectMany(rectangle => new[] { rectangle.Left, rectangle.Right })
+            .Distinct()
+            .OrderBy(value => value)
+            .ToArray();
+        long area = 0;
+        for (var index = 0; index + 1 < xCoordinates.Length; index++)
+        {
+            var left = xCoordinates[index];
+            var right = xCoordinates[index + 1];
+            var intervals = rectangles
+                .Where(rectangle => rectangle.Left < right && rectangle.Right > left)
+                .Select(rectangle => (rectangle.Top, rectangle.Bottom))
+                .OrderBy(interval => interval.Top)
+                .ToArray();
+            if (intervals.Length == 0)
+            {
+                continue;
+            }
+
+            var unionHeight = 0;
+            var currentTop = intervals[0].Top;
+            var currentBottom = intervals[0].Bottom;
+            foreach (var interval in intervals.Skip(1))
+            {
+                if (interval.Top > currentBottom)
+                {
+                    unionHeight += currentBottom - currentTop;
+                    currentTop = interval.Top;
+                    currentBottom = interval.Bottom;
+                }
+                else
+                {
+                    currentBottom = Math.Max(currentBottom, interval.Bottom);
+                }
+            }
+            unionHeight += currentBottom - currentTop;
+            area += (long)(right - left) * unionHeight;
+        }
+
+        return area;
     }
 
     private static void AddPlaneOrientationDiagnostics(

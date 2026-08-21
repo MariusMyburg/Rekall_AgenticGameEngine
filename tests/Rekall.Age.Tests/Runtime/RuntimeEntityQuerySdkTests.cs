@@ -69,11 +69,24 @@ public sealed class RuntimeEntityQuerySdkTests
 
         var updated = world
             .UpdateEntity("actor", entity => entity
+                .WithPosition2D(new RekallAgeRuntimeVector2(4, 5))
+                .WithRotation2D(30)
+                .WithScale2D(new RekallAgeRuntimeVector2(2, 3))
                 .WithPosition3D(new RekallAgeRuntimeVector3(1, 2, 3))
                 .WithTag("selected"))
             .UpdateEntitiesWithTag("decor", entity => entity.WithVisible(false));
 
+        Assert.Equal(new RekallAgeRuntimeVector2(4, 5), updated.FindEntity("actor")!.Transform.Position2D);
+        Assert.Equal(30, updated.FindEntity("actor")!.Transform.Rotation2D);
+        Assert.Equal(new RekallAgeRuntimeVector2(2, 3), updated.FindEntity("actor")!.Transform.Scale2D);
         Assert.Equal(new RekallAgeRuntimeVector3(1, 2, 3), updated.FindEntity("actor")!.Transform.Position3D);
+        var authoredTransform2D = updated.FindEntity("actor")!.FindComponent("Rekall.Transform2D");
+        Assert.NotNull(authoredTransform2D);
+        Assert.Equal(4, authoredTransform2D.Properties["x"]!.GetValue<double>());
+        Assert.Equal(5, authoredTransform2D.Properties["y"]!.GetValue<double>());
+        Assert.Equal(30, authoredTransform2D.Properties["rotation"]!.GetValue<double>());
+        Assert.Equal(2, authoredTransform2D.Properties["scaleX"]!.GetValue<double>());
+        Assert.Equal(3, authoredTransform2D.Properties["scaleY"]!.GetValue<double>());
         Assert.Equal(["selected", "unit"], updated.FindEntity("actor")!.Tags);
         Assert.False(updated.FindEntity("prop")!.Visible);
         Assert.Same(updated, updated.UpdateEntity("missing", entity => entity.WithVisible(false)));
@@ -169,8 +182,9 @@ public sealed class RuntimeEntityQuerySdkTests
             new RekallAgeRuntimeComponent("Game.Runner", new JsonObject
             {
                 ["speed"] = 12.5,
-                ["enabled"] = true,
-                ["label"] = "ready"
+                ["Enabled"] = true,
+                ["Label"] = "ready",
+                ["Score"] = 1
             }));
 
         Assert.Equal(12.5, entity.ComponentNumber("Game.Runner", "speed", 1));
@@ -184,6 +198,9 @@ public sealed class RuntimeEntityQuerySdkTests
             .WithComponentString("Game.Runner", "label", "charged");
 
         Assert.Equal(3, updated.ComponentNumber("Game.Runner", "score", 0));
+        var runnerProperties = updated.FindComponent("Game.Runner")!.Properties;
+        Assert.Contains("Score", runnerProperties.Select(property => property.Key));
+        Assert.DoesNotContain("score", runnerProperties.Select(property => property.Key));
         Assert.False(updated.ComponentBoolean("Game.Runner", "enabled", true));
         Assert.Equal("charged", updated.ComponentString("Game.Runner", "label"));
         Assert.Equal(new RekallAgeRuntimeVector3(0, 0, 0), updated.Transform.Position3D);

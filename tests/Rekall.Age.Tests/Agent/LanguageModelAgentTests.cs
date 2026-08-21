@@ -47,7 +47,9 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("rekall.module.inspect_runtime_sdk", prompt, StringComparison.Ordinal);
         Assert.Contains("module source topology", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("ComponentNumber", prompt, StringComparison.Ordinal);
-        Assert.Contains("entity.Transform.Position3D", prompt, StringComparison.Ordinal);
+        Assert.Contains("WithPosition2D", prompt, StringComparison.Ordinal);
+        Assert.Contains("WithPosition3D", prompt, StringComparison.Ordinal);
+        Assert.Contains("match the authored transform dimension", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("do not introduce JsonObject", prompt, StringComparison.Ordinal);
         Assert.Contains("two separate semantic scalar actions", prompt, StringComparison.Ordinal);
         Assert.Contains("InputActionValue returns double", prompt, StringComparison.Ordinal);
@@ -1458,6 +1460,48 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task FailedRuntimeAssertionContinuesWithoutOverflowWhenTurnsAreUnbounded()
+    {
+        var assertionArguments = MeaningfulRuntimeCheckpointArguments();
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", assertionArguments)],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.write_source", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", assertionArguments)],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Gameplay now passes.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new FailsFirstRuntimeAssertionToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = null,
+                MaxRuntimeBehaviorRepairTurns = 3,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(5, result.Turns);
+        Assert.Contains(
+            model.Requests[2].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("no configured overall turn limit", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task LateSuccessfulRuntimeCheckpointUnlocksBoundedDeliveryTurns()
     {
         var checkpoint = MeaningfulRuntimeCheckpointArguments();
@@ -1973,6 +2017,88 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("#14 noise.14 ok", ledger.Content, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task TaskSpecificCompletionRejectsPackageAuditWithoutRequestedRemoteImageVisualEvidence()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.workflow.audit_playable_package", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Everything is complete.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new TaskEvidenceToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest(
+                "model",
+                "system",
+                "<user-request>Create a game with an openly licensed image from the internet as a full-window background. Implement the moving raindrops-on-glass effect as a custom shader.</user-request>")
+            {
+                MaxTurns = 3,
+                RequireTaskSpecificEvidence = true,
+                RequireCompletionAuditToolEvidence = true,
+                CompletionAuditPrimingTools = new HashSet<string>(
+                    ["rekall.workflow.audit_playable_package"],
+                    StringComparer.Ordinal)
+            },
+            CancellationToken.None);
+
+        Assert.False(result.Completed);
+        Assert.Contains(
+            model.Requests[2].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("Task-specific completion evidence is incomplete", StringComparison.Ordinal)
+                && message.Content.Contains("rekall.asset.import_remote", StringComparison.Ordinal)
+                && message.Content.Contains("custom shader", StringComparison.OrdinalIgnoreCase)
+                && message.Content.Contains("REKALL_VIEWPORT_LOW_VISUAL_COVERAGE", StringComparison.Ordinal)
+                && message.Content.Contains("distinct frame", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task TaskSpecificCompletionAcceptsLicensedRemoteAssetFullCoverageAndDistinctFrameProof()
+    {
+        static RekallAgeLanguageModelResponse Call(string name, JsonObject? arguments = null) => new(
+            "test", "model", "", "",
+            [new RekallAgeLanguageModelToolCall(name, arguments ?? new JsonObject())],
+            "tool_calls", new(1, 1, 1));
+        var model = new ScriptedModelClient(
+            Call("rekall.asset.search_remote_images"),
+            Call("rekall.asset.import_remote", new JsonObject
+            {
+                ["license"] = "CC BY 2.0",
+                ["licenseUrl"] = "https://creativecommons.org/licenses/by/2.0/",
+                ["attribution"] = "Example Artist"
+            }),
+            Call("rekall.shader.write", new JsonObject { ["name"] = "agent/rain-glass" }),
+            Call("rekall.shader.validate", new JsonObject { ["name"] = "agent/rain-glass" }),
+            Call("rekall.shader.assign_pipeline", new JsonObject { ["entityName"] = "Background" }),
+            Call("rekall.render.capture_runtime_viewport", new JsonObject { ["frames"] = 1 }),
+            Call("rekall.render.capture_runtime_viewport", new JsonObject { ["frames"] = 60 }),
+            Call("rekall.workflow.audit_playable_package"),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Evidence-backed completion.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new TaskEvidenceToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest(
+                "model",
+                "system",
+                "<user-request>Create a game with an openly licensed image from the internet as a full-window background. Implement the moving raindrops-on-glass effect as a custom shader.</user-request>")
+            {
+                MaxTurns = 9,
+                RequireTaskSpecificEvidence = true,
+                RequireCompletionAuditToolEvidence = true,
+                CompletionAuditPrimingTools = new HashSet<string>(
+                    ["rekall.workflow.audit_playable_package"],
+                    StringComparer.Ordinal)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal("Evidence-backed completion.", result.FinalContent);
+    }
+
     private sealed class ScriptedModelClient(params RekallAgeLanguageModelResponse[] responses) : IRekallAgeLanguageModelClient
     {
         private int _index;
@@ -2066,6 +2192,41 @@ public sealed class LanguageModelAgentTests
         {
             Executions.Add((name, arguments));
             return ValueTask.FromResult<JsonNode>(new JsonObject { ["ready"] = true });
+        }
+    }
+
+    private sealed class TaskEvidenceToolExecutor : IRekallAgeAgentToolExecutor
+    {
+        public IReadOnlyList<RekallAgeLanguageModelTool> Tools { get; } = [];
+
+        public ValueTask<JsonNode> ExecuteAsync(
+            string name,
+            JsonObject arguments,
+            CancellationToken cancellationToken)
+        {
+            if (name.Equals("rekall.render.capture_runtime_viewport", StringComparison.Ordinal))
+            {
+                var frame = arguments["frames"]?.GetValue<int>() ?? 1;
+                return ValueTask.FromResult<JsonNode>(new JsonObject
+                {
+                    ["ok"] = true,
+                    ["value"] = new JsonObject
+                    {
+                        ["captured"] = true,
+                        ["frameIndex"] = frame,
+                        ["assetBackedRenderableCount"] = 1,
+                        ["frameAnalysis"] = new JsonObject
+                        {
+                            ["analyzed"] = true,
+                            ["visuallyInformative"] = true,
+                            ["dominantColorRatio"] = 0.72,
+                            ["warningCodes"] = new JsonArray()
+                        }
+                    }
+                });
+            }
+
+            return ValueTask.FromResult<JsonNode>(new JsonObject { ["ok"] = true });
         }
     }
 

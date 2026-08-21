@@ -113,10 +113,10 @@ public sealed class InspectRuntimeSdkCommand
             new RekallAgeRuntimeSdkContract(
                 "authoring-recipe",
                 "entity-transform-and-component-state-recipe",
-                "RekallAgeRuntimeEntity.Transform + ComponentNumber/ComponentBoolean/ComponentString + WithComponentNumber/WithComponentBoolean/WithComponentString",
-                "Read transforms directly from the immutable entity and use typed component-state helpers. These helpers require only Rekall.Age.Modules and Rekall.Age.Runtime.Abstractions; do not invent entity.Properties, entity.Transform3D, ReadVector3, ToMutable, or JsonObject boilerplate.")
+                "RekallAgeRuntimeEntity.Transform + WithPosition2D/WithRotation2D/WithScale2D + WithPosition3D/WithRotation3D/WithScale3D + typed component state",
+                "Read transforms directly from the immutable entity and use the dimension-matched immutable transform helper: WithPosition2D for Rekall.Transform2D and WithPosition3D for Rekall.Transform3D. Use typed component-state helpers. These helpers require only Rekall.Age.Modules and Rekall.Age.Runtime.Abstractions; do not invent entity.Properties, entity.Transform3D, ReadVector3, ToMutable, or JsonObject boilerplate.")
             {
-                Usage = "var position = entity.Transform.Position3D; var speed = entity.ComponentNumber(componentType, \"movementSpeed\", 5); entity = entity.WithComponentBoolean(componentType, \"charged\", true); // no JsonObject required"
+                Usage = "var position = entity.Transform.Position2D; entity = entity.WithPosition2D(new RekallAgeRuntimeVector2(nextX, nextY)); var speed = entity.ComponentNumber(componentType, \"movementSpeed\", 5); entity = entity.WithComponentBoolean(componentType, \"charged\", true); // no JsonObject required"
             },
             new RekallAgeRuntimeSdkContract(
                 "authoring-recipe",
@@ -216,6 +216,10 @@ public sealed class InspectRuntimeSdkCommand
         nameof(RekallAgeRuntimeModuleSdk.WasInputActionPressed) or
         nameof(RekallAgeRuntimeModuleSdk.WasInputActionReleased) =>
             "Reads semantic actions projected from Rekall.InputActionMap. Call this extension on world, not frame context.",
+        nameof(RekallAgeRuntimeModuleSdk.WithPosition2D) or
+        nameof(RekallAgeRuntimeModuleSdk.WithRotation2D) or
+        nameof(RekallAgeRuntimeModuleSdk.WithScale2D) =>
+            "Returns a replacement immutable entity with the requested 2D transform value and updates Rekall.Transform2D. Use these for 2D scenes; they do not mutate Transform3D.",
         nameof(RekallAgeRuntimeModuleSdk.WithPosition3D) or
         nameof(RekallAgeRuntimeModuleSdk.WithRotation3D) or
         nameof(RekallAgeRuntimeModuleSdk.WithScale3D) =>
@@ -274,6 +278,12 @@ public sealed class InspectRuntimeSdkCommand
             "if (world.WasInputActionPressed(\"reset\")) { /* agent-authored rule */ }",
         nameof(RekallAgeRuntimeModuleSdk.WithPosition3D) =>
             "world = world.UpdateEntity(entity.Id, current => current.WithPosition3D(new RekallAgeRuntimeVector3(x, y, z)));",
+        nameof(RekallAgeRuntimeModuleSdk.WithPosition2D) =>
+            "world = world.UpdateEntity(entity.Id, current => current.WithPosition2D(new RekallAgeRuntimeVector2(x, y)));",
+        nameof(RekallAgeRuntimeModuleSdk.WithRotation2D) =>
+            "entity = entity.WithRotation2D(rotationDegrees);",
+        nameof(RekallAgeRuntimeModuleSdk.WithScale2D) =>
+            "entity = entity.WithScale2D(new RekallAgeRuntimeVector2(scaleX, scaleY));",
         nameof(RekallAgeRuntimeModuleSdk.FindEntity) =>
             "var player = world.FindEntity(\"Player\"); // exact id first, then one unique exact name; null when ambiguous",
         nameof(RekallAgeRuntimeModuleSdk.EntitiesNamed) =>

@@ -4,13 +4,17 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 18:54 Africa/Johannesburg
+Last verified: 2026-08-21 20:03 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: Studio/project authoring no longer has a default turn count,
-generated-output ceiling, or per-turn deadline; the installed short-request
-Rain Glass acceptance is running without those limits
+Latest milestone: the rebuilt Windows distribution is green at 1,091/1,091
+engine and 11/11 Studio tests twice plus the full installed-product matrix. A
+second Rain Glass diagnostic was rejected honestly for omitting the requested
+internet image and full-window composition. Generic task-derived prompt and
+completion-evidence enforcement is implemented test-first. Per the user's
+explicit priority correction, Pong is now the active acceptance, Galaga is
+next, and Rain Glass resumes only after both games are complete.
 
 ## Product objective
 
@@ -32,7 +36,17 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Acceptance benchmark queue
 
-1. Current Studio end-to-end visual-effects class: acquire a rights-compatible
+1. Prove a complete playable Pong game through the generic portable authoring
+   contracts. Require agent-owned delta-time gameplay, semantic controls,
+   scoring, reset/serve transitions, executable assertions for both players and
+   scoring, independent visual inspection, clean validation, a portable package,
+   relocation, and consolidated audit.
+2. Prove a Galaga-class game entirely through Studio. Require player movement
+   and firing, multiple enemies, projectiles, collisions, score/lives or an
+   equivalent complete loop, executable transition assertions, informative
+   visual evidence, packaging, relocation, and audit without genre-specific
+   engine built-ins.
+3. Resume the Studio end-to-end visual-effects class: acquire a rights-compatible
    nature image from the internet with source/provenance recorded, import it
    through generic asset contracts, present it across the full player window,
    and author moving
@@ -52,11 +66,9 @@ Studio is important, but it does not define or reorder the engine foundation.
    provenance, and generated package credits; do not scrape providers without a
    supported API or permission. Mixed-license catalogs remain opt-in and
    policy-filtered.
-2. After the arbitrary described-game path is reliable, prove a complete
-   playable Pong game through the same generic contracts.
-3. Then prove a Galaga-class game entirely through Studio and broaden the 3D
-   acceptance suite through both Studio and portable MCP contracts.
-4. Platform track after the desktop authoring loop is reliable: publish games
+4. Broaden the 3D acceptance suite through both Studio and portable MCP
+   contracts.
+5. Platform track after the desktop authoring loop is reliable: publish games
    as static browser deployments through .NET WebAssembly and a WebGPU renderer
    backend, with ahead-of-time compiled game-authored modules and browser-native
    input, audio, storage, and networking adapters. WebGL2 is a later bounded
@@ -65,6 +77,59 @@ Studio is important, but it does not define or reorder the engine foundation.
    platform.
 
 ## Verified status
+
+- The rebuilt `0.1.0-preview.1` Windows distribution passes the locked Release
+  gate with zero compiler warnings/errors, 1,091/1,091 engine tests and 11/11
+  Studio tests in each of two independent passes, followed by the complete
+  installed-product matrix. The refined viewport analyzer preserves the 98.5%
+  generic blocking threshold while emitting
+  `REKALL_VIEWPORT_LOW_VISUAL_COVERAGE` at 95%; Studio treats that advisory as
+  failed task-specific visual evidence without invalidating legitimate sparse
+  package proofs. The focused rendering/package/gauntlet regressions pass
+  13/13 and Studio view-model tests pass 11/11.
+
+- A second clean installed-Studio Rain Glass diagnostic used real
+  `qwen3.8:27b` with no configured reasoning, turn, output, or deadline limit.
+  It completed 34 turns and 35 tool calls, compiled agent-owned runtime and
+  playable modules, passed three runtime assertions, validated, packaged, and
+  audited. Independent evidence still rejected the deliverable: the model
+  never searched for or imported the explicitly requested internet image and
+  rendered only three tiny droplets against a dark clear color. Studio reported
+  `Succeeded=false`, four renderables, and `visual repair required`. AGE now
+  derives an explicit delivery checklist from the authoritative user request
+  and, in strict sessions, refuses completion without direct evidence for
+  requested remote-image search/import and license provenance, authored/
+  validated/assigned custom shaders, asset-backed full-window captures, and
+  distinct-time frames. The prompt explicitly states that moving geometry is
+  not a substitute for a requested custom shader. The affected generic agent,
+  SDK, world-mutation, viewport, and Studio selections pass 80/80 and 11/11.
+  This remains diagnostic evidence; Pong and Galaga now take priority before a
+  third Rain Glass run.
+
+- The corrected installed-Studio Rain Glass run used only the ordinary request
+  recorded above with real `qwen3.8:27b`, no configured turn/output/deadline
+  limit, native reasoning, and task-specific completion required. Across 33
+  turns and 51 tool calls it searched Openverse, selected and imported a real
+  1024x683 CC BY 2.0 Flickr landscape with exact source, creator, license URL,
+  SHA-256, and byte-count provenance, authored a ten-entity scene, scaffolded
+  and built a game-owned RainGlass runtime module, then attempted executable
+  semantic-input proof. The run failed honestly. Its first fully shaped failed
+  runtime assertion triggered `checked(int.MaxValue + repairTurns)` because the
+  unlimited turn sentinel still flowed through finite reserve arithmetic. Its
+  2D drops remained still because the SDK exposed only `WithPosition3D`, while
+  partial blueprint repair retained both lower-camel and Pascal-case component
+  properties. Finally, independent 960x540 capture proved the asset loaded but
+  occupied only a tiny area: 98.0% of pixels were the camera clear color even
+  though the prior 98.5% warning threshold called the frame informative.
+  Test-first repairs now skip finite reserve arithmetic for unbounded runs;
+  expose `WithPosition2D`, `WithRotation2D`, and `WithScale2D` through the
+  compiled SDK and agent contract; make typed component reads/writes and scene
+  merges case-insensitive without duplicate keys; and emit
+  `REKALL_VIEWPORT_LOW_VISUAL_COVERAGE` for frames dominated 95% or more by one
+  color. Studio rejects that advisory for task-specific visual proof, while the
+  generic package blocker remains at 98.5% to preserve valid sparse games. The
+  affected language-agent, SDK, world-mutation, runtime-helper, and viewport
+  selections pass. This failed run remains diagnostic evidence, not acceptance.
 
 - User-facing Studio and project-agent sessions now leave maximum turns,
   generated output, per-turn duration, and Ollama reasoning mode unspecified by
@@ -2991,11 +3056,12 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
-Author the queued raindrops-on-glass acceptance game entirely in Studio and
-require two temporally distinct frames, package, relocation, and audit. Do not
-return to broad subsystem or CI expansion before this user-visible Studio game
-proof completes. Then prove Pong through portable MCP, Galaga entirely through
-Studio, and broader 3D through both paths.
+Finish Pong through the generic portable authoring path now. Then finish a
+Galaga-class game entirely through Studio. Only after both are complete, resume
+the queued Rain Glass custom-shader acceptance and require the licensed remote
+image, full-window asset-backed composition, two temporally distinct frames,
+package relocation, and audit. Do not return to broad subsystem or CI expansion
+before these user-visible game proofs complete.
 
 ## Evidence index
 

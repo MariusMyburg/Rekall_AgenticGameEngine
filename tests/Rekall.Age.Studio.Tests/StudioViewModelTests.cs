@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json.Nodes;
 using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Editor;
+using Rekall.Age.Rendering;
 using Rekall.Age.Studio;
 using Rekall.Age.Workflows;
 using Rekall.Age.World;
@@ -10,6 +11,26 @@ namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioViewModelTests
 {
+    [Fact]
+    public void StudioRejectsLowCoverageAdvisoryAsTaskSpecificVisualProof()
+    {
+        var analysis = new RekallAgeViewportFrameAnalysis(
+            true,
+            true,
+            100,
+            100,
+            5,
+            0.96,
+            1,
+            0.2,
+            0.1,
+            ["REKALL_VIEWPORT_LOW_VISUAL_COVERAGE"]);
+
+        Assert.False(RekallAgeStudioViewModel.IsStudioVisualProofAcceptable(analysis));
+        Assert.True(RekallAgeStudioViewModel.IsStudioVisualProofAcceptable(
+            analysis with { DominantColorRatio = 0.7, WarningCodes = [] }));
+    }
+
     [Fact]
     public void AutomationRejectsANonInformativeViewportEvenWhenItIsNonblankAndPackaged()
     {

@@ -11,6 +11,7 @@ using System.Windows.Media.Imaging;
 using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Editor;
 using Rekall.Age.Editor.Contracts;
+using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Workflows;
 using Rekall.Age.Workflows.Commands;
@@ -640,13 +641,19 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             ViewportImage = LoadBitmap(capture.ScreenshotPath);
             ViewportRenderableCount = capture.RenderableCount;
-            ViewportVisuallyInformative = capture.FrameAnalysis.Analyzed
-                && capture.FrameAnalysis.VisuallyInformative;
+            ViewportVisuallyInformative = IsStudioVisualProofAcceptable(capture.FrameAnalysis);
             ViewportSummary = $"{capture.Width}×{capture.Height} · frame {capture.FrameIndex} · {capture.RenderableCount} renderables · "
                 + (ViewportVisuallyInformative ? "visually informative" : "visual repair required");
         }
         return result;
     }
+
+    internal static bool IsStudioVisualProofAcceptable(RekallAgeViewportFrameAnalysis analysis) =>
+        analysis.Analyzed
+        && analysis.VisuallyInformative
+        && !analysis.WarningCodes.Contains(
+            "REKALL_VIEWPORT_LOW_VISUAL_COVERAGE",
+            StringComparer.Ordinal);
 
     private async Task PlayAsync()
     {

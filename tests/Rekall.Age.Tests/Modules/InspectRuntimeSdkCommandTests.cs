@@ -44,7 +44,9 @@ public sealed class InspectRuntimeSdkCommandTests
             && contract.Usage!.Contains("entity.WithComponentBoolean", StringComparison.Ordinal));
         Assert.Contains(result.Value.Contracts, contract =>
             contract.Name == "entity-transform-and-component-state-recipe"
-            && contract.Usage!.Contains("entity.Transform.Position3D", StringComparison.Ordinal)
+            && contract.Usage!.Contains("entity.Transform.Position2D", StringComparison.Ordinal)
+            && contract.Description.Contains("WithPosition2D", StringComparison.Ordinal)
+            && contract.Description.Contains("WithPosition3D", StringComparison.Ordinal)
             && contract.Usage.Contains("no JsonObject", StringComparison.Ordinal));
         Assert.Contains(result.Value.Contracts, contract =>
             contract.Name == "scalar-two-axis-input-and-double-math-recipe"
@@ -112,6 +114,10 @@ public sealed class InspectRuntimeSdkCommandTests
         Assert.Contains(result.Value.Contracts, contract =>
             contract.Name == "RekallAgeRuntimeVector2"
             && contract.Description.Contains("planar", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "WithPosition2D"
+            && contract.Signature.Contains("RekallAgeRuntimeVector2 position", StringComparison.Ordinal)
+            && contract.Usage!.Contains("WithPosition2D", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -76,6 +76,7 @@ public sealed class RekallAgeProjectAgentSession
                 MaxTurnDuration = request.MaxTurnDuration,
                 RequireCompletionAudit = request.RequireCompletionAudit,
                 RequireCompletionAuditToolEvidence = request.RequireCompletionAuditToolEvidence,
+                RequireTaskSpecificEvidence = request.RequireCompletionAuditToolEvidence,
                 RequireRuntimeBehaviorAssertions = !request.TreatGauntletAsTerminalSuccess,
                 RuntimeAuthoringCheckpointSatisfied = hasExistingRuntimeSystem,
                 Progress = progress,

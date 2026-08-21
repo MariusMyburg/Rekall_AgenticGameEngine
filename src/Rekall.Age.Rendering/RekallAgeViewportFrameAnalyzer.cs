@@ -81,7 +81,7 @@ public static class RekallAgeViewportFrameAnalyzer
 
         return new RekallAgeViewportFrameAnalysis(
             true,
-            warningCodes.Count == 0,
+            !warningCodes.Any(IsBlockingWarning),
             totalPixels,
             opaquePixels,
             colorCounts.Count,
@@ -113,6 +113,10 @@ public static class RekallAgeViewportFrameAnalyzer
         {
             warnings.Add("REKALL_VIEWPORT_DOMINATED_BY_ONE_COLOR");
         }
+        else if (dominantColorRatio >= 0.95)
+        {
+            warnings.Add("REKALL_VIEWPORT_LOW_VISUAL_COVERAGE");
+        }
 
         if (luminanceDeviation < 0.01)
         {
@@ -126,4 +130,7 @@ public static class RekallAgeViewportFrameAnalyzer
 
         return warnings;
     }
+
+    private static bool IsBlockingWarning(string warningCode) =>
+        !warningCode.Equals("REKALL_VIEWPORT_LOW_VISUAL_COVERAGE", StringComparison.Ordinal);
 }

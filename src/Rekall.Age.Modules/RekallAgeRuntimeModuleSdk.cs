@@ -392,6 +392,53 @@ public static class RekallAgeRuntimeModuleSdk
         return entity.ReplicatePosition || entity.ReplicateRotation || entity.ReplicateScale;
     }
 
+    public static RekallAgeRuntimeEntity WithPosition2D(
+        this RekallAgeRuntimeEntity entity,
+        RekallAgeRuntimeVector2 position)
+    {
+        var updated = entity with
+        {
+            Transform = entity.Transform with { Position2D = position }
+        };
+        return updated.UpdateComponent("Rekall.Transform2D", properties =>
+        {
+            SetCanonicalProperty(properties, "x", position.X);
+            SetCanonicalProperty(properties, "y", position.Y);
+            return properties;
+        });
+    }
+
+    public static RekallAgeRuntimeEntity WithRotation2D(
+        this RekallAgeRuntimeEntity entity,
+        double rotation)
+    {
+        var updated = entity with
+        {
+            Transform = entity.Transform with { Rotation2D = rotation }
+        };
+        return updated.UpdateComponent("Rekall.Transform2D", properties =>
+        {
+            SetCanonicalProperty(properties, "rotation", rotation);
+            return properties;
+        });
+    }
+
+    public static RekallAgeRuntimeEntity WithScale2D(
+        this RekallAgeRuntimeEntity entity,
+        RekallAgeRuntimeVector2 scale)
+    {
+        var updated = entity with
+        {
+            Transform = entity.Transform with { Scale2D = scale }
+        };
+        return updated.UpdateComponent("Rekall.Transform2D", properties =>
+        {
+            SetCanonicalProperty(properties, "scaleX", scale.X);
+            SetCanonicalProperty(properties, "scaleY", scale.Y);
+            return properties;
+        });
+    }
+
     public static RekallAgeRuntimeEntity WithPosition3D(
         this RekallAgeRuntimeEntity entity,
         RekallAgeRuntimeVector3 position)
@@ -402,9 +449,9 @@ public static class RekallAgeRuntimeModuleSdk
         };
         return updated.UpdateComponent("Rekall.Transform3D", properties =>
         {
-            properties["x"] = position.X;
-            properties["y"] = position.Y;
-            properties["z"] = position.Z;
+            SetCanonicalProperty(properties, "x", position.X);
+            SetCanonicalProperty(properties, "y", position.Y);
+            SetCanonicalProperty(properties, "z", position.Z);
             return properties;
         });
     }
@@ -419,9 +466,9 @@ public static class RekallAgeRuntimeModuleSdk
         };
         return updated.UpdateComponent("Rekall.Transform3D", properties =>
         {
-            properties["pitch"] = rotation.X;
-            properties["yaw"] = rotation.Y;
-            properties["roll"] = rotation.Z;
+            SetCanonicalProperty(properties, "pitch", rotation.X);
+            SetCanonicalProperty(properties, "yaw", rotation.Y);
+            SetCanonicalProperty(properties, "roll", rotation.Z);
             return properties;
         });
     }
@@ -436,9 +483,9 @@ public static class RekallAgeRuntimeModuleSdk
         };
         return updated.UpdateComponent("Rekall.Transform3D", properties =>
         {
-            properties["scaleX"] = scale.X;
-            properties["scaleY"] = scale.Y;
-            properties["scaleZ"] = scale.Z;
+            SetCanonicalProperty(properties, "scaleX", scale.X);
+            SetCanonicalProperty(properties, "scaleY", scale.Y);
+            SetCanonicalProperty(properties, "scaleZ", scale.Z);
             return properties;
         });
     }
@@ -511,7 +558,7 @@ public static class RekallAgeRuntimeModuleSdk
         double value) =>
         entity.UpdateComponent(componentType, properties =>
         {
-            properties[propertyName] = value;
+            SetCanonicalProperty(properties, propertyName, value);
             return properties;
         });
 
@@ -522,7 +569,7 @@ public static class RekallAgeRuntimeModuleSdk
         bool value) =>
         entity.UpdateComponent(componentType, properties =>
         {
-            properties[propertyName] = value;
+            SetCanonicalProperty(properties, propertyName, value);
             return properties;
         });
 
@@ -533,9 +580,17 @@ public static class RekallAgeRuntimeModuleSdk
         string? value) =>
         entity.UpdateComponent(componentType, properties =>
         {
-            properties[propertyName] = value;
+            SetCanonicalProperty(properties, propertyName, value);
             return properties;
         });
+
+    private static void SetCanonicalProperty(JsonObject properties, string propertyName, JsonNode? value)
+    {
+        var existingName = properties
+            .Select(property => property.Key)
+            .FirstOrDefault(name => name.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
+        properties[existingName ?? propertyName] = value;
+    }
 
     public static double DeterministicUnit(int seed, long sequence)
     {
@@ -947,7 +1002,7 @@ public static class RekallAgeRuntimeModuleSdk
 
     public static double ReadNumber(this JsonObject properties, string name, double fallback)
     {
-        if (!properties.TryGetPropertyValue(name, out var node) || node is not JsonValue value)
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
         {
             return fallback;
         }
@@ -975,7 +1030,7 @@ public static class RekallAgeRuntimeModuleSdk
 
     public static bool ReadBoolean(this JsonObject properties, string name, bool fallback)
     {
-        if (!properties.TryGetPropertyValue(name, out var node) || node is not JsonValue value)
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
         {
             return fallback;
         }
@@ -992,12 +1047,25 @@ public static class RekallAgeRuntimeModuleSdk
 
     public static string? ReadString(this JsonObject properties, string name, string? fallback = null)
     {
-        if (!properties.TryGetPropertyValue(name, out var node) || node is not JsonValue value)
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
         {
             return fallback;
         }
 
         return value.TryGetValue<string>(out var text) ? text : fallback;
+    }
+
+    private static bool TryGetPropertyValue(JsonObject properties, string name, out JsonNode? value)
+    {
+        if (properties.TryGetPropertyValue(name, out value))
+        {
+            return true;
+        }
+
+        var existingName = properties
+            .Select(property => property.Key)
+            .FirstOrDefault(candidate => candidate.Equals(name, StringComparison.OrdinalIgnoreCase));
+        return existingName is not null && properties.TryGetPropertyValue(existingName, out value);
     }
 
     private static RekallAgeRuntimeWorld WithEvents(

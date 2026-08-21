@@ -22,6 +22,13 @@ public sealed record RekallAgeComponentDocument(string Type, JsonObject Properti
         }
 
         var properties = Properties.DeepClone().AsObject();
+        foreach (var existingName in properties
+            .Select(property => property.Key)
+            .Where(existingName => existingName.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase))
+            .ToArray())
+        {
+            properties.Remove(existingName);
+        }
         properties[name.Trim()] = value?.DeepClone();
         return this with { Properties = properties };
     }

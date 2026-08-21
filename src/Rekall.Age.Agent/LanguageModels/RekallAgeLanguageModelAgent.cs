@@ -34,6 +34,8 @@ public sealed record RekallAgeLanguageModelAgentRequest(string Model, string Sys
 
     public bool RequireCompletionAuditToolEvidence { get; init; }
 
+    public bool RequireTaskSpecificEvidence { get; init; }
+
     public bool RequireRuntimeBehaviorAssertions { get; init; }
 
     public int MaxRuntimeBehaviorRepairTurns { get; init; } = 12;
@@ -150,6 +152,13 @@ public sealed class RekallAgeLanguageModelAgent(
         }
 
         transcript.Add(new RekallAgeLanguageModelMessage("user", request.Task));
+        var taskEvidence = new RekallAgeTaskEvidenceTracker(
+            request.Task,
+            request.RequireTaskSpecificEvidence);
+        if (taskEvidence.InitialInstruction is { Length: > 0 } taskEvidenceInstruction)
+        {
+            transcript.Add(new RekallAgeLanguageModelMessage("user", taskEvidenceInstruction));
+        }
         var promptTokens = 0;
         var completionTokens = 0;
         long totalDuration = 0;
@@ -264,9 +273,12 @@ public sealed class RekallAgeLanguageModelAgent(
                         && maxRuntimeBehaviorRepairTurns > 0)
                     {
                         runtimeRepairReserveActivated = true;
-                        turnLimit = Math.Max(
-                            turnLimit,
-                            Math.Min(256, checked(turn + maxRuntimeBehaviorRepairTurns)));
+                        if (hasTurnLimit)
+                        {
+                            turnLimit = Math.Max(
+                                turnLimit,
+                                Math.Min(256, checked(turn + maxRuntimeBehaviorRepairTurns)));
+                        }
                     }
                     transcript.Add(new RekallAgeLanguageModelMessage("user", runtimeEvidenceMessage));
                     continue;
@@ -278,6 +290,13 @@ public sealed class RekallAgeLanguageModelAgent(
                     transcript.Add(new RekallAgeLanguageModelMessage(
                         "user",
                         BuildRuntimeAuthoringCheckpointPrompt(maxPreRuntimeAuthoringMutations)));
+                    continue;
+                }
+
+                if (taskEvidence.TryBuildMissingEvidencePrompt(out var taskEvidencePrompt))
+                {
+                    completionAuditPending = false;
+                    transcript.Add(new RekallAgeLanguageModelMessage("user", taskEvidencePrompt));
                     continue;
                 }
 
@@ -371,6 +390,7 @@ public sealed class RekallAgeLanguageModelAgent(
                     succeeded,
                     outputText.Length <= 1_200 ? outputText : outputText[..1_200] + "…");
                 toolExecutions.Add(execution);
+                taskEvidence.Observe(executedToolName, effectiveCall.Arguments, output, succeeded);
                 var identicalFailureCount = CountConsecutiveIdenticalFailures(toolExecutions);
                 repeatedFailureRecovery = identicalFailureCount >= 3
                     ? BuildRepeatedFailureRecovery(execution, output, identicalFailureCount)
@@ -501,9 +521,12 @@ public sealed class RekallAgeLanguageModelAgent(
                 if (!runtimeRepairReserveActivated && maxRuntimeBehaviorRepairTurns > 0)
                 {
                     runtimeRepairReserveActivated = true;
-                    turnLimit = Math.Max(
-                        turnLimit,
-                        Math.Min(256, checked(maxTurns + maxRuntimeBehaviorRepairTurns)));
+                    if (hasTurnLimit)
+                    {
+                        turnLimit = Math.Max(
+                            turnLimit,
+                            Math.Min(256, checked(maxTurns + maxRuntimeBehaviorRepairTurns)));
+                    }
                 }
 
                 runtimeCheckpointPrompted = true;

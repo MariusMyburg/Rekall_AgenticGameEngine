@@ -277,6 +277,47 @@ public sealed class WorldMutationCommandTests
     }
 
     [Fact]
+    public async Task ApplySceneBlueprintReplacesPropertyUsingCanonicalCaseWithoutDuplicates()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        var drop = RekallAgeEntityDocument.Create("Drop", [])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Game.RainDropState",
+                new JsonObject { ["dropSpeed"] = 2.5, ["elapsed"] = 0 }));
+        await store.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"]).AddEntity(drop),
+            CancellationToken.None);
+
+        var result = await new ApplySceneBlueprintCommand().ExecuteAsync(
+            new ApplySceneBlueprintRequest(
+                root,
+                "Main",
+                [
+                    new RekallAgeSceneBlueprintEntity(
+                        "Drop",
+                        Components:
+                        [
+                            new RekallAgeSceneBlueprintComponent(
+                                "Game.RainDropState",
+                                new JsonObject { ["DropSpeed"] = 4.5, ["Elapsed"] = 1 })
+                        ])
+                ]),
+            new RekallAgeCommandContext(
+                "agent",
+                RekallAgeTransaction.Begin("canonical component properties"),
+                CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        var saved = await store.LoadAsync(root, "Main", CancellationToken.None);
+        var properties = Assert.Single(Assert.Single(saved.Entities).Components).Properties;
+        Assert.Equal(["DropSpeed", "Elapsed"], properties.Select(property => property.Key).Order(StringComparer.Ordinal));
+        Assert.Equal(4.5, properties["DropSpeed"]!.GetValue<double>());
+        Assert.Equal(1, properties["Elapsed"]!.GetValue<int>());
+    }
+
+    [Fact]
     public async Task DeleteEntityRemovesOneEntityAndCapturesPreimage()
     {
         var root = TestPaths.CreateTempDirectory();

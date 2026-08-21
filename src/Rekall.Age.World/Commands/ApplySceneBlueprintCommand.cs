@@ -266,6 +266,13 @@ public sealed class ApplySceneBlueprintCommand
             var properties = current.Properties.DeepClone().AsObject();
             foreach (var property in supplied.Properties ?? [])
             {
+                foreach (var existingName in properties
+                    .Select(existing => existing.Key)
+                    .Where(existingName => existingName.Equals(property.Key, StringComparison.OrdinalIgnoreCase))
+                    .ToArray())
+                {
+                    properties.Remove(existingName);
+                }
                 properties[property.Key] = property.Value?.DeepClone();
             }
             merged = merged.AddComponent(current with { Properties = properties });

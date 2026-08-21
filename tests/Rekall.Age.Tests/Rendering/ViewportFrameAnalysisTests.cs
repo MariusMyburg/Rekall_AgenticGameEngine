@@ -54,4 +54,20 @@ public sealed class ViewportFrameAnalysisTests
         Assert.True(analysis.DistinctColorCount > 8);
         Assert.DoesNotContain("REKALL_VIEWPORT_FLAT_COLOR", analysis.WarningCodes);
     }
+
+    [Fact]
+    public void AnalyzerFlagsTinyDetailedContentAsLowCoverageWithoutInvalidatingSparseScenes()
+    {
+        var rgba = Enumerable.Range(0, 100)
+            .SelectMany(index => index < 96
+                ? new byte[] { 10, 20, 30, 255 }
+                : new byte[] { (byte)(100 + index), (byte)(200 - index), 220, 255 })
+            .ToArray();
+
+        var analysis = RekallAgeViewportFrameAnalyzer.Analyze(new RekallAgeRgbaImage(10, 10, rgba));
+
+        Assert.Equal(0.96, analysis.DominantColorRatio, precision: 2);
+        Assert.Contains("REKALL_VIEWPORT_LOW_VISUAL_COVERAGE", analysis.WarningCodes);
+        Assert.True(analysis.VisuallyInformative);
+    }
 }

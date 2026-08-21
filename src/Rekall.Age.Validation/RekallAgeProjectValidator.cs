@@ -244,35 +244,22 @@ public sealed class RekallAgeProjectValidator
                          component.Type.StartsWith("Rekall.", StringComparison.Ordinal)
                          && !BuiltInComponentSchemas.ContainsKey(component.Type)))
             {
-                var suggestion = BuiltInComponentSchemas.Keys
-                    .Select(type => (Type: type, Distance: EditDistance(component.Type, type)))
-                    .OrderBy(candidate => candidate.Distance)
-                    .ThenBy(candidate => candidate.Type, StringComparer.Ordinal)
-                    .First();
-                if (suggestion.Distance > 3)
-                {
-                    continue;
-                }
-
-                issues.Add(new RekallAgeValidationIssue(
-                    "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN",
-                    $"Entity '{entity.Name}' uses unknown reserved component '{component.Type}'. "
-                    + (suggestion.Distance <= 3 ? $"Did you mean '{suggestion.Type}'? " : string.Empty)
-                    + "Use the exact type returned by rekall.module.search_component_schemas.",
-                    "blocking",
-                    entity.Id,
-                    [
-                        new RekallAgeSuggestedCommand(
+                var suggestion = FindSafeReservedComponentSuggestion(component.Type);
+                var suggestedCommands = suggestion is null
+                    ? null
+                    : new RekallAgeSuggestedCommand[]
+                    {
+                        new(
                             "rekall.component.add",
                             new Dictionary<string, object?>
                             {
                                 ["projectRoot"] = projectRoot,
                                 ["sceneName"] = scene.Name,
                                 ["entityId"] = entity.Id,
-                                ["componentType"] = suggestion.Type,
+                                ["componentType"] = suggestion,
                                 ["properties"] = component.Properties.DeepClone().AsObject()
                             }),
-                        new RekallAgeSuggestedCommand(
+                        new(
                             "rekall.component.remove",
                             new Dictionary<string, object?>
                             {
@@ -281,7 +268,16 @@ public sealed class RekallAgeProjectValidator
                                 ["entityId"] = entity.Id,
                                 ["componentType"] = component.Type
                             })
-                    ]));
+                    };
+
+                issues.Add(new RekallAgeValidationIssue(
+                    "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN",
+                    $"Entity '{entity.Name}' uses unknown reserved component '{component.Type}'. "
+                    + (suggestion is not null ? $"Did you mean '{suggestion}'? " : string.Empty)
+                    + "Use the exact type returned by rekall.module.search_component_schemas.",
+                    "blocking",
+                    entity.Id,
+                    suggestedCommands));
             }
 
             foreach (var component in entity.Components)
@@ -371,6 +367,27 @@ public sealed class RekallAgeProjectValidator
                 }
             }
         }
+    }
+
+    private static string? FindSafeReservedComponentSuggestion(string componentType)
+    {
+        var finalSegment = componentType[(componentType.LastIndexOf('.') + 1)..];
+        var exactSuffixMatches = BuiltInComponentSchemas.Keys
+            .Where(type => type[(type.LastIndexOf('.') + 1)..]
+                .Equals(finalSegment, StringComparison.OrdinalIgnoreCase))
+            .Take(2)
+            .ToArray();
+        if (exactSuffixMatches.Length == 1)
+        {
+            return exactSuffixMatches[0];
+        }
+
+        var nearest = BuiltInComponentSchemas.Keys
+            .Select(type => (Type: type, Distance: EditDistance(componentType, type)))
+            .OrderBy(candidate => candidate.Distance)
+            .ThenBy(candidate => candidate.Type, StringComparer.Ordinal)
+            .First();
+        return nearest.Distance <= 3 ? nearest.Type : null;
     }
 
     private static string? ExpectedStructuredShape(RekallAgePropertySchema property) =>

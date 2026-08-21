@@ -115,6 +115,41 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneRejectsEveryUnknownReservedTypeAndOnlyRepairsSafeSuffixAlias()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"])
+            .AddEntity(RekallAgeEntityDocument.Create("Aliased Transform", [])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Components.Transform3D",
+                    new JsonObject { ["X"] = 3 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Invented Drive", [])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.CompletelyInventedWarpDrive",
+                    new JsonObject())));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        var unknown = report.Issues
+            .Where(issue => issue.Code == "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN")
+            .OrderBy(issue => issue.Target, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(2, unknown.Length);
+        var alias = Assert.Single(unknown, issue =>
+            issue.Message.Contains("Rekall.Components.Transform3D", StringComparison.Ordinal));
+        Assert.Contains("Rekall.Transform3D", alias.Message, StringComparison.Ordinal);
+        Assert.Equal(2, alias.SuggestedCommands?.Count);
+        var invented = Assert.Single(unknown, issue =>
+            issue.Message.Contains("Rekall.CompletelyInventedWarpDrive", StringComparison.Ordinal));
+        Assert.DoesNotContain("Did you mean", invented.Message, StringComparison.Ordinal);
+        Assert.Null(invented.SuggestedCommands);
+        Assert.All(unknown, issue => Assert.Equal("blocking", issue.Severity));
+    }
+
+    [Fact]
     public async Task ValidateSceneRejectsUnknownPropertiesOnKnownBuiltInComponents()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -772,6 +807,46 @@ public sealed class ProjectValidatorTests
         var components = Assert.Single(repaired.Entities).Components;
         Assert.Contains(components, component => component.Type == "Rekall.Rigidbody3D");
         Assert.DoesNotContain(components, component => component.Type == "Rekall.RigidBody3D");
+    }
+
+    [Fact]
+    public async Task RepairProjectValidationCanonicalizesExactSuffixAliasWithoutGuessingInventedType()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity(RekallAgeEntityDocument.Create("Body", [])
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.Components.Transform3D",
+                        new JsonObject { ["X"] = 2 }))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.CompletelyInventedWarpDrive"))),
+            CancellationToken.None);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new ValidateProjectCommand());
+        registry.Register(new AddComponentCommand());
+        registry.Register(new RemoveComponentCommand());
+        registry.Register(new RepairProjectValidationCommand(registry));
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("repair suffix alias"),
+            CancellationToken.None);
+
+        var result = await registry.ExecuteAsync<RepairProjectValidationRequest, RepairProjectValidationResult>(
+            "rekall.validation.repair_project",
+            new RepairProjectValidationRequest(root),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(2, result.Value.ExecutedRepairCount);
+        Assert.Single(result.Value.Validation.Scenes.SelectMany(scene => scene.Issues), issue =>
+            issue.Message.Contains("Rekall.CompletelyInventedWarpDrive", StringComparison.Ordinal));
+        var repaired = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        var components = Assert.Single(repaired.Entities).Components;
+        var transform = Assert.Single(components, component => component.Type == "Rekall.Transform3D");
+        Assert.Equal(2, transform.Properties["X"]!.GetValue<int>());
+        Assert.DoesNotContain(components, component => component.Type == "Rekall.Components.Transform3D");
+        Assert.Contains(components, component => component.Type == "Rekall.CompletelyInventedWarpDrive");
     }
 
     [Fact]

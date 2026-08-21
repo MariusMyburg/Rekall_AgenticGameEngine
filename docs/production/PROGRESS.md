@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 04:24 Africa/Johannesburg
+Last verified: 2026-08-21 04:42 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: module compilation has a bounded recoverable process
-lifecycle; reserved component validation must now fail closed
+Latest milestone: reserved engine component validation fails closed with
+bounded safe repair; scene blueprint normalization is the next measured blocker
 
 ## Product objective
 
@@ -31,6 +31,26 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Reserved component fail-closed validation: every unknown `Rekall.*` component
+  is now blocking. Repair suggestions are emitted only for a unique exact final
+  segment match or a full-name edit distance of at most three; otherwise the
+  validator refuses to guess. Focused validation and repair coverage passed,
+  including property-preserving repair and no-suggestion behavior for an
+  invented type. The locked zero-warning/error gate passed 982/982 engine and
+  7/7 Studio tests twice and the complete installed matrix. The 1,186-payload-
+  file archive is 201,530,567 bytes with SHA-256
+  `B6B5B36BC2105BF3880750E0B2835970DFE436284F2FC4C8E7B1BDDECE28A826`.
+- Clean installed real-Qwen benchmark 23 compiled an authored `GameRules`
+  runtime system, projected semantic input, and produced a nonblank 960x540
+  frame with two renderables. It remained red at the protected 76-turn bound:
+  46/74 tool calls succeeded, final validation correctly exposed all 13
+  blocking component type/property defects, and no package was produced. Nine
+  `rekall.scene.apply_blueprint` calls failed while Qwen alternated among
+  predictable component object representations and occasionally malformed
+  encoded arrays. The next generic tranche is bounded, unambiguous scene
+  blueprint component normalization with precise indexed rejection of
+  ambiguous shapes. Evidence SHA-256 is
+  `BE91F223DF81D16BF76DB1AA3CEA24D5BF3269A20B43C5A1419C5EEB097C85F8`.
 - Bounded module compiler lifecycle: every module build has a two-minute
   engine-owned deadline. Timeout and external cancellation terminate the whole
   process tree with five-second cleanup bounds; timeout returns

@@ -112,7 +112,58 @@ public sealed class InputActionSystemTests
         Assert.Equal(2, lookY.Value);
     }
 
-    private static RekallAgeRuntimeWorld CreateWorld(JsonArray actions)
+    [Fact]
+    public async Task NonRenderedInputConfigurationStillProjectsActions()
+    {
+        var world = CreateWorld(
+            new JsonArray(new JsonObject
+            {
+                ["name"] = "move.horizontal",
+                ["positiveKey"] = "D"
+            }),
+            visible: false,
+            active: true);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(
+                world,
+                1,
+                CancellationToken.None,
+                new RekallAgeRuntimeInputState(
+                    SemanticActions: [new("move.horizontal", Value: 1, IsDown: true)]));
+
+        var action = Assert.Single(result.World.Subsystems.Input.Actions);
+        Assert.Equal("move.horizontal", action.Name);
+        Assert.Equal(1, action.Value);
+        Assert.True(action.IsDown);
+        Assert.Equal("Gameplay Input", action.SourceEntityName);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ExplicitlyInactiveInputMapDoesNotProjectActions(bool visible)
+    {
+        var world = CreateWorld(
+            new JsonArray(new JsonObject { ["name"] = "move.horizontal", ["positiveKey"] = "D" }),
+            visible,
+            active: false);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(
+                world,
+                1,
+                CancellationToken.None,
+                new RekallAgeRuntimeInputState(
+                    PressedKeys: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "D" }));
+
+        Assert.Empty(result.World.Subsystems.Input.Actions);
+    }
+
+    private static RekallAgeRuntimeWorld CreateWorld(
+        JsonArray actions,
+        bool visible = true,
+        bool active = true)
     {
         var input = new RekallAgeRuntimeEntity(
             "input",
@@ -120,7 +171,7 @@ public sealed class InputActionSystemTests
             ["input"],
             null,
             null,
-            true,
+            visible,
             false,
             RekallAgeRuntimeTransform.Identity,
             [
@@ -128,7 +179,7 @@ public sealed class InputActionSystemTests
                     "Rekall.InputActionMap",
                     new JsonObject
                     {
-                        ["active"] = true,
+                        ["active"] = active,
                         ["actions"] = actions
                     })
             ]);

@@ -18,11 +18,6 @@ public sealed class RekallAgeInputActionSystem : IRekallAgeRuntimeWorldSystem
         var observations = new List<RekallAgeRuntimeObservation>();
         foreach (var entity in world.Entities)
         {
-            if (!entity.Visible)
-            {
-                continue;
-            }
-
             foreach (var component in entity.Components.Where(component =>
                          component.Type.Equals("Rekall.InputActionMap", StringComparison.Ordinal)))
             {

@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 07:55 Africa/Johannesburg
+Last verified: 2026-08-21 08:15 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: failed runtime assertion evidence survives bounded agent
-output; input maps must not be disabled by visual visibility
+Latest milestone: semantic input is independent of render visibility; delivery
+guidance must front-load the required playable package adapter
 
 ## Product objective
 
@@ -31,6 +31,29 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Semantic input-map evaluation is now independent of an entity's visual
+  `Visible` flag. Hidden configuration entities can project actions, while the
+  map's explicit `Active` property remains the authoritative enable/disable
+  switch for both visible and hidden entities. Focused input/runtime/UI coverage
+  passed 17/17. The locked zero-warning/error gate passed 1,010/1,010 engine and
+  7/7 Studio tests twice and the complete installed matrix. Its 1,186-file
+  archive is 201,582,200 bytes with SHA-256
+  `742DB0C5DAB7F1CD598616F59ACCACD12CC8D845D90C87E11A49CD3CD4203F2D`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+- Clean installed real-Qwen benchmark 34 reached a passing executable gameplay
+  checkpoint: its authored module compiled, semantic `move.horizontal` input
+  projected two declared actions, four runtime assertions passed, and the orb's
+  strict X-position delta changed under engine delta time. The viewport was
+  nonblank at 960x540 with five renderables. The run remained red after 77/82
+  successful calls, with no package or audit: Qwen delayed the separately
+  required generic `IRekallAgePlayableModule` package-proof adapter until the
+  first package attempt exposed its absence. Scaffolding/building that adapter
+  correctly invalidated the earlier runtime proof, and the following package
+  call was therefore deferred at the protected turn limit. The next generic
+  agent-contract correction is to front-load the adapter immediately after a
+  gameplay checkpoint, before the final build/inspection/package sequence.
+  Evidence SHA-256 is
+  `A62D352CE41BBE821B46F1E84DC9108DE940A3850769EC766F9EB6387CB65944`.
 - Front-loaded runtime assertion evidence: failed inspection summaries now lead
   with bounded entity, subject, component/property, operator, expected value,
   actual value, and comparison explanation before large subsystem/entity data.

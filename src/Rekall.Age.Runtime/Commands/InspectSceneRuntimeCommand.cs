@@ -152,7 +152,7 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Inspects deterministic scene simulation after a requested frame count without requiring a compiled playable adapter; reports physics, animation, UI, audio, events, systems, and bounded entity states. For executable behavior proof, pass representative input frames plus 1-64 assertions. Assertion shape: {\"entityName\":\"Player\",\"subject\":\"component.property\",\"operator\":\"greater-than-or-equal\",\"componentType\":\"Game.Modules.Rules.PlayerState\",\"propertyName\":\"Score\",\"expected\":1}. Subjects: entity, visible, component, component.property, delta.component.property, changed.component.property, transform.position2d.x/y, transform.position3d.x/y/z, delta.position2d.x/y, delta.position3d.x/y/z. delta.component.property reports numeric final-minus-initial state; changed.component.property reports whether the bounded JSON value changed. Operators: exists, not-exists, equals, not-equals, contains, greater-than, greater-than-or-equal, less-than, less-than-or-equal. Any failed assertion fails the command with actual bounded values.",
+        "Inspects deterministic scene simulation after a requested frame count without requiring a compiled playable adapter; reports physics, animation, UI, audio, events, systems, and bounded entity states. For executable behavior proof, pass representative input frames plus 1-64 assertions. Inject declared semantic actions with this exact frame shape: {\"semanticActions\":[{\"name\":\"move.horizontal\",\"value\":1,\"isDown\":true}]}; semantic samples override raw-device projection for the matching action declared by Rekall.InputActionMap. Assertion shape: {\"entityName\":\"Player\",\"subject\":\"component.property\",\"operator\":\"greater-than-or-equal\",\"componentType\":\"Game.Modules.Rules.PlayerState\",\"propertyName\":\"Score\",\"expected\":1}. Subjects: entity, visible, component, component.property, delta.component.property, changed.component.property, transform.position2d.x/y, transform.position3d.x/y/z, delta.position2d.x/y, delta.position3d.x/y/z. delta.component.property reports numeric final-minus-initial state; changed.component.property reports whether the bounded JSON value changed. Operators: exists, not-exists, equals, not-equals, contains, greater-than, greater-than-or-equal, less-than, less-than-or-equal. Any failed assertion fails the command with actual bounded values.",
         typeof(InspectSceneRuntimeRequest).FullName!,
         typeof(InspectSceneRuntimeResult).FullName!);
 
@@ -162,34 +162,8 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
     {
         if (request.Frames < 0)
         {
-            var empty = new InspectSceneRuntimeResult(
-                request.SceneName,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                Array.Empty<RekallAgeRuntimeInputAction>(),
-                0,
-                Array.Empty<RekallAgeRuntimeEvent>(),
-                0,
-                0,
-                0,
-                0,
-                Array.Empty<RekallAgeRuntimeXrAction>(),
-                Array.Empty<string>(),
-                Array.Empty<RekallAgeRuntimeObservation>(),
-                0,
-                0,
-                Array.Empty<InspectSceneRuntimeCulledRenderable>());
             return RekallAgeCommandResult<InspectSceneRuntimeResult>.Failure(
-                empty,
+                CreateEmptyResult(request.SceneName),
                 "Runtime inspection requires a non-negative frame count.",
                 [
                     new RekallAgeCommandError(
@@ -235,10 +209,98 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
                 ]);
         }
 
+        if (ValidateInputs(request.Inputs) is { Count: > 0 } inputErrors)
+        {
+            return RekallAgeCommandResult<InspectSceneRuntimeResult>.Failure(
+                CreateEmptyResult(request.SceneName),
+                "Runtime inspection rejected invalid semantic action input.",
+                inputErrors);
+        }
+
         return RekallAgeCommandResult<InspectSceneRuntimeResult>.Success(
             result,
             $"Runtime {result.SceneName} frame {result.FrameIndex}: {result.EntityCount} entities, {result.RenderableCount} renderable, {assertionResults.Count} behavior assertion(s) passed.");
     }
+
+    private static IReadOnlyList<RekallAgeCommandError> ValidateInputs(
+        IReadOnlyList<RekallAgeRuntimeInputFrame>? inputs)
+    {
+        const int maximumSemanticActionsPerFrame = 64;
+        var errors = new List<RekallAgeCommandError>();
+        if (inputs is null)
+        {
+            return errors;
+        }
+
+        for (var frameIndex = 0; frameIndex < inputs.Count; frameIndex++)
+        {
+            var samples = inputs[frameIndex].SemanticActions;
+            if (samples is null)
+            {
+                continue;
+            }
+
+            if (samples.Count > maximumSemanticActionsPerFrame)
+            {
+                errors.Add(new RekallAgeCommandError(
+                    "REKALL_RUNTIME_INPUT_SEMANTIC_ACTION_LIMIT",
+                    $"Input frame {frameIndex} has {samples.Count} semantic actions; the maximum is {maximumSemanticActionsPerFrame}.",
+                    $"inputs[{frameIndex}].semanticActions"));
+            }
+
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            for (var sampleIndex = 0; sampleIndex < Math.Min(samples.Count, maximumSemanticActionsPerFrame); sampleIndex++)
+            {
+                var sample = samples[sampleIndex];
+                var target = $"inputs[{frameIndex}].semanticActions[{sampleIndex}]";
+                if (string.IsNullOrWhiteSpace(sample.Name) || !double.IsFinite(sample.Value))
+                {
+                    errors.Add(new RekallAgeCommandError(
+                        "REKALL_RUNTIME_INPUT_SEMANTIC_ACTION_INVALID",
+                        "Semantic action samples require a non-blank exact action name and a finite numeric value.",
+                        target));
+                    continue;
+                }
+
+                if (!names.Add(sample.Name.Trim()))
+                {
+                    errors.Add(new RekallAgeCommandError(
+                        "REKALL_RUNTIME_INPUT_SEMANTIC_ACTION_DUPLICATE",
+                        $"Semantic action '{sample.Name.Trim()}' appears more than once in input frame {frameIndex}.",
+                        target));
+                }
+            }
+        }
+
+        return errors;
+    }
+
+    private static InspectSceneRuntimeResult CreateEmptyResult(string sceneName) => new(
+        sceneName,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        Array.Empty<RekallAgeRuntimeInputAction>(),
+        0,
+        Array.Empty<RekallAgeRuntimeEvent>(),
+        0,
+        0,
+        0,
+        0,
+        Array.Empty<RekallAgeRuntimeXrAction>(),
+        Array.Empty<string>(),
+        Array.Empty<RekallAgeRuntimeObservation>(),
+        0,
+        0,
+        Array.Empty<InspectSceneRuntimeCulledRenderable>());
 
     private static IReadOnlyList<InspectSceneRuntimeAssertionResult> EvaluateAssertions(
         RekallAgeRuntimeWorld world,

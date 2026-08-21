@@ -56,6 +56,77 @@ public sealed class RuntimeInputInspectionTests
     }
 
     [Fact]
+    public async Task RuntimeInspectionProjectsInjectedSemanticActionsThroughDeclaredActionMap()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"])
+            .AddEntity(RekallAgeEntityDocument.Create("Input", ["input"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.InputActionMap",
+                    new JsonObject
+                    {
+                        ["actions"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = "move.horizontal", ["positiveKey"] = "D", ["negativeKey"] = "A" }
+                        }
+                    })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(
+                root,
+                "Main",
+                1,
+                [
+                    new RekallAgeRuntimeInputFrame(
+                        SemanticActions:
+                        [
+                            new RekallAgeRuntimeSemanticActionSample(
+                                "move.horizontal",
+                                Value: -0.75,
+                                IsDown: true,
+                                WasPressed: true),
+                            new RekallAgeRuntimeSemanticActionSample("undeclared.action")
+                        ])
+                ]),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("semantic-runtime-input"), CancellationToken.None));
+
+        Assert.True(result.Ok);
+        var action = Assert.Single(result.Value.InputActions);
+        Assert.Equal("move.horizontal", action.Name);
+        Assert.Equal(-0.75, action.Value);
+        Assert.True(action.IsDown);
+        Assert.True(action.WasPressed);
+        Assert.False(action.WasReleased);
+    }
+
+    [Fact]
+    public async Task RuntimeInspectionRejectsDuplicateSemanticActionSamples()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"]);
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(
+                root,
+                "Main",
+                1,
+                [
+                    new RekallAgeRuntimeInputFrame(
+                        SemanticActions:
+                        [
+                            new RekallAgeRuntimeSemanticActionSample("move.horizontal"),
+                            new RekallAgeRuntimeSemanticActionSample("move.horizontal", Value: -1)
+                        ])
+                ]),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("invalid-semantic-runtime-input"), CancellationToken.None));
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, error => error.Code == "REKALL_RUNTIME_INPUT_SEMANTIC_ACTION_DUPLICATE");
+    }
+
+    [Fact]
     public async Task RuntimeInspectionReportsRuntimeEventsForAgents()
     {
         var root = TestPaths.CreateTempDirectory();

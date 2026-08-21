@@ -1589,6 +1589,48 @@ improve only generic authoring primitives, schemas, diagnostics, and repair
 efficiency. Studio, embedded AI, MCP, CLI, and packaged players must continue
 to consume the same contracts.
 
+Fresh installed Lumen Vault benchmark 17 is retained as an honest failure.
+Real local `qwen3.5:35b` used 76 bounded turns (including the protected repair
+reserve), with 54 successful and 22 failed tool executions. It compiled an
+agent-authored runtime system, declared semantic input, produced an eight-entity
+runtime scene and a nonblank 960x540 Studio viewport with six visible
+renderables, but never passed the strict movement checkpoint and therefore did
+not package. The measured cause is a generic contract mismatch: runtime modules
+consume semantic actions, while deterministic input frames expose only raw
+device facts. The model supplied intuitive `move_horizontal` and
+`move_vertical` fields; deserialization discarded them and all projected action
+values stayed zero. The current plan adds bounded typed semantic-action
+injection and rejects ineffective checkpoint inputs with a copyable repair
+shape before rerunning the unchanged game brief.
+
+The semantic runtime-input tranche is now implemented and installed-product
+verified. Runtime input frames expose bounded typed semantic action samples;
+samples override raw projection only for exact actions declared by an active
+`Rekall.InputActionMap`, undeclared samples remain isolated, raw device input
+continues to work, and invalid duplicates/bounds fail with structured errors.
+The MCP schema, runtime command description, embedded agent contract, and
+checkpoint preflight all expose the same copyable shape. Unknown flat action
+fields no longer count as evidence and are rejected before tool execution.
+The focused runtime/agent/MCP selection passed 27 tests. The zero-warning,
+zero-error Release solution passed 971 engine and 7 Studio tests, and both
+locked distribution passes repeated 971/971 and 7/7. All installed-product
+acceptance checks passed against the 1,186-file Windows distribution; its
+201,512,801-byte archive has SHA-256
+`5884DEEE2A9010904C113FFE3CD32FA4143459D5E269D5611385D3E0944BBFF4`.
+
+Fresh installed Lumen Vault benchmark 18 is retained as the next honest
+failure. The unchanged brief and real `qwen3.5:35b` used 74 tool executions
+(48 successful, 26 failed), compiled the agent-authored runtime system, and
+produced a nonblank 960x540 viewport with 11 renderables. Crucially, all six
+runtime checkpoints now used the exact typed `semanticActions` payload, proving
+the benchmark-17 blocker is removed. The run still ended at the turn limit
+without packaging because AGE accepted `Rekall.InputActionMap.Actions` as a
+JSON-encoded string rather than an actual array. Runtime consequently reported
+zero input actions and the model repeatedly revised otherwise executable C#.
+The next generic target is fail-closed structured component-property authoring
+and a direct runtime diagnostic with the exact valid action-map shape; no
+Lumen-Vault-specific behavior belongs in the engine.
+
 The 2026-08-20 capability audit verified that built-in component schemas and
 `rekall.module.search_component_schemas` expose exact 2D/3D transform, camera,
 renderer, light, rigidbody, collider, world, and material contracts, while

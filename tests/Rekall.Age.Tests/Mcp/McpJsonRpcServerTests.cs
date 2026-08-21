@@ -4,6 +4,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Mcp;
 using Rekall.Age.Rendering.Commands;
+using Rekall.Age.Runtime.Commands;
 using Rekall.Age.Workflows.Commands;
 using Rekall.Age.World.Commands;
 using Rekall.Age.World;
@@ -67,6 +68,27 @@ public sealed class McpJsonRpcServerTests
         Assert.DoesNotContain(
             schema.GetProperty("required").EnumerateArray(),
             item => item.GetString() == "expectedRevision");
+    }
+
+    [Fact]
+    public async Task RuntimeInspectionSchemaExposesTypedSemanticActionSamples()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new InspectSceneRuntimeCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(
+            """{"jsonrpc":"2.0","id":24,"method":"tools/list"}""",
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var schema = document.RootElement.GetProperty("result").GetProperty("tools")[0].GetProperty("inputSchema");
+        var inputFrame = schema.GetProperty("properties").GetProperty("inputs").GetProperty("items");
+        var semanticAction = inputFrame.GetProperty("properties").GetProperty("semanticActions").GetProperty("items");
+        Assert.Equal("string", semanticAction.GetProperty("properties").GetProperty("name").GetProperty("type").GetString());
+        Assert.Equal("number", semanticAction.GetProperty("properties").GetProperty("value").GetProperty("type").GetString());
+        Assert.Equal("boolean", semanticAction.GetProperty("properties").GetProperty("isDown").GetProperty("type").GetString());
+        Assert.Contains(semanticAction.GetProperty("required").EnumerateArray(), item => item.GetString() == "name");
     }
 
     [Fact]

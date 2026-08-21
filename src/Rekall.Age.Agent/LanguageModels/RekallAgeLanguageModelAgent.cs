@@ -472,6 +472,15 @@ public sealed class RekallAgeLanguageModelAgent(
                 ["operator"] = "exists",
                 ["componentType"] = "<exact attached Game.* type>"
             },
+            ["requiredSemanticInputFrameShape"] = new JsonObject
+            {
+                ["semanticActions"] = new JsonArray(new JsonObject
+                {
+                    ["name"] = "move.horizontal",
+                    ["value"] = 1,
+                    ["isDown"] = true
+                })
+            },
             ["candidateAgentComponentAssertion"] = candidateAgentComponentAssertion,
             ["errors"] = new JsonArray(new JsonObject
             {
@@ -479,7 +488,7 @@ public sealed class RekallAgeLanguageModelAgent(
                 ["message"] = message,
                 ["target"] = "rekall.runtime.inspect_scene"
             }),
-            ["instruction"] = "Call rekall.runtime.inspect_scene now with non-empty inputs. The Game.* existence assertion must put the runtime entity name in entityName and the exact attached agent-owned type in componentType: {\"entityName\":\"Player\",\"subject\":\"component\",\"operator\":\"exists\",\"componentType\":\"Game.Modules.Rules.PlayerState\"}. Also include a transition assertion using an exact subject: {\"entityName\":\"Player\",\"subject\":\"delta.position3d.x\",\"operator\":\"greater-than\",\"expected\":0}; or use delta.position2d.x/y, delta.position3d.x/y/z, delta.component.property with componentType set to Game.* strictly compared with 0, or changed.component.property with componentType set to Game.* equals true. The intuitive delta.transform.position2d/3d axis aliases are accepted and normalized. Do not put a component type in entityName, omit componentType, or weaken a failed transition assertion. A failed qualifying assertion opens targeted repair work; unrelated discovery, validation, polish, capture, and packaging remain deferred until this checkpoint executes."
+            ["instruction"] = "Call rekall.runtime.inspect_scene now with effective input frames. To drive a semantic action consumed by InputActionValue/IsInputActionDown, inject the exact action name declared by Rekall.InputActionMap with this copyable shape: {\"inputs\":[{\"semanticActions\":[{\"name\":\"move.horizontal\",\"value\":1,\"isDown\":true}]}]}. Do not invent flat fields such as move_horizontal; unknown fields are ignored by the typed runtime frame and do not count as input. Raw-device arrays such as pressedKeys remain supported. The Game.* existence assertion must put the runtime entity name in entityName and the exact attached agent-owned type in componentType: {\"entityName\":\"Player\",\"subject\":\"component\",\"operator\":\"exists\",\"componentType\":\"Game.Modules.Rules.PlayerState\"}. Also include a transition assertion using an exact subject: {\"entityName\":\"Player\",\"subject\":\"delta.position3d.x\",\"operator\":\"greater-than\",\"expected\":0}; or use delta.position2d.x/y, delta.position3d.x/y/z, delta.component.property with componentType set to Game.* strictly compared with 0, or changed.component.property with componentType set to Game.* equals true. The intuitive delta.transform.position2d/3d axis aliases are accepted and normalized. Do not put a component type in entityName, omit componentType, or weaken a failed transition assertion. A failed qualifying assertion opens targeted repair work; unrelated discovery, validation, polish, capture, and packaging remain deferred until this checkpoint executes."
         };
     }
 
@@ -617,7 +626,7 @@ public sealed class RekallAgeLanguageModelAgent(
 
     private static RuntimeCheckpointCoverage EvaluateRuntimeCheckpointCoverage(JsonObject arguments)
     {
-        var hasInputs = HasNonemptyArrayArgument(arguments, "inputs");
+        var hasInputs = HasEffectiveRuntimeInputs(arguments);
         if (GetArgument(arguments, "assertions") is not JsonArray assertions)
         {
             return new RuntimeCheckpointCoverage(hasInputs, false, false);
@@ -629,6 +638,59 @@ public sealed class RekallAgeLanguageModelAgent(
             && IsAgentComponent(GetString(assertion, "componentType")));
         var hasTransition = assertions.OfType<JsonObject>().Any(IsMeaningfulRuntimeTransition);
         return new RuntimeCheckpointCoverage(hasInputs, hasAgentComponent, hasTransition);
+    }
+
+    private static bool HasEffectiveRuntimeInputs(JsonObject arguments)
+    {
+        if (GetArgument(arguments, "inputs") is not JsonArray inputs)
+        {
+            return false;
+        }
+
+        string[] rawArrayNames =
+        [
+            "pressedKeys",
+            "pressedKeysThisFrame",
+            "releasedKeysThisFrame",
+            "pressedButtons",
+            "pressedButtonsThisFrame",
+            "releasedButtonsThisFrame",
+            "xrPoses",
+            "xrActions"
+        ];
+        string[] rawScalarNames =
+        [
+            "mouseX",
+            "mouseY",
+            "mouseDeltaX",
+            "mouseDeltaY",
+            "mouseWheelDelta"
+        ];
+
+        foreach (var frame in inputs.OfType<JsonObject>())
+        {
+            if (rawArrayNames.Any(name => GetArgument(frame, name) is JsonArray { Count: > 0 }))
+            {
+                return true;
+            }
+
+            if (rawScalarNames.Any(name =>
+                    GetArgument(frame, name) is { } value
+                    && TryGetNumber(value, out var number)
+                    && Math.Abs(number) > double.Epsilon))
+            {
+                return true;
+            }
+
+            if (GetArgument(frame, "semanticActions") is JsonArray semanticActions
+                && semanticActions.OfType<JsonObject>().Any(sample =>
+                    !string.IsNullOrWhiteSpace(GetString(sample, "name"))))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsMeaningfulRuntimeTransition(JsonObject assertion)
@@ -677,7 +739,7 @@ public sealed class RekallAgeLanguageModelAgent(
     {
         public IReadOnlyList<string> Missing => new[]
         {
-            (Inputs, "non-empty inputs"),
+            (Inputs, "effective raw-device input or declared semanticActions input"),
             (AgentComponent, "component/exists assertion for attached Game.* state"),
             (Transition, "strict nonzero transform delta or changed Game.* property assertion")
         }

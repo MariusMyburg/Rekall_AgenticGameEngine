@@ -28,6 +28,13 @@ public sealed record RekallAgeRuntimeEntity(
 
 public sealed record RekallAgeRuntimeComponent(string Type, JsonObject Properties);
 
+public sealed record RekallAgeRuntimeSemanticActionSample(
+    string Name,
+    double Value = 1,
+    bool IsDown = true,
+    bool WasPressed = false,
+    bool WasReleased = false);
+
 public sealed record RekallAgeRuntimeInputState(
     double MouseX = 0,
     double MouseY = 0,
@@ -43,7 +50,8 @@ public sealed record RekallAgeRuntimeInputState(
     IReadOnlyList<RekallAgeRuntimeXrPose>? XrPoses = null,
     IReadOnlyList<RekallAgeRuntimeXrAction>? XrActions = null,
     double ViewportWidth = 0,
-    double ViewportHeight = 0)
+    double ViewportHeight = 0,
+    IReadOnlyList<RekallAgeRuntimeSemanticActionSample>? SemanticActions = null)
 {
     public static RekallAgeRuntimeInputState Empty { get; } = new();
 }
@@ -63,7 +71,8 @@ public sealed record RekallAgeRuntimeInputFrame(
     IReadOnlyList<RekallAgeRuntimeXrPose>? XrPoses = null,
     IReadOnlyList<RekallAgeRuntimeXrAction>? XrActions = null,
     double ViewportWidth = 0,
-    double ViewportHeight = 0)
+    double ViewportHeight = 0,
+    IReadOnlyList<RekallAgeRuntimeSemanticActionSample>? SemanticActions = null)
 {
     public RekallAgeRuntimeInputState ToState()
     {
@@ -82,7 +91,8 @@ public sealed record RekallAgeRuntimeInputFrame(
             XrPoses,
             XrActions,
             ViewportWidth,
-            ViewportHeight);
+            ViewportHeight,
+            SemanticActions);
     }
 
     private static IReadOnlySet<string>? ToSet(IReadOnlyList<string>? values)

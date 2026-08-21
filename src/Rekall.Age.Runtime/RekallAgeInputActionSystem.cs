@@ -153,6 +153,17 @@ public sealed class RekallAgeInputActionSystem : IRekallAgeRuntimeWorldSystem
             }
         }
 
+        var semanticSample = input.SemanticActions?.FirstOrDefault(sample =>
+            !string.IsNullOrWhiteSpace(sample.Name)
+            && sample.Name.Trim().Equals(name.Trim(), StringComparison.Ordinal));
+        if (semanticSample is not null)
+        {
+            value = semanticSample.Value;
+            isDown = semanticSample.IsDown;
+            wasPressed = semanticSample.WasPressed;
+            wasReleased = semanticSample.WasReleased;
+        }
+
         return new RekallAgeRuntimeInputAction(
             name.Trim(),
             value,

@@ -277,7 +277,7 @@ public sealed class BuildModulesCommand
             "entity query entity transform Position3D immutable vector ComponentNumber ComponentBoolean ComponentString WithComponentNumber WithComponentBoolean WithComponentString UpdateEntity WithPosition3D runtime world";
         var recovery =
             "REKALL_RUNTIME_SDK_COMPILER_RECOVERY: Preserve the scaffolded SDK topology and repair against these exact immutable patterns:\n"
-            + "- Select one entity: var entity = world.FindEntity(\"Player\"); then null-check it; EntitiesNamed returns a list, not one entity.\n"
+            + "- Select one entity: var entity = world.FindEntity(\"Player\"); then null-check it; EntitiesNamed returns a list of case-insensitive exact-name matches, never prefix matches. Query numbered/grouped objects with EntitiesWithComponent or EntitiesWithTag.\n"
             + "- Read transform: var position = entity.Transform.Position3D;\n"
             + "- Read authored state: var value = entity.ComponentNumber(componentType, \"value\", 0); use ComponentBoolean/ComponentString for those kinds.\n"
             + "- Read authored booleans: var enabled = entity.ComponentBoolean(componentType, \"enabled\", false); Boolean helpers use bool values directly, never compare them with 0 or 1.\n"

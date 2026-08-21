@@ -237,6 +237,7 @@ public sealed class RekallAgeLanguageModelAgent(
             string? repeatedFailureRecovery = null;
             string? packageAuditRecovery = null;
             string? blueprintStructureRecovery = null;
+            string? runtimeEvidenceRecovery = null;
             foreach (var call in response.ToolCalls)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -302,8 +303,15 @@ public sealed class RekallAgeLanguageModelAgent(
                 {
                     blueprintStructureRecovery =
                         "Stop broad blueprint retries: several recent rekall.scene.apply_blueprint calls have failed. "
-                        + "Use one small flat entity repair at a time. The top-level entities field must be a native JSON array of sibling entity objects; each entity has name and a components array; each component is exactly one object containing type and optional properties together. Never nest entity name/id/tags/components inside a component or split type and properties across adjacent objects. "
+                        + "Use one small flat logical-entity repair at a time. The top-level entities field must be a native JSON array of sibling entity objects; each entity has name and a components array; each component is exactly one object containing type and optional properties together. Never nest entity name/id/tags/components inside a component or split type and properties across adjacent objects. Keep every component of the same logical object on that same logical entity: do not create separate FooTransform, FooMesh, FooCollider, or FooState sibling entities. "
                         + "For an existing entity, prefer rekall.component.add or the relevant targeted component/entity mutation when available. Re-inspect the current scene before retrying; preserve already-valid authored content.";
+                }
+                if (!succeeded
+                    && executedToolName.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
+                    && CountRecentFailedToolAttempts(toolExecutions, executedToolName) >= 3)
+                {
+                    runtimeEvidenceRecovery =
+                        "Stop runtime evidence-shape retries: several recent rekall.runtime.inspect_scene calls have failed. Do not attach or remove an unrelated component merely to satisfy evidence, weaken the requested assertion, or keep permuting fields. Repair the authored gameplay rule and its scene prerequisites from the actual failure. Keep transform, renderer, collider, and agent-owned state for one logical object on the same entity. EntitiesNamed is case-insensitive exact-name matching, never prefix matching; for numbered or grouped objects use EntitiesWithComponent, EntitiesWithTag, or EntitiesWithTagAndComponent. Then use one exact agent-owned state assertion shape: {\"entityName\":\"Player\",\"subject\":\"changed.component.property\",\"operator\":\"equals\",\"componentType\":\"Game.Modules.Rules.PlayerState\",\"propertyName\":\"Score\",\"expected\":true}. Explicitly author the initial property on that same component, repeat held input for every needed frame, and rerun only after the rule or prerequisite changed.";
                 }
                 if (!succeeded
                     && executedToolName.Equals(
@@ -367,6 +375,11 @@ public sealed class RekallAgeLanguageModelAgent(
             if (blueprintStructureRecovery is not null)
             {
                 transcript.Add(new RekallAgeLanguageModelMessage("user", blueprintStructureRecovery));
+            }
+
+            if (runtimeEvidenceRecovery is not null)
+            {
+                transcript.Add(new RekallAgeLanguageModelMessage("user", runtimeEvidenceRecovery));
             }
 
             if (request.RequireRuntimeBehaviorAssertions

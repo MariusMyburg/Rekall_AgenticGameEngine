@@ -224,7 +224,50 @@ public sealed class LanguageModelAgentTests
             message => message.Role == "user"
                 && message.Content.Contains("Stop broad blueprint retries", StringComparison.Ordinal)
                 && message.Content.Contains("top-level entities", StringComparison.Ordinal)
+                && message.Content.Contains("same logical entity", StringComparison.Ordinal)
                 && message.Content.Contains("rekall.component.add", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AgentStopsRuntimeEvidenceShapeThrashAndRedirectsToAuthoredBehavior()
+    {
+        RekallAgeLanguageModelResponse Inspect(string propertyName) => new(
+            "test", "model", "", "",
+            [new RekallAgeLanguageModelToolCall(
+                "rekall.runtime.inspect_scene",
+                new JsonObject
+                {
+                    ["frames"] = 10,
+                    ["inputs"] = new JsonArray(new JsonObject { ["pressedKeys"] = new JsonArray("D") }),
+                    ["assertions"] = new JsonArray(new JsonObject
+                    {
+                        ["entityName"] = "Player",
+                        ["subject"] = "component.property",
+                        ["operator"] = "changed.component.property",
+                        ["propertyName"] = propertyName
+                    })
+                })],
+            "tool_calls", new(1, 1, 1));
+        var model = new ScriptedModelClient(
+            Inspect("First"),
+            Inspect("Second"),
+            Inspect("Third"),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Repairing the authored rule.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new AlwaysFailsRuntimeInspectionToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task") { MaxTurns = 4 },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Contains(
+            model.Requests[3].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("Stop runtime evidence-shape retries", StringComparison.Ordinal)
+                && message.Content.Contains("Do not attach", StringComparison.Ordinal)
+                && message.Content.Contains("EntitiesWithComponent", StringComparison.Ordinal)
+                && message.Content.Contains("propertyName", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1566,6 +1609,22 @@ public sealed class LanguageModelAgentTests
             {
                 ["ok"] = false,
                 ["summary"] = "Invalid scene blueprint shape."
+            });
+    }
+
+    private sealed class AlwaysFailsRuntimeInspectionToolExecutor : IRekallAgeAgentToolExecutor
+    {
+        public IReadOnlyList<RekallAgeLanguageModelTool> Tools { get; } =
+            [new("rekall.runtime.inspect_scene", "Inspect runtime", new JsonObject { ["type"] = "object" })];
+
+        public ValueTask<JsonNode> ExecuteAsync(
+            string name,
+            JsonObject arguments,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult<JsonNode>(new JsonObject
+            {
+                ["ok"] = false,
+                ["summary"] = "Runtime inspection completed, but an authored state assertion failed."
             });
     }
 

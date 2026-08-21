@@ -12,7 +12,7 @@ public static class RekallAgeModuleHostProtocol
     public const int MaximumModules = 256;
     public const int MaximumPendingRequests = 1;
     public static TimeSpan StartupTimeout { get; } = TimeSpan.FromSeconds(10);
-    public static TimeSpan RequestTimeout { get; } = TimeSpan.FromMilliseconds(250);
+    public static TimeSpan RequestTimeout { get; } = TimeSpan.FromSeconds(1);
 }
 
 public static class RekallAgeModuleHostOperations

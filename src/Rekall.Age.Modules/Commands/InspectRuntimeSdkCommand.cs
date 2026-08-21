@@ -237,7 +237,7 @@ public sealed class InspectRuntimeSdkCommand
         nameof(RekallAgeRuntimeModuleSdk.FindEntity) =>
             "Returns the exact-id match first, otherwise the single case-insensitive exact-name match. Returns null for no match or an ambiguous duplicate name; use EntitiesNamed when names may repeat.",
         nameof(RekallAgeRuntimeModuleSdk.EntitiesNamed) =>
-            "Returns every case-insensitive exact-name match in stable entity-id order. Use this for duplicate authored names; FindEntity is the single-result id-or-unique-name helper.",
+            "Returns every case-insensitive exact-name match in stable entity-id order. This is not prefix matching: EntitiesNamed(\"EnergySeal\") does not match EnergySeal1. Use this for duplicate exact authored names; use EntitiesWithComponent, EntitiesWithTag, or EntitiesWithTagAndComponent for numbered or grouped objects. FindEntity is the single-result id-or-unique-name helper.",
         nameof(RekallAgeRuntimeModuleSdk.Raycast2D) =>
             "Returns stable distance-ordered hits against visible Rekall.BoxCollider2D and Rekall.CircleCollider2D entities, with optional tag and component filters.",
         nameof(RekallAgeRuntimeModuleSdk.Raycast3D) =>
@@ -266,7 +266,7 @@ public sealed class InspectRuntimeSdkCommand
         nameof(RekallAgeRuntimeModuleSdk.FindEntity) =>
             "var player = world.FindEntity(\"Player\"); // exact id first, then one unique exact name; null when ambiguous",
         nameof(RekallAgeRuntimeModuleSdk.EntitiesNamed) =>
-            "var doors = world.EntitiesNamed(\"Door\"); // stable collection when authored names may repeat",
+            "var doors = world.EntitiesNamed(\"Door\"); // exact name only; use EntitiesWithComponent/EntitiesWithTag for groups",
         nameof(RekallAgeRuntimeModuleSdk.UpdateComponent) =>
             "var replacement = entity.UpdateComponent(componentType, properties => { properties[\"score\"] = score; return properties; });",
         nameof(RekallAgeRuntimeModuleSdk.RemoveEntity) =>

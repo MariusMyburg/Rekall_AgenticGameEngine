@@ -41,6 +41,30 @@ public sealed class ModuleHostWindowsIsolationTests
     }
 
     [Fact]
+    public async Task RestrictedClientAllowsBoundedSchedulerJitterWithinRequestDeadline()
+    {
+        Assert.True(OperatingSystem.IsWindows());
+        var projectRoot = await CreateModuleAsync(source => source.Replace(
+            "var frame = (int)state.Numbers[\"frame\"];",
+            "System.Threading.Thread.Sleep(400); var frame = (int)state.Numbers[\"frame\"];",
+            StringComparison.Ordinal));
+        var hostRoot = await CreateRealHostPayloadAsync();
+        await using var client = await RekallAgeRestrictedModuleHostClient.StartAsync(
+            projectRoot,
+            hostRoot,
+            TestPaths.CreateTempDirectory(),
+            CancellationToken.None);
+        await client.CreatePlayableAsync(
+            new RekallAgePlayableModuleContext("Jitter", []),
+            CancellationToken.None);
+
+        var rendered = await client.RenderPlayableAsync(CancellationToken.None);
+
+        Assert.Contains("Scene Jitter", rendered.Frame.Text, StringComparison.Ordinal);
+        Assert.True(client.IsRunning);
+    }
+
+    [Fact]
     public async Task RestrictedClientTerminatesHungModuleAtRequestDeadline()
     {
         Assert.True(OperatingSystem.IsWindows());
@@ -256,9 +280,10 @@ public sealed class ModuleHostWindowsIsolationTests
         var reader = new RekallAgeModuleHostFrameCodec();
         Assert.True((await reader.ReadAsync(process.StandardOutput, CancellationToken.None)).Ok is true);
         Assert.True((await reader.ReadAsync(process.StandardOutput, CancellationToken.None)).Ok is true);
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var exitCode = await process.WaitForExitAsync(timeout.Token);
-        var standardError = await process.ReadBoundedStandardErrorAsync(timeout.Token);
+        using var exitTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var exitCode = await process.WaitForExitAsync(exitTimeout.Token);
+        using var diagnosticsTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var standardError = await process.ReadBoundedStandardErrorAsync(diagnosticsTimeout.Token);
 
         Assert.Equal(0, exitCode);
         Assert.Equal(string.Empty, standardError);
@@ -332,9 +357,10 @@ public sealed class ModuleHostWindowsIsolationTests
             responses.Add(await codec.ReadAsync(process.StandardOutput, CancellationToken.None));
         }
 
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        Assert.Equal(0, await process.WaitForExitAsync(timeout.Token));
-        var standardError = await process.ReadBoundedStandardErrorAsync(timeout.Token);
+        using var exitTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        Assert.Equal(0, await process.WaitForExitAsync(exitTimeout.Token));
+        using var diagnosticsTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var standardError = await process.ReadBoundedStandardErrorAsync(diagnosticsTimeout.Token);
         return new RestrictedWorkerResult(responses, standardError);
     }
 

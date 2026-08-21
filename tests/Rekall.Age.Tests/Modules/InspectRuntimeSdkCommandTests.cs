@@ -61,6 +61,15 @@ public sealed class InspectRuntimeSdkCommandTests
             && contract.Usage!.Contains("RegisterComponent", StringComparison.Ordinal)
             && contract.Description.Contains("every", StringComparison.OrdinalIgnoreCase));
         Assert.All(result.Value.Contracts, contract => Assert.False(string.IsNullOrWhiteSpace(contract.Signature)));
+
+        var queryResult = await new InspectRuntimeSdkCommand().ExecuteAsync(
+            new InspectRuntimeSdkRequest("entities named exact prefix component tag", Limit: 16),
+            context);
+        Assert.True(queryResult.Ok, queryResult.Summary);
+        Assert.Contains(queryResult.Value.Contracts, contract =>
+            contract.Name == "EntitiesNamed"
+            && contract.Description.Contains("not prefix", StringComparison.OrdinalIgnoreCase)
+            && contract.Description.Contains("EntitiesWithComponent", StringComparison.Ordinal));
     }
 
     [Fact]

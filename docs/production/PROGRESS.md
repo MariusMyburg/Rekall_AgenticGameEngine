@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 10:46 Africa/Johannesburg
+Last verified: 2026-08-21 11:17 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: partial blueprint repairs preserve composition; repeated
-malformed blueprint shapes receive explicit bounded recovery
+Latest milestone: logical-entity and runtime-evidence recovery is installed and
+locked; clean benchmark 44 is next
 
 ## Product objective
 
@@ -31,6 +31,43 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Clean installed real-Qwen benchmark 43 confirms malformed-blueprint recovery
+  now changes behavior, then exposes logical-entity composition and runtime
+  evidence repair as the next generic blockers. After early invalid broad calls,
+  Qwen switched to valid small blueprints and targeted entity/component tools,
+  authored and compiled a substantial delta-time movement, seal collection,
+  progress/win, and reset module, passed movement checkpoints, and produced a
+  nonblank frame with seven renderables. It nevertheless split transforms,
+  geometry, and state across sibling `FooTransform`/`FooMesh` entities; its
+  module then treated exact `EntitiesNamed("EnergySeal")` as a prefix query for
+  `EnergySeal1/2/3`. No seal transition could occur. The protected repair loop
+  spent its remaining turns permuting assertion fields and temporarily attaching
+  an unrelated seal component to the player, so AGE correctly blocked packaging
+  after 76 turns/75 tools. Two validation warnings remained. Evidence SHA-256 is
+  `88AAC1948297D6629B8B86C5853618881CECBF20F42882F7F500D105A03866BC`.
+- Blueprint and embedded-agent contracts now state that transform, render,
+  collider/body, input, and agent state for one logical runtime object belong on
+  the same entity, never separate `FooTransform`/`FooMesh` siblings.
+  `EntitiesNamed` SDK inspection and compiler recovery now explicitly state its
+  case-insensitive exact-name semantics and direct numbered/grouped queries to
+  `EntitiesWithComponent`, `EntitiesWithTag`, or their intersection. Three
+  recent failed runtime inspections trigger a bounded circuit-breaker that
+  forbids unrelated proof components and assertion weakening, supplies the
+  exact component-property assertion shape, and redirects repair to the authored
+  rule and scene prerequisites. The locked gate also exposed two load-sensitive
+  Windows AppContainer reliability issues: a 250 ms valid-request deadline was
+  too narrow under full-suite scheduling pressure, and the isolation harness
+  reused one cancellation budget for sequential process-exit and stderr-drain
+  phases. Restricted requests now allow one bounded second while the existing
+  five-second hung-module test remains fail-closed; exit and bounded diagnostic
+  collection retain independent ten-second budgets. The new jitter regression,
+  hung-module termination, and 256 KiB stderr drain/bound test passed three
+  consecutive focused runs. The final uninterrupted zero-warning/error gate
+  passed 1,021/1,021 engine and 7/7 Studio tests twice plus the complete
+  installed matrix. Its 1,186-file archive is 201,598,814 bytes with SHA-256
+  `5AA2EAD44C58C6DE78811B99EAFBC232899D3F9E7E9585468BE17B1452980430`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+  Clean installed benchmark 44 is next.
 - Clean installed real-Qwen benchmark 42 failed before meaningful state proof
   because 18 of 23 blueprint calls used invalid or unsupported structure. The
   recurring shapes nested complete entity objects inside `components`, split

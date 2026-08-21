@@ -346,6 +346,38 @@ public sealed class CaptureRuntimeViewportCommandTests
     }
 
     [Fact]
+    public async Task CaptureRuntimeViewportCommandReportsOverlappingReadableSiblingText()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["ReferenceWidth"] = 200, ["ReferenceHeight"] = 100 }));
+        var title = RekallAgeEntityDocument.Create("Title", ["ui"]) with { ParentId = canvas.Id };
+        title = title.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Label",
+            new JsonObject { ["X"] = 0, ["Y"] = 0, ["Width"] = 200, ["Height"] = 30, ["Text"] = "LUMEN VAULT" }));
+        var status = RekallAgeEntityDocument.Create("Status", ["ui"]) with { ParentId = canvas.Id };
+        status = status.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Label",
+            new JsonObject { ["X"] = 0, ["Y"] = 0, ["Width"] = 200, ["Height"] = 30, ["Text"] = "SEALS READY" }));
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["ui"]).AddEntity(canvas).AddEntity(title).AddEntity(status),
+            CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 1, Path.Combine(root, "Viewport"), 200, 100, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("ui overlap diagnostics"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains("REKALL_VIEWPORT_UI_TEXT_OVERLAP", result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.Contains(result.Value.LayoutDiagnostics.AuthoringHints, hint =>
+            hint.Contains("Title", StringComparison.Ordinal)
+            && hint.Contains("Status", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task CaptureRuntimeViewportCommandCanUseVulkanForClearOnlyRuntimeFrames()
     {
         var root = TestPaths.CreateTempDirectory();

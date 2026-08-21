@@ -24,6 +24,8 @@ public sealed record RekallAgeLanguageModelAgentRequest(string Model, string Sys
 
     public int? MaxOutputTokens { get; init; } = 8_192;
 
+    public TimeSpan? MaxTurnDuration { get; init; } = TimeSpan.FromMinutes(3);
+
     public int MaxContextMessages { get; init; } = 20;
 
     public int MaxToolResultCharacters { get; init; } = 12_000;
@@ -39,6 +41,8 @@ public sealed record RekallAgeLanguageModelAgentRequest(string Model, string Sys
     public int MaxPostRuntimeDeliveryTurns { get; init; } = 16;
 
     public int MaxPreRuntimeAuthoringMutations { get; init; } = 4;
+
+    public bool RuntimeAuthoringCheckpointSatisfied { get; init; }
 
     public IProgress<RekallAgeLanguageModelAgentProgress>? Progress { get; init; }
 
@@ -109,6 +113,7 @@ public sealed class RekallAgeLanguageModelAgent(
     IRekallAgeLanguageModelClient modelClient,
     IRekallAgeAgentToolExecutor toolExecutor)
 {
+    private const int MaximumEncodedGatewayArgumentsCharacters = 1_000_000;
     private const int MaxEncodedStructuredArgumentCharacters = 1_000_000;
 
     public async ValueTask<RekallAgeLanguageModelAgentResult> RunAsync(
@@ -125,6 +130,12 @@ public sealed class RekallAgeLanguageModelAgent(
             : null;
         int? maxOutputTokens = request.MaxOutputTokens is { } requestedMaxOutputTokens
             ? Math.Clamp(requestedMaxOutputTokens, 512, 65_536)
+            : null;
+        TimeSpan? maxTurnDuration = request.MaxTurnDuration is { } requestedMaxTurnDuration
+            ? TimeSpan.FromMilliseconds(Math.Clamp(
+                requestedMaxTurnDuration.TotalMilliseconds,
+                100,
+                TimeSpan.FromMinutes(30).TotalMilliseconds))
             : null;
         var maxRuntimeBehaviorRepairTurns = Math.Clamp(request.MaxRuntimeBehaviorRepairTurns, 0, 64);
         var maxPostRuntimeDeliveryTurns = Math.Clamp(request.MaxPostRuntimeDeliveryTurns, 0, 32);
@@ -158,18 +169,51 @@ public sealed class RekallAgeLanguageModelAgent(
                 turn,
                 "turn.started",
                 $"Running agent turn {turn} of {turnLimit}."));
-            var response = await modelClient.ChatAsync(
-                new RekallAgeLanguageModelRequest(
-                    request.Model,
-                    BuildContext(transcript, toolExecutions, maxContextMessages),
-                    toolExecutor.Tools)
+            RekallAgeLanguageModelResponse response;
+            using (var turnCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+            {
+                try
                 {
-                    Think = actionRecoveryPending ? ReduceReasoningForAction(request.Think) : request.Think,
-                    Temperature = request.Temperature,
-                    ContextWindowTokens = contextWindowTokens,
-                    MaxOutputTokens = maxOutputTokens
-                },
-                cancellationToken);
+                    var responseTask = modelClient.ChatAsync(
+                        new RekallAgeLanguageModelRequest(
+                            request.Model,
+                            BuildContext(transcript, toolExecutions, maxContextMessages),
+                            toolExecutor.Tools)
+                        {
+                            Think = actionRecoveryPending ? ReduceReasoningForAction(request.Think) : request.Think,
+                            Temperature = request.Temperature,
+                            ContextWindowTokens = contextWindowTokens,
+                            MaxOutputTokens = actionRecoveryPending
+                                ? ReduceOutputTokensForAction(maxOutputTokens)
+                                : maxOutputTokens
+                        },
+                        turnCancellation.Token).AsTask();
+                    try
+                    {
+                        response = maxTurnDuration is { } duration
+                            ? await responseTask.WaitAsync(duration, cancellationToken)
+                            : await responseTask.WaitAsync(cancellationToken);
+                    }
+                    catch (TimeoutException) when (maxTurnDuration is not null)
+                    {
+                        turnCancellation.Cancel();
+                        ObserveAbandonedTask(responseTask);
+                        throw;
+                    }
+                }
+                catch (TimeoutException) when (maxTurnDuration is not null)
+                {
+                    actionRecoveryPending = true;
+                    transcript.Add(new RekallAgeLanguageModelMessage(
+                        "user",
+                        "The previous provider turn exceeded the per-turn deadline before responding. Do not restart, repeat, or summarize reasoning. Continue from the persistent tool ledger and immediately call the single next tool that most directly advances or verifies the unfinished task."));
+                    request.Progress?.Report(new RekallAgeLanguageModelAgentProgress(
+                        turn,
+                        "turn.timeout",
+                        "The model exceeded its per-turn deadline; the next turn will use reduced reasoning and output budget to force a concrete action."));
+                    continue;
+                }
+            }
             promptTokens += response.Usage.PromptTokens;
             completionTokens += response.Usage.CompletionTokens;
             totalDuration = checked(totalDuration + response.Usage.TotalDurationNanoseconds);
@@ -224,7 +268,7 @@ public sealed class RekallAgeLanguageModelAgent(
                 }
 
                 if (request.RequireRuntimeBehaviorAssertions
-                    && RequiresRuntimeAuthoringCheckpoint(toolExecutions, maxPreRuntimeAuthoringMutations))
+                    && RequiresRuntimeAuthoringCheckpoint(toolExecutions, maxPreRuntimeAuthoringMutations, request.RuntimeAuthoringCheckpointSatisfied))
                 {
                     transcript.Add(new RekallAgeLanguageModelMessage(
                         "user",
@@ -273,7 +317,7 @@ public sealed class RekallAgeLanguageModelAgent(
                 toolCallCount++;
                 JsonNode output;
                 if (request.RequireRuntimeBehaviorAssertions
-                    && RequiresRuntimeAuthoringCheckpoint(toolExecutions, maxPreRuntimeAuthoringMutations)
+                    && RequiresRuntimeAuthoringCheckpoint(toolExecutions, maxPreRuntimeAuthoringMutations, request.RuntimeAuthoringCheckpointSatisfied)
                     && ShouldDeferUntilRuntimeAuthoring(call))
                 {
                     output = RuntimeAuthoringCheckpointRequired(call, maxPreRuntimeAuthoringMutations);
@@ -310,14 +354,15 @@ public sealed class RekallAgeLanguageModelAgent(
                         + $"\n[tool result truncated at {maxToolResultCharacters} of {outputText.Length} characters; use a narrower inspect tool if more detail is required]";
                 }
 
-                var executedToolName = CanonicalToolName(call.Name, output);
+                var effectiveCall = EffectivePolicyCall(call);
+                var executedToolName = CanonicalToolName(call, output);
                 var succeeded = output["ok"] is not JsonValue okValue
                     || !okValue.TryGetValue<bool>(out var ok)
                     || ok;
                 var execution = new RekallAgeLanguageModelToolExecution(
                     toolCallCount,
                     executedToolName,
-                    (JsonObject)call.Arguments.DeepClone(),
+                    (JsonObject)effectiveCall.Arguments.DeepClone(),
                     succeeded,
                     outputText.Length <= 1_200 ? outputText : outputText[..1_200] + "…");
                 toolExecutions.Add(execution);
@@ -356,13 +401,13 @@ public sealed class RekallAgeLanguageModelAgent(
                 transcript.Add(new RekallAgeLanguageModelMessage("tool", outputText, executedToolName));
                 if (!succeeded
                     && executedToolName.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
-                    && HasRuntimeCheckpointCoverage(call.Arguments))
+                    && HasRuntimeCheckpointCoverage(effectiveCall.Arguments))
                 {
                     failedRuntimeAssertionThisTurn = true;
                 }
                 else if (succeeded
                     && executedToolName.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
-                    && HasRuntimeCheckpointCoverage(call.Arguments))
+                    && HasRuntimeCheckpointCoverage(effectiveCall.Arguments))
                 {
                     successfulRuntimeCheckpointThisTurn = true;
                 }
@@ -412,7 +457,7 @@ public sealed class RekallAgeLanguageModelAgent(
 
             if (request.RequireRuntimeBehaviorAssertions
                 && !runtimeAuthoringCheckpointPrompted
-                && RequiresRuntimeAuthoringCheckpoint(toolExecutions, maxPreRuntimeAuthoringMutations))
+                && RequiresRuntimeAuthoringCheckpoint(toolExecutions, maxPreRuntimeAuthoringMutations, request.RuntimeAuthoringCheckpointSatisfied))
             {
                 runtimeAuthoringCheckpointPrompted = true;
                 transcript.Add(new RekallAgeLanguageModelMessage(
@@ -632,9 +677,11 @@ public sealed class RekallAgeLanguageModelAgent(
 
     private static bool RequiresRuntimeAuthoringCheckpoint(
         IReadOnlyList<RekallAgeLanguageModelToolExecution> executions,
-        int maxPreRuntimeAuthoringMutations)
+        int maxPreRuntimeAuthoringMutations,
+        bool checkpointAlreadySatisfied)
     {
-        if (maxPreRuntimeAuthoringMutations <= 0
+        if (checkpointAlreadySatisfied
+            || maxPreRuntimeAuthoringMutations <= 0
             || executions.Any(execution => execution.Succeeded
                 && (execution.Name.Equals("rekall.module.scaffold_runtime_system", StringComparison.Ordinal)
                     || execution.Name.Equals("rekall.module.write_source", StringComparison.Ordinal))))
@@ -648,12 +695,16 @@ public sealed class RekallAgeLanguageModelAgent(
 
     private static bool IsWorldAuthoringMutation(string toolName) =>
         toolName.Equals("rekall.scene.apply_blueprint", StringComparison.Ordinal)
-        || toolName.StartsWith("rekall.entity.", StringComparison.Ordinal)
-        || toolName.StartsWith("rekall.component.", StringComparison.Ordinal);
+        || toolName.Equals("rekall.entity.create", StringComparison.Ordinal)
+        || toolName.Equals("rekall.entity.delete", StringComparison.Ordinal)
+        || toolName.Equals("rekall.component.add", StringComparison.Ordinal)
+        || toolName.Equals("rekall.component.remove", StringComparison.Ordinal)
+        || toolName.Equals("rekall.component.set_property", StringComparison.Ordinal)
+        || toolName.Equals("rekall.component.remove_property", StringComparison.Ordinal);
 
     private static bool ShouldDeferUntilRuntimeAuthoring(RekallAgeLanguageModelToolCall call)
     {
-        var toolName = CanonicalPolicyToolName(call.Name);
+        var toolName = EffectivePolicyCall(call).Name;
         return !toolName.Equals("rekall.tools.search", StringComparison.Ordinal)
             && !toolName.StartsWith("rekall.context.", StringComparison.Ordinal)
             && !toolName.StartsWith("rekall.compatibility.", StringComparison.Ordinal)
@@ -697,6 +748,7 @@ public sealed class RekallAgeLanguageModelAgent(
         RekallAgeLanguageModelToolCall call,
         bool requireAgentStateTransition)
     {
+        var effectiveCall = EffectivePolicyCall(call);
         if (IsDestructiveSceneReplacement(call))
         {
             const string destructiveMessage =
@@ -716,10 +768,10 @@ public sealed class RekallAgeLanguageModelAgent(
             };
         }
 
-        var attemptedInspection = CanonicalPolicyToolName(call.Name)
+        var attemptedInspection = effectiveCall.Name
             .Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal);
-        var hasAssertions = attemptedInspection && HasNonemptyArrayArgument(call.Arguments, "assertions");
-        var coverage = EvaluateRuntimeCheckpointCoverage(call.Arguments);
+        var hasAssertions = attemptedInspection && HasNonemptyArrayArgument(effectiveCall.Arguments, "assertions");
+        var coverage = EvaluateRuntimeCheckpointCoverage(effectiveCall.Arguments);
         var missing = coverage.Missing
             .Concat(requireAgentStateTransition && !coverage.AgentStateTransition
                 ? ["changed agent-owned component property assertion for requested stateful gameplay"]
@@ -735,7 +787,7 @@ public sealed class RekallAgeLanguageModelAgent(
             : !hasAssertions
                 ? "The first executable gameplay checkpoint requires representative input frames and a non-empty assertions array."
                 : $"Runtime checkpoint coverage is incomplete. Missing: {string.Join(", ", missing)}.";
-        var candidateAgentComponentAssertion = BuildCandidateAgentComponentAssertion(call.Arguments);
+        var candidateAgentComponentAssertion = BuildCandidateAgentComponentAssertion(effectiveCall.Arguments);
         return new JsonObject
         {
             ["ok"] = false,
@@ -817,7 +869,8 @@ public sealed class RekallAgeLanguageModelAgent(
 
     private static bool ShouldDeferUntilRuntimeCheckpoint(RekallAgeLanguageModelToolCall call)
     {
-        var toolName = CanonicalPolicyToolName(call.Name);
+        var effectiveCall = EffectivePolicyCall(call);
+        var toolName = effectiveCall.Name;
         if (IsDestructiveSceneReplacement(call))
         {
             return true;
@@ -825,12 +878,12 @@ public sealed class RekallAgeLanguageModelAgent(
 
         if (toolName.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal))
         {
-            if (HasUnknownRuntimeInspectionArgument(call.Arguments))
+            if (HasUnknownRuntimeInspectionArgument(effectiveCall.Arguments))
             {
                 return false;
             }
 
-            return !HasRuntimeCheckpointCoverage(call.Arguments);
+            return !HasRuntimeCheckpointCoverage(effectiveCall.Arguments);
         }
 
         return !IsRuntimeCheckpointPreparationTool(toolName);
@@ -848,8 +901,9 @@ public sealed class RekallAgeLanguageModelAgent(
     }
 
     private static bool IsDestructiveSceneReplacement(RekallAgeLanguageModelToolCall call) =>
-        CanonicalPolicyToolName(call.Name).Equals("rekall.scene.apply_blueprint", StringComparison.Ordinal)
-        && call.Arguments["clearExisting"] is JsonValue clearExistingValue
+        EffectivePolicyCall(call) is var effectiveCall
+        && effectiveCall.Name.Equals("rekall.scene.apply_blueprint", StringComparison.Ordinal)
+        && effectiveCall.Arguments["clearExisting"] is JsonValue clearExistingValue
         && clearExistingValue.TryGetValue<bool>(out var clearExisting)
         && clearExisting;
 
@@ -869,12 +923,62 @@ public sealed class RekallAgeLanguageModelAgent(
         || toolName.Equals("rekall.module.write_source", StringComparison.Ordinal)
         || toolName.Equals("rekall.build.modules", StringComparison.Ordinal);
 
-    private static string CanonicalToolName(string attemptedName, JsonNode output) =>
+    private static string CanonicalToolName(RekallAgeLanguageModelToolCall call, JsonNode output) =>
         output["toolNameCorrection"]?["canonical"] is JsonValue canonical
         && canonical.TryGetValue<string>(out var corrected)
         && !string.IsNullOrWhiteSpace(corrected)
             ? corrected
-            : CanonicalPolicyToolName(attemptedName);
+            : EffectivePolicyCall(call).Name;
+
+    private static RekallAgeLanguageModelToolCall EffectivePolicyCall(RekallAgeLanguageModelToolCall call)
+    {
+        var canonicalName = CanonicalPolicyToolName(call.Name);
+        if (!canonicalName.Equals("rekall.tools.execute", StringComparison.Ordinal)
+            || call.Arguments["name"] is not JsonValue targetValue
+            || !targetValue.TryGetValue<string>(out var targetName)
+            || string.IsNullOrWhiteSpace(targetName))
+        {
+            return call with { Name = canonicalName };
+        }
+
+        var targetArguments = ReadEffectiveGatewayArguments(call.Arguments["arguments"]);
+        return new RekallAgeLanguageModelToolCall(
+            CanonicalPolicyToolName(targetName),
+            targetArguments);
+    }
+
+    private static JsonObject ReadEffectiveGatewayArguments(JsonNode? node)
+    {
+        if (node is JsonObject objectArguments)
+        {
+            return objectArguments;
+        }
+
+        if (node is JsonValue encoded
+            && encoded.TryGetValue<string>(out var json))
+        {
+            if (json.Length > MaximumEncodedGatewayArgumentsCharacters)
+            {
+                return new JsonObject { ["_rekallGatewayArgumentsRejected"] = "too-large" };
+            }
+
+            try
+            {
+                if (JsonNode.Parse(json) is JsonObject decoded)
+                {
+                    return decoded;
+                }
+            }
+            catch (JsonException)
+            {
+                // The gateway executor returns the bounded structured argument error.
+            }
+        }
+
+        return node is null
+            ? new JsonObject()
+            : new JsonObject { ["_rekallGatewayArgumentsRejected"] = "invalid" };
+    }
 
     private static string CanonicalPolicyToolName(string toolName) =>
         toolName.StartsWith("rekal.", StringComparison.Ordinal)
@@ -1125,6 +1229,15 @@ public sealed class RekallAgeLanguageModelAgent(
         }
     }
 
+    private static void ObserveAbandonedTask(Task task)
+    {
+        _ = task.ContinueWith(
+            static faulted => _ = faulted.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
     private static string GetString(JsonObject arguments, string name) =>
         GetArgument(arguments, name) is JsonValue value
         && value.TryGetValue<string>(out var text)
@@ -1220,6 +1333,11 @@ public sealed class RekallAgeLanguageModelAgent(
         think?.Trim().ToLowerInvariant() is "high" or "medium" or "true"
             ? "low"
             : think;
+
+    private static int? ReduceOutputTokensForAction(int? maxOutputTokens) =>
+        maxOutputTokens is { } configured
+            ? Math.Min(configured, 2_048)
+            : 2_048;
 
     private static string EffectiveToolName(
         RekallAgeLanguageModelToolCall call,

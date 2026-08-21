@@ -156,6 +156,139 @@ public sealed class RuntimeViewportAssetRenderingTests
     }
 
     [Fact]
+    public async Task SoftwareRendererProjectsWorldMeshesThroughTheAuthored3DCameraPose()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var renderable = new RekallAgeRuntimeViewportRenderable(
+            "orb",
+            "Orb",
+            "mesh",
+            "rekall.geometry.sphere",
+            0,
+            0,
+            0,
+            10,
+            Variant: "rekall.geometry.sphere",
+            MaterialColor: "#ff2200");
+        static RekallAgeRuntimeViewportFrame Frame(
+            RekallAgeRuntimeViewportRenderable item,
+            double cameraY) => new(
+                "Main",
+                0,
+                0,
+                320,
+                180,
+                new RekallAgeRuntimeViewportCamera(
+                    "camera",
+                    "Camera",
+                    "Camera3D",
+                    true,
+                    X: 0,
+                    Y: cameraY,
+                    Z: -10,
+                    FieldOfViewDegrees: 60,
+                    ClearColor: "#05070a"),
+                [],
+                [item],
+                0,
+                new RekallAgeRuntimeViewportOverlay(false, 0),
+                []);
+        var renderer = new RekallAgeRuntimeSoftwareRenderer();
+        var centeredCapture = await renderer.CaptureAsync(
+            Frame(renderable, cameraY: 0),
+            Path.Combine(root, "centered"),
+            "frame.png",
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            CancellationToken.None);
+        var elevatedCapture = await renderer.CaptureAsync(
+            Frame(renderable, cameraY: 5),
+            Path.Combine(root, "elevated"),
+            "frame.png",
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            CancellationToken.None);
+        var centered = await RekallAgePngReader.ReadRgbaAsync(centeredCapture.ScreenshotPath, CancellationToken.None);
+        var elevated = await RekallAgePngReader.ReadRgbaAsync(elevatedCapture.ScreenshotPath, CancellationToken.None);
+
+        static double RedCentroidY(RekallAgeRgbaImage image)
+        {
+            var coordinates = Enumerable.Range(0, image.Width * image.Height)
+                .Where(pixel =>
+                {
+                    var color = image.GetPixel(pixel % image.Width, pixel / image.Width);
+                    return color.R > 120 && color.G < 100 && color.B < 100;
+                })
+                .Select(pixel => pixel / image.Width)
+                .ToArray();
+            Assert.NotEmpty(coordinates);
+            return coordinates.Average();
+        }
+
+        Assert.True(
+            RedCentroidY(elevated) > RedCentroidY(centered) + 20,
+            "Raising a forward-facing camera must project the same world mesh lower in the viewport.");
+    }
+
+    [Theory]
+    [InlineData("perspective", -11)]
+    [InlineData("perspective", 1)]
+    [InlineData("orthographic", -11)]
+    [InlineData("orthographic", 1)]
+    public async Task SoftwareRendererClipsWorldMeshesOutsideTheAuthoredCameraDepthRange(
+        string projectionMode,
+        double renderableZ)
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main",
+            0,
+            0,
+            160,
+            90,
+            new RekallAgeRuntimeViewportCamera(
+                "camera",
+                "Camera",
+                "Camera3D",
+                true,
+                Z: -10,
+                ProjectionMode: projectionMode,
+                OrthographicSize: 10,
+                NearClip: 0.5,
+                FarClip: 5,
+                ClearColor: "#05070a"),
+            [],
+            [new RekallAgeRuntimeViewportRenderable(
+                "orb",
+                "Orb",
+                "mesh",
+                "rekall.geometry.sphere",
+                0,
+                0,
+                renderableZ,
+                10,
+                Variant: "rekall.geometry.sphere",
+                MaterialColor: "#ff2200")],
+            0,
+            new RekallAgeRuntimeViewportOverlay(false, 0),
+            []);
+
+        var capture = await new RekallAgeRuntimeSoftwareRenderer().CaptureAsync(
+            frame,
+            Path.Combine(root, projectionMode, renderableZ.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            "frame.png",
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            CancellationToken.None);
+        var image = await RekallAgePngReader.ReadRgbaAsync(capture.ScreenshotPath, CancellationToken.None);
+
+        Assert.DoesNotContain(
+            Enumerable.Range(0, image.Width * image.Height),
+            pixel =>
+            {
+                var color = image.GetPixel(pixel % image.Width, pixel / image.Width);
+                return color.R > 120 && color.G < 100 && color.B < 100;
+            });
+    }
+
+    [Fact]
     public async Task SoftwareRendererRecognizesPointLightRenderablesWithoutFallbackMarkers()
     {
         var root = TestPaths.CreateTempDirectory();

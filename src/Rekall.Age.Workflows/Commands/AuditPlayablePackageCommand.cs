@@ -35,7 +35,8 @@ public sealed class AuditPlayablePackageCommand
     {
         "REKALL_VIEWPORT_UI_ELEMENT_SEVERELY_CLIPPED",
         "REKALL_VIEWPORT_UI_TEXT_NOT_VISIBLE",
-        "REKALL_VIEWPORT_UI_TEXT_SEVERELY_CLIPPED"
+        "REKALL_VIEWPORT_UI_TEXT_SEVERELY_CLIPPED",
+        "REKALL_VIEWPORT_UI_TEXT_OVERLAP"
     };
 
     private static readonly string[] RequiredKeyArtifacts =

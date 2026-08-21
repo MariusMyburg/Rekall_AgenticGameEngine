@@ -552,9 +552,56 @@ public sealed class CaptureRuntimeViewportCommand
                 }
             }
         }
+
+        var textGeometry = frame.Renderables
+            .Where(item => !string.IsNullOrEmpty(item.UiVisual?.Text))
+            .Select(item => (item.EntityName, Geometry: CalculateVisibleTextGeometry(frame, item.UiVisual!)))
+            .Where(item => item.Geometry.VisibleArea > 0)
+            .ToArray();
+        for (var leftIndex = 0; leftIndex < textGeometry.Length; leftIndex++)
+        {
+            for (var rightIndex = leftIndex + 1; rightIndex < textGeometry.Length; rightIndex++)
+            {
+                var left = textGeometry[leftIndex];
+                var right = textGeometry[rightIndex];
+                var overlapWidth = IntersectionLength(
+                    left.Geometry.X,
+                    left.Geometry.X + left.Geometry.Width,
+                    right.Geometry.X,
+                    right.Geometry.X + right.Geometry.Width);
+                var overlapHeight = IntersectionLength(
+                    left.Geometry.Y,
+                    left.Geometry.Y + left.Geometry.Height,
+                    right.Geometry.Y,
+                    right.Geometry.Y + right.Geometry.Height);
+                var overlapArea = (long)overlapWidth * overlapHeight;
+                var smallerArea = Math.Min(left.Geometry.VisibleArea, right.Geometry.VisibleArea);
+                if (smallerArea == 0 || overlapArea * 5 < smallerArea)
+                {
+                    continue;
+                }
+
+                warnings.Add("REKALL_VIEWPORT_UI_TEXT_OVERLAP");
+                if (hints.Count < maximumHints)
+                {
+                    var percent = (int)Math.Round(overlapArea * 100d / smallerArea);
+                    hints.Add($"UI text on '{left.EntityName}' and '{right.EntityName}' overlaps by {percent}% of the smaller visible text area; separate their effective X/Y layouts or use a non-overlapping parent layout, then recapture.");
+                }
+            }
+        }
     }
 
     private static int CalculateVisibleTextPercent(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportUiVisual visual)
+    {
+        var geometry = CalculateVisibleTextGeometry(frame, visual);
+        return geometry.FullArea == 0
+            ? 100
+            : (int)Math.Round(geometry.VisibleArea * 100d / geometry.FullArea);
+    }
+
+    private static UiTextGeometry CalculateVisibleTextGeometry(
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeRuntimeViewportUiVisual visual)
     {
@@ -573,10 +620,17 @@ public sealed class CaptureRuntimeViewportCommand
         var visibleWidth = IntersectionLength(textX, textX + textWidth, clipLeft, clipRight);
         var visibleHeight = IntersectionLength(textY, textY + textHeight, clipTop, clipBottom);
         var textArea = (long)textWidth * textHeight;
-        var visibleArea = (long)visibleWidth * visibleHeight;
-        return textArea == 0
-            ? 100
-            : (int)Math.Round(visibleArea * 100d / textArea);
+        return new UiTextGeometry(
+            textArea,
+            Math.Max(textX, clipLeft),
+            Math.Max(textY, clipTop),
+            visibleWidth,
+            visibleHeight);
+    }
+
+    private sealed record UiTextGeometry(long FullArea, int X, int Y, int Width, int Height)
+    {
+        public long VisibleArea => (long)Width * Height;
     }
 
     private static int IntersectionLength(int start, int end, int clipStart, int clipEnd)

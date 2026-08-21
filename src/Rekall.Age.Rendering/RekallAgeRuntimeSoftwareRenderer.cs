@@ -1218,6 +1218,12 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeRuntimeViewportRenderable renderable)
     {
+        if (renderable.Kind.Equals("mesh", StringComparison.Ordinal)
+            && TryProjectWorldCenter(frame, renderable, out var projectedCenter))
+        {
+            return projectedCenter;
+        }
+
         if (renderable.Kind.Equals("mesh", StringComparison.Ordinal))
         {
             var meshX = (int)Math.Round(frame.Width / 2.0 + renderable.X * 18);
@@ -1232,6 +1238,77 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         var y = 16 + (seed / 17 + (int)Math.Round(renderable.Y * 7)) % Math.Max(1, frame.Height - 28);
         return (x, y);
     }
+
+    private static bool TryProjectWorldCenter(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable,
+        out (int X, int Y) center)
+    {
+        center = default;
+        var camera = frame.ActiveCamera;
+        if (camera is null
+            || !camera.Kind.Equals("Camera3D", StringComparison.OrdinalIgnoreCase)
+            || IsDefaultCameraPose(camera))
+        {
+            return false;
+        }
+
+        var delta = new SoftwareVec3(
+            renderable.X - camera.X,
+            renderable.Y - camera.Y,
+            renderable.Z - camera.Z);
+        var forward = Normalize(Rotate(new SoftwareVec3(0, 0, 1), camera.RotationX, camera.RotationY, camera.RotationZ));
+        var right = Normalize(Rotate(new SoftwareVec3(1, 0, 0), camera.RotationX, camera.RotationY, camera.RotationZ));
+        var up = Normalize(Rotate(new SoftwareVec3(0, 1, 0), camera.RotationX, camera.RotationY, camera.RotationZ));
+        var cameraX = Dot(delta, right);
+        var cameraY = Dot(delta, up);
+        var cameraDepth = Dot(delta, forward);
+        var rect = RekallAgeRuntimeViewportCameraRect.FromFrame(frame);
+        if (rect.Width <= 0 || rect.Height <= 0)
+        {
+            return false;
+        }
+
+        var nearClip = Math.Max(0.001, camera.NearClip);
+        var farClip = Math.Max(nearClip + 0.001, camera.FarClip);
+        if (!double.IsFinite(cameraDepth)
+            || cameraDepth <= nearClip
+            || cameraDepth > farClip)
+        {
+            center = (-1_000_000, -1_000_000);
+            return true;
+        }
+
+        double screenX;
+        double screenY;
+        if (camera.ProjectionMode.Equals("orthographic", StringComparison.OrdinalIgnoreCase))
+        {
+            var worldHeight = Math.Max(0.001, camera.OrthographicSize);
+            var pixelsPerWorldUnit = rect.Height / worldHeight;
+            screenX = rect.X + rect.Width / 2.0 + cameraX * pixelsPerWorldUnit;
+            screenY = rect.Y + rect.Height / 2.0 - cameraY * pixelsPerWorldUnit;
+        }
+        else
+        {
+            var fieldOfView = Math.Clamp(camera.FieldOfViewDegrees, 1, 179);
+            var focalLength = rect.Height / (2 * Math.Tan(DegreesToRadians(fieldOfView) / 2));
+            screenX = rect.X + rect.Width / 2.0 + cameraX * focalLength / cameraDepth;
+            screenY = rect.Y + rect.Height / 2.0 - cameraY * focalLength / cameraDepth;
+        }
+
+        center = (
+            (int)Math.Clamp(Math.Round(screenX), -1_000_000, 1_000_000),
+            (int)Math.Clamp(Math.Round(screenY), -1_000_000, 1_000_000));
+        return true;
+    }
+
+    private static bool IsDefaultCameraPose(RekallAgeRuntimeViewportCamera camera) =>
+        Math.Abs(camera.X) < 0.0001
+        && Math.Abs(camera.Y) < 0.0001
+        && Math.Abs(camera.Z) < 0.0001
+        && Math.Abs(camera.RotationX) < 0.0001
+        && Math.Abs(camera.RotationY) < 0.0001
+        && Math.Abs(camera.RotationZ) < 0.0001;
 
     private static void DrawDebugOverlay(RekallAgeRuntimeViewportFrame frame, byte[] pixels)
     {

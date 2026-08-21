@@ -15,6 +15,8 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
     private readonly HashSet<string>? _exposedTools;
     private const string SearchToolName = "rekall.tools.search";
     private const string ExecuteToolName = "rekall.tools.execute";
+    private const int MaximumDirectlyExposedTools = 24;
+    private const int MaximumEncodedGatewayArgumentsCharacters = 1_000_000;
 
     public RekallAgeMcpAgentToolExecutor(
         RekallAgeCommandRegistry registry,
@@ -44,7 +46,7 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
     public IReadOnlyList<RekallAgeLanguageModelTool> Tools => _exposedTools is null
         ? _allTools.Values.OrderBy(tool => tool.Name, StringComparer.Ordinal).ToArray()
         : _exposedTools.Select(name => _allTools[name])
-            .Concat([SearchTool])
+            .Concat([SearchTool, ExecuteTool])
             .OrderBy(tool => tool.Name, StringComparer.Ordinal)
             .ToArray();
 
@@ -243,7 +245,6 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
             : 6;
         var terms = query.Split([' ', '.', '_', '-', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var matches = _allTools.Values
-            .Where(tool => !_exposedTools!.Contains(tool.Name))
             .Select(tool => new
             {
                 Tool = tool,
@@ -256,10 +257,14 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
             .Where(item => terms.Length == 0 || item.Score > 0)
             .OrderByDescending(item => item.Score)
             .ThenBy(item => item.Tool.Name, StringComparer.Ordinal)
-            .Take(Math.Min(maxResults, Math.Max(0, 24 - _exposedTools!.Count)))
+            .Take(maxResults)
             .Select(item => item.Tool)
             .ToArray();
-        _exposedTools.UnionWith(matches.Select(tool => tool.Name));
+        var directExposureBudget = Math.Max(0, MaximumDirectlyExposedTools - _exposedTools!.Count);
+        _exposedTools.UnionWith(matches
+            .Where(tool => !_exposedTools.Contains(tool.Name))
+            .Take(directExposureBudget)
+            .Select(tool => tool.Name));
         return new JsonObject
         {
             ["ok"] = true,
@@ -269,9 +274,10 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
             {
                 ["name"] = tool.Name,
                 ["description"] = tool.Description,
-                ["parameters"] = tool.Parameters.DeepClone()
+                ["parameters"] = tool.Parameters.DeepClone(),
+                ["directlyExposed"] = _exposedTools.Contains(tool.Name)
             }).ToArray()),
-            ["instruction"] = "On the next turn, call the matched native tool directly with arguments conforming to its parameters schema. rekall.tools.execute remains available as a compatibility gateway."
+            ["instruction"] = "On the next turn, call the matched native tool directly when directlyExposed is true. When it is false, call rekall.tools.execute with that exact name and an arguments object conforming to the returned parameters schema. Search can rediscover tools throughout long sessions."
         };
     }
 
@@ -336,6 +342,22 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
         }
         if (node is JsonValue scalar && scalar.TryGetValue<string>(out var json))
         {
+            if (json.Length > MaximumEncodedGatewayArgumentsCharacters)
+            {
+                arguments = [];
+                error = new JsonObject
+                {
+                    ["ok"] = false,
+                    ["summary"] = $"rekall.tools.execute encoded arguments exceed the {MaximumEncodedGatewayArgumentsCharacters:N0}-character safety limit.",
+                    ["errors"] = new JsonArray(new JsonObject
+                    {
+                        ["code"] = "REKALL_AGENT_ARGUMENTS_TOO_LARGE",
+                        ["message"] = "Provide a smaller target-tool arguments object. Large content must use a purpose-built bounded authoring operation."
+                    })
+                };
+                return false;
+            }
+
             try
             {
                 if (JsonNode.Parse(json) is JsonObject parsed)
@@ -367,7 +389,7 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
 
     private static RekallAgeLanguageModelTool SearchTool { get; } = new(
         SearchToolName,
-        "Search Rekall AGE tool schemas by capability or task words. Matched native tools are exposed on the next turn; call them directly.",
+        "Search or rediscover Rekall AGE tool schemas by capability or task words. Results state whether to call the native tool directly or through the bounded execution gateway.",
         new JsonObject
         {
             ["type"] = "object",

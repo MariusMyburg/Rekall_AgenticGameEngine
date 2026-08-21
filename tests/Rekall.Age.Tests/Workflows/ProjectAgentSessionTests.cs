@@ -40,7 +40,8 @@ public sealed class ProjectAgentSessionTests
         registry.Register(new GauntletProofCommand());
         await CreateProjectAsync(registry, root);
 
-        var result = await new RekallAgeProjectAgentSession(new ScriptedModelClient(GauntletCall(root)), registry).RunAsync(
+        var model = new ScriptedModelClient(GauntletCall(root));
+        var result = await new RekallAgeProjectAgentSession(model, registry).RunAsync(
             new RekallAgeProjectAgentSessionRequest(root, "Main", "model", "Run the fixed proof")
             {
                 TreatGauntletAsTerminalSuccess = true
@@ -51,6 +52,8 @@ public sealed class ProjectAgentSessionTests
         Assert.True(result.Succeeded, result.Summary);
         Assert.Equal(1, result.AgentResult.Turns);
         Assert.Equal("terminal_tool_success", result.AgentResult.StopReason);
+        Assert.Equal("low", model.Requests[0].Think);
+        Assert.Equal(1_024, model.Requests[0].MaxOutputTokens);
     }
 
     [Fact]
@@ -84,6 +87,167 @@ public sealed class ProjectAgentSessionTests
         Assert.Contains((await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None)).Entities,
             entity => entity.Name == "Agent Authored");
         Assert.Contains(progress.Values, item => item.Phase == "tool.completed");
+    }
+
+    [Fact]
+    public async Task ExistingRuntimeSystemSourceSatisfiesThePreRuntimeAuthoringCheckpoint()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = CreateRegistry();
+        await CreateProjectAsync(registry, root);
+        var moduleDirectory = Path.Combine(root, "Modules", "ExistingRules");
+        Directory.CreateDirectory(moduleDirectory);
+        await File.WriteAllTextAsync(
+            Path.Combine(moduleDirectory, "ExistingRulesModule.cs"),
+            "public sealed class ExistingRulesSystem : IRekallAgeRuntimeModuleSystem { }");
+        var responses = Enumerable.Range(1, 5)
+            .Select(index => new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.entity.create", new JsonObject
+                {
+                    ["name"] = $"Revision {index}",
+                    ["tags"] = new JsonArray()
+                })],
+                "tool_calls", new(1, 1, 1)))
+            .Append(new RekallAgeLanguageModelResponse(
+                "test", "model", "Revision complete.", "", [], "stop", new(1, 1, 1)))
+            .ToArray();
+
+        var result = await new RekallAgeProjectAgentSession(new ScriptedModelClient(responses), registry).RunAsync(
+            new RekallAgeProjectAgentSessionRequest(root, "Main", "model", "Revise the existing game")
+            {
+                MaxTurns = 8,
+                RequireCompletionAudit = false
+            },
+            progress: null,
+            CancellationToken.None);
+
+        Assert.Equal(5, result.AgentResult.ToolExecutions.Count(execution => execution.Succeeded));
+        Assert.DoesNotContain(result.AgentResult.ToolExecutions, execution =>
+            execution.ResultPreview.Contains("REKALL_RUNTIME_AUTHORING_CHECKPOINT_REQUIRED", StringComparison.Ordinal));
+        var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        Assert.All(Enumerable.Range(1, 5), index =>
+            Assert.Contains(scene.Entities, entity => entity.Name == $"Revision {index}"));
+    }
+
+    [Fact]
+    public async Task CommentsAndStringLiteralsDoNotPretendToBeExistingRuntimeSystems()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = CreateRegistry();
+        await CreateProjectAsync(registry, root);
+        var moduleDirectory = Path.Combine(root, "Modules", "NotesOnly");
+        Directory.CreateDirectory(moduleDirectory);
+        await File.WriteAllTextAsync(
+            Path.Combine(moduleDirectory, "NotesOnly.cs"),
+            "// class Fake : IRekallAgeRuntimeModuleSystem { }\npublic static class Notes { public const string Text = \"IRekallAgeRuntimeModuleSystem\"; }");
+        var responses = Enumerable.Range(1, 5)
+            .Select(index => new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.entity.create", new JsonObject
+                {
+                    ["name"] = $"Revision {index}",
+                    ["tags"] = new JsonArray()
+                })],
+                "tool_calls", new(1, 1, 1)))
+            .ToArray();
+
+        var result = await new RekallAgeProjectAgentSession(new ScriptedModelClient(responses), registry).RunAsync(
+            new RekallAgeProjectAgentSessionRequest(root, "Main", "model", "Revise the game")
+            {
+                MaxTurns = 5,
+                RequireCompletionAudit = false
+            },
+            progress: null,
+            CancellationToken.None);
+
+        Assert.Equal(4, result.AgentResult.ToolExecutions.Count(execution => execution.Succeeded));
+        Assert.Contains(result.AgentResult.ToolExecutions, execution =>
+            execution.ResultPreview.Contains("REKALL_RUNTIME_AUTHORING_CHECKPOINT_REQUIRED", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("public sealed class Helper : Generic<IRekallAgeRuntimeModuleSystem> { }")]
+    [InlineData("public sealed class Helper<T> : Base where T : IRekallAgeRuntimeModuleSystem { }")]
+    public async Task IndirectRuntimeInterfaceReferencesDoNotPretendToBeRuntimeSystems(string source)
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = CreateRegistry();
+        await CreateProjectAsync(registry, root);
+        var moduleDirectory = Path.Combine(root, "Modules", "IndirectReference");
+        Directory.CreateDirectory(moduleDirectory);
+        await File.WriteAllTextAsync(Path.Combine(moduleDirectory, "IndirectReference.cs"), source);
+        var responses = Enumerable.Range(1, 5)
+            .Select(index => new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.entity.create", new JsonObject
+                {
+                    ["name"] = $"Revision {index}",
+                    ["tags"] = new JsonArray()
+                })],
+                "tool_calls", new(1, 1, 1)))
+            .ToArray();
+
+        var result = await new RekallAgeProjectAgentSession(new ScriptedModelClient(responses), registry).RunAsync(
+            new RekallAgeProjectAgentSessionRequest(root, "Main", "model", "Revise the game")
+            {
+                MaxTurns = 5,
+                RequireCompletionAudit = false
+            },
+            progress: null,
+            CancellationToken.None);
+
+        Assert.Equal(4, result.AgentResult.ToolExecutions.Count(execution => execution.Succeeded));
+        Assert.Contains(result.AgentResult.ToolExecutions, execution =>
+            execution.ResultPreview.Contains("REKALL_RUNTIME_AUTHORING_CHECKPOINT_REQUIRED", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ReparsePointModulesRootCannotSatisfyTheRuntimeAuthoringCheckpointFromOutsideTheProject()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var outside = TestPaths.CreateTempDirectory();
+        var registry = CreateRegistry();
+        await CreateProjectAsync(registry, root);
+        var outsideModule = Path.Combine(outside, "OutsideRules");
+        Directory.CreateDirectory(outsideModule);
+        await File.WriteAllTextAsync(
+            Path.Combine(outsideModule, "OutsideRules.cs"),
+            "public sealed class OutsideRules : IRekallAgeRuntimeModuleSystem { }");
+        var modulesRoot = Path.Combine(root, "Modules");
+        if (Directory.Exists(modulesRoot)) Directory.Delete(modulesRoot, recursive: true);
+        try
+        {
+            Directory.CreateSymbolicLink(modulesRoot, outside);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return;
+        }
+
+        var responses = Enumerable.Range(1, 5)
+            .Select(index => new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.entity.create", new JsonObject
+                {
+                    ["name"] = $"Revision {index}",
+                    ["tags"] = new JsonArray()
+                })],
+                "tool_calls", new(1, 1, 1)))
+            .ToArray();
+
+        var result = await new RekallAgeProjectAgentSession(new ScriptedModelClient(responses), registry).RunAsync(
+            new RekallAgeProjectAgentSessionRequest(root, "Main", "model", "Revise the game")
+            {
+                MaxTurns = 5,
+                RequireCompletionAudit = false
+            },
+            progress: null,
+            CancellationToken.None);
+
+        Assert.Equal(4, result.AgentResult.ToolExecutions.Count(execution => execution.Succeeded));
+        Assert.Contains(result.AgentResult.ToolExecutions, execution =>
+            execution.ResultPreview.Contains("REKALL_RUNTIME_AUTHORING_CHECKPOINT_REQUIRED", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -122,6 +286,42 @@ public sealed class ProjectAgentSessionTests
     }
 
     [Fact]
+    public async Task SessionSuppliesItsOwnedProjectAndSceneScopeToGatewayTargets()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = CreateRegistry();
+        await CreateProjectAsync(registry, root);
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.tools.execute", new JsonObject
+                {
+                    ["name"] = "rekall.entity.create",
+                    ["arguments"] = new JsonObject
+                    {
+                        ["name"] = "Gateway Scope Defaulted",
+                        ["tags"] = new JsonArray("agent-authored")
+                    }
+                })],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "Created in the open scene.", "", [], "stop", new(1, 1, 1)));
+
+        var result = await new RekallAgeProjectAgentSession(model, registry).RunAsync(
+            new RekallAgeProjectAgentSessionRequest(root, "Main", "model", "Add one entity")
+            {
+                MaxTurns = 2,
+                RequireCompletionAudit = false
+            },
+            progress: null,
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded, result.Summary);
+        Assert.Contains(
+            (await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None)).Entities,
+            entity => entity.Name == "Gateway Scope Defaulted");
+    }
+
+    [Fact]
     public async Task SessionRejectsToolArgumentsThatEscapeTheOpenProject()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -157,6 +357,48 @@ public sealed class ProjectAgentSessionTests
         Assert.Contains("REKALL_AGENT_PROJECT_SCOPE_VIOLATION", failed.ResultPreview, StringComparison.Ordinal);
         Assert.DoesNotContain((await new RekallAgeSceneStore().LoadAsync(outside, "Main", CancellationToken.None)).Entities,
             entity => entity.Name == "Escaped");
+    }
+
+    [Fact]
+    public async Task SessionRejectsOversizedEncodedGatewayArgumentsBeforeScopeInspection()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var outside = TestPaths.CreateTempDirectory();
+        var registry = CreateRegistry();
+        await CreateProjectAsync(registry, root);
+        await CreateProjectAsync(registry, outside);
+        var encoded = new JsonObject
+        {
+            ["projectRoot"] = outside,
+            ["sceneName"] = "Main",
+            ["name"] = "Escaped Oversized",
+            ["tags"] = new JsonArray(),
+            ["padding"] = new string('x', 1_000_001)
+        }.ToJsonString();
+        var model = new ScriptedModelClient(new RekallAgeLanguageModelResponse(
+            "test", "model", "", "",
+            [new RekallAgeLanguageModelToolCall("rekall.tools.execute", new JsonObject
+            {
+                ["name"] = "rekall.entity.create",
+                ["arguments"] = encoded
+            })],
+            "tool_calls", new(1, 1, 1)));
+
+        var result = await new RekallAgeProjectAgentSession(model, registry).RunAsync(
+            new RekallAgeProjectAgentSessionRequest(root, "Main", "model", "Try to escape")
+            {
+                MaxTurns = 1,
+                RequireCompletionAudit = false
+            },
+            progress: null,
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.AgentResult.ToolExecutions, execution =>
+            execution.ResultPreview.Contains("REKALL_AGENT_ARGUMENTS_TOO_LARGE", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            (await new RekallAgeSceneStore().LoadAsync(outside, "Main", CancellationToken.None)).Entities,
+            entity => entity.Name == "Escaped Oversized");
     }
 
     [Fact]
@@ -228,10 +470,14 @@ public sealed class ProjectAgentSessionTests
     {
         private int _index;
         public string ProviderId => "test";
+        public List<RekallAgeLanguageModelRequest> Requests { get; } = [];
         public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
             ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([new("model", 1)]);
-        public ValueTask<RekallAgeLanguageModelResponse> ChatAsync(RekallAgeLanguageModelRequest request, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(responses[Math.Min(_index++, responses.Length - 1)]);
+        public ValueTask<RekallAgeLanguageModelResponse> ChatAsync(RekallAgeLanguageModelRequest request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            return ValueTask.FromResult(responses[Math.Min(_index++, responses.Length - 1)]);
+        }
     }
 
     private sealed class RecordingProgress<T> : IProgress<T>

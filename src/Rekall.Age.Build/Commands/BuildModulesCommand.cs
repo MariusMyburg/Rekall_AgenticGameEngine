@@ -220,7 +220,13 @@ public sealed class BuildModulesCommand
                         .Select(issue => new RekallAgeCommandError(
                             "REKALL_MODULE_SDK_INTEGRITY_FAILED",
                             issue.Message,
-                            issue.Target))
+                            issue.Target,
+                            [new RekallAgeSuggestedCommand(
+                                "rekall.module.install_sdk",
+                                new Dictionary<string, object?>
+                                {
+                                    ["projectRoot"] = request.ProjectRoot
+                                })]))
                         .ToArray());
             }
         }

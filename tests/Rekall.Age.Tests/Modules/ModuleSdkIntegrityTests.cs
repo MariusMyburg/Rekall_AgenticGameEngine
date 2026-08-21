@@ -118,7 +118,13 @@ public sealed class ModuleSdkIntegrityTests
     private static void AssertSdkRejected(RekallAgeCommandResult<BuildModulesResult> result)
     {
         Assert.False(result.Ok);
-        Assert.Contains(result.Errors, error => error.Code == "REKALL_MODULE_SDK_INTEGRITY_FAILED");
+        var errors = result.Errors.Where(error => error.Code == "REKALL_MODULE_SDK_INTEGRITY_FAILED").ToArray();
+        Assert.NotEmpty(errors);
+        Assert.All(errors, error =>
+        {
+            var repair = Assert.Single(error.SuggestedCommands!, command => command.Tool == "rekall.module.install_sdk");
+            Assert.False(string.IsNullOrWhiteSpace((string)repair.Arguments["projectRoot"]!));
+        });
     }
 
     private static async Task<(string Root, string SdkRoot)> ScaffoldAsync(string moduleName)

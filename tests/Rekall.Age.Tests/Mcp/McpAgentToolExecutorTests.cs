@@ -38,7 +38,7 @@ public sealed class McpAgentToolExecutorTests
         var executor = new RekallAgeMcpAgentToolExecutor(registry, progressiveDiscovery: true);
 
         Assert.Equal(
-            ["rekall.context.engine_status", "rekall.tools.search"],
+            ["rekall.context.engine_status", "rekall.tools.execute", "rekall.tools.search"],
             executor.Tools.Select(tool => tool.Name));
 
         var result = await executor.ExecuteAsync(
@@ -64,7 +64,7 @@ public sealed class McpAgentToolExecutorTests
                 }
             },
             CancellationToken.None);
-        Assert.True(executed["ok"]!.GetValue<bool>());
+        Assert.True(executed["ok"]!.GetValue<bool>(), executed.ToJsonString());
 
         var directDiscoveredCall = await executor.ExecuteAsync(
             "rekall.project.create",
@@ -76,6 +76,40 @@ public sealed class McpAgentToolExecutorTests
             },
             CancellationToken.None);
         Assert.True(directDiscoveredCall["ok"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task ProgressiveDiscoveryCanRediscoverAndExecuteToolsAfterDirectExposureBudgetIsFull()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new GetEngineStatusCommand());
+        for (var index = 0; index < 30; index++)
+        {
+            registry.Register(new TestCommand($"rekall.test.command_{index:D2}", $"unique-capability-{index:D2}"));
+        }
+        var executor = new RekallAgeMcpAgentToolExecutor(registry, progressiveDiscovery: true);
+        for (var index = 0; index < 23; index++)
+        {
+            await executor.ExecuteAsync(
+                "rekall.tools.search",
+                new JsonObject { ["query"] = $"unique-capability-{index:D2}", ["maxResults"] = 1 },
+                CancellationToken.None);
+        }
+
+        var search = await executor.ExecuteAsync(
+            "rekall.tools.search",
+            new JsonObject { ["query"] = "unique-capability-29", ["maxResults"] = 1 },
+            CancellationToken.None);
+
+        Assert.Equal(1, search["matched"]!.GetValue<int>());
+        Assert.False(search["tools"]![0]!["directlyExposed"]!.GetValue<bool>());
+        Assert.Contains("rekall.tools.execute", search["instruction"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Contains(executor.Tools, tool => tool.Name == "rekall.tools.execute");
+        var executed = await executor.ExecuteAsync(
+            "rekall.tools.execute",
+            new JsonObject { ["name"] = "rekall.test.command_29", ["arguments"] = new JsonObject() },
+            CancellationToken.None);
+        Assert.True(executed["ok"]!.GetValue<bool>(), executed.ToJsonString());
     }
 
     [Fact]
@@ -176,6 +210,32 @@ public sealed class McpAgentToolExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteGatewayRejectsOversizedEncodedArgumentsBeforeParsing()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CreateProjectCommand());
+        var executor = new RekallAgeMcpAgentToolExecutor(registry, progressiveDiscovery: true);
+        var oversizedArguments = new JsonObject
+        {
+            ["projectRoot"] = TestPaths.CreateTempDirectory(),
+            ["name"] = "Oversized",
+            ["padding"] = new string('x', 1_000_001)
+        }.ToJsonString();
+
+        var result = await executor.ExecuteAsync(
+            "rekall.tools.execute",
+            new JsonObject
+            {
+                ["name"] = "rekall.project.create",
+                ["arguments"] = oversizedArguments
+            },
+            CancellationToken.None);
+
+        Assert.False(result["ok"]!.GetValue<bool>());
+        Assert.Contains("REKALL_AGENT_ARGUMENTS_TOO_LARGE", result.ToJsonString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task DiscoveredNativeToolAcceptsEquivalentGatewayArgumentEnvelope()
     {
         var registry = new RekallAgeCommandRegistry();
@@ -229,4 +289,19 @@ public sealed class McpAgentToolExecutorTests
             result["suggestedTools"]![0]!["name"]!.GetValue<string>());
         Assert.Contains("exact suggested name", result["instruction"]!.GetValue<string>(), StringComparison.Ordinal);
     }
+
+    private sealed class TestCommand(string name, string description)
+        : IRekallAgeCommand<TestRequest, JsonObject>
+    {
+        public string Name => name;
+
+        public RekallAgeCommandSchema Schema => new(Name, description, typeof(TestRequest).FullName!, typeof(JsonObject).FullName!);
+
+        public ValueTask<RekallAgeCommandResult<JsonObject>> ExecuteAsync(
+            TestRequest request,
+            RekallAgeCommandContext context) => ValueTask.FromResult(
+                RekallAgeCommandResult<JsonObject>.Success(new JsonObject { ["executed"] = Name }));
+    }
+
+    private sealed record TestRequest;
 }

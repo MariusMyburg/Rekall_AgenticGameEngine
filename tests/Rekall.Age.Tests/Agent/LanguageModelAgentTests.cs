@@ -47,8 +47,8 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("first runnable gameplay checkpoint", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("before visual polish", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("package audit does not prove world gameplay", prompt, StringComparison.Ordinal);
-        Assert.Contains("call the matched native tool directly", prompt, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("then call them through rekall.tools.execute", prompt, StringComparison.Ordinal);
+        Assert.Contains("native tool directly", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("when false, call rekall.tools.execute", prompt, StringComparison.Ordinal);
         Assert.Contains("Do not replace its compilable SDK types", prompt, StringComparison.Ordinal);
         Assert.Contains("not a substitute for world gameplay", prompt, StringComparison.Ordinal);
         Assert.Contains("rekall.validation.repair_project", prompt, StringComparison.Ordinal);
@@ -146,6 +146,67 @@ public sealed class LanguageModelAgentTests
         Assert.Contains(model.Requests[1].Messages, message =>
             message.Role == "user"
             && message.Content.Contains("immediately call the single next tool", StringComparison.Ordinal));
+        Assert.Equal([8_192, 2_048, 8_192], model.Requests.Select(request => request.MaxOutputTokens));
+    }
+
+    [Fact]
+    public async Task AgentRecoversTimedOutTurnWithLowReasoningAndSmallerActionBudget()
+    {
+        var model = new TimeoutThenActionModelClient();
+        var progress = new RecordingProgress<RekallAgeLanguageModelAgentProgress>();
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 3,
+                Think = "medium",
+                MaxTurnDuration = TimeSpan.FromMilliseconds(100),
+                Progress = progress
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(["medium", "low", "medium"], model.Requests.Select(request => request.Think));
+        Assert.Equal([8_192, 2_048, 8_192], model.Requests.Select(request => request.MaxOutputTokens));
+        Assert.Contains(model.Requests[1].Messages, message =>
+            message.Role == "user"
+            && message.Content.Contains("exceeded the per-turn deadline", StringComparison.Ordinal));
+        Assert.Contains(progress.Values, item => item.Phase == "turn.timeout");
+    }
+
+    [Fact]
+    public async Task AgentEnforcesTurnDeadlineWhenProviderIgnoresCancellation()
+    {
+        var model = new NonCooperativeTimeoutThenActionModelClient();
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 3,
+                MaxTurnDuration = TimeSpan.FromMilliseconds(100)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(3, model.Requests.Count);
+    }
+
+    [Fact]
+    public async Task AgentPropagatesProviderSelfCancellationAsProviderFailure()
+    {
+        var agent = new RekallAgeLanguageModelAgent(
+            new SelfCancellingModelClient(),
+            new RecordingToolExecutor());
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 2,
+                MaxTurnDuration = TimeSpan.FromSeconds(1)
+            },
+            CancellationToken.None).AsTask());
     }
 
     [Fact]
@@ -729,6 +790,50 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task RuntimeCheckpointBlocksEncodedGatewayDestructiveSceneReplacement()
+    {
+        var destructiveArguments = new JsonObject
+        {
+            ["clearExisting"] = true,
+            ["entities"] = new JsonArray(new JsonObject { ["name"] = "Player" })
+        }.ToJsonString();
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.tools.execute", new JsonObject
+                {
+                    ["name"] = "rekall.scene.apply_blueprint",
+                    ["arguments"] = destructiveArguments
+                })],
+                "tool_calls", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+
+        var result = await new RekallAgeLanguageModelAgent(model, tools).RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 3,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.DoesNotContain(tools.Executions, execution => execution.Name == "rekall.tools.execute");
+        Assert.Contains(result.ToolExecutions, execution =>
+            execution.Name == "rekall.scene.apply_blueprint"
+            && !execution.Succeeded
+            && execution.ResultPreview.Contains(
+                "REKALL_RUNTIME_CHECKPOINT_DESTRUCTIVE_REPLACEMENT_DEFERRED",
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task RuntimeCheckpointRejectsExistenceOnlyAssertionsAsInsufficientCoverage()
     {
         var model = new ScriptedModelClient(
@@ -945,6 +1050,86 @@ public sealed class LanguageModelAgentTests
         Assert.DoesNotContain(result.ToolExecutions, execution =>
             execution.Name == "rekall.runtime.inspect_scene"
             && execution.ResultPreview.Contains("REKALL_RUNTIME_", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteGatewayRuntimeInspectionQualifiesAsFreshImmediateEvidence()
+    {
+        var gatewayCheckpoint = new RekallAgeLanguageModelToolCall(
+            "rekall.tools.execute",
+            new JsonObject
+            {
+                ["name"] = "rekall.runtime.inspect_scene",
+                ["arguments"] = MeaningfulRuntimeCheckpointArguments()
+            });
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "", [gatewayCheckpoint], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Gameplay is proven.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 4,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        var inspection = Assert.Single(result.ToolExecutions, execution =>
+            execution.Name == "rekall.runtime.inspect_scene");
+        Assert.True(inspection.Succeeded);
+        Assert.True(inspection.Arguments.ContainsKey("inputs"));
+        Assert.True(inspection.Arguments.ContainsKey("assertions"));
+    }
+
+    [Fact]
+    public async Task EncodedExecuteGatewayRuntimeInspectionQualifiesAsFreshImmediateEvidence()
+    {
+        var gatewayCheckpoint = new RekallAgeLanguageModelToolCall(
+            "rekall.tools.execute",
+            new JsonObject
+            {
+                ["name"] = "rekall.runtime.inspect_scene",
+                ["arguments"] = MeaningfulRuntimeCheckpointArguments().ToJsonString()
+            });
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "", [gatewayCheckpoint], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Gameplay is proven.", "", [], "stop", new(1, 1, 1)));
+
+        var result = await new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor()).RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 4,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        var inspection = Assert.Single(result.ToolExecutions, execution =>
+            execution.Name == "rekall.runtime.inspect_scene");
+        Assert.True(inspection.Arguments.ContainsKey("inputs"));
+        Assert.True(inspection.Arguments.ContainsKey("assertions"));
     }
 
     [Fact]
@@ -1457,6 +1642,97 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task RuntimeAuthoringCheckpointDoesNotCountReadOnlyEntityInspectionAsMutation()
+    {
+        var inspect = new RekallAgeLanguageModelToolCall("rekall.entity.inspect", new JsonObject());
+        var mutate = new RekallAgeLanguageModelToolCall("rekall.scene.apply_blueprint", new JsonObject());
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [inspect], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [inspect], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [mutate], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "Done", "", [], "stop", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+
+        var result = await new RekallAgeLanguageModelAgent(model, tools).RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 4,
+                MaxPreRuntimeAuthoringMutations = 2,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(3, tools.Executions.Count);
+        Assert.All(result.ToolExecutions, execution => Assert.True(execution.Succeeded));
+    }
+
+    [Fact]
+    public async Task ArbitraryRuntimeSourceReadDoesNotSatisfyPreRuntimeAuthoringCheckpoint()
+    {
+        var read = new RekallAgeLanguageModelToolCall("rekall.module.read_source", new JsonObject());
+        var mutate = new RekallAgeLanguageModelToolCall("rekall.scene.apply_blueprint", new JsonObject());
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [read], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [mutate], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [mutate], "tool_calls", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+
+        var result = await new RekallAgeLanguageModelAgent(model, tools).RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 3,
+                MaxPreRuntimeAuthoringMutations = 1,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.False(result.Completed);
+        Assert.Equal(2, tools.Executions.Count);
+        var deferred = Assert.Single(result.ToolExecutions, execution =>
+            execution.Name == "rekall.scene.apply_blueprint" && !execution.Succeeded);
+        Assert.Contains("REKALL_RUNTIME_AUTHORING_CHECKPOINT_REQUIRED", deferred.ResultPreview, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RuntimeAuthoringPolicyEvaluatesExecuteGatewayTargetAndArguments()
+    {
+        var mutate = new RekallAgeLanguageModelToolCall("rekall.scene.apply_blueprint", new JsonObject());
+        var gatewayWrite = new RekallAgeLanguageModelToolCall(
+            "rekall.tools.execute",
+            new JsonObject
+            {
+                ["name"] = "rekall.module.write_source",
+                ["arguments"] = new JsonObject
+                {
+                    ["projectRoot"] = "game",
+                    ["moduleName"] = "Rules",
+                    ["fileName"] = "Rules.cs",
+                    ["content"] = "runtime source"
+                }
+            });
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [mutate], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [gatewayWrite], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [mutate], "tool_calls", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+
+        var result = await new RekallAgeLanguageModelAgent(model, tools).RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 3,
+                MaxPreRuntimeAuthoringMutations = 1,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.False(result.Completed);
+        Assert.Equal(3, tools.Executions.Count);
+        Assert.Contains(result.ToolExecutions, execution => execution.Name == "rekall.module.write_source" && execution.Succeeded);
+        Assert.All(result.ToolExecutions, execution => Assert.True(execution.Succeeded));
+    }
+
+    [Fact]
     public async Task NonRuntimeTaskDoesNotApplyEarlyRuntimeAuthoringCheckpoint()
     {
         var sceneCall = new RekallAgeLanguageModelToolCall("rekall.scene.apply_blueprint", new JsonObject());
@@ -1695,6 +1971,76 @@ public sealed class LanguageModelAgentTests
             Requests.Add(request);
             return ValueTask.FromResult(responses[Math.Min(_index++, responses.Length - 1)]);
         }
+    }
+
+    private sealed class TimeoutThenActionModelClient : IRekallAgeLanguageModelClient
+    {
+        private int _index;
+        public string ProviderId => "test";
+        public List<RekallAgeLanguageModelRequest> Requests { get; } = [];
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([]);
+
+        public async ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            var index = _index++;
+            if (index == 0)
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+
+            return index == 1
+                ? new RekallAgeLanguageModelResponse(
+                    "test", "model", "", "",
+                    [new RekallAgeLanguageModelToolCall("inspect", new JsonObject())],
+                    "tool_calls", new(1, 1, 1))
+                : new RekallAgeLanguageModelResponse("test", "model", "Ready", "", [], "stop", new(1, 1, 1));
+        }
+    }
+
+    private sealed class NonCooperativeTimeoutThenActionModelClient : IRekallAgeLanguageModelClient
+    {
+        private int _index;
+        public string ProviderId => "test";
+        public List<RekallAgeLanguageModelRequest> Requests { get; } = [];
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([]);
+
+        public ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            var index = _index++;
+            if (index == 0)
+            {
+                return new ValueTask<RekallAgeLanguageModelResponse>(
+                    new TaskCompletionSource<RekallAgeLanguageModelResponse>(
+                        TaskCreationOptions.RunContinuationsAsynchronously).Task);
+            }
+
+            return ValueTask.FromResult(index == 1
+                ? new RekallAgeLanguageModelResponse(
+                    "test", "model", "", "",
+                    [new RekallAgeLanguageModelToolCall("inspect", new JsonObject())],
+                    "tool_calls", new(1, 1, 1))
+                : new RekallAgeLanguageModelResponse("test", "model", "Ready", "", [], "stop", new(1, 1, 1)));
+        }
+    }
+
+    private sealed class SelfCancellingModelClient : IRekallAgeLanguageModelClient
+    {
+        public string ProviderId => "test";
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([]);
+
+        public ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromCanceled<RekallAgeLanguageModelResponse>(new CancellationToken(canceled: true));
     }
 
     private sealed class RecordingToolExecutor : IRekallAgeAgentToolExecutor

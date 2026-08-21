@@ -4,12 +4,13 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 14:30 Africa/Johannesburg
+Last verified: 2026-08-21 16:49 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: real Qwen completed the installed Lumen Vault gameplay loop;
-package audits now block severe visual-layout defects and return repair hints
+Latest milestone: real Qwen revised and delivered Lumen Vault from runtime
+visual evidence; the reviewed Studio/agent path now has fail-closed bounded
+gateway policy, project scope, provider deadlines, and camera proof
 
 ## Product objective
 
@@ -31,12 +32,7 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Acceptance benchmark queue
 
-1. Current: repair the visually weak Lumen Vault composition through the real
-   Qwen authoring loop, then show its improved proof frame and playable package.
-   The unchanged installed benchmark already completed compiled game-owned
-   behavior, semantic input, runtime state transitions, proof capture,
-   packaging, relocation, and audit; the remaining blocker is presentation.
-2. Next Studio end-to-end visual-effects class: acquire a rights-compatible
+1. Current Studio end-to-end visual-effects class: acquire a rights-compatible
    nature image from the internet with source/provenance recorded, import it
    through generic asset contracts, present it across the full player window,
    and author moving
@@ -49,8 +45,10 @@ Studio is important, but it does not define or reorder the engine foundation.
    entirely through Rekall.Age.Studio so prompt entry, tool execution, project
    mutation, play, capture, packaging, and audit prove the UI as a real consumer
    of the same portable authoring contracts.
-3. After the arbitrary described-game path is reliable, prove a complete
+2. After the arbitrary described-game path is reliable, prove a complete
    playable Pong game through the same generic contracts.
+3. Then prove a Galaga-class game entirely through Studio and broaden the 3D
+   acceptance suite through both Studio and portable MCP contracts.
 4. Platform track after the desktop authoring loop is reliable: publish games
    as static browser deployments through .NET WebAssembly and a WebGPU renderer
    backend, with ahead-of-time compiled game-authored modules and browser-native
@@ -60,6 +58,57 @@ Studio is important, but it does not define or reorder the engine foundation.
    platform.
 
 ## Verified status
+
+- Real `qwen3.8:27b` repaired and delivered the preserved benchmark-48 Lumen
+  Vault instead of replacing it. Qwen separated the three HUD rows, balanced
+  the arena across X and Z, reduced the existing player/seal scales, and
+  corrected the existing camera to `(0,24,18)` with pitch `53`, yaw `180` from
+  direct runtime evidence. The player-facing 1280x720 frame shows the player
+  and all three seals distinctly with zero clipping/overlap/layout warnings;
+  its 13,791-byte PNG has SHA-256
+  `110C402A258D4EA97B28636DB5E3B54113843971340CA34612E81A0C8702F8CC`.
+  Representative semantic horizontal and vertical input then ran 153 frames
+  and passed six strict assertions: exact agent component existence, X and Z
+  movement, collected-state change, `Collected == 3`, and `Complete == true`.
+  Project validation reported zero issues. The graphics package ran, captured,
+  passed all eight audit checks including layout integrity, and relocated with
+  121 verified files. Its 45,419,287-byte archive has SHA-256
+  `E3FF107748583A4EAA73F587CF459BD090F39D2E34AF88E320F44FC75831BEC4`.
+- The evidence-driven repair exposed and closed generic authoring/runtime
+  defects rather than hard-coding Lumen behavior. Progressive discovery keeps
+  the bounded direct tool set while allowing every command to be rediscovered
+  and executed through the permanent gateway; checkpoint policy evaluates the
+  gateway's real target and its bounded object-form or encoded arguments.
+  Encoded destructive replacement cannot evade checkpoint policy, oversized
+  encoded calls fail closed in both MCP and Studio, and gateway project/scene
+  defaults remain inside the open-project security boundary. Read-only source
+  inspection no longer counts as runtime authoring; existing direct runtime-
+  system implementations satisfy revision sessions from turn zero, while
+  comments, strings, generic arguments, constraints, and reparse-point module
+  roots do not. Stale SDK build errors return the exact install action. Provider
+  turns now have a hard wall-time bound even when a client ignores cancellation,
+  while provider self-cancellation propagates as a real failure. Project/Studio
+  Ollama sessions use measured low-reasoning 1,024-token two-minute defaults
+  while the provider-neutral agent retains broader defaults. Viewport diagnostics
+  detect severe text clipping and sibling text overlap, carry their evidence
+  through package capture, and make package layout audit fail closed. Finally,
+  the software proof renderer now projects world meshes through the authored
+  non-default `Camera3D` position, rotation, projection, FOV, viewport, and
+  near/far depth range in perspective and orthographic modes
+  instead of placing meshes from world X/Y alone; the regression failed before
+  the fix and the surrounding rendering selection passed 72/72.
+- The final changed-surface selection passed 123/123. Independent review found
+  no remaining Critical or Important issues and assessed the milestone ready
+  to merge. The locked Release build completed with zero warnings/errors. Two
+  independent passes each completed 1,056/1,056 engine and 7/7 Studio tests.
+  The assembled installed
+  distribution passed its complete acceptance matrix, including installed
+  Studio agent authoring, trust tamper rejection, package audit/relocation,
+  recovery, animation, morphing, runtime soak, atomic persistence, and document
+  revision/recovery. Its 1,186-payload archive is 201,644,796 bytes with SHA-256
+  `8D685EAD8229B2C6DD851D20A5B496901702643B94D5FCEC714704784A3A5116`.
+  The next acceptance begins with a new project and performs the entire
+  raindrops-on-glass authoring loop through Rekall.Age.Studio.
 
 - Clean installed benchmark 48 completed the unchanged Lumen Vault request with
   real `qwen3.8:27b`: 88 turns, 102 tool executions, and 17 failed calls that
@@ -2880,13 +2929,11 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
-Run Qwen against the preserved benchmark-48 Lumen Vault with the new package
-layout diagnostics and require it to repair the scene/camera/UI composition
-without weakening gameplay evidence. Show the improved proof frame and playable
-package. Then author the queued raindrops-on-glass acceptance game entirely in
-Studio and require two temporally distinct frames, package, relocation, and
-audit. Do not return to broad subsystem or CI expansion before these user-visible
-game proofs complete.
+Author the queued raindrops-on-glass acceptance game entirely in Studio and
+require two temporally distinct frames, package, relocation, and audit. Do not
+return to broad subsystem or CI expansion before this user-visible Studio game
+proof completes. Then prove Pong through portable MCP, Galaga entirely through
+Studio, and broader 3D through both paths.
 
 ## Evidence index
 

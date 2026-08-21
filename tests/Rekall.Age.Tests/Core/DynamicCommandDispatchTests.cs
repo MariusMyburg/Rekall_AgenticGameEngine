@@ -173,7 +173,7 @@ public sealed class DynamicCommandDispatchTests
                   "name":"Body",
                   "components":[
                     {"type":"Rekall.Transform3D","X":2,"Y":3},
-                    {"type":"Rekall.RigidBody3D","Type":"Dynamic","properties":{"Mass":4}},
+                    {"type":"Rekall.Rigidbody3D","Type":"Dynamic","properties":{"Mass":4}},
                     {"typeName":"Rekall.PointLight","Intensity":2},
                     {"Type":"Game.State","Properties":[
                       {"Name":"Score","Value":1},
@@ -191,7 +191,7 @@ public sealed class DynamicCommandDispatchTests
         var transform = Assert.Single(components, component => component.Type == "Rekall.Transform3D");
         Assert.Equal(2, transform.Properties["X"]!.GetValue<int>());
         Assert.Equal(3, transform.Properties["Y"]!.GetValue<int>());
-        var body = Assert.Single(components, component => component.Type == "Rekall.RigidBody3D");
+        var body = Assert.Single(components, component => component.Type == "Rekall.Rigidbody3D");
         Assert.Equal("Dynamic", body.Properties["Type"]!.GetValue<string>());
         Assert.Equal(4, body.Properties["Mass"]!.GetValue<int>());
         var light = Assert.Single(components, component => component.Type == "Rekall.PointLight");
@@ -263,6 +263,40 @@ public sealed class DynamicCommandDispatchTests
         Assert.Equal("REKALL_SCENE_BLUEPRINT_COMPONENT_TYPE_REQUIRED", error.Code);
         Assert.Equal("Main.entities[0].components[0]", error.Target);
         Assert.Empty(context.Transaction.ChangedResources);
+    }
+
+    [Fact]
+    public async Task RegistryRejectsUnknownReservedBlueprintComponentAtIndexedTarget()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new ApplySceneBlueprintCommand());
+        var arguments = new JsonObject
+        {
+            ["projectRoot"] = "unused",
+            ["sceneName"] = "Main",
+            ["entities"] = new JsonArray(new JsonObject
+            {
+                ["name"] = "Player",
+                ["components"] = new JsonArray(new JsonObject
+                {
+                    ["type"] = "Rekall.Collider3D"
+                })
+            })
+        };
+        var result = await registry.ExecuteJsonAsync(
+            "rekall.scene.apply_blueprint",
+            arguments.ToJsonString(),
+            new RekallAgeCommandContext(
+                "test",
+                RekallAgeTransaction.Begin("blueprint"),
+                CancellationToken.None));
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal("REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN", error.Code);
+        Assert.Equal("Main.entities[0].components[0]", error.Target);
+        Assert.Contains(error.SuggestedCommands!, command =>
+            command.Tool == "rekall.module.search_component_schemas");
     }
 
     [Fact]

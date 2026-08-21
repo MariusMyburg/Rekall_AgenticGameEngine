@@ -62,6 +62,52 @@ public sealed class SceneStoreTests
     }
 
     [Fact]
+    public async Task AddComponentRejectsUnknownReservedTypeWithoutPersistingIt()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"])
+            .AddEntity(RekallAgeEntityDocument.Create("Player", ["player"]));
+        await store.SaveAsync(root, scene, CancellationToken.None);
+        var command = new AddComponentCommand();
+        var context = new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("component"), CancellationToken.None);
+
+        var result = await command.ExecuteAsync(
+            new AddComponentRequest(root, "Main", scene.Entities.Single().Id, "Rekall.Collider3D"),
+            context);
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal("REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN", error.Code);
+        Assert.Equal("Rekall.Collider3D", error.Target);
+        Assert.Contains(error.SuggestedCommands!, command =>
+            command.Tool == "rekall.module.search_component_schemas");
+        var persisted = await store.LoadAsync(root, "Main", CancellationToken.None);
+        Assert.Empty(persisted.Entities.Single().Components);
+        Assert.Empty(context.Transaction.ChangedResources);
+    }
+
+    [Fact]
+    public async Task AddComponentContinuesToAcceptAgentOwnedType()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"])
+            .AddEntity(RekallAgeEntityDocument.Create("Player", ["player"]));
+        await store.SaveAsync(root, scene, CancellationToken.None);
+        var command = new AddComponentCommand();
+        var context = new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("component"), CancellationToken.None);
+
+        var result = await command.ExecuteAsync(
+            new AddComponentRequest(root, "Main", scene.Entities.Single().Id, "Game.Modules.Rules.PlayerState"),
+            context);
+
+        Assert.True(result.Ok);
+        Assert.Contains(result.Value.Scene.Entities.Single().Components, component =>
+            component.Type == "Game.Modules.Rules.PlayerState");
+    }
+
+    [Fact]
     public async Task SavedSceneDeclaresCurrentSchema()
     {
         var root = TestPaths.CreateTempDirectory();

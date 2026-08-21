@@ -4,13 +4,13 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 05:59 Africa/Johannesburg
+Last verified: 2026-08-21 06:20 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: late passing gameplay checkpoints receive a one-shot bounded
-delivery reserve; direct component mutation must now fail closed on unknown
-reserved types
+Latest milestone: every primary scene mutation fails closed on unknown reserved
+component identities; schema-aware property validation at mutation time is the
+next measured blocker
 
 ## Product objective
 
@@ -32,6 +32,28 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Fail-closed component identity authoring: one exact catalog covers all 70
+  built-in `Rekall.*` component identities and is mechanically checked against
+  the module index. Direct component adds and bulk scene blueprints reject
+  unknown reserved types before persistence, including case/whitespace variants,
+  with conservative spelling and schema-search recovery; arbitrary `Game.*`
+  components remain valid. Final validation consumes the same catalog. Focused
+  world/dispatch/validation coverage passed 62/62. The locked zero-warning/error
+  gate passed 995/995 engine and 7/7 Studio tests twice and the complete
+  installed matrix. Its 1,186-payload-file archive is 201,558,474 bytes with
+  SHA-256
+  `611E63631B6F2D8AC04554287560AA5EA3A45A4E99FF5BFA5FD415BD84B06D27`;
+  zero reusable nodes and zero run-scoped temp directories remained.
+- Clean installed real-Qwen benchmark 28 made 57/64 successful tool calls,
+  compiled the authored `GameRules` system, reached zero validation issues, and
+  produced a nonblank 960x540 viewport with eight renderables. It remained red
+  without a package: built-in component property defects were accepted during
+  initial authoring, and Qwen spent roughly 24 late calls repeatedly validating
+  and removing them one at a time before reopening an already-existing module.
+  The next generic tranche validates exact built-in property names/shapes/ranges
+  at component-add and blueprint mutation boundaries so invalid content never
+  consumes the runtime/delivery budget. Evidence SHA-256 is
+  `F8AAAEFC1569A8FE5B2F859A10F05923BA2EDD9D6F3BA2D070A9B4FB9C7A563C`.
 - Post-runtime delivery reserve: a qualifying successful runtime inspection can
   extend an agent run by at most eight delivery turns, only on the turn that
   produces the fresh evidence and only once. Early checkpoints cannot arm the

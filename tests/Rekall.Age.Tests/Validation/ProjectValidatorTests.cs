@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
+using Rekall.Age.Modules;
+using Rekall.Age.Modules.BuiltIns;
 using Rekall.Age.Validation;
 using Rekall.Age.Validation.Commands;
 using Rekall.Age.Workflows;
@@ -11,6 +13,25 @@ namespace Rekall.Age.Tests.Validation;
 
 public sealed class ProjectValidatorTests
 {
+    [Fact]
+    public void ReservedComponentTypeCatalogMatchesIndexedBuiltInSchemas()
+    {
+        var indexed = RekallAgeModuleIndexer.IndexAssembly(typeof(RekallAgeBuiltInModule).Assembly)
+            .Components.Select(component => component.TypeName)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.True(indexed.SetEquals(RekallAgeBuiltInComponentTypeCatalog.Types));
+    }
+
+    [Theory]
+    [InlineData("Rekall.Collider3D")]
+    [InlineData(" rekall.Collider3D ")]
+    public void ReservedComponentTypeCatalogRejectsUnknownTypesAcrossCaseAndWhitespace(string componentType)
+    {
+        Assert.True(RekallAgeBuiltInComponentTypeCatalog.IsUnknownReserved(componentType));
+        Assert.Equal("Rekall.BoxCollider3D", RekallAgeBuiltInComponentTypeCatalog.FindSafeSuggestion(componentType));
+    }
+
     [Fact]
     public async Task ValidateSceneRejectsAssignedShaderPipelineWithIncompatibleAbi()
     {

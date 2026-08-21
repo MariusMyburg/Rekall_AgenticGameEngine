@@ -147,6 +147,14 @@ public sealed class ApplySceneBlueprintCommand
                         "REKALL_SCENE_BLUEPRINT_COMPONENT_TYPE_REQUIRED",
                         "Every scene blueprint component requires a type.",
                         $"{entityTarget}.components[{componentIndex}]"));
+                    continue;
+                }
+
+                if (RekallAgeReservedComponentAuthoring.Validate(
+                        component.Type,
+                        $"{entityTarget}.components[{componentIndex}]") is { } reservedError)
+                {
+                    errors.Add(reservedError);
                 }
             }
         }

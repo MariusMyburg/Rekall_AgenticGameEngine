@@ -1,7 +1,6 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Rendering;
 using Rekall.Age.Modules;
-using Rekall.Age.Modules.BuiltIns;
 using Rekall.Age.World;
 using System.Globalization;
 using System.Text.Json;
@@ -14,7 +13,7 @@ public sealed class RekallAgeProjectValidator
     private static readonly string[] UiComponentTypes =
         ["Rekall.UiCanvas", "Rekall.UiElement", "Rekall.Panel", "Rekall.Label", "Rekall.Image", "Rekall.Button"];
     private static readonly IReadOnlyDictionary<string, RekallAgeComponentSchema> BuiltInComponentSchemas =
-        RekallAgeModuleIndexer.IndexAssembly(typeof(RekallAgeBuiltInModule).Assembly)
+        RekallAgeModuleIndexer.IndexAssembly(typeof(Rekall.Age.Modules.BuiltIns.RekallAgeBuiltInModule).Assembly)
             .Components.ToDictionary(component => component.TypeName, StringComparer.Ordinal);
     private static readonly IReadOnlyDictionary<string, string> UnqualifiedBuiltInAliases =
         BuiltInComponentSchemas.Keys.ToDictionary(
@@ -241,10 +240,9 @@ public sealed class RekallAgeProjectValidator
             ValidatePhysicsColliderDimensions(projectRoot, scene.Name, entity, issues);
 
             foreach (var component in entity.Components.Where(component =>
-                         component.Type.StartsWith("Rekall.", StringComparison.Ordinal)
-                         && !BuiltInComponentSchemas.ContainsKey(component.Type)))
+                         RekallAgeBuiltInComponentTypeCatalog.IsUnknownReserved(component.Type)))
             {
-                var suggestion = FindSafeReservedComponentSuggestion(component.Type);
+                var suggestion = RekallAgeBuiltInComponentTypeCatalog.FindSafeSuggestion(component.Type);
                 var suggestedCommands = suggestion is null
                     ? null
                     : new RekallAgeSuggestedCommand[]
@@ -367,27 +365,6 @@ public sealed class RekallAgeProjectValidator
                 }
             }
         }
-    }
-
-    private static string? FindSafeReservedComponentSuggestion(string componentType)
-    {
-        var finalSegment = componentType[(componentType.LastIndexOf('.') + 1)..];
-        var exactSuffixMatches = BuiltInComponentSchemas.Keys
-            .Where(type => type[(type.LastIndexOf('.') + 1)..]
-                .Equals(finalSegment, StringComparison.OrdinalIgnoreCase))
-            .Take(2)
-            .ToArray();
-        if (exactSuffixMatches.Length == 1)
-        {
-            return exactSuffixMatches[0];
-        }
-
-        var nearest = BuiltInComponentSchemas.Keys
-            .Select(type => (Type: type, Distance: EditDistance(componentType, type)))
-            .OrderBy(candidate => candidate.Distance)
-            .ThenBy(candidate => candidate.Type, StringComparer.Ordinal)
-            .First();
-        return nearest.Distance <= 3 ? nearest.Type : null;
     }
 
     private static string? ExpectedStructuredShape(RekallAgePropertySchema property) =>
@@ -662,27 +639,6 @@ public sealed class RekallAgeProjectValidator
             : schema.Minimum is not null
                 ? $">= {schema.Minimum}"
                 : $"<= {schema.Maximum}";
-    }
-
-    private static int EditDistance(string left, string right)
-    {
-        var previous = Enumerable.Range(0, right.Length + 1).ToArray();
-        for (var leftIndex = 1; leftIndex <= left.Length; leftIndex++)
-        {
-            var current = new int[right.Length + 1];
-            current[0] = leftIndex;
-            for (var rightIndex = 1; rightIndex <= right.Length; rightIndex++)
-            {
-                var substitution = left[leftIndex - 1] == right[rightIndex - 1] ? 0 : 1;
-                current[rightIndex] = Math.Min(
-                    Math.Min(current[rightIndex - 1] + 1, previous[rightIndex] + 1),
-                    previous[rightIndex - 1] + substitution);
-            }
-
-            previous = current;
-        }
-
-        return previous[right.Length];
     }
 
     private static void ValidateActiveStereoCameras(

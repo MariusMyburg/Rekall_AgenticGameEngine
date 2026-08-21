@@ -29,6 +29,14 @@ public sealed class AddComponentCommand : IRekallAgeCommand<AddComponentRequest,
         AddComponentRequest request,
         RekallAgeCommandContext context)
     {
+        if (RekallAgeReservedComponentAuthoring.Validate(request.ComponentType, request.ComponentType) is { } error)
+        {
+            return RekallAgeCommandResult<AddComponentResult>.Failure(
+                new AddComponentResult(RekallAgeSceneDocument.Create(request.SceneName, [])),
+                error.Message,
+                [error]);
+        }
+
         var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
         var scene = loaded.Value;
         var component = RekallAgeComponentDocument.Create(request.ComponentType, request.Properties ?? new JsonObject());

@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 08:15 Africa/Johannesburg
+Last verified: 2026-08-21 08:35 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: semantic input is independent of render visibility; delivery
-guidance must front-load the required playable package adapter
+Latest milestone: package-adapter ordering is front-loaded; complex delivery
+needs a larger bounded post-runtime reserve
 
 ## Product objective
 
@@ -31,6 +31,29 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Passing gameplay checkpoints now give just-in-time package ordering: when the
+  task requires a package, agents are told to scaffold the generic
+  `rekall.module.scaffold_playable` adapter before the final build, keep all
+  world gameplay in the runtime-system module, and refresh runtime proof once
+  after that build. The complete language-agent policy suite passed 31/31. The
+  locked zero-warning/error gate passed 1,010/1,010 engine and 7/7 Studio tests
+  twice and the complete installed matrix. Its 1,186-file archive is
+  201,581,919 bytes with SHA-256
+  `94A1D028DBBBC26BEE15A484DB4923ED083949BD9A2A81472D2A22895CA02B82`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+- Clean installed real-Qwen benchmark 35 proved the new ordering. After a
+  passing three-assertion gameplay checkpoint, Qwen immediately discovered and
+  scaffolded `LumenVaultPlayableShell`, built both modules, and refreshed a
+  passing runtime checkpoint. The run compiled real world gameplay with three
+  semantic actions and finished with a nonblank 960x540 Studio viewport, but
+  remained red at 45/75 successful calls with one renderable and no package or
+  audit. The exact remaining policy limit is measured: the late checkpoint at
+  turn 69 granted only eight bounded delivery turns, all consumed by adapter
+  discovery/scaffolding/build, required visual-schema discovery, one correctly
+  deferred validation, and the refreshed runtime proof at turn 77. Complex
+  packaged tasks need a larger but still bounded post-runtime delivery reserve
+  for visual repair, validation, package creation, and audit. Evidence SHA-256
+  is `00AE88F02C0C5155EE28AA59A2B5D12E990E66BC95168EB5D6CCBBF14052DFEE`.
 - Semantic input-map evaluation is now independent of an entity's visual
   `Visible` flag. Hidden configuration entities can project actions, while the
   map's explicit `Active` property remains the authoritative enable/disable

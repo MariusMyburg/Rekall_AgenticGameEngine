@@ -1031,6 +1031,13 @@ public sealed class LanguageModelAgentTests
             model.Requests[2].Messages,
             message => message.Role == "user"
                 && message.Content.Contains("protected delivery", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            model.Requests[2].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("rekall.module.scaffold_playable", StringComparison.Ordinal)
+                && message.Content.Contains("before the final build", StringComparison.OrdinalIgnoreCase)
+                && message.Content.Contains("runtime-system module", StringComparison.OrdinalIgnoreCase)
+                && message.Content.Contains("refresh runtime proof", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

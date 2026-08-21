@@ -335,7 +335,7 @@ public sealed class RekallAgeLanguageModelAgent(
                     turnLimit = extendedTurnLimit;
                     transcript.Add(new RekallAgeLanguageModelMessage(
                         "user",
-                        $"The executable gameplay checkpoint passed. You now have a protected delivery reserve through turn {turnLimit}. Validate the current project, apply only the smallest evidence-backed repairs, refresh runtime proof after any mutation, then package, capture proof, and audit the deliverable. Do not reopen broad authoring or spend this finite reserve on optional polish."));
+                        $"The executable gameplay checkpoint passed. You now have a protected delivery reserve through turn {turnLimit}. If this task requires a packaged deliverable and no compiled package-proof adapter exists, call rekall.module.scaffold_playable now, before the final build; it is only the generic deterministic package adapter, so keep all requested world gameplay in the runtime-system module. Then perform the final build and refresh runtime proof once because module changes stale the prior checkpoint. Validate the current project, apply only the smallest evidence-backed repairs, then package, capture proof, and audit the deliverable. Do not reopen broad authoring or spend this finite reserve on optional polish."));
                 }
             }
 

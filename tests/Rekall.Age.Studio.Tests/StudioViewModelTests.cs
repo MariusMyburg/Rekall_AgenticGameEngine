@@ -6,11 +6,163 @@ using Rekall.Age.Rendering;
 using Rekall.Age.Studio;
 using Rekall.Age.Workflows;
 using Rekall.Age.World;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioViewModelTests
 {
+    [Fact]
+    public async Task ViewModelExposesDistinctEditAndPersistentSimulateModes()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-mode-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview);
+            viewModel.ProjectPathInput = root;
+            viewModel.ProjectNameInput = "Mode Test";
+            viewModel.SceneNameInput = "Main";
+            await ExecuteAsync(viewModel.CreateCommand);
+
+            Assert.Equal(RekallAgeStudioMode.Edit, viewModel.Mode);
+            Assert.True(viewModel.SimulateCommand.CanExecute(null));
+
+            await ExecuteAsync(viewModel.SimulateCommand);
+            await viewModel.AdvanceLivePreviewAsync();
+
+            Assert.Equal(RekallAgeStudioMode.Simulate, viewModel.Mode);
+            Assert.True(viewModel.IsSimulating);
+            Assert.False(viewModel.PlayCommand.CanExecute(null));
+            Assert.Equal(6, viewModel.PreviewFrameIndex);
+            Assert.Equal(2, preview.ResetCount);
+            Assert.Equal(1, preview.StepCount);
+
+            await ExecuteAsync(viewModel.StopCommand);
+
+            Assert.Equal(RekallAgeStudioMode.Edit, viewModel.Mode);
+            Assert.False(viewModel.IsSimulating);
+            Assert.Equal(3, preview.ResetCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task LiveOffSuppressesAutomaticEditPreviewAndPersistentCaptureArtifacts()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-live-off-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Live Off Test",
+                SceneNameInput = "Main",
+                IsLiveViewportEnabled = false
+            };
+
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+
+            Assert.Equal(0, preview.ResetCount);
+            Assert.False(Directory.Exists(Path.Combine(root, "Artifacts", "Studio", "Viewport")));
+
+            viewModel.IsLiveViewportEnabled = true;
+            await ExecuteAsync(viewModel.AddEntityCommand);
+
+            Assert.Equal(1, preview.ResetCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ModeTransitionDisablesConflictingCommandsBeforeAwaitingPreview()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-transition-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Transition Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            preview.BlockNextReset();
+
+            var simulate = ExecuteAsync(viewModel.SimulateCommand);
+            await preview.WaitForBlockedResetAsync();
+
+            Assert.True(viewModel.IsBusy);
+            Assert.False(viewModel.PlayCommand.CanExecute(null));
+            Assert.False(viewModel.SimulateCommand.CanExecute(null));
+            Assert.False(viewModel.StopCommand.CanExecute(null));
+
+            preview.ReleaseBlockedReset();
+            await simulate;
+            Assert.Equal(RekallAgeStudioMode.Simulate, viewModel.Mode);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RepeatedDisposeAwaitsTheSameInProgressShutdown()
+    {
+        var preview = new RecordingPreviewSession();
+        preview.BlockDispose();
+        var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            new EmptyModel(),
+            preview);
+
+        var first = viewModel.DisposeAsync().AsTask();
+        await preview.WaitForDisposeAsync();
+        var second = viewModel.DisposeAsync().AsTask();
+
+        Assert.Same(first, second);
+        Assert.False(second.IsCompleted);
+
+        preview.ReleaseDispose();
+        await Task.WhenAll(first, second);
+    }
+
+    [Fact]
+    public void StudioShellRequiresSharedDarkControlsAndVisibleModeAffordances()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var app = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "App.xaml"));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+
+        Assert.Contains("Property=\"FontFamily\" Value=\"Segoe UI\"", app, StringComparison.Ordinal);
+        Assert.Contains("TargetType=\"{x:Type Button}\"", app, StringComparison.Ordinal);
+        Assert.Contains("TargetType=\"{x:Type TextBox}\"", app, StringComparison.Ordinal);
+        Assert.Contains("TargetType=\"{x:Type ComboBox}\"", app, StringComparison.Ordinal);
+        Assert.Contains("TargetType=\"{x:Type ListBox}\"", app, StringComparison.Ordinal);
+        Assert.Contains("SimulateCommand", window, StringComparison.Ordinal);
+        Assert.Contains("IsLiveViewportEnabled", window, StringComparison.Ordinal);
+        Assert.Contains("ModeLabel", window, StringComparison.Ordinal);
+    }
     [Fact]
     public void StudioRejectsLowCoverageAdvisoryAsTaskSpecificVisualProof()
     {
@@ -327,6 +479,90 @@ public sealed class StudioViewModelTests
                 [call],
                 "tool_calls",
                 new RekallAgeLanguageModelUsage(100, 10, 1)));
+        }
+    }
+
+    private sealed class RecordingPreviewSession : IRekallAgeStudioPreviewSession
+    {
+        private int _frame;
+        private TaskCompletionSource? _blockedReset;
+        private TaskCompletionSource? _resetEntered;
+        private TaskCompletionSource? _disposeBlocked;
+        private TaskCompletionSource? _disposeEntered;
+        public int ResetCount { get; private set; }
+        public int StepCount { get; private set; }
+
+        public ValueTask<RekallAgeStudioPreviewFrame> ResetAsync(
+            string projectRoot,
+            string sceneName,
+            int width,
+            int height,
+            CancellationToken cancellationToken)
+        {
+            ResetCount++;
+            _frame = 0;
+            _resetEntered?.TrySetResult();
+            return _blockedReset is null
+                ? ValueTask.FromResult(CreateFrame(_frame))
+                : AwaitBlockedResetAsync(_blockedReset, cancellationToken);
+        }
+
+        public ValueTask<RekallAgeStudioPreviewFrame> StepAsync(int frameCount, CancellationToken cancellationToken)
+        {
+            StepCount++;
+            _frame += frameCount;
+            return ValueTask.FromResult(CreateFrame(_frame));
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            _disposeEntered?.TrySetResult();
+            return _disposeBlocked is null ? ValueTask.CompletedTask : new ValueTask(_disposeBlocked.Task);
+        }
+
+        public ValueTask ClearAsync(CancellationToken cancellationToken)
+        {
+            _frame = 0;
+            return ValueTask.CompletedTask;
+        }
+
+        public void BlockNextReset()
+        {
+            _blockedReset = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _resetEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        public Task WaitForBlockedResetAsync() => _resetEntered?.Task.WaitAsync(TimeSpan.FromSeconds(5))
+            ?? Task.CompletedTask;
+
+        public void ReleaseBlockedReset() => _blockedReset?.TrySetResult();
+
+        public void BlockDispose()
+        {
+            _disposeBlocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _disposeEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        public Task WaitForDisposeAsync() => _disposeEntered?.Task.WaitAsync(TimeSpan.FromSeconds(5))
+            ?? Task.CompletedTask;
+
+        public void ReleaseDispose() => _disposeBlocked?.TrySetResult();
+
+        private async ValueTask<RekallAgeStudioPreviewFrame> AwaitBlockedResetAsync(
+            TaskCompletionSource blockedReset,
+            CancellationToken cancellationToken)
+        {
+            await blockedReset.Task.WaitAsync(cancellationToken);
+            _blockedReset = null;
+            return CreateFrame(_frame);
+        }
+
+        private static RekallAgeStudioPreviewFrame CreateFrame(int frame)
+        {
+            var image = BitmapSource.Create(
+                1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[4], 4);
+            image.Freeze();
+            return new RekallAgeStudioPreviewFrame(image, frame, 0, 0, "software-live");
         }
     }
 

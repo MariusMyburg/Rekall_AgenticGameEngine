@@ -18,11 +18,22 @@ using Rekall.Age.Workflows.Commands;
 
 namespace Rekall.Age.Studio;
 
+public enum RekallAgeStudioMode
+{
+    Edit,
+    Simulate,
+    Play
+}
+
 public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDisposable
 {
     private readonly RekallAgeWorkbenchSession _session;
     private readonly HttpClient? _ollamaHttpClient;
     private readonly RekallAgeProjectAgentSession _agentSession;
+    private readonly IRekallAgeStudioPreviewSession _previewSession;
+    private readonly SemaphoreSlim _modeTransitionGate = new(1, 1);
+    private readonly CancellationTokenSource _lifecycleCancellation = new();
+    private readonly object _disposeSync = new();
     private readonly RekallAgeAsyncCommand _openCommand;
     private readonly RekallAgeAsyncCommand _createCommand;
     private readonly RekallAgeAsyncCommand _addEntityCommand;
@@ -33,6 +44,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _validateCommand;
     private readonly RekallAgeAsyncCommand _captureCommand;
     private readonly RekallAgeAsyncCommand _playCommand;
+    private readonly RekallAgeAsyncCommand _simulateCommand;
     private readonly RekallAgeAsyncCommand _stopCommand;
     private readonly RekallAgeAsyncCommand _switchSceneCommand;
     private readonly RekallAgeAsyncCommand _packageCommand;
@@ -46,6 +58,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private CancellationTokenSource? _agentCancellation;
     private bool _isBusy;
     private bool _isAgentRunning;
+    private bool _isLiveViewportEnabled = true;
+    private Task? _disposeTask;
+    private int _previewAdvancing;
+    private int _previewFrameIndex;
+    private RekallAgeStudioMode _mode;
     private string _projectPathInput = string.Empty;
     private string _projectNameInput = "New Rekall Game";
     private string _sceneNameInput = "Main";
@@ -59,7 +76,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _statusText = "Create or open a Rekall AGE project to begin.";
     private string _viewportTitle = "Viewport";
     private string _viewportSummary = "No rendered frame yet.";
-    private BitmapImage? _viewportImage;
+    private BitmapSource? _viewportImage;
     private int _viewportRenderableCount;
     private bool _viewportVisuallyInformative;
     private RekallAgeWorkbenchModel? _currentModel;
@@ -81,8 +98,17 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     internal RekallAgeStudioViewModel(
         RekallAgeWorkbenchSession session,
         IRekallAgeLanguageModelClient? languageModelClient)
+        : this(session, languageModelClient, new RekallAgeStudioPreviewSession())
+    {
+    }
+
+    internal RekallAgeStudioViewModel(
+        RekallAgeWorkbenchSession session,
+        IRekallAgeLanguageModelClient? languageModelClient,
+        IRekallAgeStudioPreviewSession previewSession)
     {
         _session = session;
+        _previewSession = previewSession;
         if (languageModelClient is null)
         {
             _ollamaHttpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
@@ -94,20 +120,21 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _agentSession = new RekallAgeProjectAgentSession(languageModelClient, RekallAgeDefaultCommandRegistry.Create());
         _openCommand = CreateAsyncCommand(OpenFromInputsAsync, CanOpenOrCreate);
         _createCommand = CreateAsyncCommand(CreateFromInputsAsync, CanOpenOrCreate);
-        _addEntityCommand = CreateAsyncCommand(AddEntityAsync, HasOpenProject);
+        _addEntityCommand = CreateAsyncCommand(AddEntityAsync, HasEditableProject);
         _addComponentCommand = CreateAsyncCommand(AddComponentAsync, CanEditComponent);
         _removeComponentCommand = CreateAsyncCommand(RemoveComponentAsync, CanEditComponent);
         _setPropertyCommand = CreateAsyncCommand(SetPropertyAsync, CanEditProperty);
         _removePropertyCommand = CreateAsyncCommand(RemovePropertyAsync, CanEditProperty);
         _validateCommand = CreateAsyncCommand(ValidateAsync, HasOpenProject);
-        _captureCommand = CreateAsyncCommand(CaptureAsync, HasOpenProject);
-        _playCommand = CreateAsyncCommand(PlayAsync, () => HasOpenProject() && !IsPlaying);
-        _stopCommand = CreateAsyncCommand(StopAsync, () => IsPlaying);
+        _captureCommand = CreateAsyncCommand(CaptureAsync, HasEditableProject);
+        _simulateCommand = CreateAsyncCommand(StartSimulationAsync, () => HasOpenProject() && Mode == RekallAgeStudioMode.Edit);
+        _playCommand = CreateAsyncCommand(PlayAsync, () => HasOpenProject() && Mode == RekallAgeStudioMode.Edit);
+        _stopCommand = CreateAsyncCommand(StopAsync, () => !IsBusy && Mode != RekallAgeStudioMode.Edit);
         _switchSceneCommand = CreateAsyncCommand(SwitchSceneAsync, CanSwitchScene);
         _packageCommand = CreateAsyncCommand(PackageAsync, HasOpenProject);
         _auditPackageCommand = CreateAsyncCommand(AuditPackageAsync, CanAuditPackage);
-        _undoCommand = CreateAsyncCommand(UndoAsync, () => HasOpenProject() && _session.CanUndo);
-        _redoCommand = CreateAsyncCommand(RedoAsync, () => HasOpenProject() && _session.CanRedo);
+        _undoCommand = CreateAsyncCommand(UndoAsync, () => HasEditableProject() && _session.CanUndo);
+        _redoCommand = CreateAsyncCommand(RedoAsync, () => HasEditableProject() && _session.CanRedo);
         _discoverModelsCommand = CreateAsyncCommand(DiscoverModelsAsync, () => !IsBusy && !IsAgentRunning);
         _runAgentCommand = CreateAsyncCommand(RunAgentAsync, CanRunAgent);
         _cancelAgentCommand = CreateAsyncCommand(CancelAgentAsync, () => IsAgentRunning);
@@ -141,6 +168,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand RemovePropertyCommand => _removePropertyCommand;
     public ICommand ValidateCommand => _validateCommand;
     public ICommand CaptureCommand => _captureCommand;
+    public ICommand SimulateCommand => _simulateCommand;
     public ICommand PlayCommand => _playCommand;
     public ICommand StopCommand => _stopCommand;
     public ICommand SwitchSceneCommand => _switchSceneCommand;
@@ -262,7 +290,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         private set => Set(ref _viewportSummary, value);
     }
 
-    public BitmapImage? ViewportImage
+    public BitmapSource? ViewportImage
     {
         get => _viewportImage;
         private set => Set(ref _viewportImage, value);
@@ -289,7 +317,40 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
-    public bool IsPlaying => _player is { HasExited: false };
+    public RekallAgeStudioMode Mode
+    {
+        get => _mode;
+        private set
+        {
+            if (!Set(ref _mode, value)) return;
+            OnPropertyChanged(nameof(ModeLabel));
+            OnPropertyChanged(nameof(IsPlaying));
+            OnPropertyChanged(nameof(IsSimulating));
+            RefreshCommands();
+        }
+    }
+
+    public string ModeLabel => Mode switch
+    {
+        RekallAgeStudioMode.Simulate => "SIMULATE",
+        RekallAgeStudioMode.Play => "PLAY",
+        _ => "EDIT"
+    };
+
+    public bool IsPlaying => Mode == RekallAgeStudioMode.Play && _player is { HasExited: false };
+    public bool IsSimulating => Mode == RekallAgeStudioMode.Simulate;
+
+    public bool IsLiveViewportEnabled
+    {
+        get => _isLiveViewportEnabled;
+        set => Set(ref _isLiveViewportEnabled, value);
+    }
+
+    public int PreviewFrameIndex
+    {
+        get => _previewFrameIndex;
+        private set => Set(ref _previewFrameIndex, value);
+    }
 
     public bool IsAgentRunning
     {
@@ -305,7 +366,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (string.IsNullOrWhiteSpace(projectRoot)) return;
         ProjectPathInput = projectRoot;
         SceneNameInput = sceneName;
-        await RunAsync(() => _session.OpenAsync(projectRoot, sceneName, CancellationToken.None).AsTask(), captureAfter: true);
+        await RunAsync(() => _session.OpenAsync(projectRoot, sceneName, CancellationToken.None).AsTask(), refreshPreviewAfter: true);
     }
 
     public async Task SelectEntityAsync(RekallAgeSceneEntityNode entity)
@@ -314,25 +375,39 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         await RunAsync(() => _session.SelectEntityAsync(entity.EntityId, CancellationToken.None).AsTask());
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        _agentCancellation?.Cancel();
-        await StopAsync();
-        _agentCancellation?.Dispose();
-        _ollamaHttpClient?.Dispose();
+        lock (_disposeSync)
+        {
+            _disposeTask ??= DisposeCoreAsync();
+            return new ValueTask(_disposeTask);
+        }
     }
 
-    private bool CanOpenOrCreate() => !IsBusy && !string.IsNullOrWhiteSpace(ProjectPathInput);
+    private async Task DisposeCoreAsync()
+    {
+        _lifecycleCancellation.Cancel();
+        _agentCancellation?.Cancel();
+        await StopCoreAsync(resetEditPreview: false, CancellationToken.None);
+        await _previewSession.DisposeAsync();
+        _agentCancellation?.Dispose();
+        _ollamaHttpClient?.Dispose();
+        _lifecycleCancellation.Dispose();
+        _modeTransitionGate.Dispose();
+    }
+
+    private bool CanOpenOrCreate() => !IsBusy && Mode == RekallAgeStudioMode.Edit && !string.IsNullOrWhiteSpace(ProjectPathInput);
     private bool HasOpenProject() => !IsBusy && _session.Model is not null;
-    private bool CanEditComponent() => HasOpenProject()
+    private bool HasEditableProject() => HasOpenProject() && Mode == RekallAgeStudioMode.Edit;
+    private bool CanEditComponent() => HasEditableProject()
         && _session.SelectedEntityId is not null
         && !string.IsNullOrWhiteSpace(ComponentTypeInput);
     private bool CanEditProperty() => CanEditComponent() && !string.IsNullOrWhiteSpace(PropertyNameInput);
-    private bool CanRunAgent() => HasOpenProject()
+    private bool CanRunAgent() => HasEditableProject()
         && !IsAgentRunning
         && !string.IsNullOrWhiteSpace(SelectedOllamaModel)
         && !string.IsNullOrWhiteSpace(AgentTaskInput);
-    private bool CanSwitchScene() => HasOpenProject()
+    private bool CanSwitchScene() => HasEditableProject()
         && !string.IsNullOrWhiteSpace(SceneNameInput)
         && !_session.SceneName!.Equals(SceneNameInput.Trim(), StringComparison.Ordinal);
     private bool CanAuditPackage() => HasOpenProject()
@@ -341,7 +416,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private Task OpenFromInputsAsync() => RunAsync(
         () => _session.OpenAsync(ProjectPathInput, NormalizeSceneName(), CancellationToken.None).AsTask(),
-        captureAfter: true);
+        refreshPreviewAfter: true);
 
     private Task CreateFromInputsAsync() => RunAsync(
         () => _session.CreateProjectAsync(
@@ -351,19 +426,20 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             ["world", "rendering2d", "rendering3d", "input", "audio", "ui", "animation", "physics", "modules"],
             ["world", "rendering2d", "rendering3d", "input", "audio", "ui", "animation", "physics"],
             "studio",
-            CancellationToken.None).AsTask());
+            CancellationToken.None).AsTask(),
+        refreshPreviewAfter: true);
 
     private Task SwitchSceneAsync() => RunAsync(
         () => _session.OpenSceneAsync(NormalizeSceneName(), CancellationToken.None).AsTask(),
-        captureAfter: true);
+        refreshPreviewAfter: true);
 
     private Task UndoAsync() => RunAsync(
         () => _session.UndoAsync("studio", CancellationToken.None).AsTask(),
-        captureAfter: true);
+        refreshPreviewAfter: true);
 
     private Task RedoAsync() => RunAsync(
         () => _session.RedoAsync("studio", CancellationToken.None).AsTask(),
-        captureAfter: true);
+        refreshPreviewAfter: true);
 
     private Task AddEntityAsync()
     {
@@ -379,7 +455,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             }),
             $"Create {name}",
             "studio",
-            CancellationToken.None).AsTask(), captureAfter: true);
+            CancellationToken.None).AsTask(), refreshPreviewAfter: true);
     }
 
     private Task AddComponentAsync() => ExecuteComponentCommandAsync(
@@ -440,7 +516,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             JsonSerializer.Serialize(arguments),
             transactionName,
             "studio",
-            CancellationToken.None).AsTask(), captureAfter: true);
+            CancellationToken.None).AsTask(), refreshPreviewAfter: true);
 
     private Task ValidateAsync() => RunAsync(() => _session.ExecuteAsync(
         "rekall.validation.scene",
@@ -655,51 +731,177 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             "REKALL_VIEWPORT_LOW_VISUAL_COVERAGE",
             StringComparer.Ordinal);
 
+    private async Task StartSimulationAsync()
+    {
+        if (_session.ProjectRoot is null || _session.SceneName is null) return;
+        IsBusy = true;
+        var transitionEntered = false;
+        try
+        {
+            await _modeTransitionGate.WaitAsync(_lifecycleCancellation.Token);
+            transitionEntered = true;
+            var frame = await _previewSession.ResetAsync(
+                _session.ProjectRoot,
+                _session.SceneName,
+                960,
+                540,
+                _lifecycleCancellation.Token);
+            ApplyPreviewFrame(frame);
+            Mode = RekallAgeStudioMode.Simulate;
+            StatusText = $"Simulating {_session.SceneName} in the live Studio viewport.";
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (transitionEntered) _modeTransitionGate.Release();
+            IsBusy = false;
+        }
+    }
+
+    internal async Task AdvanceLivePreviewAsync()
+    {
+        if (!IsBusy && Mode == RekallAgeStudioMode.Play && _player is { HasExited: true })
+        {
+            _player.Dispose();
+            _player = null;
+            Mode = RekallAgeStudioMode.Edit;
+            StatusText = "Player exited; returned to Edit mode.";
+            if (IsLiveViewportEnabled)
+            {
+                await RefreshEditPreviewAsync(StatusText);
+            }
+        }
+        if (!IsSimulating || !IsLiveViewportEnabled || IsBusy
+            || Interlocked.Exchange(ref _previewAdvancing, 1) != 0)
+        {
+            return;
+        }
+        try
+        {
+            ApplyPreviewFrame(await _previewSession.StepAsync(6, _lifecycleCancellation.Token));
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException or ArgumentException)
+        {
+            Mode = RekallAgeStudioMode.Edit;
+            StatusText = $"Live simulation stopped: {exception.Message}";
+            Replace(ValidationLines, [$"error: REKALL_STUDIO_PREVIEW_FAILED - {exception.Message}"]);
+        }
+        finally
+        {
+            Volatile.Write(ref _previewAdvancing, 0);
+        }
+    }
+
+    private void ApplyPreviewFrame(RekallAgeStudioPreviewFrame frame)
+    {
+        ViewportImage = frame.Image;
+        PreviewFrameIndex = frame.FrameIndex;
+        ViewportRenderableCount = frame.RenderableCount;
+        ViewportSummary = $"{frame.Image.PixelWidth}×{frame.Image.PixelHeight} · frame {frame.FrameIndex} · "
+            + $"{frame.RenderableCount} renderables · {frame.ObservationCount} observations · live preview";
+    }
+
     private async Task PlayAsync()
     {
         if (_session.ProjectRoot is null || _session.SceneName is null) return;
-        var executable = ResolvePlayerExecutable();
-        if (executable is null)
-        {
-            StatusText = "Player executable was not found. Build or install Rekall.Age.Player.Windows.";
-            return;
-        }
-
-        var startInfo = new ProcessStartInfo(executable) { UseShellExecute = false };
-        startInfo.ArgumentList.Add(_session.ProjectRoot);
-        startInfo.ArgumentList.Add(_session.SceneName);
-        startInfo.ArgumentList.Add("--graphics");
-        startInfo.ArgumentList.Add("--backend");
-        startInfo.ArgumentList.Add("vulkan");
-        _player = Process.Start(startInfo);
-        StatusText = _player is null ? "Player could not be started." : $"Playing {_session.SceneName}.";
-        OnPropertyChanged(nameof(IsPlaying));
-        RefreshCommands();
-        await Task.CompletedTask;
-    }
-
-    private async Task StopAsync()
-    {
-        if (_player is null) return;
+        IsBusy = true;
+        var transitionEntered = false;
         try
         {
-            if (!_player.HasExited)
+            await _modeTransitionGate.WaitAsync(_lifecycleCancellation.Token);
+            transitionEntered = true;
+            await _previewSession.ClearAsync(_lifecycleCancellation.Token);
+            var executable = ResolvePlayerExecutable();
+            if (executable is null)
             {
-                _player.Kill(entireProcessTree: true);
-                await _player.WaitForExitAsync();
+                StatusText = "Player executable was not found. Build or install Rekall.Age.Player.Windows.";
+                return;
+            }
+
+            var startInfo = new ProcessStartInfo(executable) { UseShellExecute = false };
+            startInfo.ArgumentList.Add(_session.ProjectRoot);
+            startInfo.ArgumentList.Add(_session.SceneName);
+            startInfo.ArgumentList.Add("--graphics");
+            startInfo.ArgumentList.Add("--backend");
+            startInfo.ArgumentList.Add("vulkan");
+            _player = Process.Start(startInfo);
+            if (_player is null)
+            {
+                StatusText = "Player could not be started.";
+                return;
+            }
+            Mode = RekallAgeStudioMode.Play;
+            StatusText = $"Playing {_session.SceneName} in the production Player window.";
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (transitionEntered) _modeTransitionGate.Release();
+            IsBusy = false;
+        }
+    }
+
+    private Task StopAsync() => StopCoreAsync(resetEditPreview: true, _lifecycleCancellation.Token);
+
+    private async Task StopCoreAsync(bool resetEditPreview, CancellationToken cancellationToken)
+    {
+        IsBusy = true;
+        var transitionEntered = false;
+        try
+        {
+            await _modeTransitionGate.WaitAsync(cancellationToken);
+            transitionEntered = true;
+            if (Mode == RekallAgeStudioMode.Simulate)
+            {
+                Mode = RekallAgeStudioMode.Edit;
+                if (resetEditPreview && _session.ProjectRoot is not null && _session.SceneName is not null)
+                {
+                    ApplyPreviewFrame(await _previewSession.ResetAsync(
+                        _session.ProjectRoot,
+                        _session.SceneName,
+                        960,
+                        540,
+                        cancellationToken));
+                }
+                StatusText = "Simulation stopped; authored scene state is unchanged.";
+                return;
+            }
+            if (_player is null)
+            {
+                Mode = RekallAgeStudioMode.Edit;
+                return;
+            }
+            try
+            {
+                if (!_player.HasExited)
+                {
+                    _player.Kill(entireProcessTree: true);
+                    await _player.WaitForExitAsync(cancellationToken);
+                }
+            }
+            finally
+            {
+                _player.Dispose();
+                _player = null;
+                Mode = RekallAgeStudioMode.Edit;
+                StatusText = "Play mode stopped; returned to Edit mode.";
             }
         }
         finally
         {
-            _player.Dispose();
-            _player = null;
-            StatusText = "Play mode stopped.";
-            OnPropertyChanged(nameof(IsPlaying));
-            RefreshCommands();
+            if (transitionEntered) _modeTransitionGate.Release();
+            IsBusy = false;
         }
     }
 
-    private async Task RunAsync(Func<Task<RekallAgeWorkbenchOperationResult>> operation, bool captureAfter = false)
+    private async Task RunAsync(Func<Task<RekallAgeWorkbenchOperationResult>> operation, bool refreshPreviewAfter = false)
     {
         if (IsBusy) return;
         IsBusy = true;
@@ -710,11 +912,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             if (result.Ok && _session.Model is not null)
             {
                 ApplyModel(_session.Model);
-                if (captureAfter)
+                if (refreshPreviewAfter && IsLiveViewportEnabled && Mode == RekallAgeStudioMode.Edit)
                 {
-                    var capture = await CaptureOperationAsync();
-                    StatusText = capture.Ok ? result.Summary : capture.Summary;
-                    ApplyModel(_session.Model!);
+                    await RefreshEditPreviewAsync(result.Summary);
                 }
             }
             else if (!result.Ok)
@@ -730,6 +930,29 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    private async Task RefreshEditPreviewAsync(string operationSummary)
+    {
+        if (_session.ProjectRoot is null || _session.SceneName is null) return;
+        try
+        {
+            ApplyPreviewFrame(await _previewSession.ResetAsync(
+                _session.ProjectRoot,
+                _session.SceneName,
+                960,
+                540,
+                _lifecycleCancellation.Token));
+            StatusText = operationSummary;
+        }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException or ArgumentException)
+        {
+            StatusText = $"{operationSummary} Live preview unavailable: {exception.Message}";
+            ValidationLines.Insert(0, $"warning: REKALL_STUDIO_EDIT_PREVIEW_FAILED - {exception.Message}");
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
         }
     }
 
@@ -897,6 +1120,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _removePropertyCommand.RaiseCanExecuteChanged();
         _validateCommand.RaiseCanExecuteChanged();
         _captureCommand.RaiseCanExecuteChanged();
+        _simulateCommand.RaiseCanExecuteChanged();
         _playCommand.RaiseCanExecuteChanged();
         _stopCommand.RaiseCanExecuteChanged();
         _switchSceneCommand.RaiseCanExecuteChanged();

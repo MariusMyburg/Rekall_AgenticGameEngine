@@ -4,14 +4,31 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 22:38 Africa/Johannesburg
+Last verified: 2026-08-21 23:19 Africa/Johannesburg
 
-Branch: `codex/production-foundation`
+Branch: `codex/studio-ergonomics`
 
-Latest milestone: the engine-owned graphics/agent tranche is green at
-1,111/1,111 engine tests, 11/11 Studio tests, and a zero-warning, zero-error
-Release solution build. Pong is still the active acceptance, Galaga is next,
-and Rain Glass resumes only after both games are complete.
+Latest milestone: the engine-owned graphics/agent tranche is merged to
+`master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,
+and a zero-warning, zero-error Release solution build. The Studio ergonomics
+tranche now adds explicit Edit, Simulate, and external production-Player modes,
+a persistent non-destructive in-viewport runtime session, a default-on live
+preview toggle, mode-aware authoring command guards, and a shared Segoe UI dark
+control theme. Automatic Edit rendering now remains entirely in memory, obeys
+the Live toggle, and leaves persistent proof PNGs to the explicit Capture action.
+Mode transitions are serialized and cancellation-safe; preview reset is
+failure-atomic, runtime/render work executes off the WPF dispatcher, preview
+ownership is released before Play, and natural Player exit is reconciled back
+to Edit by the Studio cadence. Candidate preview state is rendered successfully
+before it atomically replaces the previous session, and repeated close/dispose
+requests share the same in-progress shutdown task. The complete Studio suite passes 19/19, the
+engine suite passes 1,111/1,111, and both Debug and Release solution builds
+complete with zero warnings/errors. Real Windows UI inspection proved Edit capture,
+continuous simulation from frame 0 through frame 120, Stop/reset to frame 0,
+and unchanged authored scene state. Independent review reports no remaining
+Critical or Important findings and marks the tranche merge-ready; integration remains.
+Pong remains the active game acceptance; this bounded
+Studio tranche precedes Galaga so that Galaga can exercise a credible editor.
 
 The first installed-Studio Pong run reached mechanical package, relocation,
 and audit success, but independent frame review rejected it: the court rendered
@@ -101,6 +118,9 @@ agents author the game.
 5. Rekall.Age.Studio as a professional consumer of the proven contracts.
 
 Studio is important, but it does not define or reorder the engine foundation.
+The current ergonomics tranche is deliberately bounded to generic viewport and
+mode contracts needed to author and verify Galaga; it adds no genre-specific
+behavior.
 
 ## Acceptance benchmark queue
 

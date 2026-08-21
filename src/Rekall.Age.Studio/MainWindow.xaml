@@ -2,9 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Rekall AGE Studio" Width="1500" Height="940" MinWidth="1120" MinHeight="700"
-        Background="{StaticResource WorkbenchBackground}" Foreground="{StaticResource WorkbenchText}">
+        Background="{StaticResource WorkbenchBackground}" Foreground="{StaticResource WorkbenchText}"
+        FontFamily="Segoe UI" UseLayoutRounding="True">
     <DockPanel>
-        <Border DockPanel.Dock="Top" Background="#171A1F" Padding="10,8">
+        <Border DockPanel.Dock="Top" Background="{StaticResource ChromeBackground}" Padding="12,9" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" /><ColumnDefinition Width="260" />
@@ -21,29 +22,38 @@
                 <ComboBox Grid.Column="5" ItemsSource="{Binding SceneNames}" SelectedItem="{Binding SceneNameInput}"
                           IsEditable="True" />
                 <Button Grid.Column="6" Content="Switch" Command="{Binding SwitchSceneCommand}" Padding="8,2" Margin="6,0" />
-                <TextBlock Grid.Column="7" Text="{Binding StatusText}" VerticalAlignment="Center" TextAlignment="Right"
-                           Foreground="#9FB0C4" TextTrimming="CharacterEllipsis" />
+                <StackPanel Grid.Column="7" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Border CornerRadius="10" BorderBrush="{StaticResource Accent}" BorderThickness="1" Padding="9,3" Margin="8,0">
+                        <TextBlock Text="{Binding ModeLabel}" Foreground="{StaticResource Accent}" FontWeight="SemiBold" FontSize="11" />
+                    </Border>
+                    <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" TextAlignment="Right"
+                               Foreground="{StaticResource MutedText}" TextTrimming="CharacterEllipsis" MaxWidth="440" />
+                </StackPanel>
             </Grid>
         </Border>
 
-        <ToolBar DockPanel.Dock="Top" Background="{StaticResource PanelBackground}" Padding="6">
-            <Button Content="Create" Command="{Binding CreateCommand}" Padding="12,4" />
-            <Button Content="Open" Command="{Binding OpenCommand}" Padding="12,4" />
-            <Separator />
-            <Button Content="Undo" Command="{Binding UndoCommand}" Padding="12,4" />
-            <Button Content="Redo" Command="{Binding RedoCommand}" Padding="12,4" />
-            <Separator />
-            <Button Content="Add Entity" Command="{Binding AddEntityCommand}" Padding="12,4" />
-            <Separator />
-            <Button Content="Play" Command="{Binding PlayCommand}" Padding="12,4" />
-            <Button Content="Stop" Command="{Binding StopCommand}" Padding="12,4" />
-            <Separator />
-            <Button Content="Capture" Command="{Binding CaptureCommand}" Padding="12,4" />
-            <Button Content="Validate" Command="{Binding ValidateCommand}" Padding="12,4" />
-            <Separator />
-            <Button Content="Package" Command="{Binding PackageCommand}" Padding="12,4" />
-            <Button Content="Audit Package" Command="{Binding AuditPackageCommand}" Padding="12,4" />
-        </ToolBar>
+        <Border DockPanel.Dock="Top" Padding="7" Background="{StaticResource ChromeBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
+          <StackPanel Orientation="Horizontal">
+            <Button Content="Create" Command="{Binding CreateCommand}" ToolTip="Create a new AGE project" />
+            <Button Content="Open" Command="{Binding OpenCommand}" ToolTip="Open the selected project" />
+            <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
+            <Button Content="Undo" Command="{Binding UndoCommand}" />
+            <Button Content="Redo" Command="{Binding RedoCommand}" />
+            <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
+            <Button Content="Add Entity" Command="{Binding AddEntityCommand}" />
+            <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
+            <Button Content="Simulate" Command="{Binding SimulateCommand}" Style="{StaticResource AccentButton}" ToolTip="Run the scene in this viewport without changing authored state" />
+            <Button Content="Play" Command="{Binding PlayCommand}" ToolTip="Launch the game in the production Player" />
+            <Button Content="Stop" Command="{Binding StopCommand}" ToolTip="Stop Simulate or Play and return to Edit" />
+            <ToggleButton Content="Live" IsChecked="{Binding IsLiveViewportEnabled, Mode=TwoWay}" Margin="7,2,2,2" ToolTip="Continuously update the viewport while simulating" />
+            <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
+            <Button Content="Capture" Command="{Binding CaptureCommand}" />
+            <Button Content="Validate" Command="{Binding ValidateCommand}" />
+            <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
+            <Button Content="Package" Command="{Binding PackageCommand}" />
+            <Button Content="Audit Package" Command="{Binding AuditPackageCommand}" />
+          </StackPanel>
+        </Border>
 
         <Grid>
             <Grid.ColumnDefinitions>
@@ -63,15 +73,22 @@
                 </DockPanel>
             </Border>
 
-            <Border Grid.Column="1" Grid.Row="0" Margin="0,8,0,8" Background="#0E1116"
+            <Border Grid.Column="1" Grid.Row="0" Margin="0,8,0,8" Background="#090C10"
                     BorderBrush="{StaticResource PanelBorder}" BorderThickness="1">
                 <Grid>
                     <Image Source="{Binding ViewportImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
-                    <Border VerticalAlignment="Top" Background="#B3171A1F" Padding="10,6">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                        <TextBlock Text="AGE" Foreground="#33404D" FontSize="34" FontWeight="Light" HorizontalAlignment="Center" />
+                        <TextBlock Text="Open a project to render the live viewport" Foreground="#607184" Margin="0,8,0,0" />
+                        <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding ViewportImage}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                    </StackPanel>
+                    <Border VerticalAlignment="Top" Background="#D9171C23" Padding="12,8">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding ViewportTitle}" FontSize="16" FontWeight="SemiBold" />
                             <TextBlock Text=" · " Foreground="#718096" />
                             <TextBlock Text="{Binding ViewportSummary}" Foreground="#AAB6C5" />
+                            <TextBlock Text=" · " Foreground="#718096" />
+                            <TextBlock Text="{Binding ModeLabel}" Foreground="{StaticResource Accent}" FontWeight="SemiBold" />
                         </StackPanel>
                     </Border>
                 </Grid>

@@ -1035,6 +1035,72 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task RuntimeTaskDefersExcessSceneAuthoringUntilModuleSliceBegins()
+    {
+        var sceneCall = new RekallAgeLanguageModelToolCall("rekall.scene.apply_blueprint", new JsonObject());
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [sceneCall], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [sceneCall], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [sceneCall], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", MeaningfulRuntimeCheckpointArguments())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "Complete", "", [], "stop", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+        var agent = new RekallAgeLanguageModelAgent(model, tools);
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 7,
+                MaxPreRuntimeAuthoringMutations = 2,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(2, tools.Executions.Count(execution => execution.Name == "rekall.scene.apply_blueprint"));
+        var deferred = Assert.Single(result.ToolExecutions, execution =>
+            execution.Name == "rekall.scene.apply_blueprint" && !execution.Succeeded);
+        Assert.Contains("REKALL_RUNTIME_AUTHORING_CHECKPOINT_REQUIRED", deferred.ResultPreview, StringComparison.Ordinal);
+        Assert.Contains(model.Requests[2].Messages, message =>
+            message.Role == "user" && message.Content.Contains("runtime module", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task NonRuntimeTaskDoesNotApplyEarlyRuntimeAuthoringCheckpoint()
+    {
+        var sceneCall = new RekallAgeLanguageModelToolCall("rekall.scene.apply_blueprint", new JsonObject());
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [sceneCall], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [sceneCall], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "", "", [sceneCall], "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "Done", "", [], "stop", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+
+        var result = await new RekallAgeLanguageModelAgent(model, tools).RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 4,
+                MaxPreRuntimeAuthoringMutations = 1,
+                RequireRuntimeBehaviorAssertions = false
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(3, tools.Executions.Count(execution => execution.Name == "rekall.scene.apply_blueprint"));
+    }
+
+    [Fact]
     public async Task SuccessfulDeliveryAuditPrimesTheNextEvidenceBackedFinalResponse()
     {
         var model = new ScriptedModelClient(

@@ -32,6 +32,8 @@ public sealed record RekallAgeLanguageModelAgentRequest(string Model, string Sys
 
     public int MaxPostRuntimeDeliveryTurns { get; init; } = 8;
 
+    public int MaxPreRuntimeAuthoringMutations { get; init; } = 4;
+
     public IProgress<RekallAgeLanguageModelAgentProgress>? Progress { get; init; }
 
     public IReadOnlySet<string> TerminalSuccessTools { get; init; } = new HashSet<string>(StringComparer.Ordinal);
@@ -114,6 +116,7 @@ public sealed class RekallAgeLanguageModelAgent(
         var maxToolResultCharacters = Math.Clamp(request.MaxToolResultCharacters, 1_000, 100_000);
         var maxRuntimeBehaviorRepairTurns = Math.Clamp(request.MaxRuntimeBehaviorRepairTurns, 0, 64);
         var maxPostRuntimeDeliveryTurns = Math.Clamp(request.MaxPostRuntimeDeliveryTurns, 0, 32);
+        var maxPreRuntimeAuthoringMutations = Math.Clamp(request.MaxPreRuntimeAuthoringMutations, 0, 32);
         var transcript = new List<RekallAgeLanguageModelMessage>();
         if (!string.IsNullOrWhiteSpace(request.SystemPrompt))
         {
@@ -131,6 +134,7 @@ public sealed class RekallAgeLanguageModelAgent(
         var runtimeCheckpointPrompted = false;
         var runtimeRepairReserveActivated = false;
         var postRuntimeDeliveryReserveActivated = false;
+        var runtimeAuthoringCheckpointPrompted = false;
         var turnLimit = maxTurns;
         for (var turn = 1; turn <= turnLimit; turn++)
         {
@@ -175,6 +179,15 @@ public sealed class RekallAgeLanguageModelAgent(
                     continue;
                 }
 
+                if (request.RequireRuntimeBehaviorAssertions
+                    && RequiresRuntimeAuthoringCheckpoint(toolExecutions, maxPreRuntimeAuthoringMutations))
+                {
+                    transcript.Add(new RekallAgeLanguageModelMessage(
+                        "user",
+                        BuildRuntimeAuthoringCheckpointPrompt(maxPreRuntimeAuthoringMutations)));
+                    continue;
+                }
+
                 if (request.RequireCompletionAudit && !completionAuditPending)
                 {
                     completionAuditPending = true;
@@ -202,6 +215,12 @@ public sealed class RekallAgeLanguageModelAgent(
                 toolCallCount++;
                 JsonNode output;
                 if (request.RequireRuntimeBehaviorAssertions
+                    && RequiresRuntimeAuthoringCheckpoint(toolExecutions, maxPreRuntimeAuthoringMutations)
+                    && ShouldDeferUntilRuntimeAuthoring(call))
+                {
+                    output = RuntimeAuthoringCheckpointRequired(call, maxPreRuntimeAuthoringMutations);
+                }
+                else if (request.RequireRuntimeBehaviorAssertions
                     && RequiresImmediateRuntimeCheckpoint(toolExecutions)
                     && ShouldDeferUntilRuntimeCheckpoint(call))
                 {
@@ -291,6 +310,16 @@ public sealed class RekallAgeLanguageModelAgent(
             if (repeatedFailureRecovery is not null)
             {
                 transcript.Add(new RekallAgeLanguageModelMessage("user", repeatedFailureRecovery));
+            }
+
+            if (request.RequireRuntimeBehaviorAssertions
+                && !runtimeAuthoringCheckpointPrompted
+                && RequiresRuntimeAuthoringCheckpoint(toolExecutions, maxPreRuntimeAuthoringMutations))
+            {
+                runtimeAuthoringCheckpointPrompted = true;
+                transcript.Add(new RekallAgeLanguageModelMessage(
+                    "user",
+                    BuildRuntimeAuthoringCheckpointPrompt(maxPreRuntimeAuthoringMutations)));
             }
 
             if (request.RequireRuntimeBehaviorAssertions
@@ -469,6 +498,69 @@ public sealed class RekallAgeLanguageModelAgent(
             && execution.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
             && HasRuntimeCheckpointCoverage(execution.Arguments));
     }
+
+    private static bool RequiresRuntimeAuthoringCheckpoint(
+        IReadOnlyList<RekallAgeLanguageModelToolExecution> executions,
+        int maxPreRuntimeAuthoringMutations)
+    {
+        if (maxPreRuntimeAuthoringMutations <= 0
+            || executions.Any(execution => execution.Succeeded
+                && (execution.Name.Equals("rekall.module.scaffold_runtime_system", StringComparison.Ordinal)
+                    || execution.Name.Equals("rekall.module.write_source", StringComparison.Ordinal))))
+        {
+            return false;
+        }
+
+        return executions.Count(execution => execution.Succeeded && IsWorldAuthoringMutation(execution.Name))
+            >= maxPreRuntimeAuthoringMutations;
+    }
+
+    private static bool IsWorldAuthoringMutation(string toolName) =>
+        toolName.Equals("rekall.scene.apply_blueprint", StringComparison.Ordinal)
+        || toolName.StartsWith("rekall.entity.", StringComparison.Ordinal)
+        || toolName.StartsWith("rekall.component.", StringComparison.Ordinal);
+
+    private static bool ShouldDeferUntilRuntimeAuthoring(RekallAgeLanguageModelToolCall call)
+    {
+        var toolName = CanonicalPolicyToolName(call.Name);
+        return !toolName.Equals("rekall.tools.search", StringComparison.Ordinal)
+            && !toolName.StartsWith("rekall.context.", StringComparison.Ordinal)
+            && !toolName.StartsWith("rekall.compatibility.", StringComparison.Ordinal)
+            && !toolName.StartsWith("rekall.module.", StringComparison.Ordinal)
+            && !toolName.Equals("rekall.build.modules", StringComparison.Ordinal);
+    }
+
+    private static JsonObject RuntimeAuthoringCheckpointRequired(
+        RekallAgeLanguageModelToolCall call,
+        int maxPreRuntimeAuthoringMutations)
+    {
+        var message =
+            $"Tool '{call.Name}' is deferred after {maxPreRuntimeAuthoringMutations} successful world-authoring mutations until the required agent-owned runtime module slice begins.";
+        return new JsonObject
+        {
+            ["ok"] = false,
+            ["summary"] = message,
+            ["errors"] = new JsonArray(new JsonObject
+            {
+                ["code"] = "REKALL_RUNTIME_AUTHORING_CHECKPOINT_REQUIRED",
+                ["message"] = message,
+                ["target"] = "rekall.module.scaffold_runtime_system"
+            }),
+            ["requiredScaffoldShape"] = new JsonObject
+            {
+                ["projectRoot"] = "<open project root>",
+                ["moduleId"] = "game.rules",
+                ["displayName"] = "Game Rules",
+                ["moduleName"] = "GameRules",
+                ["componentName"] = "GameState",
+                ["systemName"] = "GameRulesSystem"
+            },
+            ["instruction"] = "Inspect the runtime SDK if needed, then call rekall.module.scaffold_runtime_system with every required field. List and read the returned source, make targeted edits, and build the module. Do not continue scene polish, validation, capture, or packaging before this thin executable slice begins."
+        };
+    }
+
+    private static string BuildRuntimeAuthoringCheckpointPrompt(int maxPreRuntimeAuthoringMutations) =>
+        $"You have used {maxPreRuntimeAuthoringMutations} successful world-authoring mutations without beginning the required runtime module. Establish the thin executable gameplay slice now. Inspect the runtime SDK if needed, call rekall.module.scaffold_runtime_system with projectRoot, moduleId, displayName, moduleName, componentName, and systemName, then list/read/edit/build that source. Further scene polish, validation, capture, packaging, and delivery are deferred until runtime-module authoring begins.";
 
     private static JsonObject RuntimeCheckpointRequired(RekallAgeLanguageModelToolCall call)
     {

@@ -4,13 +4,13 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 06:39 Africa/Johannesburg
+Last verified: 2026-08-21 06:55 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: production authoring rejects invalid built-in properties
-before mutation; an early thin executable-slice policy is the next measured
-blocker
+Latest milestone: runtime-behavior tasks establish an early compiled gameplay
+slice; custom component identity in runtime checkpoint policy is the next
+measured blocker
 
 ## Product objective
 
@@ -32,6 +32,32 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Early runtime authoring checkpoint: tasks that require runtime behavior now
+  allow at most four successful world-authoring mutations before deferring
+  further non-module work until runtime-system scaffold/source authoring begins.
+  The bound is request-configurable from 0 (disabled) through 32, emits
+  structured recovery, and leaves non-runtime tasks unchanged. Focused policy
+  tests passed 2/2 and the full language-agent suite passed 29/29. The locked
+  zero-warning/error gate passed 1,003/1,003 engine and 7/7 Studio tests twice
+  and the complete installed matrix. Its archive is 201,575,814 bytes with
+  SHA-256
+  `FD0421AA9DDF871D4854588E8B74F0A54F917F79A9C34D32455B117020839289`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+- Clean installed real-Qwen benchmark 30 made 37/61 successful tool calls,
+  successfully compiled the authored `LumenVaultGameplay` runtime module, and
+  produced a nonblank 960x540 viewport with ten renderables. The module slice
+  began after two successful scene mutations instead of benchmark 29's 47-turn
+  delay, proving the early policy changes shipped agent behavior. The run still
+  reached the 64-turn limit without packaging: seven final runtime inspections
+  were rejected because checkpoint coverage recognizes only `Game.*` component
+  names, while the engine's own runtime-system scaffold and component registry
+  use CLR component names such as `LumenVaultGameManager`. The exact asserted
+  component was attached, but `candidateAgentComponentAssertion` remained null.
+  The next generic tranche aligns agent-owned checkpoint identity with actual
+  module component contracts and rejects built-in-only substitutions without
+  imposing a namespace convention the scaffold does not produce. Evidence
+  SHA-256 is
+  `BE1586FDEAF0928A784D59082E5646934D46AF4852501A8DF6B17A3C61E2D2C5`.
 - Schema-aware component admission: the production registry injects indexed
   built-in property policy into component add, property set, and scene blueprint
   commands without coupling the generic world layer to module schemas. Unknown

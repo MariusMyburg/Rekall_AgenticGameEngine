@@ -1184,6 +1184,80 @@ public sealed class SceneRuntimeFoundationTests
     }
 
     [Fact]
+    public async Task InspectSceneRuntimeCommandRejectsMissingAssertionIdentityWithoutThrowing()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity(RekallAgeEntityDocument.Create("Player", ["player"])),
+            CancellationToken.None);
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(
+                root,
+                "Main",
+                Assertions:
+                [
+                    new InspectSceneRuntimeAssertion(null!, "delta.position3d.x", "greater-than")
+                    {
+                        Expected = JsonValue.Create(0)
+                    }
+                ]),
+            new RekallAgeCommandContext(
+                "test",
+                RekallAgeTransaction.Begin("reject incomplete assertion"),
+                CancellationToken.None));
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal("REKALL_RUNTIME_ASSERTION_FIELD_REQUIRED", error.Code);
+        Assert.Equal("assertions[0].entityName", error.Target);
+        Assert.Contains("entityName", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ChangedComponentAssertionReportsMissingPropertyInsteadOfFalse()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity(RekallAgeEntityDocument.Create("Player", ["player"])
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Game.PlayerState",
+                        new JsonObject { ["Enabled"] = true }))),
+            CancellationToken.None);
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(
+                root,
+                "Main",
+                Assertions:
+                [
+                    new InspectSceneRuntimeAssertion(
+                        "Player",
+                        "changed.component.property",
+                        "equals")
+                    {
+                        ComponentType = "Game.PlayerState",
+                        PropertyName = "Active",
+                        Expected = JsonValue.Create(true)
+                    }
+                ]),
+            new RekallAgeCommandContext(
+                "test",
+                RekallAgeTransaction.Begin("report missing changed property"),
+                CancellationToken.None));
+
+        Assert.False(result.Ok);
+        var assertion = Assert.Single(result.Value.AssertionResults);
+        Assert.Null(assertion.Actual);
+        Assert.Contains("property 'Active' was not found", assertion.Summary, StringComparison.Ordinal);
+        Assert.Contains("actual (missing)", result.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task InspectSceneRuntimeCommandExposesBoundedUiContractsForAgentVerification()
     {
         var root = TestPaths.CreateTempDirectory();

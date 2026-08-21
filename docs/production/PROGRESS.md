@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 09:43 Africa/Johannesburg
+Last verified: 2026-08-21 10:00 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: package completion is audit-backed; stateful game tasks must
-also prove changed agent-owned runtime state before delivery
+Latest milestone: stateful games require changed runtime-state proof; malformed
+runtime assertions now fail with structured evidence instead of exceptions
 
 ## Product objective
 
@@ -31,6 +31,31 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Clean installed real-Qwen benchmark 40 proves the stateful gate changes
+  authoring behavior but exposed runtime-inspection robustness defects. Qwen
+  authored and compiled genuine `PlayerState`, `SealState`, and `HUDScore`
+  contracts with delta-time semantic movement, distance-based seal contact, and
+  state mutation instead of scaffold-only motion. Delivery remained blocked
+  because the state assertion targeted a nonexistent `PlayerState.Active`
+  property; later scene churn removed the attached state, and a final assertion
+  omitted `entityName`. `rekall.runtime.inspect_scene` then threw a raw
+  `NullReferenceException`; the run correctly ended red after 76 turns/76 tools,
+  with zero validation issues, four renderables, no package, and evidence
+  SHA-256 `5D025EC5564A6462EF9B289247CA2402A899FC493B36D6AA320AE949E4C96650`.
+- Runtime assertion validation now runs before simulation and rejects blank
+  `entityName`, `subject`, or `operator` fields with bounded
+  `REKALL_RUNTIME_ASSERTION_FIELD_REQUIRED` errors and exact argument targets;
+  failed-summary bounding is null-safe as a second line of defense. Semantic
+  input validation also runs before simulation. `changed.component.property`
+  now reports an absent property directly rather than the misleading value
+  `false` when it is missing from both initial and final state. Both defects have
+  red/green regressions and all nine runtime-inspection focused tests pass. The
+  locked zero-warning/error gate passed 1,017/1,017 engine and 7/7 Studio tests
+  twice plus the complete installed matrix. Its 1,186-file archive is
+  201,589,933 bytes with SHA-256
+  `E8B621715EFC354F97D3D9C4F9D26EB83B722FDAE32886B5E0B6A74564A50487`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+  A clean installed rerun is next.
 - Clean installed real-Qwen benchmark 39 demonstrates both the SDK-recovery
   improvement and the next false-positive boundary. `qwen3.5:35b` compiled its
   runtime module without a failed build, reached zero validation issues, a

@@ -173,6 +173,22 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
                 ]);
         }
 
+        if (ValidateInputs(request.Inputs) is { Count: > 0 } inputErrors)
+        {
+            return RekallAgeCommandResult<InspectSceneRuntimeResult>.Failure(
+                CreateEmptyResult(request.SceneName),
+                "Runtime inspection rejected invalid semantic action input.",
+                inputErrors);
+        }
+
+        if (ValidateAssertions(request.Assertions) is { Count: > 0 } assertionErrors)
+        {
+            return RekallAgeCommandResult<InspectSceneRuntimeResult>.Failure(
+                CreateEmptyResult(request.SceneName),
+                "Runtime inspection rejected invalid behavior assertions.",
+                assertionErrors);
+        }
+
         var snapshotService = new RekallAgeRuntimeSnapshotService();
         var initialWorld = await snapshotService.InspectSceneAsync(
             request.ProjectRoot,
@@ -207,14 +223,6 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
                         $"{failedCount} runtime behavior assertion(s) failed. Inspect the bounded assertion results and repair authored content.",
                         request.SceneName)
                 ]);
-        }
-
-        if (ValidateInputs(request.Inputs) is { Count: > 0 } inputErrors)
-        {
-            return RekallAgeCommandResult<InspectSceneRuntimeResult>.Failure(
-                CreateEmptyResult(request.SceneName),
-                "Runtime inspection rejected invalid semantic action input.",
-                inputErrors);
         }
 
         return RekallAgeCommandResult<InspectSceneRuntimeResult>.Success(
@@ -257,8 +265,43 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
         }
         return Bound(summary, maximumSummaryCharacters);
 
-        static string Bound(string value, int maximumCharacters) =>
-            value.Length <= maximumCharacters ? value : value[..maximumCharacters] + "…";
+        static string Bound(string? value, int maximumCharacters) =>
+            string.IsNullOrEmpty(value)
+                ? "(missing)"
+                : value.Length <= maximumCharacters ? value : value[..maximumCharacters] + "…";
+    }
+
+    private static IReadOnlyList<RekallAgeCommandError> ValidateAssertions(
+        IReadOnlyList<InspectSceneRuntimeAssertion>? assertions)
+    {
+        var errors = new List<RekallAgeCommandError>();
+        if (assertions is null)
+        {
+            return errors;
+        }
+
+        for (var index = 0; index < Math.Min(assertions.Count, 64); index++)
+        {
+            var assertion = assertions[index];
+            AddRequired(assertion.EntityName, "entityName");
+            AddRequired(assertion.Subject, "subject");
+            AddRequired(assertion.Operator, "operator");
+
+            void AddRequired(string? value, string field)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return;
+                }
+
+                errors.Add(new RekallAgeCommandError(
+                    "REKALL_RUNTIME_ASSERTION_FIELD_REQUIRED",
+                    $"Runtime behavior assertion {index} requires a non-blank {field}.",
+                    $"assertions[{index}].{field}"));
+            }
+        }
+
+        return errors;
     }
 
     private static IReadOnlyList<RekallAgeCommandError> ValidateInputs(
@@ -452,6 +495,12 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
                 : FindProperty(initialComponent, assertion.PropertyName);
             if (subject == "changed.component.property")
             {
+                if (finalProperty is null && initialProperty is null)
+                {
+                    return (false, null,
+                        $"Component property '{assertion.PropertyName}' was not found on '{assertion.ComponentType}'.");
+                }
+
                 return (true, JsonValue.Create(!JsonNode.DeepEquals(finalProperty, initialProperty)), string.Empty);
             }
 

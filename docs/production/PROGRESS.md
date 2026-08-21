@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 12:00 Africa/Johannesburg
+Last verified: 2026-08-21 12:29 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: stale immutable-world lineage and nested mutation diagnostics
-are installed and locked; clean benchmark 46 is next
+Latest milestone: command dispatch now fails closed on unknown top-level
+arguments and the complete installed product gate passes under download load
 
 ## Product objective
 
@@ -46,9 +46,59 @@ Studio is important, but it does not define or reorder the engine foundation.
    effect from inspectable general-purpose capabilities.
 3. After the arbitrary described-game path is reliable, prove a complete
    playable Pong game through the same generic contracts.
+4. Platform track after the desktop authoring loop is reliable: publish games
+   as static browser deployments through .NET WebAssembly and a WebGPU renderer
+   backend, with ahead-of-time compiled game-authored modules and browser-native
+   input, audio, storage, and networking adapters. WebGL2 is a later bounded
+   compatibility tier, not the primary rendering contract. Preserve the same
+   generic world/runtime and authoring ABI; do not fork game semantics by
+   platform.
 
 ## Verified status
 
+- Generic command dispatch now rejects unknown top-level arguments before a
+  command can execute or mutate state with stable code
+  `REKALL_COMMAND_ARGUMENT_UNKNOWN`, the exact unknown and allowed fields, the
+  bounded command contract, and native structured-value repair guidance.
+  Supported aliases are replaced by their canonical fields during
+  normalization, so strict binding does not break documented compatibility.
+  Malformed runtime-inspection calls reach typed binding before checkpoint
+  policy can hide the defect. Focused dispatcher/agent coverage passed 51/51.
+  The production gate also exposed a real scheduler-contention boundary: the
+  prior one-second restricted-module request deadline rejected a valid
+  400-millisecond module during the full suite while Ollama downloaded a large
+  model. A 1.2-second valid request reliably reproduced the boundary before the
+  deadline was raised to two seconds; three consecutive focused runs now allow
+  that request while still terminating a five-second hung module. The locked
+  build completed with zero warnings/errors; both independent passes completed
+  1,028/1,028 engine and 7/7 Studio tests, and the complete installed matrix
+  passed under the continuing download load. The 1,186-payload archive is
+  201,619,003 bytes with SHA-256
+  `7E55AF4EB2B5FF9B0F8DF9F7C453D9822B226DC9B56DE7C166A4D60C762417CC`.
+  Qwen 3.8 benchmark 47 is next after the model pull completes.
+- Browser game publishing is architecturally viable but not implemented. The
+  managed world/runtime and generic authoring contracts are the reusable base;
+  the current native Vulkan/SPIR-V renderer, Windows AppContainer module host,
+  and desktop player cannot run in a browser. The production direction is a
+  WebGPU renderer and browser host over .NET WebAssembly, ahead-of-time module
+  compilation rather than in-browser dynamic compilation/loading, browser
+  capability adapters, and automated multi-browser gameplay proof. This track
+  remains behind closing the installed arbitrary-game authoring benchmark so it
+  reuses a proven runtime ABI instead of destabilizing the core prematurely.
+- Clean installed real-Qwen benchmark 46 authored a nonblank 11-renderable
+  scene with coherent player and seal entities, semantic input, camera, light,
+  floor, colliders, and agent-owned state. It nevertheless exhausted 64 turns
+  with the runtime module still at its scaffold and no package. The decisive
+  contract defect was silent argument dropping: repeated runtime inspections
+  supplied plausible `inputFrames` and `frameCount` fields instead of `inputs`
+  and `frames`, plus JSON-encoded assertion strings. AGE ignored the unknown
+  names and reported only missing checkpoint coverage, so Qwen spent dozens of
+  turns permuting an ineffective shape instead of receiving an exact binding
+  error. Evidence SHA-256 is
+  `EC7DFD8B23F49C4E4081D835CA678FD820F0D0743BD9D0D318AA85BF1D01CED5`.
+  The next implementation item is fail-closed unknown argument validation with
+  exact allowed names and native structured-value repair guidance across the
+  generic command dispatcher.
 - Module builds now reject stale immutable-world lineage with
   `REKALL_MODULE_IMMUTABLE_WORLD_STALE_BASE` and the exact continuation variable,
   and reject mutation of an outer world inside an entity-update callback with

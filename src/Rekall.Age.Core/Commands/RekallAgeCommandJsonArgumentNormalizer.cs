@@ -137,6 +137,7 @@ internal static class RekallAgeCommandJsonArgumentNormalizer
         }
 
         value[canonicalName] = alias.Value.DeepClone();
+        value.Remove(alias.Key);
     }
 
     private static bool TryNormalizeScalar(string text, Type type, out JsonNode value)

@@ -56,6 +56,30 @@ public sealed class DynamicCommandDispatchTests
     }
 
     [Fact]
+    public async Task RegistryRejectsUnknownTopLevelFieldsWithAllowedContractBeforeExecution()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new EchoCommand());
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("unknown argument"),
+            CancellationToken.None);
+
+        var result = await registry.ExecuteJsonAsync(
+            "rekall.test.echo",
+            """{"message":"hello","inputFrames":[]}""",
+            context);
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal("REKALL_COMMAND_ARGUMENT_UNKNOWN", error.Code);
+        Assert.Contains("inputFrames", error.Message, StringComparison.Ordinal);
+        Assert.Contains("message", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Expected command contract: Echoes a message.", error.Message, StringComparison.Ordinal);
+        Assert.Empty(context.Transaction.ChangedResources);
+    }
+
+    [Fact]
     public async Task RegistryNormalizesModelEncodedTypedFieldsWithoutRewritingStrings()
     {
         var registry = new RekallAgeCommandRegistry();

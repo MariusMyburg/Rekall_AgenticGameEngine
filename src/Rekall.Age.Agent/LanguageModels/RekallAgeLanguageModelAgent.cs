@@ -797,10 +797,26 @@ public sealed class RekallAgeLanguageModelAgent(
 
         if (toolName.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal))
         {
+            if (HasUnknownRuntimeInspectionArgument(call.Arguments))
+            {
+                return false;
+            }
+
             return !HasRuntimeCheckpointCoverage(call.Arguments);
         }
 
         return !IsRuntimeCheckpointPreparationTool(toolName);
+    }
+
+    private static bool HasUnknownRuntimeInspectionArgument(JsonObject arguments)
+    {
+        string[] allowed =
+        [
+            "projectRoot", "sceneName", "frames", "inputs", "assertions",
+            "frame", "frameCount", "fabricFrames", "fabricFrameCount"
+        ];
+        return arguments.Any(argument =>
+            !allowed.Contains(argument.Key, StringComparer.OrdinalIgnoreCase));
     }
 
     private static bool IsDestructiveSceneReplacement(RekallAgeLanguageModelToolCall call) =>

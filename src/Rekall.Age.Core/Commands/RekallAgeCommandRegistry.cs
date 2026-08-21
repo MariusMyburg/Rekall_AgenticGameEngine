@@ -111,6 +111,39 @@ public sealed class RekallAgeCommandRegistry
                 {
                     throw new JsonException($"Arguments for command '{Command.Name}' must be a JSON object.");
                 }
+                var allowedFields = typeof(TRequest).GetProperties()
+                    .Where(property => property.GetMethod is not null && property.GetIndexParameters().Length == 0)
+                    .Select(property => JsonNamingPolicy.CamelCase.ConvertName(property.Name))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray();
+                var unknownFields = document.RootElement.EnumerateObject()
+                    .Select(property => property.Name)
+                    .Where(name => !allowedFields.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray();
+                if (unknownFields.Length > 0)
+                {
+                    var unknownNames = string.Join(", ", unknownFields.Select(field => $"'{field}'"));
+                    var allowedNames = string.Join(", ", allowedFields.Select(field => $"'{field}'"));
+                    var contract = Schema.Description.Length <= 1_000
+                        ? Schema.Description
+                        : Schema.Description[..1_000] + "…";
+                    var message = $"Command '{Command.Name}' received unknown argument field(s): {unknownNames}. "
+                        + $"Allowed fields: {allowedNames}. Use the exact allowed names and native JSON arrays/objects for structured values. "
+                        + $"Expected command contract: {contract}";
+                    var error = new RekallAgeCommandError(
+                        "REKALL_COMMAND_ARGUMENT_UNKNOWN",
+                        message,
+                        Command.Name);
+                    return new RekallAgeDynamicCommandResult(
+                        false,
+                        error.Message,
+                        null,
+                        [error],
+                        CreateTransactionSummary(context));
+                }
                 var required = typeof(TRequest).GetConstructors()
                     .OrderByDescending(constructor => constructor.GetParameters().Length)
                     .FirstOrDefault()

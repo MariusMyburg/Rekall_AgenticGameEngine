@@ -817,6 +817,42 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task RuntimeCheckpointForwardsUnknownTopLevelArgumentsToTypedBinding()
+    {
+        var checkpoint = MeaningfulRuntimeCheckpointArguments();
+        var inputs = checkpoint["inputs"]!.DeepClone();
+        checkpoint.Remove("inputs");
+        checkpoint["inputFrames"] = inputs;
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", checkpoint)],
+                "tool_calls", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+        var agent = new RekallAgeLanguageModelAgent(model, tools);
+
+        await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 3,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.Single(tools.Executions, execution =>
+            execution.Name == "rekall.runtime.inspect_scene"
+            && execution.Arguments.ContainsKey("inputFrames"));
+    }
+
+    [Fact]
     public async Task RuntimeCheckpointAcceptsLosslesslyEncodedTypedArrays()
     {
         var checkpoint = MeaningfulRuntimeCheckpointArguments();

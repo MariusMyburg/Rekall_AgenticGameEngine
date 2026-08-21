@@ -46,7 +46,7 @@ public sealed class ModuleHostWindowsIsolationTests
         Assert.True(OperatingSystem.IsWindows());
         var projectRoot = await CreateModuleAsync(source => source.Replace(
             "var frame = (int)state.Numbers[\"frame\"];",
-            "System.Threading.Thread.Sleep(400); var frame = (int)state.Numbers[\"frame\"];",
+            "System.Threading.Thread.Sleep(1200); var frame = (int)state.Numbers[\"frame\"];",
             StringComparison.Ordinal));
         var hostRoot = await CreateRealHostPayloadAsync();
         await using var client = await RekallAgeRestrictedModuleHostClient.StartAsync(

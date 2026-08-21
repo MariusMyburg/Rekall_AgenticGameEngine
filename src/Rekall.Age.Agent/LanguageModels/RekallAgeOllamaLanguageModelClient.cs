@@ -60,9 +60,20 @@ public sealed class RekallAgeOllamaLanguageModelClient : IRekallAgeLanguageModel
             payload["keep_alive"] = request.KeepAlive;
         }
 
+        var runtimeOptions = new JsonObject();
+        if (request.ContextWindowTokens is { } contextWindowTokens)
+        {
+            runtimeOptions["num_ctx"] = contextWindowTokens;
+        }
+
         if (request.Temperature is { } temperature)
         {
-            payload["options"] = new JsonObject { ["temperature"] = temperature };
+            runtimeOptions["temperature"] = temperature;
+        }
+
+        if (runtimeOptions.Count > 0)
+        {
+            payload["options"] = runtimeOptions;
         }
 
         var unsupportedThinkRecovered = false;

@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 12:40 Africa/Johannesburg
+Last verified: 2026-08-21 12:52 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -68,6 +68,13 @@ Studio is important, but it does not define or reorder the engine foundation.
   exact copyable names such as `projectName` rather than `ProjectName`. The
   new casing regression failed first and all 12 dispatcher tests then passed.
   Focused dispatcher/agent coverage passed 51/51.
+  AGE's provider-neutral language-model request now carries a bounded context
+  window and embedded agent sessions default to 65,536 tokens; the Ollama
+  adapter emits this as `options.num_ctx`. This avoids relying on Ollama's
+  32K automatic default for a 32-GiB GPU during long-horizon game authoring and
+  follows Ollama's recommendation of at least 64K for agent/coding workloads.
+  The request-propagation regressions failed first, then the combined Ollama
+  client/language-agent selection passed 43/43.
   The production gate also exposed a real scheduler-contention boundary: the
   prior one-second restricted-module request deadline rejected a valid
   400-millisecond module during the full suite while Ollama downloaded a large
@@ -77,8 +84,8 @@ Studio is important, but it does not define or reorder the engine foundation.
   build completed with zero warnings/errors; both independent passes completed
   1,028/1,028 engine and 7/7 Studio tests, and the complete installed matrix
   passed under the continuing download load. The 1,186-payload archive is
-  201,618,693 bytes with SHA-256
-  `5122140FE8B74065EE349EC23F9A94284DD048DB6FFD5B7C9BECB08606AB0FB8`.
+  201,619,976 bytes with SHA-256
+  `B960C61BF2F83019E8350CEFC201290F047A72D3D6C4664E4525EE8D799C6B42`.
   Qwen 3.8 benchmark 47 is next after the model pull completes.
 - Browser game publishing is architecturally viable but not implemented. The
   managed world/runtime and generic authoring contracts are the reusable base;

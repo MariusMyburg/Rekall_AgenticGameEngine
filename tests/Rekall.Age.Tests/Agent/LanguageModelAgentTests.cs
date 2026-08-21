@@ -83,6 +83,7 @@ public sealed class LanguageModelAgentTests
         Assert.Equal(30, result.Usage.PromptTokens);
         Assert.Equal(5, result.Usage.CompletionTokens);
         Assert.Equal(300, result.Usage.TotalDurationNanoseconds);
+        Assert.All(model.Requests, request => Assert.Equal(65_536, request.ContextWindowTokens));
         var execution = Assert.Single(tools.Executions);
         Assert.Equal("inspect", execution.Name);
         Assert.Equal("game", execution.Arguments["root"]!.GetValue<string>());

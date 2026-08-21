@@ -23,6 +23,8 @@ public sealed record RekallAgeLanguageModelRequest(
     public double? Temperature { get; init; }
 
     public string? KeepAlive { get; init; }
+
+    public int? ContextWindowTokens { get; init; }
 }
 
 public sealed record RekallAgeLanguageModelMessage(

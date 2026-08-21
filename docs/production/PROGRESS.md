@@ -4,13 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 09:21 Africa/Johannesburg
+Last verified: 2026-08-21 09:43 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: task-specific Studio completion fails closed without
-successful package-audit tool evidence; exact typed SDK compiler recovery is
-the next measured repair
+Latest milestone: package completion is audit-backed; stateful game tasks must
+also prove changed agent-owned runtime state before delivery
 
 ## Product objective
 
@@ -32,6 +31,30 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Clean installed real-Qwen benchmark 39 demonstrates both the SDK-recovery
+  improvement and the next false-positive boundary. `qwen3.5:35b` compiled its
+  runtime module without a failed build, reached zero validation issues, a
+  nonblank 960x540 frame with 15 renderables, a 38 MB package, and a successful
+  structural package audit after 85 turns/71 tools. Evidence SHA-256 is
+  `045D63DC82AF2345F141AC88E4F6D70344FD4E9C6D9E2D7BE2AD06BF399EEA2F`.
+  Independent source and frame review rejects it as a gameplay pass: the rules
+  module only applies scaffold `ValuePerSecond` movement and contains no seal
+  contact, progress, completion/HUD, or reset logic; its runtime assertions
+  prove movement and a static property only. The package audit is structurally
+  correct but not sufficient task evidence.
+- Stateful task evidence now derives from generic behavioral terms such as
+  collection/contact, score/progress, reset, health/damage, timers, spawning,
+  and destruction. Such tasks cannot unlock delivery or narrative completion
+  with movement or a static property assertion: a fresh runtime inspection must
+  also prove `delta.component.property` against zero or
+  `changed.component.property == true` for agent-owned state. Missing proof
+  receives a bounded repair reserve. The red false-pass regression and all
+  35 language-agent policy tests pass. The locked zero-warning/error gate passed
+  1,015/1,015 engine and 7/7 Studio tests twice plus the complete installed
+  matrix. Its 1,186-file archive is 201,586,790 bytes with SHA-256
+  `51E6DB118BD1682D2C5834F330A7572EE45E092E1A993F0153B95B535DEBCD04`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+  A clean installed rerun is next.
 - Task-specific Studio completion now rejects narrative self-audits until a
   configured completion-audit tool has succeeded, with no intervening tool call
   before the evidence-backed final response. The strict contract is explicit at

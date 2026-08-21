@@ -137,6 +137,8 @@ public sealed class RekallAgeLanguageModelAgent(
         var runtimeRepairReserveActivated = false;
         var postRuntimeDeliveryReserveActivated = false;
         var runtimeAuthoringCheckpointPrompted = false;
+        var requireAgentStateTransitionProof = request.RequireRuntimeBehaviorAssertions
+            && RequiresAgentStateTransitionProof(request.Task);
         var turnLimit = maxTurns;
         for (var turn = 1; turn <= turnLimit; turn++)
         {
@@ -175,8 +177,20 @@ public sealed class RekallAgeLanguageModelAgent(
                 }
 
                 if (request.RequireRuntimeBehaviorAssertions
-                    && RequiresFreshRuntimeBehaviorAssertions(toolExecutions, out var runtimeEvidenceMessage))
+                    && RequiresFreshRuntimeBehaviorAssertions(
+                        toolExecutions,
+                        requireAgentStateTransitionProof,
+                        out var runtimeEvidenceMessage))
                 {
+                    if (requireAgentStateTransitionProof
+                        && !runtimeRepairReserveActivated
+                        && maxRuntimeBehaviorRepairTurns > 0)
+                    {
+                        runtimeRepairReserveActivated = true;
+                        turnLimit = Math.Max(
+                            turnLimit,
+                            Math.Min(256, checked(turn + maxRuntimeBehaviorRepairTurns)));
+                    }
                     transcript.Add(new RekallAgeLanguageModelMessage("user", runtimeEvidenceMessage));
                     continue;
                 }
@@ -235,10 +249,12 @@ public sealed class RekallAgeLanguageModelAgent(
                     output = RuntimeAuthoringCheckpointRequired(call, maxPreRuntimeAuthoringMutations);
                 }
                 else if (request.RequireRuntimeBehaviorAssertions
-                    && RequiresImmediateRuntimeCheckpoint(toolExecutions)
+                    && RequiresImmediateRuntimeCheckpoint(
+                        toolExecutions,
+                        requireAgentStateTransitionProof)
                     && ShouldDeferUntilRuntimeCheckpoint(call))
                 {
-                    output = RuntimeCheckpointRequired(call);
+                    output = RuntimeCheckpointRequired(call, requireAgentStateTransitionProof);
                 }
                 else
                 {
@@ -352,7 +368,9 @@ public sealed class RekallAgeLanguageModelAgent(
                 && !postRuntimeDeliveryReserveActivated
                 && maxPostRuntimeDeliveryTurns > 0
                 && successfulRuntimeCheckpointThisTurn
-                && HasFreshSuccessfulRuntimeCheckpoint(toolExecutions))
+                && HasFreshSuccessfulRuntimeCheckpoint(
+                    toolExecutions,
+                    requireAgentStateTransitionProof))
             {
                 var extendedTurnLimit = Math.Min(256, checked(turn + maxPostRuntimeDeliveryTurns));
                 if (extendedTurnLimit > turnLimit)
@@ -516,7 +534,8 @@ public sealed class RekallAgeLanguageModelAgent(
     }
 
     private static bool RequiresImmediateRuntimeCheckpoint(
-        IReadOnlyList<RekallAgeLanguageModelToolExecution> executions)
+        IReadOnlyList<RekallAgeLanguageModelToolExecution> executions,
+        bool requireAgentStateTransition)
     {
         var latestRuntimeAuthoring = executions
             .Where(execution => execution.Succeeded
@@ -545,7 +564,7 @@ public sealed class RekallAgeLanguageModelAgent(
         return !executions.Any(execution =>
             execution.Sequence > latestSuccessfulBuild
             && execution.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
-            && HasRuntimeCheckpointCoverage(execution.Arguments));
+            && HasRuntimeCheckpointCoverage(execution.Arguments, requireAgentStateTransition));
     }
 
     private static bool RequiresRuntimeAuthoringCheckpoint(
@@ -611,12 +630,19 @@ public sealed class RekallAgeLanguageModelAgent(
     private static string BuildRuntimeAuthoringCheckpointPrompt(int maxPreRuntimeAuthoringMutations) =>
         $"You have used {maxPreRuntimeAuthoringMutations} successful world-authoring mutations without beginning the required runtime module. Establish the thin executable gameplay slice now. Inspect the runtime SDK if needed, call rekall.module.scaffold_runtime_system with projectRoot, moduleId, displayName, moduleName, componentName, and systemName, then list/read/edit/build that source. Further scene polish, validation, capture, packaging, and delivery are deferred until runtime-module authoring begins.";
 
-    private static JsonObject RuntimeCheckpointRequired(RekallAgeLanguageModelToolCall call)
+    private static JsonObject RuntimeCheckpointRequired(
+        RekallAgeLanguageModelToolCall call,
+        bool requireAgentStateTransition)
     {
         var attemptedInspection = CanonicalPolicyToolName(call.Name)
             .Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal);
         var hasAssertions = attemptedInspection && HasNonemptyArrayArgument(call.Arguments, "assertions");
         var coverage = EvaluateRuntimeCheckpointCoverage(call.Arguments);
+        var missing = coverage.Missing
+            .Concat(requireAgentStateTransition && !coverage.AgentStateTransition
+                ? ["changed agent-owned component property assertion for requested stateful gameplay"]
+                : Array.Empty<string>())
+            .ToArray();
         var code = !attemptedInspection
             ? "REKALL_RUNTIME_CHECKPOINT_REQUIRED"
             : !hasAssertions
@@ -626,7 +652,7 @@ public sealed class RekallAgeLanguageModelAgent(
             ? $"Tool '{call.Name}' is deferred until the first executable gameplay checkpoint passes or returns direct repair evidence."
             : !hasAssertions
                 ? "The first executable gameplay checkpoint requires representative input frames and a non-empty assertions array."
-                : $"Runtime checkpoint coverage is incomplete. Missing: {string.Join(", ", coverage.Missing)}.";
+                : $"Runtime checkpoint coverage is incomplete. Missing: {string.Join(", ", missing)}.";
         var candidateAgentComponentAssertion = BuildCandidateAgentComponentAssertion(call.Arguments);
         return new JsonObject
         {
@@ -637,7 +663,8 @@ public sealed class RekallAgeLanguageModelAgent(
                 ["inputs"] = coverage.Inputs,
                 ["agentComponent"] = coverage.AgentComponent,
                 ["transition"] = coverage.Transition,
-                ["missing"] = new JsonArray(coverage.Missing
+                ["agentStateTransition"] = coverage.AgentStateTransition,
+                ["missing"] = new JsonArray(missing
                     .Select(item => (JsonNode?)JsonValue.Create(item))
                     .ToArray())
             },
@@ -664,7 +691,11 @@ public sealed class RekallAgeLanguageModelAgent(
                 ["message"] = message,
                 ["target"] = "rekall.runtime.inspect_scene"
             }),
-            ["instruction"] = "Call rekall.runtime.inspect_scene now with effective input frames. To drive a semantic action consumed by InputActionValue/IsInputActionDown, inject the exact action name declared by Rekall.InputActionMap with this copyable shape: {\"inputs\":[{\"semanticActions\":[{\"name\":\"move.horizontal\",\"value\":1,\"isDown\":true}]}]}. Do not invent flat fields such as move_horizontal; unknown fields are ignored by the typed runtime frame and do not count as input. Raw-device arrays such as pressedKeys remain supported. The agent-owned existence assertion must put the runtime entity name in entityName and the exact attached non-Rekall.* component identity in componentType. Both scaffold-qualified names such as Game.Modules.Rules.PlayerState and exact authored CLR identities such as PlayerState are accepted: {\"entityName\":\"Player\",\"subject\":\"component\",\"operator\":\"exists\",\"componentType\":\"PlayerState\"}. Also include a transition assertion using an exact subject: {\"entityName\":\"Player\",\"subject\":\"delta.position3d.x\",\"operator\":\"greater-than\",\"expected\":0}; or use delta.position2d.x/y, delta.position3d.x/y/z, delta.component.property with componentType set to the agent-owned identity strictly compared with 0, or changed.component.property with that componentType equals true. The intuitive delta.transform.position2d/3d axis aliases are accepted and normalized. Do not substitute an engine-owned Rekall.* component, put a component type in entityName, omit componentType, or weaken a failed transition assertion. A failed qualifying assertion opens targeted repair work; unrelated discovery, validation, polish, capture, and packaging remain deferred until this checkpoint executes."
+            ["instruction"] = "Call rekall.runtime.inspect_scene now with effective input frames. To drive a semantic action consumed by InputActionValue/IsInputActionDown, inject the exact action name declared by Rekall.InputActionMap with this copyable shape: {\"inputs\":[{\"semanticActions\":[{\"name\":\"move.horizontal\",\"value\":1,\"isDown\":true}]}]}. Do not invent flat fields such as move_horizontal; unknown fields are ignored by the typed runtime frame and do not count as input. Raw-device arrays such as pressedKeys remain supported. The agent-owned existence assertion must put the runtime entity name in entityName and the exact attached non-Rekall.* component identity in componentType. Both scaffold-qualified names such as Game.Modules.Rules.PlayerState and exact authored CLR identities such as PlayerState are accepted: {\"entityName\":\"Player\",\"subject\":\"component\",\"operator\":\"exists\",\"componentType\":\"PlayerState\"}. Also include a transition assertion using an exact subject: {\"entityName\":\"Player\",\"subject\":\"delta.position3d.x\",\"operator\":\"greater-than\",\"expected\":0}; or use delta.position2d.x/y, delta.position3d.x/y/z, delta.component.property with componentType set to the agent-owned identity strictly compared with 0, or changed.component.property with that componentType equals true."
+                + (requireAgentStateTransition
+                    ? " This task requests stateful gameplay, so also prove an agent-owned property actually changes with delta.component.property compared strictly with zero or changed.component.property equals true; movement or a static component.property assertion cannot unlock delivery."
+                    : string.Empty)
+                + " The intuitive delta.transform.position2d/3d axis aliases are accepted and normalized. Do not substitute an engine-owned Rekall.* component, put a component type in entityName, omit componentType, or weaken a failed transition assertion. A failed qualifying assertion opens targeted repair work; unrelated discovery, validation, polish, capture, and packaging remain deferred until this checkpoint executes."
         };
     }
 
@@ -743,6 +774,7 @@ public sealed class RekallAgeLanguageModelAgent(
 
     private static bool RequiresFreshRuntimeBehaviorAssertions(
         IReadOnlyList<RekallAgeLanguageModelToolExecution> executions,
+        bool requireAgentStateTransition,
         out string message)
     {
         message = string.Empty;
@@ -769,19 +801,35 @@ public sealed class RekallAgeLanguageModelAgent(
             execution.Succeeded
             && execution.Sequence > latestMutation
             && execution.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
-            && HasRuntimeCheckpointCoverage(execution.Arguments));
+            && HasRuntimeCheckpointCoverage(execution.Arguments, requireAgentStateTransition));
         if (passingAssertionEvidence)
         {
             return false;
         }
 
+        var stateRequirement = requireAgentStateTransition
+            ? " This task explicitly requests stateful gameplay, so movement and a static component.property value are insufficient: at least one passing assertion must prove a changed agent-owned component property through delta.component.property compared strictly with zero or changed.component.property equals true."
+            : string.Empty;
         message =
-            "Deterministic gameplay evidence is still required. You authored a runtime-system module, so narrative source inspection, a successful build, zero validation issues, soak, capture, package, and package audit cannot complete the task by themselves. Call rekall.runtime.inspect_scene after the latest scene/module mutation with representative authored input frames. Minimum passing runtime behavior assertions are: an exists assertion for an attached agent-owned component using its exact non-Rekall.* runtime identity, plus a strict assertion proving either a nonzero transform delta or a changed agent-owned component property. Require additional passing assertions for the exact requested progress/contact, completion/HUD, and reset transitions. Subjects include component, component.property, delta.component.property, changed.component.property, transform.position2d.x/y, transform.position3d.x/y/z, delta.position2d.x/y, and delta.position3d.x/y/z. Do not weaken a failed assertion merely to make it pass; repair the authored behavior from the actual bounded values and rerun the same intended transition. Do not claim completion until qualifying runtime evidence passes after the latest mutation.";
+            "Deterministic gameplay evidence is still required. You authored a runtime-system module, so narrative source inspection, a successful build, zero validation issues, soak, capture, package, and package audit cannot complete the task by themselves. Call rekall.runtime.inspect_scene after the latest scene/module mutation with representative authored input frames. Minimum passing runtime behavior assertions are: an exists assertion for an attached agent-owned component using its exact non-Rekall.* runtime identity, plus a strict assertion proving either a nonzero transform delta or a changed agent-owned component property."
+            + stateRequirement
+            + " Require additional passing assertions for the exact requested progress/contact, completion/HUD, and reset transitions. Subjects include component, component.property, delta.component.property, changed.component.property, transform.position2d.x/y, transform.position3d.x/y/z, delta.position2d.x/y, and delta.position3d.x/y/z. Do not weaken a failed assertion merely to make it pass; repair the authored behavior from the actual bounded values and rerun the same intended transition. Do not claim completion until qualifying runtime evidence passes after the latest mutation.";
         return true;
     }
 
+    private static bool RequiresAgentStateTransitionProof(string task)
+    {
+        string[] statefulTerms =
+        [
+            "collect", "contact", "collision", "score", "progress", "reset", "restart",
+            "health", "damage", "inventory", "quest", "timer", "cooldown", "spawn", "destroy"
+        ];
+        return statefulTerms.Any(term => task.Contains(term, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static bool HasFreshSuccessfulRuntimeCheckpoint(
-        IReadOnlyList<RekallAgeLanguageModelToolExecution> executions)
+        IReadOnlyList<RekallAgeLanguageModelToolExecution> executions,
+        bool requireAgentStateTransition)
     {
         var latestMutation = executions
             .Where(execution => execution.Succeeded && InvalidatesRuntimeBehaviorEvidence(execution.Name))
@@ -792,7 +840,7 @@ public sealed class RekallAgeLanguageModelAgent(
             execution.Succeeded
             && execution.Sequence > latestMutation
             && execution.Name.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
-            && HasRuntimeCheckpointCoverage(execution.Arguments));
+            && HasRuntimeCheckpointCoverage(execution.Arguments, requireAgentStateTransition));
     }
 
     private static bool InvalidatesRuntimeBehaviorEvidence(string toolName) =>
@@ -809,10 +857,15 @@ public sealed class RekallAgeLanguageModelAgent(
         return GetArrayArgument(arguments, name) is { Count: > 0 };
     }
 
-    private static bool HasRuntimeCheckpointCoverage(JsonObject arguments)
+    private static bool HasRuntimeCheckpointCoverage(
+        JsonObject arguments,
+        bool requireAgentStateTransition = false)
     {
         var coverage = EvaluateRuntimeCheckpointCoverage(arguments);
-        return coverage.Inputs && coverage.AgentComponent && coverage.Transition;
+        return coverage.Inputs
+            && coverage.AgentComponent
+            && coverage.Transition
+            && (!requireAgentStateTransition || coverage.AgentStateTransition);
     }
 
     private static RuntimeCheckpointCoverage EvaluateRuntimeCheckpointCoverage(JsonObject arguments)
@@ -820,7 +873,7 @@ public sealed class RekallAgeLanguageModelAgent(
         var hasInputs = HasEffectiveRuntimeInputs(arguments);
         if (GetArrayArgument(arguments, "assertions") is not { } assertions)
         {
-            return new RuntimeCheckpointCoverage(hasInputs, false, false);
+            return new RuntimeCheckpointCoverage(hasInputs, false, false, false);
         }
 
         var hasAgentComponent = assertions.OfType<JsonObject>().Any(assertion =>
@@ -828,7 +881,12 @@ public sealed class RekallAgeLanguageModelAgent(
             && GetString(assertion, "operator").Equals("exists", StringComparison.OrdinalIgnoreCase)
             && IsAgentOwnedComponent(GetString(assertion, "componentType")));
         var hasTransition = assertions.OfType<JsonObject>().Any(IsMeaningfulRuntimeTransition);
-        return new RuntimeCheckpointCoverage(hasInputs, hasAgentComponent, hasTransition);
+        var hasAgentStateTransition = assertions.OfType<JsonObject>().Any(IsMeaningfulAgentStateTransition);
+        return new RuntimeCheckpointCoverage(
+            hasInputs,
+            hasAgentComponent,
+            hasTransition,
+            hasAgentStateTransition);
     }
 
     private static bool HasEffectiveRuntimeInputs(JsonObject arguments)
@@ -886,6 +944,25 @@ public sealed class RekallAgeLanguageModelAgent(
 
     private static bool IsMeaningfulRuntimeTransition(JsonObject assertion)
     {
+        if (IsMeaningfulAgentStateTransition(assertion))
+        {
+            return true;
+        }
+
+        var subject = RekallAgeRuntimeAssertionSubjects.Normalize(GetString(assertion, "subject"));
+        var comparison = GetString(assertion, "operator").ToLowerInvariant();
+        var expected = GetArgument(assertion, "expected");
+        var isTransformDelta = subject is "delta.position2d.x" or "delta.position2d.y"
+            or "delta.position3d.x" or "delta.position3d.y" or "delta.position3d.z";
+        return isTransformDelta
+            && comparison is "greater-than" or "less-than"
+            && expected is not null
+            && TryGetNumber(expected, out var threshold)
+            && Math.Abs(threshold) <= double.Epsilon;
+    }
+
+    private static bool IsMeaningfulAgentStateTransition(JsonObject assertion)
+    {
         var subject = RekallAgeRuntimeAssertionSubjects.Normalize(GetString(assertion, "subject"));
         var comparison = GetString(assertion, "operator").ToLowerInvariant();
         var expected = GetArgument(assertion, "expected");
@@ -898,11 +975,8 @@ public sealed class RekallAgeLanguageModelAgent(
                 && changedValue;
         }
 
-        var isTransformDelta = subject is "delta.position2d.x" or "delta.position2d.y"
-            or "delta.position3d.x" or "delta.position3d.y" or "delta.position3d.z";
-        var isAgentStateDelta = subject == "delta.component.property"
-            && IsAgentOwnedComponent(GetString(assertion, "componentType"));
-        return (isTransformDelta || isAgentStateDelta)
+        return subject == "delta.component.property"
+            && IsAgentOwnedComponent(GetString(assertion, "componentType"))
             && comparison is "greater-than" or "less-than"
             && expected is not null
             && TryGetNumber(expected, out var threshold)
@@ -952,7 +1026,11 @@ public sealed class RekallAgeLanguageModelAgent(
         double.TryParse(node.ToJsonString(), NumberStyles.Float, CultureInfo.InvariantCulture, out number)
         && double.IsFinite(number);
 
-    private sealed record RuntimeCheckpointCoverage(bool Inputs, bool AgentComponent, bool Transition)
+    private sealed record RuntimeCheckpointCoverage(
+        bool Inputs,
+        bool AgentComponent,
+        bool Transition,
+        bool AgentStateTransition)
     {
         public IReadOnlyList<string> Missing => new[]
         {

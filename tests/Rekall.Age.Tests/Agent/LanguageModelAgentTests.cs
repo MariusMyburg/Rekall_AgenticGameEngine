@@ -338,6 +338,58 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task StatefulGameplayTaskRejectsMovementOnlyCheckpointUntilAgentStateChanges()
+    {
+        var movementOnly = MeaningfulRuntimeCheckpointArguments();
+        var stateful = MeaningfulRuntimeCheckpointArguments();
+        ((JsonArray)stateful["assertions"]!).Add(new JsonObject
+        {
+            ["entityName"] = "Player",
+            ["subject"] = "changed.component.property",
+            ["operator"] = "equals",
+            ["expected"] = true,
+            ["componentType"] = "Game.PlayerState",
+            ["propertyName"] = "sealsCollected"
+        });
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", movementOnly)],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Movement proves the game is complete.", "", [], "stop", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", stateful)],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Progress is now proven.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest(
+                "model",
+                "system",
+                "Move the player, collect seals, record progress, and support reset.")
+            {
+                MaxTurns = 5,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(5, result.Turns);
+        Assert.Contains(
+            model.Requests[3].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("changed agent-owned component property", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task SuccessfulRuntimeBuildPromptsAnImmediateGameplayCheckpoint()
     {
         var model = new ScriptedModelClient(

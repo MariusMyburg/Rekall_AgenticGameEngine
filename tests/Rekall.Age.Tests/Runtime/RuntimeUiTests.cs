@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime;
 using Rekall.Age.World;
 
@@ -382,5 +383,109 @@ public sealed class RuntimeUiTests
         Assert.True(
             modernDefault.Pixels.Chunk(4).Select(Convert.ToHexString).Distinct(StringComparer.Ordinal).Count() > 2,
             "Modern antialiased text should contain more than transparent and solid glyph pixels.");
+    }
+
+    [Fact]
+    public void TextRasterizerCachesTightGlyphSurfacesAndFallsBackForUnresolvedFonts()
+    {
+        var uniqueText = $"Cache {Guid.NewGuid():N}";
+        var visual = new RekallAgeRuntimeViewportUiVisual(
+            "Label", 0, 0, 1920, 1080, 0, 0, 1920, 1080,
+            uniqueText, "#00000000", "#ffffff", "#00000000", 0, 24);
+        var rasterizer = new RekallAgeRuntimeTextRasterizer();
+
+        var first = rasterizer.Rasterize(visual, null);
+        var second = rasterizer.Rasterize(visual, null);
+        var unresolvedFamily = rasterizer.Rasterize(
+            visual with { Text = uniqueText + " missing", FontFamily = "Definitely Not An Installed Font" },
+            null);
+        var unresolvedAsset = rasterizer.Rasterize(
+            visual with { Text = uniqueText + " asset", FontAssetId = "missing_font" },
+            null);
+
+        Assert.Same(first, second);
+        Assert.Equal(3, rasterizer.RasterizationCount);
+        Assert.True(first.Width < visual.Width);
+        Assert.True(first.Height < visual.Height);
+        Assert.False(first.UsedBitmapFallback);
+        Assert.True(unresolvedFamily.UsedBitmapFallback);
+        Assert.True(unresolvedAsset.UsedBitmapFallback);
+    }
+
+    [Fact]
+    public void SoftwareRendererIncludesFontFailuresInStructuredAssetCounts()
+    {
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main", 0, 0, 16, 16, null, [], [], 0,
+            new RekallAgeRuntimeViewportOverlay(false, 0), []);
+        var assets = RekallAgeRuntimeViewportAssetSet.Empty with
+        {
+            Issues =
+            [
+                new("missing", "REKALL_RENDER_FONT_MISSING", "missing"),
+                new("corrupt", "REKALL_RENDER_FONT_UNSUPPORTED", "unsupported")
+            ]
+        };
+
+        var rendered = new RekallAgeRuntimeSoftwareRenderer().RenderRgba(frame, assets);
+
+        Assert.Equal(1, rendered.MissingAssetCount);
+        Assert.Equal(1, rendered.UnsupportedAssetCount);
+    }
+
+    [Fact]
+    public void TextRasterizerBoundsExtremeAuthoredTextAndTotalCacheMemory()
+    {
+        var rasterizer = new RekallAgeRuntimeTextRasterizer();
+        for (var index = 0; index < 8; index++)
+        {
+            var visual = new RekallAgeRuntimeViewportUiVisual(
+                "Label", 0, 0, int.MaxValue, int.MaxValue, 0, 0, int.MaxValue, int.MaxValue,
+                new string('W', 20_000) + index, "#00000000", "#ffffff", "#00000000", 0,
+                int.MaxValue, FontFamily: "Missing Extreme Font");
+
+            var raster = rasterizer.Rasterize(
+                visual,
+                null,
+                RekallAgeRuntimeTextRasterizer.MaximumRasterWidth,
+                RekallAgeRuntimeTextRasterizer.MaximumRasterHeight);
+
+            Assert.InRange(raster.Width, 1, RekallAgeRuntimeTextRasterizer.MaximumRasterWidth);
+            Assert.InRange(raster.Height, 1, RekallAgeRuntimeTextRasterizer.MaximumRasterHeight);
+            Assert.Equal(checked(raster.Width * raster.Height * 4), raster.Rgba.Length);
+            Assert.True(raster.WasTruncated);
+            Assert.True(raster.FullWidth >= raster.Width);
+            Assert.True(raster.FullHeight >= raster.Height);
+            Assert.InRange(rasterizer.CachedBytes, 0, RekallAgeRuntimeTextRasterizer.MaximumCacheBytes);
+        }
+
+        Assert.True(rasterizer.RasterizationCount > 0);
+        Assert.InRange(rasterizer.CachedBytes, 1, RekallAgeRuntimeTextRasterizer.MaximumCacheBytes);
+    }
+
+    [Fact]
+    public void TextRasterizerUsesBoundedCanonicalKeysForUnrenderedTextTails()
+    {
+        var rasterizer = new RekallAgeRuntimeTextRasterizer();
+        var prefix = new string('W', 4096);
+        var firstVisual = new RekallAgeRuntimeViewportUiVisual(
+            "Label", int.MinValue, int.MinValue, int.MaxValue, int.MaxValue,
+            int.MinValue, int.MinValue, int.MaxValue, int.MaxValue,
+            prefix + "AAAA", "#00000000", "#ffffff", "#00000000", 0, 24,
+            FontFamily: "Missing Canonical Font");
+        var secondVisual = firstVisual with { Text = prefix + "BBBB" };
+
+        var first = rasterizer.Rasterize(firstVisual, null, 64, 32);
+        var second = rasterizer.Rasterize(secondVisual, null, 64, 32);
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main", 0, 0, 64, 32, null, [], [], 0,
+            new RekallAgeRuntimeViewportOverlay(false, 0), []);
+        var extremeLayout = RekallAgeRuntimeUiTextLayoutResolver.Resolve(frame, firstVisual, null);
+
+        Assert.Same(first, second);
+        Assert.Equal(1, rasterizer.RasterizationCount);
+        Assert.InRange(rasterizer.CachedBytes, 1, RekallAgeRuntimeTextRasterizer.MaximumCacheBytes);
+        Assert.InRange(extremeLayout.Raster.Width, 1, RekallAgeRuntimeTextRasterizer.MaximumRasterWidth);
+        Assert.InRange(extremeLayout.Raster.Height, 1, RekallAgeRuntimeTextRasterizer.MaximumRasterHeight);
     }
 }

@@ -1,11 +1,4 @@
 using Rekall.Age.Rendering.Abstractions;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.Drawing.Text;
-using System.Runtime.InteropServices;
-using System.Runtime.Versioning;
-using DrawingFontStyle = System.Drawing.FontStyle;
-using DrawingPixelFormat = System.Drawing.Imaging.PixelFormat;
 
 namespace Rekall.Age.Rendering;
 
@@ -56,9 +49,11 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
             assetBackedCount,
             fallbackCount,
             assets.Issues.Count(issue =>
-                issue.Code.Equals("REKALL_RENDER_ASSET_MISSING", StringComparison.Ordinal)),
+                issue.Code.Equals("REKALL_RENDER_ASSET_MISSING", StringComparison.Ordinal)
+                || issue.Code.Equals("REKALL_RENDER_FONT_MISSING", StringComparison.Ordinal)),
             assets.Issues.Count(issue =>
-                issue.Code.Equals("REKALL_RENDER_ASSET_UNSUPPORTED", StringComparison.Ordinal)),
+                issue.Code.Equals("REKALL_RENDER_ASSET_UNSUPPORTED", StringComparison.Ordinal)
+                || issue.Code.Equals("REKALL_RENDER_FONT_UNSUPPORTED", StringComparison.Ordinal)),
             IsNonBlank(pixels));
     }
 
@@ -333,10 +328,11 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         RekallAgeRuntimeFontAsset? font,
         byte[] pixels)
     {
-        var left = Math.Max(0, Math.Max(visual.X, visual.ClipX));
-        var top = Math.Max(0, Math.Max(visual.Y, visual.ClipY));
-        var right = Math.Min(frame.Width, Math.Min(visual.X + visual.Width, visual.ClipX + visual.ClipWidth));
-        var bottom = Math.Min(frame.Height, Math.Min(visual.Y + visual.Height, visual.ClipY + visual.ClipHeight));
+        var clip = RekallAgeRuntimeUiClipRect.Resolve(frame, visual);
+        var left = clip.Left;
+        var top = clip.Top;
+        var right = clip.Right;
+        var bottom = clip.Bottom;
         if (right <= left || bottom <= top)
         {
             return;
@@ -407,169 +403,38 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
             return;
         }
 
-        if (OperatingSystem.IsWindowsVersionAtLeast(6, 1)
-            && TryDrawUiTextWithSystemFont(frame, visual, font, pixels, clipLeft, clipTop, clipRight, clipBottom))
+        var layout = RekallAgeRuntimeUiTextLayoutResolver.Resolve(frame, visual, font);
+        var raster = layout.Raster;
+        var originX = layout.X;
+        var originY = layout.Y;
+        for (var localY = 0; localY < raster.Height; localY++)
         {
-            return;
-        }
-
-        var color = ParseUiColor(visual.ForegroundColor, new UiColor(255, 255, 255, 255));
-        var scale = Math.Max(1, visual.FontSize / 5);
-        var cursorX = visual.X + Math.Max(2, visual.BorderWidth + 2);
-        var originY = visual.Y + Math.Max(0, (visual.Height - 5 * scale) / 2);
-        foreach (var character in visual.Text)
-        {
-            if (character == ' ')
+            var y = originY + localY;
+            if (y < clipTop || y >= clipBottom)
             {
-                cursorX += 2 * scale;
                 continue;
             }
-
-            var rows = RekallAgeBitmapFont.Rows(character);
-            var glyphWidth = RekallAgeBitmapFont.Width(character);
-            for (var row = 0; row < rows.Count; row++)
+            for (var localX = 0; localX < raster.Width; localX++)
             {
-                for (var column = 0; column < glyphWidth; column++)
+                var x = originX + localX;
+                if (x < clipLeft || x >= clipRight)
                 {
-                    if ((rows[row] & (1 << (glyphWidth - column - 1))) == 0)
-                    {
-                        continue;
-                    }
-
-                    for (var sy = 0; sy < scale; sy++)
-                    {
-                        for (var sx = 0; sx < scale; sx++)
-                        {
-                            var x = cursorX + column * scale + sx;
-                            var y = originY + row * scale + sy;
-                            if (x >= clipLeft && x < clipRight && y >= clipTop && y < clipBottom)
-                            {
-                                AlphaBlend(pixels, ToIndex(frame, x, y), color.R, color.G, color.B, color.A);
-                            }
-                        }
-                    }
+                    continue;
                 }
-            }
-
-            cursorX += (glyphWidth + 1) * scale;
-            if (cursorX >= clipRight)
-            {
-                break;
+                var source = (localY * raster.Width + localX) * 4;
+                if (raster.Rgba[source + 3] > 0)
+                {
+                    AlphaBlend(
+                        pixels,
+                        ToIndex(frame, x, y),
+                        raster.Rgba[source],
+                        raster.Rgba[source + 1],
+                        raster.Rgba[source + 2],
+                        raster.Rgba[source + 3]);
+                }
             }
         }
     }
-
-    [SupportedOSPlatform("windows6.1")]
-    private static bool TryDrawUiTextWithSystemFont(
-        RekallAgeRuntimeViewportFrame frame,
-        RekallAgeRuntimeViewportUiVisual visual,
-        RekallAgeRuntimeFontAsset? fontAsset,
-        byte[] pixels,
-        int clipLeft,
-        int clipTop,
-        int clipRight,
-        int clipBottom)
-    {
-        try
-        {
-            var fontStyle = DrawingFontStyle.Regular;
-            if (visual.FontWeight.Equals("bold", StringComparison.OrdinalIgnoreCase))
-            {
-                fontStyle |= DrawingFontStyle.Bold;
-            }
-            if (visual.FontStyle.Equals("italic", StringComparison.OrdinalIgnoreCase))
-            {
-                fontStyle |= DrawingFontStyle.Italic;
-            }
-
-            using var privateFonts = new PrivateFontCollection();
-            FontFamily? assetFamily = null;
-            if (fontAsset is not null)
-            {
-                try
-                {
-                    privateFonts.AddFontFile(fontAsset.Path);
-                    assetFamily = privateFonts.Families.FirstOrDefault();
-                }
-                catch (Exception ex) when (ex is ArgumentException
-                    or FileNotFoundException
-                    or ExternalException)
-                {
-                    assetFamily = null;
-                }
-            }
-
-            var textSurfaceWidth = Math.Max(1, clipRight - clipLeft);
-            var textSurfaceHeight = Math.Max(1, clipBottom - clipTop);
-            using var bitmap = new Bitmap(textSurfaceWidth, textSurfaceHeight, DrawingPixelFormat.Format32bppArgb);
-            using (var graphics = Graphics.FromImage(bitmap))
-            using (var font = assetFamily is null
-                ? new Font(
-                    string.IsNullOrWhiteSpace(visual.FontFamily) ? "Segoe UI" : visual.FontFamily,
-                    Math.Max(1, visual.FontSize),
-                    fontStyle,
-                    GraphicsUnit.Pixel)
-                : new Font(assetFamily, Math.Max(1, visual.FontSize), fontStyle, GraphicsUnit.Pixel))
-            using (var brush = new SolidBrush(ToDrawingColor(ParseUiColor(
-                visual.ForegroundColor,
-                new UiColor(255, 255, 255, 255)))))
-            using (var format = (StringFormat)StringFormat.GenericTypographic.Clone())
-            {
-                graphics.Clear(Color.Transparent);
-                graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-                format.FormatFlags |= StringFormatFlags.NoWrap | StringFormatFlags.NoClip;
-                var measured = graphics.MeasureString(visual.Text, font, int.MaxValue, format);
-                var x = visual.X + Math.Max(2, visual.BorderWidth + 2) - clipLeft;
-                var y = visual.Y + Math.Max(0, (visual.Height - measured.Height) / 2f) - clipTop;
-                graphics.DrawString(visual.Text, font, brush, x, y, format);
-            }
-
-            var area = new Rectangle(0, 0, textSurfaceWidth, textSurfaceHeight);
-            var data = bitmap.LockBits(area, ImageLockMode.ReadOnly, DrawingPixelFormat.Format32bppArgb);
-            try
-            {
-                var stride = Math.Abs(data.Stride);
-                var bgra = new byte[stride * textSurfaceHeight];
-                Marshal.Copy(data.Scan0, bgra, 0, bgra.Length);
-                for (var y = clipTop; y < clipBottom; y++)
-                {
-                    var localY = y - clipTop;
-                    var sourceRow = data.Stride >= 0 ? localY : textSurfaceHeight - localY - 1;
-                    for (var x = clipLeft; x < clipRight; x++)
-                    {
-                        var source = sourceRow * stride + (x - clipLeft) * 4;
-                        var alpha = bgra[source + 3];
-                        if (alpha == 0)
-                        {
-                            continue;
-                        }
-
-                        AlphaBlend(
-                            pixels,
-                            ToIndex(frame, x, y),
-                            bgra[source + 2],
-                            bgra[source + 1],
-                            bgra[source],
-                            alpha);
-                    }
-                }
-            }
-            finally
-            {
-                bitmap.UnlockBits(data);
-            }
-
-            return true;
-        }
-        catch (Exception ex) when (ex is ArgumentException
-            or ExternalException
-            or OutOfMemoryException)
-        {
-            return false;
-        }
-    }
-
-    private static Color ToDrawingColor(UiColor color) => Color.FromArgb(color.A, color.R, color.G, color.B);
 
     private static UiColor ParseUiColor(string? color, UiColor fallback)
     {

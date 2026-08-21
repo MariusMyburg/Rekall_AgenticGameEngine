@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 21:59 Africa/Johannesburg
+Last verified: 2026-08-21 22:38 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
 Latest milestone: the engine-owned graphics/agent tranche is green at
-1,101/1,101 engine tests, 11/11 Studio tests, and a zero-warning, zero-error
+1,111/1,111 engine tests, 11/11 Studio tests, and a zero-warning, zero-error
 Release solution build. Pong is still the active acceptance, Galaga is next,
 and Rain Glass resumes only after both games are complete.
 
@@ -59,19 +59,30 @@ First, a pruned long-running agent conversation inserted its durable tool ledger
 as a new system message after the original user request and could retain orphaned
 tool results; Qwen 3.8 then failed with `no user query found in messages`. The
 ledger is now a user-role continuation and pruning starts only at a complete
-message boundary. Second, UI text used only a five-pixel bitmap alphabet. The
-Windows renderer now defaults to antialiased Segoe UI, exposes generic
-`FontFamily`, `FontWeight`, `FontStyle`, and imported `FontAssetId` contracts,
-resolves project `font` assets, supports distinct system families such as
-Georgia and Consolas, and retains the bitmap alphabet only as a deterministic
-fallback. The text surface is bounded to each clipped element rather than a
-full-frame allocation. A fresh 960x540 Pong capture shows the compact score,
-serve prompt, and controls in the modern default while preserving the full
-court. Font-family, font-asset, message-pruning, module-reflection, locked player
-publish, package publish, and bounded MCP schema regressions are all included in
-the 1,101-test green run. The next action is to checkpoint/merge this tranche,
-then resume Pong through Studio and require fresh runtime behavior evidence,
-package relocation, audit, and independent play/visual inspection.
+message boundary; blank-system sessions preserve only the initial user task and
+cannot retain an unresolved assistant tool call. Second, UI text used only a
+five-pixel bitmap alphabet. The Windows renderer now defaults to antialiased
+Segoe UI and exposes generic `FontFamily`, `FontWeight`, `FontStyle`, and imported
+`FontAssetId` contracts. It supports distinct installed families, validates
+imported TTF/OTF files, and uses the bitmap alphabet only as a deterministic
+fallback for missing, corrupt, unsupported, or uninstalled fonts. Rasterization
+has hard text, pixel, dimension, entry, and 16 MiB total-cache limits covering
+both pixels and bounded canonical keys, with overflow-safe truncation and tight
+measured glyph surfaces. Rendering and
+clipping/overlap diagnostics share the same effective viewport, inherited, and
+element-own clip rectangle plus those exact metrics. Module indexing skips unrelated
+runtime assemblies but remains strict for assemblies that reference the Rekall
+module contract, so project module load failures are not silently hidden. A
+fresh reviewed 960x540 Pong capture at
+`Artifacts/PongStudioV1/Artifacts/ModernFontCaptureBounded/Main_runtime_001.png`
+is informative with 73 distinct colors, no culling, asset issues, fallbacks, or
+runtime observations, and preserves the full court with compact modern score,
+serve, and control text. The font validation/cache/measurement/asset-count,
+message-pruning, module-filtering, locked player publish, package publish, and
+bounded MCP schema regressions are included in the 1,111-test green run. The
+next action is to checkpoint/merge this tranche, then resume Pong through Studio
+and require fresh runtime behavior evidence, package relocation, audit, and
+independent play/visual inspection.
 
 ## Product objective
 

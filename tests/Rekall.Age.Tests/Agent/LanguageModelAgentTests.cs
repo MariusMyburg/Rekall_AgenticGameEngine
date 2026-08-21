@@ -2022,6 +2022,39 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task PrunedContextWithoutSystemPromptDoesNotPreserveAnUnresolvedAssistantToolCall()
+    {
+        var calls = Enumerable.Range(1, 8)
+            .Select(sequence => new RekallAgeLanguageModelToolCall(
+                $"inspect.{sequence}",
+                new JsonObject { ["sequence"] = sequence }))
+            .ToArray();
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "", calls, "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Complete", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "", "task")
+            {
+                MaxTurns = 2,
+                MaxContextMessages = 4
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal("user", model.Requests[1].Messages[0].Role);
+        Assert.Equal("task", model.Requests[1].Messages[0].Content);
+        Assert.DoesNotContain(model.Requests[1].Messages, message => message.Role == "assistant");
+        Assert.DoesNotContain(model.Requests[1].Messages, message => message.Role == "tool");
+        Assert.Contains(model.Requests[1].Messages, message =>
+            message.Role == "user"
+            && message.Content.StartsWith("Persistent Rekall tool ledger", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task TaskSpecificCompletionRejectsPackageAuditWithoutRequestedRemoteImageVisualEvidence()
     {
         var model = new ScriptedModelClient(

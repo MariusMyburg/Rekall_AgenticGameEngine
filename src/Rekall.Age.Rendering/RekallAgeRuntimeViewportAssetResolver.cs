@@ -1,6 +1,9 @@
 using Rekall.Age.Assets;
 using Rekall.Age.Rendering.Abstractions;
 using StbImageSharp;
+using System.Drawing.Text;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace Rekall.Age.Rendering;
 
@@ -79,6 +82,7 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
 
         foreach (var assetId in fontAssetIds)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!catalogById.TryGetValue(assetId, out var asset))
             {
                 issues.Add(new RekallAgeRuntimeViewportAssetIssue(
@@ -103,6 +107,15 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
                     assetId,
                     "REKALL_RENDER_FONT_MISSING",
                     "Font asset imported file was not found."));
+                continue;
+            }
+
+            if (!IsLoadableFont(asset.ImportedPath))
+            {
+                issues.Add(new RekallAgeRuntimeViewportAssetIssue(
+                    assetId,
+                    "REKALL_RENDER_FONT_UNSUPPORTED",
+                    "Font asset is corrupt, unsupported, or cannot be loaded by the runtime."));
                 continue;
             }
 
@@ -264,6 +277,35 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
             Textures = textures,
             Fonts = fonts
         };
+    }
+
+    private static bool IsLoadableFont(string path)
+    {
+        var extension = Path.GetExtension(path);
+        if (!extension.Equals(".ttf", StringComparison.OrdinalIgnoreCase)
+            && !extension.Equals(".otf", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return OperatingSystem.IsWindowsVersionAtLeast(6, 1) && IsLoadableWindowsFont(path);
+    }
+
+    [SupportedOSPlatform("windows6.1")]
+    private static bool IsLoadableWindowsFont(string path)
+    {
+        try
+        {
+            using var fonts = new PrivateFontCollection();
+            fonts.AddFontFile(path);
+            return fonts.Families.Length > 0;
+        }
+        catch (Exception exception) when (exception is ArgumentException
+            or FileNotFoundException
+            or ExternalException)
+        {
+            return false;
+        }
     }
 
     private static async ValueTask<RekallAgeRgbaImage> ReadImageTextureAsync(

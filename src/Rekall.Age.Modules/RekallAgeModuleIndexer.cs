@@ -6,7 +6,7 @@ public static class RekallAgeModuleIndexer
 {
     public static RekallAgeModuleIndex IndexAssembly(Assembly assembly)
     {
-        var modules = GetLoadableTypes(assembly)
+        var modules = assembly.GetTypes()
             .Where(type => !type.IsAbstract && typeof(RekallAgeModule).IsAssignableFrom(type))
             .Select(IndexModule)
             .Where(module => module is not null)
@@ -17,21 +17,10 @@ public static class RekallAgeModuleIndexer
         return new RekallAgeModuleIndex(modules);
     }
 
-    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
-    {
-        try
-        {
-            return assembly.GetTypes();
-        }
-        catch (ReflectionTypeLoadException exception)
-        {
-            return exception.Types.OfType<Type>();
-        }
-    }
-
     public static RekallAgeModuleIndex IndexAssemblies(IEnumerable<Assembly> assemblies)
     {
         var modules = assemblies
+            .Where(CanContainRekallModules)
             .SelectMany(assembly => IndexAssembly(assembly).Modules)
             .GroupBy(module => module.Id, StringComparer.Ordinal)
             .Select(group => group.First())
@@ -39,6 +28,19 @@ public static class RekallAgeModuleIndexer
             .ToArray();
 
         return new RekallAgeModuleIndex(modules);
+    }
+
+    private static bool CanContainRekallModules(Assembly assembly)
+    {
+        var moduleAssembly = typeof(RekallAgeModule).Assembly;
+        if (assembly == moduleAssembly)
+        {
+            return true;
+        }
+
+        var moduleAssemblyName = moduleAssembly.GetName().Name;
+        return assembly.GetReferencedAssemblies().Any(reference =>
+            reference.Name?.Equals(moduleAssemblyName, StringComparison.Ordinal) == true);
     }
 
     private static RekallAgeModuleMetadata? IndexModule(Type type)

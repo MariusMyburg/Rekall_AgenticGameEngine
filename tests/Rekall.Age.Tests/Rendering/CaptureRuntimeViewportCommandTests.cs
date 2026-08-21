@@ -360,7 +360,7 @@ public sealed class CaptureRuntimeViewportCommandTests
             new JsonObject
             {
                 ["X"] = 25,
-                ["Y"] = 30,
+                ["Y"] = 40,
                 ["Width"] = 150,
                 ["Height"] = 40,
                 ["Text"] = "SYSTEMS READY"
@@ -415,6 +415,41 @@ public sealed class CaptureRuntimeViewportCommandTests
         Assert.Contains(result.Value.LayoutDiagnostics.AuthoringHints, hint =>
             hint.Contains("Title", StringComparison.Ordinal)
             && hint.Contains("Status", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CaptureRuntimeViewportCommandUsesElementBoundsForTextClippingDiagnostics()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["ReferenceWidth"] = 200, ["ReferenceHeight"] = 100 }));
+        var label = RekallAgeEntityDocument.Create("Narrow Label", ["ui"]) with { ParentId = canvas.Id };
+        label = label.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Label",
+            new JsonObject
+            {
+                ["X"] = 10,
+                ["Y"] = 10,
+                ["Width"] = 30,
+                ["Height"] = 24,
+                ["Text"] = "THIS TEXT OVERFLOWS",
+                ["FontSize"] = 18
+            }));
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["ui"]).AddEntity(canvas).AddEntity(label),
+            CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 1, Path.Combine(root, "Viewport"), 200, 100, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("own bounds clipping"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains("REKALL_VIEWPORT_UI_TEXT_SEVERELY_CLIPPED", result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.Contains(result.Value.LayoutDiagnostics.AuthoringHints, hint =>
+            hint.Contains("Narrow Label", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -1314,8 +1314,23 @@ public sealed class RekallAgeLanguageModelAgent(
             return transcript.ToArray();
         }
 
-        var prefixCount = Math.Min(2, transcript.Count);
-        var tail = transcript.Skip(transcript.Count - (maxMessages - prefixCount - 1)).ToArray();
+        var prefix = new List<RekallAgeLanguageModelMessage>(2);
+        if (transcript[0].Role.Equals("system", StringComparison.Ordinal))
+        {
+            prefix.Add(transcript[0]);
+        }
+
+        var firstUserMessage = transcript.FirstOrDefault(message =>
+            message.Role.Equals("user", StringComparison.Ordinal));
+        if (firstUserMessage is not null && !prefix.Contains(firstUserMessage))
+        {
+            prefix.Add(firstUserMessage);
+        }
+
+        var tailCapacity = Math.Max(0, maxMessages - prefix.Count - 1);
+        var tail = tailCapacity == 0
+            ? []
+            : transcript.Skip(transcript.Count - tailCapacity).ToArray();
         var firstCompleteMessage = Array.FindIndex(tail, message => !message.Role.Equals("tool", StringComparison.Ordinal));
         if (firstCompleteMessage < 0)
         {
@@ -1326,7 +1341,7 @@ public sealed class RekallAgeLanguageModelAgent(
             tail = tail[firstCompleteMessage..];
         }
 
-        return transcript.Take(prefixCount)
+        return prefix
             .Append(CreateLedgerMessage(executions))
             .Concat(tail)
             .ToArray();

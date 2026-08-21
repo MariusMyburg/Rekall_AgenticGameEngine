@@ -200,7 +200,7 @@ public sealed class CaptureRuntimeViewportCommand
             "software-rasterized",
             null,
             frameAnalysis,
-            BuildLayoutDiagnostics(frame));
+            BuildLayoutDiagnostics(frame, assets));
 
         context.Transaction.RecordChangedResource(capture.ScreenshotPath);
         return RekallAgeCommandResult<CaptureRuntimeViewportResult>.Success(
@@ -252,9 +252,11 @@ public sealed class CaptureRuntimeViewportCommand
             capture.SpriteCount,
             0,
             assets.Issues.Count(issue =>
-                issue.Code.Equals("REKALL_RENDER_ASSET_MISSING", StringComparison.Ordinal)),
+                issue.Code.Equals("REKALL_RENDER_ASSET_MISSING", StringComparison.Ordinal)
+                || issue.Code.Equals("REKALL_RENDER_FONT_MISSING", StringComparison.Ordinal)),
             assets.Issues.Count(issue =>
-                issue.Code.Equals("REKALL_RENDER_ASSET_UNSUPPORTED", StringComparison.Ordinal)),
+                issue.Code.Equals("REKALL_RENDER_ASSET_UNSUPPORTED", StringComparison.Ordinal)
+                || issue.Code.Equals("REKALL_RENDER_FONT_UNSUPPORTED", StringComparison.Ordinal)),
             assets.Issues
                 .Select(issue => issue.Code)
                 .Distinct(StringComparer.Ordinal)
@@ -265,7 +267,7 @@ public sealed class CaptureRuntimeViewportCommand
             capture.Captured ? "vulkan-scene-rendered" : "vulkan-scene-failed",
             capture.SelectedDevice?.Name,
             frameAnalysis,
-            BuildLayoutDiagnostics(frame));
+            BuildLayoutDiagnostics(frame, assets));
 
         if (capture.Captured)
         {
@@ -328,7 +330,7 @@ public sealed class CaptureRuntimeViewportCommand
             capture.Captured ? "vulkan-clear-pass" : "vulkan-unavailable",
             capture.SelectedDevice?.Name,
             frameAnalysis,
-            BuildLayoutDiagnostics(frame));
+            BuildLayoutDiagnostics(frame, RekallAgeRuntimeViewportAssetSet.Empty));
 
         if (capture.Captured)
         {
@@ -409,7 +411,8 @@ public sealed class CaptureRuntimeViewportCommand
     }
 
     private static CaptureRuntimeViewportLayoutDiagnostics BuildLayoutDiagnostics(
-        RekallAgeRuntimeViewportFrame frame)
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets)
     {
         var camera = frame.ActiveCamera;
         var bounds = BuildWorldBounds(frame.Renderables);
@@ -438,7 +441,7 @@ public sealed class CaptureRuntimeViewportCommand
             AddPlaneOrientationDiagnostics(frame.Renderables, camera, warnings, hints);
         }
 
-        AddUiDiagnostics(frame, warnings, hints);
+        AddUiDiagnostics(frame, assets, warnings, hints);
 
         return new CaptureRuntimeViewportLayoutDiagnostics(
             true,
@@ -507,6 +510,7 @@ public sealed class CaptureRuntimeViewportCommand
 
     private static void AddUiDiagnostics(
         RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
         List<string> warnings,
         List<string> hints)
     {
@@ -539,7 +543,7 @@ public sealed class CaptureRuntimeViewportCommand
 
             if (!string.IsNullOrEmpty(visual.Text))
             {
-                var visiblePercent = CalculateVisibleTextPercent(frame, visual);
+                var visiblePercent = CalculateVisibleTextPercent(frame, visual, ResolveFont(visual, assets));
                 if (visiblePercent < 75)
                 {
                     warnings.Add("REKALL_VIEWPORT_UI_TEXT_SEVERELY_CLIPPED");
@@ -578,7 +582,10 @@ public sealed class CaptureRuntimeViewportCommand
 
         var textGeometry = uiRenderables
             .Where(item => !string.IsNullOrEmpty(item.UiVisual?.Text))
-            .Select(item => (item.EntityName, Geometry: CalculateVisibleTextGeometry(frame, item.UiVisual!)))
+            .Select(item => (item.EntityName, Geometry: CalculateVisibleTextGeometry(
+                frame,
+                item.UiVisual!,
+                ResolveFont(item.UiVisual!, assets))))
             .Where(item => item.Geometry.VisibleArea > 0)
             .ToArray();
         for (var leftIndex = 0; leftIndex < textGeometry.Length; leftIndex++)
@@ -731,9 +738,10 @@ public sealed class CaptureRuntimeViewportCommand
 
     private static int CalculateVisibleTextPercent(
         RekallAgeRuntimeViewportFrame frame,
-        RekallAgeRuntimeViewportUiVisual visual)
+        RekallAgeRuntimeViewportUiVisual visual,
+        RekallAgeRuntimeFontAsset? font)
     {
-        var geometry = CalculateVisibleTextGeometry(frame, visual);
+        var geometry = CalculateVisibleTextGeometry(frame, visual, font);
         return geometry.FullArea == 0
             ? 100
             : (int)Math.Round(geometry.VisibleArea * 100d / geometry.FullArea);
@@ -741,23 +749,24 @@ public sealed class CaptureRuntimeViewportCommand
 
     private static UiTextGeometry CalculateVisibleTextGeometry(
         RekallAgeRuntimeViewportFrame frame,
-        RekallAgeRuntimeViewportUiVisual visual)
+        RekallAgeRuntimeViewportUiVisual visual,
+        RekallAgeRuntimeFontAsset? font)
     {
-        var scale = Math.Max(1, visual.FontSize / 5);
-        var textWidth = visual.Text!.Sum(character =>
-            character == ' '
-                ? 2 * scale
-                : (RekallAgeBitmapFont.Width(character) + 1) * scale);
-        var textX = visual.X + Math.Max(2, visual.BorderWidth + 2);
-        var textY = visual.Y + Math.Max(0, (visual.Height - 5 * scale) / 2);
-        var clipLeft = Math.Max(0, visual.ClipX);
-        var clipTop = Math.Max(0, visual.ClipY);
-        var clipRight = Math.Min(frame.Width, visual.ClipX + visual.ClipWidth);
-        var clipBottom = Math.Min(frame.Height, visual.ClipY + visual.ClipHeight);
-        var textHeight = 5 * scale;
-        var visibleWidth = IntersectionLength(textX, textX + textWidth, clipLeft, clipRight);
-        var visibleHeight = IntersectionLength(textY, textY + textHeight, clipTop, clipBottom);
-        var textArea = (long)textWidth * textHeight;
+        var layout = RekallAgeRuntimeUiTextLayoutResolver.Resolve(frame, visual, font);
+        var raster = layout.Raster;
+        var textWidth = raster.Width;
+        var textX = layout.X;
+        var textY = layout.Y;
+        var clipLeft = layout.Clip.Left;
+        var clipTop = layout.Clip.Top;
+        var clipRight = layout.Clip.Right;
+        var clipBottom = layout.Clip.Bottom;
+        var textHeight = raster.Height;
+        var textRight = (int)Math.Clamp((long)textX + textWidth, int.MinValue, int.MaxValue);
+        var textBottom = (int)Math.Clamp((long)textY + textHeight, int.MinValue, int.MaxValue);
+        var visibleWidth = IntersectionLength(textX, textRight, clipLeft, clipRight);
+        var visibleHeight = IntersectionLength(textY, textBottom, clipTop, clipBottom);
+        var textArea = (long)raster.FullWidth * raster.FullHeight;
         return new UiTextGeometry(
             textArea,
             Math.Max(textX, clipLeft),
@@ -765,6 +774,14 @@ public sealed class CaptureRuntimeViewportCommand
             visibleWidth,
             visibleHeight);
     }
+
+    private static RekallAgeRuntimeFontAsset? ResolveFont(
+        RekallAgeRuntimeViewportUiVisual visual,
+        RekallAgeRuntimeViewportAssetSet assets) =>
+        visual.FontAssetId is { } fontAssetId
+        && assets.Fonts.TryGetValue(fontAssetId, out var font)
+            ? font
+            : null;
 
     private sealed record UiTextGeometry(long FullArea, int X, int Y, int Width, int Height)
     {

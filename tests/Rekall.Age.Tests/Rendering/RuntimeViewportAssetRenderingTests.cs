@@ -449,7 +449,7 @@ public sealed class RuntimeViewportAssetRenderingTests
     }
 
     [Fact]
-    public async Task AssetResolverLoadsImportedFontReferencedByUiText()
+    public async Task AssetResolverRejectsCorruptImportedFontReferencedByUiText()
     {
         var root = TestPaths.CreateTempDirectory();
         var fontPath = Path.Combine(root, "title.ttf");
@@ -478,6 +478,38 @@ public sealed class RuntimeViewportAssetRenderingTests
             1,
             new Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportOverlay(false, 0),
             []);
+
+        var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(root, frame, CancellationToken.None);
+
+        Assert.Empty(assets.Fonts);
+        Assert.Contains(assets.Issues, issue =>
+            issue.AssetId == "asset_title_font"
+            && issue.Code == "REKALL_RENDER_FONT_UNSUPPORTED");
+    }
+
+    [Fact]
+    public async Task AssetResolverLoadsValidImportedFontReferencedByUiText()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var fontPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "segoeui.ttf");
+        Assert.True(File.Exists(fontPath), $"Expected Windows UI font at {fontPath}.");
+        await new RekallAgeAssetCatalogStore().SaveAsync(
+            root,
+            new RekallAgeAssetCatalogDocument(
+            [
+                new RekallAgeAssetDocument(
+                    "asset_title_font", "title-font", "Title Font", "font",
+                    fontPath, fontPath, "hash")
+            ]),
+            CancellationToken.None);
+        var visual = new Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportUiVisual(
+            "Label", 0, 0, 120, 30, 0, 0, 120, 30, "Title", "#00000000", "#ffffff",
+            "#00000000", 0, 20, FontAssetId: "asset_title_font");
+        var frame = new Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame(
+            "Main", 0, 0, 120, 30, null, [],
+            [new Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportRenderable(
+                "title", "Title", "ui", null, 0, 0, 0, 400, UiVisual: visual)],
+            1, new Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportOverlay(false, 0), []);
 
         var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(root, frame, CancellationToken.None);
 

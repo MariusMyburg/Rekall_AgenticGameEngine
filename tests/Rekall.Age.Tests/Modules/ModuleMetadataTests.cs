@@ -3,11 +3,45 @@ using Rekall.Age.Core.Transactions;
 using Rekall.Age.Modules;
 using Rekall.Age.Modules.BuiltIns;
 using Rekall.Age.Modules.Commands;
+using System.Reflection;
 
 namespace Rekall.Age.Tests.Modules;
 
 public sealed class ModuleMetadataTests
 {
+    [Fact]
+    public void IndexAssembliesSkipsUnrelatedRuntimeAssembliesAndKeepsRekallModules()
+    {
+        var index = RekallAgeModuleIndexer.IndexAssemblies(
+        [
+            typeof(System.Drawing.Font).Assembly,
+            typeof(RekallAgeBuiltInModule).Assembly
+        ]);
+
+        Assert.Contains(index.Modules, module => module.Id == "rekall.builtins");
+    }
+
+    [Fact]
+    public void IndexAssembliesDoesNotReflectUnrelatedPartiallyLoadableAssembly()
+    {
+        var index = RekallAgeModuleIndexer.IndexAssemblies(
+        [
+            new ThrowingTypeAssembly(referencesModules: false),
+            typeof(RekallAgeBuiltInModule).Assembly
+        ]);
+
+        Assert.Contains(index.Modules, module => module.Id == "rekall.builtins");
+    }
+
+    [Fact]
+    public void IndexAssembliesPropagatesLoadFailureFromCandidateModuleAssembly()
+    {
+        var assembly = new ThrowingTypeAssembly(referencesModules: true);
+
+        Assert.Throws<ReflectionTypeLoadException>(() =>
+            RekallAgeModuleIndexer.IndexAssemblies([assembly]));
+    }
+
     [Fact]
     public void IndexerDiscoversModuleComponentsPropertiesAndCapabilities()
     {
@@ -33,6 +67,15 @@ public sealed class ModuleMetadataTests
         Assert.True(result.Ok);
         var schema = Assert.Single(result.Value.Components, item => item.DisplayName == "Player Controller");
         Assert.Contains(schema.Properties, property => property.Name == nameof(TestPlayerController.MoveSpeed));
+    }
+
+    private sealed class ThrowingTypeAssembly(bool referencesModules) : Assembly
+    {
+        public override Type[] GetTypes() =>
+            throw new ReflectionTypeLoadException([], []);
+
+        public override AssemblyName[] GetReferencedAssemblies() =>
+            referencesModules ? [typeof(RekallAgeModule).Assembly.GetName()] : [];
     }
 
     [Fact]

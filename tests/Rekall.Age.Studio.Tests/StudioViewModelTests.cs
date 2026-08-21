@@ -139,7 +139,7 @@ public sealed class StudioViewModelTests
             var result = await RekallAgeStudioAutomation.RunAsync(
                 new RekallAgeStudioAutomationOptions(root, "Must Not Replace Existing Game", "Main", "deterministic", "Inspect the existing game.", evidence)
                 {
-                    TreatGauntletAsTerminalSuccess = false,
+                    TreatGauntletAsTerminalSuccess = true,
                     MaxTurns = 2
                 },
                 new EmptyModel(),

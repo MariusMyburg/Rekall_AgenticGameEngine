@@ -1246,6 +1246,47 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task StrictCompletionRejectsNarrativeClaimsUntilConfiguredAuditToolSucceeds()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Everything is complete.", "", [], "stop", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "I confirm completion.", "", [], "stop", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall(
+                    "rekall.workflow.audit_playable_package",
+                    new JsonObject { ["packagePath"] = "game.zip" })],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Audit-backed completion.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 4,
+                RequireCompletionAudit = true,
+                RequireCompletionAuditToolEvidence = true,
+                CompletionAuditPrimingTools = new HashSet<string>(
+                    ["rekall.workflow.audit_playable_package"],
+                    StringComparer.Ordinal)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(4, result.Turns);
+        Assert.Equal("Audit-backed completion.", result.FinalContent);
+        Assert.All(model.Requests.Skip(1).Take(2), request =>
+            Assert.Contains(request.Messages, message =>
+                message.Role == "user"
+                && message.Content.Contains(
+                    "rekall.workflow.audit_playable_package",
+                    StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public async Task ToolUseAfterPrimedDeliveryAuditInvalidatesTheCompletionProof()
     {
         var model = new ScriptedModelClient(

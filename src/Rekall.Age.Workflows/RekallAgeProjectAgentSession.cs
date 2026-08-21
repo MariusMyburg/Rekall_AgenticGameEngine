@@ -16,6 +16,7 @@ public sealed record RekallAgeProjectAgentSessionRequest(
     public string? Think { get; init; } = "medium";
     public double? Temperature { get; init; }
     public bool RequireCompletionAudit { get; init; } = true;
+    public bool RequireCompletionAuditToolEvidence { get; init; }
     public bool TreatGauntletAsTerminalSuccess { get; init; }
 }
 
@@ -76,6 +77,7 @@ public sealed class RekallAgeProjectAgentSession
                 Think = request.Think,
                 Temperature = request.Temperature,
                 RequireCompletionAudit = request.RequireCompletionAudit,
+                RequireCompletionAuditToolEvidence = request.RequireCompletionAuditToolEvidence,
                 RequireRuntimeBehaviorAssertions = !request.TreatGauntletAsTerminalSuccess,
                 Progress = progress,
                 CompletionAuditPrimingTools = new HashSet<string>(

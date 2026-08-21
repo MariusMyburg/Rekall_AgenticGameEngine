@@ -4,12 +4,13 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 09:02 Africa/Johannesburg
+Last verified: 2026-08-21 09:21 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: failed package audits are task-anchored; task-specific Studio
-completion must require successful audit-tool evidence
+Latest milestone: task-specific Studio completion fails closed without
+successful package-audit tool evidence; exact typed SDK compiler recovery is
+the next measured repair
 
 ## Product objective
 
@@ -31,6 +32,35 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Task-specific Studio completion now rejects narrative self-audits until a
+  configured completion-audit tool has succeeded, with no intervening tool call
+  before the evidence-backed final response. The strict contract is explicit at
+  the language-agent and project-session boundaries and enabled only for
+  task-specific Studio automation, preserving generic gauntlet behavior. Red
+  regressions were followed by 40/40 language/session and 7/7 Studio focused
+  passes. The locked zero-warning/error gate then passed 1,013/1,013 engine and
+  7/7 Studio tests twice plus the full installed-product matrix. Its 1,186-file
+  archive is 201,584,539 bytes with SHA-256
+  `2D5CFBFB86B53C5E7A6D92DE8114D9768D2B1546B7C3F9B3415495609F0AA985`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+- Clean installed real-Qwen benchmark 38 proves the strict contract fails
+  closed. Local `qwen3.5:35b` created seven renderables and a game-authored
+  `LumenVaultRuntime` module but produced no package or audit; Studio returned
+  `turn_limit`, a blank outer viewport, four blocking validation issues, and
+  `Succeeded=False` after 59 tool calls rather than accepting an unsupported
+  completion narrative. The final generic bottleneck was typed SDK repair:
+  Qwen compared a `ComponentBoolean` result with an integer, passed numeric
+  values to `WithComponentBoolean`, and supplied a boolean fallback to the
+  double-valued `InputActionValue`. Evidence SHA-256 is
+  `56ABB8FD0000CE02DFABF7889BFFE9E783EC56C4FFB2EB2A090961FF5BFDD604`.
+  A new red/green build-command regression now requires bounded compiler
+  recovery to show exact bool read/write and semantic reset-action forms; its
+  two focused recovery tests pass. The locked zero-warning/error gate passed
+  1,014/1,014 engine and 7/7 Studio tests twice plus the complete installed
+  matrix. Its 1,186-file archive is 201,585,180 bytes with SHA-256
+  `7104C0B6752840FD01DF37884CB6139E0CA3AF71E033F45C156A9CBF5B5E5769`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+  A clean installed rerun is next.
 - Failed package audits now inject bounded, task-anchored recovery: agents must
   repair the original requested entities, visuals, HUD, and behavior; generic
   `Cube/Test/Demo/Fault` filler is explicitly rejected; and scene/module changes

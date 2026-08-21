@@ -532,6 +532,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 {
                     MaxTurns = AgentMaxTurns,
                     RequireCompletionAudit = true,
+                    RequireCompletionAuditToolEvidence = !TreatGauntletAsTerminalSuccess,
                     TreatGauntletAsTerminalSuccess = TreatGauntletAsTerminalSuccess
                 },
                 progress,

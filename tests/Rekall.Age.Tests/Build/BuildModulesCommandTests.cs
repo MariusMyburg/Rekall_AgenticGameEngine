@@ -264,4 +264,58 @@ public sealed class BuildModulesCommandTests
         Assert.False(string.IsNullOrWhiteSpace((string)inspection.Arguments["query"]!));
         Assert.Contains("entity transform", (string)inspection.Arguments["query"]!, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task RuntimeSdkBooleanCompilerFailureReturnsExactBooleanAndInputRepairContract()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("runtime sdk boolean compiler recovery"),
+            CancellationToken.None);
+        var scaffold = await new ScaffoldRuntimeSystemModuleCommand().ExecuteAsync(
+            new ScaffoldRuntimeSystemModuleRequest(
+                root,
+                "game.state",
+                "Game State",
+                "GameState",
+                "GameStateComponent",
+                "GameStateSystem"),
+            context);
+        var source = await File.ReadAllTextAsync(scaffold.Value.SourcePath);
+        source = source.Replace(
+            "var position = entity.Transform.Position3D;",
+            "var enabled = entity.ComponentBoolean(componentType, \"enabled\", false) != 0;\n"
+            + "            var reset = world.InputActionValue(\"reset\", false) > 0;\n"
+            + "            var replacement = entity.WithComponentBoolean(componentType, \"enabled\", 1);\n"
+            + "            var position = entity.Transform.Position3D;",
+            StringComparison.Ordinal);
+        await new WriteModuleSourceCommand().ExecuteAsync(
+            new WriteModuleSourceRequest(root, "GameState", "GameStateModule.cs", source),
+            context);
+
+        var result = await new BuildModulesCommand().ExecuteAsync(
+            new BuildModulesRequest(root),
+            context);
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors, item => item.Code == "REKALL_MODULE_BUILD_FAILED");
+        Assert.Contains(
+            "var enabled = entity.ComponentBoolean(componentType, \"enabled\", false);",
+            error.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "entity.WithComponentBoolean(componentType, \"enabled\", true)",
+            error.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "world.WasInputActionPressed(\"reset\")",
+            error.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "world.InputActionValue(\"reset\", 0) > 0",
+            error.Message,
+            StringComparison.Ordinal);
+        Assert.Contains("Boolean helpers use bool values", error.Message, StringComparison.Ordinal);
+    }
 }

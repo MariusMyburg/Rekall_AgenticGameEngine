@@ -280,6 +280,9 @@ public sealed class BuildModulesCommand
             + "- Select one entity: var entity = world.FindEntity(\"Player\"); then null-check it; EntitiesNamed returns a list, not one entity.\n"
             + "- Read transform: var position = entity.Transform.Position3D;\n"
             + "- Read authored state: var value = entity.ComponentNumber(componentType, \"value\", 0); use ComponentBoolean/ComponentString for those kinds.\n"
+            + "- Read authored booleans: var enabled = entity.ComponentBoolean(componentType, \"enabled\", false); Boolean helpers use bool values directly, never compare them with 0 or 1.\n"
+            + "- Write authored booleans: entity = entity.WithComponentBoolean(componentType, \"enabled\", true); pass true/false, never 1/0.\n"
+            + "- Read a pressed semantic action: var resetPressed = world.WasInputActionPressed(\"reset\"); alternatively use world.InputActionValue(\"reset\", 0) > 0 because InputActionValue and its fallback are double.\n"
             + "- Replace position: var updated = entity.WithPosition3D(new RekallAgeRuntimeVector3(x, y, z));\n"
             + "- Persist replacement: world = world.UpdateEntity(entity.Id, current => current.WithPosition3D(new RekallAgeRuntimeVector3(x, y, z)));\n"
             + "These are extension-call shapes on the entity/world. Do not invent RekallAgeRuntimeModuleSdk.GetTransform3D, ReadTransform3D, Transform3D, GetComponentNumber, or a two-argument WithPosition3D. Inspect the compiled SDK with the populated suggested command, read the existing source, make one targeted repair, and rebuild.\n\n"
@@ -312,7 +315,10 @@ public sealed class BuildModulesCommand
         || output.Contains("ComponentBoolean", StringComparison.Ordinal)
         || output.Contains("ComponentString", StringComparison.Ordinal)
         || output.Contains("WithPosition3D", StringComparison.Ordinal)
-        || output.Contains("Position3D", StringComparison.Ordinal);
+        || output.Contains("Position3D", StringComparison.Ordinal)
+        || output.Contains("operands of type 'bool' and 'int'", StringComparison.Ordinal)
+        || output.Contains("cannot convert from 'bool' to 'double'", StringComparison.Ordinal)
+        || output.Contains("cannot convert from 'int' to 'bool'", StringComparison.Ordinal);
 
     private static void ResetVerifiedGeneratedDirectory(
         RekallAgeModuleBuildCandidate candidate,

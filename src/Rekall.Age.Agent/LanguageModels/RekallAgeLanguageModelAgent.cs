@@ -26,6 +26,8 @@ public sealed record RekallAgeLanguageModelAgentRequest(string Model, string Sys
 
     public bool RequireCompletionAudit { get; init; }
 
+    public bool RequireCompletionAuditToolEvidence { get; init; }
+
     public bool RequireRuntimeBehaviorAssertions { get; init; }
 
     public int MaxRuntimeBehaviorRepairTurns { get; init; } = 12;
@@ -185,6 +187,17 @@ public sealed class RekallAgeLanguageModelAgent(
                     transcript.Add(new RekallAgeLanguageModelMessage(
                         "user",
                         BuildRuntimeAuthoringCheckpointPrompt(maxPreRuntimeAuthoringMutations)));
+                    continue;
+                }
+
+                if (request.RequireCompletionAuditToolEvidence && !completionAuditPending)
+                {
+                    var requiredTools = request.CompletionAuditPrimingTools.Count == 0
+                        ? "a configured completion-audit tool"
+                        : string.Join(" or ", request.CompletionAuditPrimingTools.Order(StringComparer.Ordinal));
+                    transcript.Add(new RekallAgeLanguageModelMessage(
+                        "user",
+                        $"Strict completion evidence required. A narrative claim cannot complete this task. Successfully call {requiredTools} against the current deliverable, then provide the final evidence-backed response without any intervening tool call. If the audit fails, repair from its direct evidence and rerun it."));
                     continue;
                 }
 

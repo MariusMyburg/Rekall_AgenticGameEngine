@@ -4,9 +4,9 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 23:19 Africa/Johannesburg
+Last verified: 2026-08-21 23:25 Africa/Johannesburg
 
-Branch: `codex/studio-ergonomics`
+Branch: `master`
 
 Latest milestone: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,
@@ -26,7 +26,9 @@ engine suite passes 1,111/1,111, and both Debug and Release solution builds
 complete with zero warnings/errors. Real Windows UI inspection proved Edit capture,
 continuous simulation from frame 0 through frame 120, Stop/reset to frame 0,
 and unchanged authored scene state. Independent review reports no remaining
-Critical or Important findings and marks the tranche merge-ready; integration remains.
+Critical or Important findings. The tranche is fast-forwarded onto `master` at
+`1dccb1c`; the merged checkout passes 19/19 Studio tests. The final progress
+checkpoint and `master` push are the remaining integration steps.
 Pong remains the active game acceptance; this bounded
 Studio tranche precedes Galaga so that Galaga can exercise a credible editor.
 

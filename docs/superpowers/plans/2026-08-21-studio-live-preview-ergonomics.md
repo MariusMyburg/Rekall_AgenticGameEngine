@@ -4,7 +4,7 @@
 
 **Goal:** Deliver explicit Edit/Simulate/Play Studio modes, persistent in-editor simulation preview, and a coherent modern dark WPF shell.
 
-**Status (2026-08-21 23:19):** Tasks 1-3 implementation, verification, and independent review are complete: 19/19 Studio tests, 1,111/1,111 engine tests, zero-warning Debug and Release builds, real Windows Edit/Simulate/Stop inspection, and no remaining Critical/Important review findings. Commit/push, merge verification, and master push remain.
+**Status (2026-08-21 23:25):** Tasks 1-3 implementation, verification, independent review, branch checkpoint/push, fast-forward integration at `1dccb1c`, and merged-master Studio verification are complete: 19/19 Studio tests, 1,111/1,111 engine tests, zero-warning Debug and Release builds, real Windows Edit/Simulate/Stop inspection, and no remaining Critical/Important review findings. The final progress checkpoint and master push remain.
 
 **Architecture:** A focused preview-session service owns generic runtime state and rendering; the view model owns editor-mode transitions; the window owns the dispatcher cadence. Application resources style the complete control family consistently.
 

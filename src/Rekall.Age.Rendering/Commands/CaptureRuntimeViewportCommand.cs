@@ -2,6 +2,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime;
 using System.Globalization;
+using System.Numerics;
 
 namespace Rekall.Age.Rendering.Commands;
 
@@ -432,6 +433,11 @@ public sealed class CaptureRuntimeViewportCommand
             AddAxisDiagnostics(bounds, warnings, hints);
         }
 
+        if (camera is not null)
+        {
+            AddPlaneOrientationDiagnostics(frame.Renderables, camera, warnings, hints);
+        }
+
         AddUiDiagnostics(frame, warnings, hints);
 
         return new CaptureRuntimeViewportLayoutDiagnostics(
@@ -589,6 +595,62 @@ public sealed class CaptureRuntimeViewportCommand
                 }
             }
         }
+    }
+
+    private static void AddPlaneOrientationDiagnostics(
+        IReadOnlyList<RekallAgeRuntimeViewportRenderable> renderables,
+        RekallAgeRuntimeViewportCamera camera,
+        List<string> warnings,
+        List<string> hints)
+    {
+        var cameraForward = RotateDirection(
+            Vector3.UnitZ,
+            camera.RotationX,
+            camera.RotationY,
+            camera.RotationZ);
+        foreach (var renderable in renderables.Where(renderable =>
+            renderable.Variant?.Equals("rekall.geometry.plane", StringComparison.OrdinalIgnoreCase) == true
+            && renderable.FacingMode.Equals("world", StringComparison.OrdinalIgnoreCase)))
+        {
+            var normal = RotateDirection(
+                Vector3.UnitY,
+                renderable.RotationX,
+                renderable.RotationY,
+                renderable.RotationZ);
+            if (Math.Abs(Vector3.Dot(normal, cameraForward)) >= 0.15f)
+            {
+                continue;
+            }
+
+            warnings.Add("REKALL_VIEWPORT_PLANE_EDGE_ON_TO_CAMERA");
+            if (hints.Count < 8)
+            {
+                hints.Add($"Plane '{renderable.EntityName}' is nearly edge-on to the active camera. Rekall geometry planes lie on local XZ with a +Y normal; rotate the plane (commonly 90 degrees around X for a Z-facing backdrop) or use an appropriate camera-facing primitive, then recapture.");
+            }
+        }
+    }
+
+    private static Vector3 RotateDirection(
+        Vector3 direction,
+        double degreesX,
+        double degreesY,
+        double degreesZ)
+    {
+        var x = direction.X;
+        var y = direction.Y;
+        var z = direction.Z;
+        var radians = MathF.PI / 180f;
+        var cos = MathF.Cos((float)degreesX * radians);
+        var sin = MathF.Sin((float)degreesX * radians);
+        (y, z) = (y * cos - z * sin, y * sin + z * cos);
+        cos = MathF.Cos((float)degreesY * radians);
+        sin = MathF.Sin((float)degreesY * radians);
+        (x, z) = (x * cos + z * sin, -x * sin + z * cos);
+        cos = MathF.Cos((float)degreesZ * radians);
+        sin = MathF.Sin((float)degreesZ * radians);
+        (x, y) = (x * cos - y * sin, x * sin + y * cos);
+        var rotated = new Vector3(x, y, z);
+        return rotated.LengthSquared() <= 0.000001f ? direction : Vector3.Normalize(rotated);
     }
 
     private static int CalculateVisibleTextPercent(

@@ -303,6 +303,46 @@ public sealed class CaptureRuntimeViewportCommandTests
     }
 
     [Fact]
+    public async Task CaptureRuntimeViewportCommandWarnsWhenAPlaneIsEdgeOnToTheActiveCamera()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["z"] = -4
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Backdrop", ["background"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["scaleX"] = 4,
+                    ["scaleY"] = 1,
+                    ["scaleZ"] = 4
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+                {
+                    ["primitive"] = "plane",
+                    ["color"] = "#33415f"
+                })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 0, Path.Combine(root, "Viewport"), 320, 180, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("edge-on plane"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains("REKALL_VIEWPORT_PLANE_EDGE_ON_TO_CAMERA", result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.Contains(result.Value.LayoutDiagnostics.AuthoringHints, hint =>
+            hint.Contains("Backdrop", StringComparison.Ordinal)
+            && hint.Contains("XZ", StringComparison.Ordinal)
+            && hint.Contains("rotate", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task CaptureRuntimeViewportCommandReportsSeverelyClippedUiAndInvisibleText()
     {
         var root = TestPaths.CreateTempDirectory();

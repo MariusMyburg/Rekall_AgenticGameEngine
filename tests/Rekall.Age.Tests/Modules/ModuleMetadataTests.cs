@@ -238,6 +238,8 @@ public sealed class ModuleMetadataTests
         Assert.Contains(networkTransform.Properties, property => property.Name == "ReplicatePosition" && property.Kind == "boolean");
         Assert.Contains(networkTransform.Properties, property => property.Name == "Priority" && property.Minimum == 0);
         var geometry = Assert.Single(module.Components, component => component.DisplayName == "Geometry Primitive");
+        Assert.Contains("XZ plane", geometry.Description, StringComparison.Ordinal);
+        Assert.Contains("normal points toward +Y", geometry.Description, StringComparison.Ordinal);
         Assert.Contains(geometry.Properties, property => property.Name == "Primitive" && property.Kind == "string");
         Assert.Contains(geometry.Properties, property => property.Name == "Color" && property.Kind == "color");
         var mesh = Assert.Single(module.Components, component => component.DisplayName == "Geometry Mesh");

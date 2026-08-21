@@ -2099,6 +2099,102 @@ public sealed class LanguageModelAgentTests
         Assert.Equal("Evidence-backed completion.", result.FinalContent);
     }
 
+    [Fact]
+    public async Task TaskSpecificCompletionRejectsPongWithoutRequestedUiAndGameplayTransitionEvidence()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.workflow.audit_playable_package", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Pong is complete.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new TaskEvidenceToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest(
+                "model",
+                "system",
+                "<user-request>Create a fully playable two-player Pong game with paddle collisions, scoring, a serve and reset flow, and clear on-screen scores and control instructions.</user-request>")
+            {
+                MaxTurns = 3,
+                RequireTaskSpecificEvidence = true,
+                RequireCompletionAuditToolEvidence = true,
+                CompletionAuditPrimingTools = new HashSet<string>(
+                    ["rekall.workflow.audit_playable_package"],
+                    StringComparer.Ordinal)
+            },
+            CancellationToken.None);
+
+        Assert.False(result.Completed);
+        Assert.Contains(
+            model.Requests[2].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("UI renderable", StringComparison.OrdinalIgnoreCase)
+                && message.Content.Contains("score transition", StringComparison.OrdinalIgnoreCase)
+                && message.Content.Contains("reset", StringComparison.OrdinalIgnoreCase)
+                && message.Content.Contains("two distinct semantic actions", StringComparison.OrdinalIgnoreCase)
+                && message.Content.Contains("collision", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task TaskSpecificCompletionAcceptsPongWithUiAndFocusedGameplayTransitionEvidence()
+    {
+        static RekallAgeLanguageModelResponse Call(string name, JsonObject? arguments = null) => new(
+            "test", "model", "", "",
+            [new RekallAgeLanguageModelToolCall(name, arguments ?? new JsonObject())],
+            "tool_calls", new(1, 1, 1));
+        static JsonObject Checkpoint(string action, string property) => new()
+        {
+            ["inputs"] = new JsonArray(new JsonObject
+            {
+                ["semanticActions"] = new JsonArray(new JsonObject
+                {
+                    ["name"] = action,
+                    ["value"] = 1,
+                    ["isDown"] = true
+                })
+            }),
+            ["assertions"] = new JsonArray(new JsonObject
+            {
+                ["entityName"] = "Ball",
+                ["subject"] = "changed.component.property",
+                ["operator"] = "equals",
+                ["expected"] = true,
+                ["componentType"] = "Game.PongState",
+                ["propertyName"] = property
+            })
+        };
+
+        var model = new ScriptedModelClient(
+            Call("rekall.render.capture_runtime_viewport", new JsonObject { ["frames"] = 1 }),
+            Call("rekall.runtime.inspect_scene", Checkpoint("left.move", "LeftScore")),
+            Call("rekall.runtime.inspect_scene", Checkpoint("right.move", "LastPaddleHit")),
+            Call("rekall.runtime.inspect_scene", Checkpoint("game.reset", "Phase")),
+            Call("rekall.workflow.audit_playable_package"),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Pong is proven.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new TaskEvidenceToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest(
+                "model",
+                "system",
+                "<user-request>Create a fully playable two-player Pong game with paddle collisions, scoring, a serve and reset flow, and clear on-screen scores and control instructions.</user-request>")
+            {
+                MaxTurns = 6,
+                RequireTaskSpecificEvidence = true,
+                RequireCompletionAuditToolEvidence = true,
+                CompletionAuditPrimingTools = new HashSet<string>(
+                    ["rekall.workflow.audit_playable_package"],
+                    StringComparer.Ordinal)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal("Pong is proven.", result.FinalContent);
+    }
+
     private sealed class ScriptedModelClient(params RekallAgeLanguageModelResponse[] responses) : IRekallAgeLanguageModelClient
     {
         private int _index;
@@ -2214,6 +2310,7 @@ public sealed class LanguageModelAgentTests
                     {
                         ["captured"] = true,
                         ["frameIndex"] = frame,
+                        ["renderableKinds"] = new JsonArray("mesh", "ui"),
                         ["assetBackedRenderableCount"] = 1,
                         ["frameAnalysis"] = new JsonObject
                         {

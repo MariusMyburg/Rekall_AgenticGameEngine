@@ -11,6 +11,12 @@ internal sealed class RekallAgeTaskEvidenceTracker
     private bool _shaderSourceAuthored;
     private bool _shaderValidated;
     private bool _shaderPipelineAssigned;
+    private bool _uiCaptureAccepted;
+    private bool _scoreTransitionProven;
+    private bool _resetTransitionProven;
+    private bool _serveTransitionProven;
+    private bool _collisionTransitionProven;
+    private readonly HashSet<string> _provenSemanticActions = new(StringComparer.OrdinalIgnoreCase);
 
     public RekallAgeTaskEvidenceTracker(string task, bool enabled)
     {
@@ -30,6 +36,12 @@ internal sealed class RekallAgeTaskEvidenceTracker
         if (IsAuthoringMutation(toolName))
         {
             _acceptedCaptureFrames.Clear();
+            _uiCaptureAccepted = false;
+            _scoreTransitionProven = false;
+            _resetTransitionProven = false;
+            _serveTransitionProven = false;
+            _collisionTransitionProven = false;
+            _provenSemanticActions.Clear();
         }
 
         switch (toolName)
@@ -54,6 +66,9 @@ internal sealed class RekallAgeTaskEvidenceTracker
                 break;
             case "rekall.render.capture_runtime_viewport":
                 ObserveCapture(output);
+                break;
+            case "rekall.runtime.inspect_scene":
+                ObserveRuntimeInspection(arguments);
                 break;
         }
     }
@@ -103,6 +118,30 @@ internal sealed class RekallAgeTaskEvidenceTracker
         {
             requirements.Add("capture at least two accepted runtime viewport frames at distinct frame indices after the final mutation, in addition to executable runtime-state proof, so the time-varying visual is evidenced");
         }
+        if (_requirements.RequireUiCapture)
+        {
+            requirements.Add("capture a fresh informative runtime viewport containing a visible UI renderable for the requested on-screen information");
+        }
+        if (_requirements.RequireScoreTransition)
+        {
+            requirements.Add("prove scoring through a passing runtime transition assertion targeting an agent-owned score or points property");
+        }
+        if (_requirements.RequireResetTransition)
+        {
+            requirements.Add("prove reset/restart through a passing runtime inspection that injects a reset/restart semantic action and asserts a state transition");
+        }
+        if (_requirements.RequireServeTransition)
+        {
+            requirements.Add("prove the requested serve flow through a passing runtime transition assertion targeting an agent-owned serve or phase/state property");
+        }
+        if (_requirements.RequireCollisionTransition)
+        {
+            requirements.Add("prove the requested collision/contact response through a passing runtime transition assertion targeting an agent-owned hit, collision, contact, or bounce property");
+        }
+        if (_requirements.RequireTwoPlayerInputs)
+        {
+            requirements.Add("prove two-player controls with passing runtime inspections that exercise at least two distinct declared semantic action names");
+        }
 
         return (initial
                 ? "Task-specific delivery checklist derived from the authoritative user request. This checklist is mandatory and supplements the generic engine workflow:\n- "
@@ -145,6 +184,30 @@ internal sealed class RekallAgeTaskEvidenceTracker
         {
             missing.Add("Fewer than two accepted runtime viewport captures at distinct frame indices prove the requested moving visual.");
         }
+        if (_requirements.RequireUiCapture && !_uiCaptureAccepted)
+        {
+            missing.Add("No fresh informative runtime viewport capture contains a UI renderable for the requested on-screen score or instructions.");
+        }
+        if (_requirements.RequireScoreTransition && !_scoreTransitionProven)
+        {
+            missing.Add("No passing runtime score transition assertion targets an agent-owned score or points property.");
+        }
+        if (_requirements.RequireResetTransition && !_resetTransitionProven)
+        {
+            missing.Add("No passing reset runtime checkpoint combines a reset/restart semantic action with a state transition assertion.");
+        }
+        if (_requirements.RequireServeTransition && !_serveTransitionProven)
+        {
+            missing.Add("No passing runtime transition assertion proves the requested serve flow.");
+        }
+        if (_requirements.RequireCollisionTransition && !_collisionTransitionProven)
+        {
+            missing.Add("No passing runtime collision/contact transition assertion proves the requested response.");
+        }
+        if (_requirements.RequireTwoPlayerInputs && _provenSemanticActions.Count < 2)
+        {
+            missing.Add("Fewer than two distinct semantic actions have passing runtime evidence for the requested two-player controls.");
+        }
         return missing;
     }
 
@@ -172,6 +235,54 @@ internal sealed class RekallAgeTaskEvidenceTracker
         }
 
         _acceptedCaptureFrames.Add(ReadInt32(value, "frameIndex"));
+        _uiCaptureAccepted |= Find(value, "renderableKinds") is JsonArray kinds
+            && kinds.Any(item => item?.GetValue<string>().Equals("ui", StringComparison.OrdinalIgnoreCase) == true);
+    }
+
+    private void ObserveRuntimeInspection(JsonObject arguments)
+    {
+        var actionNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (Find(arguments, "inputs") is JsonArray inputs)
+        {
+            foreach (var frame in inputs.OfType<JsonObject>())
+            {
+                if (Find(frame, "semanticActions") is not JsonArray actions)
+                {
+                    continue;
+                }
+
+                foreach (var action in actions.OfType<JsonObject>())
+                {
+                    if (Find(action, "name") is JsonValue nameValue
+                        && nameValue.TryGetValue<string>(out var name)
+                        && !string.IsNullOrWhiteSpace(name))
+                    {
+                        actionNames.Add(name);
+                        _provenSemanticActions.Add(name);
+                    }
+                }
+            }
+        }
+
+        if (Find(arguments, "assertions") is not JsonArray assertions)
+        {
+            return;
+        }
+
+        var transitionProperties = assertions
+            .OfType<JsonObject>()
+            .Where(assertion => Find(assertion, "subject")?.GetValue<string>() is { } subject
+                && (subject.StartsWith("delta.", StringComparison.OrdinalIgnoreCase)
+                    || subject.StartsWith("changed.", StringComparison.OrdinalIgnoreCase)))
+            .Select(assertion => Find(assertion, "propertyName")?.GetValue<string>() ?? string.Empty)
+            .Where(property => !string.IsNullOrWhiteSpace(property))
+            .ToArray();
+
+        _scoreTransitionProven |= transitionProperties.Any(property => ContainsAny(property, "score", "points"));
+        _serveTransitionProven |= transitionProperties.Any(property => ContainsAny(property, "serve", "phase", "state"));
+        _collisionTransitionProven |= transitionProperties.Any(property => ContainsAny(property, "hit", "collision", "contact", "bounce"));
+        _resetTransitionProven |= actionNames.Any(action => ContainsAny(action, "reset", "restart"))
+            && transitionProperties.Length > 0;
     }
 
     private static bool IsAuthoringMutation(string toolName) =>
@@ -222,9 +333,15 @@ internal sealed class RekallAgeTaskEvidenceTracker
         bool RequireOpenLicense,
         bool RequireCustomShader,
         bool RequireFullViewportCoverage,
-        bool RequireDistinctTimeFrames)
+        bool RequireDistinctTimeFrames,
+        bool RequireUiCapture,
+        bool RequireScoreTransition,
+        bool RequireResetTransition,
+        bool RequireServeTransition,
+        bool RequireCollisionTransition,
+        bool RequireTwoPlayerInputs)
     {
-        public static Requirements None { get; } = new(false, false, false, false, false, false);
+        public static Requirements None { get; } = new(false, false, false, false, false, false, false, false, false, false, false, false);
 
         public bool Any => this != None;
 
@@ -246,7 +363,25 @@ internal sealed class RekallAgeTaskEvidenceTracker
                 "fills the window",
                 "fill the window");
             var timeVarying = ContainsAny(request, "moving", "animated", "animating", "time-varying", "time varying");
-            return new Requirements(remote, remote && !suppliedUrl, openLicense, shader, fullViewport, timeVarying);
+            var ui = ContainsAny(request, "on-screen", "on screen", "scoreboard", "hud", "control instructions");
+            var scoring = ContainsAny(request, "scoring", "score points", "scorekeeping", "score keeping");
+            var reset = ContainsAny(request, "reset", "restart");
+            var serve = ContainsAny(request, "serve flow", "serving flow", "serve and");
+            var collision = ContainsAny(request, "collision", "contact response", "bounce response");
+            var twoPlayer = ContainsAny(request, "two-player", "two player", "2-player", "2 player");
+            return new Requirements(
+                remote,
+                remote && !suppliedUrl,
+                openLicense,
+                shader,
+                fullViewport,
+                timeVarying,
+                ui,
+                scoring,
+                reset,
+                serve,
+                collision,
+                twoPlayer);
         }
 
         private static string ExtractUserRequest(string task)
@@ -266,4 +401,7 @@ internal sealed class RekallAgeTaskEvidenceTracker
         private static bool ContainsAny(string value, params string[] candidates) =>
             candidates.Any(candidate => value.Contains(candidate, StringComparison.Ordinal));
     }
+
+    private static bool ContainsAny(string value, params string[] candidates) =>
+        candidates.Any(candidate => value.Contains(candidate, StringComparison.OrdinalIgnoreCase));
 }

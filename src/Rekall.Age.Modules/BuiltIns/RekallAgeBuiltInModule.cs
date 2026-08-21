@@ -532,10 +532,10 @@ public sealed class RekallAgeNetworkTransformComponent : RekallAgeComponent
     public int Priority { get; init; } = 0;
 }
 
-[RekallAgeComponent("Geometry Primitive")]
+[RekallAgeComponent("Geometry Primitive", Description = "Engine-local 3D primitive geometry centered at the entity transform. Cube, sphere, cylinder, and cone use their conventional local axes. The plane primitive lies on the local XZ plane and its normal points toward +Y; rotate it 90 degrees around local X for an XY backdrop facing a camera along the Z axis, or use a camera-plane facing mode where supported.")]
 public sealed class RekallAgeGeometryPrimitiveComponent : RekallAgeComponent
 {
-    [RekallAgeProperty]
+    [RekallAgeProperty(Description = "Primitive kind. A plane is centered on local XZ with +Y normal; Transform3D ScaleX and ScaleZ size its surface, while rotation controls which direction it faces.")]
     public string Primitive { get; init; } = "cube";
 
     [RekallAgeProperty(Kind = "color")]

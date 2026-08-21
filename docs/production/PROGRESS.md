@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 20:03 Africa/Johannesburg
+Last verified: 2026-08-21 20:44 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
@@ -15,6 +15,22 @@ internet image and full-window composition. Generic task-derived prompt and
 completion-evidence enforcement is implemented test-first. Per the user's
 explicit priority correction, Pong is now the active acceptance, Galaga is
 next, and Rain Glass resumes only after both games are complete.
+
+The first installed-Studio Pong run reached mechanical package, relocation,
+and audit success, but independent frame review rejected it: the court rendered
+as broad bands, the ball/paddles were not recognizably composed, and the
+requested score/control UI was absent. Source inspection found a generic
+authoring-contract defect: `rekall.geometry.plane` is an XZ plane with a +Y
+normal, but its agent-facing schema did not disclose that orientation. The
+engine now documents the convention and emits
+`REKALL_VIEWPORT_PLANE_EDGE_ON_TO_CAMERA` when a world plane is nearly edge-on
+to the active camera. Strict task evidence now also derives requested UI,
+scoring, reset/serve, collision, and two-player semantic-input obligations from
+the ordinary user request and refuses completion without focused passing
+captures/runtime transitions. The focused plane/schema and task-evidence tests
+are green, and the complete Release solution builds with zero warnings/errors.
+Pong remains active until its repaired Studio output is independently playable
+and recognizable; the failed V1 package is diagnostic evidence only.
 
 ## Product objective
 

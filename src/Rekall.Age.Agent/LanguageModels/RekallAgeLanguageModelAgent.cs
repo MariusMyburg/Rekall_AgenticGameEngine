@@ -30,7 +30,7 @@ public sealed record RekallAgeLanguageModelAgentRequest(string Model, string Sys
 
     public int MaxRuntimeBehaviorRepairTurns { get; init; } = 12;
 
-    public int MaxPostRuntimeDeliveryTurns { get; init; } = 8;
+    public int MaxPostRuntimeDeliveryTurns { get; init; } = 16;
 
     public int MaxPreRuntimeAuthoringMutations { get; init; } = 4;
 

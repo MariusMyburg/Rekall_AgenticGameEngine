@@ -1072,6 +1072,43 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task DefaultPostRuntimeDeliveryReserveSupportsComplexBoundedDelivery()
+    {
+        var responses = new List<RekallAgeLanguageModelResponse>
+        {
+            new(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall(
+                    "rekall.runtime.inspect_scene",
+                    MeaningfulRuntimeCheckpointArguments())],
+                "tool_calls", new(1, 1, 1))
+        };
+        responses.AddRange(Enumerable.Range(1, 15).Select(sequence =>
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall(
+                    "inspect",
+                    new JsonObject { ["deliveryStep"] = sequence })],
+                "tool_calls", new(1, 1, 1))));
+        responses.Add(new RekallAgeLanguageModelResponse(
+            "test", "model", "Delivered", "", [], "stop", new(1, 1, 1)));
+        var model = new ScriptedModelClient([.. responses]);
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 1,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(17, result.Turns);
+        Assert.Equal(17, model.Requests.Count);
+    }
+
+    [Fact]
     public async Task EarlyRuntimeCheckpointDoesNotArmDeliveryReserveLaterAsBudgetElapses()
     {
         var model = new ScriptedModelClient(

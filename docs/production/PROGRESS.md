@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 08:35 Africa/Johannesburg
+Last verified: 2026-08-21 08:50 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: package-adapter ordering is front-loaded; complex delivery
-needs a larger bounded post-runtime reserve
+Latest milestone: complex delivery has a bounded 16-turn reserve; failed visual
+audits must redirect repairs to the original requested game
 
 ## Product objective
 
@@ -31,6 +31,29 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- The post-runtime delivery reserve is now 16 bounded turns. It activates only
+  once after a qualifying successful gameplay checkpoint, does not increase the
+  general authoring budget, and retains the global 256-turn hard ceiling. A
+  red/green scripted delivery regression and all 32 language-agent policy tests
+  passed. The locked zero-warning/error gate passed 1,011/1,011 engine and 7/7
+  Studio tests twice and the complete installed matrix. Its 1,186-file archive
+  is 201,582,146 bytes with SHA-256
+  `5F8DBD4B3843FD8A06949F448AE687FC01CA49CA2539B447140A47905ED5EDCC`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+- Clean installed real-Qwen benchmark 36 reached package creation at call 26,
+  produced an 85 MB archive, ran package audit, and continued for 49 more calls
+  rather than expiring immediately. It compiled both `PlayerMovementSystem` and
+  `GamePlayable`, passed semantic movement assertions, and ended with a nonblank
+  960x540 Studio viewport. The run remained red at 55/75 successful calls with
+  two renderables, a stale package, blocking validation, and no passing final
+  audit. The audit's uninformative-frame failure did not provide an anchored
+  recovery directive; Qwen added unrelated `Cube`/`CubeFaulted` validation-demo
+  content and an unresolved `default` shader instead of completing the requested
+  arena, orb, seals, HUD, completion, and reset behavior. The next generic agent
+  correction is a bounded failed-audit recovery message that requires repairs
+  against the original task and prohibits diagnostic filler content. Evidence
+  SHA-256 is
+  `AE7280A767B2210735484740CE5C39AF77E4A6EBB0359B9864DB35D384EE45D4`.
 - Passing gameplay checkpoints now give just-in-time package ordering: when the
   task requires a package, agents are told to scaffold the generic
   `rekall.module.scaffold_playable` adapter before the final build, keep all

@@ -669,6 +669,25 @@ public sealed class RekallAgeLanguageModelAgent(
         RekallAgeLanguageModelToolCall call,
         bool requireAgentStateTransition)
     {
+        if (IsDestructiveSceneReplacement(call))
+        {
+            const string destructiveMessage =
+                "Destructive clearExisting=true scene replacement is deferred during executable-checkpoint repair because it can erase already-valid authored content.";
+            return new JsonObject
+            {
+                ["ok"] = false,
+                ["summary"] = destructiveMessage,
+                ["errors"] = new JsonArray(new JsonObject
+                {
+                    ["code"] = "REKALL_RUNTIME_CHECKPOINT_DESTRUCTIVE_REPLACEMENT_DEFERRED",
+                    ["message"] = destructiveMessage,
+                    ["target"] = "rekall.scene.apply_blueprint.clearExisting"
+                }),
+                ["instruction"] =
+                    "Preserve the current scene. Re-inspect it, then use clearExisting=false safe partial upserts or targeted entity/component mutations only for missing checkpoint prerequisites. Repair the compiled runtime rule or exact existing entity state; do not replace the arena while proving gameplay."
+            };
+        }
+
         var attemptedInspection = CanonicalPolicyToolName(call.Name)
             .Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal);
         var hasAssertions = attemptedInspection && HasNonemptyArrayArgument(call.Arguments, "assertions");
@@ -771,6 +790,11 @@ public sealed class RekallAgeLanguageModelAgent(
     private static bool ShouldDeferUntilRuntimeCheckpoint(RekallAgeLanguageModelToolCall call)
     {
         var toolName = CanonicalPolicyToolName(call.Name);
+        if (IsDestructiveSceneReplacement(call))
+        {
+            return true;
+        }
+
         if (toolName.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal))
         {
             return !HasRuntimeCheckpointCoverage(call.Arguments);
@@ -778,6 +802,12 @@ public sealed class RekallAgeLanguageModelAgent(
 
         return !IsRuntimeCheckpointPreparationTool(toolName);
     }
+
+    private static bool IsDestructiveSceneReplacement(RekallAgeLanguageModelToolCall call) =>
+        CanonicalPolicyToolName(call.Name).Equals("rekall.scene.apply_blueprint", StringComparison.Ordinal)
+        && call.Arguments["clearExisting"] is JsonValue clearExistingValue
+        && clearExistingValue.TryGetValue<bool>(out var clearExisting)
+        && clearExisting;
 
     private static bool IsRuntimeCheckpointPreparationTool(string toolName) =>
         toolName.Equals("rekall.tools.search", StringComparison.Ordinal)

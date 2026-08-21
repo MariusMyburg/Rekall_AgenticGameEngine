@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 11:17 Africa/Johannesburg
+Last verified: 2026-08-21 11:40 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: logical-entity and runtime-evidence recovery is installed and
-locked; clean benchmark 44 is next
+Latest milestone: immutable mutation and destructive checkpoint repair
+safeguards are installed and locked; clean benchmark 45 is next
 
 ## Product objective
 
@@ -31,6 +31,39 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Clean installed real-Qwen benchmark 44 confirms the logical-entity contract
+  works, then exposes two deeper generic hazards. Qwen initially authored eight
+  coherent entities: each seal held its geometry, transform, and trigger; the
+  floor held collider, geometry, and transform; and the player held state,
+  rigid body, collider, and transform. It authored and compiled a substantial
+  movement, collection, progress/completion, and reset module. The final source,
+  however, discarded the immutable results of bare
+  `world.UpdateEntitiesWithComponent(...)` calls, making movement and collection
+  no-ops. Before a qualifying checkpoint, it then applied `clearExisting=true`
+  with one player and deleted the valid arena. AGE correctly blocked delivery;
+  the run ended after 76 tools with no package, two renderables, a missing-camera
+  blocker, and evidence SHA-256
+  `00AD67FA477FE7F807B8A1379F328859886BFBB08502B4CC72490FDBC4FD9FCD`.
+- Module builds now reject a bare discarded immutable-world mutation such as
+  `world.UpdateEntitiesWithComponent(...)` with
+  `REKALL_MODULE_IMMUTABLE_MUTATION_DISCARDED`, source line evidence, and the
+  exact `world = world.Update...` repair before issuing trusted build receipts.
+  The embedded contract states the same immutable-world rule. While the first
+  executable checkpoint is pending, agent policy now blocks destructive
+  `clearExisting=true` scene replacement with
+  `REKALL_RUNTIME_CHECKPOINT_DESTRUCTIVE_REPLACEMENT_DEFERRED`, while retaining
+  safe `clearExisting=false` upserts and targeted entity/component prerequisite
+  repairs. Both defects have red/green regressions. The gate also exposed a
+  pre-existing cancellation-test race: its token could expire during the new
+  source preflight before the fake compiler existed. Cancellation now begins
+  after the injected compiler process starts, preserving deterministic proof
+  that external cancellation terminates the process; it passed three focused
+  runs. The final uninterrupted zero-warning/error gate passed 1,023/1,023
+  engine and 7/7 Studio tests twice plus the complete installed matrix. Its
+  1,186-file archive is 201,602,891 bytes with SHA-256
+  `CAFA899BFBD3FFE265A489031F3C63BAA70F3812EE715D48A34A1E0C73DB6EC3`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+  Clean installed benchmark 45 is next.
 - Clean installed real-Qwen benchmark 43 confirms malformed-blueprint recovery
   now changes behavior, then exposes logical-entity composition and runtime
   evidence repair as the next generic blockers. After early invalid broad calls,

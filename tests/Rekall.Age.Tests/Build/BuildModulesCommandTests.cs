@@ -69,7 +69,7 @@ public sealed class BuildModulesCommandTests
     public async Task ExternalCancellationTerminatesWedgedCompilerAndRemainsCancellation()
     {
         var root = TestPaths.CreateTempDirectory();
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+        using var cancellation = new CancellationTokenSource();
         var context = new RekallAgeCommandContext(
             "agent",
             RekallAgeTransaction.Begin("cancel module"),
@@ -94,6 +94,7 @@ public sealed class BuildModulesCommandTests
             helper.ArgumentList.Add("Start-Sleep -Seconds 30");
             var process = Process.Start(helper);
             compilerProcessId = process?.Id;
+            cancellation.CancelAfter(TimeSpan.FromMilliseconds(200));
             return process;
         }
         var command = new BuildModulesCommand(TimeSpan.FromSeconds(30), StartWedgedCompiler);
@@ -317,5 +318,48 @@ public sealed class BuildModulesCommandTests
             error.Message,
             StringComparison.Ordinal);
         Assert.Contains("Boolean helpers use bool values", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DiscardedImmutableWorldMutationFailsBuildWithExactRepair()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("discarded immutable world mutation"),
+            CancellationToken.None);
+        var scaffold = await new ScaffoldRuntimeSystemModuleCommand().ExecuteAsync(
+            new ScaffoldRuntimeSystemModuleRequest(
+                root,
+                "game.motion",
+                "Game Motion",
+                "GameMotion",
+                "OrbitMotion",
+                "OrbitMotionSystem"),
+            context);
+        var source = await File.ReadAllTextAsync(scaffold.Value.SourcePath);
+        source = source
+            .Replace(
+                "var updatedWorld = world.UpdateEntitiesWithComponent(componentType, entity =>",
+                "world.UpdateEntitiesWithComponent(componentType, entity =>",
+                StringComparison.Ordinal)
+            .Replace(
+                "return ValueTask.FromResult(updatedWorld);",
+                "return ValueTask.FromResult(world);",
+                StringComparison.Ordinal);
+        await new WriteModuleSourceCommand().ExecuteAsync(
+            new WriteModuleSourceRequest(root, "GameMotion", "GameMotionModule.cs", source),
+            context);
+
+        var result = await new BuildModulesCommand().ExecuteAsync(
+            new BuildModulesRequest(root),
+            context);
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal("REKALL_MODULE_IMMUTABLE_MUTATION_DISCARDED", error.Code);
+        Assert.Contains("world = world.UpdateEntitiesWithComponent", error.Message, StringComparison.Ordinal);
+        Assert.Contains("immutable", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(result.Value.Modules);
     }
 }

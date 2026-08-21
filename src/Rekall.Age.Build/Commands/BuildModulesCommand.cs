@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.ComponentModel;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Modules.Security;
 
@@ -37,6 +38,9 @@ public sealed class BuildModulesCommand
 
     private static readonly TimeSpan DefaultBuildTimeout = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan ProcessCleanupTimeout = TimeSpan.FromSeconds(5);
+    private static readonly Regex DiscardedWorldMutation = new(
+        @"^\s*(?<receiver>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*(?<method>AddEntity|RemoveEntity|ReplaceEntity|UpdateEntity|UpdateEntitiesWithTag|UpdateEntitiesWithComponent|UpdateEntitiesWithTagAndComponent)\s*\(",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     public BuildModulesCommand()
         : this(
@@ -140,6 +144,44 @@ public sealed class BuildModulesCommand
                         issue.Message,
                         issue.Target))
                     .ToArray());
+        }
+
+        foreach (var candidate in policy.Candidates)
+        {
+            foreach (var sourcePath in candidate.SourcePaths)
+            {
+                var lines = await File.ReadAllLinesAsync(sourcePath, context.CancellationToken);
+                for (var index = 0; index < lines.Length; index++)
+                {
+                    var match = DiscardedWorldMutation.Match(lines[index]);
+                    if (!match.Success)
+                    {
+                        continue;
+                    }
+
+                    var receiver = match.Groups["receiver"].Value;
+                    var method = match.Groups["method"].Value;
+                    var message =
+                        $"Immutable runtime world mutation '{receiver}.{method}(...)' is discarded at line {index + 1}. "
+                        + $"Persist the returned world, for example: {receiver} = {receiver}.{method}(...). "
+                        + "All RekallAgeRuntimeWorld mutation helpers return replacements; calling one without assignment, return, or another consuming expression is a gameplay no-op.";
+                    return RekallAgeCommandResult<BuildModulesResult>.Failure(
+                        new BuildModulesResult(results),
+                        "A runtime module discards an immutable world mutation.",
+                        [new RekallAgeCommandError(
+                            "REKALL_MODULE_IMMUTABLE_MUTATION_DISCARDED",
+                            message,
+                            $"{sourcePath}:{index + 1}",
+                            [new RekallAgeSuggestedCommand(
+                                "rekall.module.read_source",
+                                new Dictionary<string, object?>
+                                {
+                                    ["projectRoot"] = request.ProjectRoot,
+                                    ["moduleName"] = candidate.ModuleName,
+                                    ["fileName"] = Path.GetFileName(sourcePath)
+                                })])]);
+                }
+            }
         }
 
         if (policy.Candidates.Count > 0)

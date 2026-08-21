@@ -39,6 +39,7 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("InputActionValue returns double", prompt, StringComparison.Ordinal);
         Assert.Contains("does not create semantic bindings", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("register every agent-owned component", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("bare world.Update... call is a gameplay no-op", prompt, StringComparison.Ordinal);
         Assert.Contains("never scaffold that module again", prompt, StringComparison.Ordinal);
         Assert.Contains("non-empty assertions array", prompt, StringComparison.Ordinal);
         Assert.Contains("first runnable gameplay checkpoint", prompt, StringComparison.OrdinalIgnoreCase);
@@ -623,6 +624,50 @@ public sealed class LanguageModelAgentTests
             execution.Name == "rekall.workflow.package_playable_game"
             && !execution.Succeeded
             && execution.ResultPreview.Contains("REKALL_RUNTIME_CHECKPOINT_REQUIRED", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RuntimeCheckpointBlocksDestructiveSceneReplacementDuringEvidenceRepair()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.scene.apply_blueprint", new JsonObject
+                {
+                    ["clearExisting"] = true,
+                    ["entities"] = new JsonArray(new JsonObject { ["name"] = "Player" })
+                })],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Preserved the authored scene.", "", [], "stop", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+        var agent = new RekallAgeLanguageModelAgent(model, tools);
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 4,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.False(result.Completed);
+        Assert.DoesNotContain(tools.Executions, execution => execution.Name == "rekall.scene.apply_blueprint");
+        Assert.Contains(result.ToolExecutions, execution =>
+            execution.Name == "rekall.scene.apply_blueprint"
+            && !execution.Succeeded
+            && execution.ResultPreview.Contains(
+                "REKALL_RUNTIME_CHECKPOINT_DESTRUCTIVE_REPLACEMENT_DEFERRED",
+                StringComparison.Ordinal)
+            && execution.ResultPreview.Contains("clearExisting=false", StringComparison.Ordinal));
     }
 
     [Fact]

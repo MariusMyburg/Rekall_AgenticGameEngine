@@ -25,6 +25,8 @@ public sealed record RekallAgeLanguageModelRequest(
     public string? KeepAlive { get; init; }
 
     public int? ContextWindowTokens { get; init; }
+
+    public int? MaxOutputTokens { get; init; }
 }
 
 public sealed record RekallAgeLanguageModelMessage(

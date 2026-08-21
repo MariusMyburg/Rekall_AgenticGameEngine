@@ -22,6 +22,8 @@ public sealed record RekallAgeLanguageModelAgentRequest(string Model, string Sys
 
     public int? ContextWindowTokens { get; init; } = 65_536;
 
+    public int? MaxOutputTokens { get; init; } = 8_192;
+
     public int MaxContextMessages { get; init; } = 20;
 
     public int MaxToolResultCharacters { get; init; } = 12_000;
@@ -121,6 +123,9 @@ public sealed class RekallAgeLanguageModelAgent(
         int? contextWindowTokens = request.ContextWindowTokens is { } requestedContextWindowTokens
             ? Math.Clamp(requestedContextWindowTokens, 4_096, 262_144)
             : null;
+        int? maxOutputTokens = request.MaxOutputTokens is { } requestedMaxOutputTokens
+            ? Math.Clamp(requestedMaxOutputTokens, 512, 65_536)
+            : null;
         var maxRuntimeBehaviorRepairTurns = Math.Clamp(request.MaxRuntimeBehaviorRepairTurns, 0, 64);
         var maxPostRuntimeDeliveryTurns = Math.Clamp(request.MaxPostRuntimeDeliveryTurns, 0, 32);
         var maxPreRuntimeAuthoringMutations = Math.Clamp(request.MaxPreRuntimeAuthoringMutations, 0, 32);
@@ -160,7 +165,8 @@ public sealed class RekallAgeLanguageModelAgent(
                 {
                     Think = request.Think,
                     Temperature = request.Temperature,
-                    ContextWindowTokens = contextWindowTokens
+                    ContextWindowTokens = contextWindowTokens,
+                    MaxOutputTokens = maxOutputTokens
                 },
                 cancellationToken);
             promptTokens += response.Usage.PromptTokens;

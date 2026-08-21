@@ -66,6 +66,11 @@ public sealed class RekallAgeOllamaLanguageModelClient : IRekallAgeLanguageModel
             runtimeOptions["num_ctx"] = contextWindowTokens;
         }
 
+        if (request.MaxOutputTokens is { } maxOutputTokens)
+        {
+            runtimeOptions["num_predict"] = maxOutputTokens;
+        }
+
         if (request.Temperature is { } temperature)
         {
             runtimeOptions["temperature"] = temperature;

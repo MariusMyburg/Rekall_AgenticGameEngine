@@ -40,7 +40,8 @@ public sealed class OllamaLanguageModelClientTests
             [new RekallAgeLanguageModelTool("rekall.context.engine_status", "Inspect engine status", new JsonObject { ["type"] = "object" })])
         {
             Think = "medium",
-            ContextWindowTokens = 65_536
+            ContextWindowTokens = 65_536,
+            MaxOutputTokens = 8_192
         };
 
         var response = await client.ChatAsync(request, CancellationToken.None);
@@ -49,6 +50,7 @@ public sealed class OllamaLanguageModelClientTests
         Assert.False(sent["stream"]!.GetValue<bool>());
         Assert.Equal("medium", sent["think"]!.GetValue<string>());
         Assert.Equal(65_536, sent["options"]!["num_ctx"]!.GetValue<int>());
+        Assert.Equal(8_192, sent["options"]!["num_predict"]!.GetValue<int>());
         Assert.Equal("function", sent["tools"]![0]!["type"]!.GetValue<string>());
         Assert.Equal("rekall.context.engine_status", sent["tools"]![0]!["function"]!["name"]!.GetValue<string>());
         var call = Assert.Single(response.ToolCalls);

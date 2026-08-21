@@ -84,6 +84,7 @@ public sealed class LanguageModelAgentTests
         Assert.Equal(5, result.Usage.CompletionTokens);
         Assert.Equal(300, result.Usage.TotalDurationNanoseconds);
         Assert.All(model.Requests, request => Assert.Equal(65_536, request.ContextWindowTokens));
+        Assert.All(model.Requests, request => Assert.Equal(8_192, request.MaxOutputTokens));
         var execution = Assert.Single(tools.Executions);
         Assert.Equal("inspect", execution.Name);
         Assert.Equal("game", execution.Arguments["root"]!.GetValue<string>());
@@ -91,6 +92,33 @@ public sealed class LanguageModelAgentTests
             message.Role == "tool" && message.ToolName == "inspect" && message.Content.Contains("ready"));
         Assert.DoesNotContain(model.Requests[1].Messages, message =>
             message.Role == "system" && message.Content.StartsWith("Persistent Rekall tool ledger", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(1, 1, 4_096, 512)]
+    [InlineData(1_000_000, 1_000_000, 262_144, 65_536)]
+    public async Task AgentClampsProviderTokenBudgets(
+        int requestedContextTokens,
+        int requestedOutputTokens,
+        int expectedContextTokens,
+        int expectedOutputTokens)
+    {
+        var model = new ScriptedModelClient(new RekallAgeLanguageModelResponse(
+            "test", "model", "Done", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 1,
+                ContextWindowTokens = requestedContextTokens,
+                MaxOutputTokens = requestedOutputTokens
+            },
+            CancellationToken.None);
+
+        var request = Assert.Single(model.Requests);
+        Assert.Equal(expectedContextTokens, request.ContextWindowTokens);
+        Assert.Equal(expectedOutputTokens, request.MaxOutputTokens);
     }
 
     [Fact]

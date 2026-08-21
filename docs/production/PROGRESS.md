@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 12:52 Africa/Johannesburg
+Last verified: 2026-08-21 13:31 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: command dispatch now fails closed on unknown top-level
-arguments and the complete installed product gate passes under download load
+Latest milestone: embedded agent turns now have a provider-neutral bounded
+output budget and the complete installed product gate passes
 
 ## Product objective
 
@@ -56,6 +56,34 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Clean real-Qwen benchmark 47 proved that context capacity and per-turn output
+  budget are separate production controls. Qwen 3.8 authored the complete
+  11-entity Lumen Vault scene and a freshly trusted 7,877-byte runtime-system
+  module with semantic movement/reset actions, delta-time motion, seal contact,
+  progress/completion state, and HUD updates. After the build, one model turn
+  generated 42,945 tokens for 4m22s, filled the entire 65,535-token allocation,
+  was reported by Ollama as `truncated = 1`, and produced no useful tool
+  mutation; the following turn began repeating the same failure. The disposable
+  benchmark process was stopped while its authored project was preserved.
+  AGE now exposes provider-neutral `MaxOutputTokens`, embedded agent turns
+  default to 8,192, and the Ollama adapter emits `options.num_predict`. This
+  bounds one reasoning/action step without reducing the 65,536-token retained
+  context, turn count, repair reserves, or total game scope. Caller values are
+  clamped to 512..65,536 tokens. The regressions failed first, then the focused
+  language-model/Ollama selection passed 45/45. Ollama documents
+  `num_predict` as the maximum generated-token count and its default as `-1`
+  (unbounded), matching the measured failure.
+  The locked Release build completed in 9.48 seconds with zero warnings/errors;
+  two independent passes completed 1,030/1,030 engine and 7/7 Studio tests.
+  The complete installed distribution matrix passed, including generic
+  authoring/package proof, trust tamper rejection, relocation/audit, runtime
+  subsystems, diagnostics recovery, morph animation, atomic persistence,
+  document revision/recovery, and Studio automation. Its 600-frame soak
+  simulated exactly 10 seconds at 4,383.5 FPS with 711,288 retained bytes and
+  all nine checks. The 1,186-payload archive is 201,620,673 bytes with SHA-256
+  `07D8213411D538FB5121A60D4C7E6C6787C0856F8B6DAD2173171C43811D8050`.
+  Clean installed benchmark 48 is next with the unchanged Lumen Vault request,
+  real Qwen 3.8, the 65,536-token context, and the new 8,192-token turn bound.
 - Generic command dispatch now rejects unknown top-level arguments before a
   command can execute or mutate state with stable code
   `REKALL_COMMAND_ARGUMENT_UNKNOWN`, the exact unknown and allowed fields, the
@@ -2824,10 +2852,11 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
-Run clean installed benchmark 46 with the unchanged task and real Ollama. Use
-its next measured blocker to choose the next generic contract repair or, after
-successful task-specific runtime/package/audit evidence, advance to the queued
-visual-effects acceptance class. Do not return to broad subsystem or CI
+Run clean installed benchmark 48 with the unchanged task and real Qwen 3.8.
+Use its next measured blocker to choose the next generic contract repair or,
+after successful task-specific runtime/package/audit evidence, show the captured
+and packaged Lumen Vault result and advance immediately to the queued
+raindrops-on-glass acceptance game. Do not return to broad subsystem or CI
 expansion until an arbitrary described game completes the full executable loop.
 
 ## Evidence index

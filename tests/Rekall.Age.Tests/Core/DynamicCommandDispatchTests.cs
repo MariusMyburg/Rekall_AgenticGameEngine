@@ -234,6 +234,8 @@ public sealed class DynamicCommandDispatchTests
         Assert.Equal("REKALL_COMMAND_ARGUMENTS_INVALID", error.Code);
         Assert.Contains("conflicting property 'x'", error.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("$.entities[0].components[0]", error.Message, StringComparison.Ordinal);
+        Assert.Contains("Expected command contract", error.Message, StringComparison.Ordinal);
+        Assert.Contains("entities and components are JSON arrays", error.Message, StringComparison.Ordinal);
         Assert.Empty(context.Transaction.ChangedResources);
     }
 

@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 10:20 Africa/Johannesburg
+Last verified: 2026-08-21 10:46 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: runtime evidence fails structurally; partial blueprint repairs
-preserve existing entity composition
+Latest milestone: partial blueprint repairs preserve composition; repeated
+malformed blueprint shapes receive explicit bounded recovery
 
 ## Product objective
 
@@ -31,6 +31,29 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Clean installed real-Qwen benchmark 42 failed before meaningful state proof
+  because 18 of 23 blueprint calls used invalid or unsupported structure. The
+  recurring shapes nested complete entity objects inside `components`, split
+  `type` and `properties` across adjacent component objects, or passed a deeply
+  malformed JSON-encoded entity tree. Qwen still compiled a substantial
+  progress/reset module and passed a thin movement checkpoint, but ended with
+  eight entities, three renderables, four validation issues, no camera/package,
+  and no state transition after 64 turns/61 tools. Evidence SHA-256 is
+  `CC0DC0A09B83B909DBBCB36F8FB7D7892540FBB608A36FD418A53801932C8477`.
+- Dynamic JSON argument failures now append a bounded copy of the declared
+  command contract. Blueprint validation states the exact flat topology:
+  entities are siblings in the top-level `entities` array; every component is
+  one object containing `type` and optional `properties`; entity fields never
+  belong inside components. After three recent blueprint failures—even with
+  different arguments—the agent loop injects a circuit-breaker that stops broad
+  retries and directs one small flat repair or targeted `rekall.component.add`.
+  Red/green dispatcher, blueprint, and agent-policy regressions pass. The locked
+  zero-warning/error gate passed 1,019/1,019 engine and 7/7 Studio tests twice
+  plus the complete installed matrix. Its fresh archive is 201,596,332 bytes
+  with SHA-256
+  `AC7114DD78552662336965086F03B6BE85BBD43B3A5986FDAE590261F4296EF1`;
+  zero run-scoped build temp directories remained. Clean installed benchmark 43
+  is next.
 - Clean installed real-Qwen benchmark 41 confirms runtime evidence now fails
   structurally without exceptions and isolates destructive partial upserts as
   the next generic blocker. Qwen authored and compiled a coherent rules module

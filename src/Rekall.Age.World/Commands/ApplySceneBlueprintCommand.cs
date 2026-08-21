@@ -155,7 +155,7 @@ public sealed class ApplySceneBlueprintCommand
             {
                 errors.Add(new RekallAgeCommandError(
                     "REKALL_SCENE_BLUEPRINT_ENTITY_NAME_REQUIRED",
-                    "Every scene blueprint entity requires a name.",
+                    "Every scene blueprint entity requires a name. Entities must be sibling objects in the top-level entities array; never nest an entity object inside another entity's components array.",
                     entityTarget));
                 continue;
             }
@@ -173,7 +173,7 @@ public sealed class ApplySceneBlueprintCommand
                 {
                     errors.Add(new RekallAgeCommandError(
                         "REKALL_SCENE_BLUEPRINT_COMPONENT_TYPE_REQUIRED",
-                        "Every scene blueprint component requires a type.",
+                        "Every scene blueprint component requires a type. Put type and optional properties together on the same component object; never split them across adjacent objects or place entity name/id/tags/components inside a component. Entities belong as sibling objects in the top-level entities array.",
                         $"{entityTarget}.components[{componentIndex}]"));
                     continue;
                 }

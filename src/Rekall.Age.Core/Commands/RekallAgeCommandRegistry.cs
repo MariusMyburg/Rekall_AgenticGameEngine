@@ -145,6 +145,10 @@ public sealed class RekallAgeCommandRegistry
                     || ex.Message.Contains(ex.Path, StringComparison.Ordinal)
                     ? ex.Message
                     : $"{ex.Message} Path: {ex.Path}.";
+                var contract = Schema.Description.Length <= 1_000
+                    ? Schema.Description
+                    : Schema.Description[..1_000] + "…";
+                message += $" Expected command contract: {contract}";
                 var error = new RekallAgeCommandError(
                     "REKALL_COMMAND_ARGUMENTS_INVALID",
                     message,

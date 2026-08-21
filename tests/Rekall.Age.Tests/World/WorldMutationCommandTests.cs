@@ -221,7 +221,11 @@ public sealed class WorldMutationCommandTests
             context);
 
         Assert.False(result.Ok);
-        Assert.Contains(result.Errors, error => error.Code == "REKALL_SCENE_BLUEPRINT_COMPONENT_TYPE_REQUIRED");
+        var error = Assert.Single(
+            result.Errors,
+            error => error.Code == "REKALL_SCENE_BLUEPRINT_COMPONENT_TYPE_REQUIRED");
+        Assert.Contains("same component object", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("top-level entities", error.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(before, await File.ReadAllTextAsync(scenePath));
         Assert.Empty(context.Transaction.ChangedResources);
     }

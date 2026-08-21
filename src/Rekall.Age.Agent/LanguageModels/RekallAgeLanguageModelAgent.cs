@@ -236,6 +236,7 @@ public sealed class RekallAgeLanguageModelAgent(
             var successfulRuntimeCheckpointThisTurn = false;
             string? repeatedFailureRecovery = null;
             string? packageAuditRecovery = null;
+            string? blueprintStructureRecovery = null;
             foreach (var call in response.ToolCalls)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -296,6 +297,15 @@ public sealed class RekallAgeLanguageModelAgent(
                     ? BuildRepeatedFailureRecovery(execution, output, identicalFailureCount)
                     : null;
                 if (!succeeded
+                    && executedToolName.Equals("rekall.scene.apply_blueprint", StringComparison.Ordinal)
+                    && CountRecentFailedToolAttempts(toolExecutions, executedToolName) >= 3)
+                {
+                    blueprintStructureRecovery =
+                        "Stop broad blueprint retries: several recent rekall.scene.apply_blueprint calls have failed. "
+                        + "Use one small flat entity repair at a time. The top-level entities field must be a native JSON array of sibling entity objects; each entity has name and a components array; each component is exactly one object containing type and optional properties together. Never nest entity name/id/tags/components inside a component or split type and properties across adjacent objects. "
+                        + "For an existing entity, prefer rekall.component.add or the relevant targeted component/entity mutation when available. Re-inspect the current scene before retrying; preserve already-valid authored content.";
+                }
+                if (!succeeded
                     && executedToolName.Equals(
                         "rekall.workflow.audit_playable_package",
                         StringComparison.Ordinal))
@@ -352,6 +362,11 @@ public sealed class RekallAgeLanguageModelAgent(
             if (repeatedFailureRecovery is not null)
             {
                 transcript.Add(new RekallAgeLanguageModelMessage("user", repeatedFailureRecovery));
+            }
+
+            if (blueprintStructureRecovery is not null)
+            {
+                transcript.Add(new RekallAgeLanguageModelMessage("user", blueprintStructureRecovery));
             }
 
             if (request.RequireRuntimeBehaviorAssertions
@@ -486,6 +501,13 @@ public sealed class RekallAgeLanguageModelAgent(
 
         return count;
     }
+
+    private static int CountRecentFailedToolAttempts(
+        IReadOnlyList<RekallAgeLanguageModelToolExecution> executions,
+        string toolName) => executions
+        .Where(execution => execution.Name.Equals(toolName, StringComparison.Ordinal))
+        .TakeLast(6)
+        .Count(execution => !execution.Succeeded);
 
     private static string BuildRepeatedFailureRecovery(
         RekallAgeLanguageModelToolExecution execution,

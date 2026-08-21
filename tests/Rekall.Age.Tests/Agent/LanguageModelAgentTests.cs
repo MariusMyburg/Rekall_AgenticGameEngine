@@ -195,6 +195,39 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task AgentStopsBroadBlueprintThrashAcrossDifferentInvalidArguments()
+    {
+        RekallAgeLanguageModelResponse Blueprint(string name) => new(
+            "test", "model", "", "",
+            [new RekallAgeLanguageModelToolCall(
+                "rekall.scene.apply_blueprint",
+                new JsonObject
+                {
+                    ["entities"] = new JsonArray(new JsonObject { ["name"] = name })
+                })],
+            "tool_calls", new(1, 1, 1));
+        var model = new ScriptedModelClient(
+            Blueprint("First"),
+            Blueprint("Second"),
+            Blueprint("Third"),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Recovered with a targeted mutation.", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new AlwaysFailsBlueprintToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task") { MaxTurns = 4 },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Contains(
+            model.Requests[3].Messages,
+            message => message.Role == "user"
+                && message.Content.Contains("Stop broad blueprint retries", StringComparison.Ordinal)
+                && message.Content.Contains("top-level entities", StringComparison.Ordinal)
+                && message.Content.Contains("rekall.component.add", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task AgentContinuesAfterEmptyFinalResponseInsteadOfClaimingCompletion()
     {
         var model = new ScriptedModelClient(
@@ -1518,6 +1551,22 @@ public sealed class LanguageModelAgentTests
                     }
                 }
                 : new JsonObject { ["ok"] = true });
+    }
+
+    private sealed class AlwaysFailsBlueprintToolExecutor : IRekallAgeAgentToolExecutor
+    {
+        public IReadOnlyList<RekallAgeLanguageModelTool> Tools { get; } =
+            [new("rekall.scene.apply_blueprint", "Apply blueprint", new JsonObject { ["type"] = "object" })];
+
+        public ValueTask<JsonNode> ExecuteAsync(
+            string name,
+            JsonObject arguments,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult<JsonNode>(new JsonObject
+            {
+                ["ok"] = false,
+                ["summary"] = "Invalid scene blueprint shape."
+            });
     }
 
     private sealed class FailsFirstRuntimeAssertionToolExecutor : IRekallAgeAgentToolExecutor

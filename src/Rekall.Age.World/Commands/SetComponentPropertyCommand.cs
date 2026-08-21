@@ -18,6 +18,12 @@ public sealed class SetComponentPropertyCommand
     : IRekallAgeCommand<SetComponentPropertyRequest, SetComponentPropertyResult>
 {
     private readonly RekallAgeSceneStore _store = new();
+    private readonly IRekallAgeComponentPropertyAdmissionPolicy? _propertyAdmission;
+
+    public SetComponentPropertyCommand(IRekallAgeComponentPropertyAdmissionPolicy? propertyAdmission = null)
+    {
+        _propertyAdmission = propertyAdmission;
+    }
 
     public string Name => "rekall.component.set_property";
 
@@ -33,6 +39,26 @@ public sealed class SetComponentPropertyCommand
     {
         var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);
         var scene = loaded.Value;
+        if (_propertyAdmission is not null)
+        {
+            var component = scene.GetRequiredEntity(request.EntityId).Components.Single(item =>
+                item.Type.Equals(request.ComponentType, StringComparison.Ordinal));
+            var prospectiveProperties = component.Properties.DeepClone().AsObject();
+            prospectiveProperties[request.PropertyName] = request.Value?.DeepClone();
+            var propertyErrors = await _propertyAdmission.ValidateAsync(
+                request.ProjectRoot,
+                request.ComponentType,
+                prospectiveProperties,
+                request.ComponentType,
+                context.CancellationToken);
+            if (propertyErrors.Count > 0)
+            {
+                return RekallAgeCommandResult<SetComponentPropertyResult>.Failure(
+                    new SetComponentPropertyResult(scene),
+                    $"Component '{request.ComponentType}' has {propertyErrors.Count} invalid authored property value(s).",
+                    propertyErrors);
+            }
+        }
         var updated = scene.UpdateEntity(
             request.EntityId,
             entity => entity.UpdateComponent(

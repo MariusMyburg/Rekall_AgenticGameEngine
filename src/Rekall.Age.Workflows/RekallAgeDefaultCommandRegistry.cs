@@ -10,6 +10,7 @@ using Rekall.Age.Playback.Commands;
 using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime.Commands;
+using Rekall.Age.Validation;
 using Rekall.Age.Validation.Commands;
 using Rekall.Age.Workflows.Commands;
 using Rekall.Age.World.Commands;
@@ -22,15 +23,16 @@ public static class RekallAgeDefaultCommandRegistry
     {
         var registry = new RekallAgeCommandRegistry();
         var shaderPipelineValidation = new RekallAgeWorkflowShaderPipelineValidationService();
+        var componentPropertyAdmission = new RekallAgeBuiltInComponentPropertyAdmissionPolicy();
         registry.Register(new CreateProjectCommand());
         registry.Register(new AddCapabilityCommand());
         registry.Register(new CreateSceneCommand());
-        registry.Register(new ApplySceneBlueprintCommand());
+        registry.Register(new ApplySceneBlueprintCommand(componentPropertyAdmission));
         registry.Register(new CreateEntityCommand());
         registry.Register(new DeleteEntityCommand());
-        registry.Register(new AddComponentCommand());
+        registry.Register(new AddComponentCommand(componentPropertyAdmission));
         registry.Register(new RemoveComponentCommand());
-        registry.Register(new SetComponentPropertyCommand());
+        registry.Register(new SetComponentPropertyCommand(componentPropertyAdmission));
         registry.Register(new RemoveComponentPropertyCommand());
         registry.Register(new InspectEntityCommand());
         registry.Register(new VerifyPlayableGameCommand());

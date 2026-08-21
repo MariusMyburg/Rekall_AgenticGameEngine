@@ -4,13 +4,13 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 06:20 Africa/Johannesburg
+Last verified: 2026-08-21 06:39 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: every primary scene mutation fails closed on unknown reserved
-component identities; schema-aware property validation at mutation time is the
-next measured blocker
+Latest milestone: production authoring rejects invalid built-in properties
+before mutation; an early thin executable-slice policy is the next measured
+blocker
 
 ## Product objective
 
@@ -32,6 +32,30 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Schema-aware component admission: the production registry injects indexed
+  built-in property policy into component add, property set, and scene blueprint
+  commands without coupling the generic world layer to module schemas. Unknown
+  names, case duplicates, encoded structured values, and numeric range violations
+  fail before transaction capture or persistence with exact indexed targets and
+  schema-search recovery. Valid built-ins and arbitrary `Game.*` state remain
+  accepted. Focused admission/dispatch/validation coverage passed 48/48. The
+  locked zero-warning/error gate passed 1,001/1,001 engine and 7/7 Studio tests
+  twice and the complete installed matrix. Its 1,186-payload-file archive is
+  201,572,291 bytes with SHA-256
+  `FFBB2C30C6977659E43E3AACEE47FBCE4F6697C81A4BB5EB5519E6FE5F3581DA`;
+  zero reusable nodes and zero run-scoped temp directories remained.
+- Clean installed real-Qwen benchmark 29 made 41/61 successful tool calls,
+  compiled the authored `LumenVault` module, reached zero validation issues,
+  and produced a nonblank 960x540 viewport with nine renderables. Property
+  admission rejected invalid authored fields at their exact blueprint indices
+  and Qwen repaired them without a late remove-property loop. It remained red
+  with no package because it spent 47 turns iterating scene content before
+  scaffolding the required gameplay module; after the final successful build,
+  its only remaining runtime call omitted inputs/assertions. The next generic
+  tranche bounds pre-gameplay scene iteration and requires the thin executable
+  runtime slice earlier whenever runtime behavior assertions are required.
+  Evidence SHA-256 is
+  `FEF947B5170416BD190435C1580FBF942B39859B23101C17765596894B016D3B`.
 - Fail-closed component identity authoring: one exact catalog covers all 70
   built-in `Rekall.*` component identities and is mechanically checked against
   the module index. Direct component adds and bulk scene blueprints reject

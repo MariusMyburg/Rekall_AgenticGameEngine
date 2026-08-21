@@ -35,6 +35,12 @@ public sealed class ApplySceneBlueprintCommand
     : IRekallAgeCommand<ApplySceneBlueprintRequest, ApplySceneBlueprintResult>
 {
     private readonly RekallAgeSceneStore _store = new();
+    private readonly IRekallAgeComponentPropertyAdmissionPolicy? _propertyAdmission;
+
+    public ApplySceneBlueprintCommand(IRekallAgeComponentPropertyAdmissionPolicy? propertyAdmission = null)
+    {
+        _propertyAdmission = propertyAdmission;
+    }
 
     public string Name => "rekall.scene.apply_blueprint";
 
@@ -48,7 +54,30 @@ public sealed class ApplySceneBlueprintCommand
         ApplySceneBlueprintRequest request,
         RekallAgeCommandContext context)
     {
-        var validationErrors = ValidateBlueprint(request.SceneName, request.Entities);
+        var entities = request.Entities ?? [];
+        var validationErrors = ValidateBlueprint(request.SceneName, entities);
+        if (_propertyAdmission is not null)
+        {
+            for (var entityIndex = 0; entityIndex < entities.Count; entityIndex++)
+            {
+                var components = entities[entityIndex].Components ?? [];
+                for (var componentIndex = 0; componentIndex < components.Count; componentIndex++)
+                {
+                    var component = components[componentIndex];
+                    if (component is null || string.IsNullOrWhiteSpace(component.Type))
+                    {
+                        continue;
+                    }
+                    var target = $"{request.SceneName}.entities[{entityIndex}].components[{componentIndex}]";
+                    validationErrors = validationErrors.Concat(await _propertyAdmission.ValidateAsync(
+                        request.ProjectRoot,
+                        component.Type,
+                        component.Properties ?? new JsonObject(),
+                        target,
+                        context.CancellationToken)).ToArray();
+                }
+            }
+        }
         if (validationErrors.Count > 0)
         {
             return RekallAgeCommandResult<ApplySceneBlueprintResult>.Failure(
@@ -63,7 +92,7 @@ public sealed class ApplySceneBlueprintCommand
         var removedCount = request.ClearExisting ? scene.Entities.Count : 0;
         var upsertedCount = 0;
 
-        foreach (var blueprint in request.Entities)
+        foreach (var blueprint in entities)
         {
             var entity = CreateEntity(blueprint);
             var replacementIndex = FindReplacementIndex(existing, blueprint);

@@ -46,7 +46,7 @@ public sealed class ApplySceneBlueprintCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Applies a generic scene entity/component blueprint in one transaction for efficient agent world authoring. Exact compact shape: {\"projectRoot\":\"...\",\"sceneName\":\"Main\",\"entities\":[{\"name\":\"Entity\",\"components\":[{\"type\":\"Rekall.Transform3D\",\"properties\":{\"X\":0}}]}],\"clearExisting\":false}. entities and components are JSON arrays; each component uses type and properties. An empty entities array is valid for an empty scene or to clear a scene when clearExisting is true.",
+        "Applies a generic scene entity/component blueprint in one transaction for efficient agent world authoring. Exact compact shape: {\"projectRoot\":\"...\",\"sceneName\":\"Main\",\"entities\":[{\"name\":\"Entity\",\"components\":[{\"type\":\"Rekall.Transform3D\",\"properties\":{\"X\":0}}]}],\"clearExisting\":false}. entities and components are JSON arrays; each component uses type and properties. With clearExisting=false, a uniquely matched id/name is a safe partial upsert: supplied component types/properties are merged and unspecified identity, tags, hierarchy, flags, transforms, renderers, and other components are preserved. Use targeted component/entity removal commands for deletion. With clearExisting=true the supplied blueprint replaces the scene exactly. An empty entities array is valid for an empty scene or to clear a scene when clearExisting is true.",
         typeof(ApplySceneBlueprintRequest).FullName!,
         typeof(ApplySceneBlueprintResult).FullName!);
 
@@ -94,15 +94,14 @@ public sealed class ApplySceneBlueprintCommand
 
         foreach (var blueprint in entities)
         {
-            var entity = CreateEntity(blueprint);
             var replacementIndex = FindReplacementIndex(existing, blueprint);
             if (replacementIndex < 0)
             {
-                existing.Add(entity);
+                existing.Add(CreateEntity(blueprint));
             }
             else
             {
-                existing[replacementIndex] = entity;
+                existing[replacementIndex] = MergeEntity(existing[replacementIndex], blueprint);
             }
 
             upsertedCount++;
@@ -230,6 +229,49 @@ public sealed class ApplySceneBlueprintCommand
         }
 
         return entity;
+    }
+
+    private static RekallAgeEntityDocument MergeEntity(
+        RekallAgeEntityDocument existing,
+        RekallAgeSceneBlueprintEntity blueprint)
+    {
+        var merged = existing with
+        {
+            Name = blueprint.Name.Trim(),
+            Tags = blueprint.Tags is null
+                ? existing.Tags
+                : RekallAgeEntityDocument.Create(blueprint.Name, blueprint.Tags).Tags,
+            ParentId = blueprint.ParentId is null
+                ? existing.ParentId
+                : string.IsNullOrWhiteSpace(blueprint.ParentId) ? null : blueprint.ParentId.Trim(),
+            Visible = blueprint.Visible ?? existing.Visible,
+            Locked = blueprint.Locked ?? existing.Locked
+        };
+        if (!string.IsNullOrWhiteSpace(blueprint.Id))
+        {
+            merged = merged with { Id = blueprint.Id.Trim() };
+        }
+
+        foreach (var supplied in blueprint.Components ?? [])
+        {
+            var current = merged.Components.FirstOrDefault(component =>
+                component.Type.Equals(supplied.Type, StringComparison.Ordinal));
+            if (current is null)
+            {
+                merged = merged.AddComponent(
+                    RekallAgeComponentDocument.Create(supplied.Type, supplied.Properties));
+                continue;
+            }
+
+            var properties = current.Properties.DeepClone().AsObject();
+            foreach (var property in supplied.Properties ?? [])
+            {
+                properties[property.Key] = property.Value?.DeepClone();
+            }
+            merged = merged.AddComponent(current with { Properties = properties });
+        }
+
+        return merged;
     }
 
     private static ApplySceneBlueprintResult Empty()

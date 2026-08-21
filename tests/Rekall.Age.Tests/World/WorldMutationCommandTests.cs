@@ -227,6 +227,52 @@ public sealed class WorldMutationCommandTests
     }
 
     [Fact]
+    public async Task ApplySceneBlueprintMergesPartialEntityRepairWithoutStrippingExistingComposition()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        var seal = RekallAgeEntityDocument.Create("Seal", ["energy-seal"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["X"] = 3 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.MeshRenderer",
+                new JsonObject { ["Color"] = "#00ffff" }));
+        await store.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"]).AddEntity(seal),
+            CancellationToken.None);
+
+        var result = await new ApplySceneBlueprintCommand().ExecuteAsync(
+            new ApplySceneBlueprintRequest(
+                root,
+                "Main",
+                [
+                    new RekallAgeSceneBlueprintEntity(
+                        "Seal",
+                        Components:
+                        [
+                            new RekallAgeSceneBlueprintComponent(
+                                "Game.SealState",
+                                new JsonObject { ["IsActive"] = true })
+                        ])
+                ]),
+            new RekallAgeCommandContext(
+                "agent",
+                RekallAgeTransaction.Begin("merge partial entity repair"),
+                CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        var saved = await store.LoadAsync(root, "Main", CancellationToken.None);
+        var updated = Assert.Single(saved.Entities);
+        Assert.Equal(seal.Id, updated.Id);
+        Assert.Equal(["energy-seal"], updated.Tags);
+        Assert.Contains(updated.Components, component => component.Type == "Rekall.Transform3D");
+        Assert.Contains(updated.Components, component => component.Type == "Rekall.MeshRenderer");
+        Assert.Contains(updated.Components, component => component.Type == "Game.SealState");
+    }
+
+    [Fact]
     public async Task DeleteEntityRemovesOneEntityAndCapturesPreimage()
     {
         var root = TestPaths.CreateTempDirectory();

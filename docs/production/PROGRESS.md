@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 10:00 Africa/Johannesburg
+Last verified: 2026-08-21 10:20 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: stateful games require changed runtime-state proof; malformed
-runtime assertions now fail with structured evidence instead of exceptions
+Latest milestone: runtime evidence fails structurally; partial blueprint repairs
+preserve existing entity composition
 
 ## Product objective
 
@@ -31,6 +31,34 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Clean installed real-Qwen benchmark 41 confirms runtime evidence now fails
+  structurally without exceptions and isolates destructive partial upserts as
+  the next generic blocker. Qwen authored and compiled a coherent rules module
+  with `CurrentProgress`, `GameComplete`, reset, semantic movement, contact,
+  seal deactivation, and progress recomputation; built a nine-entity scene with
+  five renderables; and passed several movement/component checkpoints. AGE
+  correctly blocked package delivery because progress never changed. The final
+  targeted component-identity repairs used partial scene blueprints that
+  replaced whole entity component sets, stripping seal transforms/renderers;
+  numeric delta evidence also lacked an explicitly authored initial value and
+  the single input sample drove only one of twenty frames. The run ended red
+  after 76 turns/71 tools with zero validation issues, no package, and evidence
+  SHA-256 `5C720F38EE2D90A63AE4CCF963E6DC2D4A23705CDBDCFEF2DBA39191FD441719`.
+- Non-clearing scene blueprints now perform safe partial upserts for uniquely
+  matched id/name entities: component properties merge by exact component type,
+  and unspecified stable id, tags, parent, visibility, lock state, transforms,
+  renderers, and other components are preserved. `clearExisting=true` retains
+  exact scene replacement semantics, while targeted removal commands provide
+  deletion. Runtime tool and stateful-gate descriptions now state that each
+  input sample drives only its corresponding frame and numeric delta assertions
+  require an explicitly authored initial property. The partial-repair red/green
+  regression plus all 35 language-agent tests and both blueprint behavior tests
+  pass. The locked zero-warning/error gate passed 1,018/1,018 engine and 7/7
+  Studio tests twice plus the complete installed matrix. Its 1,186-file archive
+  is 201,594,233 bytes with SHA-256
+  `29FB0FC0F44D4CCE61C29F85DAE4BE5CD504B24B6CF69E22E89A42FE5830A956`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+  A clean installed rerun is next.
 - Clean installed real-Qwen benchmark 40 proves the stateful gate changes
   authoring behavior but exposed runtime-inspection robustness defects. Qwen
   authored and compiled genuine `PlayerState`, `SealState`, and `HUDScore`

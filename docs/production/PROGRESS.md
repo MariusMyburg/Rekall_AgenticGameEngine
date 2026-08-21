@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 13:31 Africa/Johannesburg
+Last verified: 2026-08-21 14:30 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: embedded agent turns now have a provider-neutral bounded
-output budget and the complete installed product gate passes
+Latest milestone: real Qwen completed the installed Lumen Vault gameplay loop;
+package audits now block severe visual-layout defects and return repair hints
 
 ## Product objective
 
@@ -31,19 +31,24 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Acceptance benchmark queue
 
-1. Current: complete the unchanged Lumen Vault gameplay-authoring gauntlet
-   through real installed binaries and real Ollama, including compiled
-   game-authored behavior, semantic input, runtime state transitions, proof
-   capture, packaging, and package audit.
-2. Next visual-effects class: acquire a rights-compatible nature image from the
-   internet with source/provenance recorded, import it through generic asset
-   contracts, present it across the full player window, and author moving
+1. Current: repair the visually weak Lumen Vault composition through the real
+   Qwen authoring loop, then show its improved proof frame and playable package.
+   The unchanged installed benchmark already completed compiled game-owned
+   behavior, semantic input, runtime state transitions, proof capture,
+   packaging, relocation, and audit; the remaining blocker is presentation.
+2. Next Studio end-to-end visual-effects class: acquire a rights-compatible
+   nature image from the internet with source/provenance recorded, import it
+   through generic asset contracts, present it across the full player window,
+   and author moving
    raindrops-on-glass through generic material, shader, buffer, sampler, UV,
    transparency/blending, and engine-time primitives. Acceptance requires at
    least two temporally distinct captured frames proving real animation, plus
    validation, packaging, and package audit. The engine must not contain a
    nature-scene or raindrop-specific built-in; the Ollama agent authors the
-   effect from inspectable general-purpose capabilities.
+   effect from inspectable general-purpose capabilities. Author this game
+   entirely through Rekall.Age.Studio so prompt entry, tool execution, project
+   mutation, play, capture, packaging, and audit prove the UI as a real consumer
+   of the same portable authoring contracts.
 3. After the arbitrary described-game path is reliable, prove a complete
    playable Pong game through the same generic contracts.
 4. Platform track after the desktop authoring loop is reliable: publish games
@@ -56,6 +61,29 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Clean installed benchmark 48 completed the unchanged Lumen Vault request with
+  real `qwen3.8:27b`: 88 turns, 102 tool executions, and 17 failed calls that
+  were repaired in-session. Qwen authored a coherent 12-entity 3D scene and a
+  trusted 6,632-byte game-owned runtime system. A 150-frame semantic-input run
+  proved delta-time player motion, collection of all three seals, progress state,
+  and completion with six passing runtime assertions. The resulting package
+  ran, relocated, and audited successfully; its archive is 38,034,938 bytes with
+  SHA-256 `8B6658AE3A06396ED4E1D783EA08D5548A1F4517D1150A87176883F7587FBF24`.
+  Independent inspection then correctly exposed that mechanical acceptance was
+  too weak: the side-on composition overlapped its primary renderables, the UI
+  title was clipped, and the spatial layout was overwhelmingly X-dominant.
+  AGE now measures visible UI text area, emits stable severe-clipping diagnostics
+  with entity-specific repair hints, carries complete layout diagnostics through
+  package capture, and blocks package audit on severe element/text clipping while
+  preserving advisory composition warnings and hints. The agent also now detects
+  provider output-limit finishes, requests one immediate tool action at reduced
+  reasoning, and restores the requested reasoning level after recovery. Focused
+  regressions passed 15/15. The locked Release build had zero warnings/errors;
+  two independent passes completed 1,032/1,032 engine and 7/7 Studio tests. The
+  rebuilt installed distribution passed its complete acceptance matrix, including
+  the installed Studio agent proof and the new `layout-integrity` package check.
+  Its 1,186-payload archive is 201,624,030 bytes with SHA-256
+  `417E706850E9D76AA250E61BC182A690334AD0683B6D8D7986C540E5E696C62B`.
 - Clean real-Qwen benchmark 47 proved that context capacity and per-turn output
   budget are separate production controls. Qwen 3.8 authored the complete
   11-entity Lumen Vault scene and a freshly trusted 7,877-byte runtime-system
@@ -2852,12 +2880,13 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
-Run clean installed benchmark 48 with the unchanged task and real Qwen 3.8.
-Use its next measured blocker to choose the next generic contract repair or,
-after successful task-specific runtime/package/audit evidence, show the captured
-and packaged Lumen Vault result and advance immediately to the queued
-raindrops-on-glass acceptance game. Do not return to broad subsystem or CI
-expansion until an arbitrary described game completes the full executable loop.
+Run Qwen against the preserved benchmark-48 Lumen Vault with the new package
+layout diagnostics and require it to repair the scene/camera/UI composition
+without weakening gameplay evidence. Show the improved proof frame and playable
+package. Then author the queued raindrops-on-glass acceptance game entirely in
+Studio and require two temporally distinct frames, package, relocation, and
+audit. Do not return to broad subsystem or CI expansion before these user-visible
+game proofs complete.
 
 ## Evidence index
 

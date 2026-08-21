@@ -338,6 +338,7 @@ public sealed class CaptureRuntimeViewportCommandTests
         Assert.True(result.Ok, result.Summary);
         Assert.Contains("REKALL_VIEWPORT_UI_ELEMENT_SEVERELY_CLIPPED", result.Value.LayoutDiagnostics.WarningCodes);
         Assert.Contains("REKALL_VIEWPORT_UI_TEXT_NOT_VISIBLE", result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.Contains("REKALL_VIEWPORT_UI_TEXT_SEVERELY_CLIPPED", result.Value.LayoutDiagnostics.WarningCodes);
         Assert.DoesNotContain("REKALL_VIEWPORT_NO_ACTIVE_CAMERA", result.Value.LayoutDiagnostics.WarningCodes);
         Assert.Contains(result.Value.LayoutDiagnostics.AuthoringHints, hint =>
             hint.Contains("Main Button", StringComparison.Ordinal)

@@ -122,6 +122,33 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task AgentUsesLowReasoningForActionRecoveryAfterOutputLimit()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "long unfinished reasoning", [], "length", new(10, 8_192, 100)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "", [new RekallAgeLanguageModelToolCall("inspect", new JsonObject())], "tool_calls", new(10, 2, 100)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Ready", "", [], "stop", new(10, 2, 100)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 3,
+                Think = "medium"
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal(["medium", "low", "medium"], model.Requests.Select(request => request.Think));
+        Assert.Contains(model.Requests[1].Messages, message =>
+            message.Role == "user"
+            && message.Content.Contains("immediately call the single next tool", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task AgentReportsBoundedTurnAndToolProgress()
     {
         var model = new ScriptedModelClient(

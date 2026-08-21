@@ -31,6 +31,13 @@ public sealed record AuditPlayablePackageResult(
 public sealed class AuditPlayablePackageCommand
     : IRekallAgeCommand<AuditPlayablePackageRequest, AuditPlayablePackageResult>
 {
+    private static readonly HashSet<string> CriticalLayoutWarningCodes = new(StringComparer.Ordinal)
+    {
+        "REKALL_VIEWPORT_UI_ELEMENT_SEVERELY_CLIPPED",
+        "REKALL_VIEWPORT_UI_TEXT_NOT_VISIBLE",
+        "REKALL_VIEWPORT_UI_TEXT_SEVERELY_CLIPPED"
+    };
+
     private static readonly string[] RequiredKeyArtifacts =
     [
         "rekall.package.json",
@@ -109,6 +116,15 @@ public sealed class AuditPlayablePackageCommand
         var capture = await _captureFrame.ExecuteAsync(
             captureRequest,
             context);
+        var layoutDiagnostics = capture.Value.LayoutDiagnostics;
+        var criticalLayoutWarnings = layoutDiagnostics?.WarningCodes
+            .Where(CriticalLayoutWarningCodes.Contains)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray() ?? [];
+        var advisoryLayoutWarnings = layoutDiagnostics?.WarningCodes
+            .Where(code => !CriticalLayoutWarningCodes.Contains(code))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray() ?? [];
 
         var checks = new[]
         {
@@ -142,6 +158,10 @@ public sealed class AuditPlayablePackageCommand
                 "nonblank-frame",
                 capture.Value.NonBlank,
                 capture.Value.NonBlank ? "Package proof frame is non-blank." : "Package proof frame is blank."),
+            new RekallAgePlayablePackageAuditCheck(
+                "layout-integrity",
+                layoutDiagnostics is not null && criticalLayoutWarnings.Length == 0,
+                BuildLayoutIntegritySummary(layoutDiagnostics, criticalLayoutWarnings, advisoryLayoutWarnings)),
             new RekallAgePlayablePackageAuditCheck(
                 "informative-frame",
                 capture.Value.FrameAnalysis.VisuallyInformative,
@@ -177,6 +197,29 @@ public sealed class AuditPlayablePackageCommand
         return RekallAgeCommandResult<AuditPlayablePackageResult>.Success(
             result,
             "Playable package audit passed.");
+    }
+
+    private static string BuildLayoutIntegritySummary(
+        Rekall.Age.Rendering.Commands.CaptureRuntimeViewportLayoutDiagnostics? diagnostics,
+        IReadOnlyList<string> criticalWarnings,
+        IReadOnlyList<string> advisoryWarnings)
+    {
+        if (diagnostics is null)
+        {
+            return "Package proof capture returned no layout diagnostics.";
+        }
+
+        var hints = diagnostics.AuthoringHints.Count == 0
+            ? string.Empty
+            : $" Repair hints: {string.Join(" ", diagnostics.AuthoringHints)}";
+        if (criticalWarnings.Count > 0)
+        {
+            return $"Package proof has blocking layout warning(s): {string.Join(", ", criticalWarnings)}.{hints}";
+        }
+
+        return advisoryWarnings.Count == 0
+            ? "Package proof layout integrity checks passed."
+            : $"Package proof layout integrity checks passed with advisory warning(s): {string.Join(", ", advisoryWarnings)}.{hints}";
     }
 
     private static IReadOnlyList<string> FindMissingKeyArtifacts(IReadOnlyList<RekallAgePlayablePackageFile> files)

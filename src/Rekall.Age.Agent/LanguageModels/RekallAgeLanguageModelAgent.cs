@@ -147,6 +147,7 @@ public sealed class RekallAgeLanguageModelAgent(
         var runtimeRepairReserveActivated = false;
         var postRuntimeDeliveryReserveActivated = false;
         var runtimeAuthoringCheckpointPrompted = false;
+        var actionRecoveryPending = false;
         var requireAgentStateTransitionProof = request.RequireRuntimeBehaviorAssertions
             && RequiresAgentStateTransitionProof(request.Task);
         var turnLimit = maxTurns;
@@ -163,7 +164,7 @@ public sealed class RekallAgeLanguageModelAgent(
                     BuildContext(transcript, toolExecutions, maxContextMessages),
                     toolExecutor.Tools)
                 {
-                    Think = request.Think,
+                    Think = actionRecoveryPending ? ReduceReasoningForAction(request.Think) : request.Think,
                     Temperature = request.Temperature,
                     ContextWindowTokens = contextWindowTokens,
                     MaxOutputTokens = maxOutputTokens
@@ -177,6 +178,21 @@ public sealed class RekallAgeLanguageModelAgent(
                 "assistant",
                 response.Content,
                 ToolCalls: response.ToolCalls));
+
+            if (response.ToolCalls.Count == 0 && IsOutputLimitFinishReason(response.FinishReason))
+            {
+                actionRecoveryPending = true;
+                transcript.Add(new RekallAgeLanguageModelMessage(
+                    "user",
+                    "Your previous response reached the provider output limit without acting. Do not repeat or summarize that reasoning. Continue from the persistent tool ledger and immediately call the single next tool that most directly advances or verifies the unfinished task."));
+                request.Progress?.Report(new RekallAgeLanguageModelAgentProgress(
+                    turn,
+                    "turn.output_limit",
+                    "The model reached its output limit without a tool call; the next turn will use reduced reasoning effort to force a concrete action."));
+                continue;
+            }
+
+            actionRecoveryPending = false;
 
             if (response.ToolCalls.Count == 0)
             {
@@ -1193,6 +1209,17 @@ public sealed class RekallAgeLanguageModelAgent(
         || name.StartsWith("rekall.workflow.relocate_", StringComparison.Ordinal)
         || name.StartsWith("rekall.workflow.capture_", StringComparison.Ordinal)
         || name.StartsWith("rekall.workflow.run_", StringComparison.Ordinal);
+
+    private static bool IsOutputLimitFinishReason(string finishReason) =>
+        finishReason.Equals("length", StringComparison.OrdinalIgnoreCase)
+        || finishReason.Equals("max_tokens", StringComparison.OrdinalIgnoreCase)
+        || finishReason.Equals("max_output_tokens", StringComparison.OrdinalIgnoreCase)
+        || finishReason.Equals("token_limit", StringComparison.OrdinalIgnoreCase);
+
+    private static string? ReduceReasoningForAction(string? think) =>
+        think?.Trim().ToLowerInvariant() is "high" or "medium" or "true"
+            ? "low"
+            : think;
 
     private static string EffectiveToolName(
         RekallAgeLanguageModelToolCall call,

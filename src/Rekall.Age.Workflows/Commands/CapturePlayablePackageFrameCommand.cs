@@ -26,7 +26,10 @@ public sealed record CapturePlayablePackageFrameResult(
     int DrawCommandCount,
     IReadOnlyList<string> DrawCommandKinds,
     RekallAgeViewportFrameAnalysis FrameAnalysis,
-    string Text);
+    string Text)
+{
+    public CaptureRuntimeViewportLayoutDiagnostics? LayoutDiagnostics { get; init; }
+}
 
 public sealed class CapturePlayablePackageFrameCommand
     : IRekallAgeCommand<CapturePlayablePackageFrameRequest, CapturePlayablePackageFrameResult>
@@ -135,7 +138,10 @@ public sealed class CapturePlayablePackageFrameCommand
             viewport.RenderableCount,
             viewport.RenderableKinds,
             viewport.FrameAnalysis,
-            $"Captured packaged authored scene '{inspection.Value.Manifest.SceneName}' using {viewport.BackendId}.");
+            $"Captured packaged authored scene '{inspection.Value.Manifest.SceneName}' using {viewport.BackendId}.")
+        {
+            LayoutDiagnostics = viewport.LayoutDiagnostics
+        };
         return RekallAgeCommandResult<CapturePlayablePackageFrameResult>.Success(
             resultValue,
             $"Captured packaged authored scene frame {viewport.FrameIndex}.");

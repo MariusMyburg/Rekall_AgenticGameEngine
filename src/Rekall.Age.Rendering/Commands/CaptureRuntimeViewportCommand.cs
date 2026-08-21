@@ -530,18 +530,31 @@ public sealed class CaptureRuntimeViewportCommand
                 }
             }
 
-            if (!string.IsNullOrEmpty(visual.Text) && !HasVisibleTextPixels(frame, visual))
+            if (!string.IsNullOrEmpty(visual.Text))
             {
-                warnings.Add("REKALL_VIEWPORT_UI_TEXT_NOT_VISIBLE");
-                if (hints.Count < maximumHints)
+                var visiblePercent = CalculateVisibleTextPercent(frame, visual);
+                if (visiblePercent < 75)
                 {
-                    hints.Add($"UI text on '{renderable.EntityName}' is outside its effective clip rectangle; adjust element bounds or parent clipping before accepting the proof frame.");
+                    warnings.Add("REKALL_VIEWPORT_UI_TEXT_SEVERELY_CLIPPED");
+                    if (hints.Count < maximumHints)
+                    {
+                        hints.Add($"UI text on '{renderable.EntityName}' is only {visiblePercent}% visible; enlarge its effective layout width/height or adjust parent clipping, then recapture.");
+                    }
+                }
+
+                if (visiblePercent == 0)
+                {
+                    warnings.Add("REKALL_VIEWPORT_UI_TEXT_NOT_VISIBLE");
+                    if (hints.Count < maximumHints)
+                    {
+                        hints.Add($"UI text on '{renderable.EntityName}' is outside its effective clip rectangle; adjust element bounds or parent clipping before accepting the proof frame.");
+                    }
                 }
             }
         }
     }
 
-    private static bool HasVisibleTextPixels(
+    private static int CalculateVisibleTextPercent(
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeRuntimeViewportUiVisual visual)
     {
@@ -556,8 +569,14 @@ public sealed class CaptureRuntimeViewportCommand
         var clipTop = Math.Max(0, visual.ClipY);
         var clipRight = Math.Min(frame.Width, visual.ClipX + visual.ClipWidth);
         var clipBottom = Math.Min(frame.Height, visual.ClipY + visual.ClipHeight);
-        return IntersectionLength(textX, textX + textWidth, clipLeft, clipRight) > 0
-            && IntersectionLength(textY, textY + 5 * scale, clipTop, clipBottom) > 0;
+        var textHeight = 5 * scale;
+        var visibleWidth = IntersectionLength(textX, textX + textWidth, clipLeft, clipRight);
+        var visibleHeight = IntersectionLength(textY, textY + textHeight, clipTop, clipBottom);
+        var textArea = (long)textWidth * textHeight;
+        var visibleArea = (long)visibleWidth * visibleHeight;
+        return textArea == 0
+            ? 100
+            : (int)Math.Round(visibleArea * 100d / textArea);
     }
 
     private static int IntersectionLength(int start, int end, int clipStart, int clipEnd)

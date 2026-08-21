@@ -110,6 +110,8 @@ public sealed class PlayablePackageIntegrityTests
         Assert.True(capture.Value.NonBlank);
         Assert.True(capture.Value.FrameAnalysis.Analyzed);
         Assert.True(capture.Value.FrameAnalysis.VisuallyInformative);
+        Assert.NotNull(capture.Value.LayoutDiagnostics);
+        Assert.True(capture.Value.LayoutDiagnostics.Analyzed);
         Assert.Equal("package_play_frame_001.png", Path.GetFileName(capture.Value.OutputPath));
         Assert.Equal("runtime-viewport", capture.Value.Kind);
         Assert.Contains("sprite", capture.Value.DrawCommandKinds);
@@ -124,6 +126,9 @@ public sealed class PlayablePackageIntegrityTests
         Assert.Contains(
             audit.Value.Checks,
             check => check.Name == "informative-frame" && check.Passed);
+        Assert.Contains(
+            audit.Value.Checks,
+            check => check.Name == "layout-integrity" && check.Passed);
 
         var relocated = await new RelocatePlayablePackageCommand().ExecuteAsync(
             new RelocatePlayablePackageRequest(
@@ -170,6 +175,65 @@ public sealed class PlayablePackageIntegrityTests
             new InspectPlayablePackageRequest(output),
             context);
         Assert.True(inspectionAfterRejectedAudit.Ok, inspectionAfterRejectedAudit.Summary);
+    }
+
+    [Fact]
+    public async Task PackageAuditRejectsSeverelyClippedUiTextWithRepairDiagnostics()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var output = Path.Combine(TestPaths.CreateTempDirectory(), "ClippedUiPackage");
+        var context = new RekallAgeCommandContext(
+            "clipped-ui-audit-test",
+            RekallAgeTransaction.Begin("reject clipped package proof"),
+            CancellationToken.None);
+        var authored = await new RunAgentAuthoringGauntletCommand().ExecuteAsync(
+            new RunAgentAuthoringGauntletRequest(
+                root,
+                "Clipped UI Game",
+                "Main",
+                Path.Combine(TestPaths.CreateTempDirectory(), "InitialPackage")),
+            context);
+        Assert.True(authored.Ok, authored.Summary);
+
+        var canvas = RekallAgeEntityDocument.Create("Proof HUD", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject
+                {
+                    ["ReferenceWidth"] = 200,
+                    ["ReferenceHeight"] = 100,
+                    ["LayoutDirection"] = "vertical"
+                }));
+        var title = RekallAgeEntityDocument.Create("Oversized Title", ["ui"]) with { ParentId = canvas.Id };
+        title = title.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Label",
+            new JsonObject
+            {
+                ["Text"] = "THIS TITLE MUST REMAIN COMPLETELY VISIBLE",
+                ["FontSize"] = 34
+            }));
+        var store = new RekallAgeSceneStore();
+        var scene = await store.LoadAsync(root, "Main", CancellationToken.None);
+        await store.SaveAsync(root, scene.AddEntity(canvas).AddEntity(title), CancellationToken.None);
+
+        var packaged = await new PackagePlayableGameCommand().ExecuteAsync(
+            new PackagePlayableGameRequest(root, "Main", output),
+            context);
+        Assert.True(packaged.Ok, packaged.Summary);
+
+        var audit = await new AuditPlayablePackageCommand().ExecuteAsync(
+            new AuditPlayablePackageRequest(
+                output,
+                Path.Combine(root, "Builds", "ClippedAudit"),
+                Width: 200,
+                Height: 100),
+            context);
+
+        Assert.False(audit.Ok);
+        var layout = Assert.Single(audit.Value.Checks, check => check.Name == "layout-integrity");
+        Assert.False(layout.Passed);
+        Assert.Contains("Oversized Title", layout.Summary, StringComparison.Ordinal);
+        Assert.Contains("REKALL_VIEWPORT_UI_TEXT_SEVERELY_CLIPPED", audit.Value.Capture.LayoutDiagnostics!.WarningCodes);
     }
 
     [Fact]

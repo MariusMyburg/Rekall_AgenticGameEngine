@@ -17,7 +17,7 @@ public sealed class InspectRuntimeSdkCommandTests
         var result = await new InspectRuntimeSdkCommand().ExecuteAsync(
             new InspectRuntimeSdkRequest(
                 "input action immutable vector entity component source duplicate system",
-                Limit: 32),
+                Limit: 40),
             context);
 
         Assert.True(result.Ok, result.Summary);
@@ -60,6 +60,10 @@ public sealed class InspectRuntimeSdkCommandTests
             contract.Name == "agent-component-registration-recipe"
             && contract.Usage!.Contains("RegisterComponent", StringComparison.Ordinal)
             && contract.Description.Contains("every", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "immutable-world-lineage-recipe"
+            && contract.Usage!.Contains("updatedWorld = updatedWorld.Update", StringComparison.Ordinal)
+            && contract.Description.Contains("outside", StringComparison.OrdinalIgnoreCase));
         Assert.All(result.Value.Contracts, contract => Assert.False(string.IsNullOrWhiteSpace(contract.Signature)));
 
         var queryResult = await new InspectRuntimeSdkCommand().ExecuteAsync(

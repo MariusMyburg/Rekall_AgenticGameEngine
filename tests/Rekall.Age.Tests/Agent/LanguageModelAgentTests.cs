@@ -40,6 +40,8 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("does not create semantic bindings", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("register every agent-owned component", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("bare world.Update... call is a gameplay no-op", prompt, StringComparison.Ordinal);
+        Assert.Contains("continue from updatedWorld", prompt, StringComparison.Ordinal);
+        Assert.Contains("never mutate an outer world inside an entity-update callback", prompt, StringComparison.Ordinal);
         Assert.Contains("never scaffold that module again", prompt, StringComparison.Ordinal);
         Assert.Contains("non-empty assertions array", prompt, StringComparison.Ordinal);
         Assert.Contains("first runnable gameplay checkpoint", prompt, StringComparison.OrdinalIgnoreCase);

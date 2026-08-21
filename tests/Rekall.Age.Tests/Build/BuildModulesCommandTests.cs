@@ -362,4 +362,107 @@ public sealed class BuildModulesCommandTests
         Assert.Contains("immutable", error.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(result.Value.Modules);
     }
+
+    [Fact]
+    public async Task StaleImmutableWorldBaseFailsBuildWithExactRepair()
+    {
+        var (root, context, sourcePath) = await ScaffoldRuntimeSystemAsync("stale world lineage");
+        var source = await File.ReadAllTextAsync(sourcePath);
+        source = source.Replace(
+            "return ValueTask.FromResult(updatedWorld);",
+            "updatedWorld = world.UpdateEntity(\"player\", entity => entity);\n\n"
+            + "        return ValueTask.FromResult(updatedWorld);",
+            StringComparison.Ordinal);
+        await File.WriteAllTextAsync(sourcePath, source);
+
+        var result = await new BuildModulesCommand().ExecuteAsync(
+            new BuildModulesRequest(root),
+            context);
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal("REKALL_MODULE_IMMUTABLE_WORLD_STALE_BASE", error.Code);
+        Assert.Contains(
+            "updatedWorld = updatedWorld.UpdateEntity",
+            error.Message,
+            StringComparison.Ordinal);
+        Assert.Contains("earlier mutation", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(result.Value.Modules);
+    }
+
+    [Fact]
+    public async Task NestedImmutableWorldMutationFailsBuildWithSequentialRepair()
+    {
+        var (root, context, sourcePath) = await ScaffoldRuntimeSystemAsync("nested world mutation");
+        var source = await File.ReadAllTextAsync(sourcePath);
+        source = source.Replace(
+            "return ValueTask.FromResult(updatedWorld);",
+            "updatedWorld = updatedWorld.UpdateEntitiesWithComponent(componentType, entity =>\n"
+            + "        {\n"
+            + "            updatedWorld = updatedWorld.UpdateEntity(entity.Id, current => current);\n"
+            + "            return entity;\n"
+            + "        });\n\n"
+            + "        return ValueTask.FromResult(updatedWorld);",
+            StringComparison.Ordinal);
+        await File.WriteAllTextAsync(sourcePath, source);
+
+        var result = await new BuildModulesCommand().ExecuteAsync(
+            new BuildModulesRequest(root),
+            context);
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal("REKALL_MODULE_IMMUTABLE_WORLD_NESTED_MUTATION", error.Code);
+        Assert.Contains("outside", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("return only the entity", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(result.Value.Modules);
+    }
+
+    [Fact]
+    public async Task ChainedWorldMutationAndReadOnlyCallbackQueryRemainBuildable()
+    {
+        var (root, context, sourcePath) = await ScaffoldRuntimeSystemAsync("valid world lineage");
+        var source = await File.ReadAllTextAsync(sourcePath);
+        source = source.Replace(
+            "var position = entity.Transform.Position3D;",
+            "var other = world.FindEntity(\"reference\");\n"
+            + "            var position = entity.Transform.Position3D;",
+            StringComparison.Ordinal);
+        source = source.Replace(
+            "return ValueTask.FromResult(updatedWorld);",
+            "var diagnostic = \"updatedWorld = world.UpdateEntity(...)\";\n"
+            + "        // updatedWorld = world.UpdateEntity(\"ignored\", entity => entity);\n"
+            + "        updatedWorld = updatedWorld.UpdateEntity(\"player\", entity => entity);\n\n"
+            + "        return ValueTask.FromResult(updatedWorld);",
+            StringComparison.Ordinal);
+        await File.WriteAllTextAsync(sourcePath, source);
+
+        var result = await new BuildModulesCommand().ExecuteAsync(
+            new BuildModulesRequest(root),
+            context);
+
+        Assert.True(result.Ok, string.Join(Environment.NewLine, result.Errors.Select(error => error.Message)));
+        Assert.Single(result.Value.Modules);
+    }
+
+    private static async Task<(string Root, RekallAgeCommandContext Context, string SourcePath)>
+        ScaffoldRuntimeSystemAsync(string transactionName)
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin(transactionName),
+            CancellationToken.None);
+        var scaffold = await new ScaffoldRuntimeSystemModuleCommand().ExecuteAsync(
+            new ScaffoldRuntimeSystemModuleRequest(
+                root,
+                "game.motion",
+                "Game Motion",
+                "GameMotion",
+                "OrbitMotion",
+                "OrbitMotionSystem"),
+            context);
+        Assert.True(scaffold.Ok);
+        return (root, context, scaffold.Value.SourcePath);
+    }
 }

@@ -143,6 +143,14 @@ public sealed class InspectRuntimeSdkCommand
                 Usage = "builder.RegisterComponent<PlayerState>(); builder.RegisterComponent<ProgressState>(); builder.RegisterComponent<CollectibleState>();"
             },
             new RekallAgeRuntimeSdkContract(
+                "authoring-recipe",
+                "immutable-world-lineage-recipe",
+                "RekallAgeRuntimeWorld mutation results form one sequential immutable lineage",
+                "Consume every mutation result and continue from the newest world. Never rebuild an already-mutated variable from a stale base. Entity-update callbacks return only replacement entities; perform additional world mutations sequentially outside callbacks so an enclosing update cannot overwrite them.")
+            {
+                Usage = "var updatedWorld = world.UpdateEntitiesWithComponent(type, entity => entity.WithComponentBoolean(type, \"active\", true)); updatedWorld = updatedWorld.UpdateEntity(id, entity => entity); return ValueTask.FromResult(updatedWorld);"
+            },
+            new RekallAgeRuntimeSdkContract(
                 "module-source",
                 "module-source-topology",
                 "Modules/<ModuleName>/<ModuleName>.csproj compiles every Modules/<ModuleName>/*.cs file",
@@ -221,8 +229,11 @@ public sealed class InspectRuntimeSdkCommand
             "Returns stateless deterministic pseudo-random values from an authored seed and stable sequence index, suitable for replayable spawning and procedural variation.",
         nameof(RekallAgeRuntimeModuleSdk.UpdateEntity) or
         nameof(RekallAgeRuntimeModuleSdk.ReplaceEntity) or
-        nameof(RekallAgeRuntimeModuleSdk.RemoveEntity) =>
-            "Returns a replacement immutable world after a generic entity mutation.",
+        nameof(RekallAgeRuntimeModuleSdk.RemoveEntity) or
+        nameof(RekallAgeRuntimeModuleSdk.UpdateEntitiesWithTag) or
+        nameof(RekallAgeRuntimeModuleSdk.UpdateEntitiesWithComponent) or
+        nameof(RekallAgeRuntimeModuleSdk.UpdateEntitiesWithTagAndComponent) =>
+            "Returns a replacement immutable world after a generic entity mutation. Continue later mutations from that replacement and perform world mutations outside entity callbacks.",
         nameof(RekallAgeRuntimeModuleSdk.UpdateComponent) or
         nameof(RekallAgeRuntimeModuleSdk.UpsertComponent) =>
             "Returns a replacement immutable entity after a JSON component mutation.",

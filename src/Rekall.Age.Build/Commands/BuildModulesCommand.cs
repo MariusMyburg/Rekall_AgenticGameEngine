@@ -41,6 +41,9 @@ public sealed class BuildModulesCommand
     private static readonly Regex DiscardedWorldMutation = new(
         @"^\s*(?<receiver>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*(?<method>AddEntity|RemoveEntity|ReplaceEntity|UpdateEntity|UpdateEntitiesWithTag|UpdateEntitiesWithComponent|UpdateEntitiesWithTagAndComponent)\s*\(",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex AssignedWorldMutation = new(
+        @"^[\t ]*(?:(?<declaration>var|RekallAgeRuntimeWorld)\s+)?(?<target>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?<receiver>[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*(?<method>AddEntity|RemoveEntity|ReplaceEntity|UpdateEntity|UpdateEntitiesWithTag|UpdateEntitiesWithComponent|UpdateEntitiesWithTagAndComponent)\s*\(",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled | RegexOptions.Multiline);
 
     public BuildModulesCommand()
         : this(
@@ -150,7 +153,8 @@ public sealed class BuildModulesCommand
         {
             foreach (var sourcePath in candidate.SourcePaths)
             {
-                var lines = await File.ReadAllLinesAsync(sourcePath, context.CancellationToken);
+                var source = await File.ReadAllTextAsync(sourcePath, context.CancellationToken);
+                var lines = source.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
                 for (var index = 0; index < lines.Length; index++)
                 {
                     var match = DiscardedWorldMutation.Match(lines[index]);
@@ -172,6 +176,26 @@ public sealed class BuildModulesCommand
                             "REKALL_MODULE_IMMUTABLE_MUTATION_DISCARDED",
                             message,
                             $"{sourcePath}:{index + 1}",
+                            [new RekallAgeSuggestedCommand(
+                                "rekall.module.read_source",
+                                new Dictionary<string, object?>
+                                {
+                                    ["projectRoot"] = request.ProjectRoot,
+                                    ["moduleName"] = candidate.ModuleName,
+                                    ["fileName"] = Path.GetFileName(sourcePath)
+                                })])]);
+                }
+
+                var lineageIssue = InspectImmutableWorldLineage(source);
+                if (lineageIssue is not null)
+                {
+                    return RekallAgeCommandResult<BuildModulesResult>.Failure(
+                        new BuildModulesResult(results),
+                        lineageIssue.Summary,
+                        [new RekallAgeCommandError(
+                            lineageIssue.Code,
+                            lineageIssue.Message,
+                            $"{sourcePath}:{lineageIssue.LineNumber}",
                             [new RekallAgeSuggestedCommand(
                                 "rekall.module.read_source",
                                 new Dictionary<string, object?>
@@ -301,6 +325,217 @@ public sealed class BuildModulesCommand
         return RekallAgeCommandResult<BuildModulesResult>.Success(
             value,
             $"Built {results.Count} module project(s).");
+    }
+
+    private static ImmutableWorldLineageIssue? InspectImmutableWorldLineage(string source)
+    {
+        var maskedSource = MaskNonCode(source);
+        var assignments = AssignedWorldMutation.Matches(maskedSource)
+            .Cast<Match>()
+            .Select(match => new WorldMutationAssignment(
+                match,
+                match.Groups["target"].Value,
+                match.Groups["receiver"].Value,
+                match.Groups["method"].Value,
+                match.Groups["declaration"].Success,
+                GetLineNumber(maskedSource, match.Index)))
+            .ToArray();
+        var establishedWorlds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var assignment in assignments)
+        {
+            if (!assignment.IsDeclaration
+                && establishedWorlds.Contains(assignment.Target)
+                && !string.Equals(assignment.Target, assignment.Receiver, StringComparison.Ordinal))
+            {
+                return new ImmutableWorldLineageIssue(
+                    "REKALL_MODULE_IMMUTABLE_WORLD_STALE_BASE",
+                    "A runtime module rebuilds an already-mutated immutable world from a stale base.",
+                    $"Immutable world '{assignment.Target}' is reassigned from stale base "
+                    + $"'{assignment.Receiver}' at line {assignment.LineNumber}, which discards an earlier mutation. "
+                    + $"Continue the current lineage instead: {assignment.Target} = {assignment.Target}.{assignment.Method}(...).",
+                    assignment.LineNumber);
+            }
+
+            establishedWorlds.Add(assignment.Target);
+        }
+
+        foreach (var outer in assignments)
+        {
+            var openParenthesis = outer.Match.Index + outer.Match.Length - 1;
+            var closeParenthesis = FindMatchingParenthesis(maskedSource, openParenthesis);
+            if (closeParenthesis < 0)
+            {
+                continue;
+            }
+
+            var callbackArrow = maskedSource.IndexOf("=>", openParenthesis, StringComparison.Ordinal);
+            if (callbackArrow < 0 || callbackArrow > closeParenthesis)
+            {
+                continue;
+            }
+
+            var worldsEstablishedBeforeCallback = assignments
+                .Where(candidate => candidate.Match.Index < outer.Match.Index)
+                .Select(candidate => candidate.Target)
+                .ToHashSet(StringComparer.Ordinal);
+            var nested = assignments.FirstOrDefault(candidate =>
+                candidate.Match.Index > callbackArrow
+                && candidate.Match.Index < closeParenthesis
+                && !candidate.IsDeclaration
+                && worldsEstablishedBeforeCallback.Contains(candidate.Target));
+            if (nested is null)
+            {
+                continue;
+            }
+
+            return new ImmutableWorldLineageIssue(
+                "REKALL_MODULE_IMMUTABLE_WORLD_NESTED_MUTATION",
+                "A runtime module mutates an outer immutable world from inside an entity-update callback.",
+                $"Immutable world '{nested.Target}' is reassigned inside the {outer.Method} callback at line "
+                + $"{nested.LineNumber}. The enclosing immutable update can overwrite that nested result. "
+                + "Return only the entity from the callback, then perform world mutations sequentially outside it.",
+                nested.LineNumber);
+        }
+
+        return null;
+    }
+
+    private static int FindMatchingParenthesis(string source, int openParenthesis)
+    {
+        var depth = 0;
+        for (var index = openParenthesis; index < source.Length; index++)
+        {
+            if (source[index] == '(')
+            {
+                depth++;
+            }
+            else if (source[index] == ')' && --depth == 0)
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int GetLineNumber(string source, int offset)
+    {
+        var line = 1;
+        for (var index = 0; index < offset; index++)
+        {
+            if (source[index] == '\n')
+            {
+                line++;
+            }
+        }
+
+        return line;
+    }
+
+    private static string MaskNonCode(string source)
+    {
+        var masked = source.ToCharArray();
+        var state = SourceMaskState.Code;
+        for (var index = 0; index < source.Length; index++)
+        {
+            var current = source[index];
+            var next = index + 1 < source.Length ? source[index + 1] : '\0';
+
+            if (state == SourceMaskState.Code)
+            {
+                if (current == '/' && next == '/')
+                {
+                    masked[index] = masked[index + 1] = ' ';
+                    index++;
+                    state = SourceMaskState.LineComment;
+                }
+                else if (current == '/' && next == '*')
+                {
+                    masked[index] = masked[index + 1] = ' ';
+                    index++;
+                    state = SourceMaskState.BlockComment;
+                }
+                else if (current == '"')
+                {
+                    masked[index] = ' ';
+                    state = index > 0 && source[index - 1] == '@'
+                        ? SourceMaskState.VerbatimString
+                        : SourceMaskState.String;
+                }
+                else if (current == '\'')
+                {
+                    masked[index] = ' ';
+                    state = SourceMaskState.Character;
+                }
+
+                continue;
+            }
+
+            if (current is not ('\r' or '\n'))
+            {
+                masked[index] = ' ';
+            }
+
+            switch (state)
+            {
+                case SourceMaskState.LineComment when current == '\n':
+                    state = SourceMaskState.Code;
+                    break;
+                case SourceMaskState.BlockComment when current == '*' && next == '/':
+                    masked[index + 1] = ' ';
+                    index++;
+                    state = SourceMaskState.Code;
+                    break;
+                case SourceMaskState.String when current == '\\':
+                case SourceMaskState.Character when current == '\\':
+                    if (index + 1 < source.Length)
+                    {
+                        masked[index + 1] = source[index + 1] is '\r' or '\n' ? source[index + 1] : ' ';
+                        index++;
+                    }
+                    break;
+                case SourceMaskState.String when current == '"':
+                    state = SourceMaskState.Code;
+                    break;
+                case SourceMaskState.Character when current == '\'':
+                    state = SourceMaskState.Code;
+                    break;
+                case SourceMaskState.VerbatimString when current == '"' && next == '"':
+                    masked[index + 1] = ' ';
+                    index++;
+                    break;
+                case SourceMaskState.VerbatimString when current == '"':
+                    state = SourceMaskState.Code;
+                    break;
+            }
+        }
+
+        return new string(masked);
+    }
+
+    private sealed record WorldMutationAssignment(
+        Match Match,
+        string Target,
+        string Receiver,
+        string Method,
+        bool IsDeclaration,
+        int LineNumber);
+
+    private sealed record ImmutableWorldLineageIssue(
+        string Code,
+        string Summary,
+        string Message,
+        int LineNumber);
+
+    private enum SourceMaskState
+    {
+        Code,
+        LineComment,
+        BlockComment,
+        String,
+        VerbatimString,
+        Character
     }
 
     private static RekallAgeCommandError CreateBuildFailureError(

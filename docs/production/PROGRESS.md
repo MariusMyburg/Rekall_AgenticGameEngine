@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 11:40 Africa/Johannesburg
+Last verified: 2026-08-21 12:00 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: immutable mutation and destructive checkpoint repair
-safeguards are installed and locked; clean benchmark 45 is next
+Latest milestone: stale immutable-world lineage and nested mutation diagnostics
+are installed and locked; clean benchmark 46 is next
 
 ## Product objective
 
@@ -29,8 +29,58 @@ agents author the game.
 
 Studio is important, but it does not define or reorder the engine foundation.
 
+## Acceptance benchmark queue
+
+1. Current: complete the unchanged Lumen Vault gameplay-authoring gauntlet
+   through real installed binaries and real Ollama, including compiled
+   game-authored behavior, semantic input, runtime state transitions, proof
+   capture, packaging, and package audit.
+2. Next visual-effects class: acquire a rights-compatible nature image from the
+   internet with source/provenance recorded, import it through generic asset
+   contracts, present it across the full player window, and author moving
+   raindrops-on-glass through generic material, shader, buffer, sampler, UV,
+   transparency/blending, and engine-time primitives. Acceptance requires at
+   least two temporally distinct captured frames proving real animation, plus
+   validation, packaging, and package audit. The engine must not contain a
+   nature-scene or raindrop-specific built-in; the Ollama agent authors the
+   effect from inspectable general-purpose capabilities.
+3. After the arbitrary described-game path is reliable, prove a complete
+   playable Pong game through the same generic contracts.
+
 ## Verified status
 
+- Module builds now reject stale immutable-world lineage with
+  `REKALL_MODULE_IMMUTABLE_WORLD_STALE_BASE` and the exact continuation variable,
+  and reject mutation of an outer world inside an entity-update callback with
+  `REKALL_MODULE_IMMUTABLE_WORLD_NESTED_MUTATION` and a sequential-repair rule.
+  The bounded preflight masks comments and strings, preserves valid chained
+  mutation and read-only callback queries, reports source lines, and issues no
+  trusted build receipt on rejection. The embedded agent contract and compiled
+  SDK inspection expose the same rule and copyable pattern. The exact installed
+  Benchmark 45 source now fails before compilation with the stale-lineage
+  diagnostic. Focused build/agent/SDK coverage passed 18/18. The locked Release
+  build completed with zero warnings/errors; both independent passes completed
+  1,026/1,026 engine and 7/7 Studio tests, and the complete installed matrix
+  passed. The 1,186-payload archive is 201,614,635 bytes with SHA-256
+  `A390D3B8ACBA938C98A43B75A1DC1FBEE7CD147FB17FEB49C839E8FE7A15F36E`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+  Clean installed benchmark 46 is next.
+- Clean installed real-Qwen benchmark 45 confirms that the discarded-mutation
+  preflight and destructive checkpoint guard both change behavior, then exposes
+  two subtler immutable-world hazards. Qwen authored and compiled semantic
+  delta-time movement, seal contact/progress/completion, and reset behavior. It
+  assigned mutation results, but later assigned `updatedWorld` from stale
+  `world`, silently discarding earlier movement. It also mutated the outer
+  immutable world from inside an entity-update callback and then overwrote that
+  nested result when the callback operation returned. Duplicate `PlayerOrb`
+  names obscured checkpoint identity; late repair deleted the coherent player
+  and retained its sparse shell. AGE correctly blocked delivery after 64 tools:
+  the final scene had two renderables, no camera, no package, and evidence
+  SHA-256
+  `711BF15F71B83590409BAF1323AED0190A6D4018727811BB707D793F9E8A08B4`.
+  The next implementation item is fail-closed, exact-repair module source
+  diagnostics for stale immutable-world lineage and nested mutation before a
+  trusted build receipt is issued.
 - Clean installed real-Qwen benchmark 44 confirms the logical-entity contract
   works, then exposes two deeper generic hazards. Qwen initially authored eight
   coherent entities: each seal held its geometry, transform, and trigger; the
@@ -2713,12 +2763,11 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
-Rerun the unchanged task-specific benchmark with real Ollama. Use its next
-measured blocker to choose between bounded module source repair, scene-schema
-call ergonomics, or protected finalization after successful package audit. Do
-not return to broad subsystem or CI expansion until an arbitrary described
-game completes the full executable loop; then prove a fully playable Pong game
-through the same generic contracts.
+Run clean installed benchmark 46 with the unchanged task and real Ollama. Use
+its next measured blocker to choose the next generic contract repair or, after
+successful task-specific runtime/package/audit evidence, advance to the queued
+visual-effects acceptance class. Do not return to broad subsystem or CI
+expansion until an arbitrary described game completes the full executable loop.
 
 ## Evidence index
 

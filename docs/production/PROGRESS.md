@@ -4,12 +4,12 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 07:16 Africa/Johannesburg
+Last verified: 2026-08-21 07:35 Africa/Johannesburg
 
 Branch: `codex/production-foundation`
 
-Latest milestone: runtime checkpoints accept exact agent-owned component
-identities; bounded SDK source repair is the next measured blocker
+Latest milestone: compiler failures return exact bounded runtime SDK repair;
+assertion results must survive bounded agent output
 
 ## Product objective
 
@@ -31,6 +31,30 @@ Studio is important, but it does not define or reorder the engine foundation.
 
 ## Verified status
 
+- Runtime SDK compiler recovery: failed runtime-module builds now put exact
+  immutable entity/transform/component/update patterns before verbose compiler
+  diagnostics and return populated SDK-inspection plus source-list suggestions.
+  AGE does not rewrite or author the game source; ordinary compiler errors and
+  timeout/cancellation semantics remain authoritative. Focused build/scaffold/
+  SDK coverage passed 14/14. The locked zero-warning/error gate passed
+  1,006/1,006 engine and 7/7 Studio tests twice and the complete installed
+  matrix. Its 1,186-file archive is 201,577,852 bytes with SHA-256
+  `D3E00E027AD3FBDE71C553011B21FCD643DACB9E477B9EF70AC2FA55ADDEAE6B`;
+  zero reusable build nodes and zero run-scoped build temp directories remained.
+- Clean installed real-Qwen benchmark 32 proved compiler recovery: the authored
+  `LumenVaultRules` module compiled on its first build at tool call 19, later
+  builds recovered after edits, and 13 real runtime inspections executed. One
+  checkpoint passed, the final viewport was nonblank at 960x540 with six
+  renderables, and the protected run expanded to 73 tool calls. It remained red
+  with no package after later scene/module mutations invalidated the proof and
+  repeated runtime assertions failed. The generic diagnostic defect is now
+  measured: serialized runtime results put large subsystem/entity state before
+  `AssertionResults`, so the bounded LLM tool output can omit the failed
+  subject's exact actual value even though the command promises bounded repair
+  evidence. The next tranche puts compact failed assertion summaries and actual
+  values at the beginning of the command result while retaining full structured
+  inspection data. Evidence SHA-256 is
+  `D6F3A52B9460823A3E05AFFAD34900D05D7448BDC68E26E89D3787B20AACD413`.
 - Runtime checkpoint component identity now matches generic module authoring:
   exact non-`Rekall.*` runtime identities are eligible agent-owned state whether
   scaffold-qualified (`Game.*`) or exact authored CLR names, while canonical

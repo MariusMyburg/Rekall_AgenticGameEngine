@@ -252,10 +252,7 @@ public sealed class BuildModulesCommand
                 "One or more module projects failed to build.",
                 results
                     .Where(result => !result.Succeeded)
-                    .Select(result => new RekallAgeCommandError(
-                        result.TimedOut ? "REKALL_MODULE_BUILD_TIMEOUT" : "REKALL_MODULE_BUILD_FAILED",
-                        result.Output,
-                        result.ProjectPath))
+                    .Select(result => CreateBuildFailureError(request.ProjectRoot, result))
                     .ToArray());
         }
 
@@ -263,6 +260,59 @@ public sealed class BuildModulesCommand
             value,
             $"Built {results.Count} module project(s).");
     }
+
+    private static RekallAgeCommandError CreateBuildFailureError(
+        string projectRoot,
+        BuildModuleResult result)
+    {
+        if (result.TimedOut || !IsRuntimeSdkCompilerFailure(result.Output))
+        {
+            return new RekallAgeCommandError(
+                result.TimedOut ? "REKALL_MODULE_BUILD_TIMEOUT" : "REKALL_MODULE_BUILD_FAILED",
+                result.Output,
+                result.ProjectPath);
+        }
+
+        const string query =
+            "entity query entity transform Position3D immutable vector ComponentNumber ComponentBoolean ComponentString WithComponentNumber WithComponentBoolean WithComponentString UpdateEntity WithPosition3D runtime world";
+        var recovery =
+            "REKALL_RUNTIME_SDK_COMPILER_RECOVERY: Preserve the scaffolded SDK topology and repair against these exact immutable patterns:\n"
+            + "- Select one entity: var entity = world.FindEntity(\"Player\"); then null-check it; EntitiesNamed returns a list, not one entity.\n"
+            + "- Read transform: var position = entity.Transform.Position3D;\n"
+            + "- Read authored state: var value = entity.ComponentNumber(componentType, \"value\", 0); use ComponentBoolean/ComponentString for those kinds.\n"
+            + "- Replace position: var updated = entity.WithPosition3D(new RekallAgeRuntimeVector3(x, y, z));\n"
+            + "- Persist replacement: world = world.UpdateEntity(entity.Id, current => current.WithPosition3D(new RekallAgeRuntimeVector3(x, y, z)));\n"
+            + "These are extension-call shapes on the entity/world. Do not invent RekallAgeRuntimeModuleSdk.GetTransform3D, ReadTransform3D, Transform3D, GetComponentNumber, or a two-argument WithPosition3D. Inspect the compiled SDK with the populated suggested command, read the existing source, make one targeted repair, and rebuild.\n\n"
+            + "Compiler diagnostics:\n"
+            + result.Output;
+        return new RekallAgeCommandError(
+            "REKALL_MODULE_BUILD_FAILED",
+            recovery,
+            result.ProjectPath,
+            [
+                new RekallAgeSuggestedCommand(
+                    "rekall.module.inspect_runtime_sdk",
+                    new Dictionary<string, object?>
+                    {
+                        ["query"] = query,
+                        ["limit"] = 24
+                    }),
+                new RekallAgeSuggestedCommand(
+                    "rekall.module.list_sources",
+                    new Dictionary<string, object?>
+                    {
+                        ["projectRoot"] = projectRoot
+                    })
+            ]);
+    }
+
+    private static bool IsRuntimeSdkCompilerFailure(string output) =>
+        output.Contains("RekallAgeRuntime", StringComparison.Ordinal)
+        || output.Contains("ComponentNumber", StringComparison.Ordinal)
+        || output.Contains("ComponentBoolean", StringComparison.Ordinal)
+        || output.Contains("ComponentString", StringComparison.Ordinal)
+        || output.Contains("WithPosition3D", StringComparison.Ordinal)
+        || output.Contains("Position3D", StringComparison.Ordinal);
 
     private static void ResetVerifiedGeneratedDirectory(
         RekallAgeModuleBuildCandidate candidate,

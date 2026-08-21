@@ -220,4 +220,48 @@ public sealed class BuildModulesCommandTests
             Environment.CurrentDirectory = previous;
         }
     }
+
+    [Fact]
+    public async Task RuntimeSdkCompilerFailureReturnsExactBoundedRepairContract()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("runtime sdk compiler recovery"),
+            CancellationToken.None);
+        var scaffold = await new ScaffoldRuntimeSystemModuleCommand().ExecuteAsync(
+            new ScaffoldRuntimeSystemModuleRequest(
+                root,
+                "game.motion",
+                "Game Motion",
+                "GameMotion",
+                "OrbitMotion",
+                "OrbitMotionSystem"),
+            context);
+        var source = await File.ReadAllTextAsync(scaffold.Value.SourcePath);
+        source = source.Replace(
+            "var position = entity.Transform.Position3D;",
+            "var position = RekallAgeRuntimeModuleSdk.GetTransform3D(entity);",
+            StringComparison.Ordinal);
+        await new WriteModuleSourceCommand().ExecuteAsync(
+            new WriteModuleSourceRequest(root, "GameMotion", "GameMotionModule.cs", source),
+            context);
+
+        var result = await new BuildModulesCommand().ExecuteAsync(
+            new BuildModulesRequest(root),
+            context);
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors, item => item.Code == "REKALL_MODULE_BUILD_FAILED");
+        Assert.Contains("entity.Transform.Position3D", error.Message, StringComparison.Ordinal);
+        Assert.Contains("entity.ComponentNumber", error.Message, StringComparison.Ordinal);
+        Assert.Contains("entity.WithPosition3D(new RekallAgeRuntimeVector3", error.Message, StringComparison.Ordinal);
+        Assert.Contains("world.UpdateEntity", error.Message, StringComparison.Ordinal);
+        Assert.Contains("GetTransform3D", error.Message, StringComparison.Ordinal);
+        var inspection = Assert.Single(
+            error.SuggestedCommands!,
+            command => command.Tool == "rekall.module.inspect_runtime_sdk");
+        Assert.False(string.IsNullOrWhiteSpace((string)inspection.Arguments["query"]!));
+        Assert.Contains("entity transform", (string)inspection.Arguments["query"]!, StringComparison.OrdinalIgnoreCase);
+    }
 }

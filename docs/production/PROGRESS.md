@@ -165,6 +165,16 @@ behavior.
    compatibility tier, not the primary rendering contract. Preserve the same
    generic world/runtime and authoring ABI; do not fork game semantics by
    platform.
+6. Advanced world-modelling track after the active WebGPU tranche and remaining
+   Godot capability audit: clone and study Blender's relevant modelling,
+   geometry, modifier, material, UV, validation, undo, and interchange systems,
+   together with useful Blender MCP authoring patterns. Implement an AGE-native,
+   100% C# modelling system rather than embedding Blender or exposing native
+   implementation objects. Users and agents must be able to author, inspect,
+   revise, validate, and reuse complex game-ready geometry and materials through
+   the same generic C#, Studio, CLI, and MCP contracts. Acceptance requires
+   increasingly complex editable worlds used in real playable runtime proofs;
+   primitive generation or opaque imported meshes alone is insufficient.
 
 ## Verified status
 

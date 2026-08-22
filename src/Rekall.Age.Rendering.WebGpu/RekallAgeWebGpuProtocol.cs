@@ -143,18 +143,21 @@ public static class RekallAgeWebGpuProtocol
         }
 
         var options = allowNumericDescriptorEnums ? DescriptorInputOptions : SerializerOptions;
-        object descriptor;
-        try
+        if (packet.Descriptor.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
         {
-            descriptor = JsonSerializer.Deserialize(packet.Descriptor.GetRawText(), descriptorType, options)
-                ?? throw InvalidPacket("WebGPU create packet descriptors must not be null.");
-        }
-        catch (JsonException exception)
-        {
-            throw InvalidJson(exception);
+            throw InvalidDescriptor();
         }
 
-        return packet with { Descriptor = JsonSerializer.SerializeToElement(descriptor, SerializerOptions) };
+        try
+        {
+            var descriptor = JsonSerializer.Deserialize(packet.Descriptor.GetRawText(), descriptorType, options)
+                ?? throw InvalidPacket("WebGPU create packet descriptors must not be null.");
+            return packet with { Descriptor = JsonSerializer.SerializeToElement(descriptor, SerializerOptions) };
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or NotSupportedException or ArgumentException)
+        {
+            throw InvalidDescriptor(exception);
+        }
     }
 
     private static bool TryGetResourceKind(string resourceType, out RekallAgeGraphicsResourceKind resourceKind)
@@ -244,6 +247,10 @@ public static class RekallAgeWebGpuProtocol
 
     private static RekallAgeWebGpuProtocolException InvalidJson(JsonException exception) => new(
         new("REKALL_WEBGPU_PROTOCOL_JSON_INVALID", "WebGPU protocol packets must be valid JSON."),
+        exception);
+
+    private static RekallAgeWebGpuProtocolException InvalidDescriptor(Exception? exception = null) => new(
+        new("REKALL_WEBGPU_PROTOCOL_DESCRIPTOR_INVALID", "WebGPU create packet descriptors must be present, valid, and supported."),
         exception);
 
     private static RekallAgeWebGpuProtocolException InvalidPacket(string message) => new(

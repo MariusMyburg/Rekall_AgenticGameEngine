@@ -124,4 +124,44 @@ public sealed class WebGpuProtocolTests
 
         Assert.Equal("REKALL_WEBGPU_PROTOCOL_RESOURCE_TYPE_MISMATCH", exception.Diagnostic.Code);
     }
+
+    [Fact]
+    public void ProtocolRejectsCreatePacketsWithMissingDescriptors()
+    {
+        const string packetJson = """
+            {"version":1,"resourceType":"buffer","handle":{"deviceId":"11111111-1111-1111-1111-111111111111","kind":"buffer","slot":7,"generation":1}}
+            """;
+
+        var exception = Assert.Throws<RekallAgeWebGpuProtocolException>(() =>
+            RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuCreatePacket>(packetJson));
+
+        Assert.Equal("REKALL_WEBGPU_PROTOCOL_DESCRIPTOR_INVALID", exception.Diagnostic.Code);
+    }
+
+    [Fact]
+    public void ProtocolRejectsInvalidDescriptorEnumsDuringDeserialization()
+    {
+        const string packetJson = """
+            {"version":1,"resourceType":"buffer","handle":{"deviceId":"11111111-1111-1111-1111-111111111111","kind":"buffer","slot":7,"generation":1},"descriptor":{"sizeBytes":16,"usage":"unsupported"}}
+            """;
+
+        var exception = Assert.Throws<RekallAgeWebGpuProtocolException>(() =>
+            RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuCreatePacket>(packetJson));
+
+        Assert.Equal("REKALL_WEBGPU_PROTOCOL_DESCRIPTOR_INVALID", exception.Diagnostic.Code);
+    }
+
+    [Fact]
+    public void ProtocolRejectsUnsupportedDescriptorEnumsDuringSerialization()
+    {
+        var packet = new RekallAgeWebGpuCreatePacket(
+            1,
+            "buffer",
+            new(Guid.Parse("11111111-1111-1111-1111-111111111111"), RekallAgeGraphicsResourceKind.Buffer, 7, 1),
+            JsonSerializer.SerializeToElement(new RekallAgeBufferDescriptor(16, (RekallAgeBufferUsage)999)));
+
+        var exception = Assert.Throws<RekallAgeWebGpuProtocolException>(() => RekallAgeWebGpuProtocol.Serialize(packet));
+
+        Assert.Equal("REKALL_WEBGPU_PROTOCOL_DESCRIPTOR_INVALID", exception.Diagnostic.Code);
+    }
 }

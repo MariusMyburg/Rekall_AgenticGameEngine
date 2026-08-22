@@ -204,6 +204,28 @@ public sealed class WebGpuRenderingDeviceTests
         Assert.Equal("REKALL_WEBGPU_PROTOCOL_COMMAND_PAYLOAD_INVALID", exception.Diagnostic.Code);
     }
 
+    [Theory]
+    [InlineData("""{"version":1,"commands":[{"kind":"endRenderPass","data":{"extra":1}}],"operation":"submit"}""")]
+    [InlineData("""{"version":1,"commands":[{"kind":"beginRenderPass","data":{"descriptor":null}}],"operation":"submit"}""")]
+    [InlineData("""{"version":1,"commands":[{"kind":"setRenderPipeline","data":{"pipeline":{"deviceId":"11111111-1111-1111-1111-111111111111","kind":"buffer","slot":0,"generation":1}}}],"operation":"submit"}""")]
+    public void ProtocolRejectsUnknownNullAndWrongKindCommandPayloads(string packet)
+    {
+        var exception = Assert.Throws<RekallAgeWebGpuProtocolException>(() => RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuSubmitPacket>(packet));
+        Assert.Equal("REKALL_WEBGPU_PROTOCOL_COMMAND_PAYLOAD_INVALID", exception.Diagnostic.Code);
+    }
+
+    [Fact]
+    public void DestroyRejectsForeignHandlesButAcceptsOnlyItsOwnPreviouslyDestroyedHandle()
+    {
+        var bridge = new RecordingWebGpuBridge();
+        using var device = CreateDevice(bridge);
+        var buffer = device.CreateBuffer(new(16, RekallAgeBufferUsage.Vertex));
+        Assert.True(device.Destroy(buffer.Handle).Valid);
+        Assert.True(device.Destroy(buffer.Handle).Valid);
+        Assert.False(device.Destroy(buffer.Handle with { Generation = buffer.Handle.Generation + 1 }).Valid);
+        Assert.False(device.Destroy(buffer.Handle with { DeviceId = Guid.NewGuid() }).Valid);
+    }
+
     private static RekallAgeGraphicsResourceHandle CreateCopySource(RekallAgeWebGpuRenderingDevice device) =>
         device.CreateBuffer(new(16, RekallAgeBufferUsage.CopySource)).Handle;
 

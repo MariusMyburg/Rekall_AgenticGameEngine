@@ -10,6 +10,7 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
     private readonly IRekallAgeWebGpuBridge _bridge;
     private readonly RekallAgeInMemoryRenderingDevice _conformance;
     private readonly Dictionary<RekallAgeGraphicsResourceHandle, RekallAgeGraphicsResourceHandle> _canvasTextures = [];
+    private readonly HashSet<RekallAgeGraphicsResourceHandle> _destroyedHandles = [];
     private IReadOnlyList<RekallAgeGraphicsDiagnostic>? _faultDiagnostics;
     private bool _disposed;
 
@@ -86,13 +87,16 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
     public RekallAgeGraphicsValidationResult Destroy(RekallAgeGraphicsResourceHandle handle)
     {
         if (_disposed) return new([new("REKALL_WEBGPU_DEVICE_DISPOSED", "The WebGPU rendering device has been disposed.")]);
-        if (!_conformance.InspectResources().Any(resource => resource.Handle == handle)) return new([]);
+        if (_destroyedHandles.Contains(handle)) return new([]);
+        if (!_conformance.InspectResources().Any(resource => resource.Handle == handle)) return _conformance.Destroy(handle);
         var execution = Execute(new RekallAgeWebGpuDestroyPacket(RekallAgeWebGpuProtocol.Version, handle));
         if (!execution.Valid) return execution;
         var validation = _conformance.Destroy(handle);
-        if (_canvasTextures.Remove(handle, out var texture))
+        _destroyedHandles.Add(handle);
+        if (_canvasTextures.TryGetValue(handle, out var texture))
         {
             var textureValidation = Destroy(texture);
+            if (textureValidation.Valid) _canvasTextures.Remove(handle);
             return textureValidation.Valid ? validation : textureValidation;
         }
         return validation;

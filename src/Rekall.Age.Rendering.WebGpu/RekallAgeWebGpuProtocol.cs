@@ -232,10 +232,14 @@ public static class RekallAgeWebGpuProtocol
     private static bool ValidateCommandPayload(RekallAgeWebGpuCommandPacket command)
     {
         if (command.Data.ValueKind != JsonValueKind.Object || !RequiredCommandProperties.TryGetValue(command.Kind, out var required)
-            || required.Any(property => !command.Data.TryGetProperty(property, out _))) return false;
+            || command.Data.EnumerateObject().Any(property => !required.Contains(property.Name, StringComparer.Ordinal))
+            || required.Any(property => !command.Data.TryGetProperty(property, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)) return false;
         try
         {
-            return JsonSerializer.Deserialize(command.Data.GetRawText(), CommandPayloadTypes[command.Kind], SerializerOptions) is not null;
+            if (JsonSerializer.Deserialize(command.Data.GetRawText(), CommandPayloadTypes[command.Kind], SerializerOptions) is null) return false;
+            return !ExpectedHandleKinds.TryGetValue(command.Kind, out var expected) || command.Data.TryGetProperty(expected.Property, out var handle)
+                && handle.ValueKind == JsonValueKind.Object && handle.TryGetProperty("kind", out var kind)
+                && kind.ValueKind == JsonValueKind.String && string.Equals(kind.GetString(), expected.Kind, StringComparison.Ordinal);
         }
         catch (JsonException) { return false; }
     }
@@ -248,6 +252,11 @@ public static class RekallAgeWebGpuProtocol
     private static readonly IReadOnlyDictionary<string, string[]> RequiredCommandProperties = new Dictionary<string, string[]>
     {
         ["copyBuffer"] = ["source", "sourceOffset", "destination", "destinationOffset", "sizeBytes"], ["beginRenderPass"] = ["descriptor"], ["setRenderPipeline"] = ["pipeline"], ["setComputePipeline"] = ["pipeline"], ["setBindingSet"] = ["index", "bindingSet"], ["setVertexBuffer"] = ["slot", "buffer", "offset", "sizeBytes"], ["setIndexBuffer"] = ["buffer", "format", "offset", "sizeBytes"], ["draw"] = ["vertexCount", "instanceCount", "firstVertex", "firstInstance"], ["drawIndexed"] = ["indexCount", "instanceCount", "firstIndex", "baseVertex", "firstInstance"], ["drawIndirect"] = ["buffer", "offset", "drawCount", "strideBytes"], ["drawIndexedIndirect"] = ["buffer", "offset", "drawCount", "strideBytes"], ["endRenderPass"] = [], ["beginComputePass"] = [], ["dispatch"] = ["groupCountX", "groupCountY", "groupCountZ"], ["dispatchIndirect"] = ["buffer", "offset"], ["endComputePass"] = []
+    };
+
+    private static readonly IReadOnlyDictionary<string, (string Property, string Kind)> ExpectedHandleKinds = new Dictionary<string, (string, string)>
+    {
+        ["setRenderPipeline"] = ("pipeline", "renderPipeline"), ["setComputePipeline"] = ("pipeline", "computePipeline"), ["setBindingSet"] = ("bindingSet", "bindingSet"), ["setVertexBuffer"] = ("buffer", "buffer"), ["setIndexBuffer"] = ("buffer", "buffer"), ["drawIndirect"] = ("buffer", "buffer"), ["drawIndexedIndirect"] = ("buffer", "buffer"), ["dispatchIndirect"] = ("buffer", "buffer")
     };
 
     private static T ValidateOperation<T>(T packet, string? actual, string expected, bool allowMissingOperation = false)

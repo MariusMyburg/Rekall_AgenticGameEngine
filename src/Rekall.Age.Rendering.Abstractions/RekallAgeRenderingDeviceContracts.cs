@@ -156,11 +156,23 @@ public enum RekallAgeBindingType
     StorageTexture
 }
 
+public enum RekallAgeTextureSampleType { Float, UnfilterableFloat, Depth, Sint, Uint }
+public enum RekallAgeTextureViewDimension { Texture1D, Texture2D, Texture2DArray, Cube, CubeArray, Texture3D }
+public enum RekallAgeStorageTextureAccess { ReadOnly, WriteOnly, ReadWrite }
+
+public sealed record RekallAgeTextureBindingMetadata(
+    RekallAgeTextureSampleType SampleType = RekallAgeTextureSampleType.Float,
+    RekallAgeTextureViewDimension ViewDimension = RekallAgeTextureViewDimension.Texture2D,
+    bool Multisampled = false,
+    RekallAgeTextureFormat StorageFormat = RekallAgeTextureFormat.Rgba8Unorm,
+    RekallAgeStorageTextureAccess StorageAccess = RekallAgeStorageTextureAccess.WriteOnly);
+
 public sealed record RekallAgeBindingLayoutEntry(
     int Binding,
     RekallAgeBindingType Type,
     RekallAgeShaderStage Visibility,
-    ulong MinimumBindingSize = 0);
+    ulong MinimumBindingSize = 0,
+    RekallAgeTextureBindingMetadata? Texture = null);
 
 public sealed record RekallAgeBindingLayoutDescriptor(
     IReadOnlyList<RekallAgeBindingLayoutEntry> Entries,

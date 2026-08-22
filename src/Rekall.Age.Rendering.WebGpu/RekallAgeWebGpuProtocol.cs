@@ -35,6 +35,7 @@ public sealed record RekallAgeWebGpuWriteTexturePacket(
     int MipLevel,
     int ArrayLayer,
     string DataBase64,
+    int Depth = 1,
     string Operation = "writeTexture") : IRekallAgeWebGpuPacket;
 
 public sealed record RekallAgeWebGpuCommandPacket(string Kind, JsonElement Data);

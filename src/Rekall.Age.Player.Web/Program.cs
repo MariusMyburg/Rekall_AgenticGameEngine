@@ -3,19 +3,8 @@ using Rekall.Age.Rendering.Abstractions;
 
 var webGpu = BrowserHost.HasWebGpu();
 var profile = webGpu ? "WebGPU" : "WebGL 2 compatibility required";
-var capabilities = RekallAgeRenderingDeviceCapabilities.DesktopBaseline(profile) with
-{
-    Backend = profile,
-    SupportsCompute = webGpu,
-    SupportsStorageBuffers = webGpu,
-    SupportsStorageTextures = webGpu,
-    SupportsIndirectDrawing = webGpu,
-    SupportsIndirectDispatch = webGpu,
-    SupportsTimestampQueries = false
-};
-
 BrowserHost.SetText("#runtime", $".NET {Environment.Version} / browser-wasm");
-BrowserHost.SetText("#graphics", capabilities.Backend);
+BrowserHost.SetText("#graphics", profile);
 
 if (!webGpu)
 {
@@ -31,12 +20,13 @@ else
         BrowserHost.SetText("#state", initialization.Diagnostics.FirstOrDefault()?.Code ?? "WEBGPU INITIALIZATION FAILED");
         BrowserHost.SetReady(false);
     }
-    else
+    else if (bridge.Capabilities is { } capabilities)
     {
         _ = new Rekall.Age.Rendering.WebGpu.RekallAgeWebGpuRenderingDevice(bridge, capabilities);
         BrowserHost.SetText("#state", "WEBGPU DEVICE READY");
         BrowserHost.SetReady(true);
     }
+    else { BrowserHost.SetText("#state", "REKALL_WEBGPU_CAPABILITIES_INVALID"); BrowserHost.SetReady(false); }
 }
 
 await Task.Delay(Timeout.InfiniteTimeSpan);

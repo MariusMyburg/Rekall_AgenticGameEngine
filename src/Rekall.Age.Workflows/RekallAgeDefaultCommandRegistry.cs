@@ -30,6 +30,7 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new ApplySceneBlueprintCommand(componentPropertyAdmission));
         registry.Register(new CreateEntityCommand());
         registry.Register(new DeleteEntityCommand());
+        registry.Register(new UpdateEntityMetadataCommand());
         registry.Register(new AddComponentCommand(componentPropertyAdmission));
         registry.Register(new RemoveComponentCommand());
         registry.Register(new SetComponentPropertyCommand(componentPropertyAdmission));

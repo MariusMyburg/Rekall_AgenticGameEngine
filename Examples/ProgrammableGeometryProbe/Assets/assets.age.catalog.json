@@ -11,6 +11,18 @@
       "glbMetadata": null,
       "textureMetadata": null,
       "provenance": null
+    },
+    {
+      "id": "asset_gpu_storage",
+      "name": "gpu-storage",
+      "displayName": "GPU Storage Probe",
+      "kind": "gpu-data",
+      "sourcePath": "C:\\portable-source\\storage.bin",
+      "importedPath": "C:\\previous-checkout\\Assets\\gpu-data\\storage.bin",
+      "contentHash": "465df05c090ddd8ebc1c3be3cb3994d8c6811d57cb50201531d4e65263bfcb05",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null
     }
   ]
 }

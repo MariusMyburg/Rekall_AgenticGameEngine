@@ -465,20 +465,25 @@ public enum RekallAgeRuntimeGpuVertexFormat
 }
 public enum RekallAgeRuntimeGpuCommandKind
 {
-    CopyBuffer,
-    BeginRenderPass,
-    SetRenderPipeline,
-    SetComputePipeline,
-    SetBindingSet,
-    SetVertexBuffer,
-    SetIndexBuffer,
-    Draw,
-    DrawIndexed,
-    EndRenderPass,
-    BeginComputePass,
-    Dispatch,
-    EndComputePass
+    CopyBuffer = 0,
+    BeginRenderPass = 1,
+    SetRenderPipeline = 2,
+    SetComputePipeline = 3,
+    SetBindingSet = 4,
+    SetVertexBuffer = 5,
+    SetIndexBuffer = 6,
+    Draw = 7,
+    DrawIndexed = 8,
+    EndRenderPass = 9,
+    BeginComputePass = 10,
+    Dispatch = 11,
+    EndComputePass = 12,
+    DrawIndirect = 13,
+    DrawIndexedIndirect = 14,
+    DispatchIndirect = 15
 }
+
+public enum RekallAgeRuntimeGpuStorageAccess { ReadOnly, ReadWrite }
 
 public sealed record RekallAgeRuntimeGpuBuffer(
     string Id,
@@ -487,6 +492,8 @@ public sealed record RekallAgeRuntimeGpuBuffer(
 {
     public string MemoryAccess { get; init; } = "device-local";
     public string? InitialDataAsset { get; init; }
+    public uint StructureByteStride { get; init; }
+    public RekallAgeRuntimeGpuStorageAccess StorageAccess { get; init; } = RekallAgeRuntimeGpuStorageAccess.ReadWrite;
 }
 
 public sealed record RekallAgeRuntimeGpuTexture(
@@ -609,6 +616,8 @@ public sealed record RekallAgeRuntimeGpuCommand(RekallAgeRuntimeGpuCommandKind K
     public uint GroupCountX { get; init; } = 1;
     public uint GroupCountY { get; init; } = 1;
     public uint GroupCountZ { get; init; } = 1;
+    public uint IndirectCount { get; init; } = 1;
+    public uint IndirectStrideBytes { get; init; }
     public IReadOnlyList<RekallAgeRuntimeGpuClearColor> ClearColors { get; init; } =
         Array.Empty<RekallAgeRuntimeGpuClearColor>();
     public float? ClearDepth { get; init; }

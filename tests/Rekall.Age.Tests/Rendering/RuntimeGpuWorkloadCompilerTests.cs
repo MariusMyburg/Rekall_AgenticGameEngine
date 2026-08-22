@@ -29,6 +29,36 @@ public sealed class RuntimeGpuWorkloadCompilerTests
     }
 
     [Fact]
+    public void CompilesStructuredStorageAndIndirectDispatchWithoutNativeHandles()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var workload = ComputeWorkload() with
+        {
+            Buffers =
+            [
+                new("particles", 4_096, RekallAgeRuntimeGpuBufferUsage.Storage) { StructureByteStride = 16 },
+                new("dispatch-args", 12, RekallAgeRuntimeGpuBufferUsage.Indirect)
+            ],
+            Commands =
+            [
+                new(RekallAgeRuntimeGpuCommandKind.BeginComputePass),
+                new(RekallAgeRuntimeGpuCommandKind.SetComputePipeline) { Resource = "simulation" },
+                new(RekallAgeRuntimeGpuCommandKind.DispatchIndirect) { Resource = "dispatch-args" },
+                new(RekallAgeRuntimeGpuCommandKind.EndComputePass)
+            ]
+        };
+
+        using var compiled = new RekallAgeRuntimeGpuWorkloadCompiler().Compile(workload, device);
+
+        Assert.True(compiled.Valid, string.Join(Environment.NewLine, compiled.Diagnostics.Select(item => item.Message)));
+        var storage = Assert.IsType<RekallAgeBufferDescriptor>(device.InspectResources().Single(item => item.Label == "particles").Descriptor);
+        Assert.Equal(16U, storage.StructureByteStride);
+        Assert.Contains(compiled.CommandBuffer!.Commands, command => command is RekallAgeDispatchIndirectCommand);
+        Assert.True(device.Submit(compiled.CommandBuffer).Valid);
+    }
+
+    [Fact]
     public void RejectsDuplicateAndMissingReferencesBeforeAllocatingAnything()
     {
         using var device = new RekallAgeInMemoryRenderingDevice(
@@ -358,7 +388,7 @@ public sealed class RuntimeGpuWorkloadCompilerTests
     {
         using var device = new RekallAgeInMemoryRenderingDevice(
             RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
-        var imported = device.CreateBuffer(new(64, RekallAgeBufferUsage.Storage, Label: "engine.buffer")).Handle;
+        var imported = device.CreateBuffer(new(64, RekallAgeBufferUsage.Storage, Label: "engine.buffer") { StructureByteStride = 16 }).Handle;
 
         using var compiled = new RekallAgeRuntimeGpuWorkloadCompiler().Compile(
             ComputeWorkload(),
@@ -372,7 +402,7 @@ public sealed class RuntimeGpuWorkloadCompilerTests
 
     private static RekallAgeRuntimeGpuWorkload ComputeWorkload() => new("particles")
     {
-        Buffers = [new("particles", 4_096, RekallAgeRuntimeGpuBufferUsage.Storage)],
+        Buffers = [new("particles", 4_096, RekallAgeRuntimeGpuBufferUsage.Storage) { StructureByteStride = 16 }],
         Shaders =
         [
             new("simulate", RekallAgeRuntimeGpuShaderStage.Compute, RekallAgeRuntimeGpuShaderLanguage.Glsl,

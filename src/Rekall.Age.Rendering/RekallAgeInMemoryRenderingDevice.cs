@@ -97,6 +97,17 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
                         {
                             diagnostics.Add(new("REKALL_GPU_BINDING_RANGE_INVALID", $"Binding {expected.Binding} buffer range is invalid.", descriptor.Label));
                         }
+                        var requiredAccess = expected.Type switch
+                        {
+                            RekallAgeBindingType.ReadOnlyStorageBuffer => RekallAgeStorageBufferAccess.ReadOnly,
+                            RekallAgeBindingType.StorageBuffer => RekallAgeStorageBufferAccess.ReadWrite,
+                            _ => (RekallAgeStorageBufferAccess?)null
+                        };
+                        if (requiredAccess.HasValue
+                            && (!buffer.Usage.HasFlag(RekallAgeBufferUsage.Storage) || buffer.StorageAccess != requiredAccess.Value))
+                        {
+                            diagnostics.Add(new("REKALL_GPU_STORAGE_ACCESS_MISMATCH", $"Binding {expected.Binding} requires {requiredAccess.Value} storage access.", descriptor.Label));
+                        }
                     }
                 }
                 if (descriptor.Entries.Select(entry => entry.Binding).Distinct().Count() != descriptor.Entries.Count)
@@ -502,6 +513,14 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
                     if (pass != CommandPass.Render || !renderPipelineSet || !indexBufferSet) diagnostics.Add(PassStateDiagnostic("Indexed draw requires a render pass, pipeline, and index buffer."));
                     if (draw.IndexCount == 0 || draw.InstanceCount == 0) diagnostics.Add(DrawRangeDiagnostic());
                     break;
+                case RekallAgeDrawIndirectCommand draw:
+                    if (pass != CommandPass.Render || !renderPipelineSet) diagnostics.Add(PassStateDiagnostic("Indirect draw requires a render pass and render pipeline."));
+                    diagnostics.AddRange(ValidateIndirectLocked(draw.Buffer, draw.Offset, draw.DrawCount, draw.StrideBytes, 16));
+                    break;
+                case RekallAgeDrawIndexedIndirectCommand draw:
+                    if (pass != CommandPass.Render || !renderPipelineSet || !indexBufferSet) diagnostics.Add(PassStateDiagnostic("Indexed indirect draw requires a render pass, pipeline, and index buffer."));
+                    diagnostics.AddRange(ValidateIndirectLocked(draw.Buffer, draw.Offset, draw.DrawCount, draw.StrideBytes, 20));
+                    break;
                 case RekallAgeEndRenderPassCommand:
                     if (pass != CommandPass.Render) diagnostics.Add(PassStateDiagnostic("No render pass is active.")); else pass = CommandPass.None;
                     break;
@@ -513,6 +532,10 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
                 case RekallAgeDispatchCommand dispatch:
                     if (pass != CommandPass.Compute || !computePipelineSet) diagnostics.Add(PassStateDiagnostic("Dispatch requires an active compute pass and compute pipeline."));
                     if (!IsDispatchInRange(dispatch.GroupCountX, dispatch.GroupCountY, dispatch.GroupCountZ)) diagnostics.Add(DispatchRangeDiagnostic(Capabilities.MaximumComputeWorkgroupsPerDimension));
+                    break;
+                case RekallAgeDispatchIndirectCommand dispatch:
+                    if (pass != CommandPass.Compute || !computePipelineSet) diagnostics.Add(PassStateDiagnostic("Indirect dispatch requires a compute pass and compute pipeline."));
+                    diagnostics.AddRange(ValidateIndirectLocked(dispatch.Buffer, dispatch.Offset, 1, 12, 12));
                     break;
                 case RekallAgeEndComputePassCommand:
                     if (pass != CommandPass.Compute) diagnostics.Add(PassStateDiagnostic("No compute pass is active.")); else pass = CommandPass.None;
@@ -537,6 +560,26 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
     private static RekallAgeGraphicsDiagnostic DispatchRangeDiagnostic(uint maximum) => new(
         "REKALL_GPU_DISPATCH_RANGE_INVALID",
         $"Dispatch workgroup counts must be from 1 through {maximum} per dimension.");
+
+    private List<RekallAgeGraphicsDiagnostic> ValidateIndirectLocked(
+        RekallAgeGraphicsResourceHandle buffer,
+        ulong offset,
+        uint count,
+        uint stride,
+        uint minimumStride)
+    {
+        var diagnostics = new List<RekallAgeGraphicsDiagnostic>();
+        var supported = minimumStride == 12 ? Capabilities.SupportsIndirectDispatch : Capabilities.SupportsIndirectDrawing;
+        if (!supported)
+            diagnostics.Add(new("REKALL_GPU_FEATURE_REQUIRED", "The selected backend does not support indirect commands.", buffer.ToString()));
+        if (count == 0 || stride < minimumStride || stride % 4 != 0 || offset % 4 != 0)
+            diagnostics.Add(new("REKALL_GPU_INDIRECT_LAYOUT_INVALID", "Indirect count must be nonzero and offset/stride must be 4-byte aligned with the required argument size.", buffer.ToString()));
+        var size = count == 0 || (ulong)(count - 1) > (ulong.MaxValue - minimumStride) / Math.Max(1U, stride)
+            ? ulong.MaxValue
+            : (ulong)(count - 1) * stride + minimumStride;
+        diagnostics.AddRange(ValidateBufferBindingLocked(buffer, RekallAgeBufferUsage.Indirect, offset, size));
+        return diagnostics;
+    }
 
     private IReadOnlyList<RekallAgeGraphicsDiagnostic> ValidateCopyLocked(
         RekallAgeGraphicsResourceHandle source,
@@ -760,6 +803,26 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
             return Valid();
         }
 
+        public RekallAgeGraphicsValidationResult DrawIndirect(RekallAgeGraphicsResourceHandle buffer, ulong offset, uint drawCount = 1, uint strideBytes = 16)
+        {
+            EnsureWritable();
+            if (_pass != CommandPass.Render || !_renderPipelineSet) return InvalidPass("Indirect draw requires an active render pass and render pipeline.");
+            var diagnostics = ValidateIndirect(buffer, offset, drawCount, strideBytes, 16);
+            if (diagnostics.Count > 0) return new(diagnostics);
+            _commands.Add(new RekallAgeDrawIndirectCommand(buffer, offset, drawCount, strideBytes));
+            return Valid();
+        }
+
+        public RekallAgeGraphicsValidationResult DrawIndexedIndirect(RekallAgeGraphicsResourceHandle buffer, ulong offset, uint drawCount = 1, uint strideBytes = 20)
+        {
+            EnsureWritable();
+            if (_pass != CommandPass.Render || !_renderPipelineSet || !_indexBufferSet) return InvalidPass("Indexed indirect draw requires a render pass, pipeline, and index buffer.");
+            var diagnostics = ValidateIndirect(buffer, offset, drawCount, strideBytes, 20);
+            if (diagnostics.Count > 0) return new(diagnostics);
+            _commands.Add(new RekallAgeDrawIndexedIndirectCommand(buffer, offset, drawCount, strideBytes));
+            return Valid();
+        }
+
         public RekallAgeGraphicsValidationResult EndRenderPass()
         {
             EnsureWritable();
@@ -789,6 +852,19 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
             if (!_device.IsDispatchInRange(groupCountX, groupCountY, groupCountZ))
                 return new([DispatchRangeDiagnostic(_device.Capabilities.MaximumComputeWorkgroupsPerDimension)]);
             _commands.Add(new RekallAgeDispatchCommand(groupCountX, groupCountY, groupCountZ));
+            return Valid();
+        }
+
+        public RekallAgeGraphicsValidationResult DispatchIndirect(RekallAgeGraphicsResourceHandle buffer, ulong offset)
+        {
+            EnsureWritable();
+            if (_pass != CommandPass.Compute || !_computePipelineSet) return InvalidPass("Indirect dispatch requires an active compute pass and compute pipeline.");
+            if (!_device.Capabilities.SupportsIndirectDispatch)
+                return new([new("REKALL_GPU_FEATURE_REQUIRED", "The selected backend does not support indirect dispatch.", buffer.ToString())]);
+            var diagnostics = _device.ValidateBufferBinding(buffer, RekallAgeBufferUsage.Indirect, offset, 12).ToList();
+            if (offset % 4 != 0) diagnostics.Add(new("REKALL_GPU_INDIRECT_ALIGNMENT_INVALID", "Indirect command offsets must be 4-byte aligned.", buffer.ToString()));
+            if (diagnostics.Count > 0) return new(diagnostics);
+            _commands.Add(new RekallAgeDispatchIndirectCommand(buffer, offset));
             return Valid();
         }
 
@@ -845,6 +921,16 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
 
         private static RekallAgeGraphicsValidationResult Valid() => new([]);
         private static RekallAgeGraphicsValidationResult InvalidPass(string message) => new([PassStateDiagnostic(message)]);
+
+        private List<RekallAgeGraphicsDiagnostic> ValidateIndirect(RekallAgeGraphicsResourceHandle buffer, ulong offset, uint count, uint stride, uint minimumStride)
+        {
+            var diagnostics = new List<RekallAgeGraphicsDiagnostic>();
+            if (count == 0 || stride < minimumStride || stride % 4 != 0 || offset % 4 != 0)
+                diagnostics.Add(new("REKALL_GPU_INDIRECT_LAYOUT_INVALID", "Indirect count must be nonzero and offset/stride must be 4-byte aligned with the required argument size.", buffer.ToString()));
+            var size = count == 0 ? 0UL : (ulong)(count - 1) * stride + minimumStride;
+            diagnostics.AddRange(_device.ValidateBufferBinding(buffer, RekallAgeBufferUsage.Indirect, offset, size));
+            return diagnostics;
+        }
     }
 
     private enum CommandPass { None, Render, Compute }

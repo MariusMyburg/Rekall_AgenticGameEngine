@@ -9,6 +9,13 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class RenderingDeviceContractTests
 {
     [Fact]
+    public void OptionalIndirectEncoderExtensionsHaveDefaultImplementations()
+    {
+        Assert.False(typeof(IRekallAgeGraphicsCommandEncoder).GetMethod(nameof(IRekallAgeGraphicsCommandEncoder.DrawIndirect))!.IsAbstract);
+        Assert.False(typeof(IRekallAgeGraphicsCommandEncoder).GetMethod(nameof(IRekallAgeGraphicsCommandEncoder.DispatchIndirect))!.IsAbstract);
+    }
+
+    [Fact]
     public async Task WorkloadInspectionExposesPortableLimitsAndStableDiagnostics()
     {
         var command = new InspectRenderingDeviceWorkloadCommand();
@@ -291,6 +298,115 @@ public sealed class RenderingDeviceContractTests
         Assert.Equal(4UL, Assert.Single(device.InspectResources()).UploadedBytes);
         var overflow = device.WriteBuffer(buffer.Handle, 15, new byte[] { 1, 2 });
         Assert.Contains(overflow.Diagnostics, item => item.Code == "REKALL_GPU_WRITE_RANGE_INVALID");
+    }
+
+    [Fact]
+    public void StorageBuffersRequireAnExplicitDivisibleStructureStride()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+
+        var missing = device.CreateBuffer(new(64, RekallAgeBufferUsage.Storage));
+        var uneven = device.CreateBuffer(new(66, RekallAgeBufferUsage.Storage) { StructureByteStride = 16 });
+        var valid = device.CreateBuffer(new(64, RekallAgeBufferUsage.Storage) { StructureByteStride = 16 });
+
+        Assert.False(missing.Created);
+        Assert.False(uneven.Created);
+        Assert.Contains(missing.Diagnostics, item => item.Code == "REKALL_GPU_BUFFER_STRUCTURE_STRIDE_INVALID");
+        Assert.Contains(uneven.Diagnostics, item => item.Code == "REKALL_GPU_BUFFER_STRUCTURE_STRIDE_INVALID");
+        Assert.True(valid.Created);
+    }
+
+    [Fact]
+    public void StorageAccessAndNativeIncompatibleUsageCombinationsFailPreflight()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var readOnly = device.CreateBuffer(new(64, RekallAgeBufferUsage.Storage) { StructureByteStride = 16, StorageAccess = RekallAgeStorageBufferAccess.ReadOnly });
+        var combined = device.CreateBuffer(new(64, RekallAgeBufferUsage.Storage | RekallAgeBufferUsage.Vertex) { StructureByteStride = 16 });
+        var dynamicIndirect = device.CreateBuffer(new(16, RekallAgeBufferUsage.Indirect, RekallAgeMemoryAccess.Upload));
+
+        Assert.True(readOnly.Created);
+        Assert.Contains(combined.Diagnostics, item => item.Code == "REKALL_GPU_BUFFER_USAGE_COMBINATION_UNSUPPORTED");
+        Assert.Contains(dynamicIndirect.Diagnostics, item => item.Code == "REKALL_GPU_BUFFER_USAGE_COMBINATION_UNSUPPORTED");
+    }
+
+    [Fact]
+    public void StorageBindingAccessMustMatchItsLayout()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var layout = device.CreateBindingLayout(new([
+            new(0, RekallAgeBindingType.ReadOnlyStorageBuffer, RekallAgeShaderStage.Compute)
+        ]));
+        var writable = device.CreateBuffer(new(64, RekallAgeBufferUsage.Storage) { StructureByteStride = 16 });
+
+        var set = device.CreateBindingSet(new(layout.Handle, [new(0, writable.Handle)]));
+
+        Assert.False(set.Created);
+        Assert.Contains(set.Diagnostics, item => item.Code == "REKALL_GPU_STORAGE_ACCESS_MISMATCH");
+    }
+
+    [Fact]
+    public void IndirectCommandsValidateUsageRangeStrideAndPassState()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var indirect = device.CreateBuffer(new(64, RekallAgeBufferUsage.Indirect)).Handle;
+        var wrongUsage = device.CreateBuffer(new(64, RekallAgeBufferUsage.Vertex)).Handle;
+        var shader = device.CreateShaderModule(new(RekallAgeShaderStage.Compute, RekallAgeShaderSourceLanguage.Glsl, "void main(){}"));
+        var pipeline = device.CreateComputePipeline(new(shader.Handle, []));
+        using var encoder = device.BeginCommandEncoder("indirect");
+
+        Assert.Contains(encoder.DrawIndirect(indirect, 0, 1, 16).Diagnostics, item => item.Code == "REKALL_GPU_PASS_STATE_INVALID");
+        Assert.True(encoder.BeginComputePass().Valid);
+        Assert.True(encoder.SetComputePipeline(pipeline.Handle).Valid);
+        Assert.Contains(encoder.DispatchIndirect(wrongUsage, 0).Diagnostics, item => item.Code == "REKALL_GPU_BUFFER_USAGE_INVALID");
+        Assert.Contains(encoder.DispatchIndirect(indirect, 60).Diagnostics, item => item.Code == "REKALL_GPU_BUFFER_RANGE_INVALID");
+        Assert.True(encoder.DispatchIndirect(indirect, 0).Valid);
+        Assert.True(encoder.EndComputePass().Valid);
+
+        Assert.IsType<RekallAgeDispatchIndirectCommand>(encoder.Finish().Commands.Single(command => command is RekallAgeDispatchIndirectCommand));
+    }
+
+    [Fact]
+    public void DispatchOnlyBackendCanCreateIndirectBuffersAndDispatchIndirectly()
+    {
+        var capabilities = RekallAgeRenderingDeviceCapabilities.DesktopBaseline("dispatch-only") with
+        {
+            SupportsIndirectDrawing = false,
+            SupportsIndirectDispatch = true
+        };
+        using var device = new RekallAgeInMemoryRenderingDevice(capabilities);
+        var indirect = device.CreateBuffer(new(12, RekallAgeBufferUsage.Indirect));
+        var shader = device.CreateShaderModule(new(RekallAgeShaderStage.Compute, RekallAgeShaderSourceLanguage.Glsl, "void main(){}"));
+        var pipeline = device.CreateComputePipeline(new(shader.Handle, []));
+        using var encoder = device.BeginCommandEncoder("dispatch-only");
+
+        Assert.True(indirect.Created);
+        Assert.True(encoder.BeginComputePass().Valid);
+        Assert.True(encoder.SetComputePipeline(pipeline.Handle).Valid);
+        Assert.True(encoder.DispatchIndirect(indirect.Handle, 0).Valid);
+    }
+
+    [Fact]
+    public void DrawingOnlyBackendRejectsIndirectDispatch()
+    {
+        var capabilities = RekallAgeRenderingDeviceCapabilities.DesktopBaseline("drawing-only") with
+        {
+            SupportsIndirectDrawing = true,
+            SupportsIndirectDispatch = false
+        };
+        using var device = new RekallAgeInMemoryRenderingDevice(capabilities);
+        var indirect = device.CreateBuffer(new(12, RekallAgeBufferUsage.Indirect));
+        var shader = device.CreateShaderModule(new(RekallAgeShaderStage.Compute, RekallAgeShaderSourceLanguage.Glsl, "void main(){}"));
+        var pipeline = device.CreateComputePipeline(new(shader.Handle, []));
+        using var encoder = device.BeginCommandEncoder("drawing-only");
+
+        Assert.True(indirect.Created);
+        Assert.True(encoder.BeginComputePass().Valid);
+        Assert.True(encoder.SetComputePipeline(pipeline.Handle).Valid);
+        Assert.Contains(encoder.DispatchIndirect(indirect.Handle, 0).Diagnostics, item => item.Code == "REKALL_GPU_FEATURE_REQUIRED");
     }
 
     [Fact]

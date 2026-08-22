@@ -29,7 +29,14 @@ internal sealed class RekallAgeVeldridRenderingDevice : IRekallAgeRenderingDevic
         _commands = commands ?? throw new ArgumentNullException(nameof(commands));
         DeviceId = Guid.NewGuid();
         Capabilities = RekallAgeRenderingDeviceCapabilities.DesktopBaseline($"veldrid-{graphicsDevice.BackendType.ToString().ToLowerInvariant()}")
-            with { SupportsStorageBuffers = false, SupportsStorageTextures = false };
+            with
+            {
+                SupportsStorageBuffers = graphicsDevice.Features.StructuredBuffer,
+                SupportsStorageTextures = false,
+                SupportsIndirectDrawing = graphicsDevice.Features.DrawIndirect,
+                SupportsCompute = graphicsDevice.Features.ComputeShader,
+                SupportsIndirectDispatch = graphicsDevice.Features.ComputeShader
+            };
     }
 
     public Guid DeviceId { get; }
@@ -58,7 +65,10 @@ internal sealed class RekallAgeVeldridRenderingDevice : IRekallAgeRenderingDevic
         Create(RekallAgeGraphicsResourceKind.Buffer, descriptor, () =>
         {
             if (descriptor.SizeBytes > uint.MaxValue) throw new NotSupportedException("Veldrid buffers are limited to 4 GiB per allocation.");
-            return _factory.CreateBuffer(new BufferDescription((uint)descriptor.SizeBytes, Map(descriptor.Usage, descriptor.MemoryAccess)));
+            return _factory.CreateBuffer(new BufferDescription(
+                (uint)descriptor.SizeBytes,
+                Map(descriptor),
+                descriptor.StructureByteStride));
         }, descriptor.SizeBytes);
 
     public RekallAgeGraphicsResourceCreationResult CreateTexture(RekallAgeTextureDescriptor descriptor) =>
@@ -96,13 +106,17 @@ internal sealed class RekallAgeVeldridRenderingDevice : IRekallAgeRenderingDevic
             descriptor.Entries.OrderBy(entry => entry.Binding).Select(entry => new ResourceLayoutElementDescription(
                 $"Binding{entry.Binding}", Map(entry.Type), Map(entry.Visibility))).ToArray())));
 
-    public RekallAgeGraphicsResourceCreationResult CreateBindingSet(RekallAgeBindingSetDescriptor descriptor) =>
-        Create(RekallAgeGraphicsResourceKind.BindingSet, descriptor, () =>
+    public RekallAgeGraphicsResourceCreationResult CreateBindingSet(RekallAgeBindingSetDescriptor descriptor)
+    {
+        var validation = ValidateBindingSetDescriptor(descriptor);
+        if (!validation.Valid) return new(default, validation.Diagnostics);
+        return Create(RekallAgeGraphicsResourceKind.BindingSet, descriptor, () =>
         {
             var layout = Native<ResourceLayout>(descriptor.Layout, RekallAgeGraphicsResourceKind.BindingLayout);
             var bindings = descriptor.Entries.OrderBy(entry => entry.Binding).Select(ToBindableResource).ToArray();
             return _factory.CreateResourceSet(new ResourceSetDescription(layout, bindings));
         });
+    }
 
     public RekallAgeGraphicsResourceCreationResult CreateGraphicsPipeline(RekallAgeGraphicsPipelineDescriptor descriptor) =>
         Create(RekallAgeGraphicsResourceKind.RenderPipeline, descriptor, () =>
@@ -266,9 +280,12 @@ internal sealed class RekallAgeVeldridRenderingDevice : IRekallAgeRenderingDevic
                     case RekallAgeSetIndexBufferCommand set: _commands.SetIndexBuffer(Native<DeviceBuffer>(set.Buffer, RekallAgeGraphicsResourceKind.Buffer), set.Format == RekallAgeIndexFormat.UInt16 ? IndexFormat.UInt16 : IndexFormat.UInt32, (uint)set.Offset); break;
                     case RekallAgeDrawCommand draw: _commands.Draw(draw.VertexCount, draw.InstanceCount, draw.FirstVertex, draw.FirstInstance); break;
                     case RekallAgeDrawIndexedCommand draw: _commands.DrawIndexed(draw.IndexCount, draw.InstanceCount, draw.FirstIndex, draw.BaseVertex, draw.FirstInstance); break;
+                    case RekallAgeDrawIndirectCommand draw: _commands.DrawIndirect(Native<DeviceBuffer>(draw.Buffer, RekallAgeGraphicsResourceKind.Buffer), (uint)draw.Offset, draw.DrawCount, draw.StrideBytes); break;
+                    case RekallAgeDrawIndexedIndirectCommand draw: _commands.DrawIndexedIndirect(Native<DeviceBuffer>(draw.Buffer, RekallAgeGraphicsResourceKind.Buffer), (uint)draw.Offset, draw.DrawCount, draw.StrideBytes); break;
                     case RekallAgeEndRenderPassCommand: renderPass = false; break;
                     case RekallAgeBeginComputePassCommand: computePass = true; break;
                     case RekallAgeDispatchCommand dispatch: _commands.Dispatch(dispatch.GroupCountX, dispatch.GroupCountY, dispatch.GroupCountZ); break;
+                    case RekallAgeDispatchIndirectCommand dispatch: _commands.DispatchIndirect(Native<DeviceBuffer>(dispatch.Buffer, RekallAgeGraphicsResourceKind.Buffer), (uint)dispatch.Offset); break;
                     case RekallAgeEndComputePassCommand: computePass = false; break;
                     default: return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_COMMAND_UNSUPPORTED", $"Veldrid cannot execute {command.GetType().Name}."));
                 }
@@ -320,6 +337,69 @@ internal sealed class RekallAgeVeldridRenderingDevice : IRekallAgeRenderingDevic
         RekallAgeRenderTargetDescriptor => Valid(),
         _ => Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_DESCRIPTOR_UNKNOWN", $"Unsupported descriptor {descriptor.GetType().Name}."))
     };
+
+    private RekallAgeGraphicsValidationResult ValidateIndirectBuffer(RekallAgeGraphicsResourceHandle handle, ulong offset, ulong size, bool dispatch = false)
+    {
+        if (dispatch ? !Capabilities.SupportsIndirectDispatch : !Capabilities.SupportsIndirectDrawing)
+            return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_FEATURE_REQUIRED", "The active backend does not support indirect commands.", handle.ToString()));
+        if (!TryEntry(handle, out var entry, out var diagnostic) || entry!.Kind != RekallAgeGraphicsResourceKind.Buffer
+            || entry.Descriptor is not RekallAgeBufferDescriptor descriptor)
+            return Invalid(diagnostic ?? new("REKALL_GPU_RESOURCE_INVALID", "Indirect commands require a buffer resource.", handle.ToString()));
+        if (!descriptor.Usage.HasFlag(RekallAgeBufferUsage.Indirect))
+            return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_BUFFER_USAGE_INVALID", "Indirect commands require Indirect buffer usage.", handle.ToString()));
+        if (offset > uint.MaxValue || size == 0 || offset > descriptor.SizeBytes || size > descriptor.SizeBytes - offset)
+            return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_BUFFER_RANGE_INVALID", "Indirect argument range is outside the buffer.", handle.ToString()));
+        return Valid();
+    }
+
+    private RekallAgeGraphicsValidationResult ValidateEncoderHandle(RekallAgeGraphicsResourceHandle handle, RekallAgeGraphicsResourceKind kind)
+    {
+        if (!TryEntry(handle, out var entry, out var diagnostic) || entry!.Kind != kind)
+            return Invalid(diagnostic ?? new RekallAgeGraphicsDiagnostic("REKALL_GPU_RESOURCE_INVALID", $"Command requires a {kind} resource.", handle.ToString()));
+        return Valid();
+    }
+
+    private RekallAgeGraphicsValidationResult ValidateEncoderBuffer(
+        RekallAgeGraphicsResourceHandle handle,
+        RekallAgeBufferUsage requiredUsage,
+        ulong offset,
+        ulong sizeBytes)
+    {
+        if (!TryEntry(handle, out var entry, out var diagnostic)
+            || entry!.Kind != RekallAgeGraphicsResourceKind.Buffer
+            || entry.Descriptor is not RekallAgeBufferDescriptor descriptor)
+            return Invalid(diagnostic ?? new RekallAgeGraphicsDiagnostic("REKALL_GPU_RESOURCE_INVALID", "Command requires a buffer resource.", handle.ToString()));
+        if (!descriptor.Usage.HasFlag(requiredUsage))
+            return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_BUFFER_USAGE_INVALID", $"Command requires {requiredUsage} buffer usage.", handle.ToString()));
+        var selectedSize = sizeBytes == 0 && offset <= descriptor.SizeBytes ? descriptor.SizeBytes - offset : sizeBytes;
+        if (offset > uint.MaxValue || selectedSize == 0 || offset > descriptor.SizeBytes || selectedSize > descriptor.SizeBytes - offset)
+            return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_BUFFER_RANGE_INVALID", "Command buffer range is outside the buffer.", handle.ToString()));
+        return Valid();
+    }
+
+    private RekallAgeGraphicsValidationResult ValidateBindingSetDescriptor(RekallAgeBindingSetDescriptor descriptor)
+    {
+        if (!TryEntry(descriptor.Layout, out var layoutEntry, out var diagnostic)
+            || layoutEntry!.Descriptor is not RekallAgeBindingLayoutDescriptor layout)
+            return Invalid(diagnostic ?? new RekallAgeGraphicsDiagnostic("REKALL_GPU_RESOURCE_INVALID", "Binding set layout is invalid.", descriptor.Label));
+        var diagnostics = new List<RekallAgeGraphicsDiagnostic>();
+        foreach (var expected in layout.Entries)
+        {
+            var matches = descriptor.Entries.Where(item => item.Binding == expected.Binding).Take(2).ToArray();
+            if (matches.Length != 1 || !TryEntry(matches[0].Resource, out var resource, out _)) continue;
+            var binding = matches[0];
+            if (resource!.Descriptor is not RekallAgeBufferDescriptor buffer) continue;
+            var required = expected.Type switch
+            {
+                RekallAgeBindingType.ReadOnlyStorageBuffer => RekallAgeStorageBufferAccess.ReadOnly,
+                RekallAgeBindingType.StorageBuffer => RekallAgeStorageBufferAccess.ReadWrite,
+                _ => (RekallAgeStorageBufferAccess?)null
+            };
+            if (required.HasValue && (!buffer.Usage.HasFlag(RekallAgeBufferUsage.Storage) || buffer.StorageAccess != required.Value))
+                diagnostics.Add(new("REKALL_GPU_STORAGE_ACCESS_MISMATCH", $"Binding {expected.Binding} requires {required.Value} storage access.", descriptor.Label));
+        }
+        return new(diagnostics);
+    }
 
     private RekallAgeGraphicsResourceHandle Add(RekallAgeGraphicsResourceKind kind, object native, string? label, object descriptor, bool ownsNative, ulong estimatedBytes = 0)
     {
@@ -394,14 +474,19 @@ internal sealed class RekallAgeVeldridRenderingDevice : IRekallAgeRenderingDevic
     private static ulong BytesPerPixel(RekallAgeTextureFormat format) => RekallAgeTextureLayout.BytesPerPixel(format);
     private static ulong SaturatingAdd(ulong left, ulong right) => ulong.MaxValue - left < right ? ulong.MaxValue : left + right;
 
-    private static BufferUsage Map(RekallAgeBufferUsage usage, RekallAgeMemoryAccess access)
+    private static BufferUsage Map(RekallAgeBufferDescriptor descriptor)
     {
+        var usage = descriptor.Usage;
         var result = (BufferUsage)0;
         if (usage.HasFlag(RekallAgeBufferUsage.Vertex)) result |= BufferUsage.VertexBuffer;
         if (usage.HasFlag(RekallAgeBufferUsage.Index)) result |= BufferUsage.IndexBuffer;
         if (usage.HasFlag(RekallAgeBufferUsage.Uniform)) result |= BufferUsage.UniformBuffer;
         if (usage.HasFlag(RekallAgeBufferUsage.Indirect)) result |= BufferUsage.IndirectBuffer;
-        if (access != RekallAgeMemoryAccess.DeviceLocal) result |= BufferUsage.Dynamic;
+        if (usage.HasFlag(RekallAgeBufferUsage.Storage))
+            result |= descriptor.StorageAccess == RekallAgeStorageBufferAccess.ReadOnly
+                ? BufferUsage.StructuredBufferReadOnly
+                : BufferUsage.StructuredBufferReadWrite;
+        if (descriptor.MemoryAccess != RekallAgeMemoryAccess.DeviceLocal) result |= BufferUsage.Dynamic;
         return result == 0 ? BufferUsage.Dynamic : result;
     }
     private static TextureUsage Map(RekallAgeTextureUsage usage, RekallAgeTextureDimension dimension)
@@ -526,23 +611,48 @@ internal sealed class RekallAgeVeldridRenderingDevice : IRekallAgeRenderingDevic
         private readonly List<RekallAgeGraphicsCommand> _commands = [];
         private bool _renderPass;
         private bool _computePass;
+        private bool _renderPipelineSet;
+        private bool _computePipelineSet;
+        private bool _indexBufferSet;
         private bool _finished;
 
-        public RekallAgeGraphicsValidationResult BeginRenderPass(RekallAgeRenderPassDescriptor descriptor) { if (_renderPass || _computePass) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "A pass is already active.")); _renderPass = true; _commands.Add(new RekallAgeBeginRenderPassCommand(descriptor)); return Valid(); }
-        public RekallAgeGraphicsValidationResult SetRenderPipeline(RekallAgeGraphicsResourceHandle pipeline) => AddInPass(_renderPass, new RekallAgeSetRenderPipelineCommand(pipeline));
-        public RekallAgeGraphicsValidationResult SetComputePipeline(RekallAgeGraphicsResourceHandle pipeline) => AddInPass(_computePass, new RekallAgeSetComputePipelineCommand(pipeline));
-        public RekallAgeGraphicsValidationResult SetBindingSet(int index, RekallAgeGraphicsResourceHandle bindingSet) => AddInPass(_renderPass || _computePass, new RekallAgeSetBindingSetCommand(index, bindingSet));
-        public RekallAgeGraphicsValidationResult SetVertexBuffer(int slot, RekallAgeGraphicsResourceHandle buffer, ulong offset = 0, ulong sizeBytes = 0) => AddInPass(_renderPass, new RekallAgeSetVertexBufferCommand(slot, buffer, offset, sizeBytes));
-        public RekallAgeGraphicsValidationResult SetIndexBuffer(RekallAgeGraphicsResourceHandle buffer, RekallAgeIndexFormat format, ulong offset = 0, ulong sizeBytes = 0) => AddInPass(_renderPass, new RekallAgeSetIndexBufferCommand(buffer, format, offset, sizeBytes));
-        public RekallAgeGraphicsValidationResult Draw(uint vertexCount, uint instanceCount = 1, uint firstVertex = 0, uint firstInstance = 0) => AddInPass(_renderPass, new RekallAgeDrawCommand(vertexCount, instanceCount, firstVertex, firstInstance));
-        public RekallAgeGraphicsValidationResult DrawIndexed(uint indexCount, uint instanceCount = 1, uint firstIndex = 0, int baseVertex = 0, uint firstInstance = 0) => AddInPass(_renderPass, new RekallAgeDrawIndexedCommand(indexCount, instanceCount, firstIndex, baseVertex, firstInstance));
+        public RekallAgeGraphicsValidationResult BeginRenderPass(RekallAgeRenderPassDescriptor descriptor) { if (_renderPass || _computePass) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "A pass is already active.")); var validation = device.ValidateEncoderHandle(descriptor.RenderTarget, RekallAgeGraphicsResourceKind.RenderTarget); if (!validation.Valid) return validation; _renderPass = true; _renderPipelineSet = false; _indexBufferSet = false; _commands.Add(new RekallAgeBeginRenderPassCommand(descriptor)); return Valid(); }
+        public RekallAgeGraphicsValidationResult SetRenderPipeline(RekallAgeGraphicsResourceHandle pipeline) { if (!_renderPass) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "A render pass must be active.")); var validation = device.ValidateEncoderHandle(pipeline, RekallAgeGraphicsResourceKind.RenderPipeline); if (!validation.Valid) return validation; _renderPipelineSet = true; _commands.Add(new RekallAgeSetRenderPipelineCommand(pipeline)); return Valid(); }
+        public RekallAgeGraphicsValidationResult SetComputePipeline(RekallAgeGraphicsResourceHandle pipeline) { if (!_computePass) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "A compute pass must be active.")); var validation = device.ValidateEncoderHandle(pipeline, RekallAgeGraphicsResourceKind.ComputePipeline); if (!validation.Valid) return validation; _computePipelineSet = true; _commands.Add(new RekallAgeSetComputePipelineCommand(pipeline)); return Valid(); }
+        public RekallAgeGraphicsValidationResult SetBindingSet(int index, RekallAgeGraphicsResourceHandle bindingSet) { if (!_renderPass && !_computePass) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "A pass must be active.")); if (index < 0 || index >= device.Capabilities.MaximumBindingsPerLayout) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_BINDING_INDEX_INVALID", "Binding-set index is outside the backend limit.")); var validation = device.ValidateEncoderHandle(bindingSet, RekallAgeGraphicsResourceKind.BindingSet); if (!validation.Valid) return validation; _commands.Add(new RekallAgeSetBindingSetCommand(index, bindingSet)); return Valid(); }
+        public RekallAgeGraphicsValidationResult SetVertexBuffer(int slot, RekallAgeGraphicsResourceHandle buffer, ulong offset = 0, ulong sizeBytes = 0) { if (!_renderPass) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "A render pass must be active.")); if (slot < 0 || slot >= device.Capabilities.MaximumVertexBuffers) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_VERTEX_BUFFER_SLOT_INVALID", "Vertex-buffer slot is outside the backend limit.")); var validation = device.ValidateEncoderBuffer(buffer, RekallAgeBufferUsage.Vertex, offset, sizeBytes); if (!validation.Valid) return validation; _commands.Add(new RekallAgeSetVertexBufferCommand(slot, buffer, offset, sizeBytes)); return Valid(); }
+        public RekallAgeGraphicsValidationResult SetIndexBuffer(RekallAgeGraphicsResourceHandle buffer, RekallAgeIndexFormat format, ulong offset = 0, ulong sizeBytes = 0) { if (!_renderPass) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "A render pass must be active.")); var validation = device.ValidateEncoderBuffer(buffer, RekallAgeBufferUsage.Index, offset, sizeBytes); if (!validation.Valid) return validation; _indexBufferSet = true; _commands.Add(new RekallAgeSetIndexBufferCommand(buffer, format, offset, sizeBytes)); return Valid(); }
+        public RekallAgeGraphicsValidationResult Draw(uint vertexCount, uint instanceCount = 1, uint firstVertex = 0, uint firstInstance = 0) => AddInPass(_renderPass && _renderPipelineSet, new RekallAgeDrawCommand(vertexCount, instanceCount, firstVertex, firstInstance));
+        public RekallAgeGraphicsValidationResult DrawIndexed(uint indexCount, uint instanceCount = 1, uint firstIndex = 0, int baseVertex = 0, uint firstInstance = 0) => AddInPass(_renderPass && _renderPipelineSet && _indexBufferSet, new RekallAgeDrawIndexedCommand(indexCount, instanceCount, firstIndex, baseVertex, firstInstance));
+        public RekallAgeGraphicsValidationResult DrawIndirect(RekallAgeGraphicsResourceHandle buffer, ulong offset, uint drawCount = 1, uint strideBytes = 16) => AddIndirect(_renderPass && _renderPipelineSet, buffer, offset, drawCount, strideBytes, 16, new RekallAgeDrawIndirectCommand(buffer, offset, drawCount, strideBytes));
+        public RekallAgeGraphicsValidationResult DrawIndexedIndirect(RekallAgeGraphicsResourceHandle buffer, ulong offset, uint drawCount = 1, uint strideBytes = 20) => AddIndirect(_renderPass && _renderPipelineSet && _indexBufferSet, buffer, offset, drawCount, strideBytes, 20, new RekallAgeDrawIndexedIndirectCommand(buffer, offset, drawCount, strideBytes));
         public RekallAgeGraphicsValidationResult EndRenderPass() { if (!_renderPass) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "No render pass is active.")); _renderPass = false; _commands.Add(new RekallAgeEndRenderPassCommand()); return Valid(); }
-        public RekallAgeGraphicsValidationResult BeginComputePass(string? passLabel = null) { if (_renderPass || _computePass) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "A pass is already active.")); _computePass = true; _commands.Add(new RekallAgeBeginComputePassCommand(passLabel)); return Valid(); }
-        public RekallAgeGraphicsValidationResult Dispatch(uint groupCountX, uint groupCountY = 1, uint groupCountZ = 1) => AddInPass(_computePass, new RekallAgeDispatchCommand(groupCountX, groupCountY, groupCountZ));
+        public RekallAgeGraphicsValidationResult BeginComputePass(string? passLabel = null) { if (_renderPass || _computePass) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "A pass is already active.")); if (!device.Capabilities.SupportsCompute) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_FEATURE_REQUIRED", "The backend does not support compute.")); _computePass = true; _computePipelineSet = false; _commands.Add(new RekallAgeBeginComputePassCommand(passLabel)); return Valid(); }
+        public RekallAgeGraphicsValidationResult Dispatch(uint groupCountX, uint groupCountY = 1, uint groupCountZ = 1) => AddInPass(_computePass && _computePipelineSet, new RekallAgeDispatchCommand(groupCountX, groupCountY, groupCountZ));
+        public RekallAgeGraphicsValidationResult DispatchIndirect(RekallAgeGraphicsResourceHandle buffer, ulong offset)
+        {
+            if (!_computePass || !_computePipelineSet || offset % 4 != 0) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "Indirect dispatch requires an active compute pass, pipeline, and aligned offset."));
+            if (!device.Capabilities.SupportsIndirectDispatch) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_FEATURE_REQUIRED", "The backend does not support indirect dispatch."));
+            var validation = device.ValidateIndirectBuffer(buffer, offset, 12, dispatch: true);
+            if (!validation.Valid) return validation;
+            _commands.Add(new RekallAgeDispatchIndirectCommand(buffer, offset));
+            return Valid();
+        }
         public RekallAgeGraphicsValidationResult EndComputePass() { if (!_computePass) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "No compute pass is active.")); _computePass = false; _commands.Add(new RekallAgeEndComputePassCommand()); return Valid(); }
         public RekallAgeGraphicsValidationResult CopyBuffer(RekallAgeGraphicsResourceHandle source, ulong sourceOffset, RekallAgeGraphicsResourceHandle destination, ulong destinationOffset, ulong sizeBytes) => AddInPass(!_renderPass && !_computePass, new RekallAgeCopyBufferCommand(source, sourceOffset, destination, destinationOffset, sizeBytes));
         public RekallAgeGraphicsCommandBuffer Finish() { if (_finished || _renderPass || _computePass) throw new InvalidOperationException("Command encoder cannot finish while a pass is active or after it has finished."); _finished = true; return new(device.DeviceId, label, new ReadOnlyCollection<RekallAgeGraphicsCommand>(_commands.ToArray())); }
         public void Dispose() { }
         private RekallAgeGraphicsValidationResult AddInPass(bool valid, RekallAgeGraphicsCommand command) { if (!valid) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "Command is invalid in the current pass state.")); _commands.Add(command); return Valid(); }
+        private RekallAgeGraphicsValidationResult AddIndirect(bool activePass, RekallAgeGraphicsResourceHandle buffer, ulong offset, uint count, uint stride, uint minimumStride, RekallAgeGraphicsCommand command)
+        {
+            if (!activePass) return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_PASS_STATE_INVALID", "Indirect draw requires an active render pass."));
+            if (count == 0 || stride < minimumStride || stride % 4 != 0 || offset % 4 != 0)
+                return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_INDIRECT_LAYOUT_INVALID", "Indirect count, offset, or stride is invalid.", buffer.ToString()));
+            var size = (ulong)(count - 1) * stride + minimumStride;
+            var validation = device.ValidateIndirectBuffer(buffer, offset, size);
+            if (!validation.Valid) return validation;
+            _commands.Add(command);
+            return Valid();
+        }
     }
 }

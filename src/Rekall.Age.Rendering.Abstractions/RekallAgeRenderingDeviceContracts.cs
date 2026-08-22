@@ -49,12 +49,17 @@ public enum RekallAgeMemoryAccess
     Upload,
     Readback
 }
+public enum RekallAgeStorageBufferAccess { ReadOnly, ReadWrite }
 
 public sealed record RekallAgeBufferDescriptor(
     ulong SizeBytes,
     RekallAgeBufferUsage Usage,
     RekallAgeMemoryAccess MemoryAccess = RekallAgeMemoryAccess.DeviceLocal,
-    string? Label = null);
+    string? Label = null)
+{
+    public uint StructureByteStride { get; init; }
+    public RekallAgeStorageBufferAccess StorageAccess { get; init; } = RekallAgeStorageBufferAccess.ReadWrite;
+}
 
 public enum RekallAgeTextureDimension
 {
@@ -270,6 +275,8 @@ public sealed record RekallAgeRenderingDeviceCapabilities(
 
     public uint MaximumComputeWorkgroupsPerDimension { get; init; } = 65_535;
 
+    public bool SupportsIndirectDispatch { get; init; } = true;
+
     public static RekallAgeRenderingDeviceCapabilities DesktopBaseline(string backend) => new(
         backend,
         MaximumBufferSizeBytes: 1UL << 30,
@@ -346,6 +353,9 @@ public sealed record RekallAgeDrawIndexedCommand(uint IndexCount, uint InstanceC
 public sealed record RekallAgeEndRenderPassCommand : RekallAgeGraphicsCommand;
 public sealed record RekallAgeBeginComputePassCommand(string? Label = null) : RekallAgeGraphicsCommand;
 public sealed record RekallAgeDispatchCommand(uint GroupCountX, uint GroupCountY, uint GroupCountZ) : RekallAgeGraphicsCommand;
+public sealed record RekallAgeDrawIndirectCommand(RekallAgeGraphicsResourceHandle Buffer, ulong Offset, uint DrawCount, uint StrideBytes) : RekallAgeGraphicsCommand;
+public sealed record RekallAgeDrawIndexedIndirectCommand(RekallAgeGraphicsResourceHandle Buffer, ulong Offset, uint DrawCount, uint StrideBytes) : RekallAgeGraphicsCommand;
+public sealed record RekallAgeDispatchIndirectCommand(RekallAgeGraphicsResourceHandle Buffer, ulong Offset) : RekallAgeGraphicsCommand;
 public sealed record RekallAgeEndComputePassCommand : RekallAgeGraphicsCommand;
 
 public sealed record RekallAgeGraphicsCommandBuffer(
@@ -364,9 +374,15 @@ public interface IRekallAgeGraphicsCommandEncoder : IDisposable
     RekallAgeGraphicsValidationResult SetIndexBuffer(RekallAgeGraphicsResourceHandle buffer, RekallAgeIndexFormat format, ulong offset = 0, ulong sizeBytes = 0);
     RekallAgeGraphicsValidationResult Draw(uint vertexCount, uint instanceCount = 1, uint firstVertex = 0, uint firstInstance = 0);
     RekallAgeGraphicsValidationResult DrawIndexed(uint indexCount, uint instanceCount = 1, uint firstIndex = 0, int baseVertex = 0, uint firstInstance = 0);
+    RekallAgeGraphicsValidationResult DrawIndirect(RekallAgeGraphicsResourceHandle buffer, ulong offset, uint drawCount = 1, uint strideBytes = 16) =>
+        new([new("REKALL_GPU_FEATURE_REQUIRED", "This rendering adapter does not implement indirect drawing.", buffer.ToString())]);
+    RekallAgeGraphicsValidationResult DrawIndexedIndirect(RekallAgeGraphicsResourceHandle buffer, ulong offset, uint drawCount = 1, uint strideBytes = 20) =>
+        new([new("REKALL_GPU_FEATURE_REQUIRED", "This rendering adapter does not implement indexed indirect drawing.", buffer.ToString())]);
     RekallAgeGraphicsValidationResult EndRenderPass();
     RekallAgeGraphicsValidationResult BeginComputePass(string? label = null);
     RekallAgeGraphicsValidationResult Dispatch(uint groupCountX, uint groupCountY = 1, uint groupCountZ = 1);
+    RekallAgeGraphicsValidationResult DispatchIndirect(RekallAgeGraphicsResourceHandle buffer, ulong offset) =>
+        new([new("REKALL_GPU_FEATURE_REQUIRED", "This rendering adapter does not implement indirect dispatch.", buffer.ToString())]);
     RekallAgeGraphicsValidationResult EndComputePass();
 
     RekallAgeGraphicsValidationResult CopyBuffer(

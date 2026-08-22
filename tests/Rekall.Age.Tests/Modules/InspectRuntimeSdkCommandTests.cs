@@ -177,5 +177,13 @@ public sealed class InspectRuntimeSdkCommandTests
         Assert.Contains(result.Value.Contracts, contract =>
             contract.Name == "RekallAgeRuntimeGpuVertexBufferLayout"
             && contract.Usage!.Contains("Float32x3", StringComparison.Ordinal));
+
+        var advanced = await new InspectRuntimeSdkCommand().ExecuteAsync(
+            new InspectRuntimeSdkRequest("gpu structured storage buffer stride indirect dispatch draw", Limit: 24),
+            context);
+        Assert.Contains(advanced.Value.Contracts, contract =>
+            contract.Name == "gpu-storage-and-indirect-recipe"
+            && contract.Usage!.Contains("StructureByteStride", StringComparison.Ordinal)
+            && contract.Usage.Contains("DispatchIndirect", StringComparison.Ordinal));
     }
 }

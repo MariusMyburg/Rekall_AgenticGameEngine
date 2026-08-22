@@ -124,6 +124,14 @@ public sealed class InspectRuntimeSdkCommand
                 Usage = "new RekallAgeRuntimeGpuBinding(0, \"engine.scene-color\"); new RekallAgeRuntimeGpuCommand(RekallAgeRuntimeGpuCommandKind.BeginRenderPass) { Resource = \"engine.output\" };"
             },
             new RekallAgeRuntimeSdkContract(
+                "authoring-recipe",
+                "gpu-storage-and-indirect-recipe",
+                "structured storage buffers + DrawIndirect/DrawIndexedIndirect/DispatchIndirect",
+                "Storage buffers require an explicit nonzero StructureByteStride that divides SizeBytes. Indirect argument buffers use Indirect usage, 4-byte-aligned offsets, and the portable argument layouts: draw 16 bytes, indexed draw 20 bytes, dispatch 12 bytes. The selected backend must advertise each capability.")
+            {
+                Usage = "new RekallAgeRuntimeGpuBuffer(\"particles\", 4096, RekallAgeRuntimeGpuBufferUsage.Storage) { StructureByteStride = 16 }; new RekallAgeRuntimeGpuBuffer(\"args\", 12, RekallAgeRuntimeGpuBufferUsage.Indirect); new(RekallAgeRuntimeGpuCommandKind.DispatchIndirect) { Resource = \"args\", SourceOffset = 0 };"
+            },
+            new RekallAgeRuntimeSdkContract(
                 "runtime-type",
                 nameof(RekallAgeRuntimeVector2),
                 "record RekallAgeRuntimeVector2(double X, double Y)",

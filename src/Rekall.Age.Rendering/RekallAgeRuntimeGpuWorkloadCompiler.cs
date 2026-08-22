@@ -72,7 +72,13 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
                 buffer.SizeBytes,
                 Map(buffer.Usage) | (hasInitialData ? RekallAgeBufferUsage.TransferDestination : 0),
                 MapMemoryAccess(buffer.MemoryAccess),
-                buffer.Id)))) return Rollback(workload.Id, device, owned, diagnostics);
+                buffer.Id)
+            {
+                StructureByteStride = buffer.StructureByteStride,
+                StorageAccess = buffer.StorageAccess == RekallAgeRuntimeGpuStorageAccess.ReadOnly
+                    ? RekallAgeStorageBufferAccess.ReadOnly
+                    : RekallAgeStorageBufferAccess.ReadWrite
+            }))) return Rollback(workload.Id, device, owned, diagnostics);
             if (hasInitialData)
             {
                 var upload = device.WriteBuffer(resources[buffer.Id], 0, initialData[buffer.InitialDataAsset!]);
@@ -188,10 +194,17 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
                     command.VertexCount, command.InstanceCount, command.FirstVertex, command.FirstInstance),
                 RekallAgeRuntimeGpuCommandKind.DrawIndexed => encoder.DrawIndexed(
                     command.IndexCount, command.InstanceCount, command.FirstIndex, command.BaseVertex, command.FirstInstance),
+                RekallAgeRuntimeGpuCommandKind.DrawIndirect => encoder.DrawIndirect(
+                    resources[command.Resource!], command.SourceOffset, command.IndirectCount,
+                    command.IndirectStrideBytes == 0 ? 16 : command.IndirectStrideBytes),
+                RekallAgeRuntimeGpuCommandKind.DrawIndexedIndirect => encoder.DrawIndexedIndirect(
+                    resources[command.Resource!], command.SourceOffset, command.IndirectCount,
+                    command.IndirectStrideBytes == 0 ? 20 : command.IndirectStrideBytes),
                 RekallAgeRuntimeGpuCommandKind.EndRenderPass => encoder.EndRenderPass(),
                 RekallAgeRuntimeGpuCommandKind.BeginComputePass => encoder.BeginComputePass(command.Label),
                 RekallAgeRuntimeGpuCommandKind.SetComputePipeline => encoder.SetComputePipeline(resources[command.Resource!]),
                 RekallAgeRuntimeGpuCommandKind.Dispatch => encoder.Dispatch(command.GroupCountX, command.GroupCountY, command.GroupCountZ),
+                RekallAgeRuntimeGpuCommandKind.DispatchIndirect => encoder.DispatchIndirect(resources[command.Resource!], command.SourceOffset),
                 RekallAgeRuntimeGpuCommandKind.EndComputePass => encoder.EndComputePass(),
                 _ => new RekallAgeGraphicsValidationResult([
                     new("REKALL_GPU_WORKLOAD_NOT_IMPLEMENTED", $"Command {command.Kind} requires the next compiler stage.")])
@@ -348,7 +361,10 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
                 or RekallAgeRuntimeGpuCommandKind.SetComputePipeline
                 or RekallAgeRuntimeGpuCommandKind.SetBindingSet
                 or RekallAgeRuntimeGpuCommandKind.SetVertexBuffer
-                or RekallAgeRuntimeGpuCommandKind.SetIndexBuffer;
+                or RekallAgeRuntimeGpuCommandKind.SetIndexBuffer
+                or RekallAgeRuntimeGpuCommandKind.DrawIndirect
+                or RekallAgeRuntimeGpuCommandKind.DrawIndexedIndirect
+                or RekallAgeRuntimeGpuCommandKind.DispatchIndirect;
             if (requiredResource && string.IsNullOrWhiteSpace(command.Resource)
                 || command.Kind == RekallAgeRuntimeGpuCommandKind.CopyBuffer
                     && (string.IsNullOrWhiteSpace(command.Source) || string.IsNullOrWhiteSpace(command.Destination)))

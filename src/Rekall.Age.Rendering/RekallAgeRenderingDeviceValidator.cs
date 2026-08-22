@@ -37,8 +37,25 @@ public static class RekallAgeRenderingDeviceValidator
         {
             diagnostics.Add(Feature("storage buffers", descriptor.Label));
         }
+        if (descriptor.Usage.HasFlag(RekallAgeBufferUsage.Storage)
+            && (descriptor.StructureByteStride == 0 || descriptor.SizeBytes % descriptor.StructureByteStride != 0)
+            || !descriptor.Usage.HasFlag(RekallAgeBufferUsage.Storage) && descriptor.StructureByteStride != 0)
+        {
+            diagnostics.Add(new("REKALL_GPU_BUFFER_STRUCTURE_STRIDE_INVALID", "Storage buffers require a nonzero structure stride that evenly divides their size; other buffers must use stride zero.", descriptor.Label));
+        }
+        var incompatibleStorageUsage = descriptor.Usage & (RekallAgeBufferUsage.Vertex | RekallAgeBufferUsage.Index
+            | RekallAgeBufferUsage.Uniform | RekallAgeBufferUsage.Indirect | RekallAgeBufferUsage.Readback);
+        if (descriptor.Usage.HasFlag(RekallAgeBufferUsage.Storage)
+            && (incompatibleStorageUsage != 0 || descriptor.MemoryAccess != RekallAgeMemoryAccess.DeviceLocal)
+            || descriptor.Usage.HasFlag(RekallAgeBufferUsage.Indirect)
+                && descriptor.MemoryAccess != RekallAgeMemoryAccess.DeviceLocal)
+        {
+            diagnostics.Add(new("REKALL_GPU_BUFFER_USAGE_COMBINATION_UNSUPPORTED", "Storage buffers cannot combine with vertex, index, uniform, indirect, readback, or dynamic memory access; indirect buffers require device-local memory.", descriptor.Label));
+        }
 
-        if (descriptor.Usage.HasFlag(RekallAgeBufferUsage.Indirect) && !capabilities.SupportsIndirectDrawing)
+        if (descriptor.Usage.HasFlag(RekallAgeBufferUsage.Indirect)
+            && !capabilities.SupportsIndirectDrawing
+            && !capabilities.SupportsIndirectDispatch)
         {
             diagnostics.Add(Feature("indirect drawing", descriptor.Label));
         }

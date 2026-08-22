@@ -29,6 +29,11 @@ public sealed class ProgrammableGeometryProbeSystem : IRekallAgeRuntimeModuleSys
             new("vertices", 24, RekallAgeRuntimeGpuBufferUsage.Vertex)
             {
                 InitialDataAsset = "asset_gpu_vertices"
+            },
+            new("storage", 16, RekallAgeRuntimeGpuBufferUsage.Storage)
+            {
+                StructureByteStride = 4,
+                InitialDataAsset = "asset_gpu_storage"
             }
         ],
         Shaders =
@@ -48,6 +53,13 @@ public sealed class ProgrammableGeometryProbeSystem : IRekallAgeRuntimeModuleSys
                     color = vec3((x + 1.0) * 0.5, (y + 1.0) * 0.5, 0.95);
                 }
                 """),
+            new("storage.compute", RekallAgeRuntimeGpuShaderStage.Compute, RekallAgeRuntimeGpuShaderLanguage.Glsl,
+                """
+                #version 450
+                layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+                layout(set = 0, binding = 0, std430) buffer Binding0 { uint values[]; };
+                void main() { values[0] = values[0] ^ 1u; }
+                """),
             new("geometry.fragment", RekallAgeRuntimeGpuShaderStage.Fragment, RekallAgeRuntimeGpuShaderLanguage.Glsl,
                 """
                 #version 450
@@ -59,8 +71,27 @@ public sealed class ProgrammableGeometryProbeSystem : IRekallAgeRuntimeModuleSys
                 }
                 """)
         ],
+        BindingLayouts =
+        [
+            new("storage.layout",
+            [
+                new(0, RekallAgeRuntimeGpuBindingType.StorageBuffer, [RekallAgeRuntimeGpuShaderStage.Compute])
+                {
+                    MinimumBindingSize = 16
+                }
+            ])
+        ],
+        BindingSets =
+        [
+            new("storage.set", "storage.layout", [new(0, "storage") { SizeBytes = 16 }])
+        ],
         Pipelines =
         [
+            new("storage.pipeline", RekallAgeRuntimeGpuPipelineKind.Compute)
+            {
+                ComputeShader = "storage.compute",
+                BindingLayouts = ["storage.layout"]
+            },
             new("geometry.pipeline", RekallAgeRuntimeGpuPipelineKind.Render)
             {
                 VertexShader = "geometry.vertex",
@@ -79,6 +110,11 @@ public sealed class ProgrammableGeometryProbeSystem : IRekallAgeRuntimeModuleSys
         ],
         Commands =
         [
+            new(RekallAgeRuntimeGpuCommandKind.BeginComputePass),
+            new(RekallAgeRuntimeGpuCommandKind.SetComputePipeline) { Resource = "storage.pipeline" },
+            new(RekallAgeRuntimeGpuCommandKind.SetBindingSet) { BindingSetIndex = 0, Resource = "storage.set" },
+            new(RekallAgeRuntimeGpuCommandKind.Dispatch) { GroupCountX = 1 },
+            new(RekallAgeRuntimeGpuCommandKind.EndComputePass),
             new(RekallAgeRuntimeGpuCommandKind.BeginRenderPass) { Resource = "engine.output" },
             new(RekallAgeRuntimeGpuCommandKind.SetRenderPipeline) { Resource = "geometry.pipeline" },
             new(RekallAgeRuntimeGpuCommandKind.SetVertexBuffer) { Slot = 0, Resource = "vertices", SizeBytes = 24 },

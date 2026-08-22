@@ -10,6 +10,7 @@ var capabilities = RekallAgeRenderingDeviceCapabilities.DesktopBaseline(profile)
     SupportsStorageBuffers = webGpu,
     SupportsStorageTextures = webGpu,
     SupportsIndirectDrawing = webGpu,
+    SupportsIndirectDispatch = webGpu,
     SupportsTimestampQueries = false
 };
 

@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-22 23:10 Africa/Johannesburg
+Last verified: 2026-08-22 23:21 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -3313,6 +3313,22 @@ triangle whose positions are decoded from the 24-byte catalog-backed vertex
 asset through an explicit `Uint32x2` layout. The committed evidence is
 `Examples/ProgrammableGeometryProbe/Captures/vulkan-asset-backed-geometry.jpg`.
 Storage-resource and indirect-command metadata/execution is the next GPU tranche.
+The storage-buffer and indirect-command portion of that tranche is now
+implemented and broadly verified. Storage buffers carry an explicit structure
+stride that must divide the allocation; the conformance and Vulkan adapters
+validate it, and the Vulkan adapter advertises the selected device's real
+structured-buffer and indirect-command capabilities. Portable command buffers
+now include range- and alignment-checked indirect draw, indexed-draw, and
+dispatch records without exposing native handles. Compiler and runtime SDK
+contracts map the same metadata and give agents exact 16-byte draw, 20-byte
+indexed-draw, and 12-byte dispatch argument layouts. The geometry probe now
+also uploads, binds, and mutates a catalog-backed structured buffer in a native
+compute pass before drawing its colorful triangle; its latest Vulkan run logged
+one enabled and one executed workload and completed 5/5 frames. The full engine
+suite passes 1,196/1,196, Studio passes 25/25, and the Release solution builds
+with zero warnings/errors. Independent review found no merge blockers. Storage
+textures and a deterministic native indirect
+argument-buffer proof remain the next sub-slice before this tranche is closed.
 After its Windows programmable-compositor proof, resume Pong through the generic
 portable authoring path, followed by a Galaga-class game in Studio. The queued
 Rain Glass shader acceptance follows those playable proofs

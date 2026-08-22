@@ -65,11 +65,21 @@ public sealed class RuntimeGpuWorkloadSdkTests
         Assert.Equal("rain", Assert.Single(projected.Subsystems.Rendering.GpuWorkloads).Id);
     }
 
+    [Fact]
+    public void ExistingGpuCommandWireValuesRemainStableWhenCommandsAreAppended()
+    {
+        Assert.Equal(9, (int)RekallAgeRuntimeGpuCommandKind.EndRenderPass);
+        Assert.Equal(10, (int)RekallAgeRuntimeGpuCommandKind.BeginComputePass);
+        Assert.Equal(11, (int)RekallAgeRuntimeGpuCommandKind.Dispatch);
+        Assert.Equal(12, (int)RekallAgeRuntimeGpuCommandKind.EndComputePass);
+        Assert.Equal(13, (int)RekallAgeRuntimeGpuCommandKind.DrawIndirect);
+    }
+
     private static RekallAgeRuntimeGpuWorkload ComputeWorkload(string id, uint groups) => new(id)
     {
         Buffers =
         [
-            new("particles", 4_096, RekallAgeRuntimeGpuBufferUsage.Storage)
+            new("particles", 4_096, RekallAgeRuntimeGpuBufferUsage.Storage) { StructureByteStride = 16 }
         ],
         Shaders =
         [

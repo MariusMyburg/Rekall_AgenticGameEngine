@@ -232,14 +232,13 @@ public static class RekallAgeWebGpuProtocol
     private static bool ValidateCommandPayload(RekallAgeWebGpuCommandPacket command)
     {
         if (command.Data.ValueKind != JsonValueKind.Object || !RequiredCommandProperties.TryGetValue(command.Kind, out var required)
-            || command.Data.EnumerateObject().Any(property => !required.Contains(property.Name, StringComparer.Ordinal))
+            || command.Data.EnumerateObject().Any(property => !AllowedCommandProperties[command.Kind].Contains(property.Name, StringComparer.Ordinal))
             || required.Any(property => !command.Data.TryGetProperty(property, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)) return false;
         try
         {
             if (JsonSerializer.Deserialize(command.Data.GetRawText(), CommandPayloadTypes[command.Kind], SerializerOptions) is null) return false;
-            return !ExpectedHandleKinds.TryGetValue(command.Kind, out var expected) || command.Data.TryGetProperty(expected.Property, out var handle)
-                && handle.ValueKind == JsonValueKind.Object && handle.TryGetProperty("kind", out var kind)
-                && kind.ValueKind == JsonValueKind.String && string.Equals(kind.GetString(), expected.Kind, StringComparison.Ordinal);
+            if (command.Kind == "copyBuffer") return HandleKind(command.Data, "source", "buffer") && HandleKind(command.Data, "destination", "buffer");
+            return !ExpectedHandleKinds.TryGetValue(command.Kind, out var expected) || HandleKind(command.Data, expected.Property, expected.Kind);
         }
         catch (JsonException) { return false; }
     }
@@ -249,9 +248,18 @@ public static class RekallAgeWebGpuProtocol
         ["copyBuffer"] = typeof(RekallAgeCopyBufferCommand), ["beginRenderPass"] = typeof(RekallAgeBeginRenderPassCommand), ["setRenderPipeline"] = typeof(RekallAgeSetRenderPipelineCommand), ["setComputePipeline"] = typeof(RekallAgeSetComputePipelineCommand), ["setBindingSet"] = typeof(RekallAgeSetBindingSetCommand), ["setVertexBuffer"] = typeof(RekallAgeSetVertexBufferCommand), ["setIndexBuffer"] = typeof(RekallAgeSetIndexBufferCommand), ["draw"] = typeof(RekallAgeDrawCommand), ["drawIndexed"] = typeof(RekallAgeDrawIndexedCommand), ["drawIndirect"] = typeof(RekallAgeDrawIndirectCommand), ["drawIndexedIndirect"] = typeof(RekallAgeDrawIndexedIndirectCommand), ["endRenderPass"] = typeof(RekallAgeEndRenderPassCommand), ["beginComputePass"] = typeof(RekallAgeBeginComputePassCommand), ["dispatch"] = typeof(RekallAgeDispatchCommand), ["dispatchIndirect"] = typeof(RekallAgeDispatchIndirectCommand), ["endComputePass"] = typeof(RekallAgeEndComputePassCommand)
     };
 
+    private static bool HandleKind(JsonElement data, string property, string expectedKind) => data.TryGetProperty(property, out var handle)
+        && handle.ValueKind == JsonValueKind.Object && handle.TryGetProperty("kind", out var kind)
+        && kind.ValueKind == JsonValueKind.String && string.Equals(kind.GetString(), expectedKind, StringComparison.Ordinal);
+
     private static readonly IReadOnlyDictionary<string, string[]> RequiredCommandProperties = new Dictionary<string, string[]>
     {
         ["copyBuffer"] = ["source", "sourceOffset", "destination", "destinationOffset", "sizeBytes"], ["beginRenderPass"] = ["descriptor"], ["setRenderPipeline"] = ["pipeline"], ["setComputePipeline"] = ["pipeline"], ["setBindingSet"] = ["index", "bindingSet"], ["setVertexBuffer"] = ["slot", "buffer", "offset", "sizeBytes"], ["setIndexBuffer"] = ["buffer", "format", "offset", "sizeBytes"], ["draw"] = ["vertexCount", "instanceCount", "firstVertex", "firstInstance"], ["drawIndexed"] = ["indexCount", "instanceCount", "firstIndex", "baseVertex", "firstInstance"], ["drawIndirect"] = ["buffer", "offset", "drawCount", "strideBytes"], ["drawIndexedIndirect"] = ["buffer", "offset", "drawCount", "strideBytes"], ["endRenderPass"] = [], ["beginComputePass"] = [], ["dispatch"] = ["groupCountX", "groupCountY", "groupCountZ"], ["dispatchIndirect"] = ["buffer", "offset"], ["endComputePass"] = []
+    };
+
+    private static readonly IReadOnlyDictionary<string, string[]> AllowedCommandProperties = new Dictionary<string, string[]>(RequiredCommandProperties)
+    {
+        ["beginComputePass"] = ["label"]
     };
 
     private static readonly IReadOnlyDictionary<string, (string Property, string Kind)> ExpectedHandleKinds = new Dictionary<string, (string, string)>

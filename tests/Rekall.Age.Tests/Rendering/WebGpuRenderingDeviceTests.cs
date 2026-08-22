@@ -226,6 +226,23 @@ public sealed class WebGpuRenderingDeviceTests
         Assert.False(device.Destroy(buffer.Handle with { DeviceId = Guid.NewGuid() }).Valid);
     }
 
+    [Fact]
+    public void ProtocolAcceptsItsOwnComputePassPacket()
+    {
+        var packet = new RekallAgeWebGpuSubmitPacket(1, null, [new("beginComputePass", RekallAgeWebGpuProtocol.ToJsonElement(new RekallAgeBeginComputePassCommand("ok"))), new("endComputePass", RekallAgeWebGpuProtocol.ToJsonElement(new RekallAgeEndComputePassCommand()))]);
+        Assert.Equal(2, RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuSubmitPacket>(RekallAgeWebGpuProtocol.Serialize(packet)).Commands.Count);
+    }
+
+    [Theory]
+    [InlineData("copyBuffer", "source", "texture")]
+    [InlineData("copyBuffer", "destination", "texture")]
+    public void ProtocolRejectsWrongCopyHandleKinds(string commandKind, string property, string kind)
+    {
+        var data = "{\"source\":{\"kind\":\"buffer\"},\"sourceOffset\":0,\"destination\":{\"kind\":\"buffer\"},\"destinationOffset\":0,\"sizeBytes\":4}".Replace($"\"{property}\":{{\"kind\":\"buffer\"}}", $"\"{property}\":{{\"kind\":\"{kind}\"}}");
+        var json = $"{{\"version\":1,\"commands\":[{{\"kind\":\"{commandKind}\",\"data\":{data}}}],\"operation\":\"submit\"}}";
+        Assert.Throws<RekallAgeWebGpuProtocolException>(() => RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuSubmitPacket>(json));
+    }
+
     private static RekallAgeGraphicsResourceHandle CreateCopySource(RekallAgeWebGpuRenderingDevice device) =>
         device.CreateBuffer(new(16, RekallAgeBufferUsage.CopySource)).Handle;
 

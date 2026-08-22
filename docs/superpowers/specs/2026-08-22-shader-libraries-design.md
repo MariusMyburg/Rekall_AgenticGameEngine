@@ -28,4 +28,3 @@ pipelines with deterministic, safe, inspectable preprocessing.
 
 This milestone does not introduce a new shader language, copy Godot shader
 code, relax AGE's material ABI, or claim WebGPU/compute support.
-

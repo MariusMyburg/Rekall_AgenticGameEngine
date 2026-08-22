@@ -59,4 +59,3 @@ desktop assemblies already run in a browser.
 Add project shader include libraries and a bounded C# preprocessor integrated
 with validation, pipeline compilation, hashing, hot reload, CLI, and MCP. This
 is generic graphics programmability, not a game-specific effect.
-

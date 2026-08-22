@@ -8,12 +8,12 @@ C# modules and execute it through the shared RenderingDevice contract.
   `Rekall.Age.Runtime.Abstractions` and stable SDK add/replace/list/remove helpers.
 - [x] Advertise exact workload types and helper signatures through runtime SDK
   inspection and module prompting.
-- [ ] Add a transactional compiler from named workloads to RenderingDevice
+- [x] Add a transactional compiler from named workloads to RenderingDevice
   descriptors, opaque handles, and immutable command buffers.
-  Compute-only slice is green; transfer/render resources and commands remain.
-- [ ] Add stable graph/reference/budget/capability diagnostics and inspection.
+  Buffer/texture asset-data upload remains a separate execution-stage item.
+- [x] Add stable graph/reference/budget/capability diagnostics and inspection.
 - [ ] Execute a programmable post-process or compute workload in the Windows
   Player with deterministic capture evidence.
-- [ ] Expose workload validation/inspection through CLI/MCP.
+- [x] Expose workload validation/inspection through CLI/MCP.
 - [ ] Run full suites, Release build, live Player proof, update production
   progress, commit, and push.

@@ -3234,7 +3234,22 @@ named buffer/shader/compute-pipeline graphs resolve to opaque handles and an
 immutable command buffer; duplicate IDs, missing references, command overflow,
 and declarations reserved for later transfer/render stages fail closed before
 retaining any resources. The combined GPU workload contract/SDK/compiler
-selection passes 12/12. Transfer/render graph compilation is still in progress.
+selection passed 12/12 at that compute-only checkpoint; the broader
+transfer/render milestone below supersedes it.
+The transfer/render compiler and agent inspection milestone is now implemented
+and checkpoint-verified. Named textures, samplers, layouts/sets, render
+pipelines, color/depth targets, clears, vertex/index bindings, draw/indexed
+draw, copies, and compute compile through the same transactional path. Null
+nested collections, missing operands/references, unsupported formats, shader
+source totals, and aggregate allocation budgets return stable diagnostics
+before allocation. `rekall.render.device.inspect_runtime_workload` is registered
+for CLI/MCP and returns named opaque resources plus immutable command kinds
+without submission. Its real CLI path compiled a WebGPU-shaped workload to two
+resources and four commands with zero diagnostics. The latest focused
+compiler/inspection/catalog selection passes 11/11, the full engine suite
+passes 1,164/1,164, Studio passes 25/25, and the Release solution builds with
+zero warnings or errors. Initial asset-data upload and real Player workload
+execution are the active gaps.
 After its Windows programmable-compositor proof, resume Pong through the generic
 portable authoring path, followed by a Galaga-class game in Studio. The queued
 Rain Glass shader acceptance follows those playable proofs

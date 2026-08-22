@@ -42,6 +42,7 @@ public sealed class McpCatalogTests
         registry.Register(new CaptureScreenshotCommand());
         registry.Register(new CaptureRuntimeViewportCommand());
         registry.Register(new InspectRenderingDeviceWorkloadCommand());
+        registry.Register(new InspectRuntimeGpuWorkloadCommand());
         registry.Register(new InspectScenePerformanceBudgetCommand());
         registry.Register(new ApplyVirtualGeometryToSceneCommand());
         registry.Register(new InspectVirtualGeometrySceneCommand());
@@ -113,6 +114,7 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.capture.screenshot");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.capture_runtime_viewport");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.device.inspect_workload");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.device.inspect_runtime_workload");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.performance.inspect_scene_budget");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.virtual_geometry.apply_scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.virtual_geometry.inspect_scene");

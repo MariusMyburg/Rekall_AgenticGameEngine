@@ -14,7 +14,46 @@ public sealed record RekallAgeWebGpuCreatePacket(
     int Version,
     string ResourceType,
     RekallAgeGraphicsResourceHandle Handle,
-    JsonElement Descriptor) : IRekallAgeWebGpuPacket;
+    JsonElement Descriptor,
+    string Operation = "create") : IRekallAgeWebGpuPacket;
+
+public sealed record RekallAgeWebGpuDestroyPacket(
+    int Version,
+    RekallAgeGraphicsResourceHandle Handle,
+    string Operation = "destroy") : IRekallAgeWebGpuPacket;
+
+public sealed record RekallAgeWebGpuWriteBufferPacket(
+    int Version,
+    RekallAgeGraphicsResourceHandle Handle,
+    ulong Offset,
+    string DataBase64,
+    string Operation = "writeBuffer") : IRekallAgeWebGpuPacket;
+
+public sealed record RekallAgeWebGpuWriteTexturePacket(
+    int Version,
+    RekallAgeGraphicsResourceHandle Handle,
+    int MipLevel,
+    int ArrayLayer,
+    string DataBase64,
+    string Operation = "writeTexture") : IRekallAgeWebGpuPacket;
+
+public sealed record RekallAgeWebGpuCommandPacket(string Kind, JsonElement Data);
+
+public sealed record RekallAgeWebGpuSubmitPacket(
+    int Version,
+    string? Label,
+    IReadOnlyList<RekallAgeWebGpuCommandPacket> Commands,
+    string Operation = "submit") : IRekallAgeWebGpuPacket;
+
+public sealed record RekallAgeWebGpuImportCanvasOutputPacket(
+    int Version,
+    RekallAgeGraphicsResourceHandle Texture,
+    RekallAgeGraphicsResourceHandle RenderTarget,
+    int Width,
+    int Height,
+    RekallAgeTextureFormat Format,
+    string? Label,
+    string Operation = "importCanvasOutput") : IRekallAgeWebGpuPacket;
 
 public sealed class RekallAgeWebGpuProtocolException : Exception
 {
@@ -67,6 +106,9 @@ public static class RekallAgeWebGpuProtocol
         return json;
     }
 
+    public static JsonElement ToJsonElement<T>(T value) =>
+        JsonSerializer.SerializeToElement(value, value?.GetType() ?? typeof(T), SerializerOptions);
+
     public static T Deserialize<T>(string json) where T : IRekallAgeWebGpuPacket
     {
         ArgumentNullException.ThrowIfNull(json);
@@ -111,9 +153,16 @@ public static class RekallAgeWebGpuProtocol
                 $"WebGPU protocol version {packet.Version} is not supported."));
         }
 
-        return packet is RekallAgeWebGpuCreatePacket createPacket
-            ? (T)(object)NormalizeCreatePacket(createPacket, allowNumericDescriptorEnums)
-            : packet;
+        return packet switch
+        {
+            RekallAgeWebGpuCreatePacket createPacket => (T)(object)NormalizeCreatePacket(createPacket, allowNumericDescriptorEnums),
+            RekallAgeWebGpuDestroyPacket destroyPacket => (T)(object)ValidateOperation(destroyPacket, destroyPacket.Operation, "destroy"),
+            RekallAgeWebGpuWriteBufferPacket writeBufferPacket => (T)(object)ValidateOperation(writeBufferPacket, writeBufferPacket.Operation, "writeBuffer"),
+            RekallAgeWebGpuWriteTexturePacket writeTexturePacket => (T)(object)ValidateOperation(writeTexturePacket, writeTexturePacket.Operation, "writeTexture"),
+            RekallAgeWebGpuSubmitPacket submitPacket => (T)(object)ValidateSubmission(submitPacket),
+            RekallAgeWebGpuImportCanvasOutputPacket importPacket => (T)(object)ValidateOperation(importPacket, importPacket.Operation, "importCanvasOutput"),
+            _ => throw InvalidPacket("WebGPU protocol packets must use a known packet type.")
+        };
     }
 
     private static RekallAgeWebGpuCreatePacket NormalizeCreatePacket(
@@ -152,13 +201,44 @@ public static class RekallAgeWebGpuProtocol
         {
             var descriptor = JsonSerializer.Deserialize(packet.Descriptor.GetRawText(), descriptorType, options)
                 ?? throw InvalidPacket("WebGPU create packet descriptors must not be null.");
-            return packet with { Descriptor = JsonSerializer.SerializeToElement(descriptor, SerializerOptions) };
+            return ValidateOperation(packet with { Descriptor = JsonSerializer.SerializeToElement(descriptor, SerializerOptions) }, packet.Operation, "create", allowMissingOperation: true);
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException or NotSupportedException or ArgumentException)
         {
             throw InvalidDescriptor(exception);
         }
     }
+
+    private static RekallAgeWebGpuSubmitPacket ValidateSubmission(RekallAgeWebGpuSubmitPacket packet)
+    {
+        ValidateOperation(packet, packet.Operation, "submit");
+        if (packet.Commands is null || packet.Commands.Any(command => !IsKnownCommand(command.Kind) || command.Data.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null))
+        {
+            throw new RekallAgeWebGpuProtocolException(new(
+                "REKALL_WEBGPU_PROTOCOL_COMMAND_KIND_INVALID",
+                "WebGPU submission packets must contain only known command kinds with payload data."));
+        }
+
+        return packet;
+    }
+
+    private static T ValidateOperation<T>(T packet, string? actual, string expected, bool allowMissingOperation = false)
+    {
+        if ((allowMissingOperation && string.IsNullOrEmpty(actual)) || string.Equals(actual, expected, StringComparison.Ordinal))
+        {
+            return packet;
+        }
+
+        throw new RekallAgeWebGpuProtocolException(new(
+            "REKALL_WEBGPU_PROTOCOL_OPERATION_INVALID",
+            "WebGPU protocol packets must use the expected operation name."));
+    }
+
+    private static bool IsKnownCommand(string? kind) => kind is
+        "copyBuffer" or "beginRenderPass" or "setRenderPipeline" or "setComputePipeline"
+        or "setBindingSet" or "setVertexBuffer" or "setIndexBuffer" or "draw" or "drawIndexed"
+        or "drawIndirect" or "drawIndexedIndirect" or "endRenderPass" or "beginComputePass"
+        or "dispatch" or "dispatchIndirect" or "endComputePass";
 
     private static bool TryGetResourceKind(string resourceType, out RekallAgeGraphicsResourceKind resourceKind)
     {

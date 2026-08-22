@@ -331,6 +331,7 @@
       "rekall.age.rendering.webgpu": {
         "type": "Project",
         "dependencies": {
+          "Rekall.Age.Rendering": "[0.1.0-preview.1, )",
           "Rekall.Age.Rendering.Abstractions": "[0.1.0-preview.1, )"
         }
       },

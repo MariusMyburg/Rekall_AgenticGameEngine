@@ -58,6 +58,12 @@ JavaScript gameplay API or parallel scene model will exist.
 - Submission is validated by the conformance backend before bridge execution.
   Failed backend submission returns stable AGE diagnostics and does not pretend
   that a frame executed.
+- The synchronous RenderingDevice surface records browser mutations immediately.
+  The concrete adapter also exposes `FlushAsync`, which awaits WebGPU error
+  scopes, shader compilation information, queue completion, and device-loss
+  state. Browser play must flush after compilation/submission before reporting
+  success; an asynchronous backend failure disposes the compiled workload and
+  faults the adapter rather than leaving it ready.
 - The first protocol version covers the complete currently supported portable
   surface: buffers, textures, samplers, WGSL shader modules, binding layouts and
   sets, render/compute pipelines, render targets, buffer/texture uploads,
@@ -77,6 +83,9 @@ JavaScript gameplay API or parallel scene model will exist.
   action; it is never reported as ready.
 - Canvas resizing is device-pixel-ratio aware and recreates only
   size-dependent targets.
+- `ImportCanvasOutput` is a concrete adapter operation that creates validated
+  conformance texture/render-target handles and emits an import packet. It does
+  not widen the public device interface or expose the browser canvas to modules.
 
 ## Shader and portability rules
 

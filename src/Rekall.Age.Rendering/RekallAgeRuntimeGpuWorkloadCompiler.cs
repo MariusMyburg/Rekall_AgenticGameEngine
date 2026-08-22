@@ -46,35 +46,60 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
     public const int MaximumCommands = 4_096;
     public const ulong MaximumEstimatedBytes = 512UL * 1024 * 1024;
     public const int MaximumAggregateShaderBytes = 4 * 1024 * 1024;
+    public const int MaximumInitialAssetBytes = 64 * 1024 * 1024;
 
     public RekallAgeCompiledGpuWorkload Compile(
         RekallAgeRuntimeGpuWorkload workload,
         IRekallAgeRenderingDevice device,
-        IReadOnlyDictionary<string, RekallAgeGraphicsResourceHandle>? externalResources = null)
+        IReadOnlyDictionary<string, RekallAgeGraphicsResourceHandle>? externalResources = null,
+        IRekallAgeGpuAssetDataResolver? assetDataResolver = null)
     {
         ArgumentNullException.ThrowIfNull(workload);
         ArgumentNullException.ThrowIfNull(device);
         externalResources ??= new Dictionary<string, RekallAgeGraphicsResourceHandle>(StringComparer.Ordinal);
-        var diagnostics = Preflight(workload, device, externalResources);
+        var diagnostics = Preflight(workload, device, externalResources, assetDataResolver);
+        if (diagnostics.Count > 0) return Invalid(workload.Id, diagnostics);
+
+        var initialData = ResolveInitialData(workload, assetDataResolver, diagnostics);
         if (diagnostics.Count > 0) return Invalid(workload.Id, diagnostics);
 
         var resources = new Dictionary<string, RekallAgeGraphicsResourceHandle>(externalResources, StringComparer.Ordinal);
         var owned = new List<RekallAgeGraphicsResourceHandle>();
         foreach (var buffer in workload.Buffers)
         {
+            var hasInitialData = !string.IsNullOrWhiteSpace(buffer.InitialDataAsset);
             if (!Add(buffer.Id, device.CreateBuffer(new(
                 buffer.SizeBytes,
-                Map(buffer.Usage),
+                Map(buffer.Usage) | (hasInitialData ? RekallAgeBufferUsage.TransferDestination : 0),
                 MapMemoryAccess(buffer.MemoryAccess),
                 buffer.Id)))) return Rollback(workload.Id, device, owned, diagnostics);
+            if (hasInitialData)
+            {
+                var upload = device.WriteBuffer(resources[buffer.Id], 0, initialData[buffer.InitialDataAsset!]);
+                if (!upload.Valid)
+                {
+                    diagnostics.AddRange(upload.Diagnostics);
+                    return Rollback(workload.Id, device, owned, diagnostics);
+                }
+            }
         }
         foreach (var texture in workload.Textures)
         {
+            var hasInitialData = !string.IsNullOrWhiteSpace(texture.InitialDataAsset);
             if (!Add(texture.Id, device.CreateTexture(new(
                 Map(texture.Dimension), texture.Width, texture.Height, texture.Depth,
                 texture.MipLevels, texture.ArrayLayers, texture.SampleCount,
-                MapFormat(texture.Format), Map(texture.Usage), texture.Id))))
+                MapFormat(texture.Format), Map(texture.Usage) | (hasInitialData ? RekallAgeTextureUsage.CopyDestination : 0), texture.Id))))
                 return Rollback(workload.Id, device, owned, diagnostics);
+            if (hasInitialData)
+            {
+                var upload = device.WriteTexture(resources[texture.Id], initialData[texture.InitialDataAsset!]);
+                if (!upload.Valid)
+                {
+                    diagnostics.AddRange(upload.Diagnostics);
+                    return Rollback(workload.Id, device, owned, diagnostics);
+                }
+            }
         }
         foreach (var sampler in workload.Samplers)
         {
@@ -211,7 +236,8 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
     private static List<RekallAgeGraphicsDiagnostic> Preflight(
         RekallAgeRuntimeGpuWorkload workload,
         IRekallAgeRenderingDevice device,
-        IReadOnlyDictionary<string, RekallAgeGraphicsResourceHandle> externalResources)
+        IReadOnlyDictionary<string, RekallAgeGraphicsResourceHandle> externalResources,
+        IRekallAgeGpuAssetDataResolver? assetDataResolver)
     {
         var diagnostics = new List<RekallAgeGraphicsDiagnostic>();
         var buffers = workload.Buffers ?? [];
@@ -242,10 +268,19 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_SHAPE_INVALID", "Render-target color attachments cannot be null.", target.Id));
         foreach (var command in commands.Where(command => command.ClearColors is null))
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_SHAPE_INVALID", "Command clear-color collections cannot be null.", workload.Id));
-        if (buffers.Any(buffer => !string.IsNullOrWhiteSpace(buffer.InitialDataAsset)))
-            diagnostics.Add(new("REKALL_GPU_WORKLOAD_NOT_IMPLEMENTED", "Initial buffer asset upload is reserved for the upload compiler stage.", workload.Id));
-        if (textures.Any(texture => !string.IsNullOrWhiteSpace(texture.InitialDataAsset)))
-            diagnostics.Add(new("REKALL_GPU_WORKLOAD_NOT_IMPLEMENTED", "Initial texture asset upload is reserved for the upload compiler stage.", workload.Id));
+        if (assetDataResolver is null && (buffers.Any(buffer => !string.IsNullOrWhiteSpace(buffer.InitialDataAsset))
+            || textures.Any(texture => !string.IsNullOrWhiteSpace(texture.InitialDataAsset))))
+            diagnostics.Add(new("REKALL_GPU_ASSET_RESOLVER_REQUIRED", "Initial GPU data requires an explicit bounded asset resolver.", workload.Id));
+        foreach (var texture in textures.Where(texture => !string.IsNullOrWhiteSpace(texture.InitialDataAsset)))
+        {
+            if (TryMapFormat(texture.Format, out var uploadFormat)
+                && uploadFormat is RekallAgeTextureFormat.Depth24Stencil8 or RekallAgeTextureFormat.Depth32Float)
+                diagnostics.Add(new("REKALL_GPU_INITIAL_DATA_FORMAT_UNSUPPORTED", "Initial texture data does not support depth/stencil formats.", texture.Id));
+            if (texture.SampleCount != 1)
+                diagnostics.Add(new("REKALL_GPU_INITIAL_DATA_SAMPLE_COUNT_UNSUPPORTED", "Initial texture data requires a single-sampled texture.", texture.Id));
+            if (texture.ArrayLayers != 1)
+                diagnostics.Add(new("REKALL_GPU_INITIAL_DATA_ARRAY_LAYERS_UNSUPPORTED", "Initial texture data currently describes exactly one array layer.", texture.Id));
+        }
         var declaredResourceIds = buffers.Select(item => item.Id)
             .Concat(textures.Select(item => item.Id))
             .Concat(samplers.Select(item => item.Id))
@@ -328,14 +363,76 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
         }
     }
 
+    private static IReadOnlyDictionary<string, byte[]> ResolveInitialData(
+        RekallAgeRuntimeGpuWorkload workload,
+        IRekallAgeGpuAssetDataResolver? resolver,
+        List<RekallAgeGraphicsDiagnostic> diagnostics)
+    {
+        var resolved = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        if (resolver is null)
+            return resolved;
+
+        var assetIds = workload.Buffers.Select(buffer => buffer.InitialDataAsset)
+            .Concat(workload.Textures.Select(texture => texture.InitialDataAsset))
+            .Where(assetId => !string.IsNullOrWhiteSpace(assetId))
+            .Select(assetId => assetId!)
+            .Distinct(StringComparer.Ordinal);
+        foreach (var assetId in assetIds)
+        {
+            RekallAgeGpuAssetDataResolution resolution;
+            try
+            {
+                resolution = resolver.Resolve(assetId);
+            }
+            catch (Exception exception)
+            {
+                diagnostics.Add(new("REKALL_GPU_ASSET_RESOLUTION_FAILED", exception.Message, assetId));
+                continue;
+            }
+            diagnostics.AddRange(resolution.Diagnostics);
+            if (!resolution.Resolved)
+            {
+                if (resolution.Diagnostics.Count == 0)
+                    diagnostics.Add(new("REKALL_GPU_ASSET_DATA_INVALID", $"Asset '{assetId}' resolved without nonempty data.", assetId));
+                continue;
+            }
+            if (resolution.Data!.Length > MaximumInitialAssetBytes)
+            {
+                diagnostics.Add(new("REKALL_GPU_INITIAL_DATA_LIMIT", $"Initial asset data cannot exceed {MaximumInitialAssetBytes} bytes.", assetId));
+                continue;
+            }
+            resolved.Add(assetId, resolution.Data);
+        }
+
+        foreach (var buffer in workload.Buffers.Where(buffer => !string.IsNullOrWhiteSpace(buffer.InitialDataAsset)))
+        {
+            if (resolved.TryGetValue(buffer.InitialDataAsset!, out var data) && (ulong)data.Length > buffer.SizeBytes)
+                diagnostics.Add(new("REKALL_GPU_INITIAL_DATA_TOO_LARGE", $"Initial data for buffer '{buffer.Id}' exceeds its declared size.", buffer.Id));
+        }
+        foreach (var texture in workload.Textures.Where(texture => !string.IsNullOrWhiteSpace(texture.InitialDataAsset)))
+        {
+            if (!resolved.TryGetValue(texture.InitialDataAsset!, out var data)) continue;
+            var expectedBytes = EstimateBaseTextureBytes(texture);
+            if ((ulong)data.Length != expectedBytes)
+                diagnostics.Add(new("REKALL_GPU_INITIAL_DATA_SIZE_INVALID", $"Initial data for texture '{texture.Id}' must contain exactly {expectedBytes} tightly packed base-mip bytes.", texture.Id));
+        }
+        return resolved;
+    }
+
     private static ulong EstimateTextureBytes(RekallAgeRuntimeGpuTexture texture)
     {
-        if (texture.Width < 1 || texture.Height < 1 || texture.Depth < 1 || texture.ArrayLayers < 1) return 0;
-        var bytesPerPixel = TryMapFormat(texture.Format, out var format) && format == RekallAgeTextureFormat.Rgba16Float ? 8UL : 4UL;
+        if (!TryMapFormat(texture.Format, out var format)) return 0;
+        return RekallAgeTextureLayout.TotalBytes(new(
+            Map(texture.Dimension), texture.Width, texture.Height, texture.Depth,
+            texture.MipLevels, texture.ArrayLayers, texture.SampleCount, format, Map(texture.Usage)));
+    }
+
+    private static ulong EstimateBaseTextureBytes(RekallAgeRuntimeGpuTexture texture)
+    {
+        var bytesPerPixel = TryMapFormat(texture.Format, out var format) ? RekallAgeTextureLayout.BytesPerPixel(format) : 0;
         try
         {
-            return checked((ulong)texture.Width * (ulong)texture.Height * (ulong)texture.Depth
-                * (ulong)texture.ArrayLayers * bytesPerPixel);
+            return checked((ulong)texture.Width * (ulong)texture.Height * (ulong)texture.Depth * bytesPerPixel);
         }
         catch (OverflowException)
         {

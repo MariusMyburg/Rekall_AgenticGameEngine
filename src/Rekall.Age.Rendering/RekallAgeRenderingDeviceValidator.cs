@@ -1,5 +1,6 @@
 using Rekall.Age.Rendering.Abstractions;
 using System.Text;
+using System.Numerics;
 
 namespace Rekall.Age.Rendering;
 
@@ -84,7 +85,10 @@ public static class RekallAgeRenderingDeviceValidator
             diagnostics.Add(new("REKALL_GPU_TEXTURE_SHAPE_INVALID", "Texture dimensions do not match the declared texture kind.", descriptor.Label));
         }
 
+        var maximumMipDimension = Math.Max(descriptor.Width, Math.Max(descriptor.Height, descriptor.Depth));
+        var maximumMipLevels = maximumMipDimension > 0 ? BitOperations.Log2((uint)maximumMipDimension) + 1 : 0;
         if (descriptor.MipLevels < 1
+            || descriptor.MipLevels > maximumMipLevels
             || descriptor.ArrayLayers < 1
             || descriptor.ArrayLayers > capabilities.MaximumTextureArrayLayers
             || descriptor.SampleCount is not (1 or 2 or 4 or 8))

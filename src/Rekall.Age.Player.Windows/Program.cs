@@ -383,7 +383,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _shaderPipelineCache = shaderPipelineCache;
         _presentPipeline = presentPipeline;
         _presentPassAdapter = new RekallAgeVeldridPresentPassAdapter();
-        _runtimeGpuWorkloadExecutor = new RekallAgeVeldridRuntimeGpuWorkloadExecutor(device, commands);
+        _runtimeGpuWorkloadExecutor = new RekallAgeVeldridRuntimeGpuWorkloadExecutor(projectRoot, device, commands);
         _hudPipeline = hudPipeline;
         _frameLayout = frameLayout;
         _drawLayout = drawLayout;

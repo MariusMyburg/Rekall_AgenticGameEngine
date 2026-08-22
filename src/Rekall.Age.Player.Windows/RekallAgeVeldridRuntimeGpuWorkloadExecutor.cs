@@ -20,6 +20,7 @@ internal sealed class RekallAgeVeldridRuntimeGpuWorkloadExecutor : IDisposable
 
     private static readonly JsonSerializerOptions HashOptions = CreateHashOptions();
     private readonly RekallAgeVeldridRenderingDevice _device;
+    private readonly RekallAgeProjectGpuAssetDataResolver _assetDataResolver;
     private readonly Dictionary<string, CachedWorkload> _cache = new(StringComparer.Ordinal);
     private Texture? _sceneColor;
     private Framebuffer? _output;
@@ -27,8 +28,11 @@ internal sealed class RekallAgeVeldridRuntimeGpuWorkloadExecutor : IDisposable
     private RekallAgeGraphicsResourceHandle _outputHandle;
     private bool _disposed;
 
-    public RekallAgeVeldridRuntimeGpuWorkloadExecutor(GraphicsDevice device, CommandList commands) =>
+    public RekallAgeVeldridRuntimeGpuWorkloadExecutor(string projectRoot, GraphicsDevice device, CommandList commands)
+    {
         _device = new(device, commands);
+        _assetDataResolver = new(projectRoot);
+    }
 
     public RekallAgeRuntimeGpuExecutionReport Record(
         IReadOnlyList<RekallAgeRuntimeGpuWorkload> workloads,
@@ -53,7 +57,7 @@ internal sealed class RekallAgeVeldridRuntimeGpuWorkloadExecutor : IDisposable
         var executed = 0;
         foreach (var workload in enabled)
         {
-            var hash = JsonSerializer.Serialize(workload, HashOptions);
+            var hash = $"{_assetDataResolver.CatalogRevision}:{JsonSerializer.Serialize(workload, HashOptions)}";
             if (!_cache.TryGetValue(workload.Id, out var cached) || !cached.Hash.Equals(hash, StringComparison.Ordinal))
             {
                 Remove(workload.Id);
@@ -64,14 +68,16 @@ internal sealed class RekallAgeVeldridRuntimeGpuWorkloadExecutor : IDisposable
                     {
                         [SceneColorImport] = _sceneColorHandle,
                         [OutputRenderTargetImport] = _outputHandle
-                    });
+                    },
+                    _assetDataResolver);
                 cached = new(hash, compiled);
-                _cache.Add(workload.Id, cached);
+                if (compiled.Valid) _cache.Add(workload.Id, cached);
             }
 
             if (!cached.Compiled.Valid)
             {
                 diagnostics.AddRange(cached.Compiled.Diagnostics);
+                cached.Compiled.Dispose();
                 continue;
             }
 

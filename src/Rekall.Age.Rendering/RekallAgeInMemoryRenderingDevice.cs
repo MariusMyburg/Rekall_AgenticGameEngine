@@ -7,6 +7,7 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
 {
     private readonly object _gate = new();
     private readonly List<ResourceSlot> _slots = [];
+    private readonly Dictionary<int, ulong> _uploadedBytes = [];
     private bool _disposed;
 
     public RekallAgeInMemoryRenderingDevice(RekallAgeRenderingDeviceCapabilities capabilities)
@@ -167,6 +168,79 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
             : new(default, diagnostics);
     }
 
+    public RekallAgeGraphicsValidationResult WriteBuffer(
+        RekallAgeGraphicsResourceHandle buffer,
+        ulong offset,
+        ReadOnlyMemory<byte> data)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        lock (_gate)
+        {
+            var diagnostics = ValidateHandleLocked(buffer, RekallAgeGraphicsResourceKind.Buffer);
+            if (diagnostics.Count > 0)
+                return new(diagnostics);
+
+            var descriptor = (RekallAgeBufferDescriptor)_slots[buffer.Slot].Resource!.Descriptor;
+            if (!descriptor.Usage.HasFlag(RekallAgeBufferUsage.TransferDestination)
+                && descriptor.MemoryAccess != RekallAgeMemoryAccess.Upload)
+            {
+                diagnostics.Add(new(
+                    "REKALL_GPU_WRITE_USAGE_INVALID",
+                    "Buffer writes require TransferDestination usage or upload memory.",
+                    buffer.ToString()));
+            }
+            if (data.IsEmpty || offset > descriptor.SizeBytes || (ulong)data.Length > descriptor.SizeBytes - offset)
+            {
+                diagnostics.Add(new(
+                    "REKALL_GPU_WRITE_RANGE_INVALID",
+                    "Buffer write data must be nonempty and contained by the resource.",
+                    buffer.ToString()));
+            }
+            if (diagnostics.Count == 0)
+                _uploadedBytes[buffer.Slot] = SaturatingAdd(_uploadedBytes.GetValueOrDefault(buffer.Slot), (ulong)data.Length);
+            return new(diagnostics);
+        }
+    }
+
+    public RekallAgeGraphicsValidationResult WriteTexture(
+        RekallAgeGraphicsResourceHandle texture,
+        ReadOnlyMemory<byte> data,
+        int mipLevel = 0,
+        int arrayLayer = 0)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        lock (_gate)
+        {
+            var diagnostics = ValidateHandleLocked(texture, RekallAgeGraphicsResourceKind.Texture);
+            if (diagnostics.Count > 0)
+                return new(diagnostics);
+
+            var descriptor = (RekallAgeTextureDescriptor)_slots[texture.Slot].Resource!.Descriptor;
+            if (!descriptor.Usage.HasFlag(RekallAgeTextureUsage.CopyDestination))
+            {
+                diagnostics.Add(new(
+                    "REKALL_GPU_WRITE_USAGE_INVALID",
+                    "Texture writes require CopyDestination usage.",
+                    texture.ToString()));
+            }
+            if (descriptor.Format is RekallAgeTextureFormat.Depth24Stencil8 or RekallAgeTextureFormat.Depth32Float)
+                diagnostics.Add(new("REKALL_GPU_WRITE_FORMAT_UNSUPPORTED", "Portable raw texture uploads do not support depth/stencil formats.", texture.ToString()));
+            if (descriptor.SampleCount != 1)
+                diagnostics.Add(new("REKALL_GPU_WRITE_SAMPLE_COUNT_UNSUPPORTED", "Portable raw texture uploads require a single-sampled texture.", texture.ToString()));
+            var expectedBytes = TextureSubresourceBytes(descriptor, mipLevel, arrayLayer, diagnostics, texture.ToString());
+            if (expectedBytes > 0 && (ulong)data.Length != expectedBytes)
+            {
+                diagnostics.Add(new(
+                    "REKALL_GPU_WRITE_RANGE_INVALID",
+                    $"Texture write must contain exactly {expectedBytes} tightly packed bytes for the selected subresource.",
+                    texture.ToString()));
+            }
+            if (diagnostics.Count == 0)
+                _uploadedBytes[texture.Slot] = SaturatingAdd(_uploadedBytes.GetValueOrDefault(texture.Slot), (ulong)data.Length);
+            return new(diagnostics);
+        }
+    }
+
     public RekallAgeGraphicsValidationResult Destroy(RekallAgeGraphicsResourceHandle handle)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -179,6 +253,7 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
             }
 
             _slots[handle.Slot] = _slots[handle.Slot] with { Resource = null };
+            _uploadedBytes.Remove(handle.Slot);
             return new([]);
         }
     }
@@ -227,7 +302,10 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
                     resource.Handle,
                     resource.Label,
                     resource.EstimatedBytes,
-                    resource.Descriptor))
+                    resource.Descriptor)
+                {
+                    UploadedBytes = _uploadedBytes.GetValueOrDefault(resource.Handle.Slot)
+                })
                 .ToArray();
         }
     }
@@ -241,6 +319,7 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
                 return;
             }
             _slots.Clear();
+            _uploadedBytes.Clear();
             _disposed = true;
         }
     }
@@ -551,12 +630,29 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
         return [];
     }
 
-    private static ulong EstimateTextureBytes(RekallAgeTextureDescriptor descriptor)
+    private static ulong EstimateTextureBytes(RekallAgeTextureDescriptor descriptor) => RekallAgeTextureLayout.TotalBytes(descriptor);
+
+    private static ulong TextureSubresourceBytes(
+        RekallAgeTextureDescriptor descriptor,
+        int mipLevel,
+        int arrayLayer,
+        List<RekallAgeGraphicsDiagnostic> diagnostics,
+        string target)
     {
-        var bytesPerPixel = descriptor.Format is RekallAgeTextureFormat.Rgba16Float ? 8UL : 4UL;
-        return checked((ulong)descriptor.Width * (ulong)descriptor.Height * (ulong)descriptor.Depth
-            * (ulong)descriptor.ArrayLayers * bytesPerPixel);
+        if (mipLevel < 0 || mipLevel >= descriptor.MipLevels
+            || arrayLayer < 0 || arrayLayer >= descriptor.ArrayLayers)
+        {
+            diagnostics.Add(new(
+                "REKALL_GPU_WRITE_SUBRESOURCE_INVALID",
+                "Texture mip level or array layer is outside the resource.",
+                target));
+            return 0;
+        }
+
+        return RekallAgeTextureLayout.SubresourceBytes(descriptor, mipLevel);
     }
+
+    private static ulong SaturatingAdd(ulong left, ulong right) => ulong.MaxValue - left < right ? ulong.MaxValue : left + right;
 
     private sealed class CommandEncoder : IRekallAgeGraphicsCommandEncoder
     {

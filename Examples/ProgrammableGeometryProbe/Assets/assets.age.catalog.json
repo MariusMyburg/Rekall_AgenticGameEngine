@@ -1,0 +1,16 @@
+{
+  "assets": [
+    {
+      "id": "asset_gpu_vertices",
+      "name": "gpu-vertices",
+      "displayName": "GPU Vertex Probe",
+      "kind": "gpu-data",
+      "sourcePath": "C:\\portable-source\\vertices.bin",
+      "importedPath": "C:\\previous-checkout\\Assets\\gpu-data\\vertices.bin",
+      "contentHash": "7adfe3596b5efdcc7722934f132611537d5530df8458bc697a3ff803ef531986",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null
+    }
+  ]
+}

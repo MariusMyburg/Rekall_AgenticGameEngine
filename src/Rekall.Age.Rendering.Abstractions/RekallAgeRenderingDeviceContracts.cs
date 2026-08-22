@@ -310,7 +310,10 @@ public sealed record RekallAgeGraphicsResourceInspection(
     RekallAgeGraphicsResourceHandle Handle,
     string? Label,
     ulong EstimatedBytes,
-    object Descriptor);
+    object Descriptor)
+{
+    public ulong UploadedBytes { get; init; }
+}
 
 public abstract record RekallAgeGraphicsCommand;
 
@@ -399,6 +402,17 @@ public interface IRekallAgeRenderingDevice : IDisposable
     RekallAgeGraphicsResourceCreationResult CreateComputePipeline(RekallAgeComputePipelineDescriptor descriptor);
 
     RekallAgeGraphicsResourceCreationResult CreateRenderTarget(RekallAgeRenderTargetDescriptor descriptor);
+
+    RekallAgeGraphicsValidationResult WriteBuffer(
+        RekallAgeGraphicsResourceHandle buffer,
+        ulong offset,
+        ReadOnlyMemory<byte> data);
+
+    RekallAgeGraphicsValidationResult WriteTexture(
+        RekallAgeGraphicsResourceHandle texture,
+        ReadOnlyMemory<byte> data,
+        int mipLevel = 0,
+        int arrayLayer = 0);
 
     RekallAgeGraphicsValidationResult Destroy(RekallAgeGraphicsResourceHandle handle);
 

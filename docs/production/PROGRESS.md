@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-22 21:32 Africa/Johannesburg
+Last verified: 2026-08-22 23:10 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -3272,8 +3272,8 @@ suite passes 1,167/1,167, Studio passes 25/25, and the Release solution builds
 with zero warnings or errors. A final bounded live Vulkan run completed 5/5
 frames in one attempt with no recovery and logged one enabled/one executed
 module workload.
-Portable vertex-buffer layout authoring is now implemented, pending its focused
-checkpoint. Runtime pipelines declare typed attributes, byte offsets, strides,
+Portable vertex-buffer layout authoring was implemented as the first half of
+this milestone. Runtime pipelines declare typed attributes, byte offsets, strides,
 and per-vertex/per-instance stepping; the compiler maps them into public
 RenderingDevice descriptors and the Veldrid adapter maps those descriptors to
 native vertex layouts. Validation bounds buffer/attribute counts and strides,
@@ -3282,8 +3282,37 @@ ranges that exceed the stride. Runtime SDK inspection supplies the exact C#
 shape and a position/normal/UV recipe. The combined RenderingDevice, compiler,
 and SDK-inspection selection passes 28/28; the Release solution is again clean
 with zero warnings/errors and the Vulkan compositor remains 5/5. Bounded
-project-asset upload remains the next half of this data-backed geometry
-milestone.
+Project-asset upload was the remaining half of this data-backed geometry
+milestone and is completed below.
+The data-backed geometry milestone is now complete. `IRekallAgeRenderingDevice`
+exposes bounded buffer and tightly packed texture writes with stable
+usage/range/subresource diagnostics and uploaded-byte inspection. The runtime
+workload compiler resolves `InitialDataAsset` only through an explicit resolver,
+adds the necessary copy-destination usage, rejects missing, empty, oversized,
+or wrongly sized payloads before retaining allocations, and rolls back every
+created resource if a native write fails. The production project resolver uses
+stable catalog IDs, relocates stale checkout paths by catalog kind and filename,
+permits reads only below the current project `Assets` root, rejects reparse
+points and hard links using the opened file handle, and performs bounded reads
+from that same handle so a path swap or file growth cannot escape the 64 MiB
+limit. Catalog and payload SHA-256 values are verified before bytes are
+returned. The Player uses a content-derived catalog revision for workload cache
+identity and does not cache resolution-dependent failures, so same-size edits
+and repaired assets retry deterministically. Portable initial texture uploads
+reject depth/stencil formats, multisampling, and multiple array layers until an
+explicit cross-backend payload layout exists; mip chains are bounded by the
+resource dimensions. A shared overflow-safe layout calculator accounts for
+format size, every mip, array layers, and samples in compiler budgets and
+backend inspection, and rejects impossible mip counts before iteration. The
+combined device/compiler/resolver selection passes 43/43, the full engine suite
+passes 1,186/1,186, Studio passes 25/25, and the
+Release solution builds with zero warnings/errors. A bounded native Vulkan run completed 5/5 frames and
+logged one enabled/one executed workload. Independent foreground
+Windows capture then proved the full native chain with a cyan/blue/magenta
+triangle whose positions are decoded from the 24-byte catalog-backed vertex
+asset through an explicit `Uint32x2` layout. The committed evidence is
+`Examples/ProgrammableGeometryProbe/Captures/vulkan-asset-backed-geometry.jpg`.
+Storage-resource and indirect-command metadata/execution is the next GPU tranche.
 After its Windows programmable-compositor proof, resume Pong through the generic
 portable authoring path, followed by a Galaga-class game in Studio. The queued
 Rain Glass shader acceptance follows those playable proofs

@@ -275,6 +275,107 @@ public sealed class RenderingDeviceContractTests
     }
 
     [Fact]
+    public void BufferWritesAreBoundedAndReportUploadedBytes()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var buffer = device.CreateBuffer(new(
+            16,
+            RekallAgeBufferUsage.Vertex | RekallAgeBufferUsage.TransferDestination,
+            Label: "vertices"));
+        Assert.True(buffer.Created);
+
+        var write = device.WriteBuffer(buffer.Handle, 4, new byte[] { 1, 2, 3, 4 });
+
+        Assert.True(write.Valid, string.Join(Environment.NewLine, write.Diagnostics.Select(item => item.Message)));
+        Assert.Equal(4UL, Assert.Single(device.InspectResources()).UploadedBytes);
+        var overflow = device.WriteBuffer(buffer.Handle, 15, new byte[] { 1, 2 });
+        Assert.Contains(overflow.Diagnostics, item => item.Code == "REKALL_GPU_WRITE_RANGE_INVALID");
+    }
+
+    [Fact]
+    public void TextureWritesRequireAnExactWritableSubresource()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var texture = device.CreateTexture(new(
+            RekallAgeTextureDimension.Texture2D,
+            2, 2, 1, 1, 1, 1,
+            RekallAgeTextureFormat.Rgba8Unorm,
+            RekallAgeTextureUsage.Sampled | RekallAgeTextureUsage.CopyDestination,
+            "pixels"));
+        Assert.True(texture.Created);
+
+        var write = device.WriteTexture(texture.Handle, Enumerable.Range(0, 16).Select(value => (byte)value).ToArray());
+
+        Assert.True(write.Valid, string.Join(Environment.NewLine, write.Diagnostics.Select(item => item.Message)));
+        Assert.Equal(16UL, Assert.Single(device.InspectResources()).UploadedBytes);
+        var wrongSize = device.WriteTexture(texture.Handle, new byte[15]);
+        Assert.Contains(wrongSize.Diagnostics, item => item.Code == "REKALL_GPU_WRITE_RANGE_INVALID");
+        var wrongSubresource = device.WriteTexture(texture.Handle, new byte[16], mipLevel: 1);
+        Assert.Contains(wrongSubresource.Diagnostics, item => item.Code == "REKALL_GPU_WRITE_SUBRESOURCE_INVALID");
+    }
+
+    [Theory]
+    [InlineData(RekallAgeTextureFormat.Depth32Float, 1, "REKALL_GPU_WRITE_FORMAT_UNSUPPORTED")]
+    [InlineData(RekallAgeTextureFormat.Rgba8Unorm, 4, "REKALL_GPU_WRITE_SAMPLE_COUNT_UNSUPPORTED")]
+    public void TextureWritesRejectLayoutsWithoutPortableRawUploadSemantics(
+        RekallAgeTextureFormat format,
+        int sampleCount,
+        string expectedCode)
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var texture = device.CreateTexture(new(
+            RekallAgeTextureDimension.Texture2D, 2, 2, 1, 1, 1, sampleCount, format,
+            (format == RekallAgeTextureFormat.Depth32Float ? RekallAgeTextureUsage.DepthStencilAttachment : RekallAgeTextureUsage.Sampled)
+            | RekallAgeTextureUsage.CopyDestination));
+        Assert.True(texture.Created);
+
+        var write = device.WriteTexture(texture.Handle, new byte[16]);
+
+        Assert.Contains(write.Diagnostics, item => item.Code == expectedCode);
+    }
+
+    [Fact]
+    public void TextureCreationRejectsMipCountsBeyondTheFullDimensionChain()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+
+        var texture = device.CreateTexture(new(
+            RekallAgeTextureDimension.Texture2D, 4, 4, 1, 4, 1, 1,
+            RekallAgeTextureFormat.Rgba8Unorm, RekallAgeTextureUsage.Sampled));
+
+        Assert.False(texture.Created);
+        Assert.Contains(texture.Diagnostics, item => item.Code == "REKALL_GPU_TEXTURE_LAYOUT_INVALID");
+    }
+
+    [Fact]
+    public void TextureInspectionCountsFormatMipsLayersAndSamples()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var texture = device.CreateTexture(new(
+            RekallAgeTextureDimension.Texture2D, 4, 4, 1, 3, 2, 4,
+            RekallAgeTextureFormat.R8Unorm, RekallAgeTextureUsage.Sampled));
+
+        Assert.True(texture.Created);
+        Assert.Equal(168UL, Assert.Single(device.InspectResources()).EstimatedBytes);
+    }
+
+    [Fact]
+    public void TextureLayoutSizingFailsFastForMipCountsBeyondTheDimensionChain()
+    {
+        var descriptor = new RekallAgeTextureDescriptor(
+            RekallAgeTextureDimension.Texture2D, 4, 4, 1, 34, 1, 1,
+            RekallAgeTextureFormat.Rgba8Unorm, RekallAgeTextureUsage.Sampled);
+
+        Assert.Equal(ulong.MaxValue, RekallAgeTextureLayout.TotalBytes(descriptor));
+        Assert.Equal(0UL, RekallAgeTextureLayout.SubresourceBytes(descriptor, 32));
+    }
+
+    [Fact]
     public void ConformanceDeviceCreatesShaderLayoutsAndPipelinesWithStageChecks()
     {
         using var device = new RekallAgeInMemoryRenderingDevice(

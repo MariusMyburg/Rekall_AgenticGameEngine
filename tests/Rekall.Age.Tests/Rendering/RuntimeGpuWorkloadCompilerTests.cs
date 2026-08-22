@@ -71,7 +71,7 @@ public sealed class RuntimeGpuWorkloadCompilerTests
     }
 
     [Fact]
-    public void FailsClosedForInitialAssetUploadReservedForTheNextCompilerStage()
+    public void InitialAssetUploadRequiresAnExplicitResolverBeforeAllocating()
     {
         using var device = new RekallAgeInMemoryRenderingDevice(
             RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
@@ -82,7 +82,127 @@ public sealed class RuntimeGpuWorkloadCompilerTests
 
         using var compiled = new RekallAgeRuntimeGpuWorkloadCompiler().Compile(workload, device);
 
-        Assert.Contains(compiled.Diagnostics, item => item.Code == "REKALL_GPU_WORKLOAD_NOT_IMPLEMENTED");
+        Assert.Contains(compiled.Diagnostics, item => item.Code == "REKALL_GPU_ASSET_RESOLVER_REQUIRED");
+        Assert.Empty(device.InspectResources());
+    }
+
+    [Fact]
+    public void UploadsResolvedInitialBufferAndTextureData()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var workload = new RekallAgeRuntimeGpuWorkload("asset-data")
+        {
+            Buffers =
+            [
+                new("vertices", 16, RekallAgeRuntimeGpuBufferUsage.Vertex)
+                {
+                    InitialDataAsset = "asset:vertices"
+                }
+            ],
+            Textures =
+            [
+                new("pixels", RekallAgeRuntimeGpuTextureDimension.Texture2D, 2, 2, 1,
+                    "rgba8-unorm", RekallAgeRuntimeGpuTextureUsage.Sampled)
+                {
+                    InitialDataAsset = "asset:pixels"
+                }
+            ]
+        };
+        var resolver = new DictionaryAssetDataResolver(new Dictionary<string, byte[]>
+        {
+            ["asset:vertices"] = [1, 2, 3, 4],
+            ["asset:pixels"] = Enumerable.Range(0, 16).Select(value => (byte)value).ToArray()
+        });
+
+        using var compiled = new RekallAgeRuntimeGpuWorkloadCompiler().Compile(
+            workload, device, assetDataResolver: resolver);
+
+        Assert.True(compiled.Valid, string.Join(Environment.NewLine, compiled.Diagnostics.Select(item => item.Message)));
+        var resources = device.InspectResources().ToDictionary(resource => resource.Label!);
+        Assert.Equal(4UL, resources["vertices"].UploadedBytes);
+        Assert.Equal(16UL, resources["pixels"].UploadedBytes);
+        var buffer = Assert.IsType<RekallAgeBufferDescriptor>(resources["vertices"].Descriptor);
+        var texture = Assert.IsType<RekallAgeTextureDescriptor>(resources["pixels"].Descriptor);
+        Assert.True(buffer.Usage.HasFlag(RekallAgeBufferUsage.TransferDestination));
+        Assert.True(texture.Usage.HasFlag(RekallAgeTextureUsage.CopyDestination));
+    }
+
+    [Fact]
+    public void RejectsInitialDataLargerThanItsDeclaredBufferWithoutRetainingAllocations()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var workload = new RekallAgeRuntimeGpuWorkload("oversized-upload")
+        {
+            Buffers =
+            [
+                new("vertices", 4, RekallAgeRuntimeGpuBufferUsage.Vertex)
+                {
+                    InitialDataAsset = "asset:vertices"
+                }
+            ]
+        };
+        var resolver = new DictionaryAssetDataResolver(new Dictionary<string, byte[]>
+        {
+            ["asset:vertices"] = [1, 2, 3, 4, 5]
+        });
+
+        using var compiled = new RekallAgeRuntimeGpuWorkloadCompiler().Compile(
+            workload, device, assetDataResolver: resolver);
+
+        Assert.Contains(compiled.Diagnostics, item => item.Code == "REKALL_GPU_INITIAL_DATA_TOO_LARGE");
+        Assert.Empty(device.InspectResources());
+    }
+
+    [Theory]
+    [InlineData("depth32-float", 1, 1, "REKALL_GPU_INITIAL_DATA_FORMAT_UNSUPPORTED")]
+    [InlineData("rgba8-unorm", 4, 1, "REKALL_GPU_INITIAL_DATA_SAMPLE_COUNT_UNSUPPORTED")]
+    [InlineData("rgba8-unorm", 1, 2, "REKALL_GPU_INITIAL_DATA_ARRAY_LAYERS_UNSUPPORTED")]
+    public void RejectsInitialTextureLayoutsWithoutPortableRawPayloadSemantics(
+        string format,
+        int sampleCount,
+        int arrayLayers,
+        string expectedCode)
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var workload = new RekallAgeRuntimeGpuWorkload("texture-upload")
+        {
+            Textures = [new("pixels", RekallAgeRuntimeGpuTextureDimension.Texture2D, 2, 2, 1, format, RekallAgeRuntimeGpuTextureUsage.Sampled)
+            {
+                SampleCount = sampleCount,
+                ArrayLayers = arrayLayers,
+                InitialDataAsset = "asset:pixels"
+            }]
+        };
+        var resolver = new DictionaryAssetDataResolver(new Dictionary<string, byte[]> { ["asset:pixels"] = new byte[16] });
+
+        using var compiled = new RekallAgeRuntimeGpuWorkloadCompiler().Compile(workload, device, assetDataResolver: resolver);
+
+        Assert.Contains(compiled.Diagnostics, item => item.Code == expectedCode);
+        Assert.Empty(device.InspectResources());
+    }
+
+    [Fact]
+    public void TextureBudgetCountsAllMipsLayersSamplesAndActualFormatSize()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var workload = new RekallAgeRuntimeGpuWorkload("texture-budget")
+        {
+            Textures = [new("large", RekallAgeRuntimeGpuTextureDimension.Texture2D, 8192, 8192, 1,
+                "r8-unorm", RekallAgeRuntimeGpuTextureUsage.Sampled)
+            {
+                MipLevels = 14,
+                ArrayLayers = 2,
+                SampleCount = 4
+            }]
+        };
+
+        using var compiled = new RekallAgeRuntimeGpuWorkloadCompiler().Compile(workload, device);
+
+        Assert.Contains(compiled.Diagnostics, item => item.Code == "REKALL_GPU_WORKLOAD_MEMORY_LIMIT");
         Assert.Empty(device.InspectResources());
     }
 
@@ -331,4 +451,13 @@ public sealed class RuntimeGpuWorkloadCompilerTests
             new(RekallAgeRuntimeGpuCommandKind.EndRenderPass)
         ]
     };
+
+    private sealed class DictionaryAssetDataResolver(IReadOnlyDictionary<string, byte[]> assets)
+        : IRekallAgeGpuAssetDataResolver
+    {
+        public RekallAgeGpuAssetDataResolution Resolve(string assetId) =>
+            assets.TryGetValue(assetId, out var data)
+                ? new(data, [])
+                : new(null, [new("REKALL_GPU_ASSET_NOT_FOUND", $"Asset '{assetId}' was not found.", assetId)]);
+    }
 }

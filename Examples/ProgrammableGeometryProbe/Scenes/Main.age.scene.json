@@ -1,0 +1,6 @@
+{
+  "id": "scene_programmable_geometry_probe",
+  "name": "Main",
+  "capabilities": ["rendering3d", "world"],
+  "entities": []
+}

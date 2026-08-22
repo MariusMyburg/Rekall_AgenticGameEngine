@@ -47,6 +47,10 @@ public sealed class WebGpuProtocolTests
         Assert.Contains("\"version\":1", json);
         Assert.Contains("\"resourceType\":\"buffer\"", json);
         Assert.Contains("\"kind\":\"buffer\"", json);
+        Assert.Contains("\"sizeBytes\":16", json);
+        Assert.Contains("\"usage\":\"vertex\"", json);
+        Assert.Contains("\"memoryAccess\":\"deviceLocal\"", json);
+        Assert.DoesNotContain("\"SizeBytes\"", json);
     }
 
     [Fact]
@@ -67,5 +71,57 @@ public sealed class WebGpuProtocolTests
 
         Assert.Throws<RekallAgeWebGpuProtocolException>(() =>
             RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuCreatePacket>(packetJson));
+    }
+
+    [Fact]
+    public void ProtocolRejectsMissingCreateResourceTypes()
+    {
+        const string packetJson = """
+            {"version":1,"handle":{"deviceId":"11111111-1111-1111-1111-111111111111","kind":"buffer","slot":7,"generation":1},"descriptor":{"sizeBytes":16,"usage":"vertex"}}
+            """;
+
+        var exception = Assert.Throws<RekallAgeWebGpuProtocolException>(() =>
+            RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuCreatePacket>(packetJson));
+
+        Assert.Equal("REKALL_WEBGPU_PROTOCOL_RESOURCE_TYPE_INVALID", exception.Diagnostic.Code);
+    }
+
+    [Fact]
+    public void ProtocolRejectsUnknownCreateResourceTypes()
+    {
+        const string packetJson = """
+            {"version":1,"resourceType":"unknown","handle":{"deviceId":"11111111-1111-1111-1111-111111111111","kind":"buffer","slot":7,"generation":1},"descriptor":{"sizeBytes":16,"usage":"vertex"}}
+            """;
+
+        var exception = Assert.Throws<RekallAgeWebGpuProtocolException>(() =>
+            RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuCreatePacket>(packetJson));
+
+        Assert.Equal("REKALL_WEBGPU_PROTOCOL_RESOURCE_TYPE_INVALID", exception.Diagnostic.Code);
+    }
+
+    [Fact]
+    public void ProtocolRejectsCreatePacketsWithMissingHandleKinds()
+    {
+        const string packetJson = """
+            {"version":1,"resourceType":"buffer","handle":{"deviceId":"11111111-1111-1111-1111-111111111111","slot":7,"generation":1},"descriptor":{"sizeBytes":16,"usage":"vertex"}}
+            """;
+
+        var exception = Assert.Throws<RekallAgeWebGpuProtocolException>(() =>
+            RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuCreatePacket>(packetJson));
+
+        Assert.Equal("REKALL_WEBGPU_PROTOCOL_RESOURCE_KIND_INVALID", exception.Diagnostic.Code);
+    }
+
+    [Fact]
+    public void ProtocolRejectsCreateResourceTypesThatDisagreeWithTheirHandleKind()
+    {
+        const string packetJson = """
+            {"version":1,"resourceType":"texture","handle":{"deviceId":"11111111-1111-1111-1111-111111111111","kind":"buffer","slot":7,"generation":1},"descriptor":{"sizeBytes":16,"usage":"vertex"}}
+            """;
+
+        var exception = Assert.Throws<RekallAgeWebGpuProtocolException>(() =>
+            RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuCreatePacket>(packetJson));
+
+        Assert.Equal("REKALL_WEBGPU_PROTOCOL_RESOURCE_TYPE_MISMATCH", exception.Diagnostic.Code);
     }
 }

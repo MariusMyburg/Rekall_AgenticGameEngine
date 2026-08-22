@@ -39,9 +39,29 @@ public static class RekallAgeWebGpuProtocol
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
     };
 
+    private static readonly JsonSerializerOptions DescriptorInputOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+    };
+
+    private static readonly IReadOnlyDictionary<RekallAgeGraphicsResourceKind, Type> CreateDescriptorTypes =
+        new Dictionary<RekallAgeGraphicsResourceKind, Type>
+        {
+            [RekallAgeGraphicsResourceKind.Buffer] = typeof(RekallAgeBufferDescriptor),
+            [RekallAgeGraphicsResourceKind.Texture] = typeof(RekallAgeTextureDescriptor),
+            [RekallAgeGraphicsResourceKind.Sampler] = typeof(RekallAgeSamplerDescriptor),
+            [RekallAgeGraphicsResourceKind.ShaderModule] = typeof(RekallAgeShaderModuleDescriptor),
+            [RekallAgeGraphicsResourceKind.BindingLayout] = typeof(RekallAgeBindingLayoutDescriptor),
+            [RekallAgeGraphicsResourceKind.BindingSet] = typeof(RekallAgeBindingSetDescriptor),
+            [RekallAgeGraphicsResourceKind.RenderPipeline] = typeof(RekallAgeGraphicsPipelineDescriptor),
+            [RekallAgeGraphicsResourceKind.ComputePipeline] = typeof(RekallAgeComputePipelineDescriptor),
+            [RekallAgeGraphicsResourceKind.RenderTarget] = typeof(RekallAgeRenderTargetDescriptor)
+        };
+
     public static string Serialize<T>(T value)
     {
-        var json = JsonSerializer.Serialize(value, SerializerOptions);
+        var json = JsonSerializer.Serialize(NormalizeForSerialization(value), SerializerOptions);
         EnsurePacketSize(json);
         EnsureSupportedVersion(json);
         return json;
@@ -52,11 +72,13 @@ public static class RekallAgeWebGpuProtocol
         ArgumentNullException.ThrowIfNull(json);
         EnsurePacketSize(json);
         EnsureSupportedVersion(json);
+        EnsurePacketShape<T>(json);
 
         try
         {
-            return JsonSerializer.Deserialize<T>(json, SerializerOptions)
+            var packet = JsonSerializer.Deserialize<T>(json, SerializerOptions)
                 ?? throw InvalidPacket("The WebGPU protocol packet cannot be null.");
+            return NormalizePacket(packet, allowNumericDescriptorEnums: false);
         }
         catch (JsonException exception)
         {
@@ -72,6 +94,82 @@ public static class RekallAgeWebGpuProtocol
                 "REKALL_WEBGPU_PROTOCOL_PACKET_TOO_LARGE",
                 $"WebGPU protocol packets must not exceed {MaximumPacketBytes} UTF-8 bytes."));
         }
+    }
+
+    private static object? NormalizeForSerialization<T>(T value) =>
+        value is IRekallAgeWebGpuPacket packet
+            ? NormalizePacket(packet, allowNumericDescriptorEnums: true)
+            : value;
+
+    private static T NormalizePacket<T>(T packet, bool allowNumericDescriptorEnums)
+        where T : IRekallAgeWebGpuPacket
+    {
+        if (packet.Version != Version)
+        {
+            throw new RekallAgeWebGpuProtocolException(new(
+                "REKALL_WEBGPU_PROTOCOL_VERSION_UNSUPPORTED",
+                $"WebGPU protocol version {packet.Version} is not supported."));
+        }
+
+        return packet is RekallAgeWebGpuCreatePacket createPacket
+            ? (T)(object)NormalizeCreatePacket(createPacket, allowNumericDescriptorEnums)
+            : packet;
+    }
+
+    private static RekallAgeWebGpuCreatePacket NormalizeCreatePacket(
+        RekallAgeWebGpuCreatePacket packet,
+        bool allowNumericDescriptorEnums)
+    {
+        if (string.IsNullOrWhiteSpace(packet.ResourceType)
+            || !TryGetResourceKind(packet.ResourceType, out var resourceKind))
+        {
+            throw new RekallAgeWebGpuProtocolException(new(
+                "REKALL_WEBGPU_PROTOCOL_RESOURCE_TYPE_INVALID",
+                "WebGPU create packets must use a known canonical resource type."));
+        }
+
+        if (packet.Handle.Kind != resourceKind)
+        {
+            throw new RekallAgeWebGpuProtocolException(new(
+                "REKALL_WEBGPU_PROTOCOL_RESOURCE_TYPE_MISMATCH",
+                "WebGPU create packet resource type must match the handle kind."));
+        }
+
+        if (!CreateDescriptorTypes.TryGetValue(resourceKind, out var descriptorType))
+        {
+            throw new RekallAgeWebGpuProtocolException(new(
+                "REKALL_WEBGPU_PROTOCOL_RESOURCE_TYPE_INVALID",
+                "WebGPU create packets must use a resource kind with a public AGE descriptor."));
+        }
+
+        var options = allowNumericDescriptorEnums ? DescriptorInputOptions : SerializerOptions;
+        object descriptor;
+        try
+        {
+            descriptor = JsonSerializer.Deserialize(packet.Descriptor.GetRawText(), descriptorType, options)
+                ?? throw InvalidPacket("WebGPU create packet descriptors must not be null.");
+        }
+        catch (JsonException exception)
+        {
+            throw InvalidJson(exception);
+        }
+
+        return packet with { Descriptor = JsonSerializer.SerializeToElement(descriptor, SerializerOptions) };
+    }
+
+    private static bool TryGetResourceKind(string resourceType, out RekallAgeGraphicsResourceKind resourceKind)
+    {
+        foreach (var kind in CreateDescriptorTypes.Keys)
+        {
+            if (string.Equals(resourceType, JsonNamingPolicy.CamelCase.ConvertName(kind.ToString()), StringComparison.Ordinal))
+            {
+                resourceKind = kind;
+                return true;
+            }
+        }
+
+        resourceKind = default;
+        return false;
     }
 
     private static void EnsureSupportedVersion(string json)
@@ -92,6 +190,50 @@ public static class RekallAgeWebGpuProtocol
                 throw new RekallAgeWebGpuProtocolException(new(
                     "REKALL_WEBGPU_PROTOCOL_VERSION_UNSUPPORTED",
                     $"WebGPU protocol version {parsedVersion} is not supported."));
+            }
+        }
+        catch (JsonException exception)
+        {
+            throw InvalidJson(exception);
+        }
+    }
+
+    private static void EnsurePacketShape<T>(string json) where T : IRekallAgeWebGpuPacket
+    {
+        if (typeof(T) != typeof(RekallAgeWebGpuCreatePacket))
+        {
+            return;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            if (!root.TryGetProperty("resourceType", out var resourceTypeElement)
+                || resourceTypeElement.ValueKind != JsonValueKind.String
+                || !TryGetResourceKind(resourceTypeElement.GetString()!, out var resourceType))
+            {
+                throw new RekallAgeWebGpuProtocolException(new(
+                    "REKALL_WEBGPU_PROTOCOL_RESOURCE_TYPE_INVALID",
+                    "WebGPU create packets must declare a known canonical resource type."));
+            }
+
+            if (!root.TryGetProperty("handle", out var handleElement)
+                || handleElement.ValueKind != JsonValueKind.Object
+                || !handleElement.TryGetProperty("kind", out var kindElement)
+                || kindElement.ValueKind != JsonValueKind.String
+                || !TryGetResourceKind(kindElement.GetString()!, out var handleKind))
+            {
+                throw new RekallAgeWebGpuProtocolException(new(
+                    "REKALL_WEBGPU_PROTOCOL_RESOURCE_KIND_INVALID",
+                    "WebGPU create packets must declare a known canonical handle kind."));
+            }
+
+            if (resourceType != handleKind)
+            {
+                throw new RekallAgeWebGpuProtocolException(new(
+                    "REKALL_WEBGPU_PROTOCOL_RESOURCE_TYPE_MISMATCH",
+                    "WebGPU create packet resource type must match the handle kind."));
             }
         }
         catch (JsonException exception)

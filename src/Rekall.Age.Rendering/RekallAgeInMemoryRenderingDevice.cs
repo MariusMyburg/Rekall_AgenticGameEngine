@@ -41,6 +41,132 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
             : new(default, validation.Diagnostics);
     }
 
+    public RekallAgeGraphicsResourceCreationResult CreateSampler(RekallAgeSamplerDescriptor descriptor) =>
+        CreateValidated(
+            descriptor,
+            RekallAgeGraphicsResourceKind.Sampler,
+            descriptor.Label,
+            RekallAgeRenderingDeviceValidator.Validate(descriptor, Capabilities));
+
+    public RekallAgeGraphicsResourceCreationResult CreateShaderModule(RekallAgeShaderModuleDescriptor descriptor) =>
+        CreateValidated(
+            descriptor,
+            RekallAgeGraphicsResourceKind.ShaderModule,
+            descriptor.Label,
+            RekallAgeRenderingDeviceValidator.Validate(descriptor, Capabilities),
+            descriptor.Source is null ? 0 : (ulong)System.Text.Encoding.UTF8.GetByteCount(descriptor.Source));
+
+    public RekallAgeGraphicsResourceCreationResult CreateBindingLayout(RekallAgeBindingLayoutDescriptor descriptor) =>
+        CreateValidated(
+            descriptor,
+            RekallAgeGraphicsResourceKind.BindingLayout,
+            descriptor.Label,
+            RekallAgeRenderingDeviceValidator.Validate(descriptor, Capabilities));
+
+    public RekallAgeGraphicsResourceCreationResult CreateBindingSet(RekallAgeBindingSetDescriptor descriptor)
+    {
+        var diagnostics = new List<RekallAgeGraphicsDiagnostic>();
+        lock (_gate)
+        {
+            diagnostics.AddRange(ValidateHandleLocked(descriptor.Layout, RekallAgeGraphicsResourceKind.BindingLayout));
+            if (diagnostics.Count == 0)
+            {
+                var layout = (RekallAgeBindingLayoutDescriptor)_slots[descriptor.Layout.Slot].Resource!.Descriptor;
+                foreach (var expected in layout.Entries)
+                {
+                    var matches = descriptor.Entries.Where(entry => entry.Binding == expected.Binding).ToArray();
+                    if (matches.Length != 1)
+                    {
+                        diagnostics.Add(new("REKALL_GPU_BINDING_SET_INCOMPLETE", $"Binding {expected.Binding} must have exactly one resource.", descriptor.Label));
+                        continue;
+                    }
+                    var requiredKind = expected.Type is RekallAgeBindingType.UniformBuffer or RekallAgeBindingType.ReadOnlyStorageBuffer or RekallAgeBindingType.StorageBuffer
+                        ? RekallAgeGraphicsResourceKind.Buffer
+                        : expected.Type is RekallAgeBindingType.Sampler or RekallAgeBindingType.ComparisonSampler
+                            ? RekallAgeGraphicsResourceKind.Sampler
+                            : RekallAgeGraphicsResourceKind.Texture;
+                    var resourceDiagnostics = ValidateHandleLocked(matches[0].Resource, requiredKind);
+                    diagnostics.AddRange(resourceDiagnostics);
+                    if (requiredKind == RekallAgeGraphicsResourceKind.Buffer && resourceDiagnostics.Count == 0)
+                    {
+                        var buffer = (RekallAgeBufferDescriptor)_slots[matches[0].Resource.Slot].Resource!.Descriptor;
+                        var available = matches[0].Offset <= buffer.SizeBytes ? buffer.SizeBytes - matches[0].Offset : 0;
+                        var size = matches[0].SizeBytes == 0 ? available : matches[0].SizeBytes;
+                        if (matches[0].Offset > buffer.SizeBytes || size > available || size < expected.MinimumBindingSize)
+                        {
+                            diagnostics.Add(new("REKALL_GPU_BINDING_RANGE_INVALID", $"Binding {expected.Binding} buffer range is invalid.", descriptor.Label));
+                        }
+                    }
+                }
+                if (descriptor.Entries.Select(entry => entry.Binding).Distinct().Count() != descriptor.Entries.Count)
+                {
+                    diagnostics.Add(new("REKALL_GPU_BINDING_DUPLICATE", "Binding set contains duplicate indices.", descriptor.Label));
+                }
+            }
+        }
+        return diagnostics.Count == 0
+            ? Create(RekallAgeGraphicsResourceKind.BindingSet, descriptor, descriptor.Label, 0)
+            : new(default, diagnostics);
+    }
+
+    public RekallAgeGraphicsResourceCreationResult CreateGraphicsPipeline(RekallAgeGraphicsPipelineDescriptor descriptor)
+    {
+        var diagnostics = RekallAgeRenderingDeviceValidator.Validate(descriptor, Capabilities).Diagnostics.ToList();
+        lock (_gate)
+        {
+            diagnostics.AddRange(ValidateShaderStageLocked(descriptor.VertexShader, RekallAgeShaderStage.Vertex));
+            diagnostics.AddRange(ValidateShaderStageLocked(descriptor.FragmentShader, RekallAgeShaderStage.Fragment));
+            foreach (var layout in descriptor.BindingLayouts)
+            {
+                diagnostics.AddRange(ValidateHandleLocked(layout, RekallAgeGraphicsResourceKind.BindingLayout));
+            }
+        }
+        return diagnostics.Count == 0
+            ? Create(RekallAgeGraphicsResourceKind.RenderPipeline, descriptor, descriptor.Label, 0)
+            : new(default, diagnostics);
+    }
+
+    public RekallAgeGraphicsResourceCreationResult CreateComputePipeline(RekallAgeComputePipelineDescriptor descriptor)
+    {
+        var diagnostics = RekallAgeRenderingDeviceValidator.Validate(descriptor, Capabilities).Diagnostics.ToList();
+        lock (_gate)
+        {
+            diagnostics.AddRange(ValidateShaderStageLocked(descriptor.ComputeShader, RekallAgeShaderStage.Compute));
+            foreach (var layout in descriptor.BindingLayouts)
+            {
+                diagnostics.AddRange(ValidateHandleLocked(layout, RekallAgeGraphicsResourceKind.BindingLayout));
+            }
+        }
+        return diagnostics.Count == 0
+            ? Create(RekallAgeGraphicsResourceKind.ComputePipeline, descriptor, descriptor.Label, 0)
+            : new(default, diagnostics);
+    }
+
+    public RekallAgeGraphicsResourceCreationResult CreateRenderTarget(RekallAgeRenderTargetDescriptor descriptor)
+    {
+        var diagnostics = new List<RekallAgeGraphicsDiagnostic>();
+        if (descriptor.Width < 1 || descriptor.Height < 1
+            || descriptor.ColorAttachments.Count == 0
+            || descriptor.ColorAttachments.Count > Capabilities.MaximumColorAttachments)
+        {
+            diagnostics.Add(new("REKALL_GPU_RENDER_TARGET_SHAPE_INVALID", "Render target dimensions and attachment count must be bounded and nonzero.", descriptor.Label));
+        }
+        lock (_gate)
+        {
+            foreach (var attachment in descriptor.ColorAttachments)
+            {
+                diagnostics.AddRange(ValidateAttachmentLocked(attachment, descriptor.Width, descriptor.Height, depth: false, descriptor.Label));
+            }
+            if (descriptor.DepthStencilAttachment is not null)
+            {
+                diagnostics.AddRange(ValidateAttachmentLocked(descriptor.DepthStencilAttachment, descriptor.Width, descriptor.Height, depth: true, descriptor.Label));
+            }
+        }
+        return diagnostics.Count == 0
+            ? Create(RekallAgeGraphicsResourceKind.RenderTarget, descriptor, descriptor.Label, 0)
+            : new(default, diagnostics);
+    }
+
     public RekallAgeGraphicsValidationResult Destroy(RekallAgeGraphicsResourceHandle handle)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -143,6 +269,20 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
         }
     }
 
+    private RekallAgeGraphicsResourceCreationResult CreateValidated(
+        object descriptor,
+        RekallAgeGraphicsResourceKind kind,
+        string? label,
+        RekallAgeGraphicsValidationResult validation,
+        ulong estimatedBytes = 0)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(descriptor);
+        return validation.Valid
+            ? Create(kind, descriptor, label, estimatedBytes)
+            : new(default, validation.Diagnostics);
+    }
+
     private IReadOnlyList<RekallAgeGraphicsDiagnostic> ValidateCopy(
         RekallAgeGraphicsResourceHandle source,
         ulong sourceOffset,
@@ -206,6 +346,44 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
             || _slots[handle.Slot].Resource is null)
         {
             return [new("REKALL_GPU_HANDLE_STALE", "Resource handle is stale or has been destroyed.", handle.ToString())];
+        }
+        return [];
+    }
+
+    private IReadOnlyList<RekallAgeGraphicsDiagnostic> ValidateShaderStageLocked(
+        RekallAgeGraphicsResourceHandle handle,
+        RekallAgeShaderStage expectedStage)
+    {
+        var diagnostics = ValidateHandleLocked(handle, RekallAgeGraphicsResourceKind.ShaderModule);
+        if (diagnostics.Count > 0)
+        {
+            return diagnostics;
+        }
+        var shader = (RekallAgeShaderModuleDescriptor)_slots[handle.Slot].Resource!.Descriptor;
+        return shader.Stage == expectedStage
+            ? []
+            : [new("REKALL_GPU_SHADER_STAGE_MISMATCH", $"Expected {expectedStage} shader but received {shader.Stage}.", handle.ToString())];
+    }
+
+    private IReadOnlyList<RekallAgeGraphicsDiagnostic> ValidateAttachmentLocked(
+        RekallAgeRenderTargetAttachment attachment,
+        int width,
+        int height,
+        bool depth,
+        string? label)
+    {
+        var diagnostics = ValidateHandleLocked(attachment.Texture, RekallAgeGraphicsResourceKind.Texture);
+        if (diagnostics.Count > 0)
+        {
+            return diagnostics;
+        }
+        var texture = (RekallAgeTextureDescriptor)_slots[attachment.Texture.Slot].Resource!.Descriptor;
+        var requiredUsage = depth ? RekallAgeTextureUsage.DepthStencilAttachment : RekallAgeTextureUsage.ColorAttachment;
+        if (!texture.Usage.HasFlag(requiredUsage) || texture.Width < width || texture.Height < height
+            || attachment.MipLevel < 0 || attachment.MipLevel >= texture.MipLevels
+            || attachment.ArrayLayer < 0 || attachment.ArrayLayer >= texture.ArrayLayers)
+        {
+            return [new("REKALL_GPU_RENDER_TARGET_ATTACHMENT_INVALID", "Render-target attachment usage, extent, mip, or layer is incompatible.", label)];
         }
         return [];
     }

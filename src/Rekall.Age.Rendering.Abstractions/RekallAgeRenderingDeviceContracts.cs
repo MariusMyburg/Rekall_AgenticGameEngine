@@ -103,6 +103,117 @@ public sealed record RekallAgeTextureDescriptor(
     RekallAgeTextureUsage Usage,
     string? Label = null);
 
+public enum RekallAgeFilter { Nearest, Linear }
+public enum RekallAgeMipmapFilter { Nearest, Linear }
+public enum RekallAgeAddressMode { ClampToEdge, Repeat, MirrorRepeat }
+public enum RekallAgeCompareOperation { Never, Less, LessEqual, Equal, GreaterEqual, Greater, NotEqual, Always }
+
+public sealed record RekallAgeSamplerDescriptor(
+    RekallAgeFilter MinFilter = RekallAgeFilter.Linear,
+    RekallAgeFilter MagFilter = RekallAgeFilter.Linear,
+    RekallAgeMipmapFilter MipmapFilter = RekallAgeMipmapFilter.Linear,
+    RekallAgeAddressMode AddressU = RekallAgeAddressMode.Repeat,
+    RekallAgeAddressMode AddressV = RekallAgeAddressMode.Repeat,
+    RekallAgeAddressMode AddressW = RekallAgeAddressMode.Repeat,
+    float MinimumLod = 0,
+    float MaximumLod = 32,
+    int MaximumAnisotropy = 1,
+    RekallAgeCompareOperation? Compare = null,
+    string? Label = null);
+
+[Flags]
+public enum RekallAgeShaderStage
+{
+    None = 0,
+    Vertex = 1 << 0,
+    Fragment = 1 << 1,
+    Compute = 1 << 2
+}
+
+public enum RekallAgeShaderSourceLanguage { Glsl, SpirV, Wgsl }
+
+public sealed record RekallAgeShaderModuleDescriptor(
+    RekallAgeShaderStage Stage,
+    RekallAgeShaderSourceLanguage Language,
+    string Source,
+    string EntryPoint = "main",
+    string? Label = null);
+
+public enum RekallAgeBindingType
+{
+    UniformBuffer,
+    ReadOnlyStorageBuffer,
+    StorageBuffer,
+    Sampler,
+    ComparisonSampler,
+    SampledTexture,
+    ReadOnlyStorageTexture,
+    StorageTexture
+}
+
+public sealed record RekallAgeBindingLayoutEntry(
+    int Binding,
+    RekallAgeBindingType Type,
+    RekallAgeShaderStage Visibility,
+    ulong MinimumBindingSize = 0);
+
+public sealed record RekallAgeBindingLayoutDescriptor(
+    IReadOnlyList<RekallAgeBindingLayoutEntry> Entries,
+    string? Label = null);
+
+public sealed record RekallAgeBindingSetEntry(
+    int Binding,
+    RekallAgeGraphicsResourceHandle Resource,
+    ulong Offset = 0,
+    ulong SizeBytes = 0);
+
+public sealed record RekallAgeBindingSetDescriptor(
+    RekallAgeGraphicsResourceHandle Layout,
+    IReadOnlyList<RekallAgeBindingSetEntry> Entries,
+    string? Label = null);
+
+public enum RekallAgePrimitiveTopology { TriangleList, TriangleStrip, LineList, LineStrip, PointList }
+public enum RekallAgeCullMode { None, Front, Back }
+public enum RekallAgeFrontFace { Clockwise, CounterClockwise }
+
+public sealed record RekallAgeColorTargetDescriptor(
+    RekallAgeTextureFormat Format,
+    bool BlendEnabled = false,
+    ulong WriteMask = 0xFUL);
+
+public sealed record RekallAgeDepthStencilDescriptor(
+    RekallAgeTextureFormat Format,
+    bool DepthWriteEnabled = true,
+    RekallAgeCompareOperation DepthCompare = RekallAgeCompareOperation.LessEqual);
+
+public sealed record RekallAgeGraphicsPipelineDescriptor(
+    RekallAgeGraphicsResourceHandle VertexShader,
+    RekallAgeGraphicsResourceHandle FragmentShader,
+    IReadOnlyList<RekallAgeGraphicsResourceHandle> BindingLayouts,
+    IReadOnlyList<RekallAgeColorTargetDescriptor> ColorTargets,
+    RekallAgeDepthStencilDescriptor? DepthStencil = null,
+    RekallAgePrimitiveTopology Topology = RekallAgePrimitiveTopology.TriangleList,
+    RekallAgeCullMode CullMode = RekallAgeCullMode.Back,
+    RekallAgeFrontFace FrontFace = RekallAgeFrontFace.CounterClockwise,
+    string? Label = null);
+
+public sealed record RekallAgeComputePipelineDescriptor(
+    RekallAgeGraphicsResourceHandle ComputeShader,
+    IReadOnlyList<RekallAgeGraphicsResourceHandle> BindingLayouts,
+    string? Label = null);
+
+public sealed record RekallAgeRenderTargetAttachment(
+    RekallAgeGraphicsResourceHandle Texture,
+    int MipLevel = 0,
+    int ArrayLayer = 0);
+
+public sealed record RekallAgeRenderTargetDescriptor(
+    IReadOnlyList<RekallAgeRenderTargetAttachment> ColorAttachments,
+    RekallAgeRenderTargetAttachment? DepthStencilAttachment,
+    int Width,
+    int Height,
+    string? Label = null);
+
 public sealed record RekallAgeRenderingDeviceCapabilities(
     string Backend,
     ulong MaximumBufferSizeBytes,
@@ -112,6 +223,8 @@ public sealed record RekallAgeRenderingDeviceCapabilities(
     int MaximumTextureArrayLayers,
     int MaximumColorAttachments,
     int MaximumBindingsPerLayout,
+    int MaximumSamplerAnisotropy,
+    int MaximumShaderSourceBytes,
     bool SupportsCompute,
     bool SupportsStorageBuffers,
     bool SupportsStorageTextures,
@@ -127,6 +240,8 @@ public sealed record RekallAgeRenderingDeviceCapabilities(
         MaximumTextureArrayLayers: 2048,
         MaximumColorAttachments: 8,
         MaximumBindingsPerLayout: 32,
+        MaximumSamplerAnisotropy: 16,
+        MaximumShaderSourceBytes: 1024 * 1024,
         SupportsCompute: true,
         SupportsStorageBuffers: true,
         SupportsStorageTextures: true,
@@ -194,6 +309,20 @@ public interface IRekallAgeRenderingDevice : IDisposable
     RekallAgeGraphicsResourceCreationResult CreateBuffer(RekallAgeBufferDescriptor descriptor);
 
     RekallAgeGraphicsResourceCreationResult CreateTexture(RekallAgeTextureDescriptor descriptor);
+
+    RekallAgeGraphicsResourceCreationResult CreateSampler(RekallAgeSamplerDescriptor descriptor);
+
+    RekallAgeGraphicsResourceCreationResult CreateShaderModule(RekallAgeShaderModuleDescriptor descriptor);
+
+    RekallAgeGraphicsResourceCreationResult CreateBindingLayout(RekallAgeBindingLayoutDescriptor descriptor);
+
+    RekallAgeGraphicsResourceCreationResult CreateBindingSet(RekallAgeBindingSetDescriptor descriptor);
+
+    RekallAgeGraphicsResourceCreationResult CreateGraphicsPipeline(RekallAgeGraphicsPipelineDescriptor descriptor);
+
+    RekallAgeGraphicsResourceCreationResult CreateComputePipeline(RekallAgeComputePipelineDescriptor descriptor);
+
+    RekallAgeGraphicsResourceCreationResult CreateRenderTarget(RekallAgeRenderTargetDescriptor descriptor);
 
     RekallAgeGraphicsValidationResult Destroy(RekallAgeGraphicsResourceHandle handle);
 

@@ -4,10 +4,9 @@
 contract, then migrate AGE rendering and add web-capable adapters incrementally.
 
 - [x] Add failing contract/descriptor/handle validation tests.
-- [ ] Implement immutable public descriptors, typed opaque handles, capability
-  model, stable diagnostics, and bounded shared validation. Buffer/texture,
-  resource-lifetime, and copy-command foundations are green; sampler, shader,
-  binding, pipeline, render-target, render, and compute descriptors remain.
+- [x] Implement immutable public descriptors, typed opaque handles, capability
+  model, stable diagnostics, and bounded shared validation for buffers,
+  textures, samplers, shaders, layouts/sets, pipelines, and render targets.
 - [ ] Add command encoders and immutable command-buffer validation tests.
 - [ ] Add an in-memory conformance backend for deterministic tests and agent
   inspection without a GPU.

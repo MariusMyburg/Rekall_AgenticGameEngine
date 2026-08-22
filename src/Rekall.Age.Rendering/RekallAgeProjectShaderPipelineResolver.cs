@@ -52,8 +52,22 @@ public sealed class RekallAgeProjectShaderPipelineResolver
             return Invalid(pipeline, fragmentErrors.Select(error => $"{error.Code}: {error.Message}"));
         }
 
-        var vertexSource = await File.ReadAllTextAsync(vertexPath.Path, cancellationToken).ConfigureAwait(false);
-        var fragmentSource = await File.ReadAllTextAsync(fragmentPath.Path, cancellationToken).ConfigureAwait(false);
+        var preprocessor = new RekallAgeShaderPreprocessor();
+        var vertexExpansion = await preprocessor
+            .ExpandFileAsync(projectRoot, vertexPath.Path, cancellationToken)
+            .ConfigureAwait(false);
+        var fragmentExpansion = await preprocessor
+            .ExpandFileAsync(projectRoot, fragmentPath.Path, cancellationToken)
+            .ConfigureAwait(false);
+        if (!vertexExpansion.Success || !fragmentExpansion.Success)
+        {
+            return Invalid(
+                pipeline,
+                vertexExpansion.Diagnostics.Concat(fragmentExpansion.Diagnostics).Select(FormatDiagnostic));
+        }
+
+        var vertexSource = vertexExpansion.ExpandedSource;
+        var fragmentSource = fragmentExpansion.ExpandedSource;
         try
         {
             var compiler = new RekallAgeVulkanShaderCompiler();
@@ -111,6 +125,9 @@ public sealed class RekallAgeProjectShaderPipelineResolver
         hash.AppendData(Encoding.UTF8.GetBytes(value));
         hash.AppendData([0]);
     }
+
+    private static string FormatDiagnostic(RekallAgeShaderPreprocessDiagnostic diagnostic) =>
+        $"{diagnostic.Code}: {diagnostic.Message} ({diagnostic.Path}{(diagnostic.Line > 0 ? $":{diagnostic.Line}" : string.Empty)})";
 
     private static RekallAgeResolvedShaderPipeline Invalid(
         RekallAgeRuntimeViewportShaderPipeline pipeline,

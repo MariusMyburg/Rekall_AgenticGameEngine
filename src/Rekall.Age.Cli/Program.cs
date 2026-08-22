@@ -71,6 +71,10 @@ internal static class RekallAgeCli
                     await InspectShaderPipelineAsync(registry, context, root, vertex, fragment),
                 ["shader", "write", var root, var name, var stage, var source] =>
                     await WriteShaderSourceAsync(registry, context, root, name, stage, source),
+                ["shader", "write-include", var root, var name, var source] =>
+                    await WriteShaderIncludeAsync(registry, context, root, name, source),
+                ["shader", "preprocess", var root, var name, var stage] =>
+                    await PreprocessShaderSourceAsync(registry, context, root, name, stage),
                 ["shader", "assign-pipeline", var root, var scene, var entityId, var vertex, var fragment] =>
                     await AssignShaderPipelineAsync(registry, context, root, scene, entityId, vertex, fragment),
                 ["render", "mesh", "inspect", var root, var scene] =>
@@ -3399,6 +3403,46 @@ internal static class RekallAgeCli
             Console.WriteLine($"  {action.Hand}/{action.Name}: value={action.Value} down={action.IsDown} pressed={action.WasPressed} released={action.WasReleased}");
         }
 
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> WriteShaderIncludeAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string name,
+        string source)
+    {
+        var result = await registry.ExecuteAsync<WriteShaderIncludeRequest, WriteShaderIncludeResult>(
+            "rekall.shader.write_include",
+            new WriteShaderIncludeRequest(root, name, source),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Path: {result.Value.RelativePath}");
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> PreprocessShaderSourceAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string name,
+        string stage)
+    {
+        var result = await registry.ExecuteAsync<PreprocessShaderSourceRequest, PreprocessShaderSourceResult>(
+            "rekall.shader.preprocess",
+            new PreprocessShaderSourceRequest(root, name, stage),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Dependencies: {string.Join(", ", result.Value.Dependencies)}");
+        foreach (var diagnostic in result.Value.Diagnostics)
+        {
+            Console.WriteLine($"  {diagnostic.Code}: {diagnostic.Message} ({diagnostic.Path}:{diagnostic.Line})");
+        }
+        if (result.Ok)
+        {
+            Console.WriteLine(result.Value.ExpandedSource);
+        }
         return result.Ok ? 0 : 1;
     }
 

@@ -197,7 +197,22 @@ public sealed class WriteShaderSourceCommand : IRekallAgeCommand<WriteShaderSour
         var validationErrors = Array.Empty<string>();
         if (request.ValidateBeforeWrite)
         {
-            var validation = ShaderSourceValidator.Validate(request.Source, resolved.Path, resolved.Stage);
+            var expansion = await new RekallAgeShaderPreprocessor()
+                .ExpandSourceAsync(request.ProjectRoot, resolved.Path, request.Source, context.CancellationToken)
+                .ConfigureAwait(false);
+            if (!expansion.Success)
+            {
+                var commandErrors = expansion.Diagnostics.Select(diagnostic => new RekallAgeCommandError(
+                    diagnostic.Code,
+                    diagnostic.Message,
+                    diagnostic.Path)).ToArray();
+                return RekallAgeCommandResult<WriteShaderSourceResult>.Failure(
+                    EmptyWrite(resolved, validated: true, compiled: false, expansion.Diagnostics.Select(FormatPreprocessDiagnostic).ToArray()),
+                    "Shader preprocessing failed.",
+                    commandErrors);
+            }
+
+            var validation = ShaderSourceValidator.Validate(expansion.ExpandedSource, resolved.Path, resolved.Stage);
             validationErrors = validation.Errors.ToArray();
             if (!validation.Compiled)
             {
@@ -234,6 +249,9 @@ public sealed class WriteShaderSourceCommand : IRekallAgeCommand<WriteShaderSour
     {
         return new WriteShaderSourceResult(resolved.Name, resolved.Stage, resolved.Path, resolved.RelativePath, false, validated, compiled, errors);
     }
+
+    private static string FormatPreprocessDiagnostic(RekallAgeShaderPreprocessDiagnostic diagnostic) =>
+        $"{diagnostic.Code}: {diagnostic.Message} ({diagnostic.Path}{(diagnostic.Line > 0 ? $":{diagnostic.Line}" : string.Empty)})";
 }
 
 public sealed class ValidateShaderSourceCommand : IRekallAgeCommand<ValidateShaderSourceRequest, ValidateShaderSourceResult>
@@ -252,6 +270,7 @@ public sealed class ValidateShaderSourceCommand : IRekallAgeCommand<ValidateShad
     {
         string source;
         string sourceName;
+        string? resolvedProjectPath = null;
         if (request.Source is not null)
         {
             if (!ShaderSourcePaths.IsSupportedStage(request.Stage))
@@ -265,6 +284,10 @@ public sealed class ValidateShaderSourceCommand : IRekallAgeCommand<ValidateShad
 
             source = request.Source;
             sourceName = $"{request.Name}.{ShaderSourcePaths.ExtensionForStage(request.Stage)}";
+            if (ShaderSourcePaths.TryResolveProjectPath(request.ProjectRoot, request.Name, request.Stage, out var inlineResolved, out _))
+            {
+                resolvedProjectPath = inlineResolved.Path;
+            }
         }
         else
         {
@@ -278,6 +301,37 @@ public sealed class ValidateShaderSourceCommand : IRekallAgeCommand<ValidateShad
 
             source = await File.ReadAllTextAsync(resolved.Path, context.CancellationToken);
             sourceName = resolved.Path;
+            if (resolved.Scope.Equals("project", StringComparison.Ordinal))
+            {
+                resolvedProjectPath = resolved.Path;
+            }
+        }
+
+        if (resolvedProjectPath is not null)
+        {
+            var expansion = await new RekallAgeShaderPreprocessor()
+                .ExpandSourceAsync(request.ProjectRoot, resolvedProjectPath, source, context.CancellationToken)
+                .ConfigureAwait(false);
+            if (!expansion.Success)
+            {
+                var diagnostics = expansion.Diagnostics.Select(FormatPreprocessDiagnostic).ToArray();
+                var failed = new ValidateShaderSourceResult(
+                    request.Name,
+                    ShaderSourcePaths.NormalizeStage(request.Stage),
+                    request.Source is null ? sourceName : null,
+                    false,
+                    0,
+                    diagnostics);
+                return RekallAgeCommandResult<ValidateShaderSourceResult>.Failure(
+                    failed,
+                    "Shader preprocessing failed.",
+                    expansion.Diagnostics.Select(diagnostic => new RekallAgeCommandError(
+                        diagnostic.Code,
+                        diagnostic.Message,
+                        diagnostic.Path)).ToArray());
+            }
+
+            source = expansion.ExpandedSource;
         }
 
         var validation = ShaderSourceValidator.Validate(source, sourceName, request.Stage);
@@ -296,6 +350,9 @@ public sealed class ValidateShaderSourceCommand : IRekallAgeCommand<ValidateShad
         var error = new RekallAgeCommandError("REKALL_SHADER_COMPILE_FAILED", "Shader source did not compile.", request.Name);
         return RekallAgeCommandResult<ValidateShaderSourceResult>.Failure(result, error.Message, [error]);
     }
+
+    private static string FormatPreprocessDiagnostic(RekallAgeShaderPreprocessDiagnostic diagnostic) =>
+        $"{diagnostic.Code}: {diagnostic.Message} ({diagnostic.Path}{(diagnostic.Line > 0 ? $":{diagnostic.Line}" : string.Empty)})";
 
     private static ValidateShaderSourceResult EmptyValidate(ValidateShaderSourceRequest request, string? path, IReadOnlyList<string> errors)
     {
@@ -579,7 +636,8 @@ internal static class ShaderSourcePaths
         {
             "vertex" => "vert",
             "fragment" => "frag",
-            _ => throw new ArgumentException("Shader stage must be 'vertex' or 'fragment'.", nameof(stage))
+            "include" => "glslinc",
+            _ => throw new ArgumentException("Shader stage must be 'vertex', 'fragment', or 'include'.", nameof(stage))
         };
     }
 
@@ -651,9 +709,9 @@ internal static class ShaderSourcePaths
             errors.Add(new RekallAgeCommandError("REKALL_SHADER_PATH_INVALID", "Shader name must be a relative path without traversal.", name));
         }
 
-        if (NormalizeStage(stage) is not "vertex" and not "fragment")
+        if (NormalizeStage(stage) is not "vertex" and not "fragment" and not "include")
         {
-            errors.Add(new RekallAgeCommandError("REKALL_SHADER_STAGE_INVALID", "Shader stage must be 'vertex' or 'fragment'.", stage));
+            errors.Add(new RekallAgeCommandError("REKALL_SHADER_STAGE_INVALID", "Shader stage must be 'vertex', 'fragment', or 'include'.", stage));
         }
 
         return errors;
@@ -691,6 +749,7 @@ internal static class ShaderSourcePaths
         {
             "vert" => "vertex",
             "frag" => "fragment",
+            "glslinc" => "include",
             _ => string.Empty
         };
         return stage.Length > 0;

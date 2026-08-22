@@ -4,11 +4,11 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-21 23:25 Africa/Johannesburg
+Last verified: 2026-08-22 20:49 Africa/Johannesburg
 
-Branch: `master`
+Branch: `codex/studio-interaction`
 
-Latest milestone: the engine-owned graphics/agent tranche is merged to
+Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,
 and a zero-warning, zero-error Release solution build. The Studio ergonomics
 tranche now adds explicit Edit, Simulate, and external production-Player modes,
@@ -3146,8 +3146,32 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
+The first Godot-reference graphics milestone is verified. A shallow,
+blob-filtered sparse reference checkout at `F:\Dev\godot-reference` pins Godot
+commit `893cf5cbfe789ae67c9389708e1428141bb39b18`; no Godot implementation code
+was copied. AGE now has a bounded 100% C# project shader preprocessor with
+nested `.glslinc` libraries, `#pragma once`, deterministic dependency output,
+root/link confinement, cycle/missing/malformed/depth/file/size diagnostics,
+and exact expanded-source inspection. Validation, Vulkan compilation,
+reflection, runtime pipeline resolution, dependency-sensitive hashing, and
+existing shader hot reload all consume expanded source. CLI/MCP expose
+`rekall.shader.write_include` and `rekall.shader.preprocess`, while existing
+list/read commands understand include resources. Verification passed 16/16
+focused shader/MCP tests, the complete 1,134/1,134 engine suite, all 25/25
+Studio tests, and a zero-warning, zero-error Release solution build. The same
+gate found and repaired two controller-input regressions: schema verbosity no
+longer truncates bounded agent discovery, and SDL controller subsystems remain
+alive until the Player window owner closes, preserving supervised graphics
+recovery.
+
+The next Godot-gap implementation is the public 100% C# RenderingDevice-style
+resource/command contract and its inspectable agent surface. Web remains an
+explicit proof track: .NET WebAssembly Player, browser host/input/audio/storage,
+WebGPU primary backend, WebGL 2 fallback, packaging/audit, and a real playable
+browser acceptance. Current desktop assemblies are not yet a web export.
+
 The 2026-08-22 generic controller-input milestone is implemented pending its
-full-suite gate: immutable controller axes/buttons/hats now flow through runtime
+physical-device acceptance gate: immutable controller axes/buttons/hats now flow through runtime
 frames; semantic maps support canonical gamepad controls, arbitrary raw
 joysticks, deadzones, saturation, inversion, response curves, and device/player
 filters; the Windows Player polls SDL2 with hot-plug and raw-device fallback;

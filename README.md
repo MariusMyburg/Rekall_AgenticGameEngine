@@ -1165,6 +1165,8 @@ Project shaders live under project shader storage and are exposed through comman
 rekall.shader.list
 rekall.shader.read
 rekall.shader.write
+rekall.shader.write_include
+rekall.shader.preprocess
 rekall.shader.validate
 rekall.shader.assign_pipeline
 ```
@@ -1172,6 +1174,12 @@ rekall.shader.assign_pipeline
 Runtime render meshes can reference `RekallAgeRuntimeRenderShaderPipeline`.
 
 Shader validation uses the Vulkan shader compiler path so agents can catch shader errors before runtime.
+Reusable shader libraries use the `.glslinc` extension and full-line directives
+such as `#include "lighting/pbr.glslinc"`. Includes are expanded recursively
+before compilation and pipeline hashing, so edits invalidate dependent runtime
+pipelines automatically. The bounded preprocessor rejects cycles, traversal,
+filesystem links, malformed directives, missing files, excessive depth/file
+counts, and expanded sources over 1 MiB with stable agent-readable diagnostics.
 
 The scene-material ABI is versioned and portable across native Vulkan capture
 and the Windows player: set 0 contains the frame uniform, set 1 contains the
@@ -1184,6 +1192,8 @@ CLI aliases expose the same command contracts:
 
 ```powershell
 dotnet run --project src/Rekall.Age.Cli -- shader write <project> agent/tint vertex <glsl-source>
+dotnet run --project src/Rekall.Age.Cli -- shader write-include <project> libraries/lighting <glsl-source>
+dotnet run --project src/Rekall.Age.Cli -- shader preprocess <project> agent/tint vertex
 dotnet run --project src/Rekall.Age.Cli -- shader assign-pipeline <project> Main <entity-id> agent/tint agent/tint
 dotnet run --project src/Rekall.Age.Cli -- shader inspect-pipeline <project> agent/tint agent/tint
 ```

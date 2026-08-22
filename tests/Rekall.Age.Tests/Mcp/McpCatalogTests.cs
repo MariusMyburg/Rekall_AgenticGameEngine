@@ -63,6 +63,8 @@ public sealed class McpCatalogTests
         registry.Register(new ListShaderSourcesCommand());
         registry.Register(new ReadShaderSourceCommand());
         registry.Register(new WriteShaderSourceCommand());
+        registry.Register(new WriteShaderIncludeCommand());
+        registry.Register(new PreprocessShaderSourceCommand());
         registry.Register(new ValidateShaderSourceCommand());
         registry.Register(new AssignShaderPipelineCommand());
         registry.Register(new ApplySceneBlueprintCommand());
@@ -86,6 +88,8 @@ public sealed class McpCatalogTests
         var catalog = RekallAgeMcpCatalog.FromRegistry(registry);
 
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.engine_status");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.shader.write_include" && tool.Category == "shaders");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.shader.preprocess" && tool.Category == "shaders");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.context.doctor");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.validation.project");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.validation.scene");

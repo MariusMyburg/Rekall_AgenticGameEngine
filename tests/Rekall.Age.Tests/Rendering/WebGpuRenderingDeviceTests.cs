@@ -243,6 +243,23 @@ public sealed class WebGpuRenderingDeviceTests
         Assert.Throws<RekallAgeWebGpuProtocolException>(() => RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuSubmitPacket>(json));
     }
 
+    [Fact]
+    public void ProtocolRejectsWrongOrUnknownNestedRenderPassDescriptor()
+    {
+        const string wrong = """{"version":1,"commands":[{"kind":"beginRenderPass","data":{"descriptor":{"renderTarget":{"kind":"texture"},"colorClearValues":[]}}}],"operation":"submit"}""";
+        const string extra = """{"version":1,"commands":[{"kind":"beginRenderPass","data":{"descriptor":{"renderTarget":{"kind":"renderTarget"},"colorClearValues":[],"extra":1}}}],"operation":"submit"}""";
+        Assert.Throws<RekallAgeWebGpuProtocolException>(() => RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuSubmitPacket>(wrong));
+        Assert.Throws<RekallAgeWebGpuProtocolException>(() => RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuSubmitPacket>(extra));
+    }
+
+    [Fact]
+    public void SubmitRejectsOversizedNestedPassLabelsBeforeBridge()
+    {
+        var bridge = new RecordingWebGpuBridge(); using var device = CreateDevice(bridge);
+        var result = device.Submit(new(device.DeviceId, null, [new RekallAgeBeginComputePassCommand(new string('x', RekallAgeWebGpuProtocol.MaximumLabelBytes + 1))]));
+        Assert.False(result.Valid); Assert.Empty(bridge.Packets);
+    }
+
     private static RekallAgeGraphicsResourceHandle CreateCopySource(RekallAgeWebGpuRenderingDevice device) =>
         device.CreateBuffer(new(16, RekallAgeBufferUsage.CopySource)).Handle;
 

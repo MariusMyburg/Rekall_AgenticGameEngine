@@ -87,6 +87,12 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
     public RekallAgeGraphicsValidationResult Destroy(RekallAgeGraphicsResourceHandle handle)
     {
         if (_disposed) return new([new("REKALL_WEBGPU_DEVICE_DISPOSED", "The WebGPU rendering device has been disposed.")]);
+        if (_canvasTextures.TryGetValue(handle, out var pendingTexture) && _destroyedHandles.Contains(handle))
+        {
+            var pending = Destroy(pendingTexture);
+            if (pending.Valid) _canvasTextures.Remove(handle);
+            return pending;
+        }
         if (_destroyedHandles.Contains(handle)) return new([]);
         if (!_conformance.InspectResources().Any(resource => resource.Handle == handle)) return _conformance.Destroy(handle);
         var execution = Execute(new RekallAgeWebGpuDestroyPacket(RekallAgeWebGpuProtocol.Version, handle));
@@ -113,6 +119,16 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
     {
         if (!IsAvailable(out var diagnostics)) return new(diagnostics);
         if (!TryValidateLabel(commandBuffer.Label, out diagnostics)) return new(diagnostics);
+        foreach (var command in commandBuffer.Commands)
+        {
+            var label = command switch
+            {
+                RekallAgeBeginRenderPassCommand renderPass => renderPass.Descriptor.Label,
+                RekallAgeBeginComputePassCommand computePass => computePass.Label,
+                _ => null
+            };
+            if (!TryValidateLabel(label, out diagnostics)) return new(diagnostics);
+        }
         var validation = _conformance.Submit(commandBuffer);
         return validation.Valid
             ? Execute(new RekallAgeWebGpuSubmitPacket(

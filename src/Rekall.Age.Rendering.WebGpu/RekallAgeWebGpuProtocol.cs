@@ -237,6 +237,7 @@ public static class RekallAgeWebGpuProtocol
         try
         {
             if (JsonSerializer.Deserialize(command.Data.GetRawText(), CommandPayloadTypes[command.Kind], SerializerOptions) is null) return false;
+            if (command.Kind == "beginRenderPass") return ValidateRenderPassDescriptor(command.Data);
             if (command.Kind == "copyBuffer") return HandleKind(command.Data, "source", "buffer") && HandleKind(command.Data, "destination", "buffer");
             return !ExpectedHandleKinds.TryGetValue(command.Kind, out var expected) || HandleKind(command.Data, expected.Property, expected.Kind);
         }
@@ -251,6 +252,16 @@ public static class RekallAgeWebGpuProtocol
     private static bool HandleKind(JsonElement data, string property, string expectedKind) => data.TryGetProperty(property, out var handle)
         && handle.ValueKind == JsonValueKind.Object && handle.TryGetProperty("kind", out var kind)
         && kind.ValueKind == JsonValueKind.String && string.Equals(kind.GetString(), expectedKind, StringComparison.Ordinal);
+
+    private static bool ValidateRenderPassDescriptor(JsonElement data)
+    {
+        if (!data.TryGetProperty("descriptor", out var descriptor) || descriptor.ValueKind != JsonValueKind.Object) return false;
+        var allowed = new[] { "renderTarget", "colorClearValues", "depthClearValue", "stencilClearValue", "label" };
+        return descriptor.EnumerateObject().All(property => allowed.Contains(property.Name, StringComparer.Ordinal))
+            && descriptor.TryGetProperty("renderTarget", out var target) && target.ValueKind == JsonValueKind.Object
+            && target.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.String && kind.GetString() == "renderTarget"
+            && descriptor.TryGetProperty("colorClearValues", out var clears) && clears.ValueKind != JsonValueKind.Null;
+    }
 
     private static readonly IReadOnlyDictionary<string, string[]> RequiredCommandProperties = new Dictionary<string, string[]>
     {

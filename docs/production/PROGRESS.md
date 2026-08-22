@@ -3250,6 +3250,28 @@ compiler/inspection/catalog selection passes 11/11, the full engine suite
 passes 1,164/1,164, Studio passes 25/25, and the Release solution builds with
 zero warnings or errors. Initial asset-data upload and real Player workload
 execution are the active gaps.
+The first real module-authored GPU workload now executes in the Windows Vulkan
+Player. The compiler accepts explicit validated external resources without
+taking ownership; the new Veldrid RenderingDevice adapter maps AGE resources,
+GLSL shaders, layouts/sets, render/compute pipelines, targets, and immutable
+commands onto the Player's active command list. The Player imports
+`engine.scene-color` and `engine.output`, caches workload compilations, rebuilds
+them when frame resources change, and reports stable diagnostics without
+crashing the render loop. A live probe exposed and fixed a runtime projection
+bug that discarded module-authored workloads after every simulation step; its
+regression is now covered. The programmable compositor probe reports one
+enabled and one executed workload on Vulkan and its captured blue/pink diagonal
+shader output is stored at
+`Examples/ProgrammableCompositorProbe/Captures/vulkan-programmable-compositor.png`.
+The current native boundary is intentionally explicit: the Veldrid adapter
+accepts GLSL, supports the render/compositor path and compute without storage,
+and advertises storage buffers/textures as unavailable until raw/structured
+layout metadata and upload/readback are implemented. Focused workload,
+projection, compiler, and SDK-inspection coverage passes 19/19; the full engine
+suite passes 1,167/1,167, Studio passes 25/25, and the Release solution builds
+with zero warnings or errors. A final bounded live Vulkan run completed 5/5
+frames in one attempt with no recovery and logged one enabled/one executed
+module workload.
 After its Windows programmable-compositor proof, resume Pong through the generic
 portable authoring path, followed by a Galaga-class game in Studio. The queued
 Rain Glass shader acceptance follows those playable proofs

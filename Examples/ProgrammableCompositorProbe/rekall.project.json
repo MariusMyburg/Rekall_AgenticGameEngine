@@ -1,0 +1,9 @@
+{
+  "name": "Programmable Compositor Probe",
+  "schemaVersion": 1,
+  "capabilities": [
+    "rendering3d",
+    "world"
+  ],
+  "sourceTemplateId": null
+}

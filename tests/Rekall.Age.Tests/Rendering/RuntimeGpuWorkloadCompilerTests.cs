@@ -182,6 +182,69 @@ public sealed class RuntimeGpuWorkloadCompilerTests
         Assert.Empty(device.InspectResources());
     }
 
+    [Fact]
+    public void ResolvesExplicitExternalResourcesWithoutTakingOwnership()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var color = device.CreateTexture(new(
+            RekallAgeTextureDimension.Texture2D, 640, 360, 1, 1, 1, 1,
+            RekallAgeTextureFormat.Rgba8Unorm,
+            RekallAgeTextureUsage.Sampled | RekallAgeTextureUsage.ColorAttachment,
+            "engine.scene-color")).Handle;
+        var outputTexture = device.CreateTexture(new(
+            RekallAgeTextureDimension.Texture2D, 640, 360, 1, 1, 1, 1,
+            RekallAgeTextureFormat.Rgba8Unorm,
+            RekallAgeTextureUsage.ColorAttachment | RekallAgeTextureUsage.Present,
+            "engine.output-color")).Handle;
+        var output = device.CreateRenderTarget(new(
+            [new(outputTexture)], null, 640, 360, "engine.output")).Handle;
+        var workload = RenderWorkload() with
+        {
+            Textures = [],
+            RenderTargets = [],
+            Commands = RenderWorkload().Commands
+                .Select(command => command.Kind == RekallAgeRuntimeGpuCommandKind.BeginRenderPass
+                    ? command with { Resource = "engine.output", ClearDepth = null }
+                    : command)
+                .ToArray()
+        };
+
+        using (var compiled = new RekallAgeRuntimeGpuWorkloadCompiler().Compile(
+            workload,
+            device,
+            new Dictionary<string, RekallAgeGraphicsResourceHandle>
+            {
+                ["engine.scene-color"] = color,
+                ["engine.output"] = output
+            }))
+        {
+            Assert.True(compiled.Valid, string.Join(Environment.NewLine, compiled.Diagnostics.Select(item => item.Message)));
+            Assert.Equal(color, compiled.Resources["engine.scene-color"]);
+            Assert.Equal(output, compiled.Resources["engine.output"]);
+        }
+
+        Assert.Contains(device.InspectResources(), resource => resource.Handle == color);
+        Assert.Contains(device.InspectResources(), resource => resource.Handle == output);
+    }
+
+    [Fact]
+    public void RejectsExternalResourceIdCollisionBeforeAllocation()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var imported = device.CreateBuffer(new(64, RekallAgeBufferUsage.Storage, Label: "engine.buffer")).Handle;
+
+        using var compiled = new RekallAgeRuntimeGpuWorkloadCompiler().Compile(
+            ComputeWorkload(),
+            device,
+            new Dictionary<string, RekallAgeGraphicsResourceHandle> { ["particles"] = imported });
+
+        Assert.False(compiled.Valid);
+        Assert.Contains(compiled.Diagnostics, diagnostic => diagnostic.Code == "REKALL_GPU_WORKLOAD_IMPORT_COLLISION");
+        Assert.Single(device.InspectResources());
+    }
+
     private static RekallAgeRuntimeGpuWorkload ComputeWorkload() => new("particles")
     {
         Buffers = [new("particles", 4_096, RekallAgeRuntimeGpuBufferUsage.Storage)],

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Rekall.Age.Modules;
+using Rekall.Age.Runtime;
 using Rekall.Age.Runtime.Abstractions;
 
 namespace Rekall.Age.Tests.Runtime;
@@ -52,6 +53,16 @@ public sealed class RuntimeGpuWorkloadSdkTests
 
         Assert.Throws<InvalidOperationException>(() =>
             world.WithGpuWorkload(ComputeWorkload("one-too-many", 1)));
+    }
+
+    [Fact]
+    public void RuntimeProjectionPreservesAgentAuthoredGpuWorkloads()
+    {
+        var authored = World().WithGpuWorkload(ComputeWorkload("rain", 8));
+
+        var projected = new RekallAgeRuntimeProjectionBuilder().Project(authored);
+
+        Assert.Equal("rain", Assert.Single(projected.Subsystems.Rendering.GpuWorkloads).Id);
     }
 
     private static RekallAgeRuntimeGpuWorkload ComputeWorkload(string id, uint groups) => new(id)

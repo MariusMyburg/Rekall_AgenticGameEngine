@@ -108,6 +108,14 @@ public sealed class InspectRuntimeSdkCommand
                 Usage = "var workload = new RekallAgeRuntimeGpuWorkload(\"simulation\") { Shaders = [computeShader], Pipelines = [computePipeline], Commands = [new(RekallAgeRuntimeGpuCommandKind.BeginComputePass), new(RekallAgeRuntimeGpuCommandKind.SetComputePipeline) { Resource = \"pipeline\" }, new(RekallAgeRuntimeGpuCommandKind.Dispatch) { GroupCountX = 8 }, new(RekallAgeRuntimeGpuCommandKind.EndComputePass)] }; world = world.WithGpuWorkload(workload);"
             },
             new RekallAgeRuntimeSdkContract(
+                "authoring-recipe",
+                "gpu-workload-frame-imports",
+                "external sampled texture engine.scene-color; external render target engine.output",
+                "The windowed Player imports its rendered scene color and final output framebuffer under stable resource IDs. Reference these IDs from ordinary binding sets and BeginRenderPass commands for fullscreen compositors; never redeclare them or assume native handles.")
+            {
+                Usage = "new RekallAgeRuntimeGpuBinding(0, \"engine.scene-color\"); new RekallAgeRuntimeGpuCommand(RekallAgeRuntimeGpuCommandKind.BeginRenderPass) { Resource = \"engine.output\" };"
+            },
+            new RekallAgeRuntimeSdkContract(
                 "runtime-type",
                 nameof(RekallAgeRuntimeVector2),
                 "record RekallAgeRuntimeVector2(double X, double Y)",

@@ -12,8 +12,14 @@ C# modules and execute it through the shared RenderingDevice contract.
   descriptors, opaque handles, and immutable command buffers.
   Buffer/texture asset-data upload remains a separate execution-stage item.
 - [x] Add stable graph/reference/budget/capability diagnostics and inspection.
-- [ ] Execute a programmable post-process or compute workload in the Windows
+- [x] Execute a programmable post-process or compute workload in the Windows
   Player with deterministic capture evidence.
+  The portable compiler accepts validated non-owning imports; the Veldrid
+  `IRekallAgeRenderingDevice` adapter executes the same immutable command
+  buffer. The Player imports `engine.scene-color` and `engine.output` without
+  exposing native handles, caches compiled workloads, and invalidates them on
+  frame-resource changes. The committed probe capture is
+  `Examples/ProgrammableCompositorProbe/Captures/vulkan-programmable-compositor.png`.
 - [x] Expose workload validation/inspection through CLI/MCP.
-- [ ] Run full suites, Release build, live Player proof, update production
+- [x] Run full suites, Release build, live Player proof, update production
   progress, commit, and push.

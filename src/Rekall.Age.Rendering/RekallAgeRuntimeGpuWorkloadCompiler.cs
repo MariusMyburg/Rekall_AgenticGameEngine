@@ -49,14 +49,16 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
 
     public RekallAgeCompiledGpuWorkload Compile(
         RekallAgeRuntimeGpuWorkload workload,
-        IRekallAgeRenderingDevice device)
+        IRekallAgeRenderingDevice device,
+        IReadOnlyDictionary<string, RekallAgeGraphicsResourceHandle>? externalResources = null)
     {
         ArgumentNullException.ThrowIfNull(workload);
         ArgumentNullException.ThrowIfNull(device);
-        var diagnostics = Preflight(workload);
+        externalResources ??= new Dictionary<string, RekallAgeGraphicsResourceHandle>(StringComparer.Ordinal);
+        var diagnostics = Preflight(workload, device, externalResources);
         if (diagnostics.Count > 0) return Invalid(workload.Id, diagnostics);
 
-        var resources = new Dictionary<string, RekallAgeGraphicsResourceHandle>(StringComparer.Ordinal);
+        var resources = new Dictionary<string, RekallAgeGraphicsResourceHandle>(externalResources, StringComparer.Ordinal);
         var owned = new List<RekallAgeGraphicsResourceHandle>();
         foreach (var buffer in workload.Buffers)
         {
@@ -199,7 +201,10 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
         }
     }
 
-    private static List<RekallAgeGraphicsDiagnostic> Preflight(RekallAgeRuntimeGpuWorkload workload)
+    private static List<RekallAgeGraphicsDiagnostic> Preflight(
+        RekallAgeRuntimeGpuWorkload workload,
+        IRekallAgeRenderingDevice device,
+        IReadOnlyDictionary<string, RekallAgeGraphicsResourceHandle> externalResources)
     {
         var diagnostics = new List<RekallAgeGraphicsDiagnostic>();
         var buffers = workload.Buffers ?? [];
@@ -231,7 +236,7 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_NOT_IMPLEMENTED", "Initial buffer asset upload is reserved for the upload compiler stage.", workload.Id));
         if (textures.Any(texture => !string.IsNullOrWhiteSpace(texture.InitialDataAsset)))
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_NOT_IMPLEMENTED", "Initial texture asset upload is reserved for the upload compiler stage.", workload.Id));
-        var resourceIds = buffers.Select(item => item.Id)
+        var declaredResourceIds = buffers.Select(item => item.Id)
             .Concat(textures.Select(item => item.Id))
             .Concat(samplers.Select(item => item.Id))
             .Concat(shaders.Select(item => item.Id))
@@ -240,6 +245,8 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
             .Concat(pipelines.Select(item => item.Id))
             .Concat(targets.Select(item => item.Id))
             .ToArray();
+        var externalIds = externalResources.Keys.ToArray();
+        var resourceIds = declaredResourceIds.Concat(externalIds).ToArray();
         if (resourceIds.Length > MaximumResources)
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_RESOURCE_LIMIT", $"Workload resources cannot exceed {MaximumResources}.", workload.Id));
         if (commands.Count > MaximumCommands)
@@ -254,8 +261,15 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_SHADER_LIMIT", $"Aggregate shader source exceeds {MaximumAggregateShaderBytes} bytes.", workload.Id));
         foreach (var id in resourceIds.Where(id => string.IsNullOrWhiteSpace(id) || id.Length > 128))
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_ID_INVALID", "Resource IDs must be nonempty and at most 128 characters.", id));
-        foreach (var duplicate in resourceIds.Where(id => !string.IsNullOrWhiteSpace(id)).GroupBy(id => id, StringComparer.Ordinal).Where(group => group.Count() > 1))
+        foreach (var duplicate in declaredResourceIds.Where(id => !string.IsNullOrWhiteSpace(id)).GroupBy(id => id, StringComparer.Ordinal).Where(group => group.Count() > 1))
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_ID_DUPLICATE", $"Resource ID '{duplicate.Key}' is declared more than once.", duplicate.Key));
+        foreach (var collision in declaredResourceIds.Intersect(externalIds, StringComparer.Ordinal))
+            diagnostics.Add(new("REKALL_GPU_WORKLOAD_IMPORT_COLLISION", $"Resource ID '{collision}' is both declared and externally imported.", collision));
+        foreach (var external in externalResources)
+        {
+            if (!external.Value.IsValid || !external.Value.BelongsTo(device.DeviceId))
+                diagnostics.Add(new("REKALL_GPU_WORKLOAD_IMPORT_INVALID", $"External resource '{external.Key}' is invalid or belongs to another rendering device.", external.Key));
+        }
         var ids = resourceIds.ToHashSet(StringComparer.Ordinal);
         foreach (var texture in textures.Where(texture => !TryMapFormat(texture.Format, out _)))
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_FORMAT_UNSUPPORTED", $"Texture format '{texture.Format}' is unsupported.", texture.Id));

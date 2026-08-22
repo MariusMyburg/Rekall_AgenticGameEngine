@@ -630,7 +630,12 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                     Sort(meshes),
                     Sort(lights),
                     Sort(uiLayers),
-                    Sort(postProcessStacks)),
+                    Sort(postProcessStacks))
+                {
+                    GpuWorkloads = (world.Subsystems.Rendering.GpuWorkloads ?? [])
+                        .OrderBy(workload => workload.Id, StringComparer.Ordinal)
+                        .ToArray()
+                },
                 new RekallAgeRuntimePhysicsView(
                     Sort(bodies),
                     Sort(colliders),

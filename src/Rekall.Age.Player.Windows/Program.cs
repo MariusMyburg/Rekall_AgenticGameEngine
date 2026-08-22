@@ -229,6 +229,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly RekallAgeVeldridShaderPipelineCache _shaderPipelineCache;
     private readonly Pipeline _presentPipeline;
     private readonly RekallAgeVeldridPresentPassAdapter _presentPassAdapter;
+    private readonly RekallAgeVeldridRuntimeGpuWorkloadExecutor _runtimeGpuWorkloadExecutor;
     private readonly Pipeline _hudPipeline;
     private readonly ResourceLayout _frameLayout;
     private readonly ResourceLayout _drawLayout;
@@ -314,6 +315,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private CancellationTokenSource? _openXrSubmitCts;
     private Task? _openXrSubmitTask;
     private bool _audioSubmissionLogged;
+    private string? _lastRuntimeGpuWorkloadStatus;
 
     public bool AudioOutputAvailable => _audioOutput is not null;
 
@@ -381,6 +383,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _shaderPipelineCache = shaderPipelineCache;
         _presentPipeline = presentPipeline;
         _presentPassAdapter = new RekallAgeVeldridPresentPassAdapter();
+        _runtimeGpuWorkloadExecutor = new RekallAgeVeldridRuntimeGpuWorkloadExecutor(device, commands);
         _hudPipeline = hudPipeline;
         _frameLayout = frameLayout;
         _drawLayout = drawLayout;
@@ -1143,6 +1146,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             PlayerLog.Write($"Player cleanup issue target=live-server: {exception.Message}");
         }
 
+        Cleanup("runtime-gpu-workloads", _runtimeGpuWorkloadExecutor.Dispose);
         Cleanup("scene-target", _sceneTarget.Dispose);
         foreach (var materialSet in _materialSets.Values)
         {
@@ -1253,6 +1257,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         }
 
         _device.WaitForIdle();
+        _runtimeGpuWorkloadExecutor.InvalidateFrameResources();
         _sceneTarget.Dispose();
         _sceneTarget = CreateSceneRenderTarget(_factory, displayWidth, displayHeight, _sceneSupersampleFactor, _presentTextureLayout);
         _cachedStaticGeometry = null;
@@ -1267,6 +1272,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         }
 
         _device.WaitForIdle();
+        _runtimeGpuWorkloadExecutor.InvalidateFrameResources();
         _sceneTarget.Dispose();
         _sceneTarget = CreateSceneRenderTarget(
             _factory,
@@ -1772,6 +1778,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _window.Width,
             _window.Height,
             new RgbaFloat(0.08f, 0.10f, 0.14f, 1f));
+        RecordRuntimeGpuWorkloads();
 
         if (overlayVertices.Length > 0)
         {
@@ -1849,6 +1856,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _window.Width,
             _window.Height,
             new RgbaFloat(0.02f, 0.04f, 0.08f, 1f));
+        RecordRuntimeGpuWorkloads();
         if (uiVertices.Length > 0)
         {
             _commands.SetPipeline(_hudPipeline);
@@ -1859,6 +1867,20 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _commands.End();
         _device.SubmitCommands(_commands);
         _device.SwapBuffers();
+    }
+
+    private void RecordRuntimeGpuWorkloads()
+    {
+        var report = _runtimeGpuWorkloadExecutor.Record(
+            _runtimeWorld.Subsystems.Rendering.GpuWorkloads,
+            _sceneTarget.Color,
+            _device.SwapchainFramebuffer);
+        var status = report.Diagnostics.Count == 0
+            ? $"Runtime GPU workloads enabled={report.EnabledWorkloads} executed={report.ExecutedWorkloads}."
+            : $"Runtime GPU workloads enabled={report.EnabledWorkloads} executed={report.ExecutedWorkloads} diagnostics={string.Join(" | ", report.Diagnostics.Select(item => $"{item.Code}: {item.Message}"))}";
+        if (status.Equals(_lastRuntimeGpuWorkloadStatus, StringComparison.Ordinal)) return;
+        _lastRuntimeGpuWorkloadStatus = status;
+        PlayerLog.Write(status);
     }
 
     private void DrawScenePacket(RenderPacket packet)

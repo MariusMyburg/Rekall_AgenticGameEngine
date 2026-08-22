@@ -170,5 +170,9 @@ public sealed class InspectRuntimeSdkCommandTests
             contract.Name == "gpu-workload-authoring-recipe"
             && contract.Usage!.Contains("BeginComputePass", StringComparison.Ordinal)
             && contract.Description.Contains("WithGpuWorkload", StringComparison.Ordinal));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "gpu-workload-frame-imports"
+            && contract.Signature.Contains("engine.scene-color", StringComparison.Ordinal)
+            && contract.Signature.Contains("engine.output", StringComparison.Ordinal));
     }
 }

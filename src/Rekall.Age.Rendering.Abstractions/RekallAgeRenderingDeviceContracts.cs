@@ -175,6 +175,33 @@ public sealed record RekallAgeBindingSetDescriptor(
 public enum RekallAgePrimitiveTopology { TriangleList, TriangleStrip, LineList, LineStrip, PointList }
 public enum RekallAgeCullMode { None, Front, Back }
 public enum RekallAgeFrontFace { Clockwise, CounterClockwise }
+public enum RekallAgeVertexStepMode { Vertex, Instance }
+public enum RekallAgeVertexFormat
+{
+    Float32,
+    Float32x2,
+    Float32x3,
+    Float32x4,
+    Uint32,
+    Uint32x2,
+    Uint32x3,
+    Uint32x4,
+    Sint32,
+    Sint32x2,
+    Sint32x3,
+    Sint32x4
+}
+
+public sealed record RekallAgeVertexAttributeDescriptor(
+    string Name,
+    int Location,
+    RekallAgeVertexFormat Format,
+    int OffsetBytes);
+
+public sealed record RekallAgeVertexBufferLayoutDescriptor(
+    int StrideBytes,
+    RekallAgeVertexStepMode StepMode,
+    IReadOnlyList<RekallAgeVertexAttributeDescriptor> Attributes);
 
 public sealed record RekallAgeColorTargetDescriptor(
     RekallAgeTextureFormat Format,
@@ -195,7 +222,11 @@ public sealed record RekallAgeGraphicsPipelineDescriptor(
     RekallAgePrimitiveTopology Topology = RekallAgePrimitiveTopology.TriangleList,
     RekallAgeCullMode CullMode = RekallAgeCullMode.Back,
     RekallAgeFrontFace FrontFace = RekallAgeFrontFace.CounterClockwise,
-    string? Label = null);
+    string? Label = null)
+{
+    public IReadOnlyList<RekallAgeVertexBufferLayoutDescriptor> VertexBuffers { get; init; } =
+        Array.Empty<RekallAgeVertexBufferLayoutDescriptor>();
+}
 
 public sealed record RekallAgeComputePipelineDescriptor(
     RekallAgeGraphicsResourceHandle ComputeShader,
@@ -232,6 +263,10 @@ public sealed record RekallAgeRenderingDeviceCapabilities(
     bool SupportsTimestampQueries)
 {
     public int MaximumVertexBuffers { get; init; } = 16;
+
+    public int MaximumVertexAttributes { get; init; } = 32;
+
+    public int MaximumVertexBufferStrideBytes { get; init; } = 2_048;
 
     public uint MaximumComputeWorkgroupsPerDimension { get; init; } = 65_535;
 

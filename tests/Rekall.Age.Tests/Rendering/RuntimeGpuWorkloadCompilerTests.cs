@@ -101,6 +101,11 @@ public sealed class RuntimeGpuWorkloadCompilerTests
         Assert.Equal(RekallAgeGraphicsResourceKind.BindingSet, compiled.Resources["frame-set"].Kind);
         Assert.Equal(RekallAgeGraphicsResourceKind.RenderPipeline, compiled.Resources["scene-pipeline"].Kind);
         Assert.Equal(RekallAgeGraphicsResourceKind.RenderTarget, compiled.Resources["viewport"].Kind);
+        var pipeline = Assert.IsType<RekallAgeGraphicsPipelineDescriptor>(device.InspectResources()
+            .Single(resource => resource.Handle == compiled.Resources["scene-pipeline"]).Descriptor);
+        var vertexLayout = Assert.Single(pipeline.VertexBuffers);
+        Assert.Equal(32, vertexLayout.StrideBytes);
+        Assert.Equal(["Position", "Normal", "UV"], vertexLayout.Attributes.Select(attribute => attribute.Name));
         Assert.Collection(compiled.CommandBuffer!.Commands,
             item => Assert.IsType<RekallAgeBeginRenderPassCommand>(item),
             item => Assert.IsType<RekallAgeSetRenderPipelineCommand>(item),
@@ -299,7 +304,16 @@ public sealed class RuntimeGpuWorkloadCompilerTests
             {
                 VertexShader = "vertex", FragmentShader = "fragment",
                 BindingLayouts = ["frame-layout"], ColorFormats = ["rgba8-unorm"],
-                DepthStencilFormat = "depth24-stencil8"
+                DepthStencilFormat = "depth24-stencil8",
+                VertexBuffers =
+                [
+                    new(32, RekallAgeRuntimeGpuVertexStepMode.Vertex,
+                    [
+                        new("Position", 0, RekallAgeRuntimeGpuVertexFormat.Float32x3, 0),
+                        new("Normal", 1, RekallAgeRuntimeGpuVertexFormat.Float32x3, 12),
+                        new("UV", 2, RekallAgeRuntimeGpuVertexFormat.Float32x2, 24)
+                    ])
+                ]
             }
         ],
         RenderTargets = [new("viewport", ["color"], 640, 360) { DepthStencilAttachment = "depth" }],

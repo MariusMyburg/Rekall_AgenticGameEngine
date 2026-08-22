@@ -112,6 +112,14 @@ internal sealed class RekallAgeVeldridRenderingDevice : IRekallAgeRenderingDevic
                 new ShaderDescription(ShaderStages.Vertex, Encoding.UTF8.GetBytes(vertex.Source), vertex.EntryPoint),
                 new ShaderDescription(ShaderStages.Fragment, Encoding.UTF8.GetBytes(fragment.Source), fragment.EntryPoint));
             var layouts = descriptor.BindingLayouts.Select(handle => Native<ResourceLayout>(handle, RekallAgeGraphicsResourceKind.BindingLayout)).ToArray();
+            var vertexLayouts = descriptor.VertexBuffers.Select(layout => new VertexLayoutDescription(
+                (uint)layout.StrideBytes,
+                layout.StepMode == RekallAgeVertexStepMode.Instance ? 1U : 0U,
+                layout.Attributes.OrderBy(attribute => attribute.Location).Select(attribute => new VertexElementDescription(
+                    attribute.Name,
+                    VertexElementSemantic.TextureCoordinate,
+                    Map(attribute.Format),
+                    (uint)attribute.OffsetBytes)).ToArray())).ToArray();
             var output = new OutputDescription(
                 descriptor.DepthStencil is null ? null : new OutputAttachmentDescription(Map(descriptor.DepthStencil.Format)),
                 descriptor.ColorTargets.Select(target => new OutputAttachmentDescription(Map(target.Format))).ToArray());
@@ -125,7 +133,7 @@ internal sealed class RekallAgeVeldridRenderingDevice : IRekallAgeRenderingDevic
                         ? DepthStencilStateDescription.Disabled
                         : new DepthStencilStateDescription(true, descriptor.DepthStencil.DepthWriteEnabled, Map(descriptor.DepthStencil.DepthCompare)),
                     new RasterizerStateDescription(Map(descriptor.CullMode), PolygonFillMode.Solid, Map(descriptor.FrontFace), true, false),
-                    Map(descriptor.Topology), new ShaderSetDescription([], shaders), layouts, output)), shaders);
+                    Map(descriptor.Topology), new ShaderSetDescription(vertexLayouts, shaders), layouts, output)), shaders);
             }
             catch
             {
@@ -391,6 +399,21 @@ internal sealed class RekallAgeVeldridRenderingDevice : IRekallAgeRenderingDevic
         RekallAgeBindingType.Sampler or RekallAgeBindingType.ComparisonSampler => ResourceKind.Sampler,
         RekallAgeBindingType.SampledTexture => ResourceKind.TextureReadOnly,
         _ => ResourceKind.TextureReadWrite
+    };
+    private static VertexElementFormat Map(RekallAgeVertexFormat value) => value switch
+    {
+        RekallAgeVertexFormat.Float32 => VertexElementFormat.Float1,
+        RekallAgeVertexFormat.Float32x2 => VertexElementFormat.Float2,
+        RekallAgeVertexFormat.Float32x3 => VertexElementFormat.Float3,
+        RekallAgeVertexFormat.Float32x4 => VertexElementFormat.Float4,
+        RekallAgeVertexFormat.Uint32 => VertexElementFormat.UInt1,
+        RekallAgeVertexFormat.Uint32x2 => VertexElementFormat.UInt2,
+        RekallAgeVertexFormat.Uint32x3 => VertexElementFormat.UInt3,
+        RekallAgeVertexFormat.Uint32x4 => VertexElementFormat.UInt4,
+        RekallAgeVertexFormat.Sint32 => VertexElementFormat.Int1,
+        RekallAgeVertexFormat.Sint32x2 => VertexElementFormat.Int2,
+        RekallAgeVertexFormat.Sint32x3 => VertexElementFormat.Int3,
+        _ => VertexElementFormat.Int4
     };
     private static PrimitiveTopology Map(RekallAgePrimitiveTopology value) => (PrimitiveTopology)(int)value;
     private static FaceCullMode Map(RekallAgeCullMode value) => value switch { RekallAgeCullMode.None => FaceCullMode.None, RekallAgeCullMode.Front => FaceCullMode.Front, _ => FaceCullMode.Back };

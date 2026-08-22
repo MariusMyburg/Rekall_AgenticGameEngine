@@ -162,6 +162,26 @@ public sealed class RenderingDeviceContractTests
             capabilities);
         Assert.True(valid.Valid, string.Join(Environment.NewLine, valid.Diagnostics.Select(item => item.Message)));
 
+        var invalidVertexLayout = RekallAgeRenderingDeviceValidator.Validate(
+            new RekallAgeGraphicsPipelineDescriptor(
+                vertex,
+                fragment,
+                [],
+                [new(RekallAgeTextureFormat.Bgra8UnormSrgb)])
+            {
+                VertexBuffers =
+                [
+                    new(16, RekallAgeVertexStepMode.Vertex,
+                    [
+                        new("Position", 0, RekallAgeVertexFormat.Float32x3, 8),
+                        new("Duplicate", 0, RekallAgeVertexFormat.Float32x2, 0)
+                    ])
+                ]
+            },
+            capabilities);
+        Assert.Contains(invalidVertexLayout.Diagnostics, item => item.Code == "REKALL_GPU_VERTEX_LOCATION_DUPLICATE");
+        Assert.Contains(invalidVertexLayout.Diagnostics, item => item.Code == "REKALL_GPU_VERTEX_ATTRIBUTE_INVALID");
+
         var invalid = RekallAgeRenderingDeviceValidator.Validate(
             new RekallAgeGraphicsPipelineDescriptor(
                 vertex,

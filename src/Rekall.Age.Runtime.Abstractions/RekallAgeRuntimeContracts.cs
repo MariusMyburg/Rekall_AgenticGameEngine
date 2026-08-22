@@ -447,6 +447,22 @@ public enum RekallAgeRuntimeGpuBindingType
 }
 public enum RekallAgeRuntimeGpuPipelineKind { Render, Compute }
 public enum RekallAgeRuntimeGpuIndexFormat { UInt16, UInt32 }
+public enum RekallAgeRuntimeGpuVertexStepMode { Vertex, Instance }
+public enum RekallAgeRuntimeGpuVertexFormat
+{
+    Float32,
+    Float32x2,
+    Float32x3,
+    Float32x4,
+    Uint32,
+    Uint32x2,
+    Uint32x3,
+    Uint32x4,
+    Sint32,
+    Sint32x2,
+    Sint32x3,
+    Sint32x4
+}
 public enum RekallAgeRuntimeGpuCommandKind
 {
     CopyBuffer,
@@ -533,6 +549,17 @@ public sealed record RekallAgeRuntimeGpuBindingSet(
     string Layout,
     IReadOnlyList<RekallAgeRuntimeGpuBinding> Bindings);
 
+public sealed record RekallAgeRuntimeGpuVertexAttribute(
+    string Name,
+    int Location,
+    RekallAgeRuntimeGpuVertexFormat Format,
+    int OffsetBytes);
+
+public sealed record RekallAgeRuntimeGpuVertexBufferLayout(
+    int StrideBytes,
+    RekallAgeRuntimeGpuVertexStepMode StepMode,
+    IReadOnlyList<RekallAgeRuntimeGpuVertexAttribute> Attributes);
+
 public sealed record RekallAgeRuntimeGpuPipeline(
     string Id,
     RekallAgeRuntimeGpuPipelineKind Kind)
@@ -545,6 +572,8 @@ public sealed record RekallAgeRuntimeGpuPipeline(
     public string? DepthStencilFormat { get; init; }
     public string PrimitiveTopology { get; init; } = "triangle-list";
     public string CullMode { get; init; } = "back";
+    public IReadOnlyList<RekallAgeRuntimeGpuVertexBufferLayout> VertexBuffers { get; init; } =
+        Array.Empty<RekallAgeRuntimeGpuVertexBufferLayout>();
 }
 
 public sealed record RekallAgeRuntimeGpuRenderTarget(

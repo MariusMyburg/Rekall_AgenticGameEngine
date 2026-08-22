@@ -3272,6 +3272,18 @@ suite passes 1,167/1,167, Studio passes 25/25, and the Release solution builds
 with zero warnings or errors. A final bounded live Vulkan run completed 5/5
 frames in one attempt with no recovery and logged one enabled/one executed
 module workload.
+Portable vertex-buffer layout authoring is now implemented, pending its focused
+checkpoint. Runtime pipelines declare typed attributes, byte offsets, strides,
+and per-vertex/per-instance stepping; the compiler maps them into public
+RenderingDevice descriptors and the Veldrid adapter maps those descriptors to
+native vertex layouts. Validation bounds buffer/attribute counts and strides,
+rejects null/empty layouts, duplicate or non-dense shader locations, and format
+ranges that exceed the stride. Runtime SDK inspection supplies the exact C#
+shape and a position/normal/UV recipe. The combined RenderingDevice, compiler,
+and SDK-inspection selection passes 28/28; the Release solution is again clean
+with zero warnings/errors and the Vulkan compositor remains 5/5. Bounded
+project-asset upload remains the next half of this data-backed geometry
+milestone.
 After its Windows programmable-compositor proof, resume Pong through the generic
 portable authoring path, followed by a Galaga-class game in Studio. The queued
 Rain Glass shader acceptance follows those playable proofs

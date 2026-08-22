@@ -97,8 +97,16 @@ public sealed class InspectRuntimeSdkCommand
             new RekallAgeRuntimeSdkContract(
                 "runtime-type",
                 nameof(RekallAgeRuntimeGpuWorkload),
-                "record RekallAgeRuntimeGpuWorkload(string Id) { Buffers; Textures; Samplers; Shaders; BindingLayouts; BindingSets; Pipelines; RenderTargets; Commands; }",
+                "record RekallAgeRuntimeGpuWorkload(string Id) { Buffers; Textures; Samplers; Shaders; BindingLayouts; BindingSets; Pipelines with VertexBuffers; RenderTargets; Commands; }",
                 "Immutable backend-neutral named GPU resource graph authored by a C# runtime module. Resources use stable string IDs; the engine validates and resolves them to opaque RenderingDevice handles."),
+            new RekallAgeRuntimeSdkContract(
+                "runtime-type",
+                nameof(RekallAgeRuntimeGpuVertexBufferLayout),
+                "record RekallAgeRuntimeGpuVertexBufferLayout(int StrideBytes, RekallAgeRuntimeGpuVertexStepMode StepMode, IReadOnlyList<RekallAgeRuntimeGpuVertexAttribute> Attributes)",
+                "Declares portable per-vertex or per-instance memory layout. Attribute locations must be unique and form a dense zero-based sequence across the pipeline; every typed format range must fit within its stride.")
+            {
+                Usage = "VertexBuffers = [new(32, RekallAgeRuntimeGpuVertexStepMode.Vertex, [new(\"Position\", 0, RekallAgeRuntimeGpuVertexFormat.Float32x3, 0), new(\"Normal\", 1, RekallAgeRuntimeGpuVertexFormat.Float32x3, 12), new(\"UV\", 2, RekallAgeRuntimeGpuVertexFormat.Float32x2, 24)])]"
+            },
             new RekallAgeRuntimeSdkContract(
                 "authoring-recipe",
                 "gpu-workload-authoring-recipe",

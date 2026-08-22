@@ -154,7 +154,7 @@ public sealed class InspectRuntimeSdkCommandTests
             CancellationToken.None);
 
         var result = await new InspectRuntimeSdkCommand().ExecuteAsync(
-            new InspectRuntimeSdkRequest("gpu workload shader compute pipeline command render", Limit: 24),
+            new InspectRuntimeSdkRequest("gpu workload shader compute pipeline command render vertex buffer layout", Limit: 24),
             context);
 
         Assert.True(result.Ok, result.Summary);
@@ -174,5 +174,8 @@ public sealed class InspectRuntimeSdkCommandTests
             contract.Name == "gpu-workload-frame-imports"
             && contract.Signature.Contains("engine.scene-color", StringComparison.Ordinal)
             && contract.Signature.Contains("engine.output", StringComparison.Ordinal));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "RekallAgeRuntimeGpuVertexBufferLayout"
+            && contract.Usage!.Contains("Float32x3", StringComparison.Ordinal));
     }
 }

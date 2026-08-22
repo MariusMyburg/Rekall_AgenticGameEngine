@@ -21,5 +21,9 @@ C# modules and execute it through the shared RenderingDevice contract.
   frame-resource changes. The committed probe capture is
   `Examples/ProgrammableCompositorProbe/Captures/vulkan-programmable-compositor.png`.
 - [x] Expose workload validation/inspection through CLI/MCP.
+- [ ] Add explicit portable vertex-buffer layouts and bounded project-asset
+  uploads so authored workloads can render arbitrary data-backed geometry.
+- [ ] Add storage-buffer/texture and indirect-command metadata plus native
+  execution where the selected backend advertises those capabilities.
 - [x] Run full suites, Release build, live Player proof, update production
   progress, commit, and push.

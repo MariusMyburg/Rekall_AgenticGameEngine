@@ -196,6 +196,7 @@ public static class RekallAgeRenderingDeviceValidator
         RekallAgeRenderingDeviceCapabilities capabilities)
     {
         var diagnostics = new List<RekallAgeGraphicsDiagnostic>();
+        var vertexBuffers = descriptor.VertexBuffers ?? [];
         if (!IsHandleKind(descriptor.VertexShader, RekallAgeGraphicsResourceKind.ShaderModule)
             || !IsHandleKind(descriptor.FragmentShader, RekallAgeGraphicsResourceKind.ShaderModule))
         {
@@ -213,6 +214,43 @@ public static class RekallAgeRenderingDeviceValidator
             || descriptor.DepthStencil is not null && !IsDepth(descriptor.DepthStencil.Format))
         {
             diagnostics.Add(new("REKALL_GPU_PIPELINE_FORMAT_INVALID", "Color and depth targets must use compatible formats.", descriptor.Label));
+        }
+        if (vertexBuffers.Count > capabilities.MaximumVertexBuffers)
+        {
+            diagnostics.Add(new("REKALL_GPU_VERTEX_BUFFER_LIMIT", $"Graphics pipeline exceeds {capabilities.MaximumVertexBuffers} vertex-buffer layouts.", descriptor.Label));
+        }
+        if (vertexBuffers.Any(layout => layout.Attributes is null))
+        {
+            diagnostics.Add(new("REKALL_GPU_VERTEX_LAYOUT_INVALID", "Vertex attribute collections cannot be null.", descriptor.Label));
+        }
+        var attributes = vertexBuffers.SelectMany(layout => layout.Attributes ?? []).ToArray();
+        if (attributes.Length > capabilities.MaximumVertexAttributes)
+        {
+            diagnostics.Add(new("REKALL_GPU_VERTEX_ATTRIBUTE_LIMIT", $"Graphics pipeline exceeds {capabilities.MaximumVertexAttributes} vertex attributes.", descriptor.Label));
+        }
+        foreach (var duplicate in attributes.Where(attribute => attribute.Location >= 0).GroupBy(attribute => attribute.Location).Where(group => group.Count() > 1))
+        {
+            diagnostics.Add(new("REKALL_GPU_VERTEX_LOCATION_DUPLICATE", $"Vertex shader location {duplicate.Key} is declared more than once.", descriptor.Label));
+        }
+        if (!attributes.Select(attribute => attribute.Location).OrderBy(location => location).SequenceEqual(Enumerable.Range(0, attributes.Length)))
+        {
+            diagnostics.Add(new("REKALL_GPU_VERTEX_LOCATION_SEQUENCE_INVALID", "Vertex locations must form one dense zero-based sequence across all buffer layouts.", descriptor.Label));
+        }
+        foreach (var layout in vertexBuffers)
+        {
+            if (layout.StrideBytes < 1 || layout.StrideBytes > capabilities.MaximumVertexBufferStrideBytes || (layout.Attributes?.Count ?? 0) == 0)
+            {
+                diagnostics.Add(new("REKALL_GPU_VERTEX_LAYOUT_INVALID", $"Vertex layout stride must be between 1 and {capabilities.MaximumVertexBufferStrideBytes} bytes and contain at least one attribute.", descriptor.Label));
+                continue;
+            }
+            foreach (var attribute in layout.Attributes!)
+            {
+                if (string.IsNullOrWhiteSpace(attribute.Name) || attribute.Location < 0 || attribute.OffsetBytes < 0
+                    || attribute.OffsetBytes + VertexFormatSize(attribute.Format) > layout.StrideBytes)
+                {
+                    diagnostics.Add(new("REKALL_GPU_VERTEX_ATTRIBUTE_INVALID", "Vertex attributes require a name, nonnegative location/offset, and a format range contained by the stride.", descriptor.Label));
+                }
+            }
         }
         return new(diagnostics);
     }
@@ -242,6 +280,14 @@ public static class RekallAgeRenderingDeviceValidator
 
     private static bool IsDepth(RekallAgeTextureFormat format) =>
         format is RekallAgeTextureFormat.Depth24Stencil8 or RekallAgeTextureFormat.Depth32Float;
+
+    private static int VertexFormatSize(RekallAgeVertexFormat format) => format switch
+    {
+        RekallAgeVertexFormat.Float32 or RekallAgeVertexFormat.Uint32 or RekallAgeVertexFormat.Sint32 => 4,
+        RekallAgeVertexFormat.Float32x2 or RekallAgeVertexFormat.Uint32x2 or RekallAgeVertexFormat.Sint32x2 => 8,
+        RekallAgeVertexFormat.Float32x3 or RekallAgeVertexFormat.Uint32x3 or RekallAgeVertexFormat.Sint32x3 => 12,
+        _ => 16
+    };
 
     private static RekallAgeGraphicsDiagnostic Feature(string feature, string? target) => new(
         "REKALL_GPU_FEATURE_REQUIRED",

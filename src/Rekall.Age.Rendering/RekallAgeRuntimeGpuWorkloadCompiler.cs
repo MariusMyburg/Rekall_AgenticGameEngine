@@ -119,7 +119,14 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
                     string.IsNullOrWhiteSpace(pipeline.DepthStencilFormat)
                         ? null
                         : new RekallAgeDepthStencilDescriptor(MapFormat(pipeline.DepthStencilFormat)),
-                    MapTopology(pipeline.PrimitiveTopology), MapCull(pipeline.CullMode), Label: pipeline.Id));
+                    MapTopology(pipeline.PrimitiveTopology), MapCull(pipeline.CullMode), Label: pipeline.Id)
+                {
+                    VertexBuffers = pipeline.VertexBuffers.Select(layout => new RekallAgeVertexBufferLayoutDescriptor(
+                        layout.StrideBytes,
+                        Map(layout.StepMode),
+                        layout.Attributes.Select(attribute => new RekallAgeVertexAttributeDescriptor(
+                            attribute.Name, attribute.Location, Map(attribute.Format), attribute.OffsetBytes)).ToArray())).ToArray()
+                });
             if (!Add(pipeline.Id, result)) return Rollback(workload.Id, device, owned, diagnostics);
         }
         foreach (var target in workload.RenderTargets)
@@ -226,8 +233,11 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_SHAPE_INVALID", "Binding-layout entries cannot be null.", layout.Id));
         foreach (var set in sets.Where(set => set.Bindings is null))
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_SHAPE_INVALID", "Binding-set bindings cannot be null.", set.Id));
-        foreach (var pipeline in pipelines.Where(pipeline => pipeline.BindingLayouts is null || pipeline.ColorFormats is null))
-            diagnostics.Add(new("REKALL_GPU_WORKLOAD_SHAPE_INVALID", "Pipeline layout and color-format collections cannot be null.", pipeline.Id));
+        foreach (var pipeline in pipelines.Where(pipeline => pipeline.BindingLayouts is null || pipeline.ColorFormats is null || pipeline.VertexBuffers is null))
+            diagnostics.Add(new("REKALL_GPU_WORKLOAD_SHAPE_INVALID", "Pipeline layout, color-format, and vertex-buffer collections cannot be null.", pipeline.Id));
+        foreach (var pipeline in pipelines)
+        foreach (var layout in (pipeline.VertexBuffers ?? []).Where(layout => layout.Attributes is null))
+            diagnostics.Add(new("REKALL_GPU_WORKLOAD_SHAPE_INVALID", "Vertex-layout attribute collections cannot be null.", pipeline.Id));
         foreach (var target in targets.Where(target => target.ColorAttachments is null))
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_SHAPE_INVALID", "Render-target color attachments cannot be null.", target.Id));
         foreach (var command in commands.Where(command => command.ClearColors is null))
@@ -390,6 +400,9 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
         stages.Aggregate(RekallAgeShaderStage.None, (result, stage) => result | Map(stage));
     private static RekallAgeIndexFormat Map(RekallAgeRuntimeGpuIndexFormat format) =>
         format == RekallAgeRuntimeGpuIndexFormat.UInt16 ? RekallAgeIndexFormat.UInt16 : RekallAgeIndexFormat.UInt32;
+    private static RekallAgeVertexStepMode Map(RekallAgeRuntimeGpuVertexStepMode mode) =>
+        mode == RekallAgeRuntimeGpuVertexStepMode.Instance ? RekallAgeVertexStepMode.Instance : RekallAgeVertexStepMode.Vertex;
+    private static RekallAgeVertexFormat Map(RekallAgeRuntimeGpuVertexFormat format) => (RekallAgeVertexFormat)(int)format;
     private static RekallAgeFilter MapFilter(string value) => Normalize(value) == "nearest" ? RekallAgeFilter.Nearest : RekallAgeFilter.Linear;
     private static RekallAgeMipmapFilter MapMipmapFilter(string value) => Normalize(value) == "nearest" ? RekallAgeMipmapFilter.Nearest : RekallAgeMipmapFilter.Linear;
     private static RekallAgeAddressMode MapAddress(string value) => Normalize(value) switch

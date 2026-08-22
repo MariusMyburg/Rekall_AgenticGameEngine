@@ -10,6 +10,7 @@ C# modules and execute it through the shared RenderingDevice contract.
   inspection and module prompting.
 - [ ] Add a transactional compiler from named workloads to RenderingDevice
   descriptors, opaque handles, and immutable command buffers.
+  Compute-only slice is green; transfer/render resources and commands remain.
 - [ ] Add stable graph/reference/budget/capability diagnostics and inspection.
 - [ ] Execute a programmable post-process or compute workload in the Windows
   Player with deterministic capture evidence.

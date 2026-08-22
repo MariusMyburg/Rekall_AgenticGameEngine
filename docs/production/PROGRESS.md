@@ -3229,6 +3229,12 @@ bounded deterministic add/replace/list/remove behavior without native handles.
 Runtime SDK inspection now exposes the exact compiled helpers, workload shape,
 opaque-handle safety boundary, and a complete compute-pass authoring recipe;
 the combined runtime/SDK selection passes 8/8.
+The transactional compiler's compute slice is also focused-verified. Valid
+named buffer/shader/compute-pipeline graphs resolve to opaque handles and an
+immutable command buffer; duplicate IDs, missing references, command overflow,
+and declarations reserved for later transfer/render stages fail closed before
+retaining any resources. The combined GPU workload contract/SDK/compiler
+selection passes 12/12. Transfer/render graph compilation is still in progress.
 After its Windows programmable-compositor proof, resume Pong through the generic
 portable authoring path, followed by a Galaga-class game in Studio. The queued
 Rain Glass shader acceptance follows those playable proofs

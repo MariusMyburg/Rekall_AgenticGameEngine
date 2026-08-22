@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-22 21:08 Africa/Johannesburg
+Last verified: 2026-08-22 21:32 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -3170,11 +3170,33 @@ explicit proof track: .NET WebAssembly Player, browser host/input/audio/storage,
 WebGPU primary backend, WebGL 2 fallback, packaging/audit, and a real playable
 browser acceptance. Current desktop assemblies are not yet a web export.
 
-RenderingDevice Task 1 is now committed at `91c3f0a`: public backend
+RenderingDevice Task 1 is committed at `91c3f0a`: public backend
 capabilities, bounded buffer/texture descriptors, stable diagnostics, opaque
 device/kind/slot/generation handles, immutable copy command buffers, stale and
 foreign handle rejection, resource inspection, and an in-memory conformance
 device pass 5/5 focused tests and a zero-warning Release rendering build.
+
+RenderingDevice Tasks 2 and 3 are implemented and focused-verified, pending the
+full-suite checkpoint. The public contract now records flat immutable transfer,
+render, and compute streams: begin/end pass, pipeline and binding-set selection,
+vertex/index buffers, draw/indexed draw, and bounded dispatch. The in-memory
+backend validates pass state and resource usage while recording, then replays
+validation at submission so destroyed/stale resources cannot silently execute.
+The focused RenderingDevice suite passes 12/12. The new
+`rekall.render.device.inspect_workload` command is registered in the default
+CLI/MCP registry, validates portable resource/compute requirements, and reports
+limits, memory estimates, command capabilities, and stable diagnostics. Its
+real CLI JSON path and the combined rendering/MCP selection pass 15/15.
+
+RenderingDevice Task 4 is verified. A generic fullscreen present-pass
+planner now emits and submits a validated six-command AGE stream and recreates
+only size-dependent target resources; its focused tests pass 4/4. The Windows
+Player's Veldrid present and post-process draw has been replaced with a thin
+executor over that AGE command stream in both runtime and playable paths. The
+live Vulkan Player completed `Examples/VulkanCubeProbe Main` for 5/5 requested
+frames in one attempt with no recovery. The complete Release engine suite passes
+1,151/1,151, Studio passes 25/25, and the Release solution builds with zero
+warnings/errors. Commit and push remain before this checkpoint is durable.
 
 The first browser runtime proof is also verified. Official .NET 10 WASM
 workloads are installed; `Rekall.Age.Player.Web` publishes real AGE Core, World,
@@ -3195,17 +3217,18 @@ The next research track is a shallow Godot .NET source audit focused on
 rendering, shader programmability, scripting, and web export, with useful
 concepts translated into AGE's 100% C# and agent-first architecture.
 
-Finish Pong through the generic portable authoring path now. Then finish a
-Galaga-class game entirely through Studio. Only after both are complete, resume
-the queued Rain Glass custom-shader acceptance and require the licensed remote
-image, full-window asset-backed composition, two temporally distinct frames,
-package relocation, and audit. Do not return to broad subsystem or CI expansion
-before these user-visible game proofs complete.
+Complete the RenderingDevice-to-Player migration checkpoint currently in
+flight: live Vulkan proof, full tests/builds, commit, and push. Then resume Pong
+through the generic portable authoring path, followed by a Galaga-class game in
+Studio. The queued Rain Glass shader acceptance follows those playable proofs
+and still requires the licensed remote image, full-window asset-backed
+composition, two temporally distinct frames, package relocation, and audit.
 
 ## Evidence index
 
 - `docs/production/2026-08-17-engine-maturity-audit.md`
 - `docs/production/2026-08-17-ollama-authoring-benchmark.md`
+- `docs/production/2026-08-22-rendering-device-migration.md`
 - `docs/superpowers/plans/2026-08-17-runtime-subsystems.md`
 - `docs/superpowers/specs/2026-08-18-runtime-soak-performance-design.md`
 - `docs/superpowers/plans/2026-08-18-runtime-soak-performance.md`

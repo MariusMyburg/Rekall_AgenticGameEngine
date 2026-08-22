@@ -67,6 +67,8 @@ internal static class RekallAgeCli
                     await AssembleDistributionAsync(
                         registry, context, output, cli, studio, headless, windows, sdk, readme, notice, thirdParty),
                 ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
+                ["render", "device", "inspect-workload", var workloadJson] =>
+                    await InspectRenderingDeviceWorkloadAsync(registry, context, workloadJson),
                 ["shader", "inspect-pipeline", var root, var vertex, var fragment] =>
                     await InspectShaderPipelineAsync(registry, context, root, vertex, fragment),
                 ["shader", "write", var root, var name, var stage, var source] =>
@@ -3420,6 +3422,45 @@ internal static class RekallAgeCli
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Path: {result.Value.RelativePath}");
         return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectRenderingDeviceWorkloadAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string workloadJson)
+    {
+        var payload = File.Exists(workloadJson)
+            ? await File.ReadAllTextAsync(workloadJson, context.CancellationToken)
+            : workloadJson;
+        var options = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            WriteIndented = true
+        };
+        options.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        InspectRenderingDeviceWorkloadRequest? request;
+        try
+        {
+            request = System.Text.Json.JsonSerializer.Deserialize<InspectRenderingDeviceWorkloadRequest>(payload, options);
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            Console.Error.WriteLine($"Rendering workload JSON is invalid: {ex.Message}");
+            return 1;
+        }
+        if (request is null)
+        {
+            Console.Error.WriteLine("Rendering workload JSON cannot be null.");
+            return 1;
+        }
+
+        var result = await registry.ExecuteAsync<InspectRenderingDeviceWorkloadRequest, InspectRenderingDeviceWorkloadResult>(
+            "rekall.render.device.inspect_workload",
+            request,
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result.Value, options));
+        return result.Ok && result.Value.Valid ? 0 : 1;
     }
 
     private static async Task<int> PreprocessShaderSourceAsync(

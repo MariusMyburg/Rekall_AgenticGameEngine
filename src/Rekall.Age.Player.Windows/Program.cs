@@ -228,6 +228,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly Pipeline _sceneTransparentPipeline;
     private readonly RekallAgeVeldridShaderPipelineCache _shaderPipelineCache;
     private readonly Pipeline _presentPipeline;
+    private readonly RekallAgeVeldridPresentPassAdapter _presentPassAdapter;
     private readonly Pipeline _hudPipeline;
     private readonly ResourceLayout _frameLayout;
     private readonly ResourceLayout _drawLayout;
@@ -379,6 +380,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _sceneTransparentPipeline = sceneTransparentPipeline;
         _shaderPipelineCache = shaderPipelineCache;
         _presentPipeline = presentPipeline;
+        _presentPassAdapter = new RekallAgeVeldridPresentPassAdapter();
         _hudPipeline = hudPipeline;
         _frameLayout = frameLayout;
         _drawLayout = drawLayout;
@@ -1171,6 +1173,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Cleanup("scene-pipeline", _scenePipeline.Dispose);
         Cleanup("scene-transparent-pipeline", _sceneTransparentPipeline.Dispose);
         Cleanup("present-pipeline", _presentPipeline.Dispose);
+        Cleanup("present-pass-adapter", _presentPassAdapter.Dispose);
         Cleanup("hud-pipeline", _hudPipeline.Dispose);
         Cleanup("frame-layout", _frameLayout.Dispose);
         Cleanup("draw-layout", _drawLayout.Dispose);
@@ -1760,14 +1763,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             }
         }
 
-        _commands.SetFramebuffer(_device.SwapchainFramebuffer);
-        _commands.SetFullViewports();
-        _commands.SetFullScissorRects();
-        _commands.ClearColorTarget(0, new RgbaFloat(0.08f, 0.10f, 0.14f, 1f));
-        _commands.SetPipeline(_presentPipeline);
-        _commands.SetGraphicsResourceSet(0, _sceneTarget.ResourceSet);
-        _commands.SetGraphicsResourceSet(1, _postProcessSet);
-        _commands.Draw(3);
+        _presentPassAdapter.Record(
+            _commands,
+            _device.SwapchainFramebuffer,
+            _presentPipeline,
+            _sceneTarget.ResourceSet,
+            _postProcessSet,
+            _window.Width,
+            _window.Height,
+            new RgbaFloat(0.08f, 0.10f, 0.14f, 1f));
 
         if (overlayVertices.Length > 0)
         {
@@ -1835,15 +1839,16 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         }
 
         _commands.Begin();
-        _commands.SetFramebuffer(_device.SwapchainFramebuffer);
-        _commands.SetFullViewports();
-        _commands.SetFullScissorRects();
-        _commands.ClearColorTarget(0, new RgbaFloat(0.02f, 0.04f, 0.08f, 1f));
         _device.UpdateBuffer(_postProcessUniformBuffer, 0, PostProcessUniform.Default);
-        _commands.SetPipeline(_presentPipeline);
-        _commands.SetGraphicsResourceSet(0, _sceneTarget.ResourceSet);
-        _commands.SetGraphicsResourceSet(1, _postProcessSet);
-        _commands.Draw(3);
+        _presentPassAdapter.Record(
+            _commands,
+            _device.SwapchainFramebuffer,
+            _presentPipeline,
+            _sceneTarget.ResourceSet,
+            _postProcessSet,
+            _window.Width,
+            _window.Height,
+            new RgbaFloat(0.02f, 0.04f, 0.08f, 1f));
         if (uiVertices.Length > 0)
         {
             _commands.SetPipeline(_hudPipeline);

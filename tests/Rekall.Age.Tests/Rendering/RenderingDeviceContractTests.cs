@@ -1,10 +1,37 @@
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Rendering.Commands;
+using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Transactions;
 
 namespace Rekall.Age.Tests.Rendering;
 
 public sealed class RenderingDeviceContractTests
 {
+    [Fact]
+    public async Task WorkloadInspectionExposesPortableLimitsAndStableDiagnostics()
+    {
+        var command = new InspectRenderingDeviceWorkloadCommand();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("inspect GPU workload"), CancellationToken.None);
+        var result = await command.ExecuteAsync(new(
+            "webgpu",
+            [new(4_096, RekallAgeBufferUsage.Vertex, Label: "vertices")],
+            [new(RekallAgeTextureDimension.Texture2D, 1920, 1080, 1, 1, 1, 1,
+                RekallAgeTextureFormat.Rgba8Unorm, RekallAgeTextureUsage.ColorAttachment, "color")],
+            [], [], [],
+            MaximumDispatchX: 65_536,
+            MaximumDispatchY: 1,
+            MaximumDispatchZ: 1), context);
+
+        Assert.True(result.Ok);
+        Assert.False(result.Value.Valid);
+        Assert.Equal("webgpu", result.Value.Capabilities.Backend);
+        Assert.Equal(2, result.Value.ResourceDescriptorCount);
+        Assert.Equal(4_096UL, result.Value.TotalBufferBytes);
+        Assert.Contains("draw-indexed", result.Value.CommandSurface);
+        Assert.Contains(result.Value.Diagnostics, item => item.Code == "REKALL_GPU_DISPATCH_RANGE_INVALID");
+    }
+
     [Fact]
     public void ValidatesBufferDescriptorsAndRequiredCapabilities()
     {
@@ -293,5 +320,105 @@ public sealed class RenderingDeviceContractTests
 
         var missing = device.CreateBindingSet(new(layout.Handle, [], "missing"));
         Assert.Contains(missing.Diagnostics, item => item.Code == "REKALL_GPU_BINDING_SET_INCOMPLETE");
+    }
+
+    [Fact]
+    public void RecordsInspectableRenderPassAndIndexedDrawCommands()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var vertexShader = device.CreateShaderModule(new(
+            RekallAgeShaderStage.Vertex, RekallAgeShaderSourceLanguage.Glsl, "void main(){}"));
+        var fragmentShader = device.CreateShaderModule(new(
+            RekallAgeShaderStage.Fragment, RekallAgeShaderSourceLanguage.Glsl, "void main(){}"));
+        var pipeline = device.CreateGraphicsPipeline(new(
+            vertexShader.Handle,
+            fragmentShader.Handle,
+            [],
+            [new(RekallAgeTextureFormat.Rgba8Unorm)],
+            Label: "scene"));
+        var vertices = device.CreateBuffer(new(256, RekallAgeBufferUsage.Vertex, Label: "vertices"));
+        var indices = device.CreateBuffer(new(72, RekallAgeBufferUsage.Index, Label: "indices"));
+        var color = device.CreateTexture(new(
+            RekallAgeTextureDimension.Texture2D, 640, 360, 1, 1, 1, 1,
+            RekallAgeTextureFormat.Rgba8Unorm,
+            RekallAgeTextureUsage.ColorAttachment,
+            "color"));
+        var target = device.CreateRenderTarget(new(
+            [new(color.Handle)], null, 640, 360, "viewport"));
+
+        using var encoder = device.BeginCommandEncoder("frame");
+        Assert.True(encoder.BeginRenderPass(new(target.Handle,
+            [new(0.02f, 0.03f, 0.04f, 1f)], Label: "main pass")).Valid);
+        Assert.True(encoder.SetRenderPipeline(pipeline.Handle).Valid);
+        Assert.True(encoder.SetVertexBuffer(0, vertices.Handle, 0, 256).Valid);
+        Assert.True(encoder.SetIndexBuffer(indices.Handle, RekallAgeIndexFormat.UInt16, 0, 72).Valid);
+        Assert.True(encoder.DrawIndexed(36, 1, 0, 0, 0).Valid);
+        Assert.True(encoder.EndRenderPass().Valid);
+        var commands = encoder.Finish();
+
+        Assert.Collection(commands.Commands,
+            item => Assert.IsType<RekallAgeBeginRenderPassCommand>(item),
+            item => Assert.IsType<RekallAgeSetRenderPipelineCommand>(item),
+            item => Assert.IsType<RekallAgeSetVertexBufferCommand>(item),
+            item => Assert.IsType<RekallAgeSetIndexBufferCommand>(item),
+            item => Assert.IsType<RekallAgeDrawIndexedCommand>(item),
+            item => Assert.IsType<RekallAgeEndRenderPassCommand>(item));
+        Assert.True(device.Submit(commands).Valid);
+    }
+
+    [Fact]
+    public void RecordsComputeDispatchAndRejectsInvalidPassState()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var shader = device.CreateShaderModule(new(
+            RekallAgeShaderStage.Compute, RekallAgeShaderSourceLanguage.Glsl, "void main(){}"));
+        var pipeline = device.CreateComputePipeline(new(shader.Handle, [], "simulation"));
+        using var encoder = device.BeginCommandEncoder("compute frame");
+
+        var outside = encoder.Draw(3);
+        Assert.Contains(outside.Diagnostics, item => item.Code == "REKALL_GPU_PASS_STATE_INVALID");
+        Assert.True(encoder.BeginComputePass("simulation pass").Valid);
+        Assert.Contains(encoder.BeginComputePass().Diagnostics,
+            item => item.Code == "REKALL_GPU_PASS_STATE_INVALID");
+        Assert.True(encoder.SetComputePipeline(pipeline.Handle).Valid);
+        Assert.Contains(encoder.Dispatch(0, 1, 1).Diagnostics,
+            item => item.Code == "REKALL_GPU_DISPATCH_RANGE_INVALID");
+        Assert.Contains(encoder.Dispatch(65_536, 1, 1).Diagnostics,
+            item => item.Code == "REKALL_GPU_DISPATCH_RANGE_INVALID");
+        Assert.Throws<InvalidOperationException>(() => encoder.Finish());
+        Assert.True(encoder.Dispatch(8, 4, 1).Valid);
+        Assert.True(encoder.EndComputePass().Valid);
+
+        var commands = encoder.Finish();
+        Assert.Collection(commands.Commands,
+            item => Assert.IsType<RekallAgeBeginComputePassCommand>(item),
+            item => Assert.IsType<RekallAgeSetComputePipelineCommand>(item),
+            item => Assert.IsType<RekallAgeDispatchCommand>(item),
+            item => Assert.IsType<RekallAgeEndComputePassCommand>(item));
+        Assert.True(device.Submit(commands).Valid);
+    }
+
+    [Fact]
+    public void SubmissionRevalidatesResourcesReferencedByRecordedCommands()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var shader = device.CreateShaderModule(new(
+            RekallAgeShaderStage.Compute, RekallAgeShaderSourceLanguage.Glsl, "void main(){}"));
+        var pipeline = device.CreateComputePipeline(new(shader.Handle, [], "simulation"));
+        using var encoder = device.BeginCommandEncoder();
+        Assert.True(encoder.BeginComputePass().Valid);
+        Assert.True(encoder.SetComputePipeline(pipeline.Handle).Valid);
+        Assert.True(encoder.Dispatch(1, 1, 1).Valid);
+        Assert.True(encoder.EndComputePass().Valid);
+        var commands = encoder.Finish();
+
+        Assert.True(device.Destroy(pipeline.Handle).Valid);
+        var submission = device.Submit(commands);
+
+        Assert.Contains(submission.Diagnostics, item => item.Code == "REKALL_GPU_HANDLE_STALE");
+        Assert.Equal(0, device.SubmissionCount);
     }
 }

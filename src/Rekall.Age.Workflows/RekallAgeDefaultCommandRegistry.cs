@@ -74,6 +74,7 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new ScaffoldRuntimeSystemModuleCommand());
         registry.Register(new WriteModuleSourceCommand());
         registry.Register(new ListRenderBackendsCommand());
+        registry.Register(new InspectRenderingDeviceWorkloadCommand());
         registry.Register(new InspectSceneMeshGeometryCommand());
         registry.Register(new InspectStereoRenderPlanCommand());
         registry.Register(new InspectScenePerformanceBudgetCommand());

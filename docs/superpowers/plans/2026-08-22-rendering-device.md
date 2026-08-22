@@ -7,11 +7,12 @@ contract, then migrate AGE rendering and add web-capable adapters incrementally.
 - [x] Implement immutable public descriptors, typed opaque handles, capability
   model, stable diagnostics, and bounded shared validation for buffers,
   textures, samplers, shaders, layouts/sets, pipelines, and render targets.
-- [ ] Add command encoders and immutable command-buffer validation tests.
-- [ ] Add an in-memory conformance backend for deterministic tests and agent
+- [x] Add command encoders and immutable command-buffer validation tests.
+- [x] Add an in-memory conformance backend for deterministic tests and agent
   inspection without a GPU.
-- [ ] Add CLI/MCP capability and workload inspection commands.
-- [ ] Implement a Veldrid/Vulkan Player adapter and migrate one real render path.
+- [x] Add CLI/MCP capability and workload inspection commands.
+- [x] Implement a Veldrid/Vulkan Player adapter and migrate one real render path.
+  The present pass completed a live 5/5-frame Vulkan acceptance.
 - [ ] Expose bounded declarative GPU workloads to agent-authored C# modules.
 - [ ] Add compute/storage/indirect operations and programmable compositor proof.
 - [ ] Implement WebGPU and WebGL 2 compatibility adapters behind the same API.

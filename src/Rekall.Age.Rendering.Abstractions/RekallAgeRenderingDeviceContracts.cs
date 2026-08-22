@@ -231,6 +231,10 @@ public sealed record RekallAgeRenderingDeviceCapabilities(
     bool SupportsIndirectDrawing,
     bool SupportsTimestampQueries)
 {
+    public int MaximumVertexBuffers { get; init; } = 16;
+
+    public uint MaximumComputeWorkgroupsPerDimension { get; init; } = 65_535;
+
     public static RekallAgeRenderingDeviceCapabilities DesktopBaseline(string backend) => new(
         backend,
         MaximumBufferSizeBytes: 1UL << 30,
@@ -275,12 +279,36 @@ public sealed record RekallAgeGraphicsResourceInspection(
 
 public abstract record RekallAgeGraphicsCommand;
 
+public enum RekallAgeIndexFormat { UInt16, UInt32 }
+
+public sealed record RekallAgeColorClearValue(float Red, float Green, float Blue, float Alpha);
+
+public sealed record RekallAgeRenderPassDescriptor(
+    RekallAgeGraphicsResourceHandle RenderTarget,
+    IReadOnlyList<RekallAgeColorClearValue> ColorClearValues,
+    float? DepthClearValue = null,
+    uint? StencilClearValue = null,
+    string? Label = null);
+
 public sealed record RekallAgeCopyBufferCommand(
     RekallAgeGraphicsResourceHandle Source,
     ulong SourceOffset,
     RekallAgeGraphicsResourceHandle Destination,
     ulong DestinationOffset,
     ulong SizeBytes) : RekallAgeGraphicsCommand;
+
+public sealed record RekallAgeBeginRenderPassCommand(RekallAgeRenderPassDescriptor Descriptor) : RekallAgeGraphicsCommand;
+public sealed record RekallAgeSetRenderPipelineCommand(RekallAgeGraphicsResourceHandle Pipeline) : RekallAgeGraphicsCommand;
+public sealed record RekallAgeSetComputePipelineCommand(RekallAgeGraphicsResourceHandle Pipeline) : RekallAgeGraphicsCommand;
+public sealed record RekallAgeSetBindingSetCommand(int Index, RekallAgeGraphicsResourceHandle BindingSet) : RekallAgeGraphicsCommand;
+public sealed record RekallAgeSetVertexBufferCommand(int Slot, RekallAgeGraphicsResourceHandle Buffer, ulong Offset, ulong SizeBytes) : RekallAgeGraphicsCommand;
+public sealed record RekallAgeSetIndexBufferCommand(RekallAgeGraphicsResourceHandle Buffer, RekallAgeIndexFormat Format, ulong Offset, ulong SizeBytes) : RekallAgeGraphicsCommand;
+public sealed record RekallAgeDrawCommand(uint VertexCount, uint InstanceCount, uint FirstVertex, uint FirstInstance) : RekallAgeGraphicsCommand;
+public sealed record RekallAgeDrawIndexedCommand(uint IndexCount, uint InstanceCount, uint FirstIndex, int BaseVertex, uint FirstInstance) : RekallAgeGraphicsCommand;
+public sealed record RekallAgeEndRenderPassCommand : RekallAgeGraphicsCommand;
+public sealed record RekallAgeBeginComputePassCommand(string? Label = null) : RekallAgeGraphicsCommand;
+public sealed record RekallAgeDispatchCommand(uint GroupCountX, uint GroupCountY, uint GroupCountZ) : RekallAgeGraphicsCommand;
+public sealed record RekallAgeEndComputePassCommand : RekallAgeGraphicsCommand;
 
 public sealed record RekallAgeGraphicsCommandBuffer(
     Guid DeviceId,
@@ -290,6 +318,19 @@ public sealed record RekallAgeGraphicsCommandBuffer(
 
 public interface IRekallAgeGraphicsCommandEncoder : IDisposable
 {
+    RekallAgeGraphicsValidationResult BeginRenderPass(RekallAgeRenderPassDescriptor descriptor);
+    RekallAgeGraphicsValidationResult SetRenderPipeline(RekallAgeGraphicsResourceHandle pipeline);
+    RekallAgeGraphicsValidationResult SetComputePipeline(RekallAgeGraphicsResourceHandle pipeline);
+    RekallAgeGraphicsValidationResult SetBindingSet(int index, RekallAgeGraphicsResourceHandle bindingSet);
+    RekallAgeGraphicsValidationResult SetVertexBuffer(int slot, RekallAgeGraphicsResourceHandle buffer, ulong offset = 0, ulong sizeBytes = 0);
+    RekallAgeGraphicsValidationResult SetIndexBuffer(RekallAgeGraphicsResourceHandle buffer, RekallAgeIndexFormat format, ulong offset = 0, ulong sizeBytes = 0);
+    RekallAgeGraphicsValidationResult Draw(uint vertexCount, uint instanceCount = 1, uint firstVertex = 0, uint firstInstance = 0);
+    RekallAgeGraphicsValidationResult DrawIndexed(uint indexCount, uint instanceCount = 1, uint firstIndex = 0, int baseVertex = 0, uint firstInstance = 0);
+    RekallAgeGraphicsValidationResult EndRenderPass();
+    RekallAgeGraphicsValidationResult BeginComputePass(string? label = null);
+    RekallAgeGraphicsValidationResult Dispatch(uint groupCountX, uint groupCountY = 1, uint groupCountZ = 1);
+    RekallAgeGraphicsValidationResult EndComputePass();
+
     RekallAgeGraphicsValidationResult CopyBuffer(
         RekallAgeGraphicsResourceHandle source,
         ulong sourceOffset,

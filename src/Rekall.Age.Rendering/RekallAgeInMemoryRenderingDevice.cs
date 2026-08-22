@@ -205,10 +205,7 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
 
         lock (_gate)
         {
-            foreach (var copy in commandBuffer.Commands.OfType<RekallAgeCopyBufferCommand>())
-            {
-                diagnostics.AddRange(ValidateCopyLocked(copy.Source, copy.SourceOffset, copy.Destination, copy.DestinationOffset, copy.SizeBytes));
-            }
+            diagnostics.AddRange(ValidateCommandSequenceLocked(commandBuffer.Commands));
             if (diagnostics.Count == 0)
             {
                 SubmissionCount++;
@@ -295,6 +292,172 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
             return ValidateCopyLocked(source, sourceOffset, destination, destinationOffset, sizeBytes);
         }
     }
+
+    private IReadOnlyList<RekallAgeGraphicsDiagnostic> ValidateHandle(
+        RekallAgeGraphicsResourceHandle handle,
+        RekallAgeGraphicsResourceKind expectedKind)
+    {
+        lock (_gate)
+        {
+            return ValidateHandleLocked(handle, expectedKind);
+        }
+    }
+
+    private IReadOnlyList<RekallAgeGraphicsDiagnostic> ValidateBufferBinding(
+        RekallAgeGraphicsResourceHandle buffer,
+        RekallAgeBufferUsage requiredUsage,
+        ulong offset,
+        ulong sizeBytes)
+    {
+        lock (_gate)
+        {
+            return ValidateBufferBindingLocked(buffer, requiredUsage, offset, sizeBytes);
+        }
+    }
+
+    private IReadOnlyList<RekallAgeGraphicsDiagnostic> ValidateBufferBindingLocked(
+        RekallAgeGraphicsResourceHandle buffer,
+        RekallAgeBufferUsage requiredUsage,
+        ulong offset,
+        ulong sizeBytes)
+    {
+        var diagnostics = ValidateHandleLocked(buffer, RekallAgeGraphicsResourceKind.Buffer);
+        if (diagnostics.Count > 0)
+        {
+            return diagnostics;
+        }
+        var descriptor = (RekallAgeBufferDescriptor)_slots[buffer.Slot].Resource!.Descriptor;
+        var available = offset <= descriptor.SizeBytes ? descriptor.SizeBytes - offset : 0;
+        var selectedSize = sizeBytes == 0 ? available : sizeBytes;
+        if (!descriptor.Usage.HasFlag(requiredUsage))
+        {
+            diagnostics.Add(new("REKALL_GPU_BUFFER_USAGE_INVALID", $"Buffer requires {requiredUsage} usage.", buffer.ToString()));
+        }
+        if (selectedSize == 0 || offset > descriptor.SizeBytes || selectedSize > available)
+        {
+            diagnostics.Add(new("REKALL_GPU_BUFFER_RANGE_INVALID", "Buffer binding range is empty or outside the resource.", buffer.ToString()));
+        }
+        return diagnostics;
+    }
+
+    private IReadOnlyList<RekallAgeGraphicsDiagnostic> ValidateRenderPass(RekallAgeRenderPassDescriptor descriptor)
+    {
+        lock (_gate)
+        {
+            return ValidateRenderPassLocked(descriptor);
+        }
+    }
+
+    private List<RekallAgeGraphicsDiagnostic> ValidateRenderPassLocked(RekallAgeRenderPassDescriptor descriptor)
+    {
+        if (descriptor.ColorClearValues is null)
+        {
+            return [new("REKALL_GPU_CLEAR_VALUE_COUNT_INVALID", "Color clear values cannot be null.", descriptor.Label)];
+        }
+        var diagnostics = ValidateHandleLocked(descriptor.RenderTarget, RekallAgeGraphicsResourceKind.RenderTarget);
+        if (diagnostics.Count > 0)
+        {
+            return diagnostics;
+        }
+        var target = (RekallAgeRenderTargetDescriptor)_slots[descriptor.RenderTarget.Slot].Resource!.Descriptor;
+        if (descriptor.ColorClearValues.Count != 0 && descriptor.ColorClearValues.Count != target.ColorAttachments.Count)
+        {
+            diagnostics.Add(new("REKALL_GPU_CLEAR_VALUE_COUNT_INVALID", "Color clear values must be empty or match the render target color attachment count.", descriptor.Label));
+        }
+        if (descriptor.DepthClearValue is < 0 or > 1 || (descriptor.DepthClearValue.HasValue && target.DepthStencilAttachment is null))
+        {
+            diagnostics.Add(new("REKALL_GPU_DEPTH_CLEAR_INVALID", "Depth clear requires a depth attachment and a value from zero through one.", descriptor.Label));
+        }
+        return diagnostics;
+    }
+
+    private IReadOnlyList<RekallAgeGraphicsDiagnostic> ValidateCommandSequenceLocked(IReadOnlyList<RekallAgeGraphicsCommand> commands)
+    {
+        var diagnostics = new List<RekallAgeGraphicsDiagnostic>();
+        CommandPass pass = CommandPass.None;
+        var renderPipelineSet = false;
+        var computePipelineSet = false;
+        var indexBufferSet = false;
+        foreach (var command in commands)
+        {
+            switch (command)
+            {
+                case RekallAgeCopyBufferCommand copy:
+                    if (pass != CommandPass.None) diagnostics.Add(PassStateDiagnostic("Buffer copies must be outside a pass."));
+                    diagnostics.AddRange(ValidateCopyLocked(copy.Source, copy.SourceOffset, copy.Destination, copy.DestinationOffset, copy.SizeBytes));
+                    break;
+                case RekallAgeBeginRenderPassCommand begin:
+                    if (pass != CommandPass.None) diagnostics.Add(PassStateDiagnostic("Passes cannot be nested."));
+                    else { pass = CommandPass.Render; renderPipelineSet = false; indexBufferSet = false; }
+                    diagnostics.AddRange(ValidateRenderPassLocked(begin.Descriptor));
+                    break;
+                case RekallAgeSetRenderPipelineCommand set:
+                    if (pass != CommandPass.Render) diagnostics.Add(PassStateDiagnostic("A render pipeline can only be bound in a render pass."));
+                    diagnostics.AddRange(ValidateHandleLocked(set.Pipeline, RekallAgeGraphicsResourceKind.RenderPipeline));
+                    renderPipelineSet = true;
+                    break;
+                case RekallAgeSetComputePipelineCommand set:
+                    if (pass != CommandPass.Compute) diagnostics.Add(PassStateDiagnostic("A compute pipeline can only be bound in a compute pass."));
+                    diagnostics.AddRange(ValidateHandleLocked(set.Pipeline, RekallAgeGraphicsResourceKind.ComputePipeline));
+                    computePipelineSet = true;
+                    break;
+                case RekallAgeSetBindingSetCommand set:
+                    if (pass == CommandPass.None || set.Index < 0 || set.Index >= Capabilities.MaximumBindingsPerLayout)
+                        diagnostics.Add(PassStateDiagnostic("Binding sets require an active pass and a bounded set index."));
+                    diagnostics.AddRange(ValidateHandleLocked(set.BindingSet, RekallAgeGraphicsResourceKind.BindingSet));
+                    break;
+                case RekallAgeSetVertexBufferCommand set:
+                    if (pass != CommandPass.Render || set.Slot < 0 || set.Slot >= Capabilities.MaximumVertexBuffers) diagnostics.Add(PassStateDiagnostic("Vertex buffers can only be bound to available slots in a render pass."));
+                    diagnostics.AddRange(ValidateBufferBindingLocked(set.Buffer, RekallAgeBufferUsage.Vertex, set.Offset, set.SizeBytes));
+                    break;
+                case RekallAgeSetIndexBufferCommand set:
+                    if (pass != CommandPass.Render) diagnostics.Add(PassStateDiagnostic("Index buffers can only be bound in a render pass."));
+                    diagnostics.AddRange(ValidateBufferBindingLocked(set.Buffer, RekallAgeBufferUsage.Index, set.Offset, set.SizeBytes));
+                    indexBufferSet = true;
+                    break;
+                case RekallAgeDrawCommand draw:
+                    if (pass != CommandPass.Render || !renderPipelineSet) diagnostics.Add(PassStateDiagnostic("Draw requires an active render pass and render pipeline."));
+                    if (draw.VertexCount == 0 || draw.InstanceCount == 0) diagnostics.Add(DrawRangeDiagnostic());
+                    break;
+                case RekallAgeDrawIndexedCommand draw:
+                    if (pass != CommandPass.Render || !renderPipelineSet || !indexBufferSet) diagnostics.Add(PassStateDiagnostic("Indexed draw requires a render pass, pipeline, and index buffer."));
+                    if (draw.IndexCount == 0 || draw.InstanceCount == 0) diagnostics.Add(DrawRangeDiagnostic());
+                    break;
+                case RekallAgeEndRenderPassCommand:
+                    if (pass != CommandPass.Render) diagnostics.Add(PassStateDiagnostic("No render pass is active.")); else pass = CommandPass.None;
+                    break;
+                case RekallAgeBeginComputePassCommand:
+                    if (pass != CommandPass.None) diagnostics.Add(PassStateDiagnostic("Passes cannot be nested."));
+                    else { pass = CommandPass.Compute; computePipelineSet = false; }
+                    if (!Capabilities.SupportsCompute) diagnostics.Add(new("REKALL_GPU_FEATURE_REQUIRED", "Compute commands require compute support."));
+                    break;
+                case RekallAgeDispatchCommand dispatch:
+                    if (pass != CommandPass.Compute || !computePipelineSet) diagnostics.Add(PassStateDiagnostic("Dispatch requires an active compute pass and compute pipeline."));
+                    if (!IsDispatchInRange(dispatch.GroupCountX, dispatch.GroupCountY, dispatch.GroupCountZ)) diagnostics.Add(DispatchRangeDiagnostic(Capabilities.MaximumComputeWorkgroupsPerDimension));
+                    break;
+                case RekallAgeEndComputePassCommand:
+                    if (pass != CommandPass.Compute) diagnostics.Add(PassStateDiagnostic("No compute pass is active.")); else pass = CommandPass.None;
+                    break;
+                default:
+                    diagnostics.Add(new("REKALL_GPU_COMMAND_UNKNOWN", $"Unsupported command type {command.GetType().Name}."));
+                    break;
+            }
+        }
+        if (pass != CommandPass.None) diagnostics.Add(PassStateDiagnostic("Command buffer ends with an active pass."));
+        return diagnostics;
+    }
+
+    private static RekallAgeGraphicsDiagnostic PassStateDiagnostic(string message) => new("REKALL_GPU_PASS_STATE_INVALID", message);
+    private static RekallAgeGraphicsDiagnostic DrawRangeDiagnostic() => new("REKALL_GPU_DRAW_RANGE_INVALID", "Draw vertex/index and instance counts must be nonzero.");
+    private bool IsDispatchInRange(uint x, uint y, uint z) =>
+        x > 0 && y > 0 && z > 0
+        && x <= Capabilities.MaximumComputeWorkgroupsPerDimension
+        && y <= Capabilities.MaximumComputeWorkgroupsPerDimension
+        && z <= Capabilities.MaximumComputeWorkgroupsPerDimension;
+
+    private static RekallAgeGraphicsDiagnostic DispatchRangeDiagnostic(uint maximum) => new(
+        "REKALL_GPU_DISPATCH_RANGE_INVALID",
+        $"Dispatch workgroup counts must be from 1 through {maximum} per dimension.");
 
     private IReadOnlyList<RekallAgeGraphicsDiagnostic> ValidateCopyLocked(
         RekallAgeGraphicsResourceHandle source,
@@ -402,11 +565,144 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
         private readonly List<RekallAgeGraphicsCommand> _commands = [];
         private bool _finished;
         private bool _disposed;
+        private CommandPass _pass;
+        private bool _renderPipelineSet;
+        private bool _computePipelineSet;
+        private bool _indexBufferSet;
 
         public CommandEncoder(RekallAgeInMemoryRenderingDevice device, string? label)
         {
             _device = device;
             _label = label;
+        }
+
+        public RekallAgeGraphicsValidationResult BeginRenderPass(RekallAgeRenderPassDescriptor descriptor)
+        {
+            EnsureWritable();
+            ArgumentNullException.ThrowIfNull(descriptor);
+            if (_pass != CommandPass.None) return InvalidPass("Passes cannot be nested.");
+            var diagnostics = _device.ValidateRenderPass(descriptor);
+            if (diagnostics.Count > 0) return new(diagnostics);
+            _commands.Add(new RekallAgeBeginRenderPassCommand(descriptor));
+            _pass = CommandPass.Render;
+            _renderPipelineSet = false;
+            _indexBufferSet = false;
+            return Valid();
+        }
+
+        public RekallAgeGraphicsValidationResult SetRenderPipeline(RekallAgeGraphicsResourceHandle pipeline)
+        {
+            EnsureWritable();
+            if (_pass != CommandPass.Render) return InvalidPass("A render pipeline can only be bound in a render pass.");
+            var diagnostics = _device.ValidateHandle(pipeline, RekallAgeGraphicsResourceKind.RenderPipeline);
+            if (diagnostics.Count > 0) return new(diagnostics);
+            _commands.Add(new RekallAgeSetRenderPipelineCommand(pipeline));
+            _renderPipelineSet = true;
+            return Valid();
+        }
+
+        public RekallAgeGraphicsValidationResult SetComputePipeline(RekallAgeGraphicsResourceHandle pipeline)
+        {
+            EnsureWritable();
+            if (_pass != CommandPass.Compute) return InvalidPass("A compute pipeline can only be bound in a compute pass.");
+            var diagnostics = _device.ValidateHandle(pipeline, RekallAgeGraphicsResourceKind.ComputePipeline);
+            if (diagnostics.Count > 0) return new(diagnostics);
+            _commands.Add(new RekallAgeSetComputePipelineCommand(pipeline));
+            _computePipelineSet = true;
+            return Valid();
+        }
+
+        public RekallAgeGraphicsValidationResult SetBindingSet(int index, RekallAgeGraphicsResourceHandle bindingSet)
+        {
+            EnsureWritable();
+            if (_pass == CommandPass.None || index < 0 || index >= _device.Capabilities.MaximumBindingsPerLayout)
+                return InvalidPass("Binding sets require an active pass and a bounded set index.");
+            var diagnostics = _device.ValidateHandle(bindingSet, RekallAgeGraphicsResourceKind.BindingSet);
+            if (diagnostics.Count > 0) return new(diagnostics);
+            _commands.Add(new RekallAgeSetBindingSetCommand(index, bindingSet));
+            return Valid();
+        }
+
+        public RekallAgeGraphicsValidationResult SetVertexBuffer(int slot, RekallAgeGraphicsResourceHandle buffer, ulong offset = 0, ulong sizeBytes = 0)
+        {
+            EnsureWritable();
+            if (_pass != CommandPass.Render || slot < 0 || slot >= _device.Capabilities.MaximumVertexBuffers)
+                return InvalidPass("Vertex buffers can only be bound to available slots in a render pass.");
+            var diagnostics = _device.ValidateBufferBinding(buffer, RekallAgeBufferUsage.Vertex, offset, sizeBytes);
+            if (diagnostics.Count > 0) return new(diagnostics);
+            _commands.Add(new RekallAgeSetVertexBufferCommand(slot, buffer, offset, sizeBytes));
+            return Valid();
+        }
+
+        public RekallAgeGraphicsValidationResult SetIndexBuffer(RekallAgeGraphicsResourceHandle buffer, RekallAgeIndexFormat format, ulong offset = 0, ulong sizeBytes = 0)
+        {
+            EnsureWritable();
+            if (_pass != CommandPass.Render) return InvalidPass("Index buffers can only be bound in a render pass.");
+            var diagnostics = _device.ValidateBufferBinding(buffer, RekallAgeBufferUsage.Index, offset, sizeBytes);
+            if (diagnostics.Count > 0) return new(diagnostics);
+            _commands.Add(new RekallAgeSetIndexBufferCommand(buffer, format, offset, sizeBytes));
+            _indexBufferSet = true;
+            return Valid();
+        }
+
+        public RekallAgeGraphicsValidationResult Draw(uint vertexCount, uint instanceCount = 1, uint firstVertex = 0, uint firstInstance = 0)
+        {
+            EnsureWritable();
+            if (_pass != CommandPass.Render || !_renderPipelineSet) return InvalidPass("Draw requires an active render pass and render pipeline.");
+            if (vertexCount == 0 || instanceCount == 0) return new([DrawRangeDiagnostic()]);
+            _commands.Add(new RekallAgeDrawCommand(vertexCount, instanceCount, firstVertex, firstInstance));
+            return Valid();
+        }
+
+        public RekallAgeGraphicsValidationResult DrawIndexed(uint indexCount, uint instanceCount = 1, uint firstIndex = 0, int baseVertex = 0, uint firstInstance = 0)
+        {
+            EnsureWritable();
+            if (_pass != CommandPass.Render || !_renderPipelineSet || !_indexBufferSet)
+                return InvalidPass("Indexed draw requires a render pass, pipeline, and index buffer.");
+            if (indexCount == 0 || instanceCount == 0) return new([DrawRangeDiagnostic()]);
+            _commands.Add(new RekallAgeDrawIndexedCommand(indexCount, instanceCount, firstIndex, baseVertex, firstInstance));
+            return Valid();
+        }
+
+        public RekallAgeGraphicsValidationResult EndRenderPass()
+        {
+            EnsureWritable();
+            if (_pass != CommandPass.Render) return InvalidPass("No render pass is active.");
+            _commands.Add(new RekallAgeEndRenderPassCommand());
+            _pass = CommandPass.None;
+            return Valid();
+        }
+
+        public RekallAgeGraphicsValidationResult BeginComputePass(string? label = null)
+        {
+            EnsureWritable();
+            if (_pass != CommandPass.None) return InvalidPass("Passes cannot be nested.");
+            if (!_device.Capabilities.SupportsCompute)
+                return new([new("REKALL_GPU_FEATURE_REQUIRED", "Compute commands require compute support.", label)]);
+            _commands.Add(new RekallAgeBeginComputePassCommand(label));
+            _pass = CommandPass.Compute;
+            _computePipelineSet = false;
+            return Valid();
+        }
+
+        public RekallAgeGraphicsValidationResult Dispatch(uint groupCountX, uint groupCountY = 1, uint groupCountZ = 1)
+        {
+            EnsureWritable();
+            if (_pass != CommandPass.Compute || !_computePipelineSet)
+                return InvalidPass("Dispatch requires an active compute pass and compute pipeline.");
+            if (!_device.IsDispatchInRange(groupCountX, groupCountY, groupCountZ))
+                return new([DispatchRangeDiagnostic(_device.Capabilities.MaximumComputeWorkgroupsPerDimension)]);
+            _commands.Add(new RekallAgeDispatchCommand(groupCountX, groupCountY, groupCountZ));
+            return Valid();
+        }
+
+        public RekallAgeGraphicsValidationResult EndComputePass()
+        {
+            EnsureWritable();
+            if (_pass != CommandPass.Compute) return InvalidPass("No compute pass is active.");
+            _commands.Add(new RekallAgeEndComputePassCommand());
+            _pass = CommandPass.None;
+            return Valid();
         }
 
         public RekallAgeGraphicsValidationResult CopyBuffer(
@@ -417,6 +713,7 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
             ulong sizeBytes)
         {
             EnsureWritable();
+            if (_pass != CommandPass.None) return InvalidPass("Buffer copies must be outside a pass.");
             var diagnostics = _device.ValidateCopy(source, sourceOffset, destination, destinationOffset, sizeBytes);
             if (diagnostics.Count == 0)
             {
@@ -428,6 +725,10 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
         public RekallAgeGraphicsCommandBuffer Finish()
         {
             EnsureWritable();
+            if (_pass != CommandPass.None)
+            {
+                throw new InvalidOperationException("Command encoder cannot finish while a render or compute pass is active.");
+            }
             _finished = true;
             return new(
                 _device.DeviceId,
@@ -445,7 +746,12 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
                 throw new InvalidOperationException("Command encoder has already been finished.");
             }
         }
+
+        private static RekallAgeGraphicsValidationResult Valid() => new([]);
+        private static RekallAgeGraphicsValidationResult InvalidPass(string message) => new([PassStateDiagnostic(message)]);
     }
+
+    private enum CommandPass { None, Render, Compute }
 
     private sealed record Resource(
         RekallAgeGraphicsResourceHandle Handle,

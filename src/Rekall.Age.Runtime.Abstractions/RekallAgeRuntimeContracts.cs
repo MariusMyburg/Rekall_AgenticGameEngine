@@ -308,6 +308,9 @@ public sealed record RekallAgeRuntimeRenderView(
     IReadOnlyList<RekallAgeRuntimeRenderUiLayer> UiLayers,
     IReadOnlyList<RekallAgeRuntimeRenderPostProcessStack> PostProcessStacks)
 {
+    public IReadOnlyList<RekallAgeRuntimeGpuWorkload> GpuWorkloads { get; init; } =
+        Array.Empty<RekallAgeRuntimeGpuWorkload>();
+
     public static RekallAgeRuntimeRenderView Empty { get; } = new(
         Array.Empty<RekallAgeRuntimeRenderCamera>(),
         Array.Empty<RekallAgeRuntimeRenderSprite>(),
@@ -400,6 +403,201 @@ public sealed record RekallAgeRuntimeRenderPostProcessPass(
     double Intensity = 1,
     double Radius = 1,
     string BlendMode = "add");
+
+[Flags]
+public enum RekallAgeRuntimeGpuBufferUsage
+{
+    None = 0,
+    CopySource = 1 << 0,
+    CopyDestination = 1 << 1,
+    Vertex = 1 << 2,
+    Index = 1 << 3,
+    Uniform = 1 << 4,
+    Storage = 1 << 5,
+    Indirect = 1 << 6,
+    Readback = 1 << 7
+}
+
+[Flags]
+public enum RekallAgeRuntimeGpuTextureUsage
+{
+    None = 0,
+    CopySource = 1 << 0,
+    CopyDestination = 1 << 1,
+    Sampled = 1 << 2,
+    Storage = 1 << 3,
+    ColorAttachment = 1 << 4,
+    DepthStencilAttachment = 1 << 5,
+    Present = 1 << 6
+}
+
+public enum RekallAgeRuntimeGpuTextureDimension { Texture1D, Texture2D, Texture3D, Cube }
+public enum RekallAgeRuntimeGpuShaderStage { Vertex, Fragment, Compute }
+public enum RekallAgeRuntimeGpuShaderLanguage { Glsl, SpirV, Wgsl }
+public enum RekallAgeRuntimeGpuBindingType
+{
+    UniformBuffer,
+    ReadOnlyStorageBuffer,
+    StorageBuffer,
+    Sampler,
+    ComparisonSampler,
+    SampledTexture,
+    ReadOnlyStorageTexture,
+    StorageTexture
+}
+public enum RekallAgeRuntimeGpuPipelineKind { Render, Compute }
+public enum RekallAgeRuntimeGpuIndexFormat { UInt16, UInt32 }
+public enum RekallAgeRuntimeGpuCommandKind
+{
+    CopyBuffer,
+    BeginRenderPass,
+    SetRenderPipeline,
+    SetComputePipeline,
+    SetBindingSet,
+    SetVertexBuffer,
+    SetIndexBuffer,
+    Draw,
+    DrawIndexed,
+    EndRenderPass,
+    BeginComputePass,
+    Dispatch,
+    EndComputePass
+}
+
+public sealed record RekallAgeRuntimeGpuBuffer(
+    string Id,
+    ulong SizeBytes,
+    RekallAgeRuntimeGpuBufferUsage Usage)
+{
+    public string MemoryAccess { get; init; } = "device-local";
+    public string? InitialDataAsset { get; init; }
+}
+
+public sealed record RekallAgeRuntimeGpuTexture(
+    string Id,
+    RekallAgeRuntimeGpuTextureDimension Dimension,
+    int Width,
+    int Height,
+    int Depth,
+    string Format,
+    RekallAgeRuntimeGpuTextureUsage Usage)
+{
+    public int MipLevels { get; init; } = 1;
+    public int ArrayLayers { get; init; } = 1;
+    public int SampleCount { get; init; } = 1;
+    public string? InitialDataAsset { get; init; }
+}
+
+public sealed record RekallAgeRuntimeGpuSampler(string Id)
+{
+    public string MinFilter { get; init; } = "linear";
+    public string MagFilter { get; init; } = "linear";
+    public string MipmapFilter { get; init; } = "linear";
+    public string AddressU { get; init; } = "repeat";
+    public string AddressV { get; init; } = "repeat";
+    public string AddressW { get; init; } = "repeat";
+    public int MaximumAnisotropy { get; init; } = 1;
+}
+
+public sealed record RekallAgeRuntimeGpuShader(
+    string Id,
+    RekallAgeRuntimeGpuShaderStage Stage,
+    RekallAgeRuntimeGpuShaderLanguage Language,
+    string Source)
+{
+    public string EntryPoint { get; init; } = "main";
+}
+
+public sealed record RekallAgeRuntimeGpuBindingLayoutEntry(
+    int Binding,
+    RekallAgeRuntimeGpuBindingType Type,
+    IReadOnlyList<RekallAgeRuntimeGpuShaderStage> Visibility)
+{
+    public ulong MinimumBindingSize { get; init; }
+}
+
+public sealed record RekallAgeRuntimeGpuBindingLayout(
+    string Id,
+    IReadOnlyList<RekallAgeRuntimeGpuBindingLayoutEntry> Entries);
+
+public sealed record RekallAgeRuntimeGpuBinding(
+    int Binding,
+    string Resource)
+{
+    public ulong Offset { get; init; }
+    public ulong SizeBytes { get; init; }
+}
+
+public sealed record RekallAgeRuntimeGpuBindingSet(
+    string Id,
+    string Layout,
+    IReadOnlyList<RekallAgeRuntimeGpuBinding> Bindings);
+
+public sealed record RekallAgeRuntimeGpuPipeline(
+    string Id,
+    RekallAgeRuntimeGpuPipelineKind Kind)
+{
+    public string? VertexShader { get; init; }
+    public string? FragmentShader { get; init; }
+    public string? ComputeShader { get; init; }
+    public IReadOnlyList<string> BindingLayouts { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> ColorFormats { get; init; } = Array.Empty<string>();
+    public string? DepthStencilFormat { get; init; }
+    public string PrimitiveTopology { get; init; } = "triangle-list";
+    public string CullMode { get; init; } = "back";
+}
+
+public sealed record RekallAgeRuntimeGpuRenderTarget(
+    string Id,
+    IReadOnlyList<string> ColorAttachments,
+    int Width,
+    int Height)
+{
+    public string? DepthStencilAttachment { get; init; }
+}
+
+public sealed record RekallAgeRuntimeGpuClearColor(float Red, float Green, float Blue, float Alpha);
+
+public sealed record RekallAgeRuntimeGpuCommand(RekallAgeRuntimeGpuCommandKind Kind)
+{
+    public string? Resource { get; init; }
+    public string? Source { get; init; }
+    public string? Destination { get; init; }
+    public string? Label { get; init; }
+    public int Slot { get; init; }
+    public int BindingSetIndex { get; init; }
+    public ulong SourceOffset { get; init; }
+    public ulong DestinationOffset { get; init; }
+    public ulong SizeBytes { get; init; }
+    public RekallAgeRuntimeGpuIndexFormat IndexFormat { get; init; } = RekallAgeRuntimeGpuIndexFormat.UInt32;
+    public uint VertexCount { get; init; }
+    public uint IndexCount { get; init; }
+    public uint InstanceCount { get; init; } = 1;
+    public uint FirstVertex { get; init; }
+    public uint FirstIndex { get; init; }
+    public int BaseVertex { get; init; }
+    public uint FirstInstance { get; init; }
+    public uint GroupCountX { get; init; } = 1;
+    public uint GroupCountY { get; init; } = 1;
+    public uint GroupCountZ { get; init; } = 1;
+    public IReadOnlyList<RekallAgeRuntimeGpuClearColor> ClearColors { get; init; } =
+        Array.Empty<RekallAgeRuntimeGpuClearColor>();
+    public float? ClearDepth { get; init; }
+}
+
+public sealed record RekallAgeRuntimeGpuWorkload(string Id)
+{
+    public bool Enabled { get; init; } = true;
+    public IReadOnlyList<RekallAgeRuntimeGpuBuffer> Buffers { get; init; } = Array.Empty<RekallAgeRuntimeGpuBuffer>();
+    public IReadOnlyList<RekallAgeRuntimeGpuTexture> Textures { get; init; } = Array.Empty<RekallAgeRuntimeGpuTexture>();
+    public IReadOnlyList<RekallAgeRuntimeGpuSampler> Samplers { get; init; } = Array.Empty<RekallAgeRuntimeGpuSampler>();
+    public IReadOnlyList<RekallAgeRuntimeGpuShader> Shaders { get; init; } = Array.Empty<RekallAgeRuntimeGpuShader>();
+    public IReadOnlyList<RekallAgeRuntimeGpuBindingLayout> BindingLayouts { get; init; } = Array.Empty<RekallAgeRuntimeGpuBindingLayout>();
+    public IReadOnlyList<RekallAgeRuntimeGpuBindingSet> BindingSets { get; init; } = Array.Empty<RekallAgeRuntimeGpuBindingSet>();
+    public IReadOnlyList<RekallAgeRuntimeGpuPipeline> Pipelines { get; init; } = Array.Empty<RekallAgeRuntimeGpuPipeline>();
+    public IReadOnlyList<RekallAgeRuntimeGpuRenderTarget> RenderTargets { get; init; } = Array.Empty<RekallAgeRuntimeGpuRenderTarget>();
+    public IReadOnlyList<RekallAgeRuntimeGpuCommand> Commands { get; init; } = Array.Empty<RekallAgeRuntimeGpuCommand>();
+}
 
 public static class RekallAgeRuntimeProjectionSources
 {

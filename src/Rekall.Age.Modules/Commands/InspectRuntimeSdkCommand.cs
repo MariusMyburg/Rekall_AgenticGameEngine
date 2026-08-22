@@ -96,6 +96,19 @@ public sealed class InspectRuntimeSdkCommand
                 "Frame facts are immutable. Semantic input actions are projected onto RekallAgeRuntimeWorld and consumed through world SDK helpers; do not invent context.InputActions."),
             new RekallAgeRuntimeSdkContract(
                 "runtime-type",
+                nameof(RekallAgeRuntimeGpuWorkload),
+                "record RekallAgeRuntimeGpuWorkload(string Id) { Buffers; Textures; Samplers; Shaders; BindingLayouts; BindingSets; Pipelines; RenderTargets; Commands; }",
+                "Immutable backend-neutral named GPU resource graph authored by a C# runtime module. Resources use stable string IDs; the engine validates and resolves them to opaque RenderingDevice handles."),
+            new RekallAgeRuntimeSdkContract(
+                "authoring-recipe",
+                "gpu-workload-authoring-recipe",
+                "RekallAgeRuntimeGpuWorkload + RekallAgeRuntimeGpuCommand + world.WithGpuWorkload(workload)",
+                "Construct typed bounded resources and one flat command stream, then consume the replacement world returned by WithGpuWorkload. Do not access Vulkan, Veldrid, WebGPU, pointers, or native handles; engine validation owns allocation and submission.")
+            {
+                Usage = "var workload = new RekallAgeRuntimeGpuWorkload(\"simulation\") { Shaders = [computeShader], Pipelines = [computePipeline], Commands = [new(RekallAgeRuntimeGpuCommandKind.BeginComputePass), new(RekallAgeRuntimeGpuCommandKind.SetComputePipeline) { Resource = \"pipeline\" }, new(RekallAgeRuntimeGpuCommandKind.Dispatch) { GroupCountX = 8 }, new(RekallAgeRuntimeGpuCommandKind.EndComputePass)] }; world = world.WithGpuWorkload(workload);"
+            },
+            new RekallAgeRuntimeSdkContract(
+                "runtime-type",
                 nameof(RekallAgeRuntimeVector2),
                 "record RekallAgeRuntimeVector2(double X, double Y)",
                 "An immutable planar vector used by Transform2D and Raycast2D. Compute scalar locals and construct a replacement vector; X and Y are not mutable fields.")
@@ -234,6 +247,10 @@ public sealed class InspectRuntimeSdkCommand
         nameof(RekallAgeRuntimeModuleSdk.DeterministicUnit) or
         nameof(RekallAgeRuntimeModuleSdk.DeterministicRange) =>
             "Returns stateless deterministic pseudo-random values from an authored seed and stable sequence index, suitable for replayable spawning and procedural variation.",
+        nameof(RekallAgeRuntimeModuleSdk.GpuWorkloads) or
+        nameof(RekallAgeRuntimeModuleSdk.WithGpuWorkload) or
+        nameof(RekallAgeRuntimeModuleSdk.WithoutGpuWorkload) =>
+            "Reads or returns a replacement immutable world containing bounded backend-neutral GPU workloads. Backends resolve authored resource IDs to opaque handles only after validation.",
         nameof(RekallAgeRuntimeModuleSdk.UpdateEntity) or
         nameof(RekallAgeRuntimeModuleSdk.ReplaceEntity) or
         nameof(RekallAgeRuntimeModuleSdk.RemoveEntity) or
@@ -273,6 +290,12 @@ public sealed class InspectRuntimeSdkCommand
             "var unit = RekallAgeRuntimeModuleSdk.DeterministicUnit(seed, spawnIndex);",
         nameof(RekallAgeRuntimeModuleSdk.DeterministicRange) =>
             "var yaw = RekallAgeRuntimeModuleSdk.DeterministicRange(seed, spawnIndex, -180, 180);",
+        nameof(RekallAgeRuntimeModuleSdk.GpuWorkloads) =>
+            "var workloads = world.GpuWorkloads(); // stable ordinal workload-id order",
+        nameof(RekallAgeRuntimeModuleSdk.WithGpuWorkload) =>
+            "world = world.WithGpuWorkload(workload); // add or replace by stable workload.Id",
+        nameof(RekallAgeRuntimeModuleSdk.WithoutGpuWorkload) =>
+            "world = world.WithoutGpuWorkload(\"simulation\");",
         nameof(RekallAgeRuntimeModuleSdk.InputActionValue) =>
             "var horizontal = world.InputActionValue(\"move.horizontal\");",
         nameof(RekallAgeRuntimeModuleSdk.IsInputActionDown) =>

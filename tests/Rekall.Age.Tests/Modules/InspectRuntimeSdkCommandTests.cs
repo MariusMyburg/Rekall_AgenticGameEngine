@@ -144,4 +144,31 @@ public sealed class InspectRuntimeSdkCommandTests
             && contract.Signature.Contains("long sequence", StringComparison.Ordinal)
             && contract.Usage!.Contains("spawnIndex", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public async Task ReturnsAgentAuthoredGpuWorkloadContractsAndSafeUsageRecipe()
+    {
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("inspect GPU workload sdk"),
+            CancellationToken.None);
+
+        var result = await new InspectRuntimeSdkCommand().ExecuteAsync(
+            new InspectRuntimeSdkRequest("gpu workload shader compute pipeline command render", Limit: 24),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "WithGpuWorkload"
+            && contract.Signature.Contains("RekallAgeRuntimeGpuWorkload workload", StringComparison.Ordinal)
+            && contract.Description.Contains("opaque", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "RekallAgeRuntimeGpuWorkload"
+            && contract.Signature.Contains("Buffers", StringComparison.Ordinal)
+            && contract.Signature.Contains("Commands", StringComparison.Ordinal));
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "gpu-workload-authoring-recipe"
+            && contract.Usage!.Contains("BeginComputePass", StringComparison.Ordinal)
+            && contract.Description.Contains("WithGpuWorkload", StringComparison.Ordinal));
+    }
 }

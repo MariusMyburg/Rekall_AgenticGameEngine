@@ -18,6 +18,8 @@ public sealed record RekallAgeRuntimeRaycast2DHit(
 
 public static class RekallAgeRuntimeModuleSdk
 {
+    public const int MaximumGpuWorkloads = 8;
+
     public static RekallAgeRuntimeEntity CreateEntity(string id, string name)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -657,6 +659,67 @@ public static class RekallAgeRuntimeModuleSdk
     public static bool WasInputActionReleased(this RekallAgeRuntimeWorld world, string name)
     {
         return world.InputActions(name).Any(action => action.WasReleased);
+    }
+
+    public static IReadOnlyList<RekallAgeRuntimeGpuWorkload> GpuWorkloads(
+        this RekallAgeRuntimeWorld world)
+    {
+        return (world.Subsystems.Rendering.GpuWorkloads ?? Array.Empty<RekallAgeRuntimeGpuWorkload>())
+            .OrderBy(workload => workload.Id, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public static RekallAgeRuntimeWorld WithGpuWorkload(
+        this RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeGpuWorkload workload)
+    {
+        ArgumentNullException.ThrowIfNull(workload);
+        if (string.IsNullOrWhiteSpace(workload.Id))
+        {
+            throw new ArgumentException("GPU workload id must not be empty.", nameof(workload));
+        }
+        var id = workload.Id.Trim();
+        if (id.Length > 128)
+        {
+            throw new ArgumentException("GPU workload id must not exceed 128 characters.", nameof(workload));
+        }
+        var current = world.GpuWorkloads();
+        var existing = current.Any(item => item.Id.Equals(id, StringComparison.Ordinal));
+        if (!existing && current.Count >= MaximumGpuWorkloads)
+        {
+            throw new InvalidOperationException($"Runtime GPU workload count cannot exceed {MaximumGpuWorkloads}.");
+        }
+        var replacement = workload with { Id = id };
+        var workloads = current
+            .Where(item => !item.Id.Equals(id, StringComparison.Ordinal))
+            .Append(replacement)
+            .OrderBy(item => item.Id, StringComparer.Ordinal)
+            .ToArray();
+        return world with
+        {
+            Subsystems = world.Subsystems with
+            {
+                Rendering = world.Subsystems.Rendering with { GpuWorkloads = workloads }
+            }
+        };
+    }
+
+    public static RekallAgeRuntimeWorld WithoutGpuWorkload(
+        this RekallAgeRuntimeWorld world,
+        string workloadId)
+    {
+        if (string.IsNullOrWhiteSpace(workloadId)) return world;
+        var id = workloadId.Trim();
+        var current = world.GpuWorkloads();
+        var workloads = current.Where(item => !item.Id.Equals(id, StringComparison.Ordinal)).ToArray();
+        if (workloads.Length == current.Count) return world;
+        return world with
+        {
+            Subsystems = world.Subsystems with
+            {
+                Rendering = world.Subsystems.Rendering with { GpuWorkloads = workloads }
+            }
+        };
     }
 
     public static IReadOnlyList<RekallAgeRuntimeControllerState> InputControllers(

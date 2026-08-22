@@ -3219,9 +3219,19 @@ rendering, shader programmability, scripting, and web export, with useful
 concepts translated into AGE's 100% C# and agent-first architecture.
 
 Complete the RenderingDevice-to-Player migration checkpoint currently in
-flight: live Vulkan proof, full tests/builds, commit, and push. Then resume Pong
-through the generic portable authoring path, followed by a Galaga-class game in
-Studio. The queued Rain Glass shader acceptance follows those playable proofs
+flight: this is now complete and pushed at `601b4bb`. The active graphics item
+is the bounded declarative GPU-workload boundary for agent-authored C# modules,
+specified in `docs/superpowers/specs/2026-08-22-module-gpu-workload-design.md`.
+Its first contract checkpoint passes 3/3 focused tests: immutable named buffer,
+texture, sampler, shader, layout/set, pipeline, render-target, and command
+records survive runtime-world JSON round-trip; module SDK helpers provide
+bounded deterministic add/replace/list/remove behavior without native handles.
+Runtime SDK inspection now exposes the exact compiled helpers, workload shape,
+opaque-handle safety boundary, and a complete compute-pass authoring recipe;
+the combined runtime/SDK selection passes 8/8.
+After its Windows programmable-compositor proof, resume Pong through the generic
+portable authoring path, followed by a Galaga-class game in Studio. The queued
+Rain Glass shader acceptance follows those playable proofs
 and still requires the licensed remote image, full-window asset-backed
 composition, two temporally distinct frames, package relocation, and audit.
 
@@ -3230,6 +3240,8 @@ composition, two temporally distinct frames, package relocation, and audit.
 - `docs/production/2026-08-17-engine-maturity-audit.md`
 - `docs/production/2026-08-17-ollama-authoring-benchmark.md`
 - `docs/production/2026-08-22-rendering-device-migration.md`
+- `docs/superpowers/specs/2026-08-22-module-gpu-workload-design.md`
+- `docs/superpowers/plans/2026-08-22-module-gpu-workloads.md`
 - `docs/superpowers/plans/2026-08-17-runtime-subsystems.md`
 - `docs/superpowers/specs/2026-08-18-runtime-soak-performance-design.md`
 - `docs/superpowers/plans/2026-08-18-runtime-soak-performance.md`

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rekall AGE — Web Player Proof</title>
+  <link rel="preload" id="webassembly">
+  <script type="importmap"></script>
+  <script type="module" src="main#[.{fingerprint}].js"></script>
+  <style>
+    :root { color-scheme: dark; --ink: #d7e5df; --muted: #7e918b; --signal: #6fffd1; --line: #203835; --void: #050a0b; }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; background: var(--void); }
+    body { color: var(--ink); font-family: Bahnschrift, "Aptos Narrow", sans-serif; letter-spacing: .035em; overflow: hidden; }
+    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .16; background-image: repeating-linear-gradient(0deg, transparent 0 3px, #9fffe00a 3px 4px); }
+    main { height: 100vh; display: grid; grid-template-columns: minmax(18rem, 25rem) 1fr; padding: clamp(1rem, 2.5vw, 2.5rem); gap: clamp(1rem, 2.5vw, 2.5rem); }
+    aside { display: flex; flex-direction: column; justify-content: space-between; border-left: 2px solid var(--signal); padding: .4rem 0 .4rem clamp(1rem, 2vw, 2rem); }
+    .eyebrow { color: var(--signal); font-size: .72rem; letter-spacing: .28em; text-transform: uppercase; }
+    h1 { font-family: Georgia, serif; font-weight: 400; font-size: clamp(3.4rem, 7vw, 7.8rem); line-height: .78; letter-spacing: -.075em; margin: 1.1rem 0 2rem; }
+    h1 span { display: block; color: transparent; -webkit-text-stroke: 1px var(--muted); }
+    .lede { max-width: 28rem; color: var(--muted); line-height: 1.7; font-size: .88rem; }
+    dl { margin: 2rem 0 0; }
+    dl div { display: grid; grid-template-columns: 6.2rem 1fr; padding: .75rem 0; border-top: 1px solid var(--line); }
+    dt { color: var(--muted); font-size: .67rem; text-transform: uppercase; letter-spacing: .18em; }
+    dd { margin: 0; font-size: .76rem; text-align: right; }
+    #state { color: #ffca7a; }
+    body[data-device="ready"] #state { color: var(--signal); }
+    .mark { font-size: .66rem; color: var(--muted); }
+    section { position: relative; min-width: 0; border: 1px solid var(--line); background: #071012; overflow: hidden; }
+    section::before { content: "WEB PLAYER / CONTRACT PROOF 001"; position: absolute; z-index: 2; top: 1rem; left: 1rem; color: var(--signal); font-size: .62rem; letter-spacing: .2em; }
+    section::after { content: "NOT YET A PLAYABLE EXPORT"; position: absolute; z-index: 2; right: 1rem; bottom: 1rem; color: var(--muted); font-size: .6rem; letter-spacing: .2em; }
+    canvas { display: block; width: 100%; height: 100%; }
+    @media (max-width: 760px) { body { overflow: auto; } main { height: auto; min-height: 100vh; grid-template-columns: 1fr; grid-template-rows: auto 58vh; } h1 { font-size: 4.6rem; } }
+  </style>
+</head>
+<body>
+  <main>
+    <aside>
+      <div>
+        <div class="eyebrow">Rekall Agentic Game Engine</div>
+        <h1>AGE<span>WEB</span></h1>
+        <p class="lede">A 100% C# browser-runtime proof for the portable rendering-device contract. This shell reports real runtime and browser graphics capability; playable export remains gated on backend and package acceptance.</p>
+        <dl>
+          <div><dt>Runtime</dt><dd id="runtime">LOADING WASM</dd></div>
+          <div><dt>Graphics</dt><dd id="graphics">PROBING</dd></div>
+          <div><dt>State</dt><dd id="state">BOOTSTRAPPING</dd></div>
+        </dl>
+      </div>
+      <div class="mark">REKALL AGE / PORTABLE PLAYER LAB / 2026</div>
+    </aside>
+    <section aria-label="Web player viewport"><canvas id="viewport"></canvas></section>
+  </main>
+</body>
+</html>

@@ -1074,6 +1074,24 @@ dotnet run --project src/Rekall.Age.Cli -- render vulkan command-buffer submit-e
 dotnet run --project src/Rekall.Age.Cli -- render vulkan render-pass capture-clear 64 64 R8G8B8A8_UNorm discrete-gpu .age-sandbox/Artifacts/Vulkan 0.2 0.4 0.8 1
 ```
 
+## Web Player Proof
+
+`src/Rekall.Age.Player.Web` is the first .NET 10 browser-WASM portability
+proof. It compiles real AGE Core, World, and Rendering.Abstractions assemblies,
+uses generated `[JSImport]` bindings to inspect browser graphics support, and
+reports the selected RenderingDevice profile in a live canvas shell.
+
+```powershell
+dotnet workload install wasm-tools wasm-experimental
+dotnet publish src/Rekall.Age.Player.Web/Rekall.Age.Player.Web.csproj -c Release
+python -m http.server 9327 --bind 127.0.0.1 --directory src/Rekall.Age.Player.Web/bin/Release/net10.0/publish/wwwroot
+```
+
+This proves the C# runtime and portable graphics contracts can execute in a
+browser; it is not yet a playable export. Completion still requires the WebGPU
+adapter, WebGL 2 compatibility adapter, scene/module package loader, browser
+input/audio/storage/network bridges, package audit, and playable acceptance.
+
 Vulkan scene rendering handles:
 
 - camera matrices

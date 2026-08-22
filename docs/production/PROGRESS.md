@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-22 20:49 Africa/Johannesburg
+Last verified: 2026-08-22 21:08 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -3169,6 +3169,19 @@ resource/command contract and its inspectable agent surface. Web remains an
 explicit proof track: .NET WebAssembly Player, browser host/input/audio/storage,
 WebGPU primary backend, WebGL 2 fallback, packaging/audit, and a real playable
 browser acceptance. Current desktop assemblies are not yet a web export.
+
+RenderingDevice Task 1 is now committed at `91c3f0a`: public backend
+capabilities, bounded buffer/texture descriptors, stable diagnostics, opaque
+device/kind/slot/generation handles, immutable copy command buffers, stale and
+foreign handle rejection, resource inspection, and an in-memory conformance
+device pass 5/5 focused tests and a zero-warning Release rendering build.
+
+The first browser runtime proof is also verified. Official .NET 10 WASM
+workloads are installed; `Rekall.Age.Player.Web` publishes real AGE Core, World,
+and Rendering.Abstractions assemblies through Emscripten. A live Chromium run
+reported `.NET 10.0.11 / browser-wasm`, detected WebGPU, rendered the canvas
+shell, and produced zero browser warnings/errors. This proves the runtime and
+interop route only, not playable export; the UI states that boundary explicitly.
 
 The 2026-08-22 generic controller-input milestone is implemented pending its
 physical-device acceptance gate: immutable controller axes/buttons/hats now flow through runtime

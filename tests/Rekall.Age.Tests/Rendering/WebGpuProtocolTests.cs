@@ -23,6 +23,20 @@ public sealed class WebGpuProtocolTests
     }
 
     [Fact]
+    public void ProtocolDeserializesTheLiteralBrowserBufferFixture()
+    {
+        const string packetJson = """
+            {"version":1,"resourceType":"buffer","handle":{"deviceId":"11111111-1111-1111-1111-111111111111","kind":"buffer","slot":7,"generation":1},"descriptor":{"sizeBytes":16,"usage":"vertex","memoryAccess":"deviceLocal","label":"literal-browser-fixture"},"operation":"create"}
+            """;
+
+        var packet = RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuCreatePacket>(packetJson);
+
+        Assert.Equal("buffer", packet.ResourceType);
+        Assert.Equal(7, packet.Handle.Slot);
+        Assert.Equal("literal-browser-fixture", packet.Descriptor.GetProperty("label").GetString());
+    }
+
+    [Fact]
     public void ProtocolRejectsUnknownVersionsAndOversizedPackets()
     {
         Assert.Throws<RekallAgeWebGpuProtocolException>(() =>

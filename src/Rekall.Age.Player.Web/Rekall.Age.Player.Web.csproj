@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.WebAssembly">
   <ItemGroup>
     <ProjectReference Include="..\Rekall.Age.Rendering.Abstractions\Rekall.Age.Rendering.Abstractions.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Rendering.WebGpu\Rekall.Age.Rendering.WebGpu.csproj" />
   </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -8,6 +9,7 @@
     <RuntimeIdentifiers>browser-wasm</RuntimeIdentifiers>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
   <ItemGroup>
     <StaticWebAssetFingerprintPattern Include="JS" Pattern="*.js" Expression="#[.{fingerprint}]!" />

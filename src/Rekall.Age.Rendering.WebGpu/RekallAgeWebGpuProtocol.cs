@@ -131,6 +131,45 @@ public static class RekallAgeWebGpuProtocol
         }
     }
 
+    public static RekallAgeWebGpuBridgeResult DeserializeBridgeResult(string? json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json ?? string.Empty);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object
+                || !root.TryGetProperty("succeeded", out var succeeded)
+                || succeeded.ValueKind is not JsonValueKind.True and not JsonValueKind.False
+                || !root.TryGetProperty("diagnostics", out var diagnostics)
+                || diagnostics.ValueKind != JsonValueKind.Array)
+            {
+                return InvalidBridgeResult();
+            }
+
+            var items = new List<RekallAgeGraphicsDiagnostic>();
+            foreach (var item in diagnostics.EnumerateArray().Take(64))
+            {
+                if (item.ValueKind != JsonValueKind.Object
+                    || !item.TryGetProperty("code", out var code) || code.ValueKind != JsonValueKind.String
+                    || !item.TryGetProperty("message", out var message) || message.ValueKind != JsonValueKind.String)
+                {
+                    return InvalidBridgeResult();
+                }
+
+                var target = item.TryGetProperty("target", out var candidate) && candidate.ValueKind == JsonValueKind.String
+                    ? candidate.GetString()
+                    : null;
+                items.Add(new(code.GetString()!, message.GetString()!, target));
+            }
+
+            return new(succeeded.GetBoolean(), items);
+        }
+        catch (JsonException)
+        {
+            return InvalidBridgeResult();
+        }
+    }
+
     private static void EnsurePacketSize(string json)
     {
         if (Encoding.UTF8.GetByteCount(json) > MaximumPacketBytes)
@@ -417,6 +456,9 @@ public static class RekallAgeWebGpuProtocol
     private static RekallAgeWebGpuProtocolException InvalidJson(JsonException exception) => new(
         new("REKALL_WEBGPU_PROTOCOL_JSON_INVALID", "WebGPU protocol packets must be valid JSON."),
         exception);
+
+    private static RekallAgeWebGpuBridgeResult InvalidBridgeResult() =>
+        new(false, [new("REKALL_WEBGPU_BRIDGE_RESULT_INVALID", "The browser WebGPU bridge returned an invalid result.")]);
 
     private static RekallAgeWebGpuProtocolException InvalidDescriptor(Exception? exception = null) => new(
         new("REKALL_WEBGPU_PROTOCOL_DESCRIPTOR_INVALID", "WebGPU create packet descriptors must be present, valid, and supported."),

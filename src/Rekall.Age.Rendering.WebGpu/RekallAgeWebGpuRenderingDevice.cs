@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 
@@ -8,6 +9,7 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
 {
     private readonly IRekallAgeWebGpuBridge _bridge;
     private readonly RekallAgeInMemoryRenderingDevice _conformance;
+    private readonly Dictionary<RekallAgeGraphicsResourceHandle, RekallAgeGraphicsResourceHandle> _canvasTextures = [];
     private IReadOnlyList<RekallAgeGraphicsDiagnostic>? _faultDiagnostics;
     private bool _disposed;
 
@@ -64,6 +66,7 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
     public RekallAgeGraphicsValidationResult WriteBuffer(RekallAgeGraphicsResourceHandle buffer, ulong offset, ReadOnlyMemory<byte> data)
     {
         if (!IsAvailable(out var diagnostics)) return new(diagnostics);
+        if (!CanSerializeUpload(new RekallAgeWebGpuWriteBufferPacket(RekallAgeWebGpuProtocol.Version, buffer, offset, string.Empty), data.Length, out diagnostics)) return new(diagnostics);
         var validation = _conformance.WriteBuffer(buffer, offset, data);
         return validation.Valid
             ? Execute(new RekallAgeWebGpuWriteBufferPacket(RekallAgeWebGpuProtocol.Version, buffer, offset, Convert.ToBase64String(data.Span)))
@@ -73,6 +76,7 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
     public RekallAgeGraphicsValidationResult WriteTexture(RekallAgeGraphicsResourceHandle texture, ReadOnlyMemory<byte> data, int mipLevel = 0, int arrayLayer = 0)
     {
         if (!IsAvailable(out var diagnostics)) return new(diagnostics);
+        if (!CanSerializeUpload(new RekallAgeWebGpuWriteTexturePacket(RekallAgeWebGpuProtocol.Version, texture, mipLevel, arrayLayer, string.Empty), data.Length, out diagnostics)) return new(diagnostics);
         var validation = _conformance.WriteTexture(texture, data, mipLevel, arrayLayer);
         return validation.Valid
             ? Execute(new RekallAgeWebGpuWriteTexturePacket(RekallAgeWebGpuProtocol.Version, texture, mipLevel, arrayLayer, Convert.ToBase64String(data.Span)))
@@ -82,20 +86,29 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
     public RekallAgeGraphicsValidationResult Destroy(RekallAgeGraphicsResourceHandle handle)
     {
         if (_disposed) return new([new("REKALL_WEBGPU_DEVICE_DISPOSED", "The WebGPU rendering device has been disposed.")]);
+        if (!_conformance.InspectResources().Any(resource => resource.Handle == handle)) return new([]);
+        var execution = Execute(new RekallAgeWebGpuDestroyPacket(RekallAgeWebGpuProtocol.Version, handle));
+        if (!execution.Valid) return execution;
         var validation = _conformance.Destroy(handle);
-        return validation.Valid
-            ? Execute(new RekallAgeWebGpuDestroyPacket(RekallAgeWebGpuProtocol.Version, handle))
-            : validation;
+        if (_canvasTextures.Remove(handle, out var texture))
+        {
+            var textureValidation = Destroy(texture);
+            return textureValidation.Valid ? validation : textureValidation;
+        }
+        return validation;
     }
 
     public IRekallAgeGraphicsCommandEncoder BeginCommandEncoder(string? label = null) =>
-        IsAvailable(out _)
+        !TryValidateLabel(label, out var labelDiagnostics)
+            ? new RekallAgeWebGpuCommandEncoder(this, null, label, new(labelDiagnostics))
+            : IsAvailable(out _)
             ? new RekallAgeWebGpuCommandEncoder(this, _conformance.BeginCommandEncoder(label), label)
             : new RekallAgeWebGpuCommandEncoder(this, null, label);
 
     public RekallAgeGraphicsValidationResult Submit(RekallAgeGraphicsCommandBuffer commandBuffer)
     {
         if (!IsAvailable(out var diagnostics)) return new(diagnostics);
+        if (!TryValidateLabel(commandBuffer.Label, out diagnostics)) return new(diagnostics);
         var validation = _conformance.Submit(commandBuffer);
         return validation.Valid
             ? Execute(new RekallAgeWebGpuSubmitPacket(
@@ -112,6 +125,7 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
         string? label = "engine.output")
     {
         if (!IsAvailable(out var diagnostics)) return CreationFailure(diagnostics);
+        if (!TryValidateLabel(label, out diagnostics)) return CreationFailure(diagnostics);
         var texture = _conformance.CreateTexture(new(
             RekallAgeTextureDimension.Texture2D, width, height, 1, 1, 1, 1, format,
             RekallAgeTextureUsage.ColorAttachment | RekallAgeTextureUsage.Present, label));
@@ -125,7 +139,11 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
 
         var execution = Execute(new RekallAgeWebGpuImportCanvasOutputPacket(
             RekallAgeWebGpuProtocol.Version, texture.Handle, target.Handle, width, height, format, label));
-        if (execution.Valid) return target;
+        if (execution.Valid)
+        {
+            _canvasTextures[target.Handle] = texture.Handle;
+            return target;
+        }
         _conformance.Destroy(target.Handle);
         _conformance.Destroy(texture.Handle);
         return CreationFailure(execution.Diagnostics);
@@ -140,6 +158,10 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
             if (result.Succeeded) return new([]);
             Fault(result.Diagnostics);
             return new(_faultDiagnostics!);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -166,10 +188,14 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
     internal RekallAgeGraphicsValidationResult EncoderAvailable() =>
         IsAvailable(out var diagnostics) ? new([]) : new(diagnostics);
 
+    internal RekallAgeGraphicsValidationResult ValidateCommandLabel(string? label) =>
+        TryValidateLabel(label, out var diagnostics) ? new([]) : new(diagnostics);
+
     private RekallAgeGraphicsResourceCreationResult Create<T>(T descriptor, Func<T, RekallAgeGraphicsResourceCreationResult> create, string resourceType)
         where T : class
     {
         if (!IsAvailable(out var diagnostics)) return CreationFailure(diagnostics);
+        if (!TryValidateLabel(GetLabel(descriptor), out diagnostics)) return CreationFailure(diagnostics);
         var created = create(descriptor);
         if (!created.Created) return created;
         var execution = Execute(new RekallAgeWebGpuCreatePacket(
@@ -208,6 +234,24 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
         _ = Execute(packet);
     }
 
+    private static bool CanSerializeUpload<T>(T packet, int dataLength, out IReadOnlyList<RekallAgeGraphicsDiagnostic> diagnostics)
+        where T : IRekallAgeWebGpuPacket
+    {
+        try
+        {
+            var emptyPacketBytes = Encoding.UTF8.GetByteCount(RekallAgeWebGpuProtocol.Serialize(packet));
+            var base64Bytes = checked(((long)dataLength + 2L) / 3L * 4L);
+            if (base64Bytes <= RekallAgeWebGpuProtocol.MaximumPacketBytes - emptyPacketBytes)
+            {
+                diagnostics = [];
+                return true;
+            }
+        }
+        catch (OverflowException) { }
+        diagnostics = [new("REKALL_WEBGPU_PROTOCOL_PACKET_TOO_LARGE", $"WebGPU protocol packets must not exceed {RekallAgeWebGpuProtocol.MaximumPacketBytes} UTF-8 bytes.")];
+        return false;
+    }
+
     private bool IsAvailable(out IReadOnlyList<RekallAgeGraphicsDiagnostic> diagnostics)
     {
         if (_disposed)
@@ -230,6 +274,20 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
             : diagnostics.Take(64).ToArray();
 
     private static RekallAgeGraphicsResourceCreationResult CreationFailure(IReadOnlyList<RekallAgeGraphicsDiagnostic> diagnostics) => new(default, diagnostics);
+
+    private static string? GetLabel(object descriptor) => descriptor switch
+    {
+        RekallAgeBufferDescriptor item => item.Label, RekallAgeTextureDescriptor item => item.Label, RekallAgeSamplerDescriptor item => item.Label,
+        RekallAgeShaderModuleDescriptor item => item.Label, RekallAgeBindingLayoutDescriptor item => item.Label, RekallAgeBindingSetDescriptor item => item.Label,
+        RekallAgeGraphicsPipelineDescriptor item => item.Label, RekallAgeComputePipelineDescriptor item => item.Label, RekallAgeRenderTargetDescriptor item => item.Label, _ => null
+    };
+
+    private static bool TryValidateLabel(string? label, out IReadOnlyList<RekallAgeGraphicsDiagnostic> diagnostics)
+    {
+        if (label is null || Encoding.UTF8.GetByteCount(label) <= RekallAgeWebGpuProtocol.MaximumLabelBytes) { diagnostics = []; return true; }
+        diagnostics = [new("REKALL_WEBGPU_LABEL_TOO_LARGE", $"WebGPU labels must not exceed {RekallAgeWebGpuProtocol.MaximumLabelBytes} UTF-8 bytes.")];
+        return false;
+    }
 
     private static RekallAgeWebGpuCommandPacket ToPacket(RekallAgeGraphicsCommand command) => new(
         command switch

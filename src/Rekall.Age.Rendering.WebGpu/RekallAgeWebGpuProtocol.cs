@@ -70,6 +70,7 @@ public static class RekallAgeWebGpuProtocol
 {
     public const int Version = 1;
     public const int MaximumPacketBytes = 16 * 1024 * 1024;
+    public const int MaximumLabelBytes = 1024;
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -212,15 +213,42 @@ public static class RekallAgeWebGpuProtocol
     private static RekallAgeWebGpuSubmitPacket ValidateSubmission(RekallAgeWebGpuSubmitPacket packet)
     {
         ValidateOperation(packet, packet.Operation, "submit");
-        if (packet.Commands is null || packet.Commands.Any(command => !IsKnownCommand(command.Kind) || command.Data.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null))
+        if (packet.Commands is null || packet.Commands.Any(command => !IsKnownCommand(command.Kind)))
         {
             throw new RekallAgeWebGpuProtocolException(new(
                 "REKALL_WEBGPU_PROTOCOL_COMMAND_KIND_INVALID",
                 "WebGPU submission packets must contain only known command kinds with payload data."));
         }
+        if (packet.Commands.Any(command => !ValidateCommandPayload(command)))
+        {
+            throw new RekallAgeWebGpuProtocolException(new(
+                "REKALL_WEBGPU_PROTOCOL_COMMAND_PAYLOAD_INVALID",
+                "WebGPU submission packets must contain complete, valid concrete command payloads."));
+        }
 
         return packet;
     }
+
+    private static bool ValidateCommandPayload(RekallAgeWebGpuCommandPacket command)
+    {
+        if (command.Data.ValueKind != JsonValueKind.Object || !RequiredCommandProperties.TryGetValue(command.Kind, out var required)
+            || required.Any(property => !command.Data.TryGetProperty(property, out _))) return false;
+        try
+        {
+            return JsonSerializer.Deserialize(command.Data.GetRawText(), CommandPayloadTypes[command.Kind], SerializerOptions) is not null;
+        }
+        catch (JsonException) { return false; }
+    }
+
+    private static readonly IReadOnlyDictionary<string, Type> CommandPayloadTypes = new Dictionary<string, Type>
+    {
+        ["copyBuffer"] = typeof(RekallAgeCopyBufferCommand), ["beginRenderPass"] = typeof(RekallAgeBeginRenderPassCommand), ["setRenderPipeline"] = typeof(RekallAgeSetRenderPipelineCommand), ["setComputePipeline"] = typeof(RekallAgeSetComputePipelineCommand), ["setBindingSet"] = typeof(RekallAgeSetBindingSetCommand), ["setVertexBuffer"] = typeof(RekallAgeSetVertexBufferCommand), ["setIndexBuffer"] = typeof(RekallAgeSetIndexBufferCommand), ["draw"] = typeof(RekallAgeDrawCommand), ["drawIndexed"] = typeof(RekallAgeDrawIndexedCommand), ["drawIndirect"] = typeof(RekallAgeDrawIndirectCommand), ["drawIndexedIndirect"] = typeof(RekallAgeDrawIndexedIndirectCommand), ["endRenderPass"] = typeof(RekallAgeEndRenderPassCommand), ["beginComputePass"] = typeof(RekallAgeBeginComputePassCommand), ["dispatch"] = typeof(RekallAgeDispatchCommand), ["dispatchIndirect"] = typeof(RekallAgeDispatchIndirectCommand), ["endComputePass"] = typeof(RekallAgeEndComputePassCommand)
+    };
+
+    private static readonly IReadOnlyDictionary<string, string[]> RequiredCommandProperties = new Dictionary<string, string[]>
+    {
+        ["copyBuffer"] = ["source", "sourceOffset", "destination", "destinationOffset", "sizeBytes"], ["beginRenderPass"] = ["descriptor"], ["setRenderPipeline"] = ["pipeline"], ["setComputePipeline"] = ["pipeline"], ["setBindingSet"] = ["index", "bindingSet"], ["setVertexBuffer"] = ["slot", "buffer", "offset", "sizeBytes"], ["setIndexBuffer"] = ["buffer", "format", "offset", "sizeBytes"], ["draw"] = ["vertexCount", "instanceCount", "firstVertex", "firstInstance"], ["drawIndexed"] = ["indexCount", "instanceCount", "firstIndex", "baseVertex", "firstInstance"], ["drawIndirect"] = ["buffer", "offset", "drawCount", "strideBytes"], ["drawIndexedIndirect"] = ["buffer", "offset", "drawCount", "strideBytes"], ["endRenderPass"] = [], ["beginComputePass"] = [], ["dispatch"] = ["groupCountX", "groupCountY", "groupCountZ"], ["dispatchIndirect"] = ["buffer", "offset"], ["endComputePass"] = []
+    };
 
     private static T ValidateOperation<T>(T packet, string? actual, string expected, bool allowMissingOperation = false)
     {

@@ -5,9 +5,10 @@ namespace Rekall.Age.Rendering.WebGpu;
 internal sealed class RekallAgeWebGpuCommandEncoder(
     RekallAgeWebGpuRenderingDevice device,
     IRekallAgeGraphicsCommandEncoder? conformance,
-    string? label) : IRekallAgeGraphicsCommandEncoder
+    string? label,
+    RekallAgeGraphicsValidationResult? initialValidation = null) : IRekallAgeGraphicsCommandEncoder
 {
-    public RekallAgeGraphicsValidationResult BeginRenderPass(RekallAgeRenderPassDescriptor descriptor) => Execute(() => conformance!.BeginRenderPass(descriptor));
+    public RekallAgeGraphicsValidationResult BeginRenderPass(RekallAgeRenderPassDescriptor descriptor) => device.ValidateCommandLabel(descriptor.Label) is { Valid: false } invalid ? invalid : Execute(() => conformance!.BeginRenderPass(descriptor));
     public RekallAgeGraphicsValidationResult SetRenderPipeline(RekallAgeGraphicsResourceHandle pipeline) => Execute(() => conformance!.SetRenderPipeline(pipeline));
     public RekallAgeGraphicsValidationResult SetComputePipeline(RekallAgeGraphicsResourceHandle pipeline) => Execute(() => conformance!.SetComputePipeline(pipeline));
     public RekallAgeGraphicsValidationResult SetBindingSet(int index, RekallAgeGraphicsResourceHandle bindingSet) => Execute(() => conformance!.SetBindingSet(index, bindingSet));
@@ -18,7 +19,7 @@ internal sealed class RekallAgeWebGpuCommandEncoder(
     public RekallAgeGraphicsValidationResult DrawIndirect(RekallAgeGraphicsResourceHandle buffer, ulong offset, uint drawCount = 1, uint strideBytes = 16) => Execute(() => conformance!.DrawIndirect(buffer, offset, drawCount, strideBytes));
     public RekallAgeGraphicsValidationResult DrawIndexedIndirect(RekallAgeGraphicsResourceHandle buffer, ulong offset, uint drawCount = 1, uint strideBytes = 20) => Execute(() => conformance!.DrawIndexedIndirect(buffer, offset, drawCount, strideBytes));
     public RekallAgeGraphicsValidationResult EndRenderPass() => Execute(conformance!.EndRenderPass);
-    public RekallAgeGraphicsValidationResult BeginComputePass(string? passLabel = null) => Execute(() => conformance!.BeginComputePass(passLabel));
+    public RekallAgeGraphicsValidationResult BeginComputePass(string? passLabel = null) => device.ValidateCommandLabel(passLabel) is { Valid: false } invalid ? invalid : Execute(() => conformance!.BeginComputePass(passLabel));
     public RekallAgeGraphicsValidationResult Dispatch(uint groupCountX, uint groupCountY = 1, uint groupCountZ = 1) => Execute(() => conformance!.Dispatch(groupCountX, groupCountY, groupCountZ));
     public RekallAgeGraphicsValidationResult DispatchIndirect(RekallAgeGraphicsResourceHandle buffer, ulong offset) => Execute(() => conformance!.DispatchIndirect(buffer, offset));
     public RekallAgeGraphicsValidationResult EndComputePass() => Execute(conformance!.EndComputePass);
@@ -27,7 +28,7 @@ internal sealed class RekallAgeWebGpuCommandEncoder(
     public void Dispose() => conformance?.Dispose();
     private RekallAgeGraphicsValidationResult Execute(Func<RekallAgeGraphicsValidationResult> action)
     {
-        var availability = device.EncoderAvailable();
+        var availability = initialValidation ?? device.EncoderAvailable();
         return !availability.Valid || conformance is null ? availability : action();
     }
 }

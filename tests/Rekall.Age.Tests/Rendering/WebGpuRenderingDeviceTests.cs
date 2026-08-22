@@ -153,14 +153,65 @@ public sealed class WebGpuRenderingDeviceTests
         Assert.Empty(bridge.Packets);
     }
 
+    [Fact]
+    public void OversizedUploadFailsBeforeConformanceMutationOrBridgeSerialization()
+    {
+        var bridge = new RecordingWebGpuBridge();
+        using var device = CreateDevice(bridge, maximumBufferSize: 32UL * 1024 * 1024);
+        var buffer = device.CreateBuffer(new(24UL * 1024 * 1024, RekallAgeBufferUsage.TransferDestination));
+        var packets = bridge.Packets.Count;
+
+        var result = device.WriteBuffer(buffer.Handle, 0, new byte[13 * 1024 * 1024]);
+
+        Assert.False(result.Valid);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "REKALL_WEBGPU_PROTOCOL_PACKET_TOO_LARGE");
+        Assert.Equal(0UL, device.InspectResources().Single().UploadedBytes);
+        Assert.Equal(packets, bridge.Packets.Count);
+    }
+
+    [Fact]
+    public void DestroyBridgeRejectionRetainsTheResourceForRetry()
+    {
+        var bridge = new SequencedBridge(RekallAgeWebGpuBridgeResult.Success, new(false, [new("REKALL_WEBGPU_DESTROY_FAILED", "no")]), RekallAgeWebGpuBridgeResult.Success);
+        using var device = CreateDevice(bridge);
+        var buffer = device.CreateBuffer(new(16, RekallAgeBufferUsage.Vertex));
+
+        Assert.False(device.Destroy(buffer.Handle).Valid);
+        Assert.Single(device.InspectResources());
+        Assert.True(device.Destroy(buffer.Handle).Valid);
+        Assert.Empty(device.InspectResources());
+    }
+
+    [Fact]
+    public async Task FlushCancellationDoesNotFaultTheDevice()
+    {
+        var bridge = new CancellingBridge();
+        using var device = CreateDevice(bridge);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => device.FlushAsync(cancellation.Token).AsTask());
+        Assert.True(device.CreateBuffer(new(16, RekallAgeBufferUsage.Vertex)).Created);
+    }
+
+    [Fact]
+    public void ProtocolRejectsSubmissionPayloadMissingConcreteCommandFields()
+    {
+        const string packet = """{"version":1,"commands":[{"kind":"copyBuffer","data":{"sourceOffset":0}}],"operation":"submit"}""";
+
+        var exception = Assert.Throws<RekallAgeWebGpuProtocolException>(() => RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuSubmitPacket>(packet));
+
+        Assert.Equal("REKALL_WEBGPU_PROTOCOL_COMMAND_PAYLOAD_INVALID", exception.Diagnostic.Code);
+    }
+
     private static RekallAgeGraphicsResourceHandle CreateCopySource(RekallAgeWebGpuRenderingDevice device) =>
         device.CreateBuffer(new(16, RekallAgeBufferUsage.CopySource)).Handle;
 
     private static RekallAgeGraphicsResourceHandle CreateCopyDestination(RekallAgeWebGpuRenderingDevice device) =>
         device.CreateBuffer(new(16, RekallAgeBufferUsage.TransferDestination)).Handle;
 
-    private static RekallAgeWebGpuRenderingDevice CreateDevice(RecordingWebGpuBridge bridge) =>
-        new(bridge, RekallAgeRenderingDeviceCapabilities.DesktopBaseline("WebGPU"));
+    private static RekallAgeWebGpuRenderingDevice CreateDevice(IRekallAgeWebGpuBridge bridge, ulong? maximumBufferSize = null) =>
+        new(bridge, RekallAgeRenderingDeviceCapabilities.DesktopBaseline("WebGPU") with { MaximumBufferSizeBytes = maximumBufferSize ?? (1UL << 30) });
 
     private sealed class RecordingWebGpuBridge(
         RekallAgeWebGpuBridgeResult? result = null,
@@ -182,5 +233,18 @@ public sealed class WebGpuRenderingDeviceTests
 
         public ValueTask<RekallAgeWebGpuBridgeResult> FlushAsync(CancellationToken cancellationToken = default) =>
             ValueTask.FromResult(_flushResult);
+    }
+
+    private sealed class SequencedBridge(params RekallAgeWebGpuBridgeResult[] results) : IRekallAgeWebGpuBridge
+    {
+        private readonly Queue<RekallAgeWebGpuBridgeResult> _results = new(results);
+        public RekallAgeWebGpuBridgeResult Execute(string packetJson) => _results.Count > 0 ? _results.Dequeue() : RekallAgeWebGpuBridgeResult.Success;
+        public ValueTask<RekallAgeWebGpuBridgeResult> FlushAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult(RekallAgeWebGpuBridgeResult.Success);
+    }
+
+    private sealed class CancellingBridge : IRekallAgeWebGpuBridge
+    {
+        public RekallAgeWebGpuBridgeResult Execute(string packetJson) => RekallAgeWebGpuBridgeResult.Success;
+        public ValueTask<RekallAgeWebGpuBridgeResult> FlushAsync(CancellationToken cancellationToken = default) => ValueTask.FromCanceled<RekallAgeWebGpuBridgeResult>(cancellationToken);
     }
 }

@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Rekall.Age.Rendering.Abstractions\Rekall.Age.Rendering.Abstractions.csproj" />
     <ProjectReference Include="..\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj" />
+    <InternalsVisibleTo Include="Rekall.Age.Tests" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -76,6 +76,8 @@ public static class RekallAgeWebGpuProtocol
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = false,
+        IgnoreReadOnlyProperties = true,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
     };
 
@@ -238,8 +240,8 @@ public static class RekallAgeWebGpuProtocol
         {
             if (JsonSerializer.Deserialize(command.Data.GetRawText(), CommandPayloadTypes[command.Kind], SerializerOptions) is null) return false;
             if (command.Kind == "beginRenderPass") return ValidateRenderPassDescriptor(command.Data);
-            if (command.Kind == "copyBuffer") return HandleKind(command.Data, "source", "buffer") && HandleKind(command.Data, "destination", "buffer");
-            return !ExpectedHandleKinds.TryGetValue(command.Kind, out var expected) || HandleKind(command.Data, expected.Property, expected.Kind);
+            if (command.Kind == "copyBuffer") return ValidateHandle(command.Data, "source", "buffer") && ValidateHandle(command.Data, "destination", "buffer");
+            return !ExpectedHandleKinds.TryGetValue(command.Kind, out var expected) || ValidateHandle(command.Data, expected.Property, expected.Kind);
         }
         catch (JsonException) { return false; }
     }
@@ -249,19 +251,50 @@ public static class RekallAgeWebGpuProtocol
         ["copyBuffer"] = typeof(RekallAgeCopyBufferCommand), ["beginRenderPass"] = typeof(RekallAgeBeginRenderPassCommand), ["setRenderPipeline"] = typeof(RekallAgeSetRenderPipelineCommand), ["setComputePipeline"] = typeof(RekallAgeSetComputePipelineCommand), ["setBindingSet"] = typeof(RekallAgeSetBindingSetCommand), ["setVertexBuffer"] = typeof(RekallAgeSetVertexBufferCommand), ["setIndexBuffer"] = typeof(RekallAgeSetIndexBufferCommand), ["draw"] = typeof(RekallAgeDrawCommand), ["drawIndexed"] = typeof(RekallAgeDrawIndexedCommand), ["drawIndirect"] = typeof(RekallAgeDrawIndirectCommand), ["drawIndexedIndirect"] = typeof(RekallAgeDrawIndexedIndirectCommand), ["endRenderPass"] = typeof(RekallAgeEndRenderPassCommand), ["beginComputePass"] = typeof(RekallAgeBeginComputePassCommand), ["dispatch"] = typeof(RekallAgeDispatchCommand), ["dispatchIndirect"] = typeof(RekallAgeDispatchIndirectCommand), ["endComputePass"] = typeof(RekallAgeEndComputePassCommand)
     };
 
-    private static bool HandleKind(JsonElement data, string property, string expectedKind) => data.TryGetProperty(property, out var handle)
-        && handle.ValueKind == JsonValueKind.Object && handle.TryGetProperty("kind", out var kind)
-        && kind.ValueKind == JsonValueKind.String && string.Equals(kind.GetString(), expectedKind, StringComparison.Ordinal);
+    private static bool ValidateHandle(JsonElement data, string property, string expectedKind)
+    {
+        if (!data.TryGetProperty(property, out var handle) || handle.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        var allowed = new[] { "deviceId", "kind", "slot", "generation" };
+        return handle.EnumerateObject().All(item => allowed.Contains(item.Name, StringComparer.Ordinal))
+            && handle.TryGetProperty("deviceId", out var deviceId) && deviceId.ValueKind == JsonValueKind.String
+            && Guid.TryParse(deviceId.GetString(), out _)
+            && handle.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.String
+            && string.Equals(kind.GetString(), expectedKind, StringComparison.Ordinal)
+            && handle.TryGetProperty("slot", out var slot) && slot.ValueKind == JsonValueKind.Number && slot.TryGetInt32(out _)
+            && handle.TryGetProperty("generation", out var generation) && generation.ValueKind == JsonValueKind.Number && generation.TryGetUInt32(out _);
+    }
 
     private static bool ValidateRenderPassDescriptor(JsonElement data)
     {
         if (!data.TryGetProperty("descriptor", out var descriptor) || descriptor.ValueKind != JsonValueKind.Object) return false;
         var allowed = new[] { "renderTarget", "colorClearValues", "depthClearValue", "stencilClearValue", "label" };
         return descriptor.EnumerateObject().All(property => allowed.Contains(property.Name, StringComparer.Ordinal))
-            && descriptor.TryGetProperty("renderTarget", out var target) && target.ValueKind == JsonValueKind.Object
-            && target.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.String && kind.GetString() == "renderTarget"
-            && descriptor.TryGetProperty("colorClearValues", out var clears) && clears.ValueKind != JsonValueKind.Null;
+            && ValidateHandle(descriptor, "renderTarget", "renderTarget")
+            && descriptor.TryGetProperty("colorClearValues", out var clears) && clears.ValueKind == JsonValueKind.Array
+            && clears.EnumerateArray().All(ValidateColorClearValue);
     }
+
+    private static bool ValidateColorClearValue(JsonElement clear)
+    {
+        if (clear.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        var allowed = new[] { "red", "green", "blue", "alpha" };
+        return clear.EnumerateObject().All(property => allowed.Contains(property.Name, StringComparer.Ordinal))
+            && HasNumber(clear, "red")
+            && HasNumber(clear, "green")
+            && HasNumber(clear, "blue")
+            && HasNumber(clear, "alpha");
+    }
+
+    private static bool HasNumber(JsonElement data, string property) =>
+        data.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number;
 
     private static readonly IReadOnlyDictionary<string, string[]> RequiredCommandProperties = new Dictionary<string, string[]>
     {

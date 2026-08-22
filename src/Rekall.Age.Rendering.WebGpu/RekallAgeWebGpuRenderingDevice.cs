@@ -208,6 +208,8 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
     internal RekallAgeGraphicsValidationResult EncoderAvailable() =>
         IsAvailable(out var diagnostics) ? new([]) : new(diagnostics);
 
+    internal int ConformanceSubmissionCount => _conformance.SubmissionCount;
+
     internal RekallAgeGraphicsValidationResult ValidateCommandLabel(string? label) =>
         TryValidateLabel(label, out var diagnostics) ? new([]) : new(diagnostics);
 

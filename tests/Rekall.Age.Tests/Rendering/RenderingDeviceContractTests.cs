@@ -347,6 +347,25 @@ public sealed class RenderingDeviceContractTests
         Assert.Contains(set.Diagnostics, item => item.Code == "REKALL_GPU_STORAGE_ACCESS_MISMATCH");
     }
 
+    [Theory]
+    [InlineData(RekallAgeBindingType.StorageTexture, RekallAgeTextureUsage.Sampled)]
+    [InlineData(RekallAgeBindingType.ReadOnlyStorageTexture, RekallAgeTextureUsage.Sampled)]
+    [InlineData(RekallAgeBindingType.SampledTexture, RekallAgeTextureUsage.Storage)]
+    public void TextureBindingUsageMustMatchItsLayout(RekallAgeBindingType bindingType, RekallAgeTextureUsage usage)
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var layout = device.CreateBindingLayout(new([new(0, bindingType, RekallAgeShaderStage.Compute)]));
+        var texture = device.CreateTexture(new(
+            RekallAgeTextureDimension.Texture2D, 4, 4, 1, 1, 1, 1,
+            RekallAgeTextureFormat.Rgba8Unorm, usage));
+
+        var set = device.CreateBindingSet(new(layout.Handle, [new(0, texture.Handle)]));
+
+        Assert.False(set.Created);
+        Assert.Contains(set.Diagnostics, item => item.Code == "REKALL_GPU_TEXTURE_USAGE_MISMATCH");
+    }
+
     [Fact]
     public void IndirectCommandsValidateUsageRangeStrideAndPassState()
     {
@@ -557,6 +576,16 @@ public sealed class RenderingDeviceContractTests
 
         var missing = device.CreateBindingSet(new(layout.Handle, [], "missing"));
         Assert.Contains(missing.Diagnostics, item => item.Code == "REKALL_GPU_BINDING_SET_INCOMPLETE");
+
+        var extra = device.CreateBindingSet(new(layout.Handle, [new(0, uniform.Handle), new(1, uniform.Handle)], "extra"));
+        Assert.Contains(extra.Diagnostics, item => item.Code == "REKALL_GPU_BINDING_SET_EXTRA");
+
+        var vertex = device.CreateBuffer(new(256, RekallAgeBufferUsage.Vertex, Label: "wrong usage"));
+        var wrongUsage = device.CreateBindingSet(new(layout.Handle, [new(0, vertex.Handle)], "wrong usage"));
+        Assert.Contains(wrongUsage.Diagnostics, item => item.Code == "REKALL_GPU_BUFFER_USAGE_INVALID");
+
+        var emptyRange = device.CreateBindingSet(new(layout.Handle, [new(0, uniform.Handle, 256, 0)], "empty range"));
+        Assert.Contains(emptyRange.Diagnostics, item => item.Code == "REKALL_GPU_BINDING_RANGE_INVALID");
     }
 
     [Fact]

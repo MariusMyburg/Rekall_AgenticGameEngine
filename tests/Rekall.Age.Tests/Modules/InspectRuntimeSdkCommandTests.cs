@@ -184,6 +184,7 @@ public sealed class InspectRuntimeSdkCommandTests
         Assert.Contains(advanced.Value.Contracts, contract =>
             contract.Name == "gpu-storage-and-indirect-recipe"
             && contract.Usage!.Contains("StructureByteStride", StringComparison.Ordinal)
+            && contract.Usage.Contains("InitialDataUInt32", StringComparison.Ordinal)
             && contract.Usage.Contains("DispatchIndirect", StringComparison.Ordinal));
     }
 }

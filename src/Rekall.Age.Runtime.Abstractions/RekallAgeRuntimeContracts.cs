@@ -492,6 +492,7 @@ public sealed record RekallAgeRuntimeGpuBuffer(
 {
     public string MemoryAccess { get; init; } = "device-local";
     public string? InitialDataAsset { get; init; }
+    public IReadOnlyList<uint> InitialDataUInt32 { get; init; } = [];
     public uint StructureByteStride { get; init; }
     public RekallAgeRuntimeGpuStorageAccess StorageAccess { get; init; } = RekallAgeRuntimeGpuStorageAccess.ReadWrite;
 }

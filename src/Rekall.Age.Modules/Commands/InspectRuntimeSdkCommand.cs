@@ -126,10 +126,10 @@ public sealed class InspectRuntimeSdkCommand
             new RekallAgeRuntimeSdkContract(
                 "authoring-recipe",
                 "gpu-storage-and-indirect-recipe",
-                "structured storage buffers + DrawIndirect/DrawIndexedIndirect/DispatchIndirect",
-                "Storage buffers require an explicit nonzero StructureByteStride that divides SizeBytes. Indirect argument buffers use Indirect usage, 4-byte-aligned offsets, and the portable argument layouts: draw 16 bytes, indexed draw 20 bytes, dispatch 12 bytes. The selected backend must advertise each capability.")
+                "structured storage buffers/textures + inline arguments + DrawIndirect/DrawIndexedIndirect/DispatchIndirect",
+                "Storage buffers require an explicit nonzero StructureByteStride that divides SizeBytes. Storage textures use Storage usage and a ReadOnlyStorageTexture or StorageTexture binding. Indirect argument buffers use Indirect usage, 4-byte-aligned offsets, and the portable argument layouts: draw 16 bytes, indexed draw 20 bytes, dispatch 12 bytes. Small exact buffers can use little-endian InitialDataUInt32; asset-backed data remains preferred for large payloads. The selected backend must advertise each capability.")
             {
-                Usage = "new RekallAgeRuntimeGpuBuffer(\"particles\", 4096, RekallAgeRuntimeGpuBufferUsage.Storage) { StructureByteStride = 16 }; new RekallAgeRuntimeGpuBuffer(\"args\", 12, RekallAgeRuntimeGpuBufferUsage.Indirect); new(RekallAgeRuntimeGpuCommandKind.DispatchIndirect) { Resource = \"args\", SourceOffset = 0 };"
+                Usage = "new RekallAgeRuntimeGpuBuffer(\"particles\", 4096, RekallAgeRuntimeGpuBufferUsage.Storage) { StructureByteStride = 16 }; new RekallAgeRuntimeGpuTexture(\"output\", RekallAgeRuntimeGpuTextureDimension.Texture2D, 256, 256, 1, \"rgba8-unorm\", RekallAgeRuntimeGpuTextureUsage.Storage); new RekallAgeRuntimeGpuBuffer(\"args\", 12, RekallAgeRuntimeGpuBufferUsage.Indirect) { InitialDataUInt32 = [8, 1, 1] }; new(RekallAgeRuntimeGpuCommandKind.DispatchIndirect) { Resource = \"args\", SourceOffset = 0 };"
             },
             new RekallAgeRuntimeSdkContract(
                 "runtime-type",

@@ -67,6 +67,8 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
     public RekallAgeGraphicsResourceCreationResult CreateBindingSet(RekallAgeBindingSetDescriptor descriptor)
     {
         var diagnostics = new List<RekallAgeGraphicsDiagnostic>();
+        if (descriptor.Entries is null)
+            return new(default, [new("REKALL_GPU_WORKLOAD_SHAPE_INVALID", "Binding-set entries cannot be null.", descriptor.Label)]);
         lock (_gate)
         {
             diagnostics.AddRange(ValidateHandleLocked(descriptor.Layout, RekallAgeGraphicsResourceKind.BindingLayout));
@@ -93,9 +95,16 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
                         var buffer = (RekallAgeBufferDescriptor)_slots[matches[0].Resource.Slot].Resource!.Descriptor;
                         var available = matches[0].Offset <= buffer.SizeBytes ? buffer.SizeBytes - matches[0].Offset : 0;
                         var size = matches[0].SizeBytes == 0 ? available : matches[0].SizeBytes;
-                        if (matches[0].Offset > buffer.SizeBytes || size > available || size < expected.MinimumBindingSize)
+                        if (matches[0].Offset > buffer.SizeBytes || size == 0 || size > available || size < expected.MinimumBindingSize)
                         {
                             diagnostics.Add(new("REKALL_GPU_BINDING_RANGE_INVALID", $"Binding {expected.Binding} buffer range is invalid.", descriptor.Label));
+                        }
+                        var requiredUsage = expected.Type == RekallAgeBindingType.UniformBuffer
+                            ? RekallAgeBufferUsage.Uniform
+                            : RekallAgeBufferUsage.Storage;
+                        if (!buffer.Usage.HasFlag(requiredUsage))
+                        {
+                            diagnostics.Add(new("REKALL_GPU_BUFFER_USAGE_INVALID", $"Binding {expected.Binding} requires {requiredUsage} buffer usage.", descriptor.Label));
                         }
                         var requiredAccess = expected.Type switch
                         {
@@ -109,10 +118,30 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
                             diagnostics.Add(new("REKALL_GPU_STORAGE_ACCESS_MISMATCH", $"Binding {expected.Binding} requires {requiredAccess.Value} storage access.", descriptor.Label));
                         }
                     }
+                    if (requiredKind == RekallAgeGraphicsResourceKind.Texture && resourceDiagnostics.Count == 0)
+                    {
+                        var texture = (RekallAgeTextureDescriptor)_slots[matches[0].Resource.Slot].Resource!.Descriptor;
+                        var requiredUsage = expected.Type == RekallAgeBindingType.SampledTexture
+                            ? RekallAgeTextureUsage.Sampled
+                            : RekallAgeTextureUsage.Storage;
+                        if (!texture.Usage.HasFlag(requiredUsage))
+                        {
+                            diagnostics.Add(new("REKALL_GPU_TEXTURE_USAGE_MISMATCH", $"Binding {expected.Binding} requires {requiredUsage} texture usage.", descriptor.Label));
+                        }
+                        if (matches[0].Offset != 0 || matches[0].SizeBytes != 0)
+                        {
+                            diagnostics.Add(new("REKALL_GPU_TEXTURE_BINDING_RANGE_INVALID", $"Binding {expected.Binding} texture bindings cannot declare byte ranges.", descriptor.Label));
+                        }
+                    }
                 }
                 if (descriptor.Entries.Select(entry => entry.Binding).Distinct().Count() != descriptor.Entries.Count)
                 {
                     diagnostics.Add(new("REKALL_GPU_BINDING_DUPLICATE", "Binding set contains duplicate indices.", descriptor.Label));
+                }
+                var expectedBindings = layout.Entries.Select(entry => entry.Binding).ToHashSet();
+                if (descriptor.Entries.Any(entry => !expectedBindings.Contains(entry.Binding)))
+                {
+                    diagnostics.Add(new("REKALL_GPU_BINDING_SET_EXTRA", "Binding set contains an entry not declared by its layout.", descriptor.Label));
                 }
             }
         }

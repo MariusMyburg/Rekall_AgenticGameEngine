@@ -32,7 +32,7 @@ internal sealed class RekallAgeVeldridRenderingDevice : IRekallAgeRenderingDevic
             with
             {
                 SupportsStorageBuffers = graphicsDevice.Features.StructuredBuffer,
-                SupportsStorageTextures = false,
+                SupportsStorageTextures = graphicsDevice.Features.ComputeShader,
                 SupportsIndirectDrawing = graphicsDevice.Features.DrawIndirect,
                 SupportsCompute = graphicsDevice.Features.ComputeShader,
                 SupportsIndirectDispatch = graphicsDevice.Features.ComputeShader
@@ -383,21 +383,59 @@ internal sealed class RekallAgeVeldridRenderingDevice : IRekallAgeRenderingDevic
             || layoutEntry!.Descriptor is not RekallAgeBindingLayoutDescriptor layout)
             return Invalid(diagnostic ?? new RekallAgeGraphicsDiagnostic("REKALL_GPU_RESOURCE_INVALID", "Binding set layout is invalid.", descriptor.Label));
         var diagnostics = new List<RekallAgeGraphicsDiagnostic>();
+        if (descriptor.Entries is null)
+            return Invalid(new RekallAgeGraphicsDiagnostic("REKALL_GPU_WORKLOAD_SHAPE_INVALID", "Binding-set entries cannot be null.", descriptor.Label));
         foreach (var expected in layout.Entries)
         {
-            var matches = descriptor.Entries.Where(item => item.Binding == expected.Binding).Take(2).ToArray();
-            if (matches.Length != 1 || !TryEntry(matches[0].Resource, out var resource, out _)) continue;
-            var binding = matches[0];
-            if (resource!.Descriptor is not RekallAgeBufferDescriptor buffer) continue;
-            var required = expected.Type switch
+            var matches = descriptor.Entries.Where(item => item.Binding == expected.Binding).ToArray();
+            if (matches.Length != 1)
             {
-                RekallAgeBindingType.ReadOnlyStorageBuffer => RekallAgeStorageBufferAccess.ReadOnly,
-                RekallAgeBindingType.StorageBuffer => RekallAgeStorageBufferAccess.ReadWrite,
-                _ => (RekallAgeStorageBufferAccess?)null
-            };
-            if (required.HasValue && (!buffer.Usage.HasFlag(RekallAgeBufferUsage.Storage) || buffer.StorageAccess != required.Value))
-                diagnostics.Add(new("REKALL_GPU_STORAGE_ACCESS_MISMATCH", $"Binding {expected.Binding} requires {required.Value} storage access.", descriptor.Label));
+                diagnostics.Add(new("REKALL_GPU_BINDING_SET_INCOMPLETE", $"Binding {expected.Binding} must have exactly one resource.", descriptor.Label));
+                continue;
+            }
+            var binding = matches[0];
+            var requiredKind = expected.Type is RekallAgeBindingType.UniformBuffer or RekallAgeBindingType.ReadOnlyStorageBuffer or RekallAgeBindingType.StorageBuffer
+                ? RekallAgeGraphicsResourceKind.Buffer
+                : expected.Type is RekallAgeBindingType.Sampler or RekallAgeBindingType.ComparisonSampler
+                    ? RekallAgeGraphicsResourceKind.Sampler
+                    : RekallAgeGraphicsResourceKind.Texture;
+            if (!TryEntry(binding.Resource, out var resource, out var resourceDiagnostic) || resource!.Kind != requiredKind)
+            {
+                diagnostics.Add(resourceDiagnostic ?? new("REKALL_GPU_RESOURCE_INVALID", $"Binding {expected.Binding} requires a {requiredKind} resource.", descriptor.Label));
+                continue;
+            }
+            if (resource.Descriptor is RekallAgeBufferDescriptor buffer)
+            {
+                var available = binding.Offset <= buffer.SizeBytes ? buffer.SizeBytes - binding.Offset : 0;
+                var size = binding.SizeBytes == 0 ? available : binding.SizeBytes;
+                if (binding.Offset > uint.MaxValue || size > uint.MaxValue || binding.Offset > buffer.SizeBytes || size == 0 || size > available || size < expected.MinimumBindingSize)
+                    diagnostics.Add(new("REKALL_GPU_BINDING_RANGE_INVALID", $"Binding {expected.Binding} buffer range is invalid.", descriptor.Label));
+                var requiredUsage = expected.Type == RekallAgeBindingType.UniformBuffer ? RekallAgeBufferUsage.Uniform : RekallAgeBufferUsage.Storage;
+                if (!buffer.Usage.HasFlag(requiredUsage))
+                    diagnostics.Add(new("REKALL_GPU_BUFFER_USAGE_INVALID", $"Binding {expected.Binding} requires {requiredUsage} buffer usage.", descriptor.Label));
+                var requiredAccess = expected.Type switch
+                {
+                    RekallAgeBindingType.ReadOnlyStorageBuffer => RekallAgeStorageBufferAccess.ReadOnly,
+                    RekallAgeBindingType.StorageBuffer => RekallAgeStorageBufferAccess.ReadWrite,
+                    _ => (RekallAgeStorageBufferAccess?)null
+                };
+                if (requiredAccess.HasValue && buffer.StorageAccess != requiredAccess.Value)
+                    diagnostics.Add(new("REKALL_GPU_STORAGE_ACCESS_MISMATCH", $"Binding {expected.Binding} requires {requiredAccess.Value} storage access.", descriptor.Label));
+            }
+            if (resource.Descriptor is RekallAgeTextureDescriptor texture)
+            {
+                var requiredUsage = expected.Type == RekallAgeBindingType.SampledTexture ? RekallAgeTextureUsage.Sampled : RekallAgeTextureUsage.Storage;
+                if (!texture.Usage.HasFlag(requiredUsage))
+                    diagnostics.Add(new("REKALL_GPU_TEXTURE_USAGE_MISMATCH", $"Binding {expected.Binding} requires {requiredUsage} texture usage.", descriptor.Label));
+                if (binding.Offset != 0 || binding.SizeBytes != 0)
+                    diagnostics.Add(new("REKALL_GPU_TEXTURE_BINDING_RANGE_INVALID", $"Binding {expected.Binding} texture bindings cannot declare byte ranges.", descriptor.Label));
+            }
         }
+        var expectedBindings = layout.Entries.Select(entry => entry.Binding).ToHashSet();
+        if (descriptor.Entries.Any(entry => !expectedBindings.Contains(entry.Binding)))
+            diagnostics.Add(new("REKALL_GPU_BINDING_SET_EXTRA", "Binding set contains an entry not declared by its layout.", descriptor.Label));
+        if (descriptor.Entries.Select(entry => entry.Binding).Distinct().Count() != descriptor.Entries.Count)
+            diagnostics.Add(new("REKALL_GPU_BINDING_DUPLICATE", "Binding set contains duplicate indices.", descriptor.Label));
         return new(diagnostics);
     }
 
@@ -554,7 +592,8 @@ internal sealed class RekallAgeVeldridRenderingDevice : IRekallAgeRenderingDevic
         RekallAgeBindingType.StorageBuffer => ResourceKind.StructuredBufferReadWrite,
         RekallAgeBindingType.Sampler or RekallAgeBindingType.ComparisonSampler => ResourceKind.Sampler,
         RekallAgeBindingType.SampledTexture => ResourceKind.TextureReadOnly,
-        _ => ResourceKind.TextureReadWrite
+        RekallAgeBindingType.ReadOnlyStorageTexture or RekallAgeBindingType.StorageTexture => ResourceKind.TextureReadWrite,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unknown binding type.")
     };
     private static VertexElementFormat Map(RekallAgeVertexFormat value) => value switch
     {

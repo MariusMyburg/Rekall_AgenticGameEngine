@@ -3327,8 +3327,18 @@ compute pass before drawing its colorful triangle; its latest Vulkan run logged
 one enabled and one executed workload and completed 5/5 frames. The full engine
 suite passes 1,196/1,196, Studio passes 25/25, and the Release solution builds
 with zero warnings/errors. Independent review found no merge blockers. Storage
-textures and a deterministic native indirect
-argument-buffer proof remain the next sub-slice before this tranche is closed.
+textures and deterministic native indirect execution are now complete. Texture
+binding sets reject sampled/storage usage mismatches and byte-range fields on
+textures before submission; the Vulkan adapter exposes storage images and maps
+read-only versus writable shader bindings explicitly. Small exact argument
+buffers can use bounded, little-endian `InitialDataUInt32` values, while large
+payloads retain the catalog-backed asset path. The native probe now binds both
+read-only and writable storage-image views, mutates its structured buffer, and
+renders its asset-backed colorful triangle through `DrawIndirect`; Vulkan again
+completed 5/5 frames with one enabled/one executed workload. The focused GPU
+selection passes 59/59, the full engine suite passes 1,201/1,201, Studio passes
+25/25, and the Release solution builds with zero warnings/errors. WebGPU backend
+execution parity is the next rendering tranche.
 After its Windows programmable-compositor proof, resume Pong through the generic
 portable authoring path, followed by a Galaga-class game in Studio. The queued
 Rain Glass shader acceptance follows those playable proofs

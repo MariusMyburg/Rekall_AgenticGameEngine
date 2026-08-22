@@ -34,7 +34,15 @@ public sealed class ProgrammableGeometryProbeSystem : IRekallAgeRuntimeModuleSys
             {
                 StructureByteStride = 4,
                 InitialDataAsset = "asset_gpu_storage"
+            },
+            new("draw.arguments", 16, RekallAgeRuntimeGpuBufferUsage.Indirect)
+            {
+                InitialDataUInt32 = [3, 1, 0, 0]
             }
+        ],
+        Textures =
+        [
+            new("storage.image", RekallAgeRuntimeGpuTextureDimension.Texture2D, 4, 4, 1, "rgba8-unorm", RekallAgeRuntimeGpuTextureUsage.Storage)
         ],
         Shaders =
         [
@@ -58,7 +66,14 @@ public sealed class ProgrammableGeometryProbeSystem : IRekallAgeRuntimeModuleSys
                 #version 450
                 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
                 layout(set = 0, binding = 0, std430) buffer Binding0 { uint values[]; };
-                void main() { values[0] = values[0] ^ 1u; }
+                layout(rgba8, set = 0, binding = 1) uniform image2D Binding1;
+                layout(rgba8, set = 0, binding = 2) readonly uniform image2D Binding2;
+                void main()
+                {
+                    values[0] = values[0] ^ 1u;
+                    imageStore(Binding1, ivec2(0, 0), vec4(0.0, 0.8, 1.0, 1.0));
+                    values[1] = floatBitsToUint(imageLoad(Binding2, ivec2(0, 0)).x);
+                }
                 """),
             new("geometry.fragment", RekallAgeRuntimeGpuShaderStage.Fragment, RekallAgeRuntimeGpuShaderLanguage.Glsl,
                 """
@@ -78,12 +93,19 @@ public sealed class ProgrammableGeometryProbeSystem : IRekallAgeRuntimeModuleSys
                 new(0, RekallAgeRuntimeGpuBindingType.StorageBuffer, [RekallAgeRuntimeGpuShaderStage.Compute])
                 {
                     MinimumBindingSize = 16
-                }
+                },
+                new(1, RekallAgeRuntimeGpuBindingType.StorageTexture, [RekallAgeRuntimeGpuShaderStage.Compute]),
+                new(2, RekallAgeRuntimeGpuBindingType.ReadOnlyStorageTexture, [RekallAgeRuntimeGpuShaderStage.Compute])
             ])
         ],
         BindingSets =
         [
-            new("storage.set", "storage.layout", [new(0, "storage") { SizeBytes = 16 }])
+            new("storage.set", "storage.layout",
+            [
+                new(0, "storage") { SizeBytes = 16 },
+                new(1, "storage.image"),
+                new(2, "storage.image")
+            ])
         ],
         Pipelines =
         [
@@ -118,7 +140,12 @@ public sealed class ProgrammableGeometryProbeSystem : IRekallAgeRuntimeModuleSys
             new(RekallAgeRuntimeGpuCommandKind.BeginRenderPass) { Resource = "engine.output" },
             new(RekallAgeRuntimeGpuCommandKind.SetRenderPipeline) { Resource = "geometry.pipeline" },
             new(RekallAgeRuntimeGpuCommandKind.SetVertexBuffer) { Slot = 0, Resource = "vertices", SizeBytes = 24 },
-            new(RekallAgeRuntimeGpuCommandKind.Draw) { VertexCount = 3 },
+            new(RekallAgeRuntimeGpuCommandKind.DrawIndirect)
+            {
+                Resource = "draw.arguments",
+                IndirectCount = 1,
+                IndirectStrideBytes = 16
+            },
             new(RekallAgeRuntimeGpuCommandKind.EndRenderPass)
         ]
     };

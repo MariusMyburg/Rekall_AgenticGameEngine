@@ -159,6 +159,59 @@ public sealed class RuntimeGpuWorkloadCompilerTests
     }
 
     [Fact]
+    public void UploadsInlineUInt32BufferDataWithoutAnAssetResolver()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var workload = new RekallAgeRuntimeGpuWorkload("inline-indirect-data")
+        {
+            Buffers =
+            [
+                new("draw-arguments", 16, RekallAgeRuntimeGpuBufferUsage.Indirect)
+                {
+                    InitialDataUInt32 = [3, 1, 0, 0]
+                }
+            ]
+        };
+
+        using var compiled = new RekallAgeRuntimeGpuWorkloadCompiler().Compile(workload, device);
+
+        Assert.True(compiled.Valid, string.Join(Environment.NewLine, compiled.Diagnostics.Select(item => item.Message)));
+        var resource = Assert.Single(device.InspectResources(), item => item.Label == "draw-arguments");
+        Assert.Equal(16UL, resource.UploadedBytes);
+        Assert.True(Assert.IsType<RekallAgeBufferDescriptor>(resource.Descriptor).Usage.HasFlag(RekallAgeBufferUsage.TransferDestination));
+    }
+
+    [Fact]
+    public void RejectsAmbiguousOrOversizedInlineBufferDataBeforeAllocation()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var workload = new RekallAgeRuntimeGpuWorkload("invalid-inline-data")
+        {
+            Buffers =
+            [
+                new("ambiguous", 4, RekallAgeRuntimeGpuBufferUsage.Indirect)
+                {
+                    InitialDataAsset = "asset:args",
+                    InitialDataUInt32 = [3]
+                },
+                new("oversized", 4, RekallAgeRuntimeGpuBufferUsage.Indirect)
+                {
+                    InitialDataUInt32 = [3, 1]
+                }
+            ]
+        };
+
+        using var compiled = new RekallAgeRuntimeGpuWorkloadCompiler().Compile(
+            workload, device, assetDataResolver: new DictionaryAssetDataResolver(new Dictionary<string, byte[]> { ["asset:args"] = [3, 0, 0, 0] }));
+
+        Assert.Contains(compiled.Diagnostics, item => item.Code == "REKALL_GPU_INITIAL_DATA_AMBIGUOUS");
+        Assert.Contains(compiled.Diagnostics, item => item.Code == "REKALL_GPU_INITIAL_DATA_TOO_LARGE");
+        Assert.Empty(device.InspectResources());
+    }
+
+    [Fact]
     public void RejectsInitialDataLargerThanItsDeclaredBufferWithoutRetainingAllocations()
     {
         using var device = new RekallAgeInMemoryRenderingDevice(

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Buffers.Binary;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime.Abstractions;
 
@@ -67,7 +68,9 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
         var owned = new List<RekallAgeGraphicsResourceHandle>();
         foreach (var buffer in workload.Buffers)
         {
-            var hasInitialData = !string.IsNullOrWhiteSpace(buffer.InitialDataAsset);
+            var hasAssetData = !string.IsNullOrWhiteSpace(buffer.InitialDataAsset);
+            var hasInlineData = buffer.InitialDataUInt32.Count > 0;
+            var hasInitialData = hasAssetData || hasInlineData;
             if (!Add(buffer.Id, device.CreateBuffer(new(
                 buffer.SizeBytes,
                 Map(buffer.Usage) | (hasInitialData ? RekallAgeBufferUsage.TransferDestination : 0),
@@ -81,7 +84,10 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
             }))) return Rollback(workload.Id, device, owned, diagnostics);
             if (hasInitialData)
             {
-                var upload = device.WriteBuffer(resources[buffer.Id], 0, initialData[buffer.InitialDataAsset!]);
+                var data = hasAssetData
+                    ? initialData[buffer.InitialDataAsset!]
+                    : EncodeUInt32(buffer.InitialDataUInt32);
+                var upload = device.WriteBuffer(resources[buffer.Id], 0, data);
                 if (!upload.Valid)
                 {
                     diagnostics.AddRange(upload.Diagnostics);
@@ -281,6 +287,21 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_SHAPE_INVALID", "Render-target color attachments cannot be null.", target.Id));
         foreach (var command in commands.Where(command => command.ClearColors is null))
             diagnostics.Add(new("REKALL_GPU_WORKLOAD_SHAPE_INVALID", "Command clear-color collections cannot be null.", workload.Id));
+        foreach (var buffer in buffers)
+        {
+            if (buffer.InitialDataUInt32 is null)
+            {
+                diagnostics.Add(new("REKALL_GPU_WORKLOAD_SHAPE_INVALID", "Inline UInt32 initial data cannot be null.", buffer.Id));
+                continue;
+            }
+            if (!string.IsNullOrWhiteSpace(buffer.InitialDataAsset) && buffer.InitialDataUInt32.Count > 0)
+                diagnostics.Add(new("REKALL_GPU_INITIAL_DATA_AMBIGUOUS", "Buffer initial data must use either an asset or inline UInt32 values, not both.", buffer.Id));
+            var inlineBytes = (ulong)buffer.InitialDataUInt32.Count * sizeof(uint);
+            if (inlineBytes > buffer.SizeBytes)
+                diagnostics.Add(new("REKALL_GPU_INITIAL_DATA_TOO_LARGE", $"Inline initial data for buffer '{buffer.Id}' exceeds its declared size.", buffer.Id));
+            if (inlineBytes > MaximumInitialAssetBytes)
+                diagnostics.Add(new("REKALL_GPU_INITIAL_DATA_LIMIT", $"Inline initial data cannot exceed {MaximumInitialAssetBytes} bytes.", buffer.Id));
+        }
         if (assetDataResolver is null && (buffers.Any(buffer => !string.IsNullOrWhiteSpace(buffer.InitialDataAsset))
             || textures.Any(texture => !string.IsNullOrWhiteSpace(texture.InitialDataAsset))))
             diagnostics.Add(new("REKALL_GPU_ASSET_RESOLVER_REQUIRED", "Initial GPU data requires an explicit bounded asset resolver.", workload.Id));
@@ -433,6 +454,14 @@ public sealed class RekallAgeRuntimeGpuWorkloadCompiler
                 diagnostics.Add(new("REKALL_GPU_INITIAL_DATA_SIZE_INVALID", $"Initial data for texture '{texture.Id}' must contain exactly {expectedBytes} tightly packed base-mip bytes.", texture.Id));
         }
         return resolved;
+    }
+
+    private static byte[] EncodeUInt32(IReadOnlyList<uint> values)
+    {
+        var data = new byte[checked(values.Count * sizeof(uint))];
+        for (var index = 0; index < values.Count; index++)
+            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(index * sizeof(uint), sizeof(uint)), values[index]);
+        return data;
     }
 
     private static ulong EstimateTextureBytes(RekallAgeRuntimeGpuTexture texture)

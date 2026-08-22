@@ -1094,7 +1094,6 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await StopOpenXrHeadsetSubmitAsync().ConfigureAwait(false);
-        _controllerInput.Dispose();
         void Cleanup(string target, Action action)
         {
             var started = Stopwatch.GetTimestamp();
@@ -1189,6 +1188,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 throw new TimeoutException("SDL window owner did not close within one second.");
             }
         });
+        Cleanup("controller-input", _controllerInput.Dispose);
     }
 
     private static void EnsureSdlVideoInitialized()

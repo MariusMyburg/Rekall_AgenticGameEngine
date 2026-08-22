@@ -99,7 +99,7 @@ public sealed class RekallAgeInputActionMapComponent : RekallAgeComponent
 
     [RekallAgeProperty(
         Kind = "inputActions",
-        Description = "Native JSON array of semantic input bindings. Each object requires name and may use keyboard/mouse fields (key, button/mouseButton, positiveKey, negativeKey, positiveButton, negativeButton, mouseWheelScale, mouseAxis/mouseDeltaAxis, mouseScale) or controller fields (controllerButton, positiveControllerButton, negativeControllerButton, controllerAxis, controllerAxisScale, deadzone, saturation, invert, responseExponent, controllerHat, controllerHatDirection, deviceId, deviceKind, playerIndex). gamepad* and joystick* aliases are accepted. Example: [{name:\"move.horizontal\",positiveKey:\"D\",negativeKey:\"A\",controllerAxis:\"LeftX\",deadzone:0.15},{name:\"primary\",key:\"Space\",controllerButton:\"A\"}]. Pass the array itself; never encode JSON inside a string. Runtime values such as value/isDown are evidence samples, not bindings.")]
+        Description = "Native JSON array of semantic bindings. Each object requires name and may combine keyboard/mouse fields with controllerButton/controllerAxis/controllerHat, signed variants, deadzone/saturation/invert/responseExponent, and deviceKind/deviceId/playerIndex filters. gamepad* and joystick* aliases are accepted. Pass native JSON, never an encoded string; runtime value/isDown samples are not bindings.")]
     public RekallAgeInputActionBinding[] Actions { get; init; } =
     [
         new("primary", Key: "Space")

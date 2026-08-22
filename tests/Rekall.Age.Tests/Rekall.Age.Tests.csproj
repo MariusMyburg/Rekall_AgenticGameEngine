@@ -39,6 +39,7 @@
     <ProjectReference Include="..\..\src\Rekall.Age.AssetPipeline\Rekall.Age.AssetPipeline.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.Runtime.Abstractions\Rekall.Age.Runtime.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.Rendering.Abstractions\Rekall.Age.Rendering.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Rekall.Age.Rendering.WebGpu\Rekall.Age.Rendering.WebGpu.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.LevelDesign\Rekall.Age.LevelDesign.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.ModuleHost\Rekall.Age.ModuleHost.csproj" />
   </ItemGroup>

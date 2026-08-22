@@ -328,6 +328,12 @@
           "Rekall.Age.World": "[0.1.0-preview.1, )"
         }
       },
+      "rekall.age.rendering.webgpu": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Rendering.Abstractions": "[0.1.0-preview.1, )"
+        }
+      },
       "rekall.age.runtime": {
         "type": "Project",
         "dependencies": {

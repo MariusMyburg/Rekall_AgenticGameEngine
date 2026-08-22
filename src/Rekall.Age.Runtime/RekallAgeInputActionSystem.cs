@@ -86,6 +86,12 @@ public sealed class RekallAgeInputActionSystem : IRekallAgeRuntimeWorldSystem
                         .OrderBy(action => action.Name, StringComparer.Ordinal)
                         .ThenBy(action => action.SourceEntityName, StringComparer.Ordinal)
                         .ToArray())
+                {
+                    Controllers = (context.Input.Controllers ?? [])
+                        .OrderBy(controller => controller.PlayerIndex)
+                        .ThenBy(controller => controller.DeviceId, StringComparer.Ordinal)
+                        .ToArray()
+                }
             },
             Observations = world.Observations.Concat(observations).ToArray()
         });
@@ -106,6 +112,8 @@ public sealed class RekallAgeInputActionSystem : IRekallAgeRuntimeWorldSystem
         var isDown = false;
         var wasPressed = false;
         var wasReleased = false;
+        string? physicalDeviceId = null;
+        string? physicalDeviceKind = null;
 
         ApplyDigitalBinding(
             ReadString(definition, "key"),
@@ -189,6 +197,23 @@ public sealed class RekallAgeInputActionSystem : IRekallAgeRuntimeWorldSystem
             }
         }
 
+        foreach (var controller in MatchingControllers(definition, input))
+        {
+            var before = value;
+            ApplyControllerBindings(
+                definition,
+                controller,
+                ref value,
+                ref isDown,
+                ref wasPressed,
+                ref wasReleased);
+            if (Math.Abs(value - before) > 0.000001 || ControllerHasEdge(definition, controller))
+            {
+                physicalDeviceId ??= controller.DeviceId;
+                physicalDeviceKind ??= controller.Kind;
+            }
+        }
+
         var semanticSample = input.SemanticActions?.FirstOrDefault(sample =>
             !string.IsNullOrWhiteSpace(sample.Name)
             && sample.Name.Trim().Equals(name.Trim(), StringComparison.Ordinal));
@@ -207,8 +232,158 @@ public sealed class RekallAgeInputActionSystem : IRekallAgeRuntimeWorldSystem
             wasPressed,
             wasReleased,
             entity.Id,
-            entity.Name);
+            entity.Name)
+        {
+            PhysicalDeviceId = physicalDeviceId,
+            PhysicalDeviceKind = physicalDeviceKind
+        };
     }
+
+    private static IEnumerable<RekallAgeRuntimeControllerState> MatchingControllers(
+        JsonObject definition,
+        RekallAgeRuntimeInputState input)
+    {
+        var deviceId = ReadString(definition, "deviceId");
+        var deviceKind = ReadString(definition, "deviceKind");
+        var playerIndex = ReadNullableInteger(definition, "playerIndex");
+        return (input.Controllers ?? [])
+            .Where(controller => string.IsNullOrWhiteSpace(deviceId)
+                || controller.DeviceId.Equals(deviceId.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Where(controller => string.IsNullOrWhiteSpace(deviceKind)
+                || controller.Kind.Equals(deviceKind.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Where(controller => playerIndex is null || controller.PlayerIndex == playerIndex)
+            .OrderBy(controller => controller.DeviceId, StringComparer.Ordinal);
+    }
+
+    private static void ApplyControllerBindings(
+        JsonObject definition,
+        RekallAgeRuntimeControllerState controller,
+        ref double value,
+        ref bool isDown,
+        ref bool wasPressed,
+        ref bool wasReleased)
+    {
+        ApplyControllerButton(
+            ReadFirstString(definition, "controllerButton", "gamepadButton", "joystickButton"),
+            controller,
+            1,
+            ref value,
+            ref isDown,
+            ref wasPressed,
+            ref wasReleased);
+        ApplyControllerButton(
+            ReadFirstString(definition, "positiveControllerButton", "positiveGamepadButton", "positiveJoystickButton"),
+            controller,
+            1,
+            ref value,
+            ref isDown,
+            ref wasPressed,
+            ref wasReleased);
+        ApplyControllerButton(
+            ReadFirstString(definition, "negativeControllerButton", "negativeGamepadButton", "negativeJoystickButton"),
+            controller,
+            -1,
+            ref value,
+            ref isDown,
+            ref wasPressed,
+            ref wasReleased);
+
+        var axisName = ReadFirstString(definition, "controllerAxis", "gamepadAxis", "joystickAxis");
+        if (!string.IsNullOrWhiteSpace(axisName))
+        {
+            var axis = controller.Axes.FirstOrDefault(candidate =>
+                candidate.Name.Equals(axisName.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (axis is not null)
+            {
+                var deadzone = Math.Clamp(ReadNumber(definition, "deadzone", 0), 0, 0.99);
+                var saturation = Math.Clamp(ReadNumber(definition, "saturation", 1), deadzone + 0.000001, 1);
+                var exponent = Math.Max(0.000001, ReadNumber(definition, "responseExponent", 1));
+                var scale = ReadNumber(
+                    definition,
+                    "controllerAxisScale",
+                    ReadNumber(definition, "axisScale", 1));
+                var magnitude = Math.Abs(axis.Value);
+                var normalized = magnitude <= deadzone
+                    ? 0
+                    : Math.Pow(Math.Clamp((magnitude - deadzone) / (saturation - deadzone), 0, 1), exponent);
+                var contribution = Math.CopySign(normalized, axis.Value) * scale;
+                if (ReadBoolean(definition, "invert", false))
+                {
+                    contribution = -contribution;
+                }
+
+                value += contribution;
+                isDown |= Math.Abs(contribution) > 0.000001;
+            }
+        }
+
+        var hatName = ReadString(definition, "controllerHat");
+        var hatDirection = ReadString(definition, "controllerHatDirection");
+        if (!string.IsNullOrWhiteSpace(hatName) && !string.IsNullOrWhiteSpace(hatDirection))
+        {
+            var hat = controller.Hats.FirstOrDefault(candidate =>
+                candidate.Name.Equals(hatName.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (hat is not null && HatMatches(hat, hatDirection))
+            {
+                value += 1;
+                isDown = true;
+            }
+        }
+    }
+
+    private static bool ControllerHasEdge(
+        JsonObject definition,
+        RekallAgeRuntimeControllerState controller)
+    {
+        var names = new[]
+        {
+            ReadFirstString(definition, "controllerButton", "gamepadButton", "joystickButton"),
+            ReadFirstString(definition, "positiveControllerButton", "positiveGamepadButton", "positiveJoystickButton"),
+            ReadFirstString(definition, "negativeControllerButton", "negativeGamepadButton", "negativeJoystickButton")
+        };
+        return names.Where(name => !string.IsNullOrWhiteSpace(name)).Any(name =>
+            Contains(controller.PressedButtonsThisFrame, name!)
+            || Contains(controller.ReleasedButtonsThisFrame, name!));
+    }
+
+    private static void ApplyControllerButton(
+        string? binding,
+        RekallAgeRuntimeControllerState controller,
+        double contribution,
+        ref double value,
+        ref bool isDown,
+        ref bool wasPressed,
+        ref bool wasReleased)
+    {
+        if (string.IsNullOrWhiteSpace(binding))
+        {
+            return;
+        }
+
+        if (Contains(controller.PressedButtons, binding))
+        {
+            value += contribution;
+            isDown = true;
+        }
+
+        wasPressed |= Contains(controller.PressedButtonsThisFrame, binding);
+        wasReleased |= Contains(controller.ReleasedButtonsThisFrame, binding);
+    }
+
+    private static bool HatMatches(RekallAgeRuntimeControllerHat hat, string direction) =>
+        direction.Trim().ToLowerInvariant() switch
+        {
+            "up" => hat.Y > 0,
+            "down" => hat.Y < 0,
+            "left" => hat.X < 0,
+            "right" => hat.X > 0,
+            "up-left" or "upleft" => hat.X < 0 && hat.Y > 0,
+            "up-right" or "upright" => hat.X > 0 && hat.Y > 0,
+            "down-left" or "downleft" => hat.X < 0 && hat.Y < 0,
+            "down-right" or "downright" => hat.X > 0 && hat.Y < 0,
+            "centered" or "center" => hat.X == 0 && hat.Y == 0,
+            _ => false
+        };
 
     private static void ApplyDigitalBinding(
         string? binding,
@@ -249,6 +424,32 @@ public sealed class RekallAgeInputActionSystem : IRekallAgeRuntimeWorldSystem
     private static bool Contains(IReadOnlySet<string>? values, string value)
     {
         return values is not null && values.Contains(value.Trim());
+    }
+
+    private static bool Contains(IReadOnlyList<string>? values, string value)
+    {
+        return values is not null && values.Any(candidate =>
+            candidate.Equals(value.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string? ReadFirstString(JsonObject properties, params string[] names) =>
+        names.Select(name => ReadString(properties, name)).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+    private static int? ReadNullableInteger(JsonObject properties, string name)
+    {
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonValue value)
+        {
+            return null;
+        }
+
+        if (value.TryGetValue<int>(out var integer))
+        {
+            return integer;
+        }
+
+        return value.TryGetValue<string>(out var text) && int.TryParse(text, out integer)
+            ? integer
+            : null;
     }
 
     private static string? ReadString(JsonObject properties, string name)

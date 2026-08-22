@@ -82,6 +82,11 @@ internal static class RekallAgeMcpToolClassifier
             return "multiplayer";
         }
 
+        if (name.StartsWith("rekall.input.", StringComparison.Ordinal))
+        {
+            return "input";
+        }
+
         if (name.StartsWith("rekall.play", StringComparison.Ordinal))
         {
             return "playtesting";
@@ -124,6 +129,7 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.multiplayer.submit_input" or
             "rekall.multiplayer.snapshot" or
             "rekall.multiplayer.delta" or
+            "rekall.input.inspect_bindings" or
             "rekall.render.visibility.inspect_scene" or
             "rekall.solar.import_ksa_system" or
             "rekall.workflow.agent_authoring_gauntlet" or

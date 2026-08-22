@@ -239,6 +239,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private ResourceSet _drawSet;
     private readonly ResourceSet _postProcessSet;
     private readonly RekallAgeRuntimeExecutionLoop _runtimeLoop;
+    private readonly RekallAgeSdlControllerInput _controllerInput = new();
     private readonly RekallAgeRuntimeSimulationClock _simulationClock;
     private readonly RekallAgeSdlAudioOutput? _audioOutput;
     private readonly RekallAgeRuntimeRenderFrameBuilder _frameBuilder = new();
@@ -1093,6 +1094,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await StopOpenXrHeadsetSubmitAsync().ConfigureAwait(false);
+        _controllerInput.Dispose();
         void Cleanup(string target, Action action)
         {
             var started = Stopwatch.GetTimestamp();
@@ -1931,6 +1933,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     private RekallAgeRuntimeInputState ConsumeRuntimeInput()
     {
+        var controllers = _controllerInput.Poll();
         var wheelDelta = _pendingMouseWheelDelta;
         var mouseDeltaX = _pendingMouseDeltaX;
         var mouseDeltaY = _pendingMouseDeltaY;
@@ -1950,7 +1953,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 PressedKeys: SnapshotSetOrNull(_pressedKeys),
                 PressedButtons: SnapshotSetOrNull(_pressedButtons),
                 ViewportWidth: Math.Max(1, _window.Width),
-                ViewportHeight: Math.Max(1, _window.Height));
+                ViewportHeight: Math.Max(1, _window.Height),
+                Controllers: controllers);
             var idleInput = _simulateXrInput
                 ? RekallAgeXrInputSimulator.CreateFrame(pointerInput, _clock.Elapsed)
                 : pointerInput;
@@ -1984,7 +1988,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             PressedButtonsThisFrame: pressedButtonsThisFrame,
             ReleasedButtonsThisFrame: releasedButtonsThisFrame,
             ViewportWidth: Math.Max(1, _window.Width),
-            ViewportHeight: Math.Max(1, _window.Height));
+            ViewportHeight: Math.Max(1, _window.Height),
+            Controllers: controllers);
         var inputFrame = _simulateXrInput
             ? RekallAgeXrInputSimulator.CreateFrame(input, _clock.Elapsed)
             : input;
@@ -2025,7 +2030,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             PressedKeys: input.PressedKeys,
             PressedButtons: input.PressedButtons,
             ViewportWidth: input.ViewportWidth,
-            ViewportHeight: input.ViewportHeight);
+            ViewportHeight: input.ViewportHeight,
+            Controllers: input.Controllers?.Select(controller => controller with
+            {
+                PressedButtonsThisFrame = [],
+                ReleasedButtonsThisFrame = []
+            }).ToArray());
     }
 
     private RekallAgePlaybackInput BuildPlayableInput(double deltaSeconds)

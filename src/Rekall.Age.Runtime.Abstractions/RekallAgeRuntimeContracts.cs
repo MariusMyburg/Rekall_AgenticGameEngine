@@ -35,6 +35,20 @@ public sealed record RekallAgeRuntimeSemanticActionSample(
     bool WasPressed = false,
     bool WasReleased = false);
 
+public sealed record RekallAgeRuntimeControllerAxis(string Name, double Value);
+
+public sealed record RekallAgeRuntimeControllerHat(string Name, int X, int Y);
+
+public sealed record RekallAgeRuntimeControllerState(
+    string DeviceId,
+    string Kind,
+    int PlayerIndex,
+    IReadOnlyList<RekallAgeRuntimeControllerAxis> Axes,
+    IReadOnlyList<string> PressedButtons,
+    IReadOnlyList<string> PressedButtonsThisFrame,
+    IReadOnlyList<string> ReleasedButtonsThisFrame,
+    IReadOnlyList<RekallAgeRuntimeControllerHat> Hats);
+
 public sealed record RekallAgeRuntimeInputState(
     double MouseX = 0,
     double MouseY = 0,
@@ -51,7 +65,8 @@ public sealed record RekallAgeRuntimeInputState(
     IReadOnlyList<RekallAgeRuntimeXrAction>? XrActions = null,
     double ViewportWidth = 0,
     double ViewportHeight = 0,
-    IReadOnlyList<RekallAgeRuntimeSemanticActionSample>? SemanticActions = null)
+    IReadOnlyList<RekallAgeRuntimeSemanticActionSample>? SemanticActions = null,
+    IReadOnlyList<RekallAgeRuntimeControllerState>? Controllers = null)
 {
     public static RekallAgeRuntimeInputState Empty { get; } = new();
 }
@@ -72,7 +87,8 @@ public sealed record RekallAgeRuntimeInputFrame(
     IReadOnlyList<RekallAgeRuntimeXrAction>? XrActions = null,
     double ViewportWidth = 0,
     double ViewportHeight = 0,
-    IReadOnlyList<RekallAgeRuntimeSemanticActionSample>? SemanticActions = null)
+    IReadOnlyList<RekallAgeRuntimeSemanticActionSample>? SemanticActions = null,
+    IReadOnlyList<RekallAgeRuntimeControllerState>? Controllers = null)
 {
     public RekallAgeRuntimeInputState ToState()
     {
@@ -92,7 +108,8 @@ public sealed record RekallAgeRuntimeInputFrame(
             XrActions,
             ViewportWidth,
             ViewportHeight,
-            SemanticActions);
+            SemanticActions,
+            Controllers);
     }
 
     private static IReadOnlySet<string>? ToSet(IReadOnlyList<string>? values)
@@ -172,6 +189,9 @@ public sealed record RekallAgeRuntimeSubsystemViews(
 public sealed record RekallAgeRuntimeInputView(
     IReadOnlyList<RekallAgeRuntimeInputAction> Actions)
 {
+    public IReadOnlyList<RekallAgeRuntimeControllerState> Controllers { get; init; } =
+        Array.Empty<RekallAgeRuntimeControllerState>();
+
     public static RekallAgeRuntimeInputView Empty { get; } = new(
         Array.Empty<RekallAgeRuntimeInputAction>());
 }
@@ -183,7 +203,12 @@ public sealed record RekallAgeRuntimeInputAction(
     bool WasPressed,
     bool WasReleased,
     string SourceEntityId,
-    string SourceEntityName);
+    string SourceEntityName)
+{
+    public string? PhysicalDeviceId { get; init; }
+
+    public string? PhysicalDeviceKind { get; init; }
+}
 
 public sealed record RekallAgeRuntimeEventView(
     IReadOnlyList<RekallAgeRuntimeEvent> Events)

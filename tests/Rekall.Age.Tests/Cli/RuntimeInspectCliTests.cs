@@ -296,6 +296,76 @@ public sealed class RuntimeInspectCliTests
     }
 
     [Fact]
+    public async Task RuntimeInspectAcceptsControllerInputJsonAndReportsPhysicalSource()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Controller Input CLI", ["world"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity(RekallAgeEntityDocument.Create("Input", ["input"])
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.InputActionMap",
+                        new JsonObject
+                        {
+                            ["actions"] = new JsonArray
+                            {
+                                new JsonObject { ["name"] = "steer", ["controllerAxis"] = "LeftX" }
+                            }
+                        }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            "runtime",
+            "inspect",
+            root,
+            "Main",
+            "1",
+            """[{"controllers":[{"deviceId":"pad-alpha","kind":"gamepad","playerIndex":0,"axes":[{"name":"LeftX","value":0.75}],"pressedButtons":[],"pressedButtonsThisFrame":[],"releasedButtonsThisFrame":[],"hats":[]}]}]""");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("steer: value=0.75 down=True", result.Output);
+        Assert.Contains("device=pad-alpha kind=gamepad", result.Output);
+    }
+
+    [Fact]
+    public async Task InputCliInspectsAndRebindsSemanticActions()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"])
+                .AddEntity((RekallAgeEntityDocument.Create("Input", ["input"]) with { Id = "input" })
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.InputActionMap",
+                        new JsonObject
+                        {
+                            ["actions"] = new JsonArray
+                            {
+                                new JsonObject { ["name"] = "primary", ["key"] = "Space" }
+                            }
+                        }))),
+            CancellationToken.None);
+
+        var inspect = await RunAsync(FindCliAssemblyPath(), "input", "inspect", root, "Main");
+        Assert.Equal(0, inspect.ExitCode);
+        Assert.Contains("primary", inspect.Output);
+
+        var rebind = await RunAsync(
+            FindCliAssemblyPath(), "input", "rebind", root, "Main", "input", "primary",
+            """{"key":"Enter","controllerButton":"A"}""");
+        Assert.Equal(0, rebind.ExitCode);
+        Assert.Contains("Rebound input action 'primary'", rebind.Output);
+        var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        var action = Assert.IsType<JsonObject>(Assert.Single(scene.GetRequiredEntity("input").Components.Single().Properties["actions"]!.AsArray()));
+        Assert.Equal("A", action["controllerButton"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task RuntimeViewportCapturePrintsCaptureSummary()
     {
         var root = TestPaths.CreateTempDirectory();

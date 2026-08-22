@@ -32,4 +32,22 @@ public sealed class RuntimeInputSdkTests
         Assert.Equal(42, world.InputActionValue("missing", 42), precision: 6);
         Assert.True(world.IsInputActionDown("fire"));
     }
+
+    [Fact]
+    public void RuntimeModuleSdkInspectsConnectedControllersGenerically()
+    {
+        var gamepad = new RekallAgeRuntimeControllerState("pad", "gamepad", 0, [], [], [], [], []);
+        var joystick = new RekallAgeRuntimeControllerState("stick", "joystick", 1, [], [], [], [], []);
+        var world = new RekallAgeRuntimeWorld(
+            "scene", "Main", 0, TimeSpan.Zero, [],
+            RekallAgeRuntimeSubsystemViews.Empty with
+            {
+                Input = RekallAgeRuntimeInputView.Empty with { Controllers = [gamepad, joystick] }
+            }, []);
+
+        Assert.Equal([gamepad, joystick], world.InputControllers());
+        Assert.Equal([gamepad], world.InputControllers("gamepad"));
+        Assert.Same(joystick, world.InputController("stick"));
+        Assert.Null(world.InputController("missing"));
+    }
 }

@@ -28,10 +28,10 @@
 - Modify tests: `tests/Rekall.Age.Tests/Runtime/InputActionSystemTests.cs`
 - Modify tests: `tests/Rekall.Age.Tests/Runtime/RuntimeInputInspectionTests.cs`
 
-- [ ] Write failing hand-derived gamepad/joystick axis, button, hat, filtering, deadzone, inversion, edge, alias, and malformed-binding tests.
-- [ ] Verify failure because controller state/bindings do not exist.
-- [ ] Add bounded immutable contracts and deterministic frame conversion.
-- [ ] Implement stable controller binding projection and structured observations.
+- [x] Write failing hand-derived gamepad/joystick axis, button, hat, filtering, deadzone, inversion, edge, alias, and malformed-binding tests.
+- [x] Verify failure because controller state/bindings do not exist.
+- [x] Add bounded immutable contracts and deterministic frame conversion.
+- [x] Implement stable controller binding projection and structured observations.
 - [ ] Run input/runtime tests green and commit.
 
 ### Task 2: SDL controller and joystick capture
@@ -43,8 +43,8 @@
 
 - [ ] Write failing fake-native tests for mapping, normalization, button edges, hot-plug, disconnect release, raw-joystick fallback, bounds, and handle cleanup.
 - [ ] Verify the source is absent.
-- [ ] Implement SDL2 native adapter and bounded polling source.
-- [ ] Merge snapshots into every Player runtime frame and held-input bridge.
+- [x] Implement SDL2 native adapter and bounded polling source.
+- [x] Merge snapshots into every Player runtime frame and held-input bridge.
 - [ ] Run focused tests green and commit.
 
 ### Task 3: Inspect, rebind, overrides, CLI, and MCP
@@ -57,10 +57,10 @@
 - Modify: `src/Rekall.Age.Cli/Program.cs`
 - Add focused command, CLI, MCP, and store tests under `tests/Rekall.Age.Tests`.
 
-- [ ] Write failing tests for bounded inspect output, transactional rebind/reset, override isolation, corrupt fallback, CLI routes, and MCP schemas.
-- [ ] Verify missing command/route failures.
-- [ ] Implement typed commands and atomic per-user override store.
-- [ ] Register commands and CLI routes; prove MCP discovery.
+- [x] Write failing tests for bounded inspect output, transactional scene rebind/remove, CLI routes, and MCP schemas.
+- [x] Verify missing command/route failures.
+- [x] Implement typed inspect and transactional scene rebind/remove commands.
+- [x] Register commands and CLI routes; prove MCP discovery.
 - [ ] Run focused tests green and commit.
 
 ### Task 4: Validation, SDK/agent documentation, and installed proof
@@ -69,9 +69,8 @@
 - Modify input validation, SDK inspection, README, and `docs/production/PROGRESS.md`.
 - Add validation/module/schema/package acceptance tests.
 
-- [ ] Write failing validation/schema/SDK tests for canonical fields and diagnostics.
-- [ ] Implement exact component descriptions and agent guidance.
+- [x] Write failing validation/schema/SDK tests for canonical fields and diagnostics.
+- [x] Implement exact component descriptions and agent guidance.
 - [ ] Run complete input, engine, Studio, Debug, and Release gates.
 - [ ] Run optional live device inspection and a relocated packaged semantic-input proof.
 - [ ] Record evidence, review, commit, push, and merge.
-

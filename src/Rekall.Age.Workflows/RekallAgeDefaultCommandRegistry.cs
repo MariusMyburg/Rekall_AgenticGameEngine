@@ -36,6 +36,8 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new SetComponentPropertyCommand(componentPropertyAdmission));
         registry.Register(new RemoveComponentPropertyCommand());
         registry.Register(new InspectEntityCommand());
+        registry.Register(new InspectInputBindingsCommand());
+        registry.Register(new RebindInputActionCommand());
         registry.Register(new VerifyPlayableGameCommand());
         registry.Register(new PackagePlayableGameCommand());
         registry.Register(new RelocatePlayablePackageCommand());

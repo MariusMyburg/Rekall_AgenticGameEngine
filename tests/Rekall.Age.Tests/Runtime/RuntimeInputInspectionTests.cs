@@ -127,6 +127,39 @@ public sealed class RuntimeInputInspectionTests
     }
 
     [Fact]
+    public async Task RuntimeInspectionRejectsUnboundedOrDuplicateControllerPayloads()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"]),
+            CancellationToken.None);
+        var controllers = Enumerable.Range(0, 65)
+            .Select(index => new RekallAgeRuntimeControllerState(
+                index < 2 ? "duplicate" : $"pad-{index}",
+                "gamepad",
+                index,
+                [],
+                [],
+                [],
+                [],
+                []))
+            .ToArray();
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(
+                root,
+                "Main",
+                1,
+                [new RekallAgeRuntimeInputFrame(Controllers: controllers)]),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("invalid-controller-input"), CancellationToken.None));
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, error => error.Code == "REKALL_RUNTIME_INPUT_CONTROLLER_LIMIT");
+        Assert.Contains(result.Errors, error => error.Code == "REKALL_RUNTIME_INPUT_CONTROLLER_DUPLICATE");
+    }
+
+    [Fact]
     public async Task RuntimeInspectionExplainsJsonEncodedActionMapInsteadOfSilentlyDroppingActions()
     {
         var root = TestPaths.CreateTempDirectory();

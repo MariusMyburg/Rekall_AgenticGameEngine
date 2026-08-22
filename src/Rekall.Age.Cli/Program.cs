@@ -41,7 +41,7 @@ internal static class RekallAgeCli
         Log.Information("Rekall AGE command starting. Args={Args}", string.Join(' ', args));
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <agent|game|project|capability|scene|entity|component|shader|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|compatibility|recovery|diagnostics|transaction|capture|render|module|build|validation|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <agent|game|project|capability|scene|entity|component|input|shader|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|compatibility|recovery|diagnostics|transaction|capture|render|module|build|validation|mcp> ...");
             Log.Information("Rekall AGE command finished with usage error. LogDirectory={LogDirectory}", logDirectory);
             Log.CloseAndFlush();
             return 2;
@@ -202,6 +202,11 @@ internal static class RekallAgeCli
                     await ExportSceneGlbAsync(registry, context, root, scene, outputPath, frames),
                 ["mcp", "stdio"] => await RunMcpStdioAsync(registry, context),
                 ["studio", "open", var root, var scene] => await OpenStudioModelAsync(root, scene),
+                ["input", "inspect", var root, var scene] => await InspectInputBindingsAsync(registry, context, root, scene),
+                ["input", "rebind", var root, var scene, var entityId, var actionName, var bindingJson] =>
+                    await RebindInputActionAsync(registry, context, root, scene, entityId, actionName, bindingJson, remove: false),
+                ["input", "remove", var root, var scene, var entityId, var actionName] =>
+                    await RebindInputActionAsync(registry, context, root, scene, entityId, actionName, null, remove: true),
                 ["asset", "import", var root, var source, var kind, var displayName] =>
                     await ImportAssetAsync(registry, context, root, source, kind, displayName),
                 ["asset", "import-report", var root, var source, var kind, var displayName] =>
@@ -3385,7 +3390,7 @@ internal static class RekallAgeCli
         Console.WriteLine($"Input actions: {result.Value.InputActionCount}");
         foreach (var action in result.Value.InputActions)
         {
-            Console.WriteLine($"  {action.Name}: value={action.Value} down={action.IsDown} pressed={action.WasPressed} released={action.WasReleased}");
+            Console.WriteLine($"  {action.Name}: value={action.Value} down={action.IsDown} pressed={action.WasPressed} released={action.WasReleased}{FormatPhysicalInputSource(action)}");
         }
 
         Console.WriteLine($"XR actions: {result.Value.XrActionCount}");
@@ -3394,6 +3399,58 @@ internal static class RekallAgeCli
             Console.WriteLine($"  {action.Hand}/{action.Name}: value={action.Value} down={action.IsDown} pressed={action.WasPressed} released={action.WasReleased}");
         }
 
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> InspectInputBindingsAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene)
+    {
+        var result = await registry.ExecuteAsync<InspectInputBindingsRequest, InspectInputBindingsResult>(
+            "rekall.input.inspect_bindings",
+            new InspectInputBindingsRequest(root, scene),
+            context);
+        Console.WriteLine(result.Summary);
+        foreach (var binding in result.Value.Bindings)
+        {
+            Console.WriteLine($"  {binding.ActionName}: entity={binding.EntityName} ({binding.EntityId}) active={binding.Active} binding={binding.Binding.ToJsonString()}");
+        }
+
+        if (result.Value.Truncated)
+        {
+            Console.WriteLine($"  Output truncated: {result.Value.Bindings.Count}/{result.Value.TotalBindingCount} bindings shown.");
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> RebindInputActionAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string entityId,
+        string actionName,
+        string? bindingJson,
+        bool remove)
+    {
+        JsonObject? binding = null;
+        if (!remove)
+        {
+            var payload = File.Exists(bindingJson)
+                ? await File.ReadAllTextAsync(bindingJson, context.CancellationToken)
+                : bindingJson;
+            binding = JsonNode.Parse(payload ?? string.Empty) as JsonObject
+                ?? throw new ArgumentException("Input binding must be a native JSON object or a path to a JSON object file.");
+        }
+
+        var result = await registry.ExecuteAsync<RebindInputActionRequest, RebindInputActionResult>(
+            "rekall.input.rebind_action",
+            new RebindInputActionRequest(root, scene, entityId, actionName, binding, remove),
+            context);
+        Console.WriteLine(result.Summary);
         return result.Ok ? 0 : 1;
     }
 
@@ -3481,7 +3538,7 @@ internal static class RekallAgeCli
         Console.WriteLine($"Input actions: {result.Value.InputActionCount}");
         foreach (var action in result.Value.InputActions)
         {
-            Console.WriteLine($"  {action.Name}: value={action.Value} down={action.IsDown} pressed={action.WasPressed} released={action.WasReleased}");
+            Console.WriteLine($"  {action.Name}: value={action.Value} down={action.IsDown} pressed={action.WasPressed} released={action.WasReleased}{FormatPhysicalInputSource(action)}");
         }
 
         Console.WriteLine($"Events: {result.Value.EventCount}");
@@ -3962,6 +4019,13 @@ internal static class RekallAgeCli
         {
             throw new ArgumentException($"Runtime input frames JSON is invalid: {ex.Message}", ex);
         }
+    }
+
+    private static string FormatPhysicalInputSource(RekallAgeRuntimeInputAction action)
+    {
+        return string.IsNullOrWhiteSpace(action.PhysicalDeviceId)
+            ? string.Empty
+            : $" device={action.PhysicalDeviceId} kind={action.PhysicalDeviceKind ?? "unknown"}";
     }
 
     private static async ValueTask<RekallAgeRuntimeInputFrame> ParseRuntimeInputFrameAsync(

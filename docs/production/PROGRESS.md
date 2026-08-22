@@ -3146,6 +3146,18 @@ SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
 ## Next after the current item
 
+The 2026-08-22 generic controller-input milestone is implemented pending its
+full-suite gate: immutable controller axes/buttons/hats now flow through runtime
+frames; semantic maps support canonical gamepad controls, arbitrary raw
+joysticks, deadzones, saturation, inversion, response curves, and device/player
+filters; the Windows Player polls SDL2 with hot-plug and raw-device fallback;
+CLI/MCP expose deterministic controller frames plus dedicated bounded binding
+inspection and transactional scene rebinding; and agent-authored modules can
+inspect physical devices while retaining semantic actions as the normal path.
+The next research track is a shallow Godot .NET source audit focused on
+rendering, shader programmability, scripting, and web export, with useful
+concepts translated into AGE's 100% C# and agent-first architecture.
+
 Finish Pong through the generic portable authoring path now. Then finish a
 Galaga-class game entirely through Studio. Only after both are complete, resume
 the queued Rain Glass custom-shader acceptance and require the licensed remote

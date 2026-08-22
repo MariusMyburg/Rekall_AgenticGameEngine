@@ -827,6 +827,8 @@ It captures:
 - mouse position
 - mouse delta
 - mouse wheel
+- SDL gamepads with canonical axes/buttons and hot-plug polling
+- arbitrary SDL joysticks with raw `AxisN`, `ButtonN`, and `HatN` controls
 - OpenXR poses/actions when VR is active
 
 `Rekall.InputActionMap` projects raw input into semantic actions. Project modules consume semantic actions, not hard-coded key folklore.
@@ -847,11 +849,34 @@ Runtime code should use:
 InputActionValue
 IsInputActionDown
 WasInputActionPressed
+WasInputActionReleased
+InputControllers
+InputController
 ```
+
+Action bindings may combine devices without changing gameplay code. Controller
+bindings support `controllerButton`, positive/negative controller buttons,
+`controllerAxis`, scale, deadzone, saturation, inversion, response exponent,
+hats, `deviceId`, `deviceKind`, and `playerIndex`. `gamepad*` and `joystick*`
+aliases are accepted. Deterministic CLI/MCP runtime input frames use the same
+structured `controllers` payload as the Player.
+
+Inspect or transactionally rebind scene-authored actions:
+
+```powershell
+dotnet run --project src/Rekall.Age.Cli -- input inspect <projectRoot> Main
+dotnet run --project src/Rekall.Age.Cli -- input rebind <projectRoot> Main <entityId> move.horizontal '{"positiveKey":"D","negativeKey":"A","controllerAxis":"LeftX","deadzone":0.15}'
+dotnet run --project src/Rekall.Age.Cli -- input remove <projectRoot> Main <entityId> obsolete.action
+```
+
+The same operations are MCP tools named `rekall.input.inspect_bindings` and
+`rekall.input.rebind_action`. Game modules should normally consume semantic
+actions; physical-controller SDK inspection is available for diagnostics and
+specialized authored behavior.
 
 VR rule:
 
-Playable VR still keeps a desktop player window. Keyboard and mouse input come from that window and are bridged into the same runtime input stream as OpenXR data.
+Playable VR still keeps a desktop player window. Keyboard, mouse, gamepad, and joystick input come from that window and are bridged into the same runtime input stream as OpenXR data.
 
 ## Runtime Events
 

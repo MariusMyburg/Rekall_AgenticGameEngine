@@ -99,7 +99,7 @@ public sealed class RekallAgeInputActionMapComponent : RekallAgeComponent
 
     [RekallAgeProperty(
         Kind = "inputActions",
-        Description = "Native JSON array of semantic input bindings. Each object requires name and may use key, button/mouseButton, positiveKey, negativeKey, positiveButton, negativeButton, mouseWheelScale, mouseAxis/mouseDeltaAxis, and mouseScale. Example: [{name:\"move.horizontal\",positiveKey:\"D\",negativeKey:\"A\"},{name:\"reset\",key:\"R\"}]. Pass the array itself; never encode JSON inside a string. Runtime values such as value/isDown are evidence samples, not bindings.")]
+        Description = "Native JSON array of semantic input bindings. Each object requires name and may use keyboard/mouse fields (key, button/mouseButton, positiveKey, negativeKey, positiveButton, negativeButton, mouseWheelScale, mouseAxis/mouseDeltaAxis, mouseScale) or controller fields (controllerButton, positiveControllerButton, negativeControllerButton, controllerAxis, controllerAxisScale, deadzone, saturation, invert, responseExponent, controllerHat, controllerHatDirection, deviceId, deviceKind, playerIndex). gamepad* and joystick* aliases are accepted. Example: [{name:\"move.horizontal\",positiveKey:\"D\",negativeKey:\"A\",controllerAxis:\"LeftX\",deadzone:0.15},{name:\"primary\",key:\"Space\",controllerButton:\"A\"}]. Pass the array itself; never encode JSON inside a string. Runtime values such as value/isDown are evidence samples, not bindings.")]
     public RekallAgeInputActionBinding[] Actions { get; init; } =
     [
         new("primary", Key: "Space")
@@ -116,7 +116,21 @@ public sealed record RekallAgeInputActionBinding(
     string? NegativeButton = null,
     double MouseWheelScale = 0,
     string? MouseAxis = null,
-    double MouseScale = 1);
+    double MouseScale = 1,
+    string? ControllerButton = null,
+    string? PositiveControllerButton = null,
+    string? NegativeControllerButton = null,
+    string? ControllerAxis = null,
+    double ControllerAxisScale = 1,
+    double Deadzone = 0,
+    double Saturation = 1,
+    bool Invert = false,
+    double ResponseExponent = 1,
+    string? ControllerHat = null,
+    string? ControllerHatDirection = null,
+    string? DeviceId = null,
+    string? DeviceKind = null,
+    int? PlayerIndex = null);
 
 [RekallAgeComponent("Event Bindings", Description = "Binds generic runtime event facts to optional handler names. Agent-authored modules consume the facts and decide game behavior; the engine does not attach genre-specific consequences.")]
 public sealed class RekallAgeEventBindingsComponent : RekallAgeComponent

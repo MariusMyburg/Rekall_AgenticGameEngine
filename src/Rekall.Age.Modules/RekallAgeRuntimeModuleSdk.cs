@@ -659,6 +659,28 @@ public static class RekallAgeRuntimeModuleSdk
         return world.InputActions(name).Any(action => action.WasReleased);
     }
 
+    public static IReadOnlyList<RekallAgeRuntimeControllerState> InputControllers(
+        this RekallAgeRuntimeWorld world,
+        string? kind = null)
+    {
+        return world.Subsystems.Input.Controllers
+            .Where(controller => string.IsNullOrWhiteSpace(kind)
+                || controller.Kind.Equals(kind.Trim(), StringComparison.OrdinalIgnoreCase))
+            .OrderBy(controller => controller.PlayerIndex)
+            .ThenBy(controller => controller.DeviceId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public static RekallAgeRuntimeControllerState? InputController(
+        this RekallAgeRuntimeWorld world,
+        string deviceId)
+    {
+        return string.IsNullOrWhiteSpace(deviceId)
+            ? null
+            : world.Subsystems.Input.Controllers.FirstOrDefault(controller =>
+                controller.DeviceId.Equals(deviceId.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
     public static RekallAgeRuntimeVector3 Forward3D(this RekallAgeRuntimeTransform transform)
     {
         return Normalize3D(Rotate3D(0, 0, 1, transform.Rotation3D));

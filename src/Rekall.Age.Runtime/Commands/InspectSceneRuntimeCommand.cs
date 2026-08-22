@@ -308,6 +308,10 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
         IReadOnlyList<RekallAgeRuntimeInputFrame>? inputs)
     {
         const int maximumSemanticActionsPerFrame = 64;
+        const int maximumControllersPerFrame = 16;
+        const int maximumAxesPerController = 32;
+        const int maximumButtonsPerController = 128;
+        const int maximumHatsPerController = 16;
         var errors = new List<RekallAgeCommandError>();
         if (inputs is null)
         {
@@ -317,39 +321,98 @@ public sealed class InspectSceneRuntimeCommand : IRekallAgeCommand<InspectSceneR
         for (var frameIndex = 0; frameIndex < inputs.Count; frameIndex++)
         {
             var samples = inputs[frameIndex].SemanticActions;
-            if (samples is null)
+            if (samples is not null)
+            {
+                if (samples.Count > maximumSemanticActionsPerFrame)
+                {
+                    errors.Add(new RekallAgeCommandError(
+                        "REKALL_RUNTIME_INPUT_SEMANTIC_ACTION_LIMIT",
+                        $"Input frame {frameIndex} has {samples.Count} semantic actions; the maximum is {maximumSemanticActionsPerFrame}.",
+                        $"inputs[{frameIndex}].semanticActions"));
+                }
+
+                var names = new HashSet<string>(StringComparer.Ordinal);
+                for (var sampleIndex = 0; sampleIndex < Math.Min(samples.Count, maximumSemanticActionsPerFrame); sampleIndex++)
+                {
+                    var sample = samples[sampleIndex];
+                    var target = $"inputs[{frameIndex}].semanticActions[{sampleIndex}]";
+                    if (string.IsNullOrWhiteSpace(sample.Name) || !double.IsFinite(sample.Value))
+                    {
+                        errors.Add(new RekallAgeCommandError(
+                            "REKALL_RUNTIME_INPUT_SEMANTIC_ACTION_INVALID",
+                            "Semantic action samples require a non-blank exact action name and a finite numeric value.",
+                            target));
+                        continue;
+                    }
+
+                    if (!names.Add(sample.Name.Trim()))
+                    {
+                        errors.Add(new RekallAgeCommandError(
+                            "REKALL_RUNTIME_INPUT_SEMANTIC_ACTION_DUPLICATE",
+                            $"Semantic action '{sample.Name.Trim()}' appears more than once in input frame {frameIndex}.",
+                            target));
+                    }
+                }
+            }
+
+            var controllers = inputs[frameIndex].Controllers;
+            if (controllers is null)
             {
                 continue;
             }
 
-            if (samples.Count > maximumSemanticActionsPerFrame)
+            if (controllers.Count > maximumControllersPerFrame)
             {
                 errors.Add(new RekallAgeCommandError(
-                    "REKALL_RUNTIME_INPUT_SEMANTIC_ACTION_LIMIT",
-                    $"Input frame {frameIndex} has {samples.Count} semantic actions; the maximum is {maximumSemanticActionsPerFrame}.",
-                    $"inputs[{frameIndex}].semanticActions"));
+                    "REKALL_RUNTIME_INPUT_CONTROLLER_LIMIT",
+                    $"Input frame {frameIndex} has {controllers.Count} controllers; the maximum is {maximumControllersPerFrame}.",
+                    $"inputs[{frameIndex}].controllers"));
             }
 
-            var names = new HashSet<string>(StringComparer.Ordinal);
-            for (var sampleIndex = 0; sampleIndex < Math.Min(samples.Count, maximumSemanticActionsPerFrame); sampleIndex++)
+            var deviceIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var controllerIndex = 0; controllerIndex < Math.Min(controllers.Count, maximumControllersPerFrame); controllerIndex++)
             {
-                var sample = samples[sampleIndex];
-                var target = $"inputs[{frameIndex}].semanticActions[{sampleIndex}]";
-                if (string.IsNullOrWhiteSpace(sample.Name) || !double.IsFinite(sample.Value))
+                var controller = controllers[controllerIndex];
+                var target = $"inputs[{frameIndex}].controllers[{controllerIndex}]";
+                if (string.IsNullOrWhiteSpace(controller.DeviceId)
+                    || string.IsNullOrWhiteSpace(controller.Kind)
+                    || controller.PlayerIndex < 0)
                 {
                     errors.Add(new RekallAgeCommandError(
-                        "REKALL_RUNTIME_INPUT_SEMANTIC_ACTION_INVALID",
-                        "Semantic action samples require a non-blank exact action name and a finite numeric value.",
+                        "REKALL_RUNTIME_INPUT_CONTROLLER_INVALID",
+                        "Controller samples require a non-blank deviceId and kind plus a non-negative playerIndex.",
                         target));
-                    continue;
+                }
+                else if (!deviceIds.Add(controller.DeviceId.Trim()))
+                {
+                    errors.Add(new RekallAgeCommandError(
+                        "REKALL_RUNTIME_INPUT_CONTROLLER_DUPLICATE",
+                        $"Controller deviceId '{controller.DeviceId.Trim()}' appears more than once in input frame {frameIndex}.",
+                        target));
                 }
 
-                if (!names.Add(sample.Name.Trim()))
+                ValidateCount(controller.Axes?.Count ?? 0, maximumAxesPerController, "axes");
+                ValidateCount(controller.PressedButtons?.Count ?? 0, maximumButtonsPerController, "pressedButtons");
+                ValidateCount(controller.PressedButtonsThisFrame?.Count ?? 0, maximumButtonsPerController, "pressedButtonsThisFrame");
+                ValidateCount(controller.ReleasedButtonsThisFrame?.Count ?? 0, maximumButtonsPerController, "releasedButtonsThisFrame");
+                ValidateCount(controller.Hats?.Count ?? 0, maximumHatsPerController, "hats");
+                if (controller.Axes?.Any(axis => string.IsNullOrWhiteSpace(axis.Name) || !double.IsFinite(axis.Value)) == true)
                 {
                     errors.Add(new RekallAgeCommandError(
-                        "REKALL_RUNTIME_INPUT_SEMANTIC_ACTION_DUPLICATE",
-                        $"Semantic action '{sample.Name.Trim()}' appears more than once in input frame {frameIndex}.",
-                        target));
+                        "REKALL_RUNTIME_INPUT_CONTROLLER_AXIS_INVALID",
+                        "Controller axes require non-blank names and finite values.",
+                        $"{target}.axes"));
+                }
+
+                void ValidateCount(int count, int maximum, string field)
+                {
+                    if (count > maximum)
+                    {
+                        errors.Add(new RekallAgeCommandError(
+                            "REKALL_RUNTIME_INPUT_CONTROLLER_FIELD_LIMIT",
+                            $"Controller {field} has {count} entries; the maximum is {maximum}.",
+                            $"{target}.{field}"));
+                    }
                 }
             }
         }

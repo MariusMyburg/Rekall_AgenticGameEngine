@@ -247,6 +247,7 @@ public sealed class ModuleMetadataTests
         Assert.DoesNotContain(module.Components, component => component.DisplayName == "Playable Loop");
         var inputActionMap = Assert.Single(module.Components, component => component.DisplayName == "Input Action Map");
         Assert.Contains(inputActionMap.Properties, property => property.Name == "Actions" && property.Kind == "inputActions");
+        Assert.Contains("controllerAxis", Assert.Single(inputActionMap.Properties, property => property.Name == "Actions").Description, StringComparison.Ordinal);
         Assert.Contains(module.Components, component => component.DisplayName == "Camera 2D");
         var camera3D = Assert.Single(module.Components, component => component.DisplayName == "Camera 3D");
         Assert.Contains("separate Rekall.Transform3D", camera3D.Description, StringComparison.Ordinal);

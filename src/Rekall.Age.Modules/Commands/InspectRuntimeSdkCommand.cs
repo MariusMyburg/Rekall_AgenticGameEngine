@@ -216,6 +216,9 @@ public sealed class InspectRuntimeSdkCommand
         nameof(RekallAgeRuntimeModuleSdk.WasInputActionPressed) or
         nameof(RekallAgeRuntimeModuleSdk.WasInputActionReleased) =>
             "Reads semantic actions projected from Rekall.InputActionMap. Call this extension on world, not frame context.",
+        nameof(RekallAgeRuntimeModuleSdk.InputControllers) or
+        nameof(RekallAgeRuntimeModuleSdk.InputController) =>
+            "Inspects connected physical gamepad or joystick state projected into the generic runtime input view. Prefer semantic InputActionMap bindings for gameplay behavior.",
         nameof(RekallAgeRuntimeModuleSdk.WithPosition2D) or
         nameof(RekallAgeRuntimeModuleSdk.WithRotation2D) or
         nameof(RekallAgeRuntimeModuleSdk.WithScale2D) =>
@@ -276,6 +279,10 @@ public sealed class InspectRuntimeSdkCommand
             "var held = world.IsInputActionDown(\"agent.authored.action\");",
         nameof(RekallAgeRuntimeModuleSdk.WasInputActionPressed) =>
             "if (world.WasInputActionPressed(\"reset\")) { /* agent-authored rule */ }",
+        nameof(RekallAgeRuntimeModuleSdk.InputControllers) =>
+            "var gamepads = world.InputControllers(\"gamepad\");",
+        nameof(RekallAgeRuntimeModuleSdk.InputController) =>
+            "var device = world.InputController(\"sdl:12\");",
         nameof(RekallAgeRuntimeModuleSdk.WithPosition3D) =>
             "world = world.UpdateEntity(entity.Id, current => current.WithPosition3D(new RekallAgeRuntimeVector3(x, y, z)));",
         nameof(RekallAgeRuntimeModuleSdk.WithPosition2D) =>

@@ -89,6 +89,32 @@ public sealed class McpJsonRpcServerTests
         Assert.Equal("number", semanticAction.GetProperty("properties").GetProperty("value").GetProperty("type").GetString());
         Assert.Equal("boolean", semanticAction.GetProperty("properties").GetProperty("isDown").GetProperty("type").GetString());
         Assert.Contains(semanticAction.GetProperty("required").EnumerateArray(), item => item.GetString() == "name");
+        var controller = inputFrame.GetProperty("properties").GetProperty("controllers").GetProperty("items");
+        Assert.Equal("string", controller.GetProperty("properties").GetProperty("deviceId").GetProperty("type").GetString());
+        Assert.Equal("array", controller.GetProperty("properties").GetProperty("axes").GetProperty("type").GetString());
+        Assert.Contains(controller.GetProperty("required").EnumerateArray(), item => item.GetString() == "deviceId");
+    }
+
+    [Fact]
+    public async Task InputAuthoringCommandsAreTypedMcpTools()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new InspectInputBindingsCommand());
+        registry.Register(new RebindInputActionCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(
+            """{"jsonrpc":"2.0","id":25,"method":"tools/list"}""",
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var tools = document.RootElement.GetProperty("result").GetProperty("tools").EnumerateArray().ToArray();
+        var inspect = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.input.inspect_bindings");
+        var rebind = tools.Single(tool => tool.GetProperty("name").GetString() == "rekall.input.rebind_action");
+        Assert.Equal("input", inspect.GetProperty("rekallCategory").GetString());
+        Assert.True(inspect.GetProperty("rekallRecommended").GetBoolean());
+        Assert.True(rebind.GetProperty("inputSchema").GetProperty("properties").TryGetProperty("binding", out var binding));
+        Assert.Equal(JsonValueKind.Object, binding.ValueKind);
     }
 
     [Fact]

@@ -3196,7 +3196,8 @@ executor over that AGE command stream in both runtime and playable paths. The
 live Vulkan Player completed `Examples/VulkanCubeProbe Main` for 5/5 requested
 frames in one attempt with no recovery. The complete Release engine suite passes
 1,151/1,151, Studio passes 25/25, and the Release solution builds with zero
-warnings/errors. Commit and push remain before this checkpoint is durable.
+warnings/errors. The verified implementation is committed at `c3801df` and is
+included with this ledger update on `origin/codex/studio-interaction`.
 
 The first browser runtime proof is also verified. Official .NET 10 WASM
 workloads are installed; `Rekall.Age.Player.Web` publishes real AGE Core, World,

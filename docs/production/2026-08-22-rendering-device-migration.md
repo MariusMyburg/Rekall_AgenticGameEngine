@@ -1,6 +1,6 @@
 # RenderingDevice Migration Evidence
 
-Status: verified; commit and push pending
+Status: verified, committed at `c3801df`, and pushed on `origin/codex/studio-interaction`
 
 Updated: 2026-08-22 21:32 Africa/Johannesburg
 
@@ -32,8 +32,8 @@ Updated: 2026-08-22 21:32 Africa/Johannesburg
 - Complete Release Studio suite: 25/25 passed.
 - Complete Release solution build: zero warnings and zero errors.
 
-Commit and push remain, after which the identifier will be recorded in the
-durable progress ledger.
+The verified implementation is committed at `c3801df`; this ledger update is
+included in the same remote branch safety checkpoint.
 
 This checkpoint does not claim the entire scene renderer has migrated, a native
 Vulkan RenderingDevice backend is complete, or browser play is complete. It is

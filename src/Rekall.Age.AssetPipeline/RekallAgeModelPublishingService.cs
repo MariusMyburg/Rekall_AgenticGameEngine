@@ -1,0 +1,490 @@
+using Rekall.Age.Assets;
+using Rekall.Age.Core.Persistence;
+using Rekall.Age.Core.Transactions;
+using Rekall.Age.Modeling;
+using System.Text.Json;
+
+namespace Rekall.Age.AssetPipeline;
+
+public sealed record RekallAgePublishModelRequest(
+    string AssetId,
+    string DisplayName,
+    RekallAgeModelSourceReference Source,
+    string ExpectedModelFileRevision);
+
+public sealed record RekallAgePublishModelResult(
+    RekallAgeModelAssetDocument Asset,
+    string ModelFileRevision,
+    string CompiledOutputPath,
+    string CompiledContentHash);
+
+public sealed record RekallAgeModelAssetInspection(
+    RekallAgeModelAssetDocument? Asset,
+    string ModelFileRevision,
+    RekallAgeModelBuildState BuildState,
+    string? CurrentSourceFileRevision,
+    long? CurrentSourceLogicalRevision,
+    bool CompiledOutputExists,
+    string? ActualCompiledContentHash,
+    IReadOnlyList<RekallAgeModelBuildDiagnostic> Diagnostics);
+
+public sealed class RekallAgeModelPublishingException : InvalidOperationException
+{
+    public RekallAgeModelPublishingException(string code, string message, string? target = null, Exception? innerException = null)
+        : base(message, innerException)
+    {
+        Code = code;
+        Target = target;
+    }
+
+    public string Code { get; }
+
+    public string? Target { get; }
+}
+
+public sealed class RekallAgeModelPublishingService
+{
+    private const int MaximumDiagnostics = 16;
+    private readonly RekallAgeMeshAssetStore _meshStore;
+    private readonly RekallAgeMeshCompiler _compiler;
+    private readonly RekallAgeModelAssetStore _modelStore;
+    private readonly RekallAgePublishedModelOutputStore _outputStore;
+    private readonly RekallAgeAssetCatalogStore _catalogStore;
+
+    public RekallAgeModelPublishingService()
+        : this(
+            new RekallAgeMeshAssetStore(),
+            new RekallAgeMeshCompiler(),
+            new RekallAgeModelAssetStore(),
+            new RekallAgePublishedModelOutputStore(),
+            new RekallAgeAssetCatalogStore())
+    {
+    }
+
+    public RekallAgeModelPublishingService(
+        RekallAgeMeshAssetStore meshStore,
+        RekallAgeMeshCompiler compiler,
+        RekallAgeModelAssetStore modelStore,
+        RekallAgePublishedModelOutputStore outputStore,
+        RekallAgeAssetCatalogStore catalogStore)
+    {
+        _meshStore = meshStore ?? throw new ArgumentNullException(nameof(meshStore));
+        _compiler = compiler ?? throw new ArgumentNullException(nameof(compiler));
+        _modelStore = modelStore ?? throw new ArgumentNullException(nameof(modelStore));
+        _outputStore = outputStore ?? throw new ArgumentNullException(nameof(outputStore));
+        _catalogStore = catalogStore ?? throw new ArgumentNullException(nameof(catalogStore));
+    }
+
+    public async ValueTask<RekallAgePublishModelResult> PublishAsync(
+        string projectRoot,
+        RekallAgePublishModelRequest request,
+        RekallAgeTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(transaction);
+        ValidateRequest(request);
+
+        var modelPath = _modelStore.GetModelPath(projectRoot, request.AssetId);
+        RekallAgeModelAssetDocument? existing = null;
+        if (File.Exists(modelPath))
+        {
+            existing = (await _modelStore.LoadVersionedAsync(projectRoot, request.AssetId, cancellationToken)
+                .ConfigureAwait(false)).Value;
+            RejectFrozen(existing);
+        }
+
+        var source = await LoadSourceAsync(projectRoot, request.Source, cancellationToken).ConfigureAwait(false);
+        var compiled = _compiler.Compile(source.Value);
+        var catalog = await _catalogStore.LoadAsync(projectRoot, cancellationToken).ConfigureAwait(false);
+        RekallAgeStagedModelOutput? staged = null;
+        var publicationStarted = false;
+        try
+        {
+            staged = await _outputStore.WriteStagedAsync(
+                projectRoot,
+                request.AssetId,
+                compiled,
+                cancellationToken).ConfigureAwait(false);
+
+            var outputPath = _outputStore.GetFinalPath(projectRoot, request.AssetId);
+            var catalogPath = _catalogStore.GetCatalogPath(projectRoot);
+            transaction.CaptureResourcePreimage(outputPath);
+            transaction.CaptureResourcePreimage(modelPath);
+            transaction.CaptureResourcePreimage(catalogPath);
+
+            var manifest = RekallAgeModelBuildManifest.Success(
+                source.Revision,
+                source.Value.Revision,
+                staged.RelativeFinalPath,
+                staged.ContentHash,
+                RekallAgeModelBuildManifest.CurrentCompilerVersion);
+            var model = existing is null
+                ? RekallAgeModelAssetDocument.Create(request.AssetId, request.DisplayName.Trim(), request.Source, manifest)
+                : existing with
+                {
+                    DisplayName = request.DisplayName.Trim(),
+                    Revision = existing.Revision + 1,
+                    Source = request.Source,
+                    BuildState = RekallAgeModelBuildState.Current,
+                    LastSuccessfulBuild = manifest,
+                    Frozen = false
+                };
+            var catalogAsset = new RekallAgeAssetDocument(
+                request.AssetId,
+                request.AssetId,
+                request.DisplayName.Trim(),
+                "model",
+                Path.GetFullPath(_meshStore.GetMeshPath(projectRoot, request.Source.AssetId)),
+                Path.GetFullPath(outputPath),
+                staged.ContentHash);
+
+            await _outputStore.CommitStagedAsync(projectRoot, staged, cancellationToken).ConfigureAwait(false);
+            publicationStarted = true;
+            var modelRevision = await _modelStore.SaveIfRevisionAsync(
+                projectRoot,
+                model,
+                request.ExpectedModelFileRevision,
+                cancellationToken).ConfigureAwait(false);
+            await _catalogStore.SaveAsync(
+                projectRoot,
+                catalog.AddOrReplace(catalogAsset),
+                cancellationToken).ConfigureAwait(false);
+
+            transaction.RecordChangedResource(outputPath);
+            transaction.RecordChangedResource(modelPath);
+            transaction.RecordChangedResource(catalogPath);
+            return new(model, modelRevision, outputPath, staged.ContentHash);
+        }
+        catch (Exception publicationError) when (publicationStarted)
+        {
+            try
+            {
+                await RestorePreimagesAsync(transaction, [
+                    _catalogStore.GetCatalogPath(projectRoot),
+                    modelPath,
+                    _outputStore.GetFinalPath(projectRoot, request.AssetId)
+                ]).ConfigureAwait(false);
+            }
+            catch (Exception rollbackError)
+            {
+                throw new RekallAgeModelPublishingException(
+                    "REKALL_MODEL_ROLLBACK_FAILED",
+                    $"Model Asset publication failed and its prior files could not be fully restored: {rollbackError.Message}",
+                    request.AssetId,
+                    new AggregateException(publicationError, rollbackError));
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (staged is not null)
+            {
+                try
+                {
+                    await _outputStore.DeleteStagedAsync(projectRoot, staged, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception) when (!publicationStarted)
+                {
+                    // Preserve the source/staging failure; staging paths are never live outputs.
+                }
+            }
+        }
+    }
+
+    public async ValueTask<RekallAgePublishModelResult> RebuildAsync(
+        string projectRoot,
+        string assetId,
+        string expectedModelFileRevision,
+        RekallAgeTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        var current = await _modelStore.LoadVersionedAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+        RejectFrozen(current.Value);
+        return await PublishAsync(
+            projectRoot,
+            new(current.Value.AssetId, current.Value.DisplayName, current.Value.Source, expectedModelFileRevision),
+            transaction,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async ValueTask<RekallAgeModelAssetInspection> InspectAsync(
+        string projectRoot,
+        string assetId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
+        ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
+        RekallAgeVersionedDocument<RekallAgeModelAssetDocument> loadedModel;
+        try
+        {
+            loadedModel = await _modelStore.LoadVersionedAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return new(
+                null,
+                RekallAgeDocumentRevision.Missing,
+                RekallAgeModelBuildState.Failed,
+                null,
+                null,
+                false,
+                null,
+                [Diagnostic("REKALL_MODEL_ASSET_MISSING", "Error", $"Model Asset '{assetId}' was not found.", assetId)]);
+        }
+
+        var model = loadedModel.Value;
+        RekallAgeVersionedDocument<Rekall.Age.Modeling.Contracts.RekallAgeMeshAsset> source;
+        try
+        {
+            source = await LoadSourceAsync(projectRoot, model.Source, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+        {
+            var retainedOutput = await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Failed,
+                null,
+                null,
+                retainedOutput.Exists,
+                retainedOutput.Hash,
+                [Diagnostic("REKALL_MODEL_SOURCE_MISSING", "Error", $"Linked mesh source '{model.Source.AssetId}' was not found; the last successful output was retained.", model.Source.AssetId)]);
+        }
+        catch (Exception error) when (error is JsonException or InvalidDataException)
+        {
+            var retainedOutput = await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Failed,
+                null,
+                null,
+                retainedOutput.Exists,
+                retainedOutput.Hash,
+                [Diagnostic("REKALL_MODEL_SOURCE_INVALID", "Error", $"Linked mesh source '{model.Source.AssetId}' is invalid: {error.Message}", model.Source.AssetId)]);
+        }
+
+        if (model.Frozen || model.BuildState == RekallAgeModelBuildState.Frozen)
+        {
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Frozen,
+                source.Revision,
+                source.Value.Revision,
+                File.Exists(_outputStore.GetFinalPath(projectRoot, assetId)),
+                model.LastSuccessfulBuild?.CompiledContentHash,
+                []);
+        }
+
+        var manifest = model.LastSuccessfulBuild;
+        if (model.BuildState == RekallAgeModelBuildState.Failed || manifest is null)
+        {
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Failed,
+                source.Revision,
+                source.Value.Revision,
+                false,
+                null,
+                [Diagnostic("REKALL_MODEL_LAST_BUILD_FAILED", "Error", "Model Asset has no usable successful build manifest.", assetId)]);
+        }
+
+        var finalPath = _outputStore.GetFinalPath(projectRoot, assetId);
+        if (!string.Equals(Path.GetFullPath(Path.Combine(projectRoot, manifest.CompiledMeshPath)), Path.GetFullPath(finalPath), PathComparison)
+            || !File.Exists(finalPath))
+        {
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Failed,
+                source.Revision,
+                source.Value.Revision,
+                false,
+                null,
+                [Diagnostic("REKALL_MODEL_OUTPUT_MISSING", "Error", "The last successful compiled Model Asset output is missing.", manifest.CompiledMeshPath)]);
+        }
+
+        string actualHash;
+        try
+        {
+            actualHash = await _outputStore.HashAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+            var actualOutput = await _outputStore.LoadAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+            if (!string.Equals(actualOutput.SourceAssetId, model.Source.AssetId, StringComparison.Ordinal)
+                || actualOutput.SourceLogicalRevision != manifest.SourceLogicalRevision)
+            {
+                return Inspection(
+                    loadedModel,
+                    RekallAgeModelBuildState.Failed,
+                    source.Revision,
+                    source.Value.Revision,
+                    true,
+                    actualHash,
+                    [Diagnostic("REKALL_MODEL_OUTPUT_PROVENANCE_INVALID", "Error", "Compiled output provenance does not match the Model Asset manifest.", manifest.CompiledMeshPath)]);
+            }
+        }
+        catch (Exception error) when (error is JsonException or InvalidDataException or IOException)
+        {
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Failed,
+                source.Revision,
+                source.Value.Revision,
+                true,
+                null,
+                [Diagnostic("REKALL_MODEL_OUTPUT_INVALID", "Error", $"Compiled output is invalid: {error.Message}", manifest.CompiledMeshPath)]);
+        }
+
+        if (!string.Equals(actualHash, manifest.CompiledContentHash, StringComparison.Ordinal))
+        {
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Failed,
+                source.Revision,
+                source.Value.Revision,
+                true,
+                actualHash,
+                [Diagnostic("REKALL_MODEL_OUTPUT_HASH_MISMATCH", "Error", "Compiled output hash does not match the Model Asset manifest.", manifest.CompiledMeshPath)]);
+        }
+
+        if (!string.Equals(source.Revision, manifest.SourceFileRevision, StringComparison.Ordinal)
+            || source.Value.Revision != manifest.SourceLogicalRevision
+            || !string.Equals(manifest.CompilerVersion, RekallAgeModelBuildManifest.CurrentCompilerVersion, StringComparison.Ordinal))
+        {
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Stale,
+                source.Revision,
+                source.Value.Revision,
+                true,
+                actualHash,
+                [Diagnostic("REKALL_MODEL_SOURCE_STALE", "Warning", "Linked mesh source or compiler revision differs from the last successful build manifest; rebuild with the expected Model Asset file revision.", model.Source.AssetId)]);
+        }
+
+        return Inspection(
+            loadedModel,
+            RekallAgeModelBuildState.Current,
+            source.Revision,
+            source.Value.Revision,
+            true,
+            actualHash,
+            []);
+    }
+
+    private async ValueTask<RekallAgeVersionedDocument<Rekall.Age.Modeling.Contracts.RekallAgeMeshAsset>> LoadSourceAsync(
+        string projectRoot,
+        RekallAgeModelSourceReference source,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (source.Kind != RekallAgeModelSourceKind.Mesh)
+        {
+            throw new RekallAgeModelPublishingException(
+                "REKALL_MODEL_SOURCE_KIND_UNSUPPORTED",
+                $"Model source kind '{source.Kind}' is not supported by the editable-mesh publisher.",
+                source.AssetId);
+        }
+
+        return await _meshStore.LoadVersionedAsync(projectRoot, source.AssetId, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void ValidateRequest(RekallAgePublishModelRequest request)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.AssetId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.DisplayName);
+        ArgumentNullException.ThrowIfNull(request.Source);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.Source.AssetId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.ExpectedModelFileRevision);
+        if (!RekallAgeDocumentRevision.IsValid(request.ExpectedModelFileRevision))
+        {
+            throw new ArgumentException(
+                "Expected Model Asset file revision must be 'missing' or a lowercase SHA-256 token.",
+                nameof(request));
+        }
+    }
+
+    private static void RejectFrozen(RekallAgeModelAssetDocument model)
+    {
+        if (model.Frozen || model.BuildState == RekallAgeModelBuildState.Frozen)
+        {
+            throw new RekallAgeModelPublishingException(
+                "REKALL_MODEL_FROZEN",
+                $"Model Asset '{model.AssetId}' is frozen and cannot be rebuilt until it is explicitly unfrozen.",
+                model.AssetId);
+        }
+    }
+
+    private static async ValueTask RestorePreimagesAsync(
+        RekallAgeTransaction transaction,
+        IReadOnlyList<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            var preimage = transaction.ResourcePreimages.First(item =>
+                string.Equals(Path.GetFullPath(item.Resource), Path.GetFullPath(path), PathComparison));
+            if (!preimage.ExistedBefore)
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+                continue;
+            }
+
+            var currentRevision = File.Exists(path)
+                ? RekallAgeDocumentRevision.Compute(await File.ReadAllBytesAsync(path, CancellationToken.None).ConfigureAwait(false))
+                : RekallAgeDocumentRevision.Missing;
+            await RekallAgeAtomicFile.WriteAllBytesIfRevisionAsync(
+                path,
+                preimage.Content,
+                RekallAgePersistedJson.MaximumDocumentBytes,
+                currentRevision,
+                previousVersionPath: null,
+                CancellationToken.None).ConfigureAwait(false);
+        }
+    }
+
+    private static RekallAgeModelAssetInspection Inspection(
+        RekallAgeVersionedDocument<RekallAgeModelAssetDocument> model,
+        RekallAgeModelBuildState state,
+        string? sourceRevision,
+        long? sourceLogicalRevision,
+        bool outputExists,
+        string? actualOutputHash,
+        IReadOnlyList<RekallAgeModelBuildDiagnostic> diagnostics) =>
+        new(
+            model.Value,
+            model.Revision,
+            state,
+            sourceRevision,
+            sourceLogicalRevision,
+            outputExists,
+            actualOutputHash,
+            diagnostics.Take(MaximumDiagnostics).ToArray());
+
+    private static RekallAgeModelBuildDiagnostic Diagnostic(string code, string severity, string message, string target) =>
+        new(code, severity, message, target);
+
+    private async ValueTask<(bool Exists, string? Hash)> InspectOutputAsync(
+        string projectRoot,
+        string assetId,
+        CancellationToken cancellationToken)
+    {
+        if (!File.Exists(_outputStore.GetFinalPath(projectRoot, assetId)))
+        {
+            return (false, null);
+        }
+
+        try
+        {
+            return (true, await _outputStore.HashAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false));
+        }
+        catch (Exception error) when (error is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            return (true, null);
+        }
+    }
+
+    private static StringComparison PathComparison =>
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+}

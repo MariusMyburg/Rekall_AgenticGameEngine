@@ -48,8 +48,34 @@ public sealed class StudioModelingSessionTests
             Assert.Equal(5, applied.Mesh.Topology.FaceIds.Count);
             Assert.Equal(5, session.Mesh!.Topology.FaceIds.Count);
             Assert.Null(session.Preview);
-            Assert.Empty(session.SelectedElementIds);
+            Assert.Equal([21UL], session.SelectedElementIds);
             Assert.Single((await new RekallAgeTransactionLogStore().LoadAsync(root, CancellationToken.None)).Transactions);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ApplyingStableIdOperationKeepsSurvivingSelectionForContinuedManipulation()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-transform-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await new RekallAgeMeshAssetStore().SaveAsync(root, Quad(), CancellationToken.None);
+            var session = new RekallAgeStudioModelingSession();
+            await session.OpenAsync(root, "quad", CancellationToken.None);
+            session.SetDomain(RekallAgeGeometryDomain.Point);
+            session.Select(1);
+            session.Select(2, extend: true);
+
+            await session.ApplyAsync("transform", new JsonObject { ["x"] = 2.0, ["y"] = 0.0, ["z"] = 0.0 }, "studio-gizmo", CancellationToken.None);
+
+            Assert.Equal([1UL, 2UL], session.SelectedElementIds);
+            Assert.Equal(2UL, session.ActiveElementId);
+            Assert.Equal(2, session.Mesh!.Topology.Positions[0].X);
+            Assert.Equal(3, session.Mesh.Topology.Positions[1].X);
         }
         finally
         {

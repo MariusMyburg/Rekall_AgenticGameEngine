@@ -178,7 +178,7 @@
                         <Grid Grid.Column="2">
                             <Grid.RowDefinitions><RowDefinition Height="140" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                             <Border Background="#0C1016" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" Margin="0,0,0,6">
-                                <Image Source="{Binding MeshViewportImage}" Stretch="Fill" MouseLeftButtonDown="OnMeshViewportMouseDown" Cursor="Cross" ToolTip="Click a visible element to select it. Shift extends; Ctrl toggles." />
+                                <Image Source="{Binding MeshViewportImage}" Stretch="Fill" MouseLeftButtonDown="OnMeshViewportMouseDown" MouseMove="OnMeshViewportMouseMove" MouseLeftButtonUp="OnMeshViewportMouseUp" LostMouseCapture="OnMeshViewportLostMouseCapture" Cursor="Cross" ToolTip="Click visible geometry to select it. In Point mode, drag the colored X/Y/Z handles to move the selection. Shift extends; Ctrl toggles." />
                             </Border>
                             <Grid Grid.Row="1">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>

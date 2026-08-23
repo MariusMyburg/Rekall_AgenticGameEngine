@@ -12,11 +12,17 @@ internal sealed record RekallAgeStudioMeshViewportFrame(
     IReadOnlyList<RekallAgeStudioMeshViewportFace> Faces,
     IReadOnlyList<RekallAgeStudioMeshViewportEdge> Edges,
     IReadOnlyList<RekallAgeStudioMeshViewportPoint> Points,
-    IReadOnlyList<RekallAgeStudioMeshViewportPoint> Corners);
+    IReadOnlyList<RekallAgeStudioMeshViewportPoint> Corners,
+    double ProjectionScale,
+    RekallAgeStudioMeshTransformGizmo? TransformGizmo);
 
 internal sealed record RekallAgeStudioMeshViewportFace(ulong Id, IReadOnlyList<Point> Polygon);
 internal sealed record RekallAgeStudioMeshViewportEdge(ulong Id, Point A, Point B);
 internal sealed record RekallAgeStudioMeshViewportPoint(ulong Id, Point Position);
+internal enum RekallAgeStudioMeshTransformAxis { X, Y, Z }
+internal sealed record RekallAgeStudioMeshTransformGizmoAxis(RekallAgeStudioMeshTransformAxis Axis, Point End);
+internal sealed record RekallAgeStudioMeshTransformGizmo(Point Origin, IReadOnlyList<RekallAgeStudioMeshTransformGizmoAxis> Axes);
+internal sealed record RekallAgeStudioMeshTransformGesture(RekallAgeStudioMeshTransformAxis Axis, Point Start);
 
 internal sealed class RekallAgeStudioMeshViewportRenderer
 {
@@ -63,6 +69,21 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
         {
             var item = new RekallAgeStudioMeshViewportPoint(id, projected[mesh.Topology.CornerPointIndices[index]]); centers[(RekallAgeGeometryDomain.Corner, id)] = item.Position; return item;
         }).ToArray();
+        RekallAgeStudioMeshTransformGizmo? gizmo = null;
+        if (activeDomain == RekallAgeGeometryDomain.Point && selected.Count > 0)
+        {
+            var selectedPointIndices = mesh.Topology.PointIds.Select((id, index) => (id, index)).Where(item => selected.Contains(item.id)).Select(item => item.index).ToArray();
+            if (selectedPointIndices.Length > 0)
+            {
+                var origin = new Point(selectedPointIndices.Average(index => projected[index].X), selectedPointIndices.Average(index => projected[index].Y));
+                gizmo = new(origin, new[]
+                {
+                    GizmoAxis(RekallAgeStudioMeshTransformAxis.X, origin),
+                    GizmoAxis(RekallAgeStudioMeshTransformAxis.Y, origin),
+                    GizmoAxis(RekallAgeStudioMeshTransformAxis.Z, origin)
+                });
+            }
+        }
 
         var visual = new DrawingVisual();
         using (var drawing = visual.RenderOpen())
@@ -86,12 +107,60 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
             if (activeDomain == RekallAgeGeometryDomain.Corner)
                 foreach (var corner in corners)
                     drawing.DrawEllipse(new SolidColorBrush(selected.Contains(corner.Id) ? Color.FromRgb(255, 190, 72) : Color.FromRgb(183, 126, 255)), null, corner.Position, 4, 4);
+            if (gizmo is not null)
+            {
+                foreach (var axis in gizmo.Axes)
+                {
+                    var color = AxisColor(axis.Axis);
+                    drawing.DrawLine(new Pen(new SolidColorBrush(color), 3), gizmo.Origin, axis.End);
+                    drawing.DrawEllipse(new SolidColorBrush(color), null, axis.End, 4, 4);
+                    drawing.DrawText(new FormattedText(axis.Axis.ToString(), System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                        new Typeface("Segoe UI Semibold"), 10, new SolidColorBrush(color), 1), axis.End + new Vector(5, -7));
+                }
+                drawing.DrawEllipse(new SolidColorBrush(Color.FromRgb(235, 239, 245)), null, gizmo.Origin, 4, 4);
+            }
             if (preview)
                 drawing.DrawText(new FormattedText("PREVIEW", System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
                     new Typeface("Segoe UI Semibold"), 11, new SolidColorBrush(Color.FromRgb(85, 214, 229)), 1), new Point(12, 10));
         }
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(visual); bitmap.Freeze();
-        return new(bitmap, centers, preview, faces, edges, points, corners);
+        return new(bitmap, centers, preview, faces, edges, points, corners, scale, gizmo);
+    }
+
+    public RekallAgeStudioMeshTransformGesture? BeginTransform(RekallAgeStudioMeshViewportFrame frame, double x, double y)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        if (frame.TransformGizmo is null) return null;
+        var point = new Point(x, y);
+        return frame.TransformGizmo.Axes
+            .Select(axis => (axis, distance: DistanceToSegment(point, frame.TransformGizmo.Origin, axis.End)))
+            .Where(item => item.distance <= EdgeHitRadius)
+            .OrderBy(item => item.distance)
+            .ThenBy(item => item.axis.Axis)
+            .Select(item => new RekallAgeStudioMeshTransformGesture(item.axis.Axis, point))
+            .FirstOrDefault();
+    }
+
+    public RekallAgeGeometryVector3 ResolveTranslation(
+        RekallAgeStudioMeshViewportFrame frame,
+        RekallAgeStudioMeshTransformGesture gesture,
+        double x,
+        double y)
+    {
+        ArgumentNullException.ThrowIfNull(frame); ArgumentNullException.ThrowIfNull(gesture);
+        if (!double.IsFinite(x) || !double.IsFinite(y) || !double.IsFinite(frame.ProjectionScale) || frame.ProjectionScale <= 0)
+            throw new ArgumentOutOfRangeException(nameof(x), "Transform coordinates and projection scale must be finite and positive.");
+        var projectedAxis = Project(AxisVector(gesture.Axis));
+        var projectedLength = new Vector(projectedAxis.X, projectedAxis.Y).Length;
+        var direction = new Vector(projectedAxis.X / projectedLength, projectedAxis.Y / projectedLength);
+        var meshDistance = Vector.Multiply(new Point(x, y) - gesture.Start, direction) / (frame.ProjectionScale * projectedLength);
+        return gesture.Axis switch
+        {
+            RekallAgeStudioMeshTransformAxis.X => new(meshDistance, 0, 0),
+            RekallAgeStudioMeshTransformAxis.Y => new(0, meshDistance, 0),
+            RekallAgeStudioMeshTransformAxis.Z => new(0, 0, meshDistance),
+            _ => throw new ArgumentOutOfRangeException(nameof(gesture))
+        };
     }
 
     public ulong? Pick(RekallAgeStudioMeshViewportFrame frame, RekallAgeGeometryDomain domain, double x, double y)
@@ -108,6 +177,26 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
     }
 
     private static Point Project(RekallAgeGeometryVector3 point) => new((point.X - point.Z) / Math.Sqrt(2), (point.X + point.Z - 2 * point.Y) / Math.Sqrt(6));
+    private static RekallAgeGeometryVector3 AxisVector(RekallAgeStudioMeshTransformAxis axis) => axis switch
+    {
+        RekallAgeStudioMeshTransformAxis.X => new(1, 0, 0),
+        RekallAgeStudioMeshTransformAxis.Y => new(0, 1, 0),
+        RekallAgeStudioMeshTransformAxis.Z => new(0, 0, 1),
+        _ => throw new ArgumentOutOfRangeException(nameof(axis))
+    };
+    private static RekallAgeStudioMeshTransformGizmoAxis GizmoAxis(RekallAgeStudioMeshTransformAxis axis, Point origin)
+    {
+        var projected = Project(AxisVector(axis));
+        var direction = new Vector(projected.X, projected.Y); direction.Normalize();
+        return new(axis, origin + direction * 52);
+    }
+    private static Color AxisColor(RekallAgeStudioMeshTransformAxis axis) => axis switch
+    {
+        RekallAgeStudioMeshTransformAxis.X => Color.FromRgb(244, 83, 91),
+        RekallAgeStudioMeshTransformAxis.Y => Color.FromRgb(95, 205, 118),
+        RekallAgeStudioMeshTransformAxis.Z => Color.FromRgb(82, 145, 246),
+        _ => Colors.White
+    };
     private static Point Center(IReadOnlyList<Point> points) => new(points.Average(item => item.X), points.Average(item => item.Y));
     private static Point Midpoint(Point a, Point b) => new((a.X + b.X) / 2, (a.Y + b.Y) / 2);
     private static StreamGeometry Polygon(IReadOnlyList<Point> points)

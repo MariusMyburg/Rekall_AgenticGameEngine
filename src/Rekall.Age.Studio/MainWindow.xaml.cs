@@ -13,6 +13,7 @@ public partial class MainWindow : Window
     private readonly RekallAgeStudioViewModel _viewModel = new();
     private readonly DispatcherTimer _previewTimer;
     private bool _shutdownComplete;
+    private bool _meshTransformDragging;
     private Task? _shutdownTask;
 
     public MainWindow()
@@ -69,6 +70,13 @@ public partial class MainWindow : Window
     {
         if (sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;
         var position = e.GetPosition(image);
+        if (_viewModel.BeginMeshViewportTransform(position.X / image.ActualWidth, position.Y / image.ActualHeight))
+        {
+            _meshTransformDragging = true;
+            image.CaptureMouse();
+            e.Handled = true;
+            return;
+        }
         var modifiers = Keyboard.Modifiers;
         _viewModel.SelectMeshViewportElement(
             position.X / image.ActualWidth,
@@ -76,6 +84,31 @@ public partial class MainWindow : Window
             modifiers.HasFlag(ModifierKeys.Shift),
             modifiers.HasFlag(ModifierKeys.Control));
         e.Handled = true;
+    }
+
+    private void OnMeshViewportMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_meshTransformDragging || sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;
+        var position = e.GetPosition(image);
+        _viewModel.UpdateMeshViewportTransform(position.X / image.ActualWidth, position.Y / image.ActualHeight);
+        e.Handled = true;
+    }
+
+    private async void OnMeshViewportMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_meshTransformDragging || sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;
+        _meshTransformDragging = false;
+        var position = e.GetPosition(image);
+        image.ReleaseMouseCapture();
+        await _viewModel.CompleteMeshViewportTransformAsync(position.X / image.ActualWidth, position.Y / image.ActualHeight);
+        e.Handled = true;
+    }
+
+    private void OnMeshViewportLostMouseCapture(object sender, MouseEventArgs e)
+    {
+        if (!_meshTransformDragging) return;
+        _meshTransformDragging = false;
+        _viewModel.CancelMeshViewportTransform();
     }
 
     protected override async void OnClosing(CancelEventArgs e)

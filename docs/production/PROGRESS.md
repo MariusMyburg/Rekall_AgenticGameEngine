@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 09:04 Africa/Johannesburg
+Last verified: 2026-08-23 09:14 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -79,6 +79,20 @@ recompilation, the complete Studio suite passes 28/28 and the modeling namespace
 passes 85/85. Direct manipulation, richer attribute/material editing, and graph
 authoring remain open, so this advances but does not complete the Studio
 modeling tranche.
+
+Point editing now has its first direct viewport manipulation path. A selected
+point set receives colored X/Y/Z handles at its projected centroid; bounded
+axis hit testing converts a screen drag through the viewport projection scale
+into a deterministic single-axis mesh-space delta. Releasing the drag applies
+the existing semantic `transform` operation as actor `studio-gizmo`, so the
+edit uses the same validation, optimistic persistence, and reversible
+transaction history as C#/CLI/MCP operations instead of an editor-only
+mutation. Surviving stable-ID selections and their active order are retained
+after operations, enabling repeated manipulation; deleted IDs are filtered.
+Focused proofs cover axis selection/projection math, off-gizmo rejection,
+persisted two-point translation, and selection retention. The complete Studio
+suite passes 30/30 after recompilation. This is translation-only on the current
+fixed isometric view; rotation/scale handles and orbit/pan/zoom remain open.
 
 The Blender-informed agentic modelling tranche is now the active implementation
 priority after the completed WebGPU and remaining Godot audits. A shallow,

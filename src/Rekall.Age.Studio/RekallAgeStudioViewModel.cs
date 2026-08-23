@@ -58,6 +58,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeStudioModelingSession _modeling = new();
     private readonly RekallAgeStudioMeshViewportRenderer _meshViewportRenderer = new();
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
+    private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
     private readonly RekallAgeAsyncCommand _refreshMeshAssetsCommand;
     private readonly RekallAgeAsyncCommand _openMeshAssetCommand;
     private readonly RekallAgeAsyncCommand _selectMeshElementCommand;
@@ -374,6 +375,60 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         SelectedMeshElementId = id;
         _modeling.Select(id.Value, extend || ExtendMeshSelection, toggle || ToggleMeshSelection);
         RefreshMeshEditingState();
+    }
+
+    public bool BeginMeshViewportTransform(double normalizedX, double normalizedY)
+    {
+        if (IsBusy || MeshEditDomain != RekallAgeGeometryDomain.Point || _meshViewportFrame is null ||
+            normalizedX is < 0 or > 1 || normalizedY is < 0 or > 1) return false;
+        _meshTransformGesture = _meshViewportRenderer.BeginTransform(
+            _meshViewportFrame,
+            normalizedX * _meshViewportFrame.Image.PixelWidth,
+            normalizedY * _meshViewportFrame.Image.PixelHeight);
+        return _meshTransformGesture is not null;
+    }
+
+    public void UpdateMeshViewportTransform(double normalizedX, double normalizedY)
+    {
+        if (_meshViewportFrame is null || _meshTransformGesture is null) return;
+        var translation = _meshViewportRenderer.ResolveTranslation(
+            _meshViewportFrame,
+            _meshTransformGesture,
+            normalizedX * _meshViewportFrame.Image.PixelWidth,
+            normalizedY * _meshViewportFrame.Image.PixelHeight);
+        StatusText = $"Move {_meshTransformGesture.Axis}: {translation.X:0.###}, {translation.Y:0.###}, {translation.Z:0.###}";
+    }
+
+    public Task CompleteMeshViewportTransformAsync(double normalizedX, double normalizedY)
+    {
+        var frame = _meshViewportFrame;
+        var gesture = _meshTransformGesture;
+        _meshTransformGesture = null;
+        if (frame is null || gesture is null) return Task.CompletedTask;
+        var translation = _meshViewportRenderer.ResolveTranslation(
+            frame,
+            gesture,
+            normalizedX * frame.Image.PixelWidth,
+            normalizedY * frame.Image.PixelHeight);
+        if (Math.Abs(translation.X) + Math.Abs(translation.Y) + Math.Abs(translation.Z) <= 1e-9)
+        {
+            StatusText = MeshSummary;
+            return Task.CompletedTask;
+        }
+        return RunModelingAsync(async () =>
+        {
+            var parameters = new JsonObject { ["x"] = translation.X, ["y"] = translation.Y, ["z"] = translation.Z };
+            var result = await _modeling.ApplyAsync("transform", parameters, "studio-gizmo", _lifecycleCancellation.Token);
+            RefreshMeshEditingState();
+            Replace(MeshDiagnosticLines, result.Validation.Diagnostics.Select(item => $"{item.Severity}: {item.Code} - {item.Message}"));
+            if (IsLiveViewportEnabled) await RefreshEditPreviewAsync($"Moved mesh {SelectedMeshAssetId} along {gesture.Axis}.");
+        });
+    }
+
+    public void CancelMeshViewportTransform()
+    {
+        _meshTransformGesture = null;
+        StatusText = MeshSummary;
     }
 
     public string? LastPackagePath

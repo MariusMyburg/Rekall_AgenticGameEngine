@@ -87,13 +87,16 @@ public sealed class RekallAgeStudioModelingSession
         CancellationToken cancellationToken)
     {
         EnsureOpen();
+        var selectionBeforeApply = _selectionHistory.ToArray();
         var operation = BuildRequest(operationId, parameters);
         var transaction = RekallAgeTransaction.Begin($"Studio mesh operation {operationId}");
         var result = await _edits.ApplyAsync(ProjectRoot!, AssetId!, FileRevision!, operation, transaction, cancellationToken).ConfigureAwait(false);
         await _transactions.AppendAsync(ProjectRoot!, transaction, actor, cancellationToken).ConfigureAwait(false);
         var loaded = await _store.LoadVersionedAsync(ProjectRoot!, AssetId!, cancellationToken).ConfigureAwait(false);
         FileRevision = loaded.Revision; Mesh = loaded.Value; Preview = null;
+        var survivingIds = DomainIds().ToHashSet();
         _selectionHistory.Clear();
+        _selectionHistory.AddRange(selectionBeforeApply.Where(survivingIds.Contains));
         return result.Operation;
     }
 

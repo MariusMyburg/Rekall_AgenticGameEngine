@@ -1,9 +1,34 @@
+using System.Windows;
 using Rekall.Age.Modeling.Contracts;
 
 namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioMeshViewportTests
 {
+    [Fact]
+    public void PointSelectionExposesAxisGizmoAndConvertsScreenDragToMeshTranslation()
+    {
+        var renderer = new RekallAgeStudioMeshViewportRenderer();
+        var frame = renderer.Render(Quad(), RekallAgeGeometryDomain.Point, [1, 2], 640, 360, preview: false);
+
+        Assert.NotNull(frame.TransformGizmo);
+        var gizmo = frame.TransformGizmo!;
+        var xAxis = Assert.Single(gizmo.Axes, axis => axis.Axis == RekallAgeStudioMeshTransformAxis.X);
+        var start = new Point((gizmo.Origin.X + xAxis.End.X) / 2, (gizmo.Origin.Y + xAxis.End.Y) / 2);
+        var gesture = renderer.BeginTransform(frame, start.X, start.Y);
+        Assert.NotNull(gesture);
+        var direction = xAxis.End - gizmo.Origin;
+        direction.Normalize();
+
+        var translation = renderer.ResolveTranslation(frame, gesture!, start.X + direction.X * frame.ProjectionScale, start.Y + direction.Y * frame.ProjectionScale);
+
+        Assert.Equal(RekallAgeStudioMeshTransformAxis.X, gesture!.Axis);
+        Assert.Equal(Math.Sqrt(3d / 2d), translation.X, precision: 8);
+        Assert.Equal(0, translation.Y);
+        Assert.Equal(0, translation.Z);
+        Assert.Null(renderer.BeginTransform(frame, -100, -100));
+    }
+
     [Fact]
     public void MeshViewportAutoFramesAndPicksStablePointEdgeFaceAndCornerIds()
     {

@@ -8,12 +8,22 @@ public sealed class RekallAgeProjectRuntimeSystemLoader
 {
     public IReadOnlyList<IRekallAgeRuntimeWorldSystem> Load(string projectRoot)
     {
-        return RekallAgeProjectModuleAssemblyLoader.LoadBuiltModuleAssemblies(projectRoot)
-            .SelectMany(LoadFromAssembly)
+        return Order(RekallAgeProjectModuleAssemblyLoader.LoadBuiltModuleAssemblies(projectRoot)
+            .SelectMany(LoadFromAssembly));
+    }
+
+    public IReadOnlyList<IRekallAgeRuntimeWorldSystem> Load(IEnumerable<Type> moduleTypes)
+    {
+        ArgumentNullException.ThrowIfNull(moduleTypes);
+        return Order(moduleTypes.SelectMany(LoadFromModuleType));
+    }
+
+    private static IReadOnlyList<IRekallAgeRuntimeWorldSystem> Order(
+        IEnumerable<IRekallAgeRuntimeWorldSystem> systems) =>
+        systems
             .OrderBy(system => system.Priority)
             .ThenBy(system => system.Id, StringComparer.Ordinal)
             .ToArray();
-    }
 
     private static IEnumerable<IRekallAgeRuntimeWorldSystem> LoadFromAssembly(Assembly assembly)
     {
@@ -21,24 +31,40 @@ public sealed class RekallAgeProjectRuntimeSystemLoader
             .Where(type => !type.IsAbstract && typeof(RekallAgeModule).IsAssignableFrom(type))
             .OrderBy(type => type.FullName, StringComparer.Ordinal))
         {
-            var module = (RekallAgeModule?)Activator.CreateInstance(moduleType, nonPublic: true)
-                ?? throw new InvalidOperationException($"Module '{moduleType.FullName}' could not be created.");
-            var builder = new RekallAgeModuleBuilder();
-            module.Configure(builder);
-
-            foreach (var systemType in builder.RuntimeSystemTypes
-                .OrderBy(type => type.FullName, StringComparer.Ordinal))
+            foreach (var system in LoadFromModuleType(moduleType))
             {
-                if (!typeof(IRekallAgeRuntimeModuleSystem).IsAssignableFrom(systemType))
-                {
-                    throw new InvalidOperationException(
-                        $"Runtime system '{systemType.FullName}' does not implement IRekallAgeRuntimeModuleSystem.");
-                }
-
-                var system = (IRekallAgeRuntimeModuleSystem?)Activator.CreateInstance(systemType, nonPublic: true)
-                    ?? throw new InvalidOperationException($"Runtime system '{systemType.FullName}' could not be created.");
-                yield return new ProjectRuntimeWorldSystemAdapter(system);
+                yield return system;
             }
+        }
+    }
+
+    private static IEnumerable<IRekallAgeRuntimeWorldSystem> LoadFromModuleType(Type moduleType)
+    {
+        ArgumentNullException.ThrowIfNull(moduleType);
+        if (moduleType.IsAbstract || !typeof(RekallAgeModule).IsAssignableFrom(moduleType))
+        {
+            throw new ArgumentException(
+                $"Registered type '{moduleType.FullName}' must be a concrete {nameof(RekallAgeModule)}.",
+                nameof(moduleType));
+        }
+
+        var module = (RekallAgeModule?)Activator.CreateInstance(moduleType, nonPublic: true)
+            ?? throw new InvalidOperationException($"Module '{moduleType.FullName}' could not be created.");
+        var builder = new RekallAgeModuleBuilder();
+        module.Configure(builder);
+
+        foreach (var systemType in builder.RuntimeSystemTypes
+            .OrderBy(type => type.FullName, StringComparer.Ordinal))
+        {
+            if (!typeof(IRekallAgeRuntimeModuleSystem).IsAssignableFrom(systemType))
+            {
+                throw new InvalidOperationException(
+                    $"Runtime system '{systemType.FullName}' does not implement IRekallAgeRuntimeModuleSystem.");
+            }
+
+            var system = (IRekallAgeRuntimeModuleSystem?)Activator.CreateInstance(systemType, nonPublic: true)
+                ?? throw new InvalidOperationException($"Runtime system '{systemType.FullName}' could not be created.");
+            yield return new ProjectRuntimeWorldSystemAdapter(system);
         }
     }
 

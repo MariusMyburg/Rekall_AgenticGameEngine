@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
+using Rekall.Age.Modules;
 using Rekall.Age.Modules.Commands;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
@@ -14,6 +15,26 @@ namespace Rekall.Age.Tests.Runtime;
 
 public sealed class ProjectRuntimeSystemTests
 {
+    [Fact]
+    public async Task RuntimeLoopRunsStaticallyRegisteredProjectModuleSystems()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"])
+            .AddEntity(RekallAgeEntityDocument.Create("Registered Actor", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    RegisteredCounterComponentType,
+                    new JsonObject { ["ticks"] = 0 })));
+        var initialWorld = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        using var loop = RekallAgeRuntimeExecutionLoop.CreateDefault(
+            [typeof(StaticallyRegisteredRuntimeModule)]);
+        var result = await loop.RunAsync(initialWorld, 2, CancellationToken.None);
+
+        var actor = result.World.FindEntity("Registered Actor");
+        Assert.NotNull(actor);
+        Assert.Equal(2, actor.ComponentNumber(RegisteredCounterComponentType, "ticks"));
+        Assert.Contains(nameof(StaticallyRegisteredRuntimeSystem), result.World.SystemsRun);
+    }
+
     [Fact]
     public async Task RuntimeSnapshotRunsCompiledProjectRuntimeSystems()
     {
@@ -180,6 +201,52 @@ public sealed class ProjectRuntimeSystemTests
 
         Assert.Contains("InputDrivenSystem", world.SystemsRun);
         Assert.Equal(1, actor.Transform.Position3D.Z, precision: 3);
+    }
+
+    private const string RegisteredCounterComponentType =
+        "Rekall.Age.Tests.Runtime.ProjectRuntimeSystemTests+StaticallyRegisteredCounter";
+
+    [RekallAgeModule("test.static-runtime", "Static Runtime Test")]
+    private sealed class StaticallyRegisteredRuntimeModule : RekallAgeModule
+    {
+        public override void Configure(RekallAgeModuleBuilder builder)
+        {
+            builder.RegisterComponent<StaticallyRegisteredCounter>();
+            builder.RegisterRuntimeSystem<StaticallyRegisteredRuntimeSystem>();
+        }
+    }
+
+    [RekallAgeComponent("Statically Registered Counter")]
+    private sealed class StaticallyRegisteredCounter : RekallAgeComponent
+    {
+        [RekallAgeProperty]
+        public double Ticks { get; init; }
+    }
+
+    private sealed class StaticallyRegisteredRuntimeSystem : IRekallAgeRuntimeModuleSystem
+    {
+        public string Id => nameof(StaticallyRegisteredRuntimeSystem);
+
+        public int Priority => 5;
+
+        public ValueTask<RekallAgeRuntimeWorld> UpdateAsync(
+            RekallAgeRuntimeWorld world,
+            RekallAgeRuntimeModuleFrameContext context)
+        {
+            var actor = world.FindEntity("Registered Actor");
+            if (actor is null)
+            {
+                return ValueTask.FromResult(world);
+            }
+
+            var ticks = actor.ComponentNumber(RegisteredCounterComponentType, "ticks");
+            return ValueTask.FromResult(world.UpdateEntity(
+                actor.Id,
+                entity => entity.WithComponentNumber(
+                    RegisteredCounterComponentType,
+                    "ticks",
+                    ticks + 1)));
+        }
     }
 
     private static async Task CreateOrbitModuleAsync(string root, RekallAgeCommandContext context)

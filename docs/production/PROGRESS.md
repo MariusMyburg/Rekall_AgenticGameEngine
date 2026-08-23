@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 06:36 Africa/Johannesburg
+Last verified: 2026-08-23 06:42 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -150,6 +150,15 @@ modelling dependencies; all 1,347 ordinarily runnable Release engine tests pass,
 and the three Windows Player tests whose generated executable had been cleaned
 pass after rebuilding that explicit prerequisite (1,350/1,350 combined). Task 6's command-level closed loop, compact reversible deltas,
 and independently inspected visible evidence are active next.
+
+Task 6 has begun with a verified grouped undo/redo invariant. A two-operation
+mesh batch (point transform plus face-winding reversal) publishes once, restores
+the exact valid pre-edit topology through the transaction preimage command, and
+then restores the exact edited positions, corner identities, and corner-point
+mapping from the undo transaction's captured preimage. The focused edit-service
+selection passes 4/4. Compact element-delta persistence remains the active next
+step; the test deliberately proves existing lossless behavior before replacing
+full mesh snapshots with bounded reversible deltas.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Persistence;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Modeling;
@@ -8,6 +9,48 @@ namespace Rekall.Age.Tests.Modeling;
 
 public sealed class MeshEditServiceTests
 {
+    [Fact]
+    public async Task GroupedMeshEditSupportsTransactionUndoAndRedoWithoutPartialTopology()
+    {
+        var (root, store, loaded) = await CreateStoredTriangle();
+        var service = new RekallAgeMeshEditService(store);
+        var edit = RekallAgeTransaction.Begin("grouped mesh edit");
+        await service.ApplyBatchAsync(
+            root,
+            "triangle",
+            loaded.Revision,
+            [Transform(2, 0), Reverse()],
+            edit,
+            CancellationToken.None);
+        var edited = await store.LoadAsync(root, "triangle", CancellationToken.None);
+        var history = new RekallAgeTransactionLogStore();
+        await history.AppendAsync(root, edit, "agent", CancellationToken.None);
+        var relativePath = Path.GetRelativePath(root, store.GetMeshPath(root, "triangle"));
+        var undo = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("undo grouped mesh edit"), CancellationToken.None);
+
+        var undone = await new RestoreTransactionPreimageCommand(history).ExecuteAsync(
+            new(root, edit.Id, relativePath),
+            undo);
+
+        Assert.True(undone.Ok, undone.Summary);
+        var restored = await store.LoadAsync(root, "triangle", CancellationToken.None);
+        Assert.Equal(new RekallAgeGeometryVector3(0, 0, 0), restored.Topology.Positions[0]);
+        Assert.Equal([31UL, 32UL, 33UL], restored.Topology.CornerIds);
+        await history.AppendAsync(root, undo.Transaction, "agent", CancellationToken.None);
+        var redo = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("redo grouped mesh edit"), CancellationToken.None);
+
+        var redone = await new RestoreTransactionPreimageCommand(history).ExecuteAsync(
+            new(root, undo.Transaction.Id, relativePath),
+            redo);
+
+        Assert.True(redone.Ok, redone.Summary);
+        var reapplied = await store.LoadAsync(root, "triangle", CancellationToken.None);
+        Assert.Equal(edited.Topology.Positions, reapplied.Topology.Positions);
+        Assert.Equal(edited.Topology.CornerIds, reapplied.Topology.CornerIds);
+        Assert.Equal(edited.Topology.CornerPointIndices, reapplied.Topology.CornerPointIndices);
+        Assert.Single(redo.Transaction.ResourcePreimages);
+    }
+
     [Fact]
     public async Task PreviewReturnsEvidenceWithoutWritingOrTouchingTransaction()
     {

@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 07:32 Africa/Johannesburg
+Last verified: 2026-08-23 07:34 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -253,6 +253,19 @@ logical revision 1 to 2, and compiles that same baked asset through the ordinary
 runtime compiler to 12 triangles with X bounds -3..3. The focused transform and
 bake tests pass with zero build warnings/errors. Remaining Task 7 work is the
 broader executable node inventory and its agent command/MCP surface.
+
+The first topology-changing procedural chain is also executable. The grid node
+creates deterministic subdivided quad topology from bounded size and segment
+parameters with stable per-domain IDs. Extrude and triangulate nodes demand
+geometry inputs and invoke the existing semantic `extrude_faces` and
+`triangulate_faces` operations over the evaluated face set, then re-identify the
+immutable result as the node output at the graph revision. A 4x2 single-cell
+grid extrudes by +2 Z into a strict 8-point, 5-quad solid and triangulates to 10
+triangle faces with bounds Z=0..2. This proves graph topology nodes reuse AGE's
+ordinary stable-ID provenance, attribute propagation, region-boundary rules,
+and strict validation rather than maintaining a parallel modelling kernel. The
+focused chain test and affected build pass with zero warnings/errors. Join,
+sphere, field/attribute, and material-assignment evaluators remain active.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

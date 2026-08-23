@@ -85,6 +85,42 @@ public sealed class ModelingGraphEvaluationTests
         Assert.Equal(2, positions.Max(position => position.Y), 6);
     }
 
+    [Fact]
+    public async Task GridExtrudeAndTriangulateReuseSemanticMeshOperations()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "operation-graph",
+            "Operation Graph",
+            [
+                new("grid", "rekall.modeling.primitive.grid", 1, new JsonObject
+                {
+                    ["sizeX"] = 4.0, ["sizeY"] = 2.0, ["segmentsX"] = 1, ["segmentsY"] = 1
+                }),
+                new("extrude", "rekall.modeling.extrude", 1, new JsonObject { ["offset"] = new JsonArray(0.0, 0.0, 2.0) }),
+                new("triangulate", "rekall.modeling.triangulate", 1, new JsonObject()),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("grid-extrude", "grid", "geometry", "extrude", "geometry"),
+                new("extrude-triangulate", "extrude", "geometry", "triangulate", "geometry"),
+                new("triangulate-output", "triangulate", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var mesh = result.Outputs["mesh"];
+        Assert.Equal(8, mesh.Topology.PointIds.Count);
+        Assert.Equal(10, mesh.Topology.FaceIds.Count);
+        Assert.All(Enumerable.Range(0, mesh.Topology.FaceIds.Count), faceIndex =>
+            Assert.Equal(3, mesh.Topology.FaceOffsets[faceIndex + 1] - mesh.Topology.FaceOffsets[faceIndex]));
+        Assert.Equal(0, mesh.Topology.Positions.Min(position => position.Z));
+        Assert.Equal(2, mesh.Topology.Positions.Max(position => position.Z));
+        Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
+    }
+
     private static RekallAgeModelingGraphAsset Graph(double sizeX, long revision)
     {
         var graph = RekallAgeModelingGraphAsset.Create(

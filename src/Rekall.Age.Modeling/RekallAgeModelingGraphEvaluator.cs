@@ -166,13 +166,58 @@ public sealed class RekallAgeModelingGraphEvaluator
         node.TypeId switch
         {
             "rekall.modeling.primitive.box" => new(CreateBox(graph, node)),
+            "rekall.modeling.primitive.grid" => new(CreateGrid(graph, node)),
             "rekall.modeling.transform" => TransformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
+            "rekall.modeling.extrude" => ApplySemanticOperation(
+                graph,
+                node,
+                InputGeometry(node, "geometry", incoming, values),
+                "extrude_faces",
+                new JsonObject
+                {
+                    ["x"] = ReadVector3(node, "offset", new(0, 0, 1)).X,
+                    ["y"] = ReadVector3(node, "offset", new(0, 0, 1)).Y,
+                    ["z"] = ReadVector3(node, "offset", new(0, 0, 1)).Z
+                }),
+            "rekall.modeling.triangulate" => ApplySemanticOperation(
+                graph,
+                node,
+                InputGeometry(node, "geometry", incoming, values),
+                "triangulate_faces",
+                new JsonObject()),
             "rekall.modeling.output.mesh" => InputGeometry(node, "input", incoming, values),
             _ => throw new EvaluationException(
                 "REKALL_MODELING_EVALUATION_NODE_NOT_IMPLEMENTED",
                 $"Node type '{node.TypeId}@{node.TypeVersion}' has no evaluator implementation.",
                 node.NodeId)
         };
+
+    private static NodeValue ApplySemanticOperation(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        NodeValue input,
+        string operationId,
+        JsonObject parameters)
+    {
+        var source = input.Mesh
+            ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", $"{node.TypeId} requires geometry input.", node.NodeId);
+        try
+        {
+            var result = new RekallAgeMeshOperationExecutor().Execute(
+                source,
+                new(operationId, RekallAgeGeometryDomain.Face, source.Topology.FaceIds.ToArray(), parameters));
+            return new(result.Mesh with
+            {
+                AssetId = $"{graph.AssetId}.{node.NodeId}",
+                Name = node.NodeId,
+                Revision = graph.Revision
+            });
+        }
+        catch (RekallAgeMeshOperationException error)
+        {
+            throw new EvaluationException(error.Code, error.Message, node.NodeId);
+        }
+    }
 
     private static NodeValue TransformGeometry(
         RekallAgeModelingGraphAsset graph,
@@ -265,6 +310,64 @@ public sealed class RekallAgeModelingGraphEvaluator
         return mesh;
     }
 
+    private static RekallAgeMeshAsset CreateGrid(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node)
+    {
+        var sizeX = ReadPositive(node, "sizeX", 1);
+        var sizeY = ReadPositive(node, "sizeY", 1);
+        var segmentsX = ReadInteger(node, "segmentsX", 1, 1, 4_096);
+        var segmentsY = ReadInteger(node, "segmentsY", 1, 1, 4_096);
+        var pointCount = checked((segmentsX + 1) * (segmentsY + 1));
+        var faceCount = checked(segmentsX * segmentsY);
+        if (pointCount > 2_000_000 || faceCount > 2_000_000)
+        {
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_ELEMENT_BUDGET_EXCEEDED", "Grid parameters exceed the hard element ceiling.", node.NodeId);
+        }
+        var positions = new List<RekallAgeGeometryVector3>(pointCount);
+        for (var y = 0; y <= segmentsY; y++)
+        for (var x = 0; x <= segmentsX; x++)
+            positions.Add(new(-sizeX / 2 + sizeX * x / segmentsX, -sizeY / 2 + sizeY * y / segmentsY, 0));
+
+        var edgePoints = new List<RekallAgeMeshEdgePointIndices>();
+        for (var y = 0; y <= segmentsY; y++)
+        for (var x = 0; x < segmentsX; x++)
+            edgePoints.Add(new(Point(x, y), Point(x + 1, y)));
+        var verticalStart = edgePoints.Count;
+        for (var y = 0; y < segmentsY; y++)
+        for (var x = 0; x <= segmentsX; x++)
+            edgePoints.Add(new(Point(x, y), Point(x, y + 1)));
+
+        var cornerPoints = new List<int>(faceCount * 4);
+        var cornerEdges = new List<int>(faceCount * 4);
+        for (var y = 0; y < segmentsY; y++)
+        for (var x = 0; x < segmentsX; x++)
+        {
+            cornerPoints.AddRange([Point(x, y), Point(x + 1, y), Point(x + 1, y + 1), Point(x, y + 1)]);
+            cornerEdges.AddRange([
+                Horizontal(x, y), Vertical(x + 1, y), Horizontal(x, y + 1), Vertical(x, y)]);
+        }
+        var topology = new RekallAgeMeshTopology(
+            Enumerable.Range(1, pointCount).Select(value => (ulong)value).ToArray(),
+            positions,
+            Enumerable.Range(1, edgePoints.Count).Select(value => (ulong)(10_000 + value)).ToArray(),
+            edgePoints,
+            Enumerable.Range(1, faceCount).Select(value => (ulong)(20_000 + value)).ToArray(),
+            Enumerable.Range(0, faceCount + 1).Select(value => value * 4).ToArray(),
+            Enumerable.Range(1, faceCount * 4).Select(value => (ulong)(30_000 + value)).ToArray(),
+            cornerPoints,
+            cornerEdges);
+        var mesh = RekallAgeMeshAsset.Create($"{graph.AssetId}.{node.NodeId}", node.NodeId, topology) with { Revision = graph.Revision };
+        var validation = new RekallAgeMeshValidator().Validate(mesh);
+        if (!validation.IsValid)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_OUTPUT_INVALID", "Grid evaluator produced invalid topology.", node.NodeId);
+        return mesh;
+
+        int Point(int x, int y) => y * (segmentsX + 1) + x;
+        int Horizontal(int x, int y) => y * segmentsX + x;
+        int Vertical(int x, int y) => verticalStart + y * (segmentsX + 1) + x;
+    }
+
     private static double ReadPositive(RekallAgeModelingGraphNode node, string name, double fallback)
     {
         var value = node.Parameters[name] is JsonValue json && json.TryGetValue<double>(out var number) ? number : fallback;
@@ -272,6 +375,14 @@ public sealed class RekallAgeModelingGraphEvaluator
         {
             throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", $"Parameter '{name}' must be positive and finite.", node.NodeId);
         }
+        return value;
+    }
+
+    private static int ReadInteger(RekallAgeModelingGraphNode node, string name, int fallback, int minimum, int maximum)
+    {
+        var value = node.Parameters[name] is JsonValue json && json.TryGetValue<int>(out var number) ? number : fallback;
+        if (value < minimum || value > maximum)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", $"Parameter '{name}' must be between {minimum} and {maximum}.", node.NodeId);
         return value;
     }
 

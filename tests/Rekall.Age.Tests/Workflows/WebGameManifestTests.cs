@@ -1,4 +1,4 @@
-using System.Text;
+using System.Text.Json;
 using Rekall.Age.Core.Product;
 using Rekall.Age.Workflows.Web;
 
@@ -71,6 +71,40 @@ public sealed class WebGameManifestTests
         Assert.Throws<InvalidDataException>(() => CreateManifest(content:
         [
             new(path, "application/json", 20, HashA),
+            new("rekall.project.json", "application/json", 10, HashB)
+        ]));
+    }
+
+    [Fact]
+    public void DecodeRejectsTamperedIdentityAndNonCanonicalOrdering()
+    {
+        var manifest = CreateManifest();
+        var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        var tamperedIdentity = JsonSerializer.SerializeToUtf8Bytes(
+            manifest with { BuildIdentity = HashB },
+            jsonOptions);
+        var reversedContent = JsonSerializer.SerializeToUtf8Bytes(
+            manifest with { Content = manifest.Content.Reverse().ToArray() },
+            jsonOptions);
+
+        Assert.Throws<InvalidDataException>(() =>
+            RekallAgeWebGameManifestCodec.DecodeAndValidate(tamperedIdentity));
+        Assert.Throws<InvalidDataException>(() =>
+            RekallAgeWebGameManifestCodec.DecodeAndValidate(reversedContent));
+    }
+
+    [Fact]
+    public void ManifestCreationRejectsUppercaseOrDuplicatePortableContentIdentity()
+    {
+        Assert.Throws<InvalidDataException>(() => CreateManifest(content:
+        [
+            new("Scenes/Main.age.scene.json", "application/json", 20, HashA.ToUpperInvariant()),
+            new("rekall.project.json", "application/json", 10, HashB)
+        ]));
+        Assert.Throws<InvalidDataException>(() => CreateManifest(content:
+        [
+            new("Scenes/Main.age.scene.json", "application/json", 20, HashA),
+            new("scenes/main.age.scene.json", "application/json", 20, HashA),
             new("rekall.project.json", "application/json", 10, HashB)
         ]));
     }

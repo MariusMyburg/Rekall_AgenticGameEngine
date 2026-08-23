@@ -58,19 +58,21 @@ public sealed class RestoreTransactionPreimageCommand
             ?? throw new InvalidOperationException(
                 $"Transaction '{request.TransactionId}' has no preimage for '{request.RelativePath}'.");
 
-        string targetPath;
+        RekallAgeResourceRestorationAdmission admission;
         try
         {
-            targetPath = _restorationPolicy.ResolveRestorablePath(request.ProjectRoot, preimage.RelativePath);
+            admission = _restorationPolicy.Admit(request.ProjectRoot, preimage.RelativePath);
         }
         catch (RekallAgeResourceRestorationException error)
         {
             return Rejected(request, error);
         }
+        var targetPath = admission.Path;
         context.Transaction.CaptureResourcePreimage(targetPath);
 
         if (!preimage.ExistedBefore)
         {
+            _restorationPolicy.Revalidate(admission);
             if (File.Exists(targetPath))
             {
                 File.Delete(targetPath);
@@ -91,6 +93,7 @@ public sealed class RestoreTransactionPreimageCommand
             if (currentSha256.Equals(delta.AfterSha256, StringComparison.Ordinal))
             {
                 var restoredBytes = RekallAgeReversibleJsonDelta.ApplyInverse(delta, currentBytes);
+                _restorationPolicy.Revalidate(admission);
                 Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
                 await File.WriteAllBytesAsync(targetPath, restoredBytes, context.CancellationToken);
                 context.Transaction.RecordChangedResource(targetPath);
@@ -122,6 +125,7 @@ public sealed class RestoreTransactionPreimageCommand
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+        _restorationPolicy.Revalidate(admission);
         await File.WriteAllBytesAsync(targetPath, bytes, context.CancellationToken);
         context.Transaction.RecordChangedResource(targetPath);
 

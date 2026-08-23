@@ -484,6 +484,57 @@ public sealed class ModelAssetPublishingTests
             (await fixture.Service.InspectAsync(fixture.Root, "hero-model", default)).BuildState);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RegistryRestoreRejectsHardLinkAliasToCurrentImmutableOutput(bool existedBefore)
+    {
+        var fixture = await CreateFixtureAsync();
+        var published = await PublishAsync(fixture);
+        var outputBytes = await File.ReadAllBytesAsync(published.CompiledOutputPath);
+        var modelPath = fixture.ModelStore.GetModelPath(fixture.Root, "hero-model");
+        var modelBytes = await File.ReadAllBytesAsync(modelPath);
+        var catalogPath = fixture.CatalogStore.GetCatalogPath(fixture.Root);
+        var catalogBytes = await File.ReadAllBytesAsync(catalogPath);
+        var aliasPath = Path.Combine(fixture.Root, "RestoreAlias.age.compiled-mesh.json");
+        CreateFileHardLinkOrSkip(aliasPath, published.CompiledOutputPath);
+        var legacy = RekallAgeTransaction.Begin("legacy hard-link alias restore");
+        legacy.RecordResourcePreimage(
+            aliasPath,
+            existedBefore,
+            existedBefore ? System.Text.Encoding.UTF8.GetBytes("{\"legacy\":true}") : []);
+        legacy.RecordChangedResource(aliasPath);
+        var history = new RekallAgeTransactionLogStore();
+        await history.AppendAsync(fixture.Root, legacy, "legacy-agent", default);
+        var historyBytes = await File.ReadAllBytesAsync(history.GetPath(fixture.Root));
+        var context = new RekallAgeCommandContext(
+            "agent", RekallAgeTransaction.Begin("reject hard-link restore"), default);
+
+        var result = await RekallAgeDefaultCommandRegistry.Create().ExecuteJsonAsync(
+            "rekall.transaction.restore_preimage",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = fixture.Root,
+                transactionId = legacy.Id,
+                relativePath = Path.GetRelativePath(fixture.Root, aliasPath)
+            }),
+            context);
+
+        Assert.False(result.Ok);
+        Assert.Equal("REKALL_RESOURCE_RESTORE_PROTECTED", Assert.Single(result.Errors).Code);
+        Assert.True(File.Exists(aliasPath));
+        Assert.Equal(outputBytes, await File.ReadAllBytesAsync(published.CompiledOutputPath));
+        Assert.Equal(outputBytes, await File.ReadAllBytesAsync(aliasPath));
+        Assert.Equal(modelBytes, await File.ReadAllBytesAsync(modelPath));
+        Assert.Equal(catalogBytes, await File.ReadAllBytesAsync(catalogPath));
+        Assert.Equal(historyBytes, await File.ReadAllBytesAsync(history.GetPath(fixture.Root)));
+        Assert.Empty(context.Transaction.ResourcePreimages);
+        Assert.Empty(context.Transaction.ChangedResources);
+        Assert.Equal(
+            RekallAgeModelBuildState.Current,
+            (await fixture.Service.InspectAsync(fixture.Root, "hero-model", default)).BuildState);
+    }
+
     [Fact]
     public async Task OversizedExistingModelDocumentFailsBeforeRebuildMutation()
     {
@@ -935,6 +986,44 @@ public sealed class ModelAssetPublishingTests
         {
             throw Xunit.Sdk.SkipException.ForSkip(
                 $"Filesystem-link confinement capability unavailable: {error.GetType().Name}: {error.Message}");
+        }
+    }
+
+    private static void CreateFileHardLinkOrSkip(string linkPath, string targetPath)
+    {
+        try
+        {
+            var startInfo = new ProcessStartInfo(OperatingSystem.IsWindows() ? "cmd.exe" : "ln")
+            {
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            if (OperatingSystem.IsWindows())
+            {
+                startInfo.ArgumentList.Add("/c");
+                startInfo.ArgumentList.Add("mklink");
+                startInfo.ArgumentList.Add("/H");
+                startInfo.ArgumentList.Add(linkPath);
+                startInfo.ArgumentList.Add(targetPath);
+            }
+            else
+            {
+                startInfo.ArgumentList.Add(targetPath);
+                startInfo.ArgumentList.Add(linkPath);
+            }
+            using var process = Process.Start(startInfo)!;
+            process.WaitForExit();
+            if (process.ExitCode != 0)
+            {
+                throw Xunit.Sdk.SkipException.ForSkip(
+                    $"Filesystem hard-link capability unavailable (exit {process.ExitCode}): {process.StandardError.ReadToEnd()}");
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            throw Xunit.Sdk.SkipException.ForSkip(
+                $"Filesystem hard-link capability unavailable: {error.GetType().Name}: {error.Message}");
         }
     }
 

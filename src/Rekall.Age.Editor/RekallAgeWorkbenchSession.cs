@@ -410,7 +410,7 @@ public sealed class RekallAgeWorkbenchSession
         {
             foreach (var preimage in target.ResourcePreimages)
             {
-                _ = _restorationPolicy.ResolveRestorablePath(ProjectRoot, preimage.RelativePath);
+                _ = _restorationPolicy.Admit(ProjectRoot, preimage.RelativePath);
             }
         }
         catch (RekallAgeResourceRestorationException error)
@@ -451,7 +451,7 @@ public sealed class RekallAgeWorkbenchSession
             string resourcePath;
             try
             {
-                resourcePath = _restorationPolicy.ResolveRestorablePath(projectRoot, preimage.Resource);
+                resourcePath = _restorationPolicy.Admit(projectRoot, preimage.Resource).Path;
             }
             catch (RekallAgeResourceRestorationException)
             {

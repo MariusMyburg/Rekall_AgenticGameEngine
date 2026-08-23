@@ -267,7 +267,12 @@ public sealed class WorkbenchSessionTests
         await outputStore.CommitStagedImmutableAsync(root, staged, default);
         await outputStore.DeleteStagedAsync(root, staged, default);
         var outputPath = outputStore.GetFinalPath(root, "hero-model", staged.ContentHash);
+        var ordinaryPath = Path.Combine(root, "ordinary-before-protected.age.json");
+        await File.WriteAllTextAsync(ordinaryPath, "{\"value\":1}");
         var legacy = RekallAgeTransaction.Begin("legacy publication owns frozen output");
+        legacy.CaptureResourcePreimage(ordinaryPath);
+        await File.WriteAllTextAsync(ordinaryPath, "{\"value\":2}");
+        legacy.RecordChangedResource(ordinaryPath);
         legacy.RecordResourcePreimage(outputPath, existedBefore: false, content: []);
         legacy.RecordChangedResource(outputPath);
         var history = new RekallAgeTransactionLogStore();
@@ -292,6 +297,7 @@ public sealed class WorkbenchSessionTests
         var modelPath = modelStore.GetModelPath(root, "hero-model");
         var modelBytes = await File.ReadAllBytesAsync(modelPath);
         var historyBytes = await File.ReadAllBytesAsync(history.GetPath(root));
+        var ordinaryBytes = await File.ReadAllBytesAsync(ordinaryPath);
         var session = new RekallAgeWorkbenchSession(registry);
         Assert.True((await session.OpenAsync(root, "Main", default)).Ok);
         Assert.True(session.CanUndo);
@@ -302,6 +308,7 @@ public sealed class WorkbenchSessionTests
         Assert.Equal("REKALL_RESOURCE_RESTORE_PROTECTED", Assert.Single(result.Errors).Code);
         Assert.True(session.CanUndo);
         Assert.Equal(outputBytes, await File.ReadAllBytesAsync(outputPath));
+        Assert.Equal(ordinaryBytes, await File.ReadAllBytesAsync(ordinaryPath));
         Assert.Equal(modelBytes, await File.ReadAllBytesAsync(modelPath));
         Assert.Equal(sceneBytes, await File.ReadAllBytesAsync(scenePath));
         Assert.Equal(historyBytes, await File.ReadAllBytesAsync(history.GetPath(root)));
@@ -311,9 +318,127 @@ public sealed class WorkbenchSessionTests
             (await publishing.InspectAsync(root, "hero-model", default)).BuildState);
     }
 
+    [Fact]
+    public async Task WorkbenchUndoRejectsHardLinkAliasOverwriteForFrozenImmutableOutput()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = RekallAgeDefaultCommandRegistry.Create();
+        await CreateProjectAndSceneAsync(registry, root);
+        var (publishing, outputPath, published) = await PublishModelAsync(root);
+        _ = await publishing.FreezeAsync(
+            root,
+            "hero-model",
+            published.ModelFileRevision,
+            RekallAgeTransaction.Begin("freeze hard-link adopter"),
+            default);
+        var aliasPath = Path.Combine(root, "WorkbenchHardLinkAlias.age.compiled-mesh.json");
+        CreateFileHardLinkOrSkip(aliasPath, outputPath);
+        var legacy = RekallAgeTransaction.Begin("legacy hard-link Workbench restore");
+        legacy.RecordResourcePreimage(
+            aliasPath,
+            existedBefore: true,
+            System.Text.Encoding.UTF8.GetBytes("{\"legacy\":true}"));
+        legacy.RecordChangedResource(aliasPath);
+        var history = new RekallAgeTransactionLogStore();
+        await history.AppendAsync(root, legacy, "legacy-agent", default);
+        var scenePath = new RekallAgeSceneStore().GetScenePath(root, "Main");
+        var sceneBytes = await File.ReadAllBytesAsync(scenePath);
+        var outputBytes = await File.ReadAllBytesAsync(outputPath);
+        var modelPath = new RekallAgeModelAssetStore().GetModelPath(root, "hero-model");
+        var modelBytes = await File.ReadAllBytesAsync(modelPath);
+        var historyBytes = await File.ReadAllBytesAsync(history.GetPath(root));
+        var session = new RekallAgeWorkbenchSession(registry);
+        Assert.True((await session.OpenAsync(root, "Main", default)).Ok);
+
+        var result = await session.UndoAsync("studio", default);
+
+        Assert.False(result.Ok);
+        Assert.Equal("REKALL_RESOURCE_RESTORE_PROTECTED", Assert.Single(result.Errors).Code);
+        Assert.True(File.Exists(aliasPath));
+        Assert.Equal(outputBytes, await File.ReadAllBytesAsync(outputPath));
+        Assert.Equal(outputBytes, await File.ReadAllBytesAsync(aliasPath));
+        Assert.Equal(modelBytes, await File.ReadAllBytesAsync(modelPath));
+        Assert.Equal(sceneBytes, await File.ReadAllBytesAsync(scenePath));
+        Assert.Equal(historyBytes, await File.ReadAllBytesAsync(history.GetPath(root)));
+        Assert.Equal(
+            RekallAgeModelBuildState.Frozen,
+            (await publishing.InspectAsync(root, "hero-model", default)).BuildState);
+    }
+
     private static RekallAgeWorkbenchSession CreateSession()
     {
         return new RekallAgeWorkbenchSession(CreateRegistry());
+    }
+
+    private static async ValueTask CreateProjectAndSceneAsync(
+        RekallAgeCommandRegistry registry,
+        string root)
+    {
+        var context = new RekallAgeCommandContext(
+            "setup", RekallAgeTransaction.Begin("create workbench fixture"), default);
+        Assert.True((await registry.ExecuteAsync<CreateProjectRequest, CreateProjectResult>(
+            "rekall.project.create",
+            new(root, "Protected Undo", ["world"]),
+            context)).Ok);
+        Assert.True((await registry.ExecuteAsync<CreateSceneRequest, CreateSceneResult>(
+            "rekall.scene.create",
+            new(root, "Main", ["world"]),
+            context)).Ok);
+    }
+
+    private static async ValueTask<(RekallAgeModelPublishingService Service, string OutputPath, RekallAgePublishModelResult Published)>
+        PublishModelAsync(string root)
+    {
+        var meshStore = new RekallAgeMeshAssetStore();
+        var mesh = await new RekallAgeMeshPrimitiveFactory().CreateAsync(
+            "box", "hero-mesh", "Hero Mesh", default);
+        await meshStore.SaveAsync(root, mesh, default);
+        var publishing = new RekallAgeModelPublishingService();
+        var published = await publishing.PublishAsync(
+            root,
+            new("hero-model", "Hero Model", new(RekallAgeModelSourceKind.Mesh, "hero-mesh"), RekallAgeDocumentRevision.Missing),
+            RekallAgeTransaction.Begin("publish hard-link adopter"),
+            default);
+        return (publishing, published.CompiledOutputPath, published);
+    }
+
+    private static void CreateFileHardLinkOrSkip(string linkPath, string targetPath)
+    {
+        try
+        {
+            var startInfo = new System.Diagnostics.ProcessStartInfo(
+                OperatingSystem.IsWindows() ? "cmd.exe" : "ln")
+            {
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            if (OperatingSystem.IsWindows())
+            {
+                startInfo.ArgumentList.Add("/c");
+                startInfo.ArgumentList.Add("mklink");
+                startInfo.ArgumentList.Add("/H");
+                startInfo.ArgumentList.Add(linkPath);
+                startInfo.ArgumentList.Add(targetPath);
+            }
+            else
+            {
+                startInfo.ArgumentList.Add(targetPath);
+                startInfo.ArgumentList.Add(linkPath);
+            }
+            using var process = System.Diagnostics.Process.Start(startInfo)!;
+            process.WaitForExit();
+            if (process.ExitCode != 0)
+            {
+                throw Xunit.Sdk.SkipException.ForSkip(
+                    $"Filesystem hard-link capability unavailable (exit {process.ExitCode}): {process.StandardError.ReadToEnd()}");
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            throw Xunit.Sdk.SkipException.ForSkip(
+                $"Filesystem hard-link capability unavailable: {error.GetType().Name}: {error.Message}");
+        }
     }
 
     private static RekallAgeCommandRegistry CreateRegistry()

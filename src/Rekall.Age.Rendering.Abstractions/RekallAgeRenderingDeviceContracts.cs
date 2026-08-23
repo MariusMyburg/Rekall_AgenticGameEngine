@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Rekall.Age.Rendering.Abstractions;
 
 public enum RekallAgeGraphicsResourceKind
@@ -288,6 +290,11 @@ public sealed record RekallAgeRenderingDeviceCapabilities(
     public uint MaximumComputeWorkgroupsPerDimension { get; init; } = 65_535;
 
     public bool SupportsIndirectDispatch { get; init; } = true;
+
+    public ImmutableHashSet<string> EnabledFeatures { get; init; } =
+        ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal);
+
+    public bool SupportsBgra8UnormStorage { get; init; } = true;
 
     public static RekallAgeRenderingDeviceCapabilities DesktopBaseline(string backend) => new(
         backend,

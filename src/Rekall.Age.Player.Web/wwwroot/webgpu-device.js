@@ -134,8 +134,16 @@ export function createWebGpuExecutor(environment = {}) {
         if (entry.type === 'comparisonSampler') return { sampler: { type: 'comparison' } };
         const metadata = entry.texture;
         const viewDimension = enumValue({ texture1D: '1d', texture2D: '2d', texture2DArray: '2d-array', cube: 'cube', cubeArray: 'cube-array', texture3D: '3d' }, metadata?.viewDimension ?? 'texture2D', 'TEXTURE_VIEW_DIMENSION');
-        if (entry.type === 'sampledTexture') return { texture: { sampleType: enumValue({ float: 'float', unfilterableFloat: 'unfilterable-float', depth: 'depth', sint: 'sint', uint: 'uint' }, metadata?.sampleType ?? 'float', 'TEXTURE_SAMPLE_TYPE'), viewDimension, multisampled: metadata?.multisampled ?? false } };
-        if (entry.type === 'readOnlyStorageTexture' || entry.type === 'storageTexture') return { storageTexture: { access: enumValue({ readOnly: 'read-only', writeOnly: 'write-only', readWrite: 'read-write' }, metadata?.storageAccess ?? (entry.type === 'readOnlyStorageTexture' ? 'readOnly' : 'writeOnly'), 'STORAGE_ACCESS'), format: enumValue(textureFormats, metadata?.storageFormat ?? 'rgba8Unorm', 'TEXTURE_FORMAT'), viewDimension } };
+        if (entry.type === 'sampledTexture') {
+            const sampleType = enumValue({ float: 'float', unfilterableFloat: 'unfilterable-float', depth: 'depth', sint: 'sint', uint: 'uint' }, metadata?.sampleType ?? 'float', 'TEXTURE_SAMPLE_TYPE');
+            const multisampled = metadata?.multisampled ?? false;
+            if (multisampled && (viewDimension !== '2d' || sampleType === 'float')) throw new Error('REKALL_WEBGPU_TEXTURE_BINDING_METADATA_MISMATCH');
+            return { texture: { sampleType, viewDimension, multisampled } };
+        }
+        if (entry.type === 'readOnlyStorageTexture' || entry.type === 'storageTexture') {
+            if (metadata?.multisampled || !['1d', '2d', '2d-array', '3d'].includes(viewDimension)) throw new Error('REKALL_WEBGPU_TEXTURE_BINDING_METADATA_MISMATCH');
+            return { storageTexture: { access: enumValue({ readOnly: 'read-only', writeOnly: 'write-only', readWrite: 'read-write' }, metadata?.storageAccess ?? (entry.type === 'readOnlyStorageTexture' ? 'readOnly' : 'writeOnly'), 'STORAGE_ACCESS'), format: enumValue(textureFormats, metadata?.storageFormat ?? 'rgba8Unorm', 'TEXTURE_FORMAT'), viewDimension } };
+        }
         throw new Error('REKALL_WEBGPU_BINDING_TYPE_INVALID');
     }
     function bindingResource(entry, layoutEntry) {
@@ -165,7 +173,7 @@ export function createWebGpuExecutor(environment = {}) {
             const data = command.data;
             if (command.kind === 'copyBuffer') encoder.copyBufferToBuffer(object(data.source, 'buffer').value, data.sourceOffset, object(data.destination, 'buffer').value, data.destinationOffset, data.sizeBytes);
             else if (command.kind === 'beginRenderPass') {
-                const target = object(data.descriptor.renderTarget).descriptor;
+                const target = object(data.descriptor.renderTarget, 'renderTarget').descriptor;
                 pass = encoder.beginRenderPass({
                     colorAttachments: target.colorAttachments.map((attachment, index) => {
                         const clear = data.descriptor.colorClearValues[index];

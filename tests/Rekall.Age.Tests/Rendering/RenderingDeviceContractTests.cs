@@ -352,6 +352,27 @@ public sealed class RenderingDeviceContractTests
     }
 
     [Fact]
+    public void Bgra8UnormStorageRequiresTheGenericCapabilityWhileDesktopBaselineRemainsCapable()
+    {
+        var descriptor = new RekallAgeTextureDescriptor(
+            RekallAgeTextureDimension.Texture2D, 4, 4, 1, 1, 1, 1,
+            RekallAgeTextureFormat.Bgra8Unorm, RekallAgeTextureUsage.Storage);
+        var unavailable = RekallAgeRenderingDeviceValidator.Validate(
+            descriptor,
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("browser-device") with { SupportsBgra8UnormStorage = false });
+        var enabled = RekallAgeRenderingDeviceValidator.Validate(
+            descriptor,
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("browser-device") with { SupportsBgra8UnormStorage = true });
+        var native = RekallAgeRenderingDeviceValidator.Validate(
+            descriptor,
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("native"));
+
+        Assert.Contains(unavailable.Diagnostics, item => item.Code == "REKALL_GPU_FEATURE_REQUIRED" && item.Message.Contains("bgra8unorm-storage", StringComparison.Ordinal));
+        Assert.True(enabled.Valid, string.Join(Environment.NewLine, enabled.Diagnostics.Select(item => item.Message)));
+        Assert.True(native.Valid, string.Join(Environment.NewLine, native.Diagnostics.Select(item => item.Message)));
+    }
+
+    [Fact]
     public void TextureBindingMetadataMatchesCubeArrayThreeDimensionalDepthFloatStorageAndMultisampleTextures()
     {
         var cases = new[]
@@ -362,7 +383,8 @@ public sealed class RenderingDeviceContractTests
             (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Texture2D, 4, 4, 1, 1, 1, 1, RekallAgeTextureFormat.Depth32Float, RekallAgeTextureUsage.Sampled), new RekallAgeTextureBindingMetadata(SampleType: RekallAgeTextureSampleType.Depth)),
             (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Texture2D, 4, 4, 1, 1, 1, 1, RekallAgeTextureFormat.R32Float, RekallAgeTextureUsage.Sampled), new RekallAgeTextureBindingMetadata(SampleType: RekallAgeTextureSampleType.UnfilterableFloat)),
             (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Texture2D, 4, 4, 1, 1, 1, 1, RekallAgeTextureFormat.R32Float, RekallAgeTextureUsage.Storage), new RekallAgeTextureBindingMetadata(StorageFormat: RekallAgeTextureFormat.R32Float, StorageAccess: RekallAgeStorageTextureAccess.WriteOnly)),
-            (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Texture2D, 4, 4, 1, 1, 1, 4, RekallAgeTextureFormat.Rgba8Unorm, RekallAgeTextureUsage.Sampled), new RekallAgeTextureBindingMetadata(Multisampled: true))
+            (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Texture2D, 4, 4, 1, 1, 1, 4, RekallAgeTextureFormat.Rgba8Unorm, RekallAgeTextureUsage.Sampled), new RekallAgeTextureBindingMetadata(SampleType: RekallAgeTextureSampleType.UnfilterableFloat, Multisampled: true)),
+            (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Texture2D, 4, 4, 1, 1, 1, 4, RekallAgeTextureFormat.Depth32Float, RekallAgeTextureUsage.Sampled), new RekallAgeTextureBindingMetadata(SampleType: RekallAgeTextureSampleType.Depth, Multisampled: true))
         };
 
         foreach (var (textureDescriptor, metadata) in cases)
@@ -373,6 +395,70 @@ public sealed class RenderingDeviceContractTests
             var texture = device.CreateTexture(textureDescriptor);
             var set = device.CreateBindingSet(new(layout.Handle, [new(0, texture.Handle)]));
             Assert.True(set.Created, string.Join(Environment.NewLine, set.Diagnostics.Select(item => item.Message)));
+        }
+    }
+
+    [Theory]
+    [InlineData("filterable")]
+    [InlineData("arrayView")]
+    [InlineData("sintType")]
+    [InlineData("uintType")]
+    public void MultisampledSampledTextureBindingsRejectFilterableNonTwoDimensionalAndIncompatibleIntegerMetadata(string invalidMetadata)
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+        var metadata = invalidMetadata switch
+        {
+            "filterable" => new RekallAgeTextureBindingMetadata(SampleType: RekallAgeTextureSampleType.Float, Multisampled: true),
+            "sintType" => new RekallAgeTextureBindingMetadata(SampleType: RekallAgeTextureSampleType.Sint, Multisampled: true),
+            "uintType" => new RekallAgeTextureBindingMetadata(SampleType: RekallAgeTextureSampleType.Uint, Multisampled: true),
+            _ => new RekallAgeTextureBindingMetadata(SampleType: RekallAgeTextureSampleType.UnfilterableFloat, ViewDimension: RekallAgeTextureViewDimension.Texture2DArray, Multisampled: true)
+        };
+        var layout = device.CreateBindingLayout(new([new(0, RekallAgeBindingType.SampledTexture, RekallAgeShaderStage.Fragment, Texture: metadata)]));
+        var texture = device.CreateTexture(new(
+            RekallAgeTextureDimension.Texture2D, 4, 4, 1, 1, invalidMetadata == "arrayView" ? 2 : 1, 4,
+            RekallAgeTextureFormat.Rgba8Unorm, RekallAgeTextureUsage.Sampled));
+
+        var set = device.CreateBindingSet(new(layout.Handle, [new(0, texture.Handle)]));
+
+        Assert.False(set.Created);
+        Assert.Contains(set.Diagnostics, item => item.Code == "REKALL_GPU_TEXTURE_BINDING_METADATA_MISMATCH");
+    }
+
+    [Fact]
+    public void StorageTextureBindingsAllowOnlyNonMultisampledOneTwoAndThreeDimensionalViews()
+    {
+        var validCases = new[]
+        {
+            (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Texture1D, 4, 1, 1, 1, 1, 1, RekallAgeTextureFormat.R32Float, RekallAgeTextureUsage.Storage), RekallAgeTextureViewDimension.Texture1D),
+            (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Texture2D, 4, 4, 1, 1, 1, 1, RekallAgeTextureFormat.R32Float, RekallAgeTextureUsage.Storage), RekallAgeTextureViewDimension.Texture2D),
+            (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Texture2D, 4, 4, 1, 1, 2, 1, RekallAgeTextureFormat.R32Float, RekallAgeTextureUsage.Storage), RekallAgeTextureViewDimension.Texture2DArray),
+            (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Texture3D, 4, 4, 4, 1, 1, 1, RekallAgeTextureFormat.R32Float, RekallAgeTextureUsage.Storage), RekallAgeTextureViewDimension.Texture3D)
+        };
+        var invalidCases = new[]
+        {
+            (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Cube, 4, 4, 1, 1, 6, 1, RekallAgeTextureFormat.R32Float, RekallAgeTextureUsage.Storage), new RekallAgeTextureBindingMetadata(ViewDimension: RekallAgeTextureViewDimension.Cube, StorageFormat: RekallAgeTextureFormat.R32Float)),
+            (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Cube, 4, 4, 1, 1, 12, 1, RekallAgeTextureFormat.R32Float, RekallAgeTextureUsage.Storage), new RekallAgeTextureBindingMetadata(ViewDimension: RekallAgeTextureViewDimension.CubeArray, StorageFormat: RekallAgeTextureFormat.R32Float)),
+            (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Texture2D, 4, 4, 1, 1, 1, 1, RekallAgeTextureFormat.R32Float, RekallAgeTextureUsage.Storage), new RekallAgeTextureBindingMetadata(Multisampled: true, StorageFormat: RekallAgeTextureFormat.R32Float)),
+            (new RekallAgeTextureDescriptor(RekallAgeTextureDimension.Texture2D, 4, 4, 1, 1, 1, 4, RekallAgeTextureFormat.R32Float, RekallAgeTextureUsage.Storage), new RekallAgeTextureBindingMetadata(StorageFormat: RekallAgeTextureFormat.R32Float))
+        };
+
+        foreach (var (descriptor, viewDimension) in validCases)
+        {
+            using var device = new RekallAgeInMemoryRenderingDevice(RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+            var layout = device.CreateBindingLayout(new([new(0, RekallAgeBindingType.StorageTexture, RekallAgeShaderStage.Compute, Texture: new(ViewDimension: viewDimension, StorageFormat: RekallAgeTextureFormat.R32Float))]));
+            var texture = device.CreateTexture(descriptor);
+            var set = device.CreateBindingSet(new(layout.Handle, [new(0, texture.Handle)]));
+            Assert.True(set.Created, string.Join(Environment.NewLine, set.Diagnostics.Select(item => item.Message)));
+        }
+
+        foreach (var (descriptor, metadata) in invalidCases)
+        {
+            using var device = new RekallAgeInMemoryRenderingDevice(RekallAgeRenderingDeviceCapabilities.DesktopBaseline("conformance"));
+            var layout = device.CreateBindingLayout(new([new(0, RekallAgeBindingType.StorageTexture, RekallAgeShaderStage.Compute, Texture: metadata)]));
+            var texture = device.CreateTexture(descriptor);
+            var set = device.CreateBindingSet(new(layout.Handle, [new(0, texture.Handle)]));
+            Assert.False(set.Created);
+            Assert.Contains(set.Diagnostics, item => item.Code == "REKALL_GPU_TEXTURE_BINDING_METADATA_MISMATCH");
         }
     }
 

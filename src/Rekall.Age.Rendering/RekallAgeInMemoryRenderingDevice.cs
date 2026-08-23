@@ -167,18 +167,27 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
             RekallAgeTextureViewDimension.Texture3D => texture.Dimension == RekallAgeTextureDimension.Texture3D,
             _ => false
         };
-        var expectedSampleType = texture.Format switch
+        var sampleTypeMatches = texture.Format switch
         {
-            RekallAgeTextureFormat.Depth24Stencil8 or RekallAgeTextureFormat.Depth32Float => RekallAgeTextureSampleType.Depth,
-            RekallAgeTextureFormat.R32Float => RekallAgeTextureSampleType.UnfilterableFloat,
-            _ => RekallAgeTextureSampleType.Float
+            RekallAgeTextureFormat.Depth24Stencil8 or RekallAgeTextureFormat.Depth32Float => metadata.SampleType == RekallAgeTextureSampleType.Depth,
+            RekallAgeTextureFormat.R32Float => metadata.SampleType == RekallAgeTextureSampleType.UnfilterableFloat,
+            _ => metadata.SampleType is RekallAgeTextureSampleType.Float or RekallAgeTextureSampleType.UnfilterableFloat
         };
         var sampleMatches = entry.Type != RekallAgeBindingType.SampledTexture
-            || metadata.SampleType == expectedSampleType && metadata.Multisampled == (texture.SampleCount > 1);
+            || sampleTypeMatches
+                && metadata.Multisampled == (texture.SampleCount > 1)
+                && (!metadata.Multisampled
+                    || metadata.ViewDimension == RekallAgeTextureViewDimension.Texture2D
+                    && metadata.SampleType != RekallAgeTextureSampleType.Float);
+        var storageViewMatches = metadata.ViewDimension is
+            RekallAgeTextureViewDimension.Texture1D or
+            RekallAgeTextureViewDimension.Texture2D or
+            RekallAgeTextureViewDimension.Texture2DArray or
+            RekallAgeTextureViewDimension.Texture3D;
         var storageMatches = entry.Type switch
         {
-            RekallAgeBindingType.ReadOnlyStorageTexture => metadata.StorageFormat == texture.Format && metadata.StorageAccess == RekallAgeStorageTextureAccess.ReadOnly && texture.SampleCount == 1,
-            RekallAgeBindingType.StorageTexture => metadata.StorageFormat == texture.Format && metadata.StorageAccess is RekallAgeStorageTextureAccess.WriteOnly or RekallAgeStorageTextureAccess.ReadWrite && texture.SampleCount == 1,
+            RekallAgeBindingType.ReadOnlyStorageTexture => metadata.StorageFormat == texture.Format && metadata.StorageAccess == RekallAgeStorageTextureAccess.ReadOnly && storageViewMatches && !metadata.Multisampled && texture.SampleCount == 1,
+            RekallAgeBindingType.StorageTexture => metadata.StorageFormat == texture.Format && metadata.StorageAccess is RekallAgeStorageTextureAccess.WriteOnly or RekallAgeStorageTextureAccess.ReadWrite && storageViewMatches && !metadata.Multisampled && texture.SampleCount == 1,
             _ => true
         };
         return viewMatches && sampleMatches && storageMatches;

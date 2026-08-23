@@ -176,10 +176,38 @@ test('uses explicit texture binding metadata instead of guessing WebGPU defaults
     const executor = createWebGpuExecutor({ navigator: { gpu: { requestAdapter: async () => ({ requestDevice: async () => device, limits: {} }), getPreferredCanvasFormat: () => 'bgra8unorm' } }, canvas: { getContext: () => ({ configure: () => {} }) } });
     await executor.initialize();
     const handle = { deviceId: '11111111-1111-1111-1111-111111111111', kind: 'bindingLayout', slot: 10, generation: 1 };
-    const packet = { version: 1, operation: 'create', resourceType: 'bindingLayout', handle, descriptor: { entries: [{ binding: 0, type: 'sampledTexture', visibility: 'fragment', texture: { sampleType: 'depth', viewDimension: 'cubeArray', multisampled: true } }, { binding: 1, type: 'storageTexture', visibility: 'compute', texture: { viewDimension: 'texture3D', storageFormat: 'r32Float', storageAccess: 'readWrite' } }] } };
+    const packet = { version: 1, operation: 'create', resourceType: 'bindingLayout', handle, descriptor: { entries: [{ binding: 0, type: 'sampledTexture', visibility: 'fragment', texture: { sampleType: 'depth', viewDimension: 'cubeArray', multisampled: false } }, { binding: 1, type: 'storageTexture', visibility: 'compute', texture: { viewDimension: 'texture3D', storageFormat: 'r32Float', storageAccess: 'readWrite' } }] } };
     assert.equal(executor.execute(JSON.stringify(packet)).succeeded, true);
-    assert.deepEqual(layout.entries[0].texture, { sampleType: 'depth', viewDimension: 'cube-array', multisampled: true });
+    assert.deepEqual(layout.entries[0].texture, { sampleType: 'depth', viewDimension: 'cube-array', multisampled: false });
     assert.deepEqual(layout.entries[1].storageTexture, { access: 'read-write', format: 'r32float', viewDimension: '3d' });
+});
+
+test('enforces WebGPU multisampled and storage texture layout dimensions before device calls', async () => {
+    const layouts = [];
+    const device = { lost: new Promise(() => {}), queue: { onSubmittedWorkDone: async () => {} }, pushErrorScope: () => {}, popErrorScope: async () => null, addEventListener: () => {}, createBindGroupLayout: descriptor => { layouts.push(descriptor); return descriptor; } };
+    const executor = createWebGpuExecutor({ navigator: { gpu: { requestAdapter: async () => ({ requestDevice: async () => device }), getPreferredCanvasFormat: () => 'bgra8unorm' } }, canvas: { getContext: () => ({ configure: () => {} }) } });
+    await executor.initialize();
+    const handle = slot => ({ deviceId: '11111111-1111-1111-1111-111111111111', kind: 'bindingLayout', slot, generation: 1 });
+    const create = (slot, type, texture) => executor.execute(JSON.stringify({ version: 1, operation: 'create', resourceType: 'bindingLayout', handle: handle(slot), descriptor: { entries: [{ binding: 0, type, visibility: 'fragment', texture }] } }));
+
+    assert.equal(create(1, 'sampledTexture', { sampleType: 'unfilterableFloat', viewDimension: 'texture2D', multisampled: true }).succeeded, true);
+    assert.equal(create(2, 'sampledTexture', { sampleType: 'depth', viewDimension: 'texture2D', multisampled: true }).succeeded, true);
+    assert.equal(create(3, 'storageTexture', { viewDimension: 'texture2D', storageFormat: 'r32Float', storageAccess: 'writeOnly', multisampled: false }).succeeded, true);
+    assert.equal(create(4, 'storageTexture', { viewDimension: 'texture2DArray', storageFormat: 'r32Float', storageAccess: 'writeOnly', multisampled: false }).succeeded, true);
+    assert.equal(create(5, 'storageTexture', { viewDimension: 'texture3D', storageFormat: 'r32Float', storageAccess: 'writeOnly', multisampled: false }).succeeded, true);
+
+    for (const [slot, type, texture] of [
+        [6, 'sampledTexture', { sampleType: 'float', viewDimension: 'texture2D', multisampled: true }],
+        [7, 'sampledTexture', { sampleType: 'depth', viewDimension: 'cube', multisampled: true }],
+        [8, 'storageTexture', { viewDimension: 'cube', storageFormat: 'r32Float', storageAccess: 'writeOnly', multisampled: false }],
+        [9, 'storageTexture', { viewDimension: 'cubeArray', storageFormat: 'r32Float', storageAccess: 'writeOnly', multisampled: false }],
+        [10, 'storageTexture', { viewDimension: 'texture2D', storageFormat: 'r32Float', storageAccess: 'writeOnly', multisampled: true }]
+    ]) {
+        const invalid = create(slot, type, texture);
+        assert.equal(invalid.succeeded, false);
+        assert.equal(invalid.diagnostics[0].code, 'REKALL_WEBGPU_TEXTURE_BINDING_METADATA_MISMATCH');
+    }
+    assert.equal(layouts.length, 5);
 });
 
 test('creates bind-group texture views with declared dimension and descriptor-derived aspect mip and layers', async () => {
@@ -230,6 +258,23 @@ test('rejects wrong-kind operation and render-attachment handles before WebGPU l
         assert.equal(rejected.succeeded, false);
         assert.equal(rejected.diagnostics[0].code, 'REKALL_WEBGPU_RESOURCE_KIND_MISMATCH');
     }
+});
+
+test('rejects a wrong-kind render-pass target before descriptor lookup', async () => {
+    const device = {
+        limits: {}, features: new Set(), lost: new Promise(() => {}),
+        queue: { onSubmittedWorkDone: async () => {}, submit: () => {} }, pushErrorScope: () => {}, popErrorScope: async () => null, addEventListener: () => {},
+        createTexture: () => ({ createView: () => ({}), destroy: () => {} }), createCommandEncoder: () => ({ beginRenderPass: () => { throw new Error('must not reach WebGPU'); } })
+    };
+    const executor = createWebGpuExecutor({ navigator: { gpu: { requestAdapter: async () => ({ requestDevice: async () => device }), getPreferredCanvasFormat: () => 'bgra8unorm' } }, canvas: { getContext: () => ({ configure: () => {} }) } });
+    await executor.initialize();
+    const texture = { deviceId: '11111111-1111-1111-1111-111111111111', kind: 'texture', slot: 1, generation: 1 };
+    assert.equal(executor.execute(JSON.stringify({ version: 1, operation: 'create', resourceType: 'texture', handle: texture, descriptor: { dimension: 'texture2D', width: 4, height: 4, depth: 1, mipLevels: 1, arrayLayers: 1, sampleCount: 1, format: 'rgba8Unorm', usage: 'colorAttachment' } })).succeeded, true);
+
+    const result = executor.execute(JSON.stringify({ version: 1, operation: 'submit', commands: [{ kind: 'beginRenderPass', data: { descriptor: { renderTarget: texture, colorClearValues: [] } } }] }));
+
+    assert.equal(result.succeeded, false);
+    assert.equal(result.diagnostics[0].code, 'REKALL_WEBGPU_RESOURCE_KIND_MISMATCH');
 });
 
 test('bounds diagnostic count and unicode strings without oversized responses', async () => {

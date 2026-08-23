@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
@@ -216,7 +217,7 @@ public static class RekallAgeWebGpuProtocol
                 return InvalidInitializationResult();
             }
 
-            var features = featuresElement.EnumerateArray().Select(item => item.GetString()!).ToHashSet(StringComparer.Ordinal);
+            var features = featuresElement.EnumerateArray().Select(item => item.GetString()!).ToImmutableHashSet(StringComparer.Ordinal);
             var deviceCapabilities = new RekallAgeRenderingDeviceCapabilities(
                 "WebGPU", maxBufferSize, maxTexture1D, maxTexture2D, maxTexture3D, maxTextureLayers,
                 maxColorAttachments, maxBindings, MaximumSamplerAnisotropy: 16,
@@ -227,7 +228,9 @@ public static class RekallAgeWebGpuProtocol
                 MaximumVertexAttributes = maxVertexAttributes,
                 MaximumVertexBufferStrideBytes = maxVertexStride,
                 MaximumComputeWorkgroupsPerDimension = maxComputeWorkgroups,
-                SupportsIndirectDispatch = true
+                SupportsIndirectDispatch = true,
+                EnabledFeatures = features,
+                SupportsBgra8UnormStorage = features.Contains("bgra8unorm-storage")
             };
             return new(deviceCapabilities, format, []);
         }

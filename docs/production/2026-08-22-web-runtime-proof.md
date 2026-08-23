@@ -67,7 +67,7 @@ Final GREEN evidence:
 
 - The focused WebGPU C# selection passed 80/80, including complete supported
   descriptor/command/packet dispatch and nested bridge-result rejection.
-- The Node browser-executor suite passed 15/15.
+- The Node browser-executor suite passed 17/17.
 - The Release browser Player build completed with zero warnings and zero errors.
 - A clean-output trimmed browser publish completed with zero warnings and zero
   errors and emitted both the fingerprinted `webgpu-device` JavaScript module
@@ -91,7 +91,15 @@ mip depth is derived from the retained texture descriptor, declared bind-group
 texture views and generic texture-metadata compatibility, requested-device
 limits/features plus a typed preferred canvas format, legal readback usage,
 strict resource-kind lookup, and bounded bridge responses. The final 80/80 C#
-and 15/15 Node totals include these cases. A fresh clean-output Release publish
+and 17/17 Node totals include these cases. A fresh clean-output Release publish
 again completed trimming and native WASM linking with zero warnings/errors and
 emitted fingerprinted `main`, `webgpu-device`, and
 `Rekall.Age.Rendering.WebGpu` WASM modules.
+
+A final follow-up tightened binding legality to WebGPU's multisampled sampled
+texture and storage texture view constraints, retained the requested device's
+exact immutable enabled-feature set, gated BGRA8 storage on the generic
+`bgra8unorm-storage` capability while leaving native baselines capable, and
+made render-pass target lookup kind-strict. The focused follow-up C# selection
+passed 13/13 and contains the conformance cases; the complete WebGPU protocol
+selection and Node executor totals above remain green.

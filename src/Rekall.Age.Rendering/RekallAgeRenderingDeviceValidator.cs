@@ -142,6 +142,12 @@ public static class RekallAgeRenderingDeviceValidator
         {
             diagnostics.Add(Feature("storage textures", descriptor.Label));
         }
+        if (descriptor.Format == RekallAgeTextureFormat.Bgra8Unorm
+            && descriptor.Usage.HasFlag(RekallAgeTextureUsage.Storage)
+            && !capabilities.SupportsBgra8UnormStorage)
+        {
+            diagnostics.Add(Feature("bgra8unorm-storage", descriptor.Label));
+        }
 
         return new(diagnostics);
     }

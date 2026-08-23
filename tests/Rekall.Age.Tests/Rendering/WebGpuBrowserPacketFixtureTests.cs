@@ -85,7 +85,7 @@ public sealed class WebGpuBrowserPacketFixtureTests
     public void BrowserInitializationRequiresEveryDeviceLimitAndRetainsPreferredCanvasFormat()
     {
         const string complete = """
-            {"succeeded":true,"diagnostics":[],"capabilities":{"preferredCanvasFormat":"rgba8unorm","limits":{"maxBufferSize":268435456,"maxTextureDimension1D":8192,"maxTextureDimension2D":8192,"maxTextureDimension3D":2048,"maxTextureArrayLayers":256,"maxColorAttachments":8,"maxBindingsPerBindGroup":1000,"maxVertexBuffers":8,"maxVertexAttributes":16,"maxVertexBufferArrayStride":2048,"maxComputeWorkgroupsPerDimension":65535},"features":["timestamp-query"]}}
+            {"succeeded":true,"diagnostics":[],"capabilities":{"preferredCanvasFormat":"rgba8unorm","limits":{"maxBufferSize":268435456,"maxTextureDimension1D":8192,"maxTextureDimension2D":8192,"maxTextureDimension3D":2048,"maxTextureArrayLayers":256,"maxColorAttachments":8,"maxBindingsPerBindGroup":1000,"maxVertexBuffers":8,"maxVertexAttributes":16,"maxVertexBufferArrayStride":2048,"maxComputeWorkgroupsPerDimension":65535},"features":["timestamp-query","shader-f16","bgra8unorm-storage"]}}
             """;
         const string missing = """
             {"succeeded":true,"diagnostics":[],"capabilities":{"preferredCanvasFormat":"bgra8unorm","limits":{"maxBufferSize":268435456},"features":[]}}
@@ -100,6 +100,10 @@ public sealed class WebGpuBrowserPacketFixtureTests
         Assert.Equal(1000, initialized.Capabilities.MaximumBindingsPerLayout);
         Assert.Equal(8, initialized.Capabilities.MaximumVertexBuffers);
         Assert.True(initialized.Capabilities.SupportsTimestampQueries);
+        Assert.True(initialized.Capabilities.SupportsBgra8UnormStorage);
+        Assert.Equal(
+            ["bgra8unorm-storage", "shader-f16", "timestamp-query"],
+            initialized.Capabilities.EnabledFeatures.Order(StringComparer.Ordinal));
         Assert.False(invalid.Succeeded);
         Assert.Null(invalid.Capabilities);
         Assert.Equal("REKALL_WEBGPU_CAPABILITIES_INVALID", Assert.Single(invalid.Diagnostics).Code);

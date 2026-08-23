@@ -7,6 +7,8 @@ using BepuPhysics.CollisionDetection;
 using BepuPhysics.Constraints;
 using BepuUtilities;
 using BepuUtilities.Memory;
+using Rekall.Age.Modeling;
+using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Runtime.Abstractions;
 
 namespace Rekall.Age.Runtime;
@@ -15,6 +17,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
 {
     private const float DefaultGravityY = -9.81f;
     private PersistentPhysicsWorld? _physicsWorld;
+    private readonly RekallAgeCompiledMeshAssetResolver _meshResolver = new();
 
     public string Id => "runtime.physics.bepu";
 
@@ -24,17 +27,22 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
         RekallAgeRuntimeWorld world,
         RekallAgeRuntimeWorldFrameContext context)
     {
-        var dynamicBodies = world.Entities
-            .Select(CreatePhysicsEntity)
+        var observations = new List<RekallAgeRuntimeObservation>();
+        var physicsEntities = world.Entities
+            .Select(entity => CreatePhysicsEntity(world.ProjectRoot, entity, context.FrameIndex, observations))
+            .ToArray();
+        var dynamicBodies = physicsEntities
             .Where(item => item.Rigidbody is not null && item.Collider is not null)
             .ToArray();
-        var staticBodies = world.Entities
-            .Select(CreatePhysicsEntity)
+        var staticBodies = physicsEntities
             .Where(item => item.Rigidbody is null && item.Collider is not null)
             .ToArray();
         if (dynamicBodies.Length == 0 && staticBodies.Length == 0)
         {
-            return ValueTask.FromResult(world);
+            return ValueTask.FromResult(world with
+            {
+                Observations = world.Observations.Concat(observations).ToArray()
+            });
         }
 
         var configuration = ReadPhysicsWorldConfiguration(world);
@@ -61,7 +69,11 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                 : entity)
             .ToArray();
         _physicsWorld.RecordOutputs(updated);
-        return ValueTask.FromResult(world with { Entities = updated });
+        return ValueTask.FromResult(world with
+        {
+            Entities = updated,
+            Observations = world.Observations.Concat(observations).ToArray()
+        });
     }
 
     public void Dispose()
@@ -164,13 +176,41 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
             .ToArray();
     }
 
-    private static PhysicsEntity CreatePhysicsEntity(RekallAgeRuntimeEntity entity)
+    private PhysicsEntity CreatePhysicsEntity(
+        string? projectRoot,
+        RekallAgeRuntimeEntity entity,
+        int frame,
+        ICollection<RekallAgeRuntimeObservation> observations)
     {
+        var reference = FindComponent(entity, "Rekall.MeshAssetReference");
+        RekallAgeCompiledMeshAssetResolution? resolved = null;
+        if (reference is not null)
+        {
+            resolved = _meshResolver.Resolve(
+                projectRoot,
+                ReadString(reference, "assetId", string.Empty),
+                ReadString(reference, "expectedRevision", string.Empty));
+            if (resolved.IssueCode is not null)
+            {
+                observations.Add(new RekallAgeRuntimeObservation(
+                    frame,
+                    resolved.IssueCode,
+                    "error",
+                    "physics",
+                    entity.Id,
+                    entity.Name,
+                    Id,
+                    resolved.IssueMessage ?? "Editable mesh collider could not be resolved.",
+                    ["rekall.mesh.inspect", "rekall.mesh.validate"]));
+            }
+        }
         return new PhysicsEntity(
             entity,
             FindComponent(entity, "Rekall.Rigidbody3D") ?? FindComponent(entity, "Rekall.Rigidbody2D"),
             FindCollider(entity),
             FindComponent(entity, "Rekall.GeometryMesh"),
+            resolved?.Snapshot,
+            resolved?.FileRevision,
             ReadPhysicsMaterial(entity),
             FindComponent(entity, "Rekall.Rigidbody2D") is not null
                 || FindComponent(entity, "Rekall.BoxCollider2D") is not null
@@ -232,7 +272,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                     Vector3.Zero);
                 return true;
             case "Rekall.MeshCollider" when ReadBoolean(collider, "convex", false)
-                && TryCreateConvexHull(pool, item.GeometryMesh, out var hull, out var center):
+                && TryCreateConvexHull(pool, item.GeometryMesh, item.CompiledMesh, out var hull, out var center):
                 pose.Position += center;
                 created = new DynamicBodyState(
                     default,
@@ -257,7 +297,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
             "Rekall.BoxCollider3D" => new StaticShape(true, simulation.Shapes.Add(CreateBox(item.Collider))),
             "Rekall.SphereCollider3D" => new StaticShape(true, simulation.Shapes.Add(CreateSphere(item.Collider))),
             "Rekall.CapsuleCollider3D" => new StaticShape(true, simulation.Shapes.Add(CreateCapsule(item.Collider))),
-            "Rekall.MeshCollider" => TryCreateStaticMesh(pool, item.GeometryMesh, out var mesh)
+            "Rekall.MeshCollider" => TryCreateStaticMesh(pool, item.GeometryMesh, item.CompiledMesh, out var mesh)
                 ? new StaticShape(true, simulation.Shapes.Add(mesh))
                 : default,
             _ => default
@@ -295,9 +335,29 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
     private static bool TryCreateStaticMesh(
         BufferPool pool,
         RekallAgeRuntimeComponent? geometryMesh,
+        RekallAgeCompiledMeshSnapshot? compiledMesh,
         out Mesh mesh)
     {
         mesh = default;
+        if (compiledMesh is not null)
+        {
+            pool.Take<Triangle>((compiledMesh.Indices.Count / 3) * 2, out var compiledTriangles);
+            for (var i = 0; i + 2 < compiledMesh.Indices.Count; i += 3)
+            {
+                var a = compiledMesh.Vertices[checked((int)compiledMesh.Indices[i])].Position;
+                var b = compiledMesh.Vertices[checked((int)compiledMesh.Indices[i + 1])].Position;
+                var c = compiledMesh.Vertices[checked((int)compiledMesh.Indices[i + 2])].Position;
+                var va = new Vector3((float)a.X, (float)a.Y, (float)a.Z);
+                var vb = new Vector3((float)b.X, (float)b.Y, (float)b.Z);
+                var vc = new Vector3((float)c.X, (float)c.Y, (float)c.Z);
+                var triangleIndex = (i / 3) * 2;
+                compiledTriangles[triangleIndex] = new Triangle(in va, in vb, in vc);
+                compiledTriangles[triangleIndex + 1] = new Triangle(in vc, in vb, in va);
+            }
+            var compiledScale = Vector3.One;
+            mesh = new Mesh(compiledTriangles, in compiledScale, pool);
+            return true;
+        }
         if (geometryMesh is null
             || !TryGetPropertyValue(geometryMesh.Properties, "vertices", out var verticesNode)
             || verticesNode is not JsonArray vertices
@@ -337,12 +397,20 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
     private static bool TryCreateConvexHull(
         BufferPool pool,
         RekallAgeRuntimeComponent? geometryMesh,
+        RekallAgeCompiledMeshSnapshot? compiledMesh,
         out ConvexHull hull,
         out Vector3 center)
     {
         hull = default;
         center = default;
-        if (!TryReadMeshPoints(geometryMesh, out var points) || points.Length < 4)
+        var points = compiledMesh is null
+            ? TryReadMeshPoints(geometryMesh, out var legacyPoints) ? legacyPoints : []
+            : compiledMesh.Vertices
+                .GroupBy(vertex => vertex.SourcePointId)
+                .Select(group => group.First().Position)
+                .Select(point => new Vector3((float)point.X, (float)point.Y, (float)point.Z))
+                .ToArray();
+        if (points.Length < 4)
         {
             return false;
         }
@@ -628,6 +696,18 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
         return value.TryGetValue<string>(out var text)
             && bool.TryParse(text, out var parsed)
             ? parsed
+            : fallback;
+    }
+
+    private static string ReadString(RekallAgeRuntimeComponent component, string name, string fallback)
+    {
+        if (!TryGetPropertyValue(component.Properties, name, out var node) || node is not JsonValue value)
+        {
+            return fallback;
+        }
+
+        return value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text)
+            ? text.Trim()
             : fallback;
     }
 
@@ -920,6 +1000,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                 item.Collider?.Type ?? string.Empty,
                 item.Collider?.Properties.ToJsonString() ?? string.Empty,
                 item.GeometryMesh?.Properties.ToJsonString() ?? string.Empty,
+                item.CompiledMeshRevision ?? string.Empty,
                 item.Material,
                 includeTransform ? item.Entity.Transform : string.Empty);
         }
@@ -976,6 +1057,8 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
         RekallAgeRuntimeComponent? Rigidbody,
         RekallAgeRuntimeComponent? Collider,
         RekallAgeRuntimeComponent? GeometryMesh,
+        RekallAgeCompiledMeshSnapshot? CompiledMesh,
+        string? CompiledMeshRevision,
         PhysicsMaterial Material,
         bool Is2D);
 

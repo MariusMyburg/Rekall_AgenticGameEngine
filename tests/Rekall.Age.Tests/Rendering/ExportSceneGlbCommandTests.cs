@@ -6,6 +6,8 @@ using Rekall.Age.Assets.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.LevelDesign.Commands;
+using Rekall.Age.Modeling;
+using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.World;
@@ -14,6 +16,50 @@ namespace Rekall.Age.Tests.Rendering;
 
 public sealed class ExportSceneGlbCommandTests
 {
+    [Fact]
+    public async Task ExportSceneGlbCommandUsesCompiledEditableMeshAsset()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeMeshAssetStore().SaveAsync(
+            root,
+            RekallAgeMeshAsset.Create(
+                "editable-triangle",
+                "Editable Triangle",
+                new(
+                    PointIds: [1, 2, 3],
+                    Positions: [new(0, 0, 0), new(1, 0, 0), new(0, 1, 0)],
+                    EdgeIds: [11, 12, 13],
+                    EdgePointIndices: [new(0, 1), new(1, 2), new(2, 0)],
+                    FaceIds: [21],
+                    FaceOffsets: [0, 3],
+                    CornerIds: [31, 32, 33],
+                    CornerPointIndices: [0, 1, 2],
+                    CornerEdgeIndices: [0, 1, 2])),
+            CancellationToken.None);
+        var entity = RekallAgeEntityDocument.Create("Editable Triangle", ["geometry"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D"))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.MeshAssetReference",
+                new JsonObject { ["assetId"] = "editable-triangle" }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.MeshRenderer",
+                new JsonObject { ["mesh"] = "editable-triangle" }));
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"]).AddEntity(entity),
+            CancellationToken.None);
+        var outputPath = Path.Combine(root, "Artifacts", "Exports", "editable.glb");
+
+        var result = await new ExportSceneGlbCommand().ExecuteAsync(
+            new ExportSceneGlbRequest(root, "Main", outputPath),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("export editable glb"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(1, result.Value.MeshCount);
+        var metadata = await RekallAgeGlbMetadataReader.ReadAsync(outputPath, CancellationToken.None);
+        Assert.Equal(1, metadata!.MeshCount);
+    }
+
     [Fact]
     public async Task ExportSceneGlbCommandWritesRenderableAuthoredMeshWithMaterialAndTransform()
     {

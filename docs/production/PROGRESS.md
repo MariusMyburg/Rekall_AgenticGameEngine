@@ -4,9 +4,18 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 16:35 Africa/Johannesburg
+Last verified: 2026-08-23 17:50 Africa/Johannesburg
 
-Branch: `codex/model-asset-foundation`
+Branch: `master`
+
+Current execution order is governed by
+[`STRATEGIC-PRIORITIES.md`](STRATEGIC-PRIORITIES.md). The immediate acceptance
+target is a substantial original platformer authored through the ordinary local
+LLM/Studio/MCP path, accepted on Windows, then published as the unchanged AGE
+project through a genuine browser-WASM runtime and direct WebGPU scene renderer.
+The current moving-dot and triangle pages remain RenderingDevice proofs only;
+CPU-frame upload, JavaScript gameplay rewrites, remote desktop streaming, and
+other visually convincing substitutes are explicitly not web game publication.
 
 The first stable Model Asset metadata and publishing foundation is now available through the default
 CLI/Studio command registry and its derived MCP catalog. The canonical surface

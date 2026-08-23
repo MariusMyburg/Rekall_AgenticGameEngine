@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 08:22 Africa/Johannesburg
+Last verified: 2026-08-23 08:26 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -379,6 +379,22 @@ preview tools recommended. A JSON-only registry proof creates, revision-patches,
 compiles, and instances a material without direct document editing; the focused
 command and atomic material-patch proofs pass 4/4. Broader modifier inventory
 and visual backend acceptance remain active.
+
+The broader mesh inventory has its first strict shading-data slice. The generic
+operation executor now generates finite Newell face normals into named corner-
+domain Float3 attributes and projects selected face corners onto XY/XZ/YZ into
+named corner-domain Float2 UV attributes with explicit scale/offset. Both
+operations preserve topology and unrelated attributes, replace only compatible
+destination attributes, report exact modified stable face/corner IDs and
+affected bounds, and fail on incompatible attributes, invalid axes, nonfinite
+coordinates, or degenerate normals. Corner-domain storage preserves seams for
+subsequent tangent generation and compilation. Two new recommended commands,
+`rekall.mesh.operation_types.search` and `.inspect`, expose the executor's
+canonical domains, change masks, typed defaults, and descriptions so agents do
+not guess operation IDs or parameters. The affected operation/command suite
+passes 17/17. Subdivision, remesh, optimization, and boolean operations remain
+active and will not be advertised until each has strict topology/provenance
+proofs.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

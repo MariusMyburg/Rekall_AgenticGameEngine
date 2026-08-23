@@ -27,15 +27,18 @@ public sealed class MeshCommandTests
         Assert.Contains("rekall.mesh.operation.apply", names);
         Assert.Contains("rekall.mesh.operation.batch", names);
         Assert.Contains("rekall.mesh.assert", names);
+        Assert.Contains("rekall.mesh.operation_types.search", names);
+        Assert.Contains("rekall.mesh.operation_types.inspect", names);
 
         var tools = RekallAgeMcpCatalog.FromRegistry(registry).Tools
             .Where(tool => tool.Name.StartsWith("rekall.mesh.", StringComparison.Ordinal))
             .ToArray();
-        Assert.Equal(10, tools.Length);
+        Assert.Equal(12, tools.Length);
         Assert.All(tools, tool => Assert.Equal("modeling", tool.Category));
         Assert.True(tools.Single(tool => tool.Name == "rekall.mesh.inspect").Recommended);
         Assert.True(tools.Single(tool => tool.Name == "rekall.mesh.inspect_compiled").Recommended);
         Assert.True(tools.Single(tool => tool.Name == "rekall.mesh.pick_compiled").Recommended);
+        Assert.True(tools.Single(tool => tool.Name == "rekall.mesh.operation_types.search").Recommended);
         Assert.False(tools.Single(tool => tool.Name == "rekall.mesh.operation.apply").Recommended);
     }
 

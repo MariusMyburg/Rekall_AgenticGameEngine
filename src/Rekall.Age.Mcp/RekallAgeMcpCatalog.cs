@@ -144,6 +144,8 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.mesh.validate" or
             "rekall.mesh.query_elements" or
             "rekall.mesh.assert" or
+            "rekall.mesh.operation_types.search" or
+            "rekall.mesh.operation_types.inspect" or
             "rekall.modeling.node_types.search" or
             "rekall.modeling.node_types.inspect" or
             "rekall.modeling.graph.inspect" or

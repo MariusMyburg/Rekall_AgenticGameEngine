@@ -135,6 +135,8 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new ApplyMeshOperationCommand());
         registry.Register(new BatchMeshOperationsCommand());
         registry.Register(new AssertMeshAssetCommand());
+        registry.Register(new SearchMeshOperationTypesCommand());
+        registry.Register(new InspectMeshOperationTypeCommand());
         registry.Register(new SearchModelingNodeTypesCommand());
         registry.Register(new InspectModelingNodeTypeCommand());
         registry.Register(new CreateModelingGraphCommand());

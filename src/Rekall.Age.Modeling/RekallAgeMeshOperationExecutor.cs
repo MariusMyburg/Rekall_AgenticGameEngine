@@ -48,7 +48,24 @@ public sealed class RekallAgeMeshOperationExecutor
             "Deletes selected faces and their corners while preserving now-loose points and edges for explicit subsequent editing.",
             RekallAgeGeometryDomain.Face,
             RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
-            [])
+            []),
+        new(
+            "generate_normals",
+            "Generates finite face normals into a named corner-domain Float3 attribute for selected faces.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Attributes,
+            [StringParameter("attribute", "normal.generated", "Destination corner normal attribute name.")]),
+        new(
+            "project_uv",
+            "Projects selected face corners onto XY, XZ, or YZ and writes a named corner-domain Float2 texture-coordinate attribute.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Attributes,
+            [
+                StringParameter("attribute", "uv.generated", "Destination corner UV attribute name."),
+                StringParameter("axis", "xy", "Projection axis: xy, xz, or yz."),
+                NumberParameter("scaleU", 1), NumberParameter("scaleV", 1),
+                NumberParameter("offsetU"), NumberParameter("offsetV")
+            ])
     ];
     private readonly RekallAgeMeshValidator _validator = new();
 
@@ -80,6 +97,8 @@ public sealed class RekallAgeMeshOperationExecutor
             "triangulate_faces" => TriangulateFaces(source, request),
             "extrude_faces" => ExtrudeFaces(source, request),
             "delete" => DeleteFaces(source, request),
+            "generate_normals" => GenerateNormals(source, request),
+            "project_uv" => ProjectUv(source, request),
             _ => throw Failure("REKALL_MESH_OPERATION_UNKNOWN", $"Unknown mesh operation '{request.OperationId}'.")
         };
         var outputValidation = _validator.Validate(result.Mesh);
@@ -134,6 +153,67 @@ public sealed class RekallAgeMeshOperationExecutor
                 modifiedPoints: ids,
                 affectedBounds: Bounds(affected)),
             ids.Select(id => Preserve(RekallAgeGeometryDomain.Point, id)).ToArray());
+    }
+
+    private static RekallAgeMeshOperationResult GenerateNormals(RekallAgeMeshAsset source, RekallAgeMeshOperationRequest request)
+    {
+        RequireDomain(request, RekallAgeGeometryDomain.Face);
+        var faceIndices = ResolveIndices(source.Topology.FaceIds, request.ElementIds, "face");
+        var attributeName = ReadBoundedString(request.Parameters, "attribute", "normal.generated");
+        var existing = source.Attributes.FirstOrDefault(item => item.Name == attributeName);
+        if (existing is not null && (existing.Domain != RekallAgeGeometryDomain.Corner || existing.ValueType != RekallAgeGeometryValueType.Float3))
+            throw Failure("REKALL_MESH_OPERATION_ATTRIBUTE_CONFLICT", $"Attribute '{attributeName}' exists with an incompatible domain or type.");
+        var values = existing?.Values.ToArray() ?? Enumerable.Repeat(JsonSerializer.SerializeToElement(new[] { 0d, 0d, 1d }), source.Topology.CornerIds.Count).ToArray();
+        var modifiedCorners = new List<ulong>();
+        foreach (var faceIndex in faceIndices)
+        {
+            var start = source.Topology.FaceOffsets[faceIndex]; var end = source.Topology.FaceOffsets[faceIndex + 1];
+            double x = 0, y = 0, z = 0;
+            for (var corner = start; corner < end; corner++)
+            {
+                var next = corner + 1 == end ? start : corner + 1;
+                var currentPoint = source.Topology.Positions[source.Topology.CornerPointIndices[corner]];
+                var nextPoint = source.Topology.Positions[source.Topology.CornerPointIndices[next]];
+                x += (currentPoint.Y - nextPoint.Y) * (currentPoint.Z + nextPoint.Z);
+                y += (currentPoint.Z - nextPoint.Z) * (currentPoint.X + nextPoint.X);
+                z += (currentPoint.X - nextPoint.X) * (currentPoint.Y + nextPoint.Y);
+            }
+            var length = Math.Sqrt(x * x + y * y + z * z);
+            if (!double.IsFinite(length) || length <= 1e-12) throw Failure("REKALL_MESH_OPERATION_NORMAL_DEGENERATE", $"Face '{source.Topology.FaceIds[faceIndex]}' has no finite normal.");
+            var encoded = JsonSerializer.SerializeToElement(new[] { x / length, y / length, z / length });
+            for (var corner = start; corner < end; corner++) { values[corner] = encoded; modifiedCorners.Add(source.Topology.CornerIds[corner]); }
+        }
+        var attribute = new RekallAgeGeometryAttribute(attributeName, RekallAgeGeometryDomain.Corner, RekallAgeGeometryValueType.Float3, values, "normal", RekallAgeGeometryInterpolation.NormalizedLinear);
+        var attributes = source.Attributes.Where(item => item.Name != attributeName).Append(attribute).OrderBy(item => item.Name, StringComparer.Ordinal).ToArray();
+        var mesh = source with { Revision = checked(source.Revision + 1), Attributes = attributes };
+        return Result(source, mesh, ChangeSet(RekallAgeMeshChangeKind.Attributes, modifiedFaces: request.ElementIds.Order().ToArray(), modifiedCorners: modifiedCorners.Order().ToArray(), changedAttributes: [attributeName], affectedBounds: Bounds(faceIndices.SelectMany(index => Enumerable.Range(source.Topology.FaceOffsets[index], source.Topology.FaceOffsets[index + 1] - source.Topology.FaceOffsets[index])).Select(index => source.Topology.Positions[source.Topology.CornerPointIndices[index]]))), request.ElementIds.Order().Select(id => Preserve(RekallAgeGeometryDomain.Face, id)).ToArray());
+    }
+
+    private static RekallAgeMeshOperationResult ProjectUv(RekallAgeMeshAsset source, RekallAgeMeshOperationRequest request)
+    {
+        RequireDomain(request, RekallAgeGeometryDomain.Face);
+        var faceIndices = ResolveIndices(source.Topology.FaceIds, request.ElementIds, "face");
+        var attributeName = ReadBoundedString(request.Parameters, "attribute", "uv.generated"); var axis = ReadBoundedString(request.Parameters, "axis", "xy").ToLowerInvariant();
+        if (axis is not ("xy" or "xz" or "yz")) throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "UV projection axis must be 'xy', 'xz', or 'yz'.");
+        var existing = source.Attributes.FirstOrDefault(item => item.Name == attributeName);
+        if (existing is not null && (existing.Domain != RekallAgeGeometryDomain.Corner || existing.ValueType != RekallAgeGeometryValueType.Float2)) throw Failure("REKALL_MESH_OPERATION_ATTRIBUTE_CONFLICT", $"Attribute '{attributeName}' exists with an incompatible domain or type.");
+        var scaleU = ReadFiniteDouble(request.Parameters, "scaleU", 1); var scaleV = ReadFiniteDouble(request.Parameters, "scaleV", 1); var offsetU = ReadFiniteDouble(request.Parameters, "offsetU"); var offsetV = ReadFiniteDouble(request.Parameters, "offsetV");
+        var values = existing?.Values.ToArray() ?? Enumerable.Repeat(JsonSerializer.SerializeToElement(new[] { 0d, 0d }), source.Topology.CornerIds.Count).ToArray(); var modifiedCorners = new List<ulong>();
+        foreach (var faceIndex in faceIndices)
+        {
+            for (var corner = source.Topology.FaceOffsets[faceIndex]; corner < source.Topology.FaceOffsets[faceIndex + 1]; corner++)
+            {
+                var point = source.Topology.Positions[source.Topology.CornerPointIndices[corner]];
+                var (first, second) = axis switch { "xy" => (point.X, point.Y), "xz" => (point.X, point.Z), _ => (point.Y, point.Z) };
+                var u = first * scaleU + offsetU; var v = second * scaleV + offsetV;
+                if (!double.IsFinite(u) || !double.IsFinite(v)) throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "UV projection produced a non-finite coordinate.");
+                values[corner] = JsonSerializer.SerializeToElement(new[] { u, v }); modifiedCorners.Add(source.Topology.CornerIds[corner]);
+            }
+        }
+        var attribute = new RekallAgeGeometryAttribute(attributeName, RekallAgeGeometryDomain.Corner, RekallAgeGeometryValueType.Float2, values, "texcoord");
+        var attributes = source.Attributes.Where(item => item.Name != attributeName).Append(attribute).OrderBy(item => item.Name, StringComparer.Ordinal).ToArray();
+        var mesh = source with { Revision = checked(source.Revision + 1), Attributes = attributes };
+        return Result(source, mesh, ChangeSet(RekallAgeMeshChangeKind.Attributes, modifiedFaces: request.ElementIds.Order().ToArray(), modifiedCorners: modifiedCorners.Order().ToArray(), changedAttributes: [attributeName], affectedBounds: Bounds(faceIndices.SelectMany(index => Enumerable.Range(source.Topology.FaceOffsets[index], source.Topology.FaceOffsets[index + 1] - source.Topology.FaceOffsets[index])).Select(index => source.Topology.Positions[source.Topology.CornerPointIndices[index]]))), request.ElementIds.Order().Select(id => Preserve(RekallAgeGeometryDomain.Face, id)).ToArray());
     }
 
     private RekallAgeMeshOperationResult ReverseFaces(
@@ -830,13 +910,16 @@ public sealed class RekallAgeMeshOperationExecutor
         };
     }
 
-    private static RekallAgeMeshOperationParameterDescriptor NumberParameter(string name) =>
+    private static RekallAgeMeshOperationParameterDescriptor NumberParameter(string name, double defaultValue = 0) =>
         new(
             name,
             RekallAgeGeometryValueType.Float,
             false,
-            JsonSerializer.SerializeToElement(0.0),
+            JsonSerializer.SerializeToElement(defaultValue),
             $"Finite {name.ToUpperInvariant()} offset in mesh-local units.");
+
+    private static RekallAgeMeshOperationParameterDescriptor StringParameter(string name, string defaultValue, string description) =>
+        new(name, RekallAgeGeometryValueType.String, false, JsonSerializer.SerializeToElement(defaultValue), description);
 
     private static IReadOnlyList<RekallAgeMeshSelection> PropagateExtrusionSelections(
         IReadOnlyList<RekallAgeMeshSelection> selections,
@@ -917,16 +1000,27 @@ public sealed class RekallAgeMeshOperationExecutor
     }
 
     private static double ReadFiniteDouble(JsonObject parameters, string name)
+        => ReadFiniteDouble(parameters, name, 0);
+
+    private static double ReadFiniteDouble(JsonObject parameters, string name, double defaultValue)
     {
         if (!parameters.TryGetPropertyValue(name, out var node) || node is null)
         {
-            return 0;
+            return defaultValue;
         }
         if (node is not JsonValue value || !TryReadNumber(value, out var number) || !IsFinite(number))
         {
             throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", $"Parameter '{name}' must be a finite number.");
         }
         return number;
+    }
+
+    private static string ReadBoundedString(JsonObject parameters, string name, string defaultValue)
+    {
+        if (!parameters.TryGetPropertyValue(name, out var node) || node is null) return defaultValue;
+        if (node is not JsonValue value || !value.TryGetValue<string>(out var text) || string.IsNullOrWhiteSpace(text) || text.Length > 128)
+            throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", $"Parameter '{name}' must be a bounded non-empty string.");
+        return text;
     }
 
     private static bool TryReadNumber(JsonValue value, out double number)

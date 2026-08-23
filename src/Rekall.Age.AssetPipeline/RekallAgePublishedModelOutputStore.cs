@@ -66,34 +66,27 @@ public sealed class RekallAgePublishedModelOutputStore
         RekallAgeStagedModelOutput staged,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(staged);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var assetId = ValidateStagedOutput(projectRoot, staged);
-        var stagedFile = await RekallAgeBoundedFileSnapshot.ReadAsync(
-            staged.Path,
-            RekallAgePersistedJson.MaximumDocumentBytes,
-            cancellationToken).ConfigureAwait(false);
-        var snapshot = DeserializeAndValidate(stagedFile.Bytes);
-        if (!string.Equals(ComputeHash(stagedFile.Bytes), staged.ContentHash, StringComparison.Ordinal))
-        {
-            throw new InvalidDataException("REKALL_MODEL_OUTPUT_STAGE_HASH_INVALID: Staged model output content does not match its declared SHA-256 hash.");
-        }
-        if (!stagedFile.Bytes.SequenceEqual(Encoding.UTF8.GetBytes(Serialize(snapshot))))
-        {
-            throw new InvalidDataException("REKALL_MODEL_OUTPUT_STAGE_DOCUMENT_INVALID: Staged model output is not canonical JSON.");
-        }
-
-        ValidateSnapshot(staged.Snapshot);
-        if (!string.Equals(Serialize(snapshot), Serialize(staged.Snapshot), StringComparison.Ordinal))
-        {
-            throw new InvalidDataException("REKALL_MODEL_OUTPUT_STAGE_SNAPSHOT_INVALID: Staged model output content does not match its declared snapshot.");
-        }
+        var validated = await ReadValidatedStagedAsync(projectRoot, staged, cancellationToken).ConfigureAwait(false);
 
         await RekallAgeAtomicFile.WriteAllTextAsync(
-            GetFinalPath(projectRoot, assetId),
-            Encoding.UTF8.GetString(stagedFile.Bytes),
+            GetFinalPath(projectRoot, validated.AssetId),
+            validated.Contents,
             RekallAgePersistedJson.MaximumDocumentBytes,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async ValueTask<string> CommitStagedIfRevisionAsync(
+        string projectRoot,
+        RekallAgeStagedModelOutput staged,
+        string expectedRevision,
+        CancellationToken cancellationToken)
+    {
+        var validated = await ReadValidatedStagedAsync(projectRoot, staged, cancellationToken).ConfigureAwait(false);
+        return await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+            GetFinalPath(projectRoot, validated.AssetId),
+            validated.Contents,
+            RekallAgePersistedJson.MaximumDocumentBytes,
+            expectedRevision,
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -136,6 +129,38 @@ public sealed class RekallAgePublishedModelOutputStore
         }
 
         return ValueTask.CompletedTask;
+    }
+
+    private static async ValueTask<ValidatedStagedOutput> ReadValidatedStagedAsync(
+        string projectRoot,
+        RekallAgeStagedModelOutput staged,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(staged);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var assetId = ValidateStagedOutput(projectRoot, staged);
+        var stagedFile = await RekallAgeBoundedFileSnapshot.ReadAsync(
+            staged.Path,
+            RekallAgePersistedJson.MaximumDocumentBytes,
+            cancellationToken).ConfigureAwait(false);
+        var snapshot = DeserializeAndValidate(stagedFile.Bytes);
+        if (!string.Equals(ComputeHash(stagedFile.Bytes), staged.ContentHash, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("REKALL_MODEL_OUTPUT_STAGE_HASH_INVALID: Staged model output content does not match its declared SHA-256 hash.");
+        }
+        if (!stagedFile.Bytes.SequenceEqual(Encoding.UTF8.GetBytes(Serialize(snapshot))))
+        {
+            throw new InvalidDataException("REKALL_MODEL_OUTPUT_STAGE_DOCUMENT_INVALID: Staged model output is not canonical JSON.");
+        }
+
+        ValidateSnapshot(staged.Snapshot);
+        if (!string.Equals(Serialize(snapshot), Serialize(staged.Snapshot), StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("REKALL_MODEL_OUTPUT_STAGE_SNAPSHOT_INVALID: Staged model output content does not match its declared snapshot.");
+        }
+
+        return new(assetId, Encoding.UTF8.GetString(stagedFile.Bytes));
     }
 
     private static string Serialize(RekallAgeCompiledMeshSnapshot snapshot) =>
@@ -425,6 +450,8 @@ public sealed class RekallAgePublishedModelOutputStore
     private static bool IsLowercaseSha256(string? value) =>
         value is { Length: 64 }
         && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+
+    private sealed record ValidatedStagedOutput(string AssetId, string Contents);
 }
 
 public sealed record RekallAgeStagedModelOutput(

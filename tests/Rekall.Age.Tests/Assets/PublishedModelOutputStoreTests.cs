@@ -10,6 +10,38 @@ namespace Rekall.Age.Tests.Assets;
 public sealed class PublishedModelOutputStoreTests
 {
     [Fact]
+    public async Task RevisionCheckedCommitRejectsStaleOutputAndRetainsConcurrentBytes()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgePublishedModelOutputStore();
+        var initial = await store.WriteStagedAsync(root, "hero-model", CompiledBox(), default);
+        var initialRevision = await store.CommitStagedIfRevisionAsync(
+            root,
+            initial,
+            Rekall.Age.Core.Persistence.RekallAgeDocumentRevision.Missing,
+            default);
+        var stale = await store.WriteStagedAsync(
+            root,
+            "hero-model",
+            CompiledBox() with { SourceLogicalRevision = 2 },
+            default);
+        var concurrent = await store.WriteStagedAsync(
+            root,
+            "hero-model",
+            CompiledBox() with { SourceLogicalRevision = 3 },
+            default);
+        var concurrentRevision = await store.CommitStagedIfRevisionAsync(root, concurrent, initialRevision, default);
+        var concurrentBytes = await File.ReadAllBytesAsync(store.GetFinalPath(root, "hero-model"));
+
+        var error = await Assert.ThrowsAsync<Rekall.Age.Core.Persistence.RekallAgeDocumentRevisionException>(() =>
+            store.CommitStagedIfRevisionAsync(root, stale, initialRevision, default).AsTask());
+
+        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", error.Code);
+        Assert.Equal(concurrentRevision, await store.HashAsync(root, "hero-model", default));
+        Assert.Equal(concurrentBytes, await File.ReadAllBytesAsync(store.GetFinalPath(root, "hero-model")));
+    }
+
+    [Fact]
     public async Task StagingWritesCanonicalEquivalentBytesWithoutReplacingThePublishedOutput()
     {
         var root = TestPaths.CreateTempDirectory();

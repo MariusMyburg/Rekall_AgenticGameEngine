@@ -97,9 +97,9 @@ public sealed class RekallAgeModelPublishingService
 
         var source = await LoadSourceAsync(projectRoot, request.Source, cancellationToken).ConfigureAwait(false);
         var compiled = _compiler.Compile(source.Value);
-        var catalog = await _catalogStore.LoadAsync(projectRoot, cancellationToken).ConfigureAwait(false);
+        var catalog = await _catalogStore.LoadVersionedAsync(projectRoot, cancellationToken).ConfigureAwait(false);
         RekallAgeStagedModelOutput? staged = null;
-        var publicationStarted = false;
+        IReadOnlyList<ModelPublicationMutation>? mutationJournal = null;
         try
         {
             staged = await _outputStore.WriteStagedAsync(
@@ -110,9 +110,13 @@ public sealed class RekallAgeModelPublishingService
 
             var outputPath = _outputStore.GetFinalPath(projectRoot, request.AssetId);
             var catalogPath = _catalogStore.GetCatalogPath(projectRoot);
-            transaction.CaptureResourcePreimage(outputPath);
-            transaction.CaptureResourcePreimage(modelPath);
-            transaction.CaptureResourcePreimage(catalogPath);
+            mutationJournal = await CaptureMutationJournalAsync(
+                transaction,
+                [outputPath, modelPath, catalogPath],
+                cancellationToken).ConfigureAwait(false);
+            var outputMutation = mutationJournal[0];
+            var modelMutation = mutationJournal[1];
+            var catalogMutation = mutationJournal[2];
 
             var manifest = RekallAgeModelBuildManifest.Success(
                 source.Revision,
@@ -140,40 +144,38 @@ public sealed class RekallAgeModelPublishingService
                 Path.GetFullPath(outputPath),
                 staged.ContentHash);
 
-            await _outputStore.CommitStagedAsync(projectRoot, staged, cancellationToken).ConfigureAwait(false);
-            publicationStarted = true;
+            outputMutation.RecordWrite(await _outputStore.CommitStagedIfRevisionAsync(
+                projectRoot,
+                staged,
+                outputMutation.BeforeRevision,
+                cancellationToken).ConfigureAwait(false));
             var modelRevision = await _modelStore.SaveIfRevisionAsync(
                 projectRoot,
                 model,
                 request.ExpectedModelFileRevision,
                 cancellationToken).ConfigureAwait(false);
-            await _catalogStore.SaveAsync(
+            modelMutation.RecordWrite(modelRevision);
+            catalogMutation.RecordWrite(await _catalogStore.SaveIfRevisionAsync(
                 projectRoot,
-                catalog.AddOrReplace(catalogAsset),
-                cancellationToken).ConfigureAwait(false);
+                catalog.Value.AddOrReplace(catalogAsset),
+                catalog.Revision,
+                cancellationToken).ConfigureAwait(false));
 
             transaction.RecordChangedResource(outputPath);
             transaction.RecordChangedResource(modelPath);
             transaction.RecordChangedResource(catalogPath);
             return new(model, modelRevision, outputPath, staged.ContentHash);
         }
-        catch (Exception publicationError) when (publicationStarted)
+        catch (Exception publicationError) when (mutationJournal?.Any(item => item.Written) == true)
         {
-            try
-            {
-                await RestorePreimagesAsync(transaction, [
-                    _catalogStore.GetCatalogPath(projectRoot),
-                    modelPath,
-                    _outputStore.GetFinalPath(projectRoot, request.AssetId)
-                ]).ConfigureAwait(false);
-            }
-            catch (Exception rollbackError)
+            var rollbackErrors = await RestoreMutationsAsync(mutationJournal).ConfigureAwait(false);
+            if (rollbackErrors.Count > 0)
             {
                 throw new RekallAgeModelPublishingException(
                     "REKALL_MODEL_ROLLBACK_FAILED",
-                    $"Model Asset publication failed and its prior files could not be fully restored: {rollbackError.Message}",
+                    $"Model Asset publication failed and {rollbackErrors.Count} prior resource(s) could not be restored without overwriting newer content.",
                     request.AssetId,
-                    new AggregateException(publicationError, rollbackError));
+                    new AggregateException([publicationError, .. rollbackErrors]));
             }
 
             throw;
@@ -186,9 +188,10 @@ public sealed class RekallAgeModelPublishingService
                 {
                     await _outputStore.DeleteStagedAsync(projectRoot, staged, CancellationToken.None).ConfigureAwait(false);
                 }
-                catch (Exception) when (!publicationStarted)
+                catch (Exception)
                 {
-                    // Preserve the source/staging failure; staging paths are never live outputs.
+                    // Staging cleanup is best effort. Published state is canonical and must not
+                    // be reported as failed merely because an unreferenced staging file is busy.
                 }
             }
         }
@@ -268,26 +271,30 @@ public sealed class RekallAgeModelPublishingService
 
         if (model.Frozen || model.BuildState == RekallAgeModelBuildState.Frozen)
         {
+            var frozenOutput = await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
             return Inspection(
                 loadedModel,
                 RekallAgeModelBuildState.Frozen,
                 source.Revision,
                 source.Value.Revision,
-                File.Exists(_outputStore.GetFinalPath(projectRoot, assetId)),
-                model.LastSuccessfulBuild?.CompiledContentHash,
+                frozenOutput.Exists,
+                frozenOutput.Hash,
                 []);
         }
 
         var manifest = model.LastSuccessfulBuild;
         if (model.BuildState == RekallAgeModelBuildState.Failed || manifest is null)
         {
+            var retainedOutput = manifest is null
+                ? (Exists: false, Hash: (string?)null)
+                : await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
             return Inspection(
                 loadedModel,
                 RekallAgeModelBuildState.Failed,
                 source.Revision,
                 source.Value.Revision,
-                false,
-                null,
+                retainedOutput.Exists,
+                retainedOutput.Hash,
                 [Diagnostic("REKALL_MODEL_LAST_BUILD_FAILED", "Error", "Model Asset has no usable successful build manifest.", assetId)]);
         }
 
@@ -305,7 +312,7 @@ public sealed class RekallAgeModelPublishingService
                 [Diagnostic("REKALL_MODEL_OUTPUT_MISSING", "Error", "The last successful compiled Model Asset output is missing.", manifest.CompiledMeshPath)]);
         }
 
-        string actualHash;
+        string? actualHash = null;
         try
         {
             actualHash = await _outputStore.HashAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
@@ -331,7 +338,7 @@ public sealed class RekallAgeModelPublishingService
                 source.Revision,
                 source.Value.Revision,
                 true,
-                null,
+                actualHash,
                 [Diagnostic("REKALL_MODEL_OUTPUT_INVALID", "Error", $"Compiled output is invalid: {error.Message}", manifest.CompiledMeshPath)]);
         }
 
@@ -414,34 +421,72 @@ public sealed class RekallAgeModelPublishingService
         }
     }
 
-    private static async ValueTask RestorePreimagesAsync(
+    private static async ValueTask<IReadOnlyList<ModelPublicationMutation>> CaptureMutationJournalAsync(
         RekallAgeTransaction transaction,
-        IReadOnlyList<string> paths)
+        IReadOnlyList<string> paths,
+        CancellationToken cancellationToken)
     {
+        var journal = new List<ModelPublicationMutation>(paths.Count);
         foreach (var path in paths)
         {
-            var preimage = transaction.ResourcePreimages.First(item =>
-                string.Equals(Path.GetFullPath(item.Resource), Path.GetFullPath(path), PathComparison));
-            if (!preimage.ExistedBefore)
+            transaction.CaptureResourcePreimage(path);
+            if (!File.Exists(path))
             {
-                if (File.Exists(path))
-                {
-                    File.Delete(path);
-                }
+                journal.Add(new(Path.GetFullPath(path), null, RekallAgeDocumentRevision.Missing));
                 continue;
             }
 
-            var currentRevision = File.Exists(path)
-                ? RekallAgeDocumentRevision.Compute(await File.ReadAllBytesAsync(path, CancellationToken.None).ConfigureAwait(false))
-                : RekallAgeDocumentRevision.Missing;
-            await RekallAgeAtomicFile.WriteAllBytesIfRevisionAsync(
-                path,
-                preimage.Content,
-                RekallAgePersistedJson.MaximumDocumentBytes,
-                currentRevision,
-                previousVersionPath: null,
-                CancellationToken.None).ConfigureAwait(false);
+            try
+            {
+                var snapshot = await RekallAgeBoundedFileSnapshot.ReadAsync(
+                    path,
+                    RekallAgePersistedJson.MaximumDocumentBytes,
+                    cancellationToken).ConfigureAwait(false);
+                journal.Add(new(snapshot.Path, snapshot.Bytes, snapshot.Revision));
+            }
+            catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+            {
+                journal.Add(new(Path.GetFullPath(path), null, RekallAgeDocumentRevision.Missing));
+            }
         }
+
+        return journal;
+    }
+
+    private static async ValueTask<IReadOnlyList<Exception>> RestoreMutationsAsync(
+        IReadOnlyList<ModelPublicationMutation> journal)
+    {
+        var rollbackErrors = new List<Exception>();
+        foreach (var mutation in journal.Reverse().Where(item => item.Written))
+        {
+            try
+            {
+                if (mutation.BeforeBytes is null)
+                {
+                    await RekallAgeAtomicFile.DeleteIfRevisionAsync(
+                        mutation.Path,
+                        RekallAgePersistedJson.MaximumDocumentBytes,
+                        mutation.AfterRevision!,
+                        CancellationToken.None).ConfigureAwait(false);
+                }
+                else
+                {
+                    await RekallAgeAtomicFile.WriteAllBytesIfRevisionAsync(
+                        mutation.Path,
+                        mutation.BeforeBytes,
+                        RekallAgePersistedJson.MaximumDocumentBytes,
+                        mutation.AfterRevision!,
+                        previousVersionPath: null,
+                        CancellationToken.None).ConfigureAwait(false);
+                }
+            }
+            catch (Exception rollbackError)
+            {
+                rollbackErrors.Add(rollbackError);
+            }
+        }
+
+        return rollbackErrors;
     }
 
     private static RekallAgeModelAssetInspection Inspection(
@@ -487,4 +532,26 @@ public sealed class RekallAgeModelPublishingService
 
     private static StringComparison PathComparison =>
         OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+    private sealed class ModelPublicationMutation(
+        string path,
+        byte[]? beforeBytes,
+        string beforeRevision)
+    {
+        public string Path { get; } = path;
+
+        public byte[]? BeforeBytes { get; } = beforeBytes;
+
+        public string BeforeRevision { get; } = beforeRevision;
+
+        public string? AfterRevision { get; private set; }
+
+        public bool Written => AfterRevision is not null;
+
+        public void RecordWrite(string afterRevision)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(afterRevision);
+            AfterRevision = afterRevision;
+        }
+    }
 }

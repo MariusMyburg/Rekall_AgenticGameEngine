@@ -301,6 +301,45 @@ public sealed class AtomicPersistedFileTests
         Assert.Equal("created", await File.ReadAllTextAsync(path));
     }
 
+    [Fact]
+    public async Task ConditionalDeleteRemovesOnlyTheExactWrittenRevision()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, "created.json");
+        var bytes = Encoding.UTF8.GetBytes("created");
+        await File.WriteAllBytesAsync(path, bytes);
+
+        await RekallAgeAtomicFile.DeleteIfRevisionAsync(
+            path,
+            maximumBytes: 1024,
+            RekallAgeDocumentRevision.Compute(bytes),
+            default);
+
+        Assert.False(File.Exists(path));
+        Assert.Empty(ControlSiblings(path));
+    }
+
+    [Fact]
+    public async Task ConditionalDeleteRejectsStaleRevisionAndRetainsConcurrentBytes()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, "created.json");
+        var written = Encoding.UTF8.GetBytes("written");
+        var concurrent = Encoding.UTF8.GetBytes("concurrent");
+        await File.WriteAllBytesAsync(path, concurrent);
+
+        var error = await Assert.ThrowsAsync<RekallAgeDocumentRevisionException>(() =>
+            RekallAgeAtomicFile.DeleteIfRevisionAsync(
+                path,
+                maximumBytes: 1024,
+                RekallAgeDocumentRevision.Compute(written),
+                default).AsTask());
+
+        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", error.Code);
+        Assert.Equal(concurrent, await File.ReadAllBytesAsync(path));
+        Assert.Empty(ControlSiblings(path));
+    }
+
     private static IReadOnlyList<string> TemporarySiblings(string destination) =>
         Directory.GetFiles(
             Path.GetDirectoryName(destination)!,

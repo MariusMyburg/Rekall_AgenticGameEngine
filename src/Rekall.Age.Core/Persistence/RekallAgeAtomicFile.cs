@@ -103,6 +103,44 @@ public static class RekallAgeAtomicFile
         return RekallAgeDocumentRevision.Compute(prepared.Bytes);
     }
 
+    public static async ValueTask DeleteIfRevisionAsync(
+        string path,
+        long maximumBytes,
+        string expectedRevision,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ValidateMaximumBytes(maximumBytes);
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedRevision);
+        if (!RekallAgeDocumentRevision.IsValid(expectedRevision))
+        {
+            throw new ArgumentException("Expected revision must be 'missing' or a lowercase SHA-256 token.", nameof(expectedRevision));
+        }
+
+        var fullPath = Path.GetFullPath(path);
+        await using var documentLock = await AcquireLockAsync(fullPath, cancellationToken).ConfigureAwait(false);
+        var currentRevision = File.Exists(fullPath)
+            ? (await RekallAgeBoundedFileSnapshot.ReadAsync(
+                fullPath,
+                maximumBytes,
+                cancellationToken).ConfigureAwait(false)).Revision
+            : RekallAgeDocumentRevision.Missing;
+        if (!string.Equals(currentRevision, expectedRevision, StringComparison.Ordinal))
+        {
+            throw new RekallAgeDocumentRevisionException(
+                "REKALL_DOCUMENT_REVISION_CONFLICT",
+                fullPath,
+                $"Document '{fullPath}' changed: expected revision '{expectedRevision}', current revision '{currentRevision}'. Reload the document, reapply the semantic change, and retry.",
+                expectedRevision,
+                currentRevision);
+        }
+
+        if (File.Exists(fullPath))
+        {
+            File.Delete(fullPath);
+        }
+    }
+
     public static string GetLockPath(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);

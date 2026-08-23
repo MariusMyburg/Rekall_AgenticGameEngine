@@ -53,6 +53,14 @@ public sealed class PublishModelAssetCommand
         PublishModelAssetRequest request,
         RekallAgeCommandContext context)
     {
+        if (request is null)
+        {
+            return ModelAssetCommandErrors.MutationFailure(
+                new ArgumentNullException(nameof(request)),
+                "request",
+                "request");
+        }
+
         try
         {
             var publication = await _service.PublishAsync(
@@ -99,6 +107,14 @@ public sealed class RebuildModelAssetCommand
         RebuildModelAssetRequest request,
         RekallAgeCommandContext context)
     {
+        if (request is null)
+        {
+            return ModelAssetCommandErrors.MutationFailure(
+                new ArgumentNullException(nameof(request)),
+                "request",
+                "request");
+        }
+
         try
         {
             var publication = await _service.RebuildAsync(
@@ -143,6 +159,18 @@ public sealed class InspectModelAssetCommand
         InspectModelAssetRequest request,
         RekallAgeCommandContext context)
     {
+        if (request is null)
+        {
+            var requestError = ModelAssetCommandErrors.Map(
+                new ArgumentNullException(nameof(request)),
+                "request",
+                "request");
+            return RekallAgeCommandResult<ModelAssetInspectionCommandResult>.Failure(
+                new(null, ["rekall.asset.model.publish", "rekall.mesh.inspect"]),
+                requestError.Message,
+                [requestError]);
+        }
+
         try
         {
             var inspection = await _service.InspectAsync(

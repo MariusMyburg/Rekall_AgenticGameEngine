@@ -41,12 +41,12 @@ then grow it into procedural geometry/material graphs and Studio modelling.
 
 ### Task 2: Versioned mesh asset store
 
-- [ ] Write failing persistence, atomic save, recovery, revision-conflict,
+- [x] Write failing persistence, atomic save, recovery, revision-conflict,
   canonical round-trip, safe-name, and document-size tests.
-- [ ] Persist assets under stable logical IDs outside scene documents.
-- [ ] Reuse AGE atomic file/recovery/schema primitives and transaction changed
+- [x] Persist assets under stable logical IDs outside scene documents.
+- [x] Reuse AGE atomic file/recovery/schema primitives and transaction changed
   resources.
-- [ ] Expose create, load, list, inspect, and validate services.
+- [x] Expose create, load, list, inspect, and validate services.
 
 ### Task 3: Editable adjacency, queries, and operation framework
 

@@ -34,8 +34,18 @@ zero-area faces, corner-edge endpoint mismatches, attribute type/length,
 material indices, and selection-domain errors; structurally valid boundary,
 loose, and non-manifold topology is summarized, with non-manifold edges emitted
 as warnings rather than silently rejected. The seven focused tests pass and the
-complete Release solution builds with zero warnings and zero errors. Task 2,
-the versioned atomic mesh asset store, is active next.
+complete Release solution builds with zero warnings and zero errors. Task 2 is
+also complete: `RekallAgeMeshAssetStore` persists canonical bounded mesh JSON
+under stable logical IDs in `Modeling/Meshes`, fails closed on unsafe IDs,
+future schemas, invalid meshes, stale file revisions, and invalid logical
+revision increments, and reuses AGE's atomic publication, SHA-256 revisions,
+document-size/depth boundary, previous-version recovery, quarantine, and schema
+inspection. Focused persistence evidence covers canonical round trips, listing,
+no temporary siblings, conflicts without overwrite, recovery/restore, safe
+names, invalid topology rejection without publication, and future-schema
+rejection. All 15 modelling kernel/store test cases pass and the Release
+solution remains zero-warning/zero-error. Task 3, editable adjacency, selectors,
+and the semantic operation framework, is active next.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 04:50 Africa/Johannesburg
+Last verified: 2026-08-23 05:00 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -3227,6 +3227,17 @@ inspect physical devices while retaining semantic actions as the normal path.
 The next research track is a shallow Godot .NET source audit focused on
 rendering, shader programmability, scripting, and web export, with useful
 concepts translated into AGE's 100% C# and agent-first architecture.
+
+That remaining Godot audit is now complete and recorded in
+`docs/production/2026-08-23-godot-remaining-capability-audit.md`. The WebGPU
+tranche closes the explicit low-level resource/command and physical browser
+execution gap. The genuine remaining concepts are a declarative render graph
+and named scene attachments, typed reusable material assets/instances, editable
+multi-surface mesh assets, scene-level instancing, shader variants/cache,
+generic GPU particles, production lighting/environment services, deterministic
+asset cooking, and complete browser game export. The next source-reference item
+is the queued Blender audit and AGE-native modelling design; Blender will inform
+authoring topology/operations while Godot informs efficient runtime projection.
 
 Complete the RenderingDevice-to-Player migration checkpoint currently in
 flight: this is now complete and pushed at `601b4bb`. The active graphics item

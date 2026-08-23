@@ -1,5 +1,6 @@
 import { dotnet } from './_framework/dotnet.js';
 import { createWebGpuExecutor } from './webgpu-device.js';
+import { publishWebGpuEvidence } from './webgpu-evidence.js';
 
 const canvas = document.querySelector('#viewport');
 const webgpu = createWebGpuExecutor();
@@ -21,12 +22,14 @@ setModuleImports('main.js', {
         initialize: async canvasSelector => JSON.stringify(await webgpu.initialize(canvasSelector)),
         execute: packet => JSON.stringify(webgpu.execute(packet)),
         flush: async () => JSON.stringify(await webgpu.flush()),
+        readPixels: async () => JSON.stringify(await webgpu.readPixels()),
         canvasWidth: () => canvas.width,
         canvasHeight: () => canvas.height
     },
     dom: {
         setText: (selector, value) => document.querySelector(selector).textContent = value,
-        setReady: ready => document.body.dataset.device = ready ? 'ready' : 'compatibility'
+        setReady: ready => document.body.dataset.device = ready ? 'ready' : 'compatibility',
+        publishEvidence: json => publishWebGpuEvidence(json, window)
     }
 });
 await runMain();

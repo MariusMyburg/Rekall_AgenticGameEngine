@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices.JavaScript;
+using Rekall.Age.Player.Web;
 using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Rendering.WebGpu;
 
 var webGpu = BrowserHost.HasWebGpu();
 var profile = webGpu ? "WebGPU" : "WebGL 2 compatibility required";
@@ -8,6 +10,8 @@ BrowserHost.SetText("#graphics", profile);
 
 if (!webGpu)
 {
+    Publish(new("WebGPU", RekallAgeWebGpuProtocol.Version, WebGpuProofWorkload.WorkloadId, 0,
+        [new("REKALL_WEBGPU_UNAVAILABLE", "WebGPU is not available in this browser.")], null));
     BrowserHost.SetText("#state", "COMPATIBILITY PATH REQUIRED");
     BrowserHost.SetReady(false);
 }
@@ -17,6 +21,7 @@ else
     var initialization = await bridge.InitializeAsync();
     if (!initialization.Succeeded)
     {
+        Publish(new("WebGPU", RekallAgeWebGpuProtocol.Version, WebGpuProofWorkload.WorkloadId, 0, initialization.Diagnostics, null));
         BrowserHost.SetText("#state", initialization.Diagnostics.FirstOrDefault()?.Code ?? "WEBGPU INITIALIZATION FAILED");
         BrowserHost.SetReady(false);
     }
@@ -24,23 +29,42 @@ else
     {
         using var device = new Rekall.Age.Rendering.WebGpu.RekallAgeWebGpuRenderingDevice(bridge, capabilities);
         var output = device.ImportCanvasOutput(BrowserHost.CanvasWidth(), BrowserHost.CanvasHeight(), canvasFormat);
-        var flush = output.Created ? await device.FlushAsync() : new RekallAgeGraphicsValidationResult(output.Diagnostics);
-        if (flush.Valid)
+        if (!output.Created)
         {
-            BrowserHost.SetText("#state", "WEBGPU DEVICE READY");
-            BrowserHost.SetReady(true);
-            await Task.Delay(Timeout.InfiniteTimeSpan);
+            Publish(new("WebGPU", RekallAgeWebGpuProtocol.Version, WebGpuProofWorkload.WorkloadId, 0, output.Diagnostics, null));
+            BrowserHost.SetText("#state", output.Diagnostics.FirstOrDefault()?.Code ?? "REKALL_WEBGPU_CANVAS_IMPORT_FAILED");
+            BrowserHost.SetReady(false);
         }
         else
         {
-            BrowserHost.SetText("#state", flush.Diagnostics.FirstOrDefault()?.Code ?? "REKALL_WEBGPU_CANVAS_IMPORT_FAILED");
-            BrowserHost.SetReady(false);
+            var evidence = await WebGpuProofExecution.ExecuteAsync(device, output.Handle, canvasFormat, bridge.ReadPixelsAsync);
+            Publish(evidence);
+            if (evidence.SubmittedFrames > 0 && evidence.Diagnostics.Count == 0 && evidence.PixelProof is { Passed: true })
+            {
+                BrowserHost.SetText("#state", "GPU WORKLOAD EXECUTED");
+                BrowserHost.SetReady(true);
+            }
+            else
+            {
+                BrowserHost.SetText("#state", evidence.Diagnostics.FirstOrDefault()?.Code ?? "REKALL_WEBGPU_PIXEL_PROOF_FAILED");
+                BrowserHost.SetReady(false);
+            }
+            await Task.Delay(Timeout.InfiniteTimeSpan);
         }
     }
-    else { BrowserHost.SetText("#state", "REKALL_WEBGPU_CAPABILITIES_INVALID"); BrowserHost.SetReady(false); }
+    else
+    {
+        var diagnostic = new RekallAgeGraphicsDiagnostic("REKALL_WEBGPU_CAPABILITIES_INVALID", "The browser returned incomplete WebGPU capabilities.");
+        Publish(new("WebGPU", RekallAgeWebGpuProtocol.Version, WebGpuProofWorkload.WorkloadId, 0, [diagnostic], null));
+        BrowserHost.SetText("#state", diagnostic.Code);
+        BrowserHost.SetReady(false);
+    }
 }
 
 await Task.Delay(Timeout.InfiniteTimeSpan);
+
+static void Publish(WebGpuProofEvidence evidence) =>
+    BrowserHost.PublishWebGpuEvidence(WebGpuProofEvidenceJson.Serialize(evidence));
 
 internal static partial class BrowserHost
 {
@@ -56,6 +80,9 @@ internal static partial class BrowserHost
     [JSImport("webgpu.flush", "main.js")]
     internal static partial Task<string> FlushWebGpuAsync();
 
+    [JSImport("webgpu.readPixels", "main.js")]
+    internal static partial Task<string> ReadWebGpuPixelsAsync();
+
     [JSImport("webgpu.canvasWidth", "main.js")]
     internal static partial int CanvasWidth();
 
@@ -67,4 +94,7 @@ internal static partial class BrowserHost
 
     [JSImport("dom.setReady", "main.js")]
     internal static partial void SetReady(bool ready);
+
+    [JSImport("dom.publishEvidence", "main.js")]
+    internal static partial void PublishWebGpuEvidence(string json);
 }

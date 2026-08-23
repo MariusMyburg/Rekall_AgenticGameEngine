@@ -30,6 +30,17 @@ internal sealed class WebGpuBrowserBridge : IRekallAgeWebGpuBridge
         catch (Exception exception) { return Failed("REKALL_WEBGPU_BRIDGE_INITIALIZE_FAILED", "The browser WebGPU bridge could not initialize.", exception.GetType().Name); }
     }
 
+    public async ValueTask<Rekall.Age.Player.Web.WebGpuProofReadbackResult> ReadPixelsAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var json = await BrowserHost.ReadWebGpuPixelsAsync().WaitAsync(cancellationToken);
+            return Rekall.Age.Player.Web.WebGpuProofEvidenceJson.DeserializeReadback(json);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch { return Rekall.Age.Player.Web.WebGpuProofEvidenceJson.DeserializeReadback(null); }
+    }
+
     private static RekallAgeWebGpuBridgeResult Failed(string code, string message, string? target = null) =>
         new(false, [new(code, message, target)]);
 

@@ -294,6 +294,7 @@ test('executes canonical uint16 and uint32 index-buffer commands', async () => {
         queue: { onSubmittedWorkDone: async () => {}, writeBuffer: () => {}, submit: () => {} },
         pushErrorScope: () => {}, popErrorScope: async () => null, addEventListener: () => {},
         createBuffer: () => ({ destroy: () => {} }),
+        createTexture: () => ({ createView: () => ({}), destroy: () => {} }),
         createCommandEncoder: () => ({ beginRenderPass: () => pass, finish: () => ({}) })
     };
     const context = { configure: () => {}, getCurrentTexture: () => ({ createView: () => ({}) }) };
@@ -302,7 +303,8 @@ test('executes canonical uint16 and uint32 index-buffer commands', async () => {
     const handle = (kind, slot) => ({ deviceId: '11111111-1111-1111-1111-111111111111', kind, slot, generation: 1 });
     const buffer = handle('buffer', 1); const texture = handle('texture', 2); const target = handle('renderTarget', 3);
     assert.equal(executor.execute(JSON.stringify({ version: 1, operation: 'create', resourceType: 'buffer', handle: buffer, descriptor: { sizeBytes: 32, usage: 'index', memoryAccess: 'deviceLocal' } })).succeeded, true);
-    assert.equal(executor.execute(JSON.stringify({ version: 1, operation: 'importCanvasOutput', texture, renderTarget: target, width: 8, height: 8, format: 'bgra8Unorm' })).succeeded, true);
+    assert.equal(executor.execute(JSON.stringify({ version: 1, operation: 'create', resourceType: 'texture', handle: texture, descriptor: { dimension: 'texture2D', width: 8, height: 8, depth: 1, mipLevels: 1, arrayLayers: 1, sampleCount: 1, format: 'bgra8Unorm', usage: 'colorAttachment' } })).succeeded, true);
+    assert.equal(executor.execute(JSON.stringify({ version: 1, operation: 'create', resourceType: 'renderTarget', handle: target, descriptor: { colorAttachments: [{ texture }], depthStencilAttachment: null, width: 8, height: 8 } })).succeeded, true);
 
     for (const format of ['uint16', 'uint32']) {
         const result = executor.execute(JSON.stringify({ version: 1, operation: 'submit', commands: [

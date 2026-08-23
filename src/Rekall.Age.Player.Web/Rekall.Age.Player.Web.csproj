@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk.WebAssembly">
   <ItemGroup>
     <ProjectReference Include="..\Rekall.Age.Rendering.Abstractions\Rekall.Age.Rendering.Abstractions.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj" />
     <ProjectReference Include="..\Rekall.Age.Rendering.WebGpu\Rekall.Age.Rendering.WebGpu.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Runtime.Abstractions\Rekall.Age.Runtime.Abstractions.csproj" />
   </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

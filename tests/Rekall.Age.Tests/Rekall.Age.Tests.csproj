@@ -15,6 +15,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\src\Rekall.Age.Player.Web\tests\fixtures\webgpu-write-texture-3d-v1.json" Link="Fixtures\webgpu-write-texture-3d-v1.json" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="..\..\src\Rekall.Age.Player.Web\WebGpuProofEvidence.cs" Link="Rendering\WebGpuProofEvidence.cs" />
+    <Compile Include="..\..\src\Rekall.Age.Player.Web\WebGpuProofExecution.cs" Link="Rendering\WebGpuProofExecution.cs" />
+    <Compile Include="..\..\src\Rekall.Age.Player.Web\WebGpuProofWorkload.cs" Link="Rendering\WebGpuProofWorkload.cs" />
   </ItemGroup>
 
   <ItemGroup>

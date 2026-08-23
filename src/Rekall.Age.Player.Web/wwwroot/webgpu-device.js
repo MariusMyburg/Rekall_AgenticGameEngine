@@ -5,6 +5,7 @@ const MAX_DIAGNOSTIC_CODE_BYTES = 128;
 const MAX_DIAGNOSTIC_MESSAGE_BYTES = 2048;
 const MAX_DIAGNOSTIC_TARGET_BYTES = 1024;
 const MAX_PENDING = 64;
+const MAX_READBACK_BYTES = 64 * 1024 * 1024;
 const deviceLimitNames = ['maxBufferSize', 'maxTextureDimension1D', 'maxTextureDimension2D', 'maxTextureDimension3D', 'maxTextureArrayLayers', 'maxColorAttachments', 'maxBindingsPerBindGroup', 'maxVertexBuffers', 'maxVertexAttributes', 'maxVertexBufferArrayStride', 'maxComputeWorkgroupsPerDimension'];
 
 const bufferUsage = { mapRead: 1, mapWrite: 2, copySource: 4, copyDestination: 8, index: 16, vertex: 32, uniform: 64, storage: 128, indirect: 256 };
@@ -54,7 +55,7 @@ export function createWebGpuExecutor(environment = {}) {
     const pendingDiagnostics = [];
     const pendingScopes = [];
     const pendingCompilations = [];
-    let adapter; let device; let context; let canvasFormat; let initialized = false; let lost = false; let pendingOverflow = false;
+    let adapter; let device; let context; let canvasFormat; let initialized = false; let lost = false; let pendingOverflow = false; let pendingReadback = null;
 
     const addDiagnostic = item => { if (pendingDiagnostics.length < MAX_DIAGNOSTICS) pendingDiagnostics.push(item); else pendingOverflow = true; };
     const object = (handle, expectedKind) => { if (expectedKind && handle?.kind !== expectedKind) throw new Error('REKALL_WEBGPU_RESOURCE_KIND_MISMATCH'); const map = maps[expectedKind ?? handle?.kind]; const value = map?.get(key(handle)); if (!value) throw new Error('REKALL_WEBGPU_RESOURCE_MISSING'); return value; };
@@ -73,7 +74,7 @@ export function createWebGpuExecutor(environment = {}) {
             context = canvas.getContext('webgpu');
             if (!context) return result(false, [diagnostic('REKALL_WEBGPU_CONTEXT_UNAVAILABLE', 'The player canvas cannot create a WebGPU context.')]);
             canvasFormat = runtime.gpu.getPreferredCanvasFormat();
-            context.configure({ device, format: canvasFormat, alphaMode: 'opaque' });
+            context.configure({ device, format: canvasFormat, alphaMode: 'opaque', usage: gpuTextureUsage('renderAttachment') | gpuTextureUsage('copySource') });
             device.addEventListener?.('uncapturederror', event => addDiagnostic(diagnostic('REKALL_WEBGPU_UNCAPTURED_ERROR', event.error?.message ?? 'WebGPU reported an uncaptured error.')));
             device.lost?.then(info => { lost = true; addDiagnostic(diagnostic('REKALL_WEBGPU_DEVICE_LOST', info?.message ?? 'The WebGPU device was lost.', info?.reason)); });
             initialized = true;
@@ -162,13 +163,18 @@ export function createWebGpuExecutor(environment = {}) {
         return { value: device.createRenderPipeline({ layout: device.createPipelineLayout({ bindGroupLayouts: layouts }), vertex: { module: vertex.value, entryPoint: vertex.descriptor.entryPoint, buffers: descriptor.vertexBuffers.map(layout => ({ arrayStride: layout.strideBytes, stepMode: enumValue({ vertex: 'vertex', instance: 'instance' }, layout.stepMode, 'VERTEX_STEP_MODE'), attributes: layout.attributes.map(attribute => ({ shaderLocation: attribute.location, format: enumValue(vertexFormats, attribute.format, 'VERTEX_FORMAT'), offset: attribute.offsetBytes })) })) }, fragment: { module: fragment.value, entryPoint: fragment.descriptor.entryPoint, targets: descriptor.colorTargets.map(target => ({ format: enumValue(textureFormats, target.format, 'TEXTURE_FORMAT'), writeMask: target.writeMask, ...(target.blendEnabled ? { blend: { color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' } } } : {}) })) }, primitive: { topology: enumValue(primitiveTopologies, descriptor.topology, 'TOPOLOGY'), cullMode: enumValue({ none: 'none', front: 'front', back: 'back' }, descriptor.cullMode, 'CULL_MODE'), frontFace: enumValue({ clockwise: 'cw', counterClockwise: 'ccw' }, descriptor.frontFace, 'FRONT_FACE') }, ...(descriptor.depthStencil ? { depthStencil: { format: enumValue(textureFormats, descriptor.depthStencil.format, 'TEXTURE_FORMAT'), depthWriteEnabled: descriptor.depthStencil.depthWriteEnabled, depthCompare: enumValue(compareOperations, descriptor.depthStencil.depthCompare, 'COMPARE') } } : {}), label: descriptor.label }), descriptor };
     }
     function createComputePipeline(descriptor) { const shader = object(descriptor.computeShader, 'shaderModule'); return { value: device.createComputePipeline({ layout: device.createPipelineLayout({ bindGroupLayouts: descriptor.bindingLayouts.map(handle => object(handle, 'bindingLayout').value) }), compute: { module: shader.value, entryPoint: shader.descriptor.entryPoint }, label: descriptor.label }), descriptor }; }
-    function attachmentView(attachment) {
+    function attachmentView(attachment, capture, target) {
         const texture = object(attachment.texture, 'texture');
-        if (texture.canvasOutput) return context.getCurrentTexture().createView();
+        if (texture.canvasOutput) {
+            const current = context.getCurrentTexture();
+            if (capture.texture && capture.texture !== current) throw new Error('REKALL_WEBGPU_MULTIPLE_CANVAS_OUTPUTS_UNSUPPORTED');
+            capture.texture = current; capture.width = target.width; capture.height = target.height;
+            return current.createView();
+        }
         return texture.value.createView({ baseMipLevel: attachment.mipLevel ?? 0, mipLevelCount: 1, baseArrayLayer: attachment.arrayLayer ?? 0, arrayLayerCount: 1 });
     }
     function executeSubmission(packet) {
-        const encoder = device.createCommandEncoder({ label: packet.label }); let pass = null;
+        const encoder = device.createCommandEncoder({ label: packet.label }); let pass = null; const capture = { texture: null, width: 0, height: 0 };
         for (const command of packet.commands) {
             const data = command.data;
             if (command.kind === 'copyBuffer') encoder.copyBufferToBuffer(object(data.source, 'buffer').value, data.sourceOffset, object(data.destination, 'buffer').value, data.destinationOffset, data.sizeBytes);
@@ -177,10 +183,10 @@ export function createWebGpuExecutor(environment = {}) {
                 pass = encoder.beginRenderPass({
                     colorAttachments: target.colorAttachments.map((attachment, index) => {
                         const clear = data.descriptor.colorClearValues[index];
-                        return { view: attachmentView(attachment), ...(clear ? { clearValue: { r: clear.red, g: clear.green, b: clear.blue, a: clear.alpha }, loadOp: 'clear' } : { loadOp: 'load' }), storeOp: 'store' };
+                        return { view: attachmentView(attachment, capture, target), ...(clear ? { clearValue: { r: clear.red, g: clear.green, b: clear.blue, a: clear.alpha }, loadOp: 'clear' } : { loadOp: 'load' }), storeOp: 'store' };
                     }),
                     ...(target.depthStencilAttachment ? { depthStencilAttachment: {
-                        view: attachmentView(target.depthStencilAttachment),
+                        view: attachmentView(target.depthStencilAttachment, capture, target),
                         ...(data.descriptor.depthClearValue !== undefined ? { depthClearValue: data.descriptor.depthClearValue, depthLoadOp: 'clear' } : { depthLoadOp: 'load' }),
                         depthStoreOp: 'store',
                         ...(data.descriptor.stencilClearValue !== undefined ? { stencilClearValue: data.descriptor.stencilClearValue, stencilLoadOp: 'clear' } : { stencilLoadOp: 'load' }), stencilStoreOp: 'store'
@@ -202,7 +208,27 @@ export function createWebGpuExecutor(environment = {}) {
             else throw new Error('REKALL_WEBGPU_COMMAND_KIND_INVALID');
         }
         if (pass) throw new Error('REKALL_WEBGPU_PASS_UNTERMINATED');
-        device.queue.submit([encoder.finish()]);
+        let readback = null;
+        if (capture.texture) {
+            if (pendingReadback) throw new Error('REKALL_WEBGPU_READBACK_PENDING');
+            if (!Number.isInteger(capture.width) || !Number.isInteger(capture.height) || capture.width <= 0 || capture.height <= 0) throw new Error('REKALL_WEBGPU_READBACK_SIZE_INVALID');
+            const bytesPerRow = Math.ceil(capture.width * 4 / 256) * 256;
+            const size = bytesPerRow * capture.height;
+            if (!Number.isSafeInteger(size) || size > MAX_READBACK_BYTES) throw new Error('REKALL_WEBGPU_READBACK_LIMIT');
+            const buffer = device.createBuffer({ size, usage: gpuBufferUsage('copyDestination') | gpuBufferUsage('mapRead'), label: 'rekall.webgpu.canvas-readback' });
+            encoder.copyTextureToBuffer(
+                { texture: capture.texture },
+                { buffer, offset: 0, bytesPerRow, rowsPerImage: capture.height },
+                { width: capture.width, height: capture.height, depthOrArrayLayers: 1 });
+            readback = { buffer, width: capture.width, height: capture.height, bytesPerRow, format: canvasFormat };
+        }
+        try {
+            device.queue.submit([encoder.finish()]);
+            pendingReadback = readback;
+        } catch (error) {
+            readback?.buffer?.destroy?.();
+            throw error;
+        }
     }
     function execute(packetJson) {
         let scoped = false;
@@ -237,5 +263,51 @@ export function createWebGpuExecutor(environment = {}) {
         try { await Promise.all([...pendingScopes.splice(0), ...pendingCompilations.splice(0)]); await device?.queue?.onSubmittedWorkDone?.(); const diagnostics = pendingDiagnostics.splice(0); if (pendingOverflow) diagnostics.push(diagnostic('REKALL_WEBGPU_PENDING_OVERFLOW', 'WebGPU pending diagnostics or completion work exceeded the bounded limit.')); pendingOverflow = false; return result(!lost && diagnostics.length === 0, diagnostics); }
         catch (error) { return result(false, [diagnostic('REKALL_WEBGPU_FLUSH_FAILED', 'WebGPU queue completion failed.', error?.name)]); }
     }
-    return { initialize, execute, flush };
+    async function readPixels() {
+        if (!initialized || lost) return result(false, [diagnostic(lost ? 'REKALL_WEBGPU_DEVICE_LOST' : 'REKALL_WEBGPU_NOT_INITIALIZED', 'The WebGPU executor is not available.')]);
+        if (!pendingReadback) return result(false, [diagnostic('REKALL_WEBGPU_READBACK_UNAVAILABLE', 'No submitted canvas output is available for pixel readback.')]);
+        const readback = pendingReadback;
+        try {
+            await device.queue.onSubmittedWorkDone?.();
+            await readback.buffer.mapAsync(globalThis.GPUMapMode?.READ ?? 1);
+            const mapped = new Uint8Array(readback.buffer.getMappedRange());
+            const samples = {
+                background: samplePixel(mapped, readback, .08, .08),
+                cyan: samplePixel(mapped, readback, .275, .7525),
+                blue: samplePixel(mapped, readback, .5, .315),
+                magenta: samplePixel(mapped, readback, .725, .7525)
+            };
+            const passed = pixelSamplesPass(samples);
+            const pixelProof = { passed, width: readback.width, height: readback.height, bytesPerRow: readback.bytesPerRow, samples };
+            return result(passed, passed ? [] : [diagnostic('REKALL_WEBGPU_PIXEL_PROOF_FAILED', 'Canvas pixels did not contain the expected dark background and distinct cyan, blue, and magenta regions.')], { pixelProof });
+        } catch (error) {
+            return result(false, [diagnostic('REKALL_WEBGPU_READBACK_FAILED', 'The submitted canvas output could not be read back.', error?.name)]);
+        } finally {
+            try { readback.buffer.unmap?.(); } catch { }
+            readback.buffer.destroy?.();
+            if (pendingReadback === readback) pendingReadback = null;
+        }
+    }
+    function samplePixel(mapped, readback, normalizedX, normalizedY) {
+        const x = Math.min(readback.width - 1, Math.max(0, Math.floor(readback.width * normalizedX)));
+        const y = Math.min(readback.height - 1, Math.max(0, Math.floor(readback.height * normalizedY)));
+        const offset = y * readback.bytesPerRow + x * 4;
+        const first = mapped[offset]; const green = mapped[offset + 1]; const third = mapped[offset + 2]; const alpha = mapped[offset + 3];
+        return readback.format.startsWith('bgra')
+            ? { x, y, r: third, g: green, b: first, a: alpha }
+            : { x, y, r: first, g: green, b: third, a: alpha };
+    }
+    function pixelSamplesPass(samples) {
+        const { background, cyan, blue, magenta } = samples;
+        const dark = background.r < 40 && background.g < 40 && background.b < 40 && background.a >= 240;
+        const cyanLike = cyan.r < 110 && cyan.g >= 150 && cyan.b >= 170 && cyan.a >= 240;
+        const blueLike = blue.r < 110 && blue.g < 140 && blue.b >= 190 && blue.a >= 240;
+        const magentaLike = magenta.r >= 150 && magenta.g < 120 && magenta.b >= 160 && magenta.a >= 240;
+        const triangle = [cyan, blue, magenta];
+        const allZero = triangle.every(pixel => pixel.r === 0 && pixel.g === 0 && pixel.b === 0 && pixel.a === 0);
+        const distance = (left, right) => Math.abs(left.r - right.r) + Math.abs(left.g - right.g) + Math.abs(left.b - right.b);
+        const distinct = distance(cyan, blue) >= 80 && distance(cyan, magenta) >= 80 && distance(blue, magenta) >= 80;
+        return dark && cyanLike && blueLike && magentaLike && distinct && !allZero;
+    }
+    return { initialize, execute, flush, readPixels };
 }

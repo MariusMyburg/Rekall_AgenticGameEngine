@@ -174,16 +174,15 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
         }
 
         var ndc = new Vector3(clip.X, clip.Y, clip.Z) / clip.W;
-        if (ndc.Z < 0 || ndc.Z > 1
-            || ndc.X < -1.25f || ndc.X > 1.25f
-            || ndc.Y < -1.25f || ndc.Y > 1.25f)
+        if (!float.IsFinite(ndc.X) || !float.IsFinite(ndc.Y) || !float.IsFinite(ndc.Z)
+            || ndc.Z < 0 || ndc.Z > 1)
         {
             return false;
         }
 
         vertex = new ScreenVertex(
-            (ndc.X * 0.5f + 0.5f) * (width - 1),
-            (1 - (ndc.Y * 0.5f + 0.5f)) * (height - 1),
+            Math.Clamp((ndc.X * 0.5f + 0.5f) * (width - 1), -1_000_000, 1_000_000),
+            Math.Clamp((1 - (ndc.Y * 0.5f + 0.5f)) * (height - 1), -1_000_000, 1_000_000),
             ndc.Z);
         return true;
     }

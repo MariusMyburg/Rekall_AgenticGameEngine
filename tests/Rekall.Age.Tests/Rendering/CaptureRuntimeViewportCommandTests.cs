@@ -751,7 +751,7 @@ public sealed class CaptureRuntimeViewportCommandTests
             .AddEntity(RekallAgeEntityDocument.Create("KeyDirectionalLight", ["light"])
                 .AddComponent(RekallAgeComponentDocument.Create(
                     "Rekall.Transform3D",
-                    new JsonObject { ["pitch"] = -35, ["yaw"] = -45 }))
+                    new JsonObject { ["pitch"] = -35, ["yaw"] = 135 }))
                 .AddComponent(RekallAgeComponentDocument.Create(
                     "Rekall.DirectionalLight",
                     new JsonObject { ["intensity"] = 1.0 })));
@@ -768,13 +768,14 @@ public sealed class CaptureRuntimeViewportCommandTests
         Assert.Equal(2, result.Value.RenderableCount);
         Assert.Equal(["light", "mesh"], result.Value.RenderableKinds);
         Assert.Equal(0, result.Value.FallbackRenderableCount);
-        Assert.Contains(Enumerable.Range(0, output.Rgba.Length / 4), pixel =>
-        {
-            var index = pixel * 4;
-            return output.Rgba[index] >= 45
-                && output.Rgba[index + 1] >= 70
-                && output.Rgba[index + 2] >= 100;
-        });
+        var background = output.GetPixel(0, 0);
+        var cubeShades = Enumerable.Range(0, output.Rgba.Length / 4)
+            .Select(pixel => output.GetPixel(pixel % output.Width, pixel / output.Width))
+            .Where(pixel => pixel != background)
+            .Select(pixel => (pixel.R, pixel.G, pixel.B))
+            .Distinct()
+            .ToArray();
+        Assert.True(cubeShades.Length >= 2);
     }
 
     private sealed class FakeVulkanViewportCapture : IRekallAgeVulkanRenderPassCapture

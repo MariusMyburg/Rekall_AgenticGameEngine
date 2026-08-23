@@ -143,10 +143,19 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         RekallAgeRuntimeViewportAssetSet assets,
         byte[] pixels)
     {
-        var assetBackedCount = 0;
+        var sharedMeshEntityIds = DrawSharedSceneMeshes(frame, assets, pixels);
+        var assetBackedCount = frame.Renderables.Count(renderable =>
+            sharedMeshEntityIds.Contains(renderable.EntityId)
+            && renderable.AssetId is { } assetId
+            && assets.Models.ContainsKey(assetId));
         var fallbackCount = 0;
         foreach (var renderable in OrderSoftwareRenderables(frame))
         {
+            if (sharedMeshEntityIds.Contains(renderable.EntityId))
+            {
+                continue;
+            }
+
             if (renderable.UiVisual is not null)
             {
                 var image = renderable.UiVisual.AssetId is { } assetId && assets.Images.TryGetValue(assetId, out var resolved)
@@ -181,6 +190,31 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         }
 
         return new SoftwareRenderCounts(assetBackedCount, fallbackCount);
+    }
+
+    private static HashSet<string> DrawSharedSceneMeshes(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
+        byte[] pixels)
+    {
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets);
+        if (meshes.Count == 0)
+        {
+            return [];
+        }
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
+        var rendered = new RekallAgePerspectiveSoftwareSceneRenderer().Render(
+            batch,
+            frame.Width,
+            frame.Height,
+            batch.Frame.SoftwareViewProjection,
+            frame.ActiveCamera?.ClearColor,
+            assets.Images);
+        rendered.CopyTo(pixels, 0);
+        return meshes
+            .Select(mesh => mesh.EntityId)
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     private static IEnumerable<RekallAgeRuntimeViewportRenderable> OrderSoftwareRenderables(

@@ -4,9 +4,9 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 19:06 Africa/Johannesburg
+Last verified: 2026-08-23 19:25 Africa/Johannesburg
 
-Branch: `master`
+Branch: `codex/genuine-web-publishing`
 
 Current execution order is governed by
 [`STRATEGIC-PRIORITIES.md`](STRATEGIC-PRIORITIES.md). The immediate acceptance
@@ -37,6 +37,20 @@ deterministic content staging package: it does not include a WASM host, compiled
 module registry, browser scene loader, input loop, or scene renderer, and does
 not claim browser playability. Those are the remaining genuine web-publication
 slices.
+
+The runtime UI projection now respects entity visibility for Label, Button,
+Panel, Image, UiElement, and UiCanvas visuals. A single entity may intentionally
+carry both UiCanvas and one visual without expanding that visual to the full
+canvas; its authored bounds are retained. The generic Runtime/Rendering
+verification for this correction passes 731/731. Software viewport capture now
+routes 3D meshes through the same mesh, model-matrix, authored-camera, and depth
+pipeline used to prepare Vulkan scenes, then composites remaining 2D/UI content.
+This removes the legacy fixed-oblique cube projection that drew rear faces and
+made ordinary cubes appear hollow or inside-out. It also rasterizes the visible
+portion of large triangles whose vertices lie outside the viewport and preserves
+near-surface depth independent of entity order. The complete Rendering namespace
+selection passes 501/501, and a fresh software capture of Clockwork Canopy now
+matches the Vulkan camera geometry instead of inventing side/bottom cube faces.
 
 The first stable Model Asset metadata and publishing foundation is now available through the default
 CLI/Studio command registry and its derived MCP catalog. The canonical surface

@@ -122,7 +122,7 @@ public sealed class RuntimeViewportAssetRenderingTests
             .AddEntity(RekallAgeEntityDocument.Create("KeyLight", ["light"])
                 .AddComponent(RekallAgeComponentDocument.Create(
                     "Rekall.Transform3D",
-                    new JsonObject { ["pitch"] = -35, ["yaw"] = -35 }))
+                    new JsonObject { ["pitch"] = -35, ["yaw"] = 145 }))
                 .AddComponent(RekallAgeComponentDocument.Create(
                     "Rekall.DirectionalLight",
                     new JsonObject { ["intensity"] = 1.0 })));
@@ -136,15 +136,11 @@ public sealed class RuntimeViewportAssetRenderingTests
             RekallAgeRuntimeViewportAssetSet.Empty,
             CancellationToken.None);
         var output = await RekallAgePngReader.ReadRgbaAsync(capture.ScreenshotPath, CancellationToken.None);
+        var background = output.GetPixel(0, 0);
         var shadedCubePixels = Enumerable.Range(0, output.Rgba.Length / 4)
-            .Select(pixel => pixel * 4)
-            .Where(index =>
-                output.Rgba[index] >= 45
-                && output.Rgba[index] <= 190
-                && output.Rgba[index + 1] >= 70
-                && output.Rgba[index + 1] <= 210
-                && output.Rgba[index + 2] >= 100)
-            .Select(index => (R: output.Rgba[index], G: output.Rgba[index + 1], B: output.Rgba[index + 2]))
+            .Select(pixel => output.GetPixel(pixel % output.Width, pixel / output.Width))
+            .Where(pixel => pixel != background)
+            .Select(pixel => (pixel.R, pixel.G, pixel.B))
             .Distinct()
             .ToArray();
 
@@ -152,7 +148,160 @@ public sealed class RuntimeViewportAssetRenderingTests
         Assert.Equal(0, capture.FallbackRenderableCount);
         Assert.Contains("mesh", frame.Renderables.Select(renderable => renderable.Kind));
         Assert.Contains("light", frame.Renderables.Select(renderable => renderable.Kind));
-        Assert.True(shadedCubePixels.Length >= 3);
+        Assert.True(
+            shadedCubePixels.Length >= 2,
+            $"Expected at least two directional-light shades, found: {string.Join(", ", shadedCubePixels.Select(pixel => $"{pixel.R}/{pixel.G}/{pixel.B}"))}");
+    }
+
+    [Fact]
+    public void SoftwareRendererDoesNotExposeRearCubeFacesThroughAnAuthoredOrthographicCamera()
+    {
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main",
+            0,
+            0,
+            200,
+            200,
+            new RekallAgeRuntimeViewportCamera(
+                "camera",
+                "Camera",
+                "Camera3D",
+                true,
+                Z: 8,
+                RotationY: 180,
+                ProjectionMode: "orthographic",
+                OrthographicSize: 4,
+                ClearColor: "#000000"),
+            [],
+            [new RekallAgeRuntimeViewportRenderable(
+                "cube",
+                "Cube",
+                "mesh",
+                "rekall.geometry.cube",
+                0,
+                0,
+                0,
+                0,
+                Variant: "rekall.geometry.cube",
+                MaterialColor: "#ff3355")],
+            0,
+            new RekallAgeRuntimeViewportOverlay(false, 0),
+            []);
+
+        var output = new RekallAgeRuntimeSoftwareRenderer().RenderRgba(
+            frame,
+            RekallAgeRuntimeViewportAssetSet.Empty);
+        var litPixels = Enumerable.Range(0, output.Rgba.Length / 4)
+            .Where(pixel =>
+            {
+                var index = pixel * 4;
+                return output.Rgba[index] != 0 || output.Rgba[index + 1] != 0 || output.Rgba[index + 2] != 0;
+            })
+            .Select(pixel => (X: pixel % frame.Width, Y: pixel / frame.Width))
+            .ToArray();
+
+        Assert.NotEmpty(litPixels);
+        Assert.InRange(litPixels.Max(pixel => pixel.X) - litPixels.Min(pixel => pixel.X), 48, 51);
+        Assert.InRange(litPixels.Max(pixel => pixel.Y) - litPixels.Min(pixel => pixel.Y), 48, 51);
+    }
+
+    [Fact]
+    public void SoftwareRendererDepthTestsSharedSceneMeshesIndependentOfEntityOrder()
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera",
+            "Camera",
+            "Camera3D",
+            true,
+            Z: 8,
+            RotationY: 180,
+            ProjectionMode: "orthographic",
+            OrthographicSize: 4,
+            ClearColor: "#000000");
+        var near = new RekallAgeRuntimeViewportRenderable(
+            "near",
+            "Near",
+            "mesh",
+            "rekall.geometry.cube",
+            0,
+            0,
+            1,
+            0,
+            Variant: "rekall.geometry.cube",
+            MaterialColor: "#ff0000");
+        var far = near with
+        {
+            EntityId = "far",
+            EntityName = "Far",
+            Z = 0,
+            MaterialColor = "#00ff00"
+        };
+
+        RekallAgeRuntimeViewportFrame Frame(IReadOnlyList<RekallAgeRuntimeViewportRenderable> renderables) => new(
+            "Main",
+            0,
+            0,
+            200,
+            200,
+            camera,
+            [],
+            renderables,
+            0,
+            new RekallAgeRuntimeViewportOverlay(false, 0),
+            []);
+        var renderer = new RekallAgeRuntimeSoftwareRenderer();
+        var nearFirst = renderer.RenderRgba(Frame([near, far]), RekallAgeRuntimeViewportAssetSet.Empty);
+        var farFirst = renderer.RenderRgba(Frame([far, near]), RekallAgeRuntimeViewportAssetSet.Empty);
+        var center = (100 * 200 + 100) * 4;
+
+        Assert.True(nearFirst.Rgba[center] > nearFirst.Rgba[center + 1]);
+        Assert.True(farFirst.Rgba[center] > farFirst.Rgba[center + 1]);
+    }
+
+    [Fact]
+    public void SoftwareRendererRasterizesTheVisiblePortionOfGeometryWithOffscreenVertices()
+    {
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main",
+            0,
+            0,
+            200,
+            200,
+            new RekallAgeRuntimeViewportCamera(
+                "camera",
+                "Camera",
+                "Camera3D",
+                true,
+                Z: 8,
+                RotationY: 180,
+                ProjectionMode: "orthographic",
+                OrthographicSize: 4,
+                ClearColor: "#000000"),
+            [],
+            [new RekallAgeRuntimeViewportRenderable(
+                "backdrop",
+                "Backdrop",
+                "mesh",
+                "rekall.geometry.cube",
+                0,
+                0,
+                0,
+                0,
+                Variant: "rekall.geometry.cube",
+                ScaleX: 20,
+                ScaleY: 20,
+                ScaleZ: 0.1,
+                MaterialColor: "#8844cc")],
+            0,
+            new RekallAgeRuntimeViewportOverlay(false, 0),
+            []);
+
+        var output = new RekallAgeRuntimeSoftwareRenderer().RenderRgba(
+            frame,
+            RekallAgeRuntimeViewportAssetSet.Empty);
+        var center = (100 * frame.Width + 100) * 4;
+
+        Assert.True(output.Rgba[center] > 20 || output.Rgba[center + 1] > 20 || output.Rgba[center + 2] > 20);
     }
 
     [Fact]

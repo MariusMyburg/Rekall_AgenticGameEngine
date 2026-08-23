@@ -43,6 +43,8 @@ public sealed class RekallAgeModelingNodeCatalog
             [Vector3("offset", "Offset")]),
         Node("rekall.modeling.triangulate", "Triangulate", "Triangulates selected polygon faces with source provenance.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("selection", RekallAgeModelingValueType.Selection), Output("geometry", RekallAgeModelingValueType.Geometry)]),
+        Node("rekall.modeling.subdivide", "Subdivide", "Subdivides selected polygon faces into centroid triangle fans with source provenance.",
+            [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("selection", RekallAgeModelingValueType.Selection), Output("geometry", RekallAgeModelingValueType.Geometry)]),
         Node("rekall.modeling.attribute.capture", "Capture Attribute", "Captures a field into a named typed geometry attribute.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("value", RekallAgeModelingValueType.Scalar, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)],
             [Text("name", "Name", "attribute"), Text("domain", "Domain", "point")]),

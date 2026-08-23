@@ -73,6 +73,8 @@ public sealed class RekallAgeModifierStackEvaluator
                 Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject())).Mesh,
             "rekall.modifier.extrude" => _executor.Execute(source, new("extrude_faces", RekallAgeGeometryDomain.Face,
                 Select(source, RekallAgeGeometryDomain.Face, selection), VectorParameters(modifier.Parameters))).Mesh,
+            "rekall.modifier.subdivide" => _executor.Execute(source, new("subdivide_faces", RekallAgeGeometryDomain.Face,
+                Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject())).Mesh,
             _ => throw new RekallAgeMeshOperationException("REKALL_MODIFIER_TYPE_UNKNOWN", $"Modifier type '{modifier.TypeId}' is not executable.")
         };
     }

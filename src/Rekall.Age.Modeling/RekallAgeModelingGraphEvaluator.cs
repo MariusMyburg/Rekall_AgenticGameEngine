@@ -188,6 +188,12 @@ public sealed class RekallAgeModelingGraphEvaluator
                 InputGeometry(node, "geometry", incoming, values),
                 "triangulate_faces",
                 new JsonObject()),
+            "rekall.modeling.subdivide" => ApplySemanticOperation(
+                graph,
+                node,
+                InputGeometry(node, "geometry", incoming, values),
+                "subdivide_faces",
+                new JsonObject()),
             "rekall.modeling.field.math" => EvaluateFieldMath(node, incoming, values),
             "rekall.modeling.attribute.named" => ReadNamedAttribute(node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.attribute.capture" => CaptureAttribute(

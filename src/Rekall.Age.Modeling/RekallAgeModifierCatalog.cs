@@ -23,7 +23,10 @@ public sealed class RekallAgeModifierCatalog
                 [Text("selection", "")], preserve),
             new("rekall.modifier.extrude", 1, "Extrude", "Extrudes a selected face region with stable provenance.",
                 RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
-                [Number("x", 0), Number("y", 0), Number("z", 1), Text("selection", "")], preserve)
+                [Number("x", 0), Number("y", 0), Number("z", 1), Text("selection", "")], preserve),
+            new("rekall.modifier.subdivide", 1, "Subdivide", "Subdivides selected or all polygon faces into centroid triangle fans.",
+                RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
+                [Text("selection", "")], preserve)
         ]);
     }
     private static RekallAgeModelingParameterDescriptor Number(string id, double value) => new(id, id, RekallAgeModelingValueType.Scalar, JsonValue.Create(value), -1_000_000, 1_000_000);

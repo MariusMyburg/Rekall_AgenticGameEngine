@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 08:26 Africa/Johannesburg
+Last verified: 2026-08-23 08:30 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -395,6 +395,23 @@ not guess operation IDs or parameters. The affected operation/command suite
 passes 17/17. Subdivision, remesh, optimization, and boolean operations remain
 active and will not be advertised until each has strict topology/provenance
 proofs.
+
+Centroid-fan face subdivision is now a shared strict mesh operation, procedural
+node, and ordered modifier. Each selected polygon derives one centroid point,
+one radial edge per source corner, and one triangle per boundary edge while
+retaining the source face ID for the first output and stable original corner IDs
+once each. The result reports created point/edge/face/corner IDs and source-face
+to output-face provenance. Point and corner numeric attributes interpolate at
+the centroid according to interpolation policy; boundary corner values and face
+attributes copy from exact sources; new edge attributes use declared/type
+defaults; face selections expand through provenance. A UV-bearing quad proof
+produces 5 points, 8 edges, 4 faces, and 12 corners, including four 0.5/0.5
+centroid UV samples, and passes strict topology validation. The procedural node
+executes the same operation and produces the same 5-point/4-face shape; modifier
+discovery exposes the same capability. The affected graph/modifier/subdivision
+selection passes 15/15. This is linear centroid subdivision, not yet a smooth
+Catmull-Clark claim; smooth subdivision, remesh, optimization, and booleans
+remain active.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

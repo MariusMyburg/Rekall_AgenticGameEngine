@@ -65,7 +65,13 @@ public sealed class RekallAgeMeshOperationExecutor
                 StringParameter("axis", "xy", "Projection axis: xy, xz, or yz."),
                 NumberParameter("scaleU", 1), NumberParameter("scaleV", 1),
                 NumberParameter("offsetU"), NumberParameter("offsetV")
-            ])
+            ]),
+        new(
+            "subdivide_faces",
+            "Subdivides selected polygon faces into centroid triangle fans with stable source provenance and domain-attribute propagation.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
+            [])
     ];
     private readonly RekallAgeMeshValidator _validator = new();
 
@@ -99,6 +105,7 @@ public sealed class RekallAgeMeshOperationExecutor
             "delete" => DeleteFaces(source, request),
             "generate_normals" => GenerateNormals(source, request),
             "project_uv" => ProjectUv(source, request),
+            "subdivide_faces" => SubdivideFaces(source, request),
             _ => throw Failure("REKALL_MESH_OPERATION_UNKNOWN", $"Unknown mesh operation '{request.OperationId}'.")
         };
         var outputValidation = _validator.Validate(result.Mesh);
@@ -214,6 +221,58 @@ public sealed class RekallAgeMeshOperationExecutor
         var attributes = source.Attributes.Where(item => item.Name != attributeName).Append(attribute).OrderBy(item => item.Name, StringComparer.Ordinal).ToArray();
         var mesh = source with { Revision = checked(source.Revision + 1), Attributes = attributes };
         return Result(source, mesh, ChangeSet(RekallAgeMeshChangeKind.Attributes, modifiedFaces: request.ElementIds.Order().ToArray(), modifiedCorners: modifiedCorners.Order().ToArray(), changedAttributes: [attributeName], affectedBounds: Bounds(faceIndices.SelectMany(index => Enumerable.Range(source.Topology.FaceOffsets[index], source.Topology.FaceOffsets[index + 1] - source.Topology.FaceOffsets[index])).Select(index => source.Topology.Positions[source.Topology.CornerPointIndices[index]]))), request.ElementIds.Order().Select(id => Preserve(RekallAgeGeometryDomain.Face, id)).ToArray());
+    }
+
+    private static RekallAgeMeshOperationResult SubdivideFaces(RekallAgeMeshAsset source, RekallAgeMeshOperationRequest request)
+    {
+        RequireDomain(request, RekallAgeGeometryDomain.Face);
+        var selectedIndices = ResolveIndices(source.Topology.FaceIds, request.ElementIds, "face").ToHashSet();
+        var topology = source.Topology;
+        var pointIds = topology.PointIds.ToList(); var positions = topology.Positions.ToList();
+        var edges = topology.EdgePointIndices.ToList(); var edgeIds = topology.EdgeIds.ToList();
+        var faceIds = new List<ulong>(); var faceOffsets = new List<int> { 0 }; var cornerIds = new List<ulong>(); var cornerPoints = new List<int>(); var cornerEdges = new List<int>();
+        var createdPoints = new List<ulong>(); var createdEdges = new List<ulong>(); var createdFaces = new List<ulong>(); var createdCorners = new List<ulong>();
+        var faceSources = new List<int>(); var cornerSources = new List<int?>(); var pointCentroidSources = new List<int[]>();
+        var provenance = new List<RekallAgeMeshElementProvenance>(); var faceMap = new Dictionary<ulong, IReadOnlyList<ulong>>();
+        var nextPointId = NextId(pointIds); var nextEdgeId = NextId(edgeIds); var nextFaceId = NextId(topology.FaceIds); var nextCornerId = NextId(topology.CornerIds);
+        for (var faceIndex = 0; faceIndex < topology.FaceIds.Count; faceIndex++)
+        {
+            var start = topology.FaceOffsets[faceIndex]; var end = topology.FaceOffsets[faceIndex + 1];
+            if (!selectedIndices.Contains(faceIndex))
+            {
+                faceIds.Add(topology.FaceIds[faceIndex]); faceSources.Add(faceIndex);
+                for (var corner = start; corner < end; corner++) { cornerIds.Add(topology.CornerIds[corner]); cornerPoints.Add(topology.CornerPointIndices[corner]); cornerEdges.Add(topology.CornerEdgeIndices[corner]); cornerSources.Add(corner); }
+                faceOffsets.Add(cornerIds.Count); continue;
+            }
+            var sourcePointIndices = Enumerable.Range(start, end - start).Select(corner => topology.CornerPointIndices[corner]).ToArray();
+            var centroid = new RekallAgeGeometryVector3(sourcePointIndices.Average(index => topology.Positions[index].X), sourcePointIndices.Average(index => topology.Positions[index].Y), sourcePointIndices.Average(index => topology.Positions[index].Z));
+            var centroidIndex = pointIds.Count; var centroidId = nextPointId++; pointIds.Add(centroidId); positions.Add(centroid); createdPoints.Add(centroidId); pointCentroidSources.Add(sourcePointIndices);
+            var radialEdges = new int[sourcePointIndices.Length];
+            for (var i = 0; i < sourcePointIndices.Length; i++) { radialEdges[i] = edges.Count; edges.Add(new(sourcePointIndices[i], centroidIndex)); var id = nextEdgeId++; edgeIds.Add(id); createdEdges.Add(id); }
+            var outputs = new List<ulong>();
+            for (var i = 0; i < sourcePointIndices.Length; i++)
+            {
+                var sourceCorner = start + i; var nextCorner = start + ((i + 1) % sourcePointIndices.Length);
+                var outputFaceId = i == 0 ? topology.FaceIds[faceIndex] : nextFaceId++;
+                if (i > 0) createdFaces.Add(outputFaceId); outputs.Add(outputFaceId); faceIds.Add(outputFaceId); faceSources.Add(faceIndex);
+                cornerIds.Add(topology.CornerIds[sourceCorner]); cornerPoints.Add(sourcePointIndices[i]); cornerEdges.Add(topology.CornerEdgeIndices[sourceCorner]); cornerSources.Add(sourceCorner);
+                var nextVertexCornerId = nextCornerId++; cornerIds.Add(nextVertexCornerId); createdCorners.Add(nextVertexCornerId); cornerPoints.Add(sourcePointIndices[(i + 1) % sourcePointIndices.Length]); cornerEdges.Add(radialEdges[(i + 1) % sourcePointIndices.Length]); cornerSources.Add(nextCorner);
+                var centroidCornerId = nextCornerId++; cornerIds.Add(centroidCornerId); createdCorners.Add(centroidCornerId); cornerPoints.Add(centroidIndex); cornerEdges.Add(radialEdges[i]); cornerSources.Add(null);
+                faceOffsets.Add(cornerIds.Count);
+            }
+            faceMap[topology.FaceIds[faceIndex]] = outputs; provenance.Add(new(RekallAgeGeometryDomain.Face, topology.FaceIds[faceIndex], outputs));
+        }
+        var attributes = source.Attributes.Select(attribute => attribute.Domain switch
+        {
+            RekallAgeGeometryDomain.Point => attribute with { Values = attribute.Values.Concat(pointCentroidSources.Select(indices => Average(attribute, indices))).ToArray() },
+            RekallAgeGeometryDomain.Edge => attribute with { Values = attribute.Values.Concat(Enumerable.Repeat(DefaultValue(attribute), createdEdges.Count)).ToArray() },
+            RekallAgeGeometryDomain.Face => attribute with { Values = faceSources.Select(index => attribute.Values[index]).ToArray() },
+            RekallAgeGeometryDomain.Corner => attribute with { Values = cornerSources.Select((index, outputIndex) => index.HasValue ? attribute.Values[index.Value] : Average(attribute, FaceCornerSourceIndices(faceSources[FaceIndexForCorner(faceOffsets, outputIndex)], topology))).ToArray() },
+            _ => attribute
+        }).ToArray();
+        var newTopology = topology with { PointIds = pointIds, Positions = positions, EdgeIds = edgeIds, EdgePointIndices = edges, FaceIds = faceIds, FaceOffsets = faceOffsets, CornerIds = cornerIds, CornerPointIndices = cornerPoints, CornerEdgeIndices = cornerEdges };
+        var mesh = source with { Revision = checked(source.Revision + 1), Topology = newTopology, Attributes = attributes, SelectionSets = PropagateSubdivisionSelections(source.SelectionSets, faceMap) };
+        return Result(source, mesh, ChangeSet(RekallAgeMeshChangeKind.Topology | (source.Attributes.Count > 0 ? RekallAgeMeshChangeKind.Attributes : RekallAgeMeshChangeKind.None) | (source.SelectionSets.Count > 0 ? RekallAgeMeshChangeKind.Selection : RekallAgeMeshChangeKind.None), createdPoints: createdPoints, createdEdges: createdEdges, createdFaces: createdFaces, createdCorners: createdCorners, modifiedFaces: request.ElementIds.Order().ToArray(), changedAttributes: source.Attributes.Select(item => item.Name).Order(StringComparer.Ordinal).ToArray(), affectedBounds: Bounds(selectedIndices.SelectMany(index => FaceCornerSourceIndices(index, topology)).Select(index => topology.Positions[topology.CornerPointIndices[index]]))), provenance);
     }
 
     private RekallAgeMeshOperationResult ReverseFaces(
@@ -889,6 +948,65 @@ public sealed class RekallAgeMeshOperationExecutor
     {
         return ids.Count == 0 ? 1 : checked(ids.Max() + 1);
     }
+
+    private static IReadOnlyList<int> FaceCornerSourceIndices(int faceIndex, RekallAgeMeshTopology topology) =>
+        Enumerable.Range(topology.FaceOffsets[faceIndex], topology.FaceOffsets[faceIndex + 1] - topology.FaceOffsets[faceIndex]).ToArray();
+
+    private static int FaceIndexForCorner(IReadOnlyList<int> faceOffsets, int cornerIndex)
+    {
+        var low = 0; var high = faceOffsets.Count - 2;
+        while (low <= high)
+        {
+            var middle = (low + high) / 2;
+            if (cornerIndex < faceOffsets[middle]) high = middle - 1;
+            else if (cornerIndex >= faceOffsets[middle + 1]) low = middle + 1;
+            else return middle;
+        }
+        throw Failure("REKALL_MESH_OPERATION_INTERNAL", "Corner does not belong to an output face.");
+    }
+
+    private static JsonElement Average(RekallAgeGeometryAttribute attribute, IReadOnlyList<int> indices)
+    {
+        if (indices.Count == 0) return DefaultValue(attribute);
+        if (attribute.Interpolation is RekallAgeGeometryInterpolation.Constant or RekallAgeGeometryInterpolation.Nearest
+            || attribute.ValueType is RekallAgeGeometryValueType.Bool or RekallAgeGeometryValueType.String
+                or RekallAgeGeometryValueType.Quaternion or RekallAgeGeometryValueType.Matrix4x4)
+            return attribute.Values[indices[0]];
+        if (attribute.ValueType == RekallAgeGeometryValueType.Int32)
+            return JsonSerializer.SerializeToElement((int)Math.Round(indices.Average(index => attribute.Values[index].GetInt32()), MidpointRounding.AwayFromZero));
+        if (attribute.ValueType == RekallAgeGeometryValueType.Float)
+            return JsonSerializer.SerializeToElement(indices.Average(index => attribute.Values[index].GetDouble()));
+        var length = attribute.ValueType switch
+        {
+            RekallAgeGeometryValueType.Float2 => 2,
+            RekallAgeGeometryValueType.Float3 => 3,
+            RekallAgeGeometryValueType.Float4 or RekallAgeGeometryValueType.ColorLinear => 4,
+            _ => 0
+        };
+        if (length == 0) return attribute.Values[indices[0]];
+        var sums = new double[length];
+        foreach (var index in indices)
+        {
+            var values = attribute.Values[index].EnumerateArray().Select(item => item.GetDouble()).ToArray();
+            for (var component = 0; component < length; component++) sums[component] += values[component];
+        }
+        for (var component = 0; component < length; component++) sums[component] /= indices.Count;
+        return JsonSerializer.SerializeToElement(sums);
+    }
+
+    private static IReadOnlyList<RekallAgeMeshSelection> PropagateSubdivisionSelections(
+        IReadOnlyList<RekallAgeMeshSelection> selections,
+        IReadOnlyDictionary<ulong, IReadOnlyList<ulong>> faceMap) =>
+        selections.Select(selection => selection.Domain != RekallAgeGeometryDomain.Face
+            ? selection
+            : selection with
+            {
+                ElementIds = Expand(selection.ElementIds, faceMap),
+                OrderedHistory = selection.OrderedHistory is null ? null : Expand(selection.OrderedHistory, faceMap),
+                ActiveElementId = selection.ActiveElementId.HasValue && faceMap.TryGetValue(selection.ActiveElementId.Value, out var outputs)
+                    ? outputs[0]
+                    : selection.ActiveElementId
+            }).ToArray();
 
     private static JsonElement DefaultValue(RekallAgeGeometryAttribute attribute)
     {

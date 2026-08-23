@@ -388,6 +388,26 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public void StudioRejectsCameraFacingAwayLayoutAsTaskSpecificVisualProof()
+    {
+        var informative = new RekallAgeViewportFrameAnalysis(
+            true,
+            true,
+            100,
+            100,
+            12,
+            0.7,
+            0.3,
+            0.5,
+            0.2,
+            []);
+
+        Assert.False(RekallAgeStudioViewModel.IsStudioVisualProofAcceptable(
+            informative,
+            ["REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT"]));
+    }
+
+    [Fact]
     public void AutomationRejectsANonInformativeViewportEvenWhenItIsNonblankAndPackaged()
     {
         var archive = Path.GetTempFileName();

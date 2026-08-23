@@ -1542,7 +1542,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             ViewportImage = LoadBitmap(capture.ScreenshotPath);
             ViewportRenderableCount = capture.RenderableCount;
-            ViewportVisuallyInformative = IsStudioVisualProofAcceptable(capture.FrameAnalysis);
+            ViewportVisuallyInformative = IsStudioVisualProofAcceptable(
+                capture.FrameAnalysis,
+                capture.LayoutDiagnostics.WarningCodes);
             ViewportSummary = $"{capture.Width}×{capture.Height} · frame {capture.FrameIndex} · {capture.RenderableCount} renderables · "
                 + (ViewportVisuallyInformative ? "visually informative" : "visual repair required");
         }
@@ -1550,10 +1552,18 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     }
 
     internal static bool IsStudioVisualProofAcceptable(RekallAgeViewportFrameAnalysis analysis) =>
+        IsStudioVisualProofAcceptable(analysis, []);
+
+    internal static bool IsStudioVisualProofAcceptable(
+        RekallAgeViewportFrameAnalysis analysis,
+        IReadOnlyList<string> layoutWarningCodes) =>
         analysis.Analyzed
         && analysis.VisuallyInformative
         && !analysis.WarningCodes.Contains(
             "REKALL_VIEWPORT_LOW_VISUAL_COVERAGE",
+            StringComparer.Ordinal)
+        && !layoutWarningCodes.Contains(
+            "REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT",
             StringComparer.Ordinal);
 
     private async Task StartSimulationAsync()

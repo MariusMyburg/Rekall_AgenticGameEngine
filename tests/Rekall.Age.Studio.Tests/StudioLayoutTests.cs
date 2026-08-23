@@ -13,6 +13,7 @@ public sealed class StudioLayoutTests
         var layout = RekallAgeStudioLayout.Default;
 
         Assert.Equal(RekallAgeStudioLayout.CurrentVersion, layout.Version);
+        Assert.Equal("World", layout.ActiveWorkspace);
         Assert.Equal(["Hierarchy", "Inspector", "Output"], layout.Panels.Select(panel => panel.Id).Order().ToArray());
         Assert.All(layout.Panels, panel => Assert.True(panel.Visible));
         Assert.InRange(layout.WindowWidth, 1120, 3840);
@@ -37,7 +38,12 @@ public sealed class StudioLayoutTests
         try
         {
             var store = new RekallAgeStudioLayoutStore(path);
-            var first = RekallAgeStudioLayout.Default with { WindowWidth = 1400, ActiveOutputTab = "Assets" };
+            var first = RekallAgeStudioLayout.Default with
+            {
+                WindowWidth = 1400,
+                ActiveOutputTab = "Assets",
+                ActiveWorkspace = "Modeling"
+            };
             await store.SaveAsync(first, CancellationToken.None);
             var second = first with
             {
@@ -52,6 +58,7 @@ public sealed class StudioLayoutTests
 
             Assert.Equal(1660, loaded.WindowWidth);
             Assert.Equal("Assets", loaded.ActiveOutputTab);
+            Assert.Equal("Modeling", loaded.ActiveWorkspace);
             Assert.False(loaded.Panel("Inspector").Visible);
             Assert.Equal(RekallAgeStudioDockRegion.Left, loaded.Panel("Inspector").Region);
             Assert.Equal(420, loaded.Panel("Inspector").Size);
@@ -61,6 +68,24 @@ public sealed class StudioLayoutTests
         {
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
+    }
+
+    [Fact]
+    public void StudioShellPromotesModelingToAnUnclutteredTopLevelWorkspace()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+        var modeling = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "ModelingWorkspace.xaml"));
+
+        Assert.Contains("x:Name=\"WorkspaceSelector\"", window, StringComparison.Ordinal);
+        Assert.Contains("Header=\"World\"", window, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Modeling\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ModelingWorkspaceHost\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ProjectBar\"", window, StringComparison.Ordinal);
+        Assert.Contains("MeshViewportImage", modeling, StringComparison.Ordinal);
+        Assert.Contains("ModelingGraphViewportImage", modeling, StringComparison.Ordinal);
+        Assert.Contains("Semantic operation", modeling, StringComparison.Ordinal);
+        Assert.Contains("NODE CONTRACTS", modeling, StringComparison.Ordinal);
     }
 
     [Theory]

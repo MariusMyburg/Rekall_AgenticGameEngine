@@ -19,11 +19,23 @@ handle publishes exactly one canonical `rekall.component.set_property`
 transaction, and the persisted `Rekall.Transform3D` change reverses through the
 ordinary Studio undo stack. Locked entities do not expose an editable gizmo.
 Simulate mode also has deterministic Pause/Resume and exact single-frame Step;
-paused timer ticks are suppressed and stopping clears paused state. The full
-Studio suite passes 46/46 after the gizmo integration; the new pause/step proof
-passes in isolation. Layout lifecycle wiring, a dedicated full-window Modeling
-workspace, richer hierarchy commands, real Windows interaction acceptance, and
-the next complete-suite run remain in progress.
+paused timer ticks are suppressed and stopping clears paused state.
+
+The Studio shell now treats World and Modeling as top-level per-window
+workspaces, following the useful Blender distinction between a workspace and a
+nested tool panel. Modeling hides the game/project bars and fills the client
+area with resizable Mesh Editing, Procedural Geometry, Materials, and
+UV/Attributes surfaces. Mesh and procedural controls are bound to the canonical
+sessions rather than display-only substitutes. World exposes live hierarchy,
+inspector, and output splitters; panel visibility; Default, Authoring, and Debug
+presets; and versioned, normalized persistence of window bounds, maximization,
+panel sizes/visibility, output tab, and active workspace. Rich scene actions now
+rename, duplicate, delete, show/hide, lock/unlock, parent, and unparent via
+canonical command transactions. A real STA WPF render loads and evaluates the
+populated procedural probe, switches into the dedicated workspace, requires the
+project chrome to disappear and the modeling host to occupy the client area,
+and writes an inspected 1480×820 PNG proof. The complete Studio suite passes
+49/49, and the Release Studio build succeeds with zero warnings and zero errors.
 
 The procedural sphere contract is now a true closed shared-topology surface:
 one vertex per pole, shared periodic seam vertices, outward cap triangles, and

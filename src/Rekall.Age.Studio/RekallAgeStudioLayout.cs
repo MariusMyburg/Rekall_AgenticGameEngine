@@ -42,6 +42,8 @@ internal sealed record RekallAgeStudioLayout(
         ["Validation", "Assets", "Overview", "Actions", "Runtime", "Transactions", "Imports", "AI Agent"],
         StringComparer.Ordinal);
 
+    public string ActiveWorkspace { get; init; } = "World";
+
     public static RekallAgeStudioLayout Default { get; } = new(
         CurrentVersion,
         double.NaN,
@@ -117,6 +119,9 @@ internal sealed record RekallAgeStudioLayout(
             ActiveOutputTab = OutputTabs.Contains(candidate.ActiveOutputTab ?? string.Empty)
                 ? candidate.ActiveOutputTab!
                 : Default.ActiveOutputTab,
+            ActiveWorkspace = candidate.ActiveWorkspace is "World" or "Modeling"
+                ? candidate.ActiveWorkspace
+                : Default.ActiveWorkspace,
             Panels = normalizedPanels
         };
     }

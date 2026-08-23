@@ -1,11 +1,12 @@
 <Window x:Class="Rekall.Age.Studio.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Rekall.Age.Studio"
         Title="Rekall AGE Studio" Width="1500" Height="940" MinWidth="1120" MinHeight="700"
         Background="{StaticResource WorkbenchBackground}" Foreground="{StaticResource WorkbenchText}"
         FontFamily="Segoe UI" UseLayoutRounding="True">
     <DockPanel>
-        <Border DockPanel.Dock="Top" Background="{StaticResource ChromeBackground}" Padding="12,9" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
+        <Border x:Name="ProjectBar" DockPanel.Dock="Top" Background="{StaticResource ChromeBackground}" Padding="12,9" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" /><ColumnDefinition Width="260" />
@@ -32,7 +33,7 @@
             </Grid>
         </Border>
 
-        <Border DockPanel.Dock="Top" Padding="7" Background="{StaticResource ChromeBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
+        <Border x:Name="MainToolbar" DockPanel.Dock="Top" Padding="7" Background="{StaticResource ChromeBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
           <StackPanel Orientation="Horizontal">
             <Button Content="Create" Command="{Binding CreateCommand}" ToolTip="Create a new AGE project" />
             <Button Content="Open" Command="{Binding OpenCommand}" ToolTip="Open the selected project" />
@@ -58,15 +59,44 @@
         </Border>
 
         <Grid>
+            <Grid.RowDefinitions><RowDefinition Height="38" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+            <TabControl x:Name="WorkspaceSelector" Grid.Row="0" SelectionChanged="OnWorkspaceChanged"
+                        Background="{StaticResource ChromeBackground}" BorderThickness="0,0,0,1">
+                <TabItem Header="World" />
+                <TabItem Header="Modeling" />
+            </TabControl>
+            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
+                <TextBlock Text="Layout" Foreground="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,5,0" />
+                <Button Content="Default" Tag="Default" Click="OnLayoutPresetClick" />
+                <Button Content="Authoring" Tag="Authoring" Click="OnLayoutPresetClick" />
+                <Button Content="Debug" Tag="Debug" Click="OnLayoutPresetClick" />
+                <Border Width="1" Margin="6,4" Background="{StaticResource PanelBorder}" />
+                <Button Content="Hierarchy" Tag="Hierarchy" Click="OnTogglePanelClick" />
+                <Button Content="Inspector" Tag="Inspector" Click="OnTogglePanelClick" />
+                <Button Content="Output" Tag="Output" Click="OnTogglePanelClick" />
+            </StackPanel>
+            <Grid x:Name="WorldWorkspace" Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="290" /><ColumnDefinition Width="*" /><ColumnDefinition Width="370" />
+                <ColumnDefinition x:Name="HierarchyColumn" Width="290" /><ColumnDefinition Width="*" /><ColumnDefinition x:Name="InspectorColumn" Width="370" />
             </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions><RowDefinition Height="*" MinHeight="300" /><RowDefinition Height="340" MinHeight="240" /></Grid.RowDefinitions>
+            <Grid.RowDefinitions><RowDefinition Height="*" MinHeight="300" /><RowDefinition x:Name="OutputRow" Height="340" MinHeight="140" /></Grid.RowDefinitions>
 
-            <Border Grid.Column="0" Grid.Row="0" Grid.RowSpan="2" Margin="8" Padding="8"
+            <Border x:Name="HierarchyPanel" Grid.Column="0" Grid.Row="0" Grid.RowSpan="2" Margin="8" Padding="8"
                     Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top" Text="Scene Hierarchy" FontWeight="SemiBold" Margin="0,0,0,8" />
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                        <TextBlock Text="Selected entity name" Foreground="{StaticResource MutedText}" />
+                        <Grid Margin="0,3,0,5"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox Text="{Binding EntityNameInput, UpdateSourceTrigger=PropertyChanged}" /><Button Grid.Column="1" Content="Rename" Command="{Binding RenameEntityCommand}" /></Grid>
+                        <UniformGrid Columns="4">
+                            <Button Content="Duplicate" Command="{Binding DuplicateEntityCommand}" />
+                            <Button Content="Delete" Command="{Binding DeleteEntityCommand}" />
+                            <Button Content="Show/Hide" Command="{Binding ToggleEntityVisibleCommand}" />
+                            <Button Content="Lock" Command="{Binding ToggleEntityLockedCommand}" />
+                        </UniformGrid>
+                        <TextBlock Text="Parent entity ID" Foreground="{StaticResource MutedText}" Margin="0,7,0,0" />
+                        <Grid Margin="0,3,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox Text="{Binding ParentEntityIdInput, UpdateSourceTrigger=PropertyChanged}" /><Button Grid.Column="1" Content="Parent" Command="{Binding ReparentEntityCommand}" /><Button Grid.Column="2" Content="Clear" Command="{Binding ClearEntityParentCommand}" /></Grid>
+                    </StackPanel>
                     <TreeView ItemsSource="{Binding EntityNodes}" SelectedItemChanged="OnSelectedEntityChanged">
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Children}"><TextBlock Text="{Binding Name}" /></HierarchicalDataTemplate>
@@ -115,7 +145,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="2" Grid.Row="0" Margin="8" Padding="8"
+            <Border x:Name="InspectorPanel" Grid.Column="2" Grid.Row="0" Margin="8" Padding="8"
                     Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top" Text="Inspector" FontWeight="SemiBold" Margin="0,0,0,8" />
@@ -145,8 +175,8 @@
                 </DockPanel>
             </Border>
 
-            <TabControl Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="1" Margin="0,0,8,8">
-                <TabItem Header="Modeling">
+            <TabControl x:Name="OutputTabs" Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="1" Margin="0,0,8,8">
+                <TabItem Header="Modeling" Visibility="Collapsed">
                     <TabControl>
                     <TabItem Header="Mesh Edit">
                     <Grid Margin="8">
@@ -369,6 +399,14 @@
                     </Grid>
                 </TabItem>
             </TabControl>
+            <GridSplitter Grid.Column="0" Grid.RowSpan="2" Width="5" HorizontalAlignment="Right"
+                          Background="Transparent" ResizeDirection="Columns" ResizeBehavior="CurrentAndNext" />
+            <GridSplitter Grid.Column="2" Grid.RowSpan="2" Width="5" HorizontalAlignment="Left"
+                          Background="Transparent" ResizeDirection="Columns" ResizeBehavior="PreviousAndCurrent" />
+            <GridSplitter Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="1" Height="5" VerticalAlignment="Top"
+                          Background="Transparent" ResizeDirection="Rows" ResizeBehavior="PreviousAndCurrent" />
+            </Grid>
+            <local:ModelingWorkspace x:Name="ModelingWorkspaceHost" Grid.Row="1" Visibility="Collapsed" />
         </Grid>
     </DockPanel>
 </Window>

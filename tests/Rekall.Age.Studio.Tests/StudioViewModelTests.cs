@@ -91,6 +91,54 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task RichSceneCommandsRenameDuplicateHideLockAndReparentThroughCanonicalTransactions()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-scene-tools-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Scene Tools Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+            var parent = Assert.Single(viewModel.EntityNodes);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+            var child = viewModel.EntityNodes.Single(entity => entity.EntityId != parent.EntityId);
+            await viewModel.SelectEntityAsync(child);
+
+            viewModel.EntityNameInput = "Playable Hero";
+            await ExecuteAsync(viewModel.RenameEntityCommand);
+            viewModel.ParentEntityIdInput = parent.EntityId;
+            await ExecuteAsync(viewModel.ReparentEntityCommand);
+            await ExecuteAsync(viewModel.ToggleEntityVisibleCommand);
+            await ExecuteAsync(viewModel.ToggleEntityLockedCommand);
+            await ExecuteAsync(viewModel.DuplicateEntityCommand);
+
+            var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            var updated = scene.GetRequiredEntity(child.EntityId);
+            Assert.Equal("Playable Hero", updated.Name);
+            Assert.Equal(parent.EntityId, updated.ParentId);
+            Assert.False(updated.Visible);
+            Assert.True(updated.Locked);
+            Assert.Contains(scene.Entities, entity => entity.Id != child.EntityId && entity.Name == "Playable Hero Copy");
+
+            await ExecuteAsync(viewModel.UndoCommand);
+            scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            Assert.DoesNotContain(scene.Entities, entity => entity.Id != child.EntityId && entity.Name == "Playable Hero Copy");
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ViewModelExposesDistinctEditAndPersistentSimulateModes()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-mode-" + Guid.NewGuid().ToString("N"));

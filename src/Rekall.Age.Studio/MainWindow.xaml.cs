@@ -13,7 +13,9 @@ namespace Rekall.Age.Studio;
 public partial class MainWindow : Window
 {
     private readonly RekallAgeStudioViewModel _viewModel = new();
+    private readonly IRekallAgeStudioLayoutStore _layoutStore = new RekallAgeStudioLayoutStore();
     private readonly DispatcherTimer _previewTimer;
+    private RekallAgeStudioLayout _layout = RekallAgeStudioLayout.Default;
     private bool _shutdownComplete;
     private bool _meshTransformDragging;
     private bool _sceneTransformDragging;
@@ -41,6 +43,8 @@ public partial class MainWindow : Window
             var sceneIndex = Array.IndexOf(args, "--scene");
             var projectRoot = projectIndex >= 0 && projectIndex + 1 < args.Length ? args[projectIndex + 1] : null;
             var sceneName = sceneIndex >= 0 && sceneIndex + 1 < args.Length ? args[sceneIndex + 1] : "Main";
+            _layout = await _layoutStore.LoadAsync(CancellationToken.None);
+            ApplyLayout(_layout);
             await _viewModel.InitializeAsync(projectRoot, sceneName);
             _previewTimer.Start();
         }
@@ -68,6 +72,101 @@ public partial class MainWindow : Window
         {
             await _viewModel.SelectEntityAsync(entity);
         }
+    }
+
+    private void OnWorkspaceChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (WorldWorkspace is null || ModelingWorkspaceHost is null || ProjectBar is null || MainToolbar is null) return;
+        var modeling = WorkspaceSelector.SelectedIndex == 1;
+        WorldWorkspace.Visibility = modeling ? Visibility.Collapsed : Visibility.Visible;
+        ModelingWorkspaceHost.Visibility = modeling ? Visibility.Visible : Visibility.Collapsed;
+        ProjectBar.Visibility = modeling ? Visibility.Collapsed : Visibility.Visible;
+        MainToolbar.Visibility = modeling ? Visibility.Collapsed : Visibility.Visible;
+        if (modeling)
+        {
+            if (_viewModel.RefreshMeshAssetsCommand.CanExecute(null)) _viewModel.RefreshMeshAssetsCommand.Execute(null);
+            if (_viewModel.RefreshModelingGraphsCommand.CanExecute(null)) _viewModel.RefreshModelingGraphsCommand.Execute(null);
+        }
+    }
+
+    private void ApplyLayout(RekallAgeStudioLayout layout)
+    {
+        Width = layout.WindowWidth;
+        Height = layout.WindowHeight;
+        if (double.IsFinite(layout.WindowX) && double.IsFinite(layout.WindowY))
+        {
+            Left = Math.Clamp(layout.WindowX, SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 100);
+            Top = Math.Clamp(layout.WindowY, SystemParameters.VirtualScreenTop, SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 80);
+        }
+        HierarchyColumn.Width = new GridLength(layout.Panel("Hierarchy").Visible ? layout.Panel("Hierarchy").Size : 0);
+        InspectorColumn.Width = new GridLength(layout.Panel("Inspector").Visible ? layout.Panel("Inspector").Size : 0);
+        OutputRow.Height = new GridLength(layout.Panel("Output").Visible ? layout.Panel("Output").Size : 0);
+        HierarchyPanel.Visibility = layout.Panel("Hierarchy").Visible ? Visibility.Visible : Visibility.Collapsed;
+        InspectorPanel.Visibility = layout.Panel("Inspector").Visible ? Visibility.Visible : Visibility.Collapsed;
+        OutputTabs.Visibility = layout.Panel("Output").Visible ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var item in OutputTabs.Items.OfType<TabItem>())
+        {
+            if (string.Equals(item.Header?.ToString(), layout.ActiveOutputTab, StringComparison.Ordinal))
+            {
+                OutputTabs.SelectedItem = item;
+                break;
+            }
+        }
+        WorkspaceSelector.SelectedIndex = layout.ActiveWorkspace == "Modeling" ? 1 : 0;
+        WindowState = layout.WindowMaximized ? WindowState.Maximized : WindowState.Normal;
+    }
+
+    private void OnLayoutPresetClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string name }
+            || !Enum.TryParse<RekallAgeStudioLayoutPreset>(name, out var preset)) return;
+        var selected = RekallAgeStudioLayout.CreatePreset(preset);
+        _layout = selected with
+        {
+            WindowX = Left,
+            WindowY = Top,
+            WindowWidth = ActualWidth,
+            WindowHeight = ActualHeight,
+            WindowMaximized = WindowState == WindowState.Maximized,
+            ActiveWorkspace = WorkspaceSelector.SelectedIndex == 1 ? "Modeling" : "World"
+        };
+        ApplyLayout(_layout);
+    }
+
+    private void OnTogglePanelClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string panelId }) return;
+        _layout = CaptureLayout();
+        var panel = _layout.Panel(panelId);
+        _layout = _layout with
+        {
+            Panels = _layout.Panels.Select(candidate => candidate.Id == panelId
+                ? candidate with { Visible = !panel.Visible }
+                : candidate).ToArray()
+        };
+        ApplyLayout(_layout);
+    }
+
+    private RekallAgeStudioLayout CaptureLayout()
+    {
+        var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
+        var activeOutput = (OutputTabs.SelectedItem as TabItem)?.Header?.ToString() ?? _layout.ActiveOutputTab;
+        return RekallAgeStudioLayout.Normalize(_layout with
+        {
+            WindowX = bounds.X,
+            WindowY = bounds.Y,
+            WindowWidth = bounds.Width,
+            WindowHeight = bounds.Height,
+            WindowMaximized = WindowState == WindowState.Maximized,
+            ActiveOutputTab = activeOutput,
+            ActiveWorkspace = WorkspaceSelector.SelectedIndex == 1 ? "Modeling" : "World",
+            Panels =
+            [
+                _layout.Panel("Hierarchy") with { Visible = HierarchyPanel.Visibility == Visibility.Visible, Size = HierarchyPanel.Visibility == Visibility.Visible ? Math.Max(180, HierarchyColumn.ActualWidth) : _layout.Panel("Hierarchy").Size },
+                _layout.Panel("Inspector") with { Visible = InspectorPanel.Visibility == Visibility.Visible, Size = InspectorPanel.Visibility == Visibility.Visible ? Math.Max(180, InspectorColumn.ActualWidth) : _layout.Panel("Inspector").Size },
+                _layout.Panel("Output") with { Visible = OutputTabs.Visibility == Visibility.Visible, Size = OutputTabs.Visibility == Visibility.Visible ? Math.Max(140, OutputRow.ActualHeight) : _layout.Panel("Output").Size }
+            ]
+        }) ?? RekallAgeStudioLayout.Default;
     }
 
     private async void OnSceneViewportMouseDown(object sender, MouseButtonEventArgs e)
@@ -207,6 +306,15 @@ public partial class MainWindow : Window
             e.Cancel = true;
             _previewTimer.Stop();
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            try
+            {
+                _layout = CaptureLayout();
+                await _layoutStore.SaveAsync(_layout, CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(exception, "Failed to persist the Studio window layout.");
+            }
             _shutdownTask ??= _viewModel.DisposeAsync().AsTask();
             try
             {

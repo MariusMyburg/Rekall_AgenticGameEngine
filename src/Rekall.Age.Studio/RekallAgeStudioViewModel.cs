@@ -41,6 +41,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _openCommand;
     private readonly RekallAgeAsyncCommand _createCommand;
     private readonly RekallAgeAsyncCommand _addEntityCommand;
+    private readonly RekallAgeAsyncCommand _renameEntityCommand;
+    private readonly RekallAgeAsyncCommand _duplicateEntityCommand;
+    private readonly RekallAgeAsyncCommand _deleteEntityCommand;
+    private readonly RekallAgeAsyncCommand _toggleEntityVisibleCommand;
+    private readonly RekallAgeAsyncCommand _toggleEntityLockedCommand;
+    private readonly RekallAgeAsyncCommand _reparentEntityCommand;
+    private readonly RekallAgeAsyncCommand _clearEntityParentCommand;
     private readonly RekallAgeAsyncCommand _addComponentCommand;
     private readonly RekallAgeAsyncCommand _removeComponentCommand;
     private readonly RekallAgeAsyncCommand _setPropertyCommand;
@@ -90,6 +97,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _projectNameInput = "New Rekall Game";
     private string _sceneNameInput = "Main";
     private string _componentTypeInput = "Rekall.Transform";
+    private string _entityNameInput = string.Empty;
+    private string _parentEntityIdInput = string.Empty;
     private string _propertyNameInput = "position";
     private string _propertyValueInput = "[0, 0, 0]";
     private string _propertySchemaHelp = "Select a registered property to see its type and constraints.";
@@ -167,6 +176,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _openCommand = CreateAsyncCommand(OpenFromInputsAsync, CanOpenOrCreate);
         _createCommand = CreateAsyncCommand(CreateFromInputsAsync, CanOpenOrCreate);
         _addEntityCommand = CreateAsyncCommand(AddEntityAsync, HasEditableProject);
+        _renameEntityCommand = CreateAsyncCommand(RenameEntityAsync, CanRenameEntity);
+        _duplicateEntityCommand = CreateAsyncCommand(DuplicateEntityAsync, HasSelectedEntity);
+        _deleteEntityCommand = CreateAsyncCommand(DeleteEntityAsync, HasSelectedEntity);
+        _toggleEntityVisibleCommand = CreateAsyncCommand(ToggleEntityVisibleAsync, HasSelectedEntity);
+        _toggleEntityLockedCommand = CreateAsyncCommand(ToggleEntityLockedAsync, HasSelectedEntity);
+        _reparentEntityCommand = CreateAsyncCommand(ReparentEntityAsync, CanReparentEntity);
+        _clearEntityParentCommand = CreateAsyncCommand(ClearEntityParentAsync, HasSelectedEntity);
         _addComponentCommand = CreateAsyncCommand(AddComponentAsync, CanEditComponent);
         _removeComponentCommand = CreateAsyncCommand(RemoveComponentAsync, CanEditComponent);
         _setPropertyCommand = CreateAsyncCommand(SetPropertyAsync, CanEditProperty);
@@ -234,6 +250,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand OpenCommand => _openCommand;
     public ICommand CreateCommand => _createCommand;
     public ICommand AddEntityCommand => _addEntityCommand;
+    public ICommand RenameEntityCommand => _renameEntityCommand;
+    public ICommand DuplicateEntityCommand => _duplicateEntityCommand;
+    public ICommand DeleteEntityCommand => _deleteEntityCommand;
+    public ICommand ToggleEntityVisibleCommand => _toggleEntityVisibleCommand;
+    public ICommand ToggleEntityLockedCommand => _toggleEntityLockedCommand;
+    public ICommand ReparentEntityCommand => _reparentEntityCommand;
+    public ICommand ClearEntityParentCommand => _clearEntityParentCommand;
     public ICommand AddComponentCommand => _addComponentCommand;
     public ICommand RemoveComponentCommand => _removeComponentCommand;
     public ICommand SetPropertyCommand => _setPropertyCommand;
@@ -345,6 +368,24 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         set
         {
             if (Set(ref _agentTaskInput, value)) RefreshCommands();
+        }
+    }
+
+    public string EntityNameInput
+    {
+        get => _entityNameInput;
+        set
+        {
+            if (Set(ref _entityNameInput, value)) RefreshCommands();
+        }
+    }
+
+    public string ParentEntityIdInput
+    {
+        get => _parentEntityIdInput;
+        set
+        {
+            if (Set(ref _parentEntityIdInput, value)) RefreshCommands();
         }
     }
 
@@ -814,6 +855,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private bool CanOpenOrCreate() => !IsBusy && Mode == RekallAgeStudioMode.Edit && !string.IsNullOrWhiteSpace(ProjectPathInput);
     private bool HasOpenProject() => !IsBusy && _session.Model is not null;
+    private bool HasSelectedEntity() => HasEditableProject() && _session.SelectedEntityId is not null;
+    private bool CanRenameEntity() => HasSelectedEntity() && !string.IsNullOrWhiteSpace(EntityNameInput);
+    private bool CanReparentEntity() => HasSelectedEntity()
+        && !string.IsNullOrWhiteSpace(ParentEntityIdInput)
+        && !ParentEntityIdInput.Trim().Equals(_session.SelectedEntityId, StringComparison.Ordinal);
     private bool HasEditableProject() => HasOpenProject() && Mode == RekallAgeStudioMode.Edit;
     private bool CanEditComponent() => HasEditableProject()
         && _session.SelectedEntityId is not null
@@ -1103,6 +1149,72 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             "studio",
             CancellationToken.None).AsTask(), refreshPreviewAfter: true);
     }
+
+    private Task RenameEntityAsync() => ExecuteSelectedEntityCommandAsync(
+        "rekall.scene.entity.update_metadata",
+        new { name = EntityNameInput.Trim() },
+        $"Rename entity to {EntityNameInput.Trim()}");
+
+    private Task DuplicateEntityAsync() => ExecuteSelectedEntityCommandAsync(
+        "rekall.level.entity.duplicate",
+        new { },
+        $"Duplicate {_session.SelectedEntityId}");
+
+    private Task DeleteEntityAsync() => ExecuteSelectedEntityCommandAsync(
+        "rekall.entity.delete",
+        new { },
+        $"Delete {_session.SelectedEntityId}");
+
+    private Task ToggleEntityVisibleAsync()
+    {
+        var selected = SelectedEntityNode();
+        return selected is null
+            ? Task.CompletedTask
+            : ExecuteSelectedEntityCommandAsync(
+                "rekall.scene.entity.update_metadata",
+                new { visible = !selected.Visible },
+                $"{(selected.Visible ? "Hide" : "Show")} {selected.Name}");
+    }
+
+    private Task ToggleEntityLockedAsync()
+    {
+        var selected = SelectedEntityNode();
+        return selected is null
+            ? Task.CompletedTask
+            : ExecuteSelectedEntityCommandAsync(
+                "rekall.scene.entity.update_metadata",
+                new { locked = !selected.Locked },
+                $"{(selected.Locked ? "Unlock" : "Lock")} {selected.Name}");
+    }
+
+    private Task ReparentEntityAsync() => ExecuteSelectedEntityCommandAsync(
+        "rekall.scene.entity.update_metadata",
+        new { parentId = ParentEntityIdInput.Trim() },
+        $"Reparent {_session.SelectedEntityId}");
+
+    private Task ClearEntityParentAsync() => ExecuteSelectedEntityCommandAsync(
+        "rekall.scene.entity.update_metadata",
+        new { clearParent = true },
+        $"Unparent {_session.SelectedEntityId}");
+
+    private Task ExecuteSelectedEntityCommandAsync(string commandName, object commandArguments, string transactionName)
+    {
+        if (_session.ProjectRoot is null || _session.SceneName is null || _session.SelectedEntityId is null)
+            return Task.CompletedTask;
+        var arguments = JsonSerializer.SerializeToNode(commandArguments)!.AsObject();
+        arguments["projectRoot"] = _session.ProjectRoot;
+        arguments["sceneName"] = _session.SceneName;
+        arguments["entityId"] = _session.SelectedEntityId;
+        return RunAsync(() => _session.ExecuteAsync(
+            commandName,
+            arguments.ToJsonString(),
+            transactionName,
+            "studio",
+            CancellationToken.None).AsTask(), refreshPreviewAfter: true);
+    }
+
+    private RekallAgeSceneEntityNode? SelectedEntityNode() =>
+        _session.SelectedEntityId is null ? null : FindEntityNode(EntityNodes, _session.SelectedEntityId);
 
     private Task AddComponentAsync() => ExecuteComponentCommandAsync(
         "rekall.component.add",
@@ -1636,6 +1748,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         OnPropertyChanged(nameof(SelectedEntityId));
         SceneNameInput = model.Scene.Name;
         Replace(EntityNodes, model.Scene.RootEntities);
+        var selectedNode = SelectedEntityNode();
+        EntityNameInput = selectedNode?.Name ?? string.Empty;
+        ParentEntityIdInput = selectedNode?.ParentId ?? string.Empty;
         Replace(SceneNames, model.Project.Scenes.Select(scene => scene.Name));
         Replace(InspectorLines, model.Inspector.Components.SelectMany(component =>
             new[] { $"{component.DisplayName} ({component.Type})" }.Concat(component.Properties
@@ -1858,6 +1973,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _openCommand.RaiseCanExecuteChanged();
         _createCommand.RaiseCanExecuteChanged();
         _addEntityCommand.RaiseCanExecuteChanged();
+        _renameEntityCommand.RaiseCanExecuteChanged();
+        _duplicateEntityCommand.RaiseCanExecuteChanged();
+        _deleteEntityCommand.RaiseCanExecuteChanged();
+        _toggleEntityVisibleCommand.RaiseCanExecuteChanged();
+        _toggleEntityLockedCommand.RaiseCanExecuteChanged();
+        _reparentEntityCommand.RaiseCanExecuteChanged();
+        _clearEntityParentCommand.RaiseCanExecuteChanged();
         _addComponentCommand.RaiseCanExecuteChanged();
         _removeComponentCommand.RaiseCanExecuteChanged();
         _setPropertyCommand.RaiseCanExecuteChanged();

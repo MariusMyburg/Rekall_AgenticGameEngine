@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
@@ -48,6 +49,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _captureCommand;
     private readonly RekallAgeAsyncCommand _playCommand;
     private readonly RekallAgeAsyncCommand _simulateCommand;
+    private readonly RekallAgeAsyncCommand _pauseSimulationCommand;
+    private readonly RekallAgeAsyncCommand _stepSimulationCommand;
     private readonly RekallAgeAsyncCommand _stopCommand;
     private readonly RekallAgeAsyncCommand _switchSceneCommand;
     private readonly RekallAgeAsyncCommand _packageCommand;
@@ -78,6 +81,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private bool _isBusy;
     private bool _isAgentRunning;
     private bool _isLiveViewportEnabled = true;
+    private bool _isSimulationPaused;
     private Task? _disposeTask;
     private int _previewAdvancing;
     private int _previewFrameIndex;
@@ -111,6 +115,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _viewportSummary = "No rendered frame yet.";
     private BitmapSource? _viewportImage;
     private RekallAgeStudioViewportInteractionSnapshot? _viewportInteraction;
+    private RekallAgeStudioSceneGizmo? _sceneGizmo;
+    private RekallAgeStudioTransformGesture? _sceneTransformGesture;
+    private RekallAgeStudioTransformUpdate? _sceneTransformUpdate;
+    private RekallAgeStudioTransformTool _transformTool = RekallAgeStudioTransformTool.Move;
+    private RekallAgeStudioTransformSpace _transformSpace = RekallAgeStudioTransformSpace.World;
+    private double _moveSnap = 0.25;
+    private double _rotationSnap = 15;
+    private double _scaleSnap = 0.1;
     private int _viewportRenderableCount;
     private bool _viewportVisuallyInformative;
     private RekallAgeWorkbenchModel? _currentModel;
@@ -162,6 +174,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _validateCommand = CreateAsyncCommand(ValidateAsync, HasOpenProject);
         _captureCommand = CreateAsyncCommand(CaptureAsync, HasEditableProject);
         _simulateCommand = CreateAsyncCommand(StartSimulationAsync, () => HasOpenProject() && Mode == RekallAgeStudioMode.Edit);
+        _pauseSimulationCommand = CreateAsyncCommand(ToggleSimulationPauseAsync, () => !IsBusy && IsSimulating);
+        _stepSimulationCommand = CreateAsyncCommand(StepSimulationAsync, () => !IsBusy && IsSimulating && IsSimulationPaused);
         _playCommand = CreateAsyncCommand(PlayAsync, () => HasOpenProject() && Mode == RekallAgeStudioMode.Edit);
         _stopCommand = CreateAsyncCommand(StopAsync, () => !IsBusy && Mode != RekallAgeStudioMode.Edit);
         _switchSceneCommand = CreateAsyncCommand(SwitchSceneAsync, CanSwitchScene);
@@ -227,6 +241,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand ValidateCommand => _validateCommand;
     public ICommand CaptureCommand => _captureCommand;
     public ICommand SimulateCommand => _simulateCommand;
+    public ICommand PauseSimulationCommand => _pauseSimulationCommand;
+    public ICommand StepSimulationCommand => _stepSimulationCommand;
     public ICommand PlayCommand => _playCommand;
     public ICommand StopCommand => _stopCommand;
     public ICommand SwitchSceneCommand => _switchSceneCommand;
@@ -567,7 +583,84 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool IsPlaying => Mode == RekallAgeStudioMode.Play && _player is { HasExited: false };
     public bool IsSimulating => Mode == RekallAgeStudioMode.Simulate;
+    public bool IsSimulationPaused
+    {
+        get => _isSimulationPaused;
+        private set
+        {
+            if (!Set(ref _isSimulationPaused, value)) return;
+            OnPropertyChanged(nameof(PauseSimulationLabel));
+            RefreshCommands();
+        }
+    }
+
+    public string PauseSimulationLabel => IsSimulationPaused ? "Resume" : "Pause";
     public string? SelectedEntityId => _session.SelectedEntityId;
+
+    public IReadOnlyList<RekallAgeStudioTransformTool> TransformTools { get; } =
+        [RekallAgeStudioTransformTool.Select, RekallAgeStudioTransformTool.Move, RekallAgeStudioTransformTool.Rotate, RekallAgeStudioTransformTool.Scale];
+
+    public IReadOnlyList<RekallAgeStudioTransformSpace> TransformSpaces { get; } =
+        [RekallAgeStudioTransformSpace.World, RekallAgeStudioTransformSpace.Local];
+
+    public RekallAgeStudioTransformTool TransformTool
+    {
+        get => _transformTool;
+        set
+        {
+            if (Set(ref _transformTool, value)) OnPropertyChanged(nameof(SceneGizmoHandles));
+        }
+    }
+
+    public RekallAgeStudioTransformSpace TransformSpace
+    {
+        get => _transformSpace;
+        set => Set(ref _transformSpace, value);
+    }
+
+    public double MoveSnap
+    {
+        get => _moveSnap;
+        set => Set(ref _moveSnap, ValidateSnap(value, nameof(MoveSnap)));
+    }
+
+    public double RotationSnap
+    {
+        get => _rotationSnap;
+        set => Set(ref _rotationSnap, ValidateSnap(value, nameof(RotationSnap)));
+    }
+
+    public double ScaleSnap
+    {
+        get => _scaleSnap;
+        set => Set(ref _scaleSnap, ValidateSnap(value, nameof(ScaleSnap)));
+    }
+
+    internal IReadOnlyList<RekallAgeStudioGizmoHandle> SceneGizmoHandles =>
+        TransformTool is RekallAgeStudioTransformTool.Select ? [] : _sceneGizmo?.Handles ?? [];
+
+    public IReadOnlyList<RekallAgeStudioGizmoDisplayLine> GetSceneGizmoDisplayLines(
+        double displayWidth,
+        double displayHeight)
+    {
+        if (_viewportInteraction is null || displayWidth <= 0 || displayHeight <= 0
+            || SceneGizmoHandles.Count == 0)
+        {
+            return [];
+        }
+
+        var scale = Math.Min(
+            displayWidth / _viewportInteraction.FrameWidth,
+            displayHeight / _viewportInteraction.FrameHeight);
+        var offsetX = (displayWidth - (_viewportInteraction.FrameWidth * scale)) * 0.5;
+        var offsetY = (displayHeight - (_viewportInteraction.FrameHeight * scale)) * 0.5;
+        return SceneGizmoHandles.Select(handle => new RekallAgeStudioGizmoDisplayLine(
+            handle.Axis,
+            offsetX + (handle.Start.X * scale),
+            offsetY + (handle.Start.Y * scale),
+            offsetX + (handle.End.X * scale),
+            offsetY + (handle.End.Y * scale))).ToArray();
+    }
 
     public bool IsLiveViewportEnabled
     {
@@ -618,6 +711,84 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         await RunAsync(() => _session.SelectEntityAsync(entityId, CancellationToken.None).AsTask());
         OnPropertyChanged(nameof(SelectedEntityId));
         return string.Equals(_session.SelectedEntityId, entityId, StringComparison.Ordinal);
+    }
+
+    public bool BeginSceneTransform(
+        double displayWidth,
+        double displayHeight,
+        double displayX,
+        double displayY)
+    {
+        if (IsBusy || Mode != RekallAgeStudioMode.Edit || TransformTool is RekallAgeStudioTransformTool.Select
+            || _viewportInteraction is null || _sceneGizmo is null)
+        {
+            return false;
+        }
+
+        var point = _viewportInteraction.MapDisplayPoint(displayWidth, displayHeight, displayX, displayY);
+        if (point is null) return false;
+        var axis = _sceneGizmo.HitTest(point.Value.X, point.Value.Y);
+        if (axis is null) return false;
+
+        var propertyName = TransformPropertyName(TransformTool, axis.Value);
+        var initialValue = InspectorNumber("Rekall.Transform3D", propertyName,
+            TransformTool is RekallAgeStudioTransformTool.Scale ? 1 : 0);
+        var snap = TransformTool switch
+        {
+            RekallAgeStudioTransformTool.Move => MoveSnap,
+            RekallAgeStudioTransformTool.Rotate => RotationSnap,
+            RekallAgeStudioTransformTool.Scale => ScaleSnap,
+            _ => 0
+        };
+        _sceneTransformGesture = _sceneGizmo.Begin(
+            TransformTool, axis.Value, point.Value.X, point.Value.Y, initialValue, snap);
+        _sceneTransformUpdate = null;
+        return true;
+    }
+
+    public bool UpdateSceneTransform(
+        double displayWidth,
+        double displayHeight,
+        double displayX,
+        double displayY)
+    {
+        if (_sceneTransformGesture is null || _viewportInteraction is null) return false;
+        var point = _viewportInteraction.MapDisplayPoint(displayWidth, displayHeight, displayX, displayY);
+        if (point is null) return false;
+        _sceneTransformUpdate = _sceneTransformGesture.Update(point.Value.X, point.Value.Y);
+        return true;
+    }
+
+    public async Task<bool> CompleteSceneTransformAsync()
+    {
+        var update = _sceneTransformUpdate;
+        _sceneTransformGesture = null;
+        _sceneTransformUpdate = null;
+        if (update is null || _session.ProjectRoot is null || _session.SceneName is null
+            || _session.SelectedEntityId is null)
+        {
+            return false;
+        }
+
+        await ExecuteComponentCommandAsync(
+            "rekall.component.set_property",
+            new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                entityId = _session.SelectedEntityId,
+                componentType = update.ComponentType,
+                propertyName = update.PropertyName,
+                value = update.Value
+            },
+            $"{TransformTool} {_session.SelectedEntityId} {update.PropertyName}");
+        return true;
+    }
+
+    public void CancelSceneTransform()
+    {
+        _sceneTransformGesture = null;
+        _sceneTransformUpdate = null;
     }
 
     public ValueTask DisposeAsync()
@@ -1222,6 +1393,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 540,
                 _lifecycleCancellation.Token);
             ApplyPreviewFrame(frame);
+            IsSimulationPaused = false;
             Mode = RekallAgeStudioMode.Simulate;
             StatusText = $"Simulating {_session.SceneName} in the live Studio viewport.";
         }
@@ -1248,7 +1420,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 await RefreshEditPreviewAsync(StatusText);
             }
         }
-        if (!IsSimulating || !IsLiveViewportEnabled || IsBusy
+        if (!IsSimulating || IsSimulationPaused || !IsLiveViewportEnabled || IsBusy
             || Interlocked.Exchange(ref _previewAdvancing, 1) != 0)
         {
             return;
@@ -1272,10 +1444,35 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
+    private Task ToggleSimulationPauseAsync()
+    {
+        IsSimulationPaused = !IsSimulationPaused;
+        StatusText = IsSimulationPaused
+            ? $"Simulation paused at frame {PreviewFrameIndex}."
+            : $"Simulation resumed from frame {PreviewFrameIndex}.";
+        return Task.CompletedTask;
+    }
+
+    private async Task StepSimulationAsync()
+    {
+        if (!IsSimulating || !IsSimulationPaused) return;
+        IsBusy = true;
+        try
+        {
+            ApplyPreviewFrame(await _previewSession.StepAsync(1, _lifecycleCancellation.Token));
+            StatusText = $"Simulation advanced exactly one frame to {PreviewFrameIndex}.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     private void ApplyPreviewFrame(RekallAgeStudioPreviewFrame frame)
     {
         ViewportImage = frame.Image;
         _viewportInteraction = frame.Interaction;
+        RefreshSceneGizmo();
         PreviewFrameIndex = frame.FrameIndex;
         ViewportRenderableCount = frame.RenderableCount;
         ViewportSummary = $"{frame.Image.PixelWidth}×{frame.Image.PixelHeight} · frame {frame.FrameIndex} · "
@@ -1336,6 +1533,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             transitionEntered = true;
             if (Mode == RekallAgeStudioMode.Simulate)
             {
+                IsSimulationPaused = false;
                 Mode = RekallAgeStudioMode.Edit;
                 if (resetEditPreview && _session.ProjectRoot is not null && _session.SceneName is not null)
                 {
@@ -1473,6 +1671,67 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             ViewportSummary = $"Camera {model.Runtime.ActiveCameraName ?? "none"} · {model.Runtime.RenderableCount} renderables";
         }
+        RefreshSceneGizmo();
+    }
+
+    private void RefreshSceneGizmo()
+    {
+        var selected = SelectedEntityId is null ? null : FindEntityNode(EntityNodes, SelectedEntityId);
+        var hasTransform3D = _currentModel?.Inspector.Components.Any(
+            component => component.Type.Equals("Rekall.Transform3D", StringComparison.Ordinal)) == true;
+        _sceneGizmo = _viewportInteraction is null || selected is null || !hasTransform3D
+            ? null
+            : RekallAgeStudioSceneGizmo.Create(_viewportInteraction, selected.EntityId, selected.Locked);
+        OnPropertyChanged(nameof(SceneGizmoHandles));
+    }
+
+    private double InspectorNumber(string componentType, string propertyName, double fallback)
+    {
+        var property = _currentModel?.Inspector.Components
+            .FirstOrDefault(component => component.Type.Equals(componentType, StringComparison.Ordinal))?
+            .Properties.FirstOrDefault(candidate => candidate.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
+        return property is { IsDefined: true }
+            && double.TryParse(property.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+            && double.IsFinite(value)
+                ? value
+                : fallback;
+    }
+
+    private static RekallAgeSceneEntityNode? FindEntityNode(
+        IEnumerable<RekallAgeSceneEntityNode> roots,
+        string entityId)
+    {
+        foreach (var node in roots)
+        {
+            if (node.EntityId.Equals(entityId, StringComparison.Ordinal)) return node;
+            var child = FindEntityNode(node.Children, entityId);
+            if (child is not null) return child;
+        }
+
+        return null;
+    }
+
+    private static string TransformPropertyName(
+        RekallAgeStudioTransformTool tool,
+        RekallAgeStudioTransformAxis axis) =>
+        (tool, axis) switch
+        {
+            (RekallAgeStudioTransformTool.Move, RekallAgeStudioTransformAxis.X) => "x",
+            (RekallAgeStudioTransformTool.Move, RekallAgeStudioTransformAxis.Y) => "y",
+            (RekallAgeStudioTransformTool.Move, RekallAgeStudioTransformAxis.Z) => "z",
+            (RekallAgeStudioTransformTool.Rotate, RekallAgeStudioTransformAxis.X) => "pitch",
+            (RekallAgeStudioTransformTool.Rotate, RekallAgeStudioTransformAxis.Y) => "yaw",
+            (RekallAgeStudioTransformTool.Rotate, RekallAgeStudioTransformAxis.Z) => "roll",
+            (RekallAgeStudioTransformTool.Scale, RekallAgeStudioTransformAxis.X) => "scaleX",
+            (RekallAgeStudioTransformTool.Scale, RekallAgeStudioTransformAxis.Y) => "scaleY",
+            (RekallAgeStudioTransformTool.Scale, RekallAgeStudioTransformAxis.Z) => "scaleZ",
+            _ => throw new ArgumentOutOfRangeException()
+        };
+
+    private static double ValidateSnap(double value, string parameterName)
+    {
+        if (!double.IsFinite(value) || value < 0) throw new ArgumentOutOfRangeException(parameterName);
+        return value;
     }
 
     private void RefreshPropertySchemas()
@@ -1606,6 +1865,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _validateCommand.RaiseCanExecuteChanged();
         _captureCommand.RaiseCanExecuteChanged();
         _simulateCommand.RaiseCanExecuteChanged();
+        _pauseSimulationCommand.RaiseCanExecuteChanged();
+        _stepSimulationCommand.RaiseCanExecuteChanged();
         _playCommand.RaiseCanExecuteChanged();
         _stopCommand.RaiseCanExecuteChanged();
         _switchSceneCommand.RaiseCanExecuteChanged();

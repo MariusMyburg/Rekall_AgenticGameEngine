@@ -43,6 +43,8 @@
             <Button Content="Add Entity" Command="{Binding AddEntityCommand}" />
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
             <Button Content="Simulate" Command="{Binding SimulateCommand}" Style="{StaticResource AccentButton}" ToolTip="Run the scene in this viewport without changing authored state" />
+            <Button Content="{Binding PauseSimulationLabel}" Command="{Binding PauseSimulationCommand}" ToolTip="Pause or resume the live simulation clock" />
+            <Button Content="Step" Command="{Binding StepSimulationCommand}" ToolTip="Advance a paused simulation by exactly one fixed frame" />
             <Button Content="Play" Command="{Binding PlayCommand}" ToolTip="Launch the game in the production Player" />
             <Button Content="Stop" Command="{Binding StopCommand}" ToolTip="Stop Simulate or Play and return to Edit" />
             <ToggleButton Content="Live" IsChecked="{Binding IsLiveViewportEnabled, Mode=TwoWay}" Margin="7,2,2,2" ToolTip="Continuously update the viewport while simulating" />
@@ -78,7 +80,10 @@
                 <Grid>
                     <Image x:Name="SceneViewportImage" Source="{Binding ViewportImage}" Stretch="Uniform"
                            RenderOptions.BitmapScalingMode="HighQuality" MouseLeftButtonDown="OnSceneViewportMouseDown"
+                           MouseMove="OnSceneViewportMouseMove" MouseLeftButtonUp="OnSceneViewportMouseUp"
+                           LostMouseCapture="OnSceneViewportLostMouseCapture" SizeChanged="OnSceneViewportSizeChanged"
                            Cursor="Cross" ToolTip="Select scene entities directly through the rendered viewport." />
+                    <Canvas x:Name="SceneGizmoCanvas" IsHitTestVisible="False" />
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
                         <TextBlock Text="AGE" Foreground="#33404D" FontSize="34" FontWeight="Light" HorizontalAlignment="Center" />
                         <TextBlock Text="Open a project to render the live viewport" Foreground="#607184" Margin="0,8,0,0" />
@@ -91,6 +96,20 @@
                             <TextBlock Text="{Binding ViewportSummary}" Foreground="#AAB6C5" />
                             <TextBlock Text=" · " Foreground="#718096" />
                             <TextBlock Text="{Binding ModeLabel}" Foreground="{StaticResource Accent}" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+                    <Border VerticalAlignment="Top" HorizontalAlignment="Left" Margin="10,48,0,0"
+                            Background="#E3151920" BorderBrush="#394451" BorderThickness="1" CornerRadius="3" Padding="5">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Transform" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="3,0,5,0" />
+                            <ComboBox Width="76" ItemsSource="{Binding TransformTools}" SelectedItem="{Binding TransformTool}" />
+                            <ComboBox Width="70" Margin="5,0,0,0" ItemsSource="{Binding TransformSpaces}" SelectedItem="{Binding TransformSpace}" />
+                            <TextBlock Text="Move" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="8,0,4,0" />
+                            <TextBox Width="45" Text="{Binding MoveSnap, UpdateSourceTrigger=LostFocus}" />
+                            <TextBlock Text="°" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="8,0,4,0" />
+                            <TextBox Width="40" Text="{Binding RotationSnap, UpdateSourceTrigger=LostFocus}" />
+                            <TextBlock Text="Scale" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="8,0,4,0" />
+                            <TextBox Width="45" Text="{Binding ScaleSnap, UpdateSourceTrigger=LostFocus}" />
                         </StackPanel>
                     </Border>
                 </Grid>

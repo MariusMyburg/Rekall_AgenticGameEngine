@@ -46,6 +46,51 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task SceneGizmoDragPersistsAsOneUndoableTransformTransaction()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-gizmo-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Scene Gizmo Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+            var entity = Assert.Single(viewModel.EntityNodes);
+            viewModel.ComponentTypeInput = "Rekall.Transform3D";
+            await ExecuteAsync(viewModel.AddComponentCommand);
+            preview.Regions.Add(new(entity.EntityId, RekallAgeStudioViewportRegionKind.World, 40, 40, 20, 20, 2, 0));
+            await viewModel.SelectEntityAsync(entity);
+            var transactionsBefore = viewModel.TransactionLines.Count;
+
+            Assert.True(viewModel.BeginSceneTransform(100, 100, 65, 50));
+            Assert.True(viewModel.UpdateSceneTransform(100, 100, 91, 50));
+            Assert.True(await viewModel.CompleteSceneTransformAsync());
+
+            var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            var transform = Assert.Single(Assert.Single(scene.Entities).Components, component => component.Type == "Rekall.Transform3D");
+            Assert.Equal(0.5, transform.Properties["x"]!.GetValue<double>(), 6);
+            Assert.Equal(transactionsBefore + 1, viewModel.TransactionLines.Count);
+
+            await ExecuteAsync(viewModel.UndoCommand);
+            scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            transform = Assert.Single(Assert.Single(scene.Entities).Components, component => component.Type == "Rekall.Transform3D");
+            Assert.False(transform.Properties.ContainsKey("x"));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ViewModelExposesDistinctEditAndPersistentSimulateModes()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-mode-" + Guid.NewGuid().ToString("N"));
@@ -79,6 +124,50 @@ public sealed class StudioViewModelTests
             Assert.Equal(RekallAgeStudioMode.Edit, viewModel.Mode);
             Assert.False(viewModel.IsSimulating);
             Assert.Equal(3, preview.ResetCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task PausedSimulationSuppressesAutomaticTicksAndSingleStepAdvancesExactlyOneFrame()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-step-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Pause Step Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.SimulateCommand);
+
+            await ExecuteAsync(viewModel.PauseSimulationCommand);
+            Assert.True(viewModel.IsSimulationPaused);
+            await viewModel.AdvanceLivePreviewAsync();
+            Assert.Equal(0, viewModel.PreviewFrameIndex);
+            Assert.Equal(0, preview.StepCount);
+
+            await ExecuteAsync(viewModel.StepSimulationCommand);
+            Assert.Equal(1, viewModel.PreviewFrameIndex);
+            Assert.Equal(1, preview.StepCount);
+
+            await ExecuteAsync(viewModel.PauseSimulationCommand);
+            Assert.False(viewModel.IsSimulationPaused);
+            await viewModel.AdvanceLivePreviewAsync();
+            Assert.Equal(7, viewModel.PreviewFrameIndex);
+            Assert.Equal(2, preview.StepCount);
+
+            await ExecuteAsync(viewModel.StopCommand);
+            Assert.False(viewModel.IsSimulationPaused);
         }
         finally
         {

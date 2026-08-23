@@ -4,9 +4,26 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 10:43 Africa/Johannesburg
+Last verified: 2026-08-23 12:20 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
+
+Studio scene interaction now uses a render-derived interaction snapshot rather
+than guessed editor geometry. Uniform-stretch letterboxing is mapped exactly;
+UI hit regions take priority; world hits resolve by depth and stable identity;
+hidden entities and synthetic render surfaces cannot be selected. The viewport
+now selects canonical scene entities directly. A tested three-axis scene gizmo
+projects from that same snapshot and exposes Select, Move, Rotate, Scale,
+World/Local, and separate movement/degree/scale snapping controls. Dragging a
+handle publishes exactly one canonical `rekall.component.set_property`
+transaction, and the persisted `Rekall.Transform3D` change reverses through the
+ordinary Studio undo stack. Locked entities do not expose an editable gizmo.
+Simulate mode also has deterministic Pause/Resume and exact single-frame Step;
+paused timer ticks are suppressed and stopping clears paused state. The full
+Studio suite passes 46/46 after the gizmo integration; the new pause/step proof
+passes in isolation. Layout lifecycle wiring, a dedicated full-window Modeling
+workspace, richer hierarchy commands, real Windows interaction acceptance, and
+the next complete-suite run remain in progress.
 
 The procedural sphere contract is now a true closed shared-topology surface:
 one vertex per pole, shared periodic seam vertices, outward cap triangles, and

@@ -112,6 +112,11 @@ then grow it into procedural geometry/material graphs and Studio modelling.
   emissive/output nodes.
 - [x] Add ordered modifier descriptors, immutable evaluation, cache identity,
   attribute-propagation policy, preview, reorder, configure, and bake.
+- [x] Prove every advertised mesh operation and modifier executes
+  deterministically from immutable input, produces strictly valid output, and
+  remains covered by an exact catalog inventory gate.
+- [x] Prove box, sphere, cylinder, cone, and torus closed-topology invariants and
+  all 15 unordered shape pairings across union, intersection, and difference.
 - [ ] Expand generic topology, UV, boolean, subdivision, remesh, and optimization
   operations only behind strict tests.
 

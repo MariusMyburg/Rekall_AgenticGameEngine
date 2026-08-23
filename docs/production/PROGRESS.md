@@ -4,9 +4,30 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 10:31 Africa/Johannesburg
+Last verified: 2026-08-23 10:43 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
+
+The procedural sphere contract is now a true closed shared-topology surface:
+one vertex per pole, shared periodic seam vertices, outward cap triangles, and
+shared middle-ring quads. The former schema-valid but open 45-point sphere for
+8 segments/4 rings is replaced by a finite manifold 26-point/56-edge/32-face
+surface with zero boundary and non-manifold edges. The real populated Studio
+fixture now requires its box/sphere Boolean evaluation to succeed before WPF
+layout can pass, so Studio presentation cannot hide a failed modeling output.
+
+Production modeling matrices now close the catalog-wide verification gap.
+Box, sphere, cylinder, cone, and torus each prove finite closed topology and the
+correct Euler class. Every unordered pairing of those five closed shapes,
+including same-family overlaps, executes union, intersection, and difference:
+15 pairings and 45 Boolean evaluations, all required to return nonempty, valid,
+closed topology. All 10 advertised semantic mesh operations and all 6 ordered
+modifiers also execute twice from immutable input, produce byte-equivalent
+deterministic meshes, advance revisions correctly, remain inside their declared
+change masks, and pass strict validation; an exact inventory assertion fails if
+a future catalog entry is advertised without joining the production matrix.
+The focused production matrix passes 37/37, the complete modeling namespace
+passes 139/139, and the complete Studio suite passes 37/37.
 
 Studio procedural graphs now expose descriptor-driven typed parameter editors
 for scalar, integer, Boolean, string, enum, material, and vector values. Editors

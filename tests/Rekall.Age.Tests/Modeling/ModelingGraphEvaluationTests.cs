@@ -148,11 +148,42 @@ public sealed class ModelingGraphEvaluationTests
         Assert.True(result.Succeeded);
         var mesh = result.Outputs["mesh"];
         Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
-        Assert.Equal(54, mesh.Topology.FaceIds.Count);
+        Assert.Equal(38, mesh.Topology.FaceIds.Count);
         Assert.Equal(-1, mesh.Topology.Positions.Min(position => position.X), 6);
         Assert.Equal(3.5, mesh.Topology.Positions.Max(position => position.X), 6);
         Assert.Equal(mesh.Topology.PointIds.Count, mesh.Topology.PointIds.Distinct().Count());
         Assert.Equal(mesh.Topology.FaceIds.Count, mesh.Topology.FaceIds.Distinct().Count());
+    }
+
+    [Fact]
+    public async Task SphereCreatesClosedManifoldWithoutSeamOrPoleDuplicates()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "sphere-graph",
+            "Sphere Graph",
+            [
+                new("sphere", "rekall.modeling.primitive.sphere", 1, new JsonObject
+                {
+                    ["radius"] = 1.0,
+                    ["segments"] = 8,
+                    ["rings"] = 4
+                }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [new("sphere-output", "sphere", "geometry", "output", "input")],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var validation = new RekallAgeMeshValidator().Validate(result.Outputs["mesh"]);
+        Assert.True(validation.IsValid);
+        Assert.Equal(26, validation.Summary.PointCount);
+        Assert.Equal(56, validation.Summary.EdgeCount);
+        Assert.Equal(32, validation.Summary.FaceCount);
+        Assert.Equal(0, validation.Summary.BoundaryEdgeCount);
+        Assert.Equal(0, validation.Summary.NonManifoldEdgeCount);
     }
 
     [Theory]

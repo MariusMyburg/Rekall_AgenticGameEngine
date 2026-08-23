@@ -714,52 +714,6 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         int Vertical(int x, int y) => verticalStart + y * (segmentsX + 1) + x;
     }
 
-    private static RekallAgeMeshAsset CreateSphere(
-        RekallAgeModelingGraphAsset graph,
-        RekallAgeModelingGraphNode node)
-    {
-        var radius = ReadPositive(node, "radius", 0.5);
-        var segments = ReadInteger(node, "segments", 16, 3, 4_096);
-        var rings = ReadInteger(node, "rings", 8, 2, 4_096);
-        var vertexCount = checked((segments + 1) * (rings + 1));
-        var triangleCount = checked(segments * 2 * (rings - 1));
-        if (vertexCount > 2_000_000 || triangleCount > 2_000_000)
-            throw new EvaluationException("REKALL_MODELING_EVALUATION_ELEMENT_BUDGET_EXCEEDED", "Sphere parameters exceed the hard element ceiling.", node.NodeId);
-        var vertices = new List<RekallAgeLegacyGeometryVertex>(vertexCount);
-        for (var ring = 0; ring <= rings; ring++)
-        {
-            var v = ring / (double)rings;
-            var theta = Math.PI * v;
-            for (var segment = 0; segment <= segments; segment++)
-            {
-                var u = segment / (double)segments;
-                var phi = Math.PI * 2 * u;
-                var normal = new RekallAgeGeometryVector3(
-                    Math.Sin(theta) * Math.Cos(phi),
-                    Math.Cos(theta),
-                    Math.Sin(theta) * Math.Sin(phi));
-                vertices.Add(new(
-                    new(normal.X * radius, normal.Y * radius, normal.Z * radius),
-                    normal,
-                    new(u, v)));
-            }
-        }
-        var indices = new List<uint>(triangleCount * 3);
-        var stride = segments + 1;
-        for (var ring = 0; ring < rings; ring++)
-        for (var segment = 0; segment < segments; segment++)
-        {
-            var a = checked((uint)(ring * stride + segment));
-            var b = a + 1;
-            var c = checked((uint)((ring + 1) * stride + segment));
-            var d = c + 1;
-            if (ring > 0) indices.AddRange([a, c, b]);
-            if (ring < rings - 1) indices.AddRange([b, c, d]);
-        }
-        return new RekallAgeLegacyGeometryMeshAdapter().Convert(
-            $"{graph.AssetId}.{node.NodeId}", node.NodeId, vertices, indices) with { Revision = graph.Revision };
-    }
-
     private static double ReadPositive(RekallAgeModelingGraphNode node, string name, double fallback)
     {
         var value = node.Parameters[name] is JsonValue json && json.TryGetValue<double>(out var number) ? number : fallback;

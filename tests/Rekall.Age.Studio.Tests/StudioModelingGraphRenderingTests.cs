@@ -24,7 +24,9 @@ public sealed class StudioModelingGraphRenderingTests
                 var projectRoot = Path.Combine(repositoryRoot, "Examples", "ProceduralModelingProbe");
                 var session = new RekallAgeStudioModelingGraphSession();
                 session.OpenAsync(projectRoot, "hero-form", CancellationToken.None).AsTask().GetAwaiter().GetResult();
-                session.EvaluateAsync("mesh", CancellationToken.None).AsTask().GetAwaiter().GetResult();
+                var evaluation = session.EvaluateAsync("mesh", CancellationToken.None).AsTask().GetAwaiter().GetResult();
+                Assert.True(evaluation.Succeeded,
+                    string.Join(Environment.NewLine, evaluation.Diagnostics.Select(item => $"{item.Code}: {item.Message}")));
                 foreach (var node in session.Nodes) viewModel.ModelingGraphNodes.Add(node);
                 foreach (var parameter in session.CreateParameterEditors("box"))
                     viewModel.ModelingGraphParameterEditors.Add(parameter);

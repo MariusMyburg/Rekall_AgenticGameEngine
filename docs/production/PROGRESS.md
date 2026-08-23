@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 20:57 Africa/Johannesburg
+Last verified: 2026-08-23 22:50 Africa/Johannesburg
 
 Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
@@ -4004,6 +4004,41 @@ output directory. The unchanged installed product matrix passed. Soak completed
 600 frames and exactly 10 seconds at 4,449.2 FPS with 693,680 retained bytes and
 all nine checks. The 1,149-payload-file archive is 195,083,188 bytes with
 SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
+
+Genuine web publishing Task 5 (the direct RenderingDevice scene renderer) has
+started with its first verified slice: `RekallAgeRenderingDeviceSceneRenderer`
+and `RekallAgeRenderingDeviceSceneResources` execute an ordinary
+`RekallAgeRuntimeViewportFrame` entirely through the generic
+`IRekallAgeRenderingDevice` contract instead of native Vulkan calls. Rather
+than duplicating the existing native scene pipeline, it reuses the same
+backend-neutral frame/draw projection already used by the Vulkan path --
+`RekallAgeVulkanSceneBatchBuilder`, `RekallAgeVulkanSceneDrawPlanBuilder`, and
+`RekallAgeVulkanSceneGeometryUploadBuilder` are all pure data transforms with
+no native Vulkan dependency -- so both backends share one camera/model/light
+projection instead of diverging. The new renderer creates a persistent,
+content-hash-cached vertex/index buffer pair, a shared WGSL scene pipeline
+(`RekallAgeSceneWgslShaderSource`), a frame uniform buffer, and one
+reusable uniform buffer plus binding set per draw slot, then records a real
+begin-pass/set-pipeline/set-buffers/draw-indexed/end-pass/submit sequence.
+Four focused tests against `RekallAgeInMemoryRenderingDevice` cover a single
+draw, two draws with distinct model matrices and separate binding sets,
+resource reuse across two identical frames (no growth in
+`InspectResources()` between frames), and a rejected empty frame. This slice
+covers camera projection, geometry primitives (explicit vertex/index meshes),
+transforms, per-draw material/emissive factors, and directional lighting
+through vertex color; it does not yet cover texture sampling, depth testing,
+skinning/morphing, atmosphere/cloud/water shading, or UI canvas draws, which
+remain the next parts of this same task. The focused rendering selection
+passed 510/510, the zero-warning/zero-error Release solution built cleanly,
+and the complete engine suite passed 1,624/1,629 with the same five
+pre-existing failures present on an unmodified tree (a wedged-compiler-timeout
+pair in `BuildModulesCommandTests`, one `McpAgentToolExecutorTests` assertion,
+one `ProjectRuntimeSystemTests` average-of-empty-sequence failure, and one
+`WindowsPlayerRecoveryTests` failure caused by a missing Debug player
+executable from a Release-only build); the change set is strictly additive
+(three new files, nothing existing modified), so none of the five are
+attributable to this slice. Studio passed 53/53. Task 6 (browser input
+bridge) is next.
 
 ## Next after the current item
 

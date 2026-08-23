@@ -247,6 +247,63 @@ public sealed class ModelAssetPublishingTests
     }
 
     [Fact]
+    public async Task AbaBeforeForwardWriteNeverRestoresJournalBytesThatWereNotTheWritePreimage()
+    {
+        var fixture = await CreateFixtureAsync();
+        var first = await PublishAsync(fixture);
+        _ = await ReplaceSourceAsync(fixture, "sphere");
+        var modelPath = fixture.ModelStore.GetModelPath(fixture.Root, "hero-model");
+        var originalModelBytes = await File.ReadAllBytesAsync(modelPath);
+        var originalOutputBytes = await File.ReadAllBytesAsync(first.CompiledOutputPath);
+        var catalogBefore = await fixture.CatalogStore.LoadVersionedAsync(fixture.Root, default);
+        var concurrentModel = first.Asset with { DisplayName = "Concurrent B" };
+        var concurrentModelBytes = System.Text.Encoding.UTF8.GetBytes(
+            fixture.ModelStore.Serialize(concurrentModel));
+        var concurrentModelRevision = await RekallAgeAtomicFile.WriteAllBytesIfRevisionAsync(
+            modelPath,
+            concurrentModelBytes,
+            RekallAgePersistedJson.MaximumDocumentBytes,
+            first.ModelFileRevision,
+            previousVersionPath: null,
+            default);
+        await using var heldOutputLock = HoldDocumentLock(first.CompiledOutputPath);
+        var transaction = RekallAgeTransaction.Begin("ABA rebuild");
+
+        var rebuild = fixture.Service.RebuildAsync(
+            fixture.Root,
+            "hero-model",
+            first.ModelFileRevision,
+            transaction,
+            default).AsTask();
+        await WaitForCapturedPreimagesAsync(transaction, 3);
+        var restoredOriginalRevision = await RekallAgeAtomicFile.WriteAllBytesIfRevisionAsync(
+            modelPath,
+            originalModelBytes,
+            RekallAgePersistedJson.MaximumDocumentBytes,
+            concurrentModelRevision,
+            previousVersionPath: null,
+            default);
+        var concurrentCatalog = catalogBefore.Value.AddOrReplace(ConcurrentCatalogAsset());
+        var concurrentCatalogRevision = await fixture.CatalogStore.SaveIfRevisionAsync(
+            fixture.Root,
+            concurrentCatalog,
+            catalogBefore.Revision,
+            default);
+        await heldOutputLock.DisposeAsync();
+
+        var error = await Assert.ThrowsAsync<RekallAgeDocumentRevisionException>(() => rebuild);
+
+        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", error.Code);
+        Assert.Equal(first.ModelFileRevision, restoredOriginalRevision);
+        Assert.Equal(originalModelBytes, await File.ReadAllBytesAsync(modelPath));
+        Assert.Equal(originalOutputBytes, await File.ReadAllBytesAsync(first.CompiledOutputPath));
+        var retainedCatalog = await fixture.CatalogStore.LoadVersionedAsync(fixture.Root, default);
+        Assert.Equal(concurrentCatalogRevision, retainedCatalog.Revision);
+        Assert.Contains(retainedCatalog.Value.Assets, asset => asset.Id == "concurrent-audio");
+        Assert.Empty(transaction.ChangedResources);
+    }
+
+    [Fact]
     public async Task RollbackConflictOnModelStillRestoresOutputAndRetainsConcurrentResources()
     {
         var fixture = await CreateFixtureAsync();
@@ -361,6 +418,52 @@ public sealed class ModelAssetPublishingTests
         Assert.True(inspection.CompiledOutputExists);
         Assert.Equal(first.CompiledContentHash, inspection.ActualCompiledContentHash);
         Assert.Contains(inspection.Diagnostics, diagnostic => diagnostic.Code == "REKALL_MODEL_LAST_BUILD_FAILED");
+    }
+
+    [Fact]
+    public async Task PersistedFailedModelWithoutManifestStillReportsCanonicalOutputEvidence()
+    {
+        var fixture = await CreateFixtureAsync();
+        var first = await PublishAsync(fixture);
+        var failed = first.Asset with
+        {
+            Revision = first.Asset.Revision + 1,
+            BuildState = RekallAgeModelBuildState.Failed,
+            LastSuccessfulBuild = null
+        };
+        await fixture.ModelStore.SaveIfRevisionAsync(fixture.Root, failed, first.ModelFileRevision, default);
+
+        var inspection = await fixture.Service.InspectAsync(fixture.Root, "hero-model", default);
+
+        Assert.Equal(RekallAgeModelBuildState.Failed, inspection.BuildState);
+        Assert.True(inspection.CompiledOutputExists);
+        Assert.Equal(first.CompiledContentHash, inspection.ActualCompiledContentHash);
+        Assert.Contains(inspection.Diagnostics, diagnostic => diagnostic.Code == "REKALL_MODEL_LAST_BUILD_FAILED");
+    }
+
+    [Fact]
+    public async Task ManifestPathMismatchReportsMetadataErrorAndActualCanonicalOutputEvidence()
+    {
+        var fixture = await CreateFixtureAsync();
+        var first = await PublishAsync(fixture);
+        var mismatchedManifest = first.Asset.LastSuccessfulBuild! with
+        {
+            CompiledMeshPath = "Assets/Models/Compiled/not-hero-model.age.compiled-mesh.json"
+        };
+        var mismatched = first.Asset with
+        {
+            Revision = first.Asset.Revision + 1,
+            LastSuccessfulBuild = mismatchedManifest
+        };
+        await fixture.ModelStore.SaveIfRevisionAsync(fixture.Root, mismatched, first.ModelFileRevision, default);
+
+        var inspection = await fixture.Service.InspectAsync(fixture.Root, "hero-model", default);
+
+        Assert.Equal(RekallAgeModelBuildState.Failed, inspection.BuildState);
+        Assert.True(inspection.CompiledOutputExists);
+        Assert.Equal(first.CompiledContentHash, inspection.ActualCompiledContentHash);
+        Assert.Contains(inspection.Diagnostics, diagnostic => diagnostic.Code == "REKALL_MODEL_OUTPUT_PATH_MISMATCH");
+        Assert.DoesNotContain(inspection.Diagnostics, diagnostic => diagnostic.Code == "REKALL_MODEL_OUTPUT_MISSING");
     }
 
     [Fact]
@@ -588,6 +691,22 @@ public sealed class ModelAssetPublishingTests
         }
 
         throw new TimeoutException($"Timed out waiting for '{path}' to change.");
+    }
+
+    private static async ValueTask WaitForCapturedPreimagesAsync(
+        RekallAgeTransaction transaction,
+        int expectedCount)
+    {
+        for (var attempt = 0; attempt < 1_000; attempt++)
+        {
+            if (transaction.ResourcePreimages.Count >= expectedCount)
+            {
+                return;
+            }
+            await Task.Delay(10);
+        }
+
+        throw new TimeoutException($"Timed out waiting for {expectedCount} transaction preimages.");
     }
 
     private static async ValueTask<FileStream> WaitForStagedFileAsync(string stagingRoot)

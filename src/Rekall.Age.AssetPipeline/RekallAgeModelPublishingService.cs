@@ -88,10 +88,13 @@ public sealed class RekallAgeModelPublishingService
 
         var modelPath = _modelStore.GetModelPath(projectRoot, request.AssetId);
         RekallAgeModelAssetDocument? existing = null;
+        var loadedModelRevision = RekallAgeDocumentRevision.Missing;
         if (File.Exists(modelPath))
         {
-            existing = (await _modelStore.LoadVersionedAsync(projectRoot, request.AssetId, cancellationToken)
-                .ConfigureAwait(false)).Value;
+            var loadedModel = await _modelStore.LoadVersionedAsync(projectRoot, request.AssetId, cancellationToken)
+                .ConfigureAwait(false);
+            existing = loadedModel.Value;
+            loadedModelRevision = loadedModel.Revision;
             RejectFrozen(existing);
         }
 
@@ -117,6 +120,9 @@ public sealed class RekallAgeModelPublishingService
             var outputMutation = mutationJournal[0];
             var modelMutation = mutationJournal[1];
             var catalogMutation = mutationJournal[2];
+            RequireMatchingPreimageRevision(request.ExpectedModelFileRevision, modelMutation);
+            RequireMatchingPreimageRevision(loadedModelRevision, modelMutation);
+            RequireMatchingPreimageRevision(catalog.Revision, catalogMutation);
 
             var manifest = RekallAgeModelBuildManifest.Success(
                 source.Revision,
@@ -152,13 +158,13 @@ public sealed class RekallAgeModelPublishingService
             var modelRevision = await _modelStore.SaveIfRevisionAsync(
                 projectRoot,
                 model,
-                request.ExpectedModelFileRevision,
+                modelMutation.BeforeRevision,
                 cancellationToken).ConfigureAwait(false);
             modelMutation.RecordWrite(modelRevision);
             catalogMutation.RecordWrite(await _catalogStore.SaveIfRevisionAsync(
                 projectRoot,
                 catalog.Value.AddOrReplace(catalogAsset),
-                catalog.Revision,
+                catalogMutation.BeforeRevision,
                 cancellationToken).ConfigureAwait(false));
 
             transaction.RecordChangedResource(outputPath);
@@ -285,9 +291,7 @@ public sealed class RekallAgeModelPublishingService
         var manifest = model.LastSuccessfulBuild;
         if (model.BuildState == RekallAgeModelBuildState.Failed || manifest is null)
         {
-            var retainedOutput = manifest is null
-                ? (Exists: false, Hash: (string?)null)
-                : await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+            var retainedOutput = await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
             return Inspection(
                 loadedModel,
                 RekallAgeModelBuildState.Failed,
@@ -299,8 +303,23 @@ public sealed class RekallAgeModelPublishingService
         }
 
         var finalPath = _outputStore.GetFinalPath(projectRoot, assetId);
-        if (!string.Equals(Path.GetFullPath(Path.Combine(projectRoot, manifest.CompiledMeshPath)), Path.GetFullPath(finalPath), PathComparison)
-            || !File.Exists(finalPath))
+        var canonicalOutput = await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+        if (!string.Equals(
+                Path.GetFullPath(Path.Combine(projectRoot, manifest.CompiledMeshPath)),
+                Path.GetFullPath(finalPath),
+                PathComparison))
+        {
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Failed,
+                source.Revision,
+                source.Value.Revision,
+                canonicalOutput.Exists,
+                canonicalOutput.Hash,
+                [Diagnostic("REKALL_MODEL_OUTPUT_PATH_MISMATCH", "Error", "The build manifest does not reference this Model Asset's canonical compiled output path.", manifest.CompiledMeshPath)]);
+        }
+
+        if (!canonicalOutput.Exists)
         {
             return Inspection(
                 loadedModel,
@@ -312,10 +331,10 @@ public sealed class RekallAgeModelPublishingService
                 [Diagnostic("REKALL_MODEL_OUTPUT_MISSING", "Error", "The last successful compiled Model Asset output is missing.", manifest.CompiledMeshPath)]);
         }
 
-        string? actualHash = null;
+        var actualHash = canonicalOutput.Hash;
         try
         {
-            actualHash = await _outputStore.HashAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+            actualHash ??= await _outputStore.HashAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
             var actualOutput = await _outputStore.LoadAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
             if (!string.Equals(actualOutput.SourceAssetId, model.Source.AssetId, StringComparison.Ordinal)
                 || actualOutput.SourceLogicalRevision != manifest.SourceLogicalRevision)
@@ -451,6 +470,23 @@ public sealed class RekallAgeModelPublishingService
         }
 
         return journal;
+    }
+
+    private static void RequireMatchingPreimageRevision(
+        string expectedRevision,
+        ModelPublicationMutation mutation)
+    {
+        if (string.Equals(expectedRevision, mutation.BeforeRevision, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        throw new RekallAgeDocumentRevisionException(
+            "REKALL_DOCUMENT_REVISION_CONFLICT",
+            mutation.Path,
+            $"Document '{mutation.Path}' changed before Model Asset publication: expected revision '{expectedRevision}', current revision '{mutation.BeforeRevision}'. Reload the document, reapply the semantic change, and retry.",
+            expectedRevision,
+            mutation.BeforeRevision);
     }
 
     private static async ValueTask<IReadOnlyList<Exception>> RestoreMutationsAsync(

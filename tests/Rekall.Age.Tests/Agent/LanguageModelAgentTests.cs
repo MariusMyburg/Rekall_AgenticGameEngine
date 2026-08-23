@@ -110,6 +110,28 @@ public sealed class LanguageModelAgentTests
             message.Role == "system" && message.Content.StartsWith("Persistent Rekall tool ledger", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task AgentKeepsAConcreteUserQueryAfterToolResultsForOllamaTemplates()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("inspect", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Complete", "", [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task") { MaxTurns = 2 },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        var continuation = model.Requests[1].Messages[^1];
+        Assert.Equal("user", continuation.Role);
+        Assert.Contains("preceding tool result", continuation.Content, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Theory]
     [InlineData(1, 1, 4_096, 512)]
     [InlineData(1_000_000, 1_000_000, 262_144, 65_536)]

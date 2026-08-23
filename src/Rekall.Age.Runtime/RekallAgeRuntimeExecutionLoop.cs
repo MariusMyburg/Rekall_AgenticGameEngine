@@ -42,6 +42,13 @@ public sealed class RekallAgeRuntimeExecutionLoop : IDisposable
         return CreateDefault(new RekallAgeProjectRuntimeSystemLoader().Load(moduleTypes), null);
     }
 
+    public static RekallAgeRuntimeExecutionLoop CreateDefault(
+        IEnumerable<RekallAgeRuntimeModuleRegistration> registrations)
+    {
+        ArgumentNullException.ThrowIfNull(registrations);
+        return CreateDefault(new RekallAgeProjectRuntimeSystemLoader().Load(registrations), null);
+    }
+
     private static RekallAgeRuntimeExecutionLoop CreateDefault(
         IEnumerable<IRekallAgeRuntimeWorldSystem> projectSystems,
         string? projectRoot)

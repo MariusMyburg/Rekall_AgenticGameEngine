@@ -36,6 +36,33 @@ public sealed class ProjectRuntimeSystemTests
     }
 
     [Fact]
+    public async Task RuntimeLoopRunsFactoryRegisteredProjectModuleSystemsWithoutReflectionDiscovery()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"])
+            .AddEntity(RekallAgeEntityDocument.Create("Registered Actor", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    RegisteredCounterComponentType,
+                    new JsonObject { ["ticks"] = 0 })));
+        var initialWorld = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        var registration = new RekallAgeRuntimeModuleRegistration(
+            typeof(StaticallyRegisteredRuntimeModule),
+            static () => new StaticallyRegisteredRuntimeModule(),
+            [
+                new RekallAgeRuntimeSystemRegistration(
+                    typeof(StaticallyRegisteredRuntimeSystem),
+                    static () => new StaticallyRegisteredRuntimeSystem())
+            ]);
+
+        using var loop = RekallAgeRuntimeExecutionLoop.CreateDefault([registration]);
+        var result = await loop.RunAsync(initialWorld, 2, CancellationToken.None);
+
+        var actor = result.World.FindEntity("Registered Actor");
+        Assert.NotNull(actor);
+        Assert.Equal(2, actor.ComponentNumber(RegisteredCounterComponentType, "ticks"));
+        Assert.Contains(nameof(StaticallyRegisteredRuntimeSystem), result.World.SystemsRun);
+    }
+
+    [Fact]
     public async Task RuntimeSnapshotRunsCompiledProjectRuntimeSystems()
     {
         var root = TestPaths.CreateTempDirectory();

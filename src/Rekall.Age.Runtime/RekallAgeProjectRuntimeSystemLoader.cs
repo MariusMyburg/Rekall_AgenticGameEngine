@@ -18,6 +18,13 @@ public sealed class RekallAgeProjectRuntimeSystemLoader
         return Order(moduleTypes.SelectMany(LoadFromModuleType));
     }
 
+    public IReadOnlyList<IRekallAgeRuntimeWorldSystem> Load(
+        IEnumerable<RekallAgeRuntimeModuleRegistration> registrations)
+    {
+        ArgumentNullException.ThrowIfNull(registrations);
+        return Order(registrations.SelectMany(LoadFromRegistration));
+    }
+
     private static IReadOnlyList<IRekallAgeRuntimeWorldSystem> Order(
         IEnumerable<IRekallAgeRuntimeWorldSystem> systems) =>
         systems
@@ -64,6 +71,63 @@ public sealed class RekallAgeProjectRuntimeSystemLoader
 
             var system = (IRekallAgeRuntimeModuleSystem?)Activator.CreateInstance(systemType, nonPublic: true)
                 ?? throw new InvalidOperationException($"Runtime system '{systemType.FullName}' could not be created.");
+            yield return new ProjectRuntimeWorldSystemAdapter(system);
+        }
+    }
+
+    private static IEnumerable<IRekallAgeRuntimeWorldSystem> LoadFromRegistration(
+        RekallAgeRuntimeModuleRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        ArgumentNullException.ThrowIfNull(registration.ModuleType);
+        ArgumentNullException.ThrowIfNull(registration.CreateModule);
+        ArgumentNullException.ThrowIfNull(registration.RuntimeSystems);
+        if (registration.ModuleType.IsAbstract
+            || !typeof(RekallAgeModule).IsAssignableFrom(registration.ModuleType))
+        {
+            throw new ArgumentException(
+                $"Registered type '{registration.ModuleType.FullName}' must be a concrete {nameof(RekallAgeModule)}.",
+                nameof(registration));
+        }
+
+        var module = registration.CreateModule()
+            ?? throw new InvalidOperationException(
+                $"Module factory for '{registration.ModuleType.FullName}' returned null.");
+        if (module.GetType() != registration.ModuleType)
+        {
+            throw new InvalidOperationException(
+                $"Module factory for '{registration.ModuleType.FullName}' returned '{module.GetType().FullName}'.");
+        }
+
+        var builder = new RekallAgeModuleBuilder();
+        module.Configure(builder);
+        var factories = registration.RuntimeSystems.ToDictionary(
+            item => item.SystemType,
+            item => item.CreateSystem);
+        var configuredTypes = builder.RuntimeSystemTypes
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+        if (factories.Count != registration.RuntimeSystems.Count
+            || factories.Count != configuredTypes.Distinct().Count()
+            || configuredTypes.Any(type => !factories.ContainsKey(type)))
+        {
+            throw new InvalidOperationException(
+                $"Static runtime-system registrations for module '{registration.ModuleType.FullName}' do not match its Configure output.");
+        }
+
+        foreach (var systemType in configuredTypes)
+        {
+            var factory = factories[systemType]
+                ?? throw new InvalidOperationException(
+                    $"Runtime system factory for '{systemType.FullName}' is null.");
+            var system = factory()
+                ?? throw new InvalidOperationException(
+                    $"Runtime system factory for '{systemType.FullName}' returned null.");
+            if (system.GetType() != systemType)
+            {
+                throw new InvalidOperationException(
+                    $"Runtime system factory for '{systemType.FullName}' returned '{system.GetType().FullName}'.");
+            }
             yield return new ProjectRuntimeWorldSystemAdapter(system);
         }
     }

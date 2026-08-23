@@ -14,7 +14,8 @@ public sealed record RekallAgeWebGameStageRequest(
     string EntrySceneName,
     string OutputDirectory,
     int ReferenceWidth = 1280,
-    int ReferenceHeight = 720);
+    int ReferenceHeight = 720,
+    RekallAgeWebModuleRegistryPlan? ModulePlan = null);
 
 public sealed record RekallAgeWebGameStageResult(
     string OutputDirectory,
@@ -113,13 +114,20 @@ public sealed class RekallAgeWebGameExporter
                 entry.Value.LongLength,
                 RekallAgeDocumentRevision.Compute(entry.Value)))
             .ToArray();
+        var modulePlan = request.ModulePlan
+            ?? new RekallAgeWebModuleRegistryGenerator().Discover(projectRoot);
+        var pathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!Path.GetFullPath(modulePlan.ProjectRoot).Equals(projectRoot, pathComparison))
+        {
+            throw new InvalidDataException("Web module publication plan belongs to a different authored project.");
+        }
         var manifest = RekallAgeWebGameManifestCodec.Create(
             new RekallAgeWebProjectIdentity(
                 project.Name,
                 RekallAgeDocumentRevision.Compute(projectEntry.Bytes.Span)),
             scenePath,
             new RekallAgeWebViewportPolicy(request.ReferenceWidth, request.ReferenceHeight, "fit"),
-            [],
+            modulePlan.Modules.Select(module => module.Identity).ToArray(),
             scene.Capabilities
                 .Where(capability => capability.StartsWith("rendering", StringComparison.Ordinal)
                     || capability.Equals("ui", StringComparison.Ordinal))

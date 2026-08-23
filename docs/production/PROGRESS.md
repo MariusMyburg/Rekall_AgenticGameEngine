@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 20:02 Africa/Johannesburg
+Last verified: 2026-08-23 20:21 Africa/Johannesburg
 
 Branch: `codex/genuine-web-publishing`
 
@@ -17,26 +17,41 @@ The current moving-dot and triangle pages remain RenderingDevice proofs only;
 CPU-frame upload, JavaScript gameplay rewrites, remote desktop streaming, and
 other visually convincing substitutes are explicitly not web game publication.
 
-The genuine web-publishing branch now has its first bounded staging exporter in
-addition to its shared-runtime seams.
-Agent-authored module types can be registered statically for browser WASM/AOT
-without weakening the ordinary desktop module loader. Shipped game content can
-be read through one bounded logical-path contract from either the filesystem or
-browser-style memory, and one byte-based scene codec now supplies identical
-schema/shape validation to both the desktop scene store and future browser
-bootstrap. An ordinary project and entry scene can now be staged into a
+The genuine web-publishing work now has a bounded static module build-input
+slice in addition to its first staging exporter and shared-runtime seams.
+Agent-authored modules and their configured runtime systems can be registered
+through explicit constructor factories for browser trimming/AOT without
+weakening the ordinary desktop module loader. A desktop build-time generator
+reuses the canonical module build policy and verified build receipts, rejects
+non-public, open-generic, unstable, or multi-module export layouts, emits
+deterministic escaped direct C# type/factory references, and emits MSBuild
+inputs that reference the original authored module projects. Those inputs bind
+the generated registry to per-file source hashes before compilation and after
+publication, while the staging request can consume that same immutable discovery
+plan for its canonical manifest identity. The WebAssembly project conditionally
+imports those inputs and reports only the number of statically bundled modules.
+Canonical web manifests now include the verified module ID, assembly identity,
+and source fingerprint.
+A real trimmed `browser-wasm` publish test retains the authored fixture module;
+the test suppresses the repository's pre-existing Core trim-analysis warnings
+because those warnings are still treated as errors outside this slice. This
+proves static compile/link inclusion, not browser execution or game playability.
+
+Shipped game content can be read through one bounded logical-path contract from
+either the filesystem or browser-style memory, and one byte-based scene codec
+supplies identical schema/shape validation to the desktop scene store and future
+browser bootstrap. An ordinary project and entry scene can be staged into a
 path-confined deterministic inventory containing the project document, scene,
 referenced-only sanitized asset catalog, and referenced asset bytes. The
 exporter preserves the 64 MiB per-read and depth-128 document limits, adds a
 4,096-entry/512 MiB aggregate closure bound, hashes actual staged bytes, and
 emits the canonical `game.manifest.json`. Equivalent projects with relative or
 root-dependent absolute imported asset paths produce the same logical manifest
-and build identity. Focused exporter tests pass 4/4; the combined content,
-scene-codec, manifest, and exporter selection passes 25/25. This is only a
-deterministic content staging package: it does not include a WASM host, compiled
-module registry, browser scene loader, input loop, or scene renderer, and does
-not claim browser playability. Those are the remaining genuine web-publication
-slices.
+and build identity. The staging package plus generated build inputs do not yet
+invoke a publication command, load the manifest/scene in the browser, create a
+runtime world from the generated registrations, bridge browser input, or render
+that world. The current Web page remains the WebGPU contract proof and does not
+claim browser game playability.
 
 The runtime UI projection now respects entity visibility for Label, Button,
 Panel, Image, UiElement, and UiCanvas visuals. A single entity may intentionally

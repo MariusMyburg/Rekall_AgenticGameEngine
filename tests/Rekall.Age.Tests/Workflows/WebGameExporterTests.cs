@@ -1,12 +1,255 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using Rekall.Age.Build.Commands;
+using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Product;
+using Rekall.Age.Core.Transactions;
+using Rekall.Age.Modules.Commands;
 using Rekall.Age.Workflows.Web;
 
 namespace Rekall.Age.Tests.Workflows;
 
 public sealed class WebGameExporterTests
 {
+    [Fact]
+    public async Task GeneratesDeterministicStaticModuleBuildInputsFromAuthoredProject()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var generated = TestPaths.CreateTempDirectory();
+        Directory.Delete(generated);
+        await WriteProjectAsync(root, "Assets/Imported/hero.png");
+        await BuildRuntimeModuleAsync(root);
+
+        var generator = new RekallAgeWebModuleRegistryGenerator();
+        var result = generator.Generate(root, generated);
+
+        var module = Assert.Single(result.Modules);
+        Assert.Equal("game.web-rules", module.Identity.Id);
+        Assert.Equal("WebRules", module.Identity.ModuleName);
+        Assert.Matches("^WebRules, Version=", module.Identity.AssemblyIdentity);
+        Assert.Matches("^[0-9a-f]{64}$", module.Identity.SourceFingerprint);
+        Assert.Equal(
+            Path.Combine(root, "Modules", "WebRules", "WebRules.csproj"),
+            Assert.Single(result.ModuleProjectPaths));
+        Assert.Equal(
+            "Game.Modules.WebRules.WebRulesModule",
+            module.ModuleTypeName);
+        Assert.Equal(
+            ["Game.Modules.WebRules.WebRulesSystem"],
+            module.RuntimeSystemTypeNames);
+
+        var source = await File.ReadAllTextAsync(result.RegistrySourcePath);
+        Assert.Contains("typeof(global::Game.Modules.WebRules.WebRulesModule)", source, StringComparison.Ordinal);
+        Assert.Contains("static () => new global::Game.Modules.WebRules.WebRulesModule()", source, StringComparison.Ordinal);
+        Assert.Contains("typeof(global::Game.Modules.WebRules.WebRulesSystem)", source, StringComparison.Ordinal);
+        Assert.Contains("static () => new global::Game.Modules.WebRules.WebRulesSystem()", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Assembly.Load", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetTypes", source, StringComparison.Ordinal);
+
+        var inputs = await File.ReadAllTextAsync(result.MsBuildInputsPath);
+        Assert.Contains("WebRules.csproj", inputs, StringComparison.Ordinal);
+        Assert.Contains("RekallAgePublishedModules.g.cs", inputs, StringComparison.Ordinal);
+        Assert.Contains("GetFileHash", inputs, StringComparison.Ordinal);
+        Assert.Contains("BeforeTargets=\"PrepareForBuild\"", inputs, StringComparison.Ordinal);
+        Assert.Contains("AfterTargets=\"Publish\"", inputs, StringComparison.Ordinal);
+        Assert.Equal(2, result.ModuleSources.Count);
+        var repeated = generator.Discover(root);
+        Assert.Equal(source, repeated.RegistrySource);
+        Assert.Equal(inputs, repeated.MsBuildInputs);
+    }
+
+    [Fact]
+    public async Task StagesAuthoredStaticModuleIdentityInCanonicalManifest()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var output = TestPaths.CreateTempDirectory();
+        Directory.Delete(output);
+        await WriteProjectAsync(root, "Assets/Imported/hero.png");
+        await BuildRuntimeModuleAsync(root);
+        var modulePlan = new RekallAgeWebModuleRegistryGenerator().Discover(root);
+
+        var result = await new RekallAgeWebGameExporter().StageAsync(
+            new RekallAgeWebGameStageRequest(root, "Main", output, ModulePlan: modulePlan),
+            CancellationToken.None);
+
+        var module = Assert.Single(result.Manifest.Modules);
+        Assert.Equal("game.web-rules", module.Id);
+        Assert.Equal("WebRules", module.ModuleName);
+        Assert.Matches("^WebRules, Version=", module.AssemblyIdentity);
+        Assert.Matches("^[0-9a-f]{64}$", module.SourceFingerprint);
+        var decoded = RekallAgeWebGameManifestCodec.DecodeAndValidate(
+            await File.ReadAllBytesAsync(result.ManifestPath));
+        Assert.Equal(module, Assert.Single(decoded.Modules));
+    }
+
+    [Fact]
+    public async Task TrimmedWebAssemblyPublishIncludesTheStaticallyRegisteredAuthoredModule()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var generated = TestPaths.CreateTempDirectory();
+        var publish = TestPaths.CreateTempDirectory();
+        Directory.Delete(generated);
+        Directory.Delete(publish);
+        await WriteProjectAsync(root, "Assets/Imported/hero.png");
+        await BuildRuntimeModuleAsync(root);
+        var registry = new RekallAgeWebModuleRegistryGenerator().Generate(root, generated);
+        var repository = FindRepositoryRoot();
+        var webProject = Path.Combine(
+            repository,
+            "src",
+            "Rekall.Age.Player.Web",
+            "Rekall.Age.Player.Web.csproj");
+        var restore = await RunDotNetAsync("restore", webProject, "--locked-mode");
+        Assert.True(restore.ExitCode == 0, restore.Output);
+        foreach (var moduleProject in registry.ModuleProjectPaths)
+        {
+            var moduleRestore = await RunDotNetAsync("restore", moduleProject);
+            Assert.True(moduleRestore.ExitCode == 0, moduleRestore.Output);
+        }
+
+        var result = await RunDotNetAsync(
+            "publish",
+            webProject,
+            "-c",
+            "Release",
+            "--no-restore",
+            "-p:PublishTrimmed=true",
+            "-p:ILLinkTreatWarningsAsErrors=false",
+            "-p:SuppressTrimAnalysisWarnings=true",
+            $"-p:RekallAgeWebPublishInputsPath={registry.MsBuildInputsPath}",
+            "-o",
+            publish);
+
+        Assert.True(result.ExitCode == 0, result.Output);
+        Assert.Contains(
+            Directory.EnumerateFiles(publish, "*", SearchOption.AllDirectories),
+            path => Path.GetFileName(path).Contains("WebRules", StringComparison.Ordinal));
+        var publishedFiles = Directory.EnumerateFiles(publish, "*", SearchOption.AllDirectories).ToArray();
+        Assert.Contains(publishedFiles, path =>
+        {
+            var bytes = File.ReadAllBytes(path);
+            return ContainsBytes(bytes, Encoding.UTF8.GetBytes("WebRulesModule"))
+                && ContainsBytes(bytes, Encoding.UTF8.GetBytes("WebRulesSystem"));
+        });
+    }
+
+    [Fact]
+    public async Task RejectsGeneratedModuleBuildInputsInsideTheAuthoredProject()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await WriteProjectAsync(root, "Assets/Imported/hero.png");
+        await BuildRuntimeModuleAsync(root);
+        var generated = Path.Combine(root, "Build", "WebInputs");
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            new RekallAgeWebModuleRegistryGenerator().Generate(root, generated));
+
+        Assert.Contains("overlap", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(Directory.Exists(generated));
+    }
+
+    [Fact]
+    public async Task RejectsAuthoredModuleWithoutAStableIdentity()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await WriteProjectAsync(root, "Assets/Imported/hero.png");
+        await BuildRuntimeModuleAsync(root, " ");
+
+        var error = Assert.Throws<InvalidDataException>(() =>
+            new RekallAgeWebModuleRegistryGenerator().Discover(root));
+
+        Assert.Contains("identity", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RejectsMultipleModuleClassesInOneAuthoredProjectBeforeManifestCreation()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await WriteProjectAsync(root, "Assets/Imported/hero.png");
+        await BuildRuntimeModuleAsync(root);
+        await File.WriteAllTextAsync(
+            Path.Combine(root, "Modules", "WebRules", "SecondModule.cs"),
+            """
+            using Rekall.Age.Modules;
+            namespace Game.Modules.WebRules;
+            [RekallAgeModule("game.second", "Second")]
+            public sealed class SecondModule : RekallAgeModule
+            {
+                public override void Configure(RekallAgeModuleBuilder builder) { }
+            }
+            """);
+        await RebuildModulesAsync(root);
+
+        var error = Assert.Throws<InvalidDataException>(() =>
+            new RekallAgeWebModuleRegistryGenerator().Discover(root));
+
+        Assert.Contains("exactly one concrete", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RejectsOpenGenericModuleTypesBeforeGeneratingCSharp()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await WriteProjectAsync(root, "Assets/Imported/hero.png");
+        await BuildRuntimeModuleAsync(root);
+        var sourcePath = Directory.EnumerateFiles(
+            Path.Combine(root, "Modules", "WebRules"), "*.cs", SearchOption.TopDirectoryOnly).Single();
+        var source = await File.ReadAllTextAsync(sourcePath);
+        source = source.Replace("public sealed class WebRulesModule", "public sealed class WebRulesModule<T>", StringComparison.Ordinal);
+        await File.WriteAllTextAsync(sourcePath, source);
+        await RebuildModulesAsync(root);
+
+        var error = Assert.Throws<InvalidDataException>(() =>
+            new RekallAgeWebModuleRegistryGenerator().Discover(root));
+
+        Assert.Contains("static browser publication", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task EscapesKeywordIdentifierSegmentsInGeneratedCSharpTypeReferences()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await WriteProjectAsync(root, "Assets/Imported/hero.png");
+        await BuildRuntimeModuleAsync(root);
+        var sourcePath = Directory.EnumerateFiles(
+            Path.Combine(root, "Modules", "WebRules"), "*.cs", SearchOption.TopDirectoryOnly).Single();
+        var source = await File.ReadAllTextAsync(sourcePath);
+        source = source.Replace("namespace Game.Modules.WebRules", "namespace Game.@event.WebRules", StringComparison.Ordinal);
+        await File.WriteAllTextAsync(sourcePath, source);
+        await RebuildModulesAsync(root);
+
+        var plan = new RekallAgeWebModuleRegistryGenerator().Discover(root);
+
+        Assert.Contains("global::Game.@event.WebRules.WebRulesModule", plan.RegistrySource, StringComparison.Ordinal);
+        Assert.Contains("global::Game.@event.WebRules.WebRulesSystem", plan.RegistrySource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GeneratedBuildInputsRejectSourceChangedAfterDiscovery()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var generated = TestPaths.CreateTempDirectory();
+        Directory.Delete(generated);
+        await WriteProjectAsync(root, "Assets/Imported/hero.png");
+        await BuildRuntimeModuleAsync(root);
+        var registry = new RekallAgeWebModuleRegistryGenerator().Generate(root, generated);
+        var moduleProject = Assert.Single(registry.ModuleProjectPaths);
+        var moduleRestore = await RunDotNetAsync("restore", moduleProject);
+        Assert.True(moduleRestore.ExitCode == 0, moduleRestore.Output);
+        var sourcePath = Directory.EnumerateFiles(
+            Path.GetDirectoryName(moduleProject)!, "*.cs", SearchOption.TopDirectoryOnly).Single();
+        await File.AppendAllTextAsync(sourcePath, Environment.NewLine + "// changed after discovery");
+        var webProject = Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Player.Web", "Rekall.Age.Player.Web.csproj");
+
+        var result = await RunDotNetAsync(
+            "build", webProject, "-c", "Release", "--no-restore",
+            $"-p:RekallAgeWebPublishInputsPath={registry.MsBuildInputsPath}");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("changed after web publication discovery", result.Output, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task StagesOnlyTheDeterministicDeclarativeEntrySceneClosure()
     {
@@ -167,5 +410,79 @@ public sealed class WebGameExporterTests
             JsonSerializer.Serialize(catalog));
         await File.WriteAllBytesAsync(Path.Combine(root, "Assets", "Imported", "hero.png"), Encoding.UTF8.GetBytes("hero-image"));
         await File.WriteAllBytesAsync(Path.Combine(root, "Assets", "Imported", "unused.png"), Encoding.UTF8.GetBytes("unused-image"));
+    }
+
+    private static async Task BuildRuntimeModuleAsync(
+        string root,
+        string moduleId = "game.web-rules")
+    {
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("web module fixture"),
+            CancellationToken.None);
+        var scaffold = await new ScaffoldRuntimeSystemModuleCommand().ExecuteAsync(
+            new ScaffoldRuntimeSystemModuleRequest(
+                root,
+                moduleId,
+                "Web Rules",
+                "WebRules",
+                "WebState",
+                "WebRulesSystem"),
+            context);
+        var build = await new BuildModulesCommand().ExecuteAsync(
+            new BuildModulesRequest(root),
+            context);
+
+        Assert.True(scaffold.Ok, scaffold.Summary);
+        Assert.True(build.Ok, string.Join(Environment.NewLine, build.Value.Modules.Select(module => module.Output)));
+    }
+
+    private static async Task RebuildModulesAsync(string root)
+    {
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("rebuild web module fixture"),
+            CancellationToken.None);
+        var build = await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
+        Assert.True(build.Ok, string.Join(Environment.NewLine, build.Value.Modules.Select(module => module.Output)));
+    }
+
+    private static async Task<(int ExitCode, string Output)> RunDotNetAsync(params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(startInfo)!;
+        var standardOutput = process.StandardOutput.ReadToEndAsync();
+        var standardError = process.StandardError.ReadToEndAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(4));
+        await process.WaitForExitAsync(timeout.Token);
+        return (process.ExitCode, await standardOutput + await standardError);
+    }
+
+    private static bool ContainsBytes(ReadOnlySpan<byte> bytes, ReadOnlySpan<byte> value) =>
+        bytes.IndexOf(value) >= 0;
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Rekall.AGE.sln")))
+            {
+                return directory.FullName;
+            }
+            directory = directory.Parent;
+        }
+        throw new InvalidOperationException("Could not find Rekall.AGE.sln from the test output directory.");
     }
 }

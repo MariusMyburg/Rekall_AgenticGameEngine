@@ -5,7 +5,10 @@ using Rekall.Age.Rendering.WebGpu;
 
 var webGpu = BrowserHost.HasWebGpu();
 var profile = webGpu ? "WebGPU" : "WebGL 2 compatibility required";
-BrowserHost.SetText("#runtime", $".NET {Environment.Version} / browser-wasm");
+var publishedModules = RekallAgePublishedModules.Registrations;
+BrowserHost.SetText(
+    "#runtime",
+    $".NET {Environment.Version} / browser-wasm / static modules {publishedModules.Count}");
 BrowserHost.SetText("#graphics", profile);
 
 if (!webGpu)

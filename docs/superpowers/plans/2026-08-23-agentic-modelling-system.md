@@ -95,7 +95,7 @@ then grow it into procedural geometry/material graphs and Studio modelling.
 - [x] Add versioned graph/node/port contracts and canonical node descriptors.
 - [x] Add atomic revision-checked graph patches and structural/type/domain/cycle
   validation.
-- [ ] Add deterministic demand evaluation, dependency invalidation, node-hash
+- [x] Add deterministic demand evaluation, dependency invalidation, node-hash
   caching, budgets, and bounded reports.
 - [ ] Supply initial primitives, transform, join, extrude, triangulate,
   named/captured attributes, field math, material assignment, and output nodes.

@@ -1,0 +1,355 @@
+using System.Diagnostics;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json.Nodes;
+using Rekall.Age.Modeling.Contracts;
+
+namespace Rekall.Age.Modeling;
+
+public sealed class RekallAgeModelingGraphEvaluator
+{
+    private readonly RekallAgeModelingGraphValidator _validator =
+        new(RekallAgeModelingNodeCatalog.CreateDefault());
+    private readonly Dictionary<string, NodeValue> _cache = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _lastNodeKeys = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IReadOnlyDictionary<string, RekallAgeMeshAsset>> _lastGoodOutputs = new(StringComparer.Ordinal);
+    private readonly object _gate = new();
+
+    public ValueTask<RekallAgeModelingGraphEvaluationReport> EvaluateAsync(
+        RekallAgeModelingGraphAsset graph,
+        IReadOnlyList<string> requestedOutputs,
+        RekallAgeModelingEvaluationBudget budget,
+        RekallAgeModelingEvaluationContext evaluationContext,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(graph);
+        ArgumentNullException.ThrowIfNull(requestedOutputs);
+        ArgumentNullException.ThrowIfNull(budget);
+        ArgumentNullException.ThrowIfNull(evaluationContext);
+        return ValueTask.FromResult(Evaluate(graph, requestedOutputs, budget, evaluationContext, cancellationToken));
+    }
+
+    private RekallAgeModelingGraphEvaluationReport Evaluate(
+        RekallAgeModelingGraphAsset graph,
+        IReadOnlyList<string> requestedOutputs,
+        RekallAgeModelingEvaluationBudget budget,
+        RekallAgeModelingEvaluationContext evaluationContext,
+        CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var diagnostics = new List<RekallAgeModelingGraphDiagnostic>();
+        var reports = new List<RekallAgeModelingNodeEvaluationReport>();
+        var outputKey = LastGoodKey(graph.AssetId, requestedOutputs);
+        try
+        {
+            ValidateInputs(requestedOutputs, budget, evaluationContext);
+            var validation = _validator.Validate(graph);
+            diagnostics.AddRange(validation.Diagnostics);
+            if (!validation.IsValid || validation.ExecutionPlan is null)
+            {
+                throw new EvaluationException("REKALL_MODELING_EVALUATION_GRAPH_INVALID", "The modelling graph did not pass strict validation.");
+            }
+
+            var requested = requestedOutputs.Distinct(StringComparer.Ordinal).ToArray();
+            var outputDefinitions = graph.Outputs.ToDictionary(output => output.Name, StringComparer.Ordinal);
+            foreach (var name in requested)
+            {
+                if (!outputDefinitions.ContainsKey(name))
+                {
+                    throw new EvaluationException("REKALL_MODELING_EVALUATION_OUTPUT_UNKNOWN", $"Graph output '{name}' was not found.");
+                }
+            }
+            var reachable = requested
+                .SelectMany(name => validation.ExecutionPlan.OutputNodeIds[name])
+                .ToHashSet(StringComparer.Ordinal);
+            var orderedNodeIds = validation.ExecutionPlan.OrderedNodeIds.Where(reachable.Contains).ToArray();
+            if (orderedNodeIds.Length > budget.MaximumEvaluatedNodes)
+            {
+                throw new EvaluationException("REKALL_MODELING_EVALUATION_NODE_BUDGET_EXCEEDED", "Reachable node count exceeds the evaluation budget.");
+            }
+
+            var nodes = graph.Nodes.ToDictionary(node => node.NodeId, StringComparer.Ordinal);
+            var values = new Dictionary<string, NodeValue>(StringComparer.Ordinal);
+            var outputHashes = new Dictionary<string, string>(StringComparer.Ordinal);
+            var accountedMeshes = new HashSet<RekallAgeMeshAsset>(ReferenceEqualityComparer.Instance);
+            var totalPoints = 0;
+            var totalFaces = 0;
+            long totalBytes = 0;
+            foreach (var nodeId in orderedNodeIds)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (stopwatch.ElapsedMilliseconds > budget.MaximumMilliseconds)
+                {
+                    throw new EvaluationException("REKALL_MODELING_EVALUATION_TIME_BUDGET_EXCEEDED", "Evaluation exceeded its time budget.", nodeId);
+                }
+                var nodeStopwatch = Stopwatch.StartNew();
+                var node = nodes[nodeId];
+                var incoming = graph.Links
+                    .Where(link => link.ToNodeId == nodeId && reachable.Contains(link.FromNodeId))
+                    .OrderBy(link => link.ToPortId, StringComparer.Ordinal)
+                    .ThenBy(link => link.LinkId, StringComparer.Ordinal)
+                    .ToArray();
+                var cacheKey = CacheKey(graph, node, incoming, outputHashes, evaluationContext);
+                NodeValue value;
+                bool cacheHit;
+                lock (_gate)
+                {
+                    cacheHit = _cache.TryGetValue(cacheKey, out value!);
+                }
+                if (!cacheHit)
+                {
+                    value = EvaluateNode(graph, node, incoming, values);
+                }
+                var (points, faces, bytes) = Size(value);
+                if (value.Mesh is not null && accountedMeshes.Add(value.Mesh))
+                {
+                    totalPoints = checked(totalPoints + points);
+                    totalFaces = checked(totalFaces + faces);
+                    totalBytes = checked(totalBytes + bytes);
+                }
+                EnforceGeometryBudgets(totalPoints, totalFaces, totalBytes, budget, nodeId);
+                var nodeIdentity = $"{graph.AssetId}|{node.NodeId}|{evaluationContext.TargetProfile}";
+                bool invalidated;
+                lock (_gate)
+                {
+                    invalidated = _lastNodeKeys.TryGetValue(nodeIdentity, out var previousKey) && previousKey != cacheKey;
+                    if (!cacheHit) _cache[cacheKey] = value;
+                    _lastNodeKeys[nodeIdentity] = cacheKey;
+                }
+                values[nodeId] = value;
+                outputHashes[nodeId] = cacheKey;
+                nodeStopwatch.Stop();
+                reports.Add(new(
+                    node.NodeId,
+                    node.TypeId,
+                    cacheKey,
+                    cacheHit,
+                    invalidated,
+                    nodeStopwatch.Elapsed.TotalMilliseconds,
+                    points,
+                    faces,
+                    bytes));
+            }
+
+            var outputs = requested.ToDictionary(
+                name => name,
+                name => values[outputDefinitions[name].NodeId].Mesh
+                    ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_OUTPUT_TYPE_INVALID", $"Output '{name}' did not evaluate to geometry."),
+                StringComparer.Ordinal);
+            lock (_gate)
+            {
+                _lastGoodOutputs[outputKey] = outputs;
+            }
+            stopwatch.Stop();
+            return Report(true, graph, outputs, false, reports, stopwatch, diagnostics, budget.MaximumReportNodes);
+        }
+        catch (EvaluationException error)
+        {
+            diagnostics.Add(new(error.Code, RekallAgeModelingDiagnosticSeverity.Error, error.Message, error.NodeId));
+            IReadOnlyDictionary<string, RekallAgeMeshAsset> fallback;
+            lock (_gate)
+            {
+                fallback = _lastGoodOutputs.GetValueOrDefault(outputKey)
+                    ?? new Dictionary<string, RekallAgeMeshAsset>(StringComparer.Ordinal);
+            }
+            stopwatch.Stop();
+            return Report(false, graph, fallback, fallback.Count > 0, reports, stopwatch, diagnostics, budget.MaximumReportNodes);
+        }
+    }
+
+    private static NodeValue EvaluateNode(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        IReadOnlyList<RekallAgeModelingGraphLink> incoming,
+        IReadOnlyDictionary<string, NodeValue> values) =>
+        node.TypeId switch
+        {
+            "rekall.modeling.primitive.box" => new(CreateBox(graph, node)),
+            "rekall.modeling.output.mesh" => InputGeometry(node, "input", incoming, values),
+            _ => throw new EvaluationException(
+                "REKALL_MODELING_EVALUATION_NODE_NOT_IMPLEMENTED",
+                $"Node type '{node.TypeId}@{node.TypeVersion}' has no evaluator implementation.",
+                node.NodeId)
+        };
+
+    private static NodeValue InputGeometry(
+        RekallAgeModelingGraphNode node,
+        string portId,
+        IReadOnlyList<RekallAgeModelingGraphLink> incoming,
+        IReadOnlyDictionary<string, NodeValue> values)
+    {
+        var link = incoming.SingleOrDefault(item => item.ToPortId == portId)
+            ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_MISSING", $"Input '{portId}' is missing.", node.NodeId);
+        return values[link.FromNodeId];
+    }
+
+    private static RekallAgeMeshAsset CreateBox(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node)
+    {
+        var halfX = ReadPositive(node, "sizeX", 1) / 2;
+        var halfY = ReadPositive(node, "sizeY", 1) / 2;
+        var halfZ = ReadPositive(node, "sizeZ", 1) / 2;
+        var topology = new RekallAgeMeshTopology(
+            PointIds: [1, 2, 3, 4, 5, 6, 7, 8],
+            Positions:
+            [
+                new(-halfX, -halfY, -halfZ), new(halfX, -halfY, -halfZ),
+                new(halfX, halfY, -halfZ), new(-halfX, halfY, -halfZ),
+                new(-halfX, -halfY, halfZ), new(halfX, -halfY, halfZ),
+                new(halfX, halfY, halfZ), new(-halfX, halfY, halfZ)
+            ],
+            EdgeIds: [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
+            EdgePointIndices:
+            [
+                new(0, 1), new(1, 2), new(2, 3), new(3, 0),
+                new(4, 5), new(5, 6), new(6, 7), new(7, 4),
+                new(0, 4), new(1, 5), new(2, 6), new(3, 7)
+            ],
+            FaceIds: [31, 32, 33, 34, 35, 36],
+            FaceOffsets: [0, 4, 8, 12, 16, 20, 24],
+            CornerIds: Enumerable.Range(41, 24).Select(value => (ulong)value).ToArray(),
+            CornerPointIndices:
+            [
+                0, 3, 2, 1, 4, 5, 6, 7, 0, 1, 5, 4,
+                1, 2, 6, 5, 2, 3, 7, 6, 3, 0, 4, 7
+            ],
+            CornerEdgeIndices:
+            [
+                3, 2, 1, 0, 4, 5, 6, 7, 0, 9, 4, 8,
+                1, 10, 5, 9, 2, 11, 6, 10, 3, 8, 7, 11
+            ]);
+        var mesh = RekallAgeMeshAsset.Create(
+            $"{graph.AssetId}.{node.NodeId}",
+            node.NodeId,
+            topology) with { Revision = graph.Revision };
+        var validation = new RekallAgeMeshValidator().Validate(mesh);
+        if (!validation.IsValid)
+        {
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_OUTPUT_INVALID", "Box evaluator produced invalid topology.", node.NodeId);
+        }
+        return mesh;
+    }
+
+    private static double ReadPositive(RekallAgeModelingGraphNode node, string name, double fallback)
+    {
+        var value = node.Parameters[name] is JsonValue json && json.TryGetValue<double>(out var number) ? number : fallback;
+        if (!double.IsFinite(value) || value <= 0)
+        {
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", $"Parameter '{name}' must be positive and finite.", node.NodeId);
+        }
+        return value;
+    }
+
+    private static string CacheKey(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        IReadOnlyList<RekallAgeModelingGraphLink> incoming,
+        IReadOnlyDictionary<string, string> hashes,
+        RekallAgeModelingEvaluationContext context)
+    {
+        var builder = new StringBuilder();
+        builder.Append(node.TypeId).Append('@').Append(node.TypeVersion).Append('|')
+            .Append(Canonical(node.Parameters)).Append('|')
+            .Append(context.Seed).Append('|')
+            .Append(context.DeterministicTime.ToString("R", CultureInfo.InvariantCulture)).Append('|')
+            .Append(context.EngineVersion).Append('|')
+            .Append(context.TargetProfile).Append('|')
+            .Append(context.EvaluationSchemaVersion).Append('|')
+            .Append(graph.SchemaVersion);
+        foreach (var link in incoming)
+        {
+            builder.Append('|').Append(link.ToPortId).Append(':').Append(link.LinkId).Append(':').Append(hashes[link.FromNodeId]);
+        }
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()))).ToLowerInvariant();
+    }
+
+    private static string Canonical(JsonNode? node) => node switch
+    {
+        null => "null",
+        JsonObject obj => "{" + string.Join(",", obj.OrderBy(item => item.Key, StringComparer.Ordinal)
+            .Select(item => JsonValue.Create(item.Key)!.ToJsonString() + ":" + Canonical(item.Value))) + "}",
+        JsonArray array => "[" + string.Join(",", array.Select(Canonical)) + "]",
+        _ => node.ToJsonString()
+    };
+
+    private static (int Points, int Faces, long Bytes) Size(NodeValue value)
+    {
+        if (value.Mesh is null) return (0, 0, 0);
+        var topology = value.Mesh.Topology;
+        return (topology.PointIds.Count, topology.FaceIds.Count,
+            topology.PointIds.Count * 64L + topology.EdgeIds.Count * 40L + topology.FaceIds.Count * 48L + topology.CornerIds.Count * 32L);
+    }
+
+    private static void EnforceGeometryBudgets(
+        int points,
+        int faces,
+        long bytes,
+        RekallAgeModelingEvaluationBudget budget,
+        string nodeId)
+    {
+        if (points > budget.MaximumPoints)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_POINT_BUDGET_EXCEEDED", "Evaluated geometry exceeds the point budget.", nodeId);
+        if (faces > budget.MaximumFaces)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_FACE_BUDGET_EXCEEDED", "Evaluated geometry exceeds the face budget.", nodeId);
+        if (bytes > budget.MaximumApproximateBytes)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_MEMORY_BUDGET_EXCEEDED", "Evaluated geometry exceeds the approximate memory budget.", nodeId);
+    }
+
+    private static void ValidateInputs(
+        IReadOnlyList<string> requestedOutputs,
+        RekallAgeModelingEvaluationBudget budget,
+        RekallAgeModelingEvaluationContext context)
+    {
+        if (requestedOutputs.Count is < 1 or > RekallAgeModelingGraphValidator.MaximumOutputs)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_OUTPUT_BOUNDS", "Evaluation requires a bounded nonempty output selection.");
+        if (budget.MaximumEvaluatedNodes < 1 || budget.MaximumPoints < 1 || budget.MaximumFaces < 1
+            || budget.MaximumApproximateBytes < 1 || budget.MaximumMilliseconds < 1 || budget.MaximumReportNodes < 1)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_BUDGET_INVALID", "Every evaluation budget must be positive.");
+        if (!double.IsFinite(context.DeterministicTime)
+            || string.IsNullOrWhiteSpace(context.EngineVersion)
+            || string.IsNullOrWhiteSpace(context.TargetProfile))
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_CONTEXT_INVALID", "Evaluation context must be finite and identify engine and target profile.");
+    }
+
+    private static RekallAgeModelingGraphEvaluationReport Report(
+        bool succeeded,
+        RekallAgeModelingGraphAsset graph,
+        IReadOnlyDictionary<string, RekallAgeMeshAsset> outputs,
+        bool retained,
+        IReadOnlyList<RekallAgeModelingNodeEvaluationReport> reports,
+        Stopwatch stopwatch,
+        IReadOnlyList<RekallAgeModelingGraphDiagnostic> diagnostics,
+        int maximumReports) =>
+        new(
+            succeeded,
+            graph.AssetId,
+            graph.Revision,
+            outputs,
+            retained,
+            reports.Count,
+            reports.Count(item => item.CacheHit),
+            reports.Count(item => item.Invalidated),
+            reports.Take(maximumReports).ToArray(),
+            reports.Count > maximumReports,
+            stopwatch.Elapsed.TotalMilliseconds,
+            diagnostics);
+
+    private static string LastGoodKey(string assetId, IReadOnlyList<string> outputs) =>
+        assetId + "|" + string.Join(",", outputs.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
+
+    private sealed record NodeValue(RekallAgeMeshAsset? Mesh);
+
+    private sealed class EvaluationException : Exception
+    {
+        public EvaluationException(string code, string message, string? nodeId = null) : base(message)
+        {
+            Code = code;
+            NodeId = nodeId;
+        }
+
+        public string Code { get; }
+        public string? NodeId { get; }
+    }
+}

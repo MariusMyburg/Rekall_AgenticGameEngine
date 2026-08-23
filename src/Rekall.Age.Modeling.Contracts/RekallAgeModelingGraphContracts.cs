@@ -134,6 +134,50 @@ public sealed record RekallAgeModelingGraphPatchOperation(
 public sealed record RekallAgeModelingGraphPatch(
     IReadOnlyList<RekallAgeModelingGraphPatchOperation> Operations);
 
+public sealed record RekallAgeModelingEvaluationContext(
+    long Seed,
+    double DeterministicTime,
+    string EngineVersion,
+    string TargetProfile,
+    int EvaluationSchemaVersion = 1);
+
+public sealed record RekallAgeModelingEvaluationBudget(
+    int MaximumEvaluatedNodes,
+    int MaximumPoints,
+    int MaximumFaces,
+    long MaximumApproximateBytes,
+    int MaximumMilliseconds,
+    int MaximumReportNodes)
+{
+    public static RekallAgeModelingEvaluationBudget Default { get; } =
+        new(4_096, 2_000_000, 2_000_000, 512L * 1024 * 1024, 30_000, 256);
+}
+
+public sealed record RekallAgeModelingNodeEvaluationReport(
+    string NodeId,
+    string TypeId,
+    string CacheKey,
+    bool CacheHit,
+    bool Invalidated,
+    double DurationMilliseconds,
+    int PointCount,
+    int FaceCount,
+    long ApproximateBytes);
+
+public sealed record RekallAgeModelingGraphEvaluationReport(
+    bool Succeeded,
+    string AssetId,
+    long SourceLogicalRevision,
+    IReadOnlyDictionary<string, RekallAgeMeshAsset> Outputs,
+    bool RetainedLastGoodOutputs,
+    int EvaluatedNodeCount,
+    int CacheHitCount,
+    int InvalidatedNodeCount,
+    IReadOnlyList<RekallAgeModelingNodeEvaluationReport> Nodes,
+    bool NodesTruncated,
+    double DurationMilliseconds,
+    IReadOnlyList<RekallAgeModelingGraphDiagnostic> Diagnostics);
+
 public sealed record RekallAgeModelingGraphAsset(
     int SchemaVersion,
     string AssetId,

@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 07:24 Africa/Johannesburg
+Last verified: 2026-08-23 07:29 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -217,6 +217,26 @@ matches. Stale writes and cycle-producing batches leave the source bytes
 unchanged. The focused graph contract/persistence/patch suite passes 7/7 with a
 zero-warning, zero-error affected-graph build. Deterministic demand evaluation,
 node hashing, cache invalidation, budgets, and bounded reports are active next.
+
+Task 7 demand evaluation is now implemented and verified. Evaluations select
+named outputs and execute only their reachable deterministic plan. Each node's
+SHA-256 cache identity includes its type/version, recursively canonical sorted
+parameters, ordered input-link hashes, deterministic seed/time, engine version,
+evaluation schema, graph schema, and target profile; graph logical revision is
+reported but deliberately does not invalidate unrelated nodes. The evaluator
+tracks per-asset/node prior identities to distinguish cache hits from actual
+dependency invalidations, bounds its node report, checks cancellation and wall
+time, and enforces node, total unique-live point/face, approximate-memory, and
+report budgets. Successful outputs become the last-good immutable snapshots;
+evaluation failure returns coded node-linked diagnostics and those snapshots
+without pretending the failed candidate succeeded. The first executable box and
+mesh-output nodes prove demand pruning (an unused sphere never executes), a
+repeat run hits both cached nodes, and changing `sizeX` invalidates exactly the
+box/output chain while moving evaluated X bounds from +/-2 to +/-4. A separate
+budget proof rejects the eight-point box under a four-point limit and returns
+the exact prior output. All 9 graph contract, persistence, patch, and evaluation
+tests pass with a zero-warning, zero-error affected build. Initial node evaluator
+coverage and bake-through to persistent editable meshes are active next.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

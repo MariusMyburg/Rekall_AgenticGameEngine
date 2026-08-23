@@ -102,9 +102,19 @@ else
 
                 var tickInputSnapshot = RekallAgeWebInputSnapshotJson.Parse(BrowserHost.SnapshotInput());
                 RekallAgeWebPlayerTickResult tick;
+                Rekall.Age.Rendering.Abstractions.RekallAgeGraphicsValidationResult flush;
                 try
                 {
                     tick = await player.TickAsync(elapsedSeconds, tickInputSnapshot, colorTarget, canvasFormat, CancellationToken.None);
+                    // Every tick's frame build records at least one WebGPU packet (typically many: resource
+                    // creation, buffer/texture writes, the render pass submission) against the JS bridge's bounded
+                    // pendingScopes/pendingCompilations queues (see webgpu-device.js MAX_PENDING); nothing else in
+                    // this loop ever drains them. Without an explicit flush every tick, those queues fill up over a
+                    // handful of frames and every subsequent WebGPU operation starts failing closed with
+                    // REKALL_WEBGPU_PENDING_OVERFLOW -- observed directly from a real browser tick on a
+                    // resource-heavy scene, not caught by any build or unit test (the in-memory test device has no
+                    // such queue).
+                    flush = await device.FlushAsync(CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
@@ -117,12 +127,25 @@ else
                     break;
                 }
 
-                BrowserHost.SetText(
-                    "#state",
-                    tick.Rendered
-                        ? $"GAME RUNNING / tick {tick.TickSequence} / frame {tick.FrameIndex} / draws {tick.DrawCount}"
-                        : tick.Diagnostics.FirstOrDefault()?.Code ?? "REKALL_WEB_PLAYER_TICK_FAILED");
-                BrowserHost.SetReady(tick.Rendered);
+                var rendered = tick.Rendered && flush.Valid;
+                string stateText;
+                if (rendered)
+                {
+                    stateText = $"GAME RUNNING / tick {tick.TickSequence} / frame {tick.FrameIndex} / draws {tick.DrawCount}";
+                }
+                else
+                {
+                    // The Code alone (e.g. REKALL_WEBGPU_DEVICE_FAULTED) does not say why -- the actual native
+                    // WebGPU validation message is carried in Diagnostic.Message. Surfacing both is the difference
+                    // between an unattended page someone can debug from the live #state text and one that just
+                    // says something failed.
+                    var diagnostic = tick.Diagnostics.FirstOrDefault() ?? flush.Diagnostics.FirstOrDefault();
+                    stateText = diagnostic is null
+                        ? "REKALL_WEB_PLAYER_TICK_FAILED"
+                        : $"{diagnostic.Code} / {diagnostic.Message}";
+                }
+                BrowserHost.SetText("#state", stateText);
+                BrowserHost.SetReady(rendered);
             }
         }
         else

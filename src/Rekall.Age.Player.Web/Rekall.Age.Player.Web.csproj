@@ -13,9 +13,32 @@
     <RuntimeIdentifiers>browser-wasm</RuntimeIdentifiers>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <!--
+      The engine represents authored component data as untyped System.Text.Json JsonObject/JsonNode trees
+      (see RekallAgeComponentDocument) and reflects over them freely rather than through a fixed set of
+      source-generated JsonSerializerContext types. Under PublishTrimmed=true, .NET turns off the reflection
+      JSON contract resolver by default, so any of those reflection-based (de)serializations throws
+      NoMetadataForType at runtime the first time it actually runs, observed directly via a real browser tick
+      throwing on System.String, not caught by any build or unit test. Restoring the reflection resolver is the
+      standard fix for a reflection-heavy System.Text.Json call graph under trimming.
+    -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
   <ItemGroup>
     <StaticWebAssetFingerprintPattern Include="JS" Pattern="*.js" Expression="#[.{fingerprint}]!" />
+  </ItemGroup>
+  <!--
+    BepuPhysics registers its constraint type processors (e.g. BallSocketTypeProcessor) by scanning its own
+    assembly's types, not through direct calls the trimmer's static analysis can see. Under PublishTrimmed=true
+    the linker removes their parameterless constructors as apparently unused, so a physics3d scene throws
+    "Arg_NoDefCTor" the first time BepuPhysics tries to instantiate one at runtime, caught only by actually
+    running a real physics-capable published build in a browser, not by any build or unit test. Rooting both
+    Bepu assemblies keeps every type (and its constructors) reachable, matching the standard trimming fix for
+    reflection-driven third-party libraries.
+  -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="BepuPhysics" />
+    <TrimmerRootAssembly Include="BepuUtilities" />
   </ItemGroup>
   <ItemGroup Condition="'$(RekallAgeWebGameContentPath)' != '' and Exists('$(RekallAgeWebGameContentPath)\game.manifest.json')">
     <Content Include="$(RekallAgeWebGameContentPath)\**\*"

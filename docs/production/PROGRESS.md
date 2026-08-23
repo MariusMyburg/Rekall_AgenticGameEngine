@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 02:10 Africa/Johannesburg
+Last verified: 2026-08-24 03:40 Africa/Johannesburg
 
 Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
@@ -4275,6 +4275,76 @@ a real static-server-boot proof): no real browser or Chromium session has
 loaded a published web game this session, so `BrowserSmokeFrameVerified`
 stays `false` and Task 5 step 7's original browser-execution gap remains
 open.** Task 9 (accept Clockwork Canopy unchanged in the browser) is next.
+
+That browser-execution gap is now closed with real tier-4/5 evidence,
+gathered directly rather than deferred further. The `claude-in-chrome`
+extension was unavailable in this unattended session, so a real, separately
+installed Playwright-driven Chromium (not a stub, not headless -- headless
+Chromium's ANGLE/D3D11 WebGPU backend failed device creation outright, a
+real browser-environment constraint, not an engine defect) loaded a real
+`rekall.game.publish_web` output of the existing `Examples/TumblingCubes`
+project (camera, lit cube geometry, a floor, a spawner module, `physics3d`
+capability) served over a genuine local static HTTP server. This surfaced
+four real, previously-undiscovered defects in the actual browser execution
+path -- none visible to any build, unit test, or code review, because the
+in-memory test rendering device and the static-server-boot audit check
+never execute WebGPU or the browser tick loop at all. Each was root-caused
+from the real failure and reverified by republishing and reloading: (1)
+`PublishTrimmed=true` removed BepuPhysics's constraint type processors
+(e.g. `BallSocketTypeProcessor`), which BepuPhysics registers by scanning
+its own assembly rather than through calls the trimmer's static analysis
+can see, throwing `Arg_NoDefCTor` the instant a physics3d scene ticked;
+fixed by rooting the `BepuPhysics`/`BepuUtilities` assemblies via
+`TrimmerRootAssembly` in `Rekall.Age.Player.Web.csproj`. (2) The same
+trimming pass disabled System.Text.Json's reflection contract resolver by
+default, and the engine represents authored component data as untyped
+`JsonObject`/`JsonNode` trees rather than through source-generated
+`JsonSerializerContext` types, so the first tick threw
+`NoMetadataForType` on `System.String`; fixed with
+`<JsonSerializerIsReflectionEnabledByDefault>true</...>`. (3) The real game
+tick loop never called `RekallAgeWebGpuRenderingDevice.FlushAsync` (only
+the old one-shot compatibility proof workload did), so the WebGPU JS
+bridge's bounded `pendingScopes`/`pendingCompilations` queues
+(`webgpu-device.js`, `MAX_PENDING = 64`) never drained and every
+subsequent WebGPU packet failed closed with
+`REKALL_WEBGPU_PENDING_OVERFLOW` within the first frame or two of a
+resource-heavy scene; fixed by flushing once per tick in
+`Program.cs`'s frame loop, folding flush diagnostics into the same
+fail-closed `#state` reporting the tick loop already used. (4) The first
+resulting real WebGPU validation error was concrete and specific:
+`webgpu-device.js` unconditionally set `stencilLoadOp`/`stencilStoreOp` on
+any depth-stencil attachment, but the engine's only depth format
+(`Depth32Float`, added this session for occlusion) carries no stencil
+aspect, which WebGPU rejects outright, faulting the device permanently
+(`RekallAgeWebGpuRenderingDevice.Fault` is sticky by design) on the very
+first real frame; fixed by gating the stencil ops on the attachment
+texture's actual format. (5) Once frame 1 rendered, frame 2 immediately
+failed with `REKALL_WEBGPU_READBACK_PENDING`: the JS bridge stages a CPU
+readback copy for every submit that draws into the live canvas output
+(originally built only for the one-shot pixel-proof compatibility page,
+which calls `readPixels()` once), but the ordinary game loop never calls
+`readPixels()`, so the first frame's unconsumed readback buffer blocked
+every later frame forever; fixed by dropping and replacing an unconsumed
+prior readback instead of throwing, since nothing had mapped or read it.
+After all five fixes, the same real browser loaded the same real published
+build, bootstrapped a five-entity physics scene, and sustained real WebGPU
+frame submission and presentation across 238+ real ticks without a single
+diagnostic, and a canvas screenshot shows two correctly lit, correctly
+occluding cubes on a floor -- genuine visual proof, not merely a
+`Rendered: true`/`DrawCount` counter, which (per the same investigation)
+cannot see a validation failure or a hollow/culled-away frame on their own.
+The engine's own focused rendering/web-player suite (36/36) and the real
+end-to-end publish/exporter suite (15/15) both still pass after these
+production-code changes, and the Release solution build is 0
+warnings/errors. These fixes live entirely in `Rekall.Age.Player.Web`
+(`Program.cs`, `Rekall.Age.Player.Web.csproj`, `wwwroot/webgpu-device.js`)
+and have no unit-test harness of their own -- `webgpu-device.js` is only
+ever exercised by a real WebGPU device, so this real-browser verification
+*is* the regression evidence for this checkpoint, not a substitute for one
+that could exist. Task 9 (accept Clockwork Canopy unchanged in the
+browser) is next, now with a browser-execution path already proven to
+carry a real physics3d scene through a full publish/serve/render/tick
+cycle.
 
 ## Next after the current item
 

@@ -189,7 +189,12 @@ export function createWebGpuExecutor(environment = {}) {
                         view: attachmentView(target.depthStencilAttachment, capture, target),
                         ...(data.descriptor.depthClearValue !== undefined ? { depthClearValue: data.descriptor.depthClearValue, depthLoadOp: 'clear' } : { depthLoadOp: 'load' }),
                         depthStoreOp: 'store',
-                        ...(data.descriptor.stencilClearValue !== undefined ? { stencilClearValue: data.descriptor.stencilClearValue, stencilLoadOp: 'clear' } : { stencilLoadOp: 'load' }), stencilStoreOp: 'store'
+                        // WebGPU rejects stencilLoadOp/stencilStoreOp on an attachment whose format has no stencil
+                        // aspect (e.g. depth32float): "must not be set if the attachment has no stencil aspect".
+                        // Only depth24Stencil8 carries one; every other depth format must omit both entirely.
+                        ...(object(target.depthStencilAttachment.texture, 'texture').descriptor.format === 'depth24Stencil8'
+                            ? { ...(data.descriptor.stencilClearValue !== undefined ? { stencilClearValue: data.descriptor.stencilClearValue, stencilLoadOp: 'clear' } : { stencilLoadOp: 'load' }), stencilStoreOp: 'store' }
+                            : {})
                     } } : {}), label: data.descriptor.label
                 });
             }
@@ -210,7 +215,13 @@ export function createWebGpuExecutor(environment = {}) {
         if (pass) throw new Error('REKALL_WEBGPU_PASS_UNTERMINATED');
         let readback = null;
         if (capture.texture) {
-            if (pendingReadback) throw new Error('REKALL_WEBGPU_READBACK_PENDING');
+            // Any submit that draws into the live canvas output (not just the one-shot compatibility proof
+            // workload's frame) stages a CPU readback copy here -- including every frame of the ordinary game
+            // loop, which never calls readPixels() to consume it. Previously an unconsumed readback from a prior
+            // frame made every later submit throw REKALL_WEBGPU_READBACK_PENDING, so a real published game could
+            // never render past its first tick. Nothing has mapped/read a readback that was never consumed by
+            // readPixels(), so it is safe to drop and replace it here instead of failing.
+            if (pendingReadback) pendingReadback.buffer?.destroy?.();
             if (!Number.isInteger(capture.width) || !Number.isInteger(capture.height) || capture.width <= 0 || capture.height <= 0) throw new Error('REKALL_WEBGPU_READBACK_SIZE_INVALID');
             const bytesPerRow = Math.ceil(capture.width * 4 / 256) * 256;
             const size = bytesPerRow * capture.height;

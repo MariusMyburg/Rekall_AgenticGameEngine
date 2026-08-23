@@ -40,6 +40,8 @@ public sealed record RekallAgeVulkanSceneMesh(
     public string MorphWeightSource { get; init; } = "none";
 
     public RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline { get; init; }
+
+    public string? MaterialAssetId { get; init; }
 }
 
 public sealed record RekallAgeVulkanSceneMorphTarget(

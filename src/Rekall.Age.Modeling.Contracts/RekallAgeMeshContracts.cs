@@ -15,6 +15,12 @@ public readonly record struct RekallAgeGeometryVector3(double X, double Y, doubl
 
 public readonly record struct RekallAgeGeometryVector4(double X, double Y, double Z, double W);
 
+public sealed record RekallAgeLegacyGeometryVertex(
+    RekallAgeGeometryVector3 Position,
+    RekallAgeGeometryVector3? Normal = null,
+    RekallAgeGeometryVector2? Uv = null,
+    RekallAgeGeometryVector4? Color = null);
+
 public readonly record struct RekallAgeMeshEdgePointIndices(int A, int B);
 
 [JsonConverter(typeof(JsonStringEnumConverter<RekallAgeGeometryDomain>))]

@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 06:30 Africa/Johannesburg
+Last verified: 2026-08-23 06:36 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -138,8 +138,18 @@ and triangle provenance remains attached for picking and repair loops. The
 focused compiler/render/legacy/Vulkan selection passes 38/38; the subsequent
 compiler/render/physics/GLB selection passes 12/12. The engine test
 project and Studio build with zero warnings/errors, and Player's changed source
-compiles cleanly. Material-surface draw expansion, legacy migration, and physical
-visible evidence remain active Task 5 work.
+compiles cleanly. Task 5 is now code-complete: compiled material-slot surfaces
+remain distinct draw meshes through Vulkan/WebGPU preparation and GLB export,
+carrying material asset IDs, exact index ranges, and source-face membership.
+The deterministic legacy adapter promotes packed indexed triangles into strict
+editable topology, deduplicates shared edges, assigns stable point/edge/face/
+corner IDs, and preserves complete authored normal/UV/color streams. The final
+compiler/render/physics/export/legacy selection passes 46/46 with a zero-warning,
+zero-error build. The transitive NuGet project graph is relocked for the new
+modelling dependencies; all 1,347 ordinarily runnable Release engine tests pass,
+and the three Windows Player tests whose generated executable had been cleaned
+pass after rebuilding that explicit prerequisite (1,350/1,350 combined). Task 6's command-level closed loop, compact reversible deltas,
+and independently inspected visible evidence are active next.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

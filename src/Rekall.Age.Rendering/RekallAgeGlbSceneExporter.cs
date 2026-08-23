@@ -895,7 +895,7 @@ public sealed class RekallAgeGlbSceneExporter
 
         return new JsonObject
         {
-            ["name"] = $"{mesh.EntityName} Material",
+            ["name"] = mesh.MaterialAssetId ?? $"{mesh.EntityName} Material",
             ["doubleSided"] = true,
             ["pbrMetallicRoughness"] = pbr
         };

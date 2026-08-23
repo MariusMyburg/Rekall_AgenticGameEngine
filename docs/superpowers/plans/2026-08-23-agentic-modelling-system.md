@@ -75,9 +75,9 @@ then grow it into procedural geometry/material graphs and Studio modelling.
   buffers, retaining face/corner/point maps.
 - [x] Add a generic scene component that references a mesh asset/evaluated
   revision and material slots.
-- [ ] Adapt software/Vulkan/WebGPU, physics cooking, Studio viewport, inspection,
+- [x] Adapt software/Vulkan/WebGPU, physics cooking, Studio viewport, inspection,
   and GLB paths through the common snapshot without a second renderer model.
-- [ ] Add legacy packed-mesh migration/adapter coverage.
+- [x] Add legacy packed-mesh migration/adapter coverage.
 
 ### Task 6: Element-delta undo and closed-loop acceptance
 

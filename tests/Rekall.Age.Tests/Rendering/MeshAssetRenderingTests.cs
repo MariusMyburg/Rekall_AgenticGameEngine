@@ -41,6 +41,9 @@ public sealed class MeshAssetRenderingTests
         Assert.Equal(21UL, provenance.SourceFaceId);
         Assert.Equal([31UL, 32UL, 33UL], provenance.SourceCornerIds);
         Assert.Equal([1UL, 2UL, 3UL], provenance.SourcePointIds);
+        var surface = Assert.Single(geometry.Surfaces!);
+        Assert.Equal(3, surface.IndexCount);
+        Assert.Equal([21UL], surface.SourceFaceIds);
     }
 
     [Fact]

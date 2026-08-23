@@ -73,7 +73,10 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
 
         if (HasValidAuthoredGeometryMesh(renderable))
         {
-            yield return ApplyVirtualGeometry(BindRenderableMaterial(BuildAuthoredGeometryMesh(renderable), renderable, assets), renderable, activeCamera);
+            foreach (var mesh in BuildAuthoredGeometryMeshes(renderable))
+            {
+                yield return ApplyVirtualGeometry(BindRenderableMaterial(mesh, renderable, assets), renderable, activeCamera);
+            }
             yield break;
         }
 
@@ -450,7 +453,7 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             (float)Math.Clamp(renderable.EmissiveStrength, 0, 64));
     }
 
-    private static RekallAgeVulkanSceneMesh BuildAuthoredGeometryMesh(RekallAgeRuntimeViewportRenderable renderable)
+    private static IEnumerable<RekallAgeVulkanSceneMesh> BuildAuthoredGeometryMeshes(RekallAgeRuntimeViewportRenderable renderable)
     {
         var geometry = renderable.GeometryMesh!;
         var fallbackColor = ParseColor(renderable.MaterialColor);
@@ -475,12 +478,21 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             })
             .ToArray();
 
-        return new RekallAgeVulkanSceneMesh(
-            renderable.EntityId,
-            renderable.EntityName,
-            "mesh",
-            vertices,
-            geometry.Indices.Select(index => (uint)index).ToArray());
+        var surfaces = geometry.Surfaces is { Count: > 0 }
+            ? geometry.Surfaces
+            : [new RekallAgeRuntimeViewportGeometrySurface(0, 0, null, 0, geometry.Indices.Count, [])];
+        foreach (var surface in surfaces)
+        {
+            yield return new RekallAgeVulkanSceneMesh(
+                renderable.EntityId,
+                surfaces.Count == 1 ? renderable.EntityName : $"{renderable.EntityName} Surface {surface.SurfaceIndex}",
+                "mesh",
+                vertices,
+                geometry.Indices.Skip(surface.FirstIndex).Take(surface.IndexCount).ToArray())
+            {
+                MaterialAssetId = surface.MaterialAssetId
+            };
+        }
     }
 
     private static RekallAgeVulkanSceneMesh BuildViewportLineSegments(RekallAgeRuntimeViewportRenderable renderable)

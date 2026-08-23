@@ -506,6 +506,50 @@ public sealed class VulkanSceneMeshBuilderTests
     }
 
     [Fact]
+    public void BuildMeshesPreservesEditableMaterialSurfacesAsSeparateDrawMeshes()
+    {
+        var geometry = new RekallAgeRuntimeViewportGeometryMesh(
+            [
+                new(0, 0, 0),
+                new(1, 0, 0),
+                new(1, 1, 0),
+                new(0, 1, 0)
+            ],
+            [0, 1, 2, 0, 2, 3],
+            Surfaces:
+            [
+                new(0, 0, "mat.stone", 0, 3, [21]),
+                new(1, 1, "mat.glass", 3, 3, [22])
+            ]);
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "entity-1",
+            "Two Materials",
+            "mesh",
+            "rekall.geometry.mesh",
+            0,
+            0,
+            0,
+            1,
+            Variant: "rekall.geometry.mesh",
+            GeometryMesh: geometry));
+
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+
+        Assert.Collection(
+            meshes,
+            first =>
+            {
+                Assert.Equal([0U, 1U, 2U], first.Indices);
+                Assert.Equal("mat.stone", first.MaterialAssetId);
+            },
+            second =>
+            {
+                Assert.Equal([0U, 2U, 3U], second.Indices);
+                Assert.Equal("mat.glass", second.MaterialAssetId);
+            });
+    }
+
+    [Fact]
     public void BuildMeshesSkipsUnsupportedMeshAssets()
     {
         var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(

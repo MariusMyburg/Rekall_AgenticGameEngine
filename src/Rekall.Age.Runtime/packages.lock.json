@@ -25,6 +25,16 @@
       "rekall.age.core": {
         "type": "Project"
       },
+      "rekall.age.modeling": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.modeling.contracts": {
+        "type": "Project"
+      },
       "rekall.age.modules": {
         "type": "Project",
         "dependencies": {

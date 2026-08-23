@@ -7,6 +7,32 @@ namespace Rekall.Age.Tests.Modeling;
 public sealed class MeshCompilerTests
 {
     [Fact]
+    public void LegacyAdapterProducesEditableSharedEdgeTopologyAndCompilesAttributes()
+    {
+        var vertices = new[]
+        {
+            new RekallAgeLegacyGeometryVertex(new(0, 0, 0), new(0, 0, 1), new(0, 0), new(1, 0, 0, 1)),
+            new RekallAgeLegacyGeometryVertex(new(1, 0, 0), new(0, 0, 1), new(1, 0), new(0, 1, 0, 1)),
+            new RekallAgeLegacyGeometryVertex(new(1, 1, 0), new(0, 0, 1), new(1, 1), new(0, 0, 1, 1)),
+            new RekallAgeLegacyGeometryVertex(new(0, 1, 0), new(0, 0, 1), new(0, 1), new(1, 1, 1, 1))
+        };
+
+        var editable = new RekallAgeLegacyGeometryMeshAdapter().Convert(
+            "legacy-quad",
+            "Legacy Quad",
+            vertices,
+            [0, 1, 2, 0, 2, 3]);
+        var compiled = new RekallAgeMeshCompiler().Compile(editable);
+
+        Assert.Equal(5, editable.Topology.EdgeIds.Count);
+        Assert.Equal(2, editable.Topology.FaceIds.Count);
+        Assert.True(new RekallAgeMeshValidator().Validate(editable).IsValid);
+        Assert.Equal(2, compiled.Triangles.Count);
+        Assert.Equal(new RekallAgeGeometryVector2(1, 1), compiled.Vertices[2].Uv);
+        Assert.Equal(new RekallAgeGeometryVector4(0, 0, 1, 1), compiled.Vertices[2].Color);
+    }
+
+    [Fact]
     public void CompileTriangulatesConcaveNgonWithFacePickingProvenance()
     {
         var mesh = Polygon(

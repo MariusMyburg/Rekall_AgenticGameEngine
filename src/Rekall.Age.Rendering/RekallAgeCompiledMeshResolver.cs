@@ -55,7 +55,14 @@ public sealed class RekallAgeCompiledMeshResolver
                 triangle.SourceFaceId,
                 triangle.SourceCornerIds,
                 triangle.SourcePointIds,
-                triangle.SurfaceIndex)).ToArray());
+                triangle.SurfaceIndex)).ToArray(),
+            snapshot.Surfaces.Select(surface => new RekallAgeRuntimeViewportGeometrySurface(
+                surface.SurfaceIndex,
+                surface.MaterialSlotIndex,
+                surface.MaterialAssetId,
+                surface.FirstIndex,
+                surface.IndexCount,
+                surface.SourceFaceIds)).ToArray());
 
     private static string? ReadString(RekallAgeRuntimeComponent component, string name)
     {

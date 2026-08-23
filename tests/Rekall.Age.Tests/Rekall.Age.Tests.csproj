@@ -48,6 +48,8 @@
     <ProjectReference Include="..\..\src\Rekall.Age.Rendering.WebGpu\Rekall.Age.Rendering.WebGpu.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.LevelDesign\Rekall.Age.LevelDesign.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.ModuleHost\Rekall.Age.ModuleHost.csproj" />
+    <ProjectReference Include="..\..\src\Rekall.Age.Modeling.Contracts\Rekall.Age.Modeling.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Rekall.Age.Modeling\Rekall.Age.Modeling.csproj" />
   </ItemGroup>
 
 </Project>

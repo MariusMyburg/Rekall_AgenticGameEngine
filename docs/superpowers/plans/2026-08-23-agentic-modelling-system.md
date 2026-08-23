@@ -32,12 +32,12 @@ then grow it into procedural geometry/material graphs and Studio modelling.
 - `src/Rekall.Age.Modeling`
 - focused modelling tests in `tests/Rekall.Age.Tests/Modeling`
 
-- [ ] Write failing serialization, stable-ID, ngon, loose-edge, UV-seam,
+- [x] Write failing serialization, stable-ID, ngon, loose-edge, UV-seam,
   non-manifold, invalid-reference, duplicate-edge/face, degeneracy, and attribute
   length/type tests.
-- [ ] Add compact point/edge/face/corner topology and typed domain attributes.
-- [ ] Add material slots, selection records, bounds, and structured validation.
-- [ ] Add projects to the solution and verify zero-warning Release builds.
+- [x] Add compact point/edge/face/corner topology and typed domain attributes.
+- [x] Add material slots, selection records, bounds, and structured validation.
+- [x] Add projects to the solution and verify zero-warning Release builds.
 
 ### Task 2: Versioned mesh asset store
 

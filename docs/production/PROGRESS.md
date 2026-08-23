@@ -24,7 +24,18 @@ reinforces a closed inspect/mutate/viewport-evidence loop, while AGE deliberatel
 uses bounded typed operations instead of arbitrary remote scripting as the
 normal path. The design, source audit, first acceptance gate, and staged
 test-driven implementation plan are recorded in the 2026-08-23 modelling docs;
-Task 1 (contracts and strict topology validation) is next.
+Task 1 (contracts and strict topology validation) is complete. New independent
+`Rekall.Age.Modeling.Contracts` and `Rekall.Age.Modeling` projects define compact
+point/edge/face/corner topology, stable element IDs, typed domain attributes,
+material slots, named/active/history selection records, and finite bounds. The
+strict validator reports coded element-linked errors for document/ID/array
+shape, invalid references, self/duplicate edges, malformed/repeated/duplicate/
+zero-area faces, corner-edge endpoint mismatches, attribute type/length,
+material indices, and selection-domain errors; structurally valid boundary,
+loose, and non-manifold topology is summarized, with non-manifold edges emitted
+as warnings rather than silently rejected. The seven focused tests pass and the
+complete Release solution builds with zero warnings and zero errors. Task 2,
+the versioned atomic mesh asset store, is active next.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

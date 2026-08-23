@@ -275,6 +275,15 @@
           "Serilog": "[4.3.1, )"
         }
       },
+      "rekall.age.modeling": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.modeling.contracts": {
+        "type": "Project"
+      },
       "rekall.age.modulehost": {
         "type": "Project",
         "dependencies": {

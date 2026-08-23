@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 09:38 Africa/Johannesburg
+Last verified: 2026-08-23 09:41 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -164,6 +164,22 @@ fail with `REKALL_MODELING_BOOLEAN_MATERIAL_SCHEMA_MISMATCH`; point/edge/corner
 attributes fail with `REKALL_MODELING_BOOLEAN_ATTRIBUTES_UNSUPPORTED` until
 true split-vertex interpolation is implemented. The modeling namespace passes
 99/99 after recompilation.
+
+Corner-domain Boolean interpolation and portable UV projection are now
+verified. `rekall.modeling.project_uv` exposes the existing semantic UV
+operation as a descriptor-driven graph node with named output attribute,
+XY/XZ/YZ axis choice, and finite scale/offset controls. The Boolean adapter
+attaches each kernel polygon to the canonical compiler triangle positions and
+stable source-corner IDs. Every output corner, including T-junction insertions
+and newly cut vertices, receives barycentric values from that source triangle;
+nearest, linear, and normalized-linear policies are honored across scalar,
+vector, color, quaternion, matrix, Boolean/integer, and string types as
+appropriate. A rotated overlapping-box proof projects UVs before the Boolean
+and returns a finite, varied `uv.generated` value for every output corner while
+remaining strictly valid and closed. Point and edge domains still fail closed
+because their ownership at cross-operand seams needs an explicit contract. The
+node inventory and complete modeling namespace pass 100/100 after
+recompilation.
 
 The Blender-informed agentic modelling tranche is now the active implementation
 priority after the completed WebGPU and remaining Godot audits. A shallow,

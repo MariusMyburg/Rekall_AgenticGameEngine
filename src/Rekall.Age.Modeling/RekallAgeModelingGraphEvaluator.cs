@@ -195,6 +195,20 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                 InputGeometry(node, "geometry", incoming, values),
                 "triangulate_faces",
                 new JsonObject()),
+            "rekall.modeling.project_uv" => ApplySemanticOperation(
+                graph,
+                node,
+                InputGeometry(node, "geometry", incoming, values),
+                "project_uv",
+                new JsonObject
+                {
+                    ["attribute"] = ReadString(node, "attribute", "uv.generated"),
+                    ["axis"] = ReadString(node, "axis", "xy"),
+                    ["scaleU"] = ReadNumber(node, "scaleU", 1),
+                    ["scaleV"] = ReadNumber(node, "scaleV", 1),
+                    ["offsetU"] = ReadNumber(node, "offsetU", 0),
+                    ["offsetV"] = ReadNumber(node, "offsetV", 0)
+                }),
             "rekall.modeling.subdivide" => ApplySemanticOperation(
                 graph,
                 node,

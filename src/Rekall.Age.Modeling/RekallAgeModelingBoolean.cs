@@ -49,8 +49,8 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         var validation = new RekallAgeMeshValidator().Validate(mesh);
         if (!validation.IsValid || validation.Summary.BoundaryEdgeCount != 0 || validation.Summary.NonManifoldEdgeCount != 0 || validation.Summary.FaceCount == 0)
             throw new EvaluationException("REKALL_MODELING_BOOLEAN_INPUT_NOT_CLOSED_MANIFOLD", $"Boolean input {label} must be a non-empty, closed manifold surface.", nodeId);
-        if (mesh.Attributes.Any(attribute => !IsBooleanProvenance(attribute) && attribute.Domain != RekallAgeGeometryDomain.Face))
-            throw new EvaluationException("REKALL_MODELING_BOOLEAN_ATTRIBUTES_UNSUPPORTED", $"Boolean input {label} contains non-face attributes that cannot yet be interpolated without data loss; apply them after the Boolean node.", nodeId);
+        if (mesh.Attributes.Any(attribute => !IsBooleanProvenance(attribute) && attribute.Domain is not (RekallAgeGeometryDomain.Face or RekallAgeGeometryDomain.Corner)))
+            throw new EvaluationException("REKALL_MODELING_BOOLEAN_ATTRIBUTES_UNSUPPORTED", $"Boolean input {label} contains point or edge attributes that cannot yet be interpolated without data loss; use face/corner attributes or apply them after the Boolean node.", nodeId);
     }
 
     private static BooleanAttributePlan PrepareBooleanAttributes(RekallAgeMeshAsset a, RekallAgeMeshAsset b, string nodeId)
@@ -94,7 +94,11 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             var normal = Unit(Cross(Subtract(p1, p0), Subtract(p2, p0)));
             polygons.Add(new(
                 indices.Select(index => new Csg.Vertex(ToCsgVector(compiled.Vertices[index].Position), ToCsgVector(normal))).ToArray(),
-                new BooleanFaceSource(operand, compiled.Triangles[triangle].SourceFaceId)));
+                new BooleanFaceSource(
+                    operand,
+                    compiled.Triangles[triangle].SourceFaceId,
+                    compiled.Triangles[triangle].SourceCornerIds.ToArray(),
+                    [p0, p1, p2])));
         }
         return Csg.CSG.FromPolygons(polygons.ToArray());
     }
@@ -167,20 +171,42 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             meshA.Topology.FaceIds.Select((id, index) => (id, index)).ToDictionary(item => item.id, item => item.index),
             meshB.Topology.FaceIds.Select((id, index) => (id, index)).ToDictionary(item => item.id, item => item.index)
         };
+        var cornerIndices = new[]
+        {
+            meshA.Topology.CornerIds.Select((id, index) => (id, index)).ToDictionary(item => item.id, item => item.index),
+            meshB.Topology.CornerIds.Select((id, index) => (id, index)).ToDictionary(item => item.id, item => item.index)
+        };
         var inputs = new[] { meshA, meshB };
         var attributes = new List<RekallAgeGeometryAttribute>();
         foreach (var schema in attributePlan.Schemas)
         {
-            var values = new List<JsonElement>(sources.Count);
-            foreach (var source in sources)
+            var values = new List<JsonElement>(schema.Domain == RekallAgeGeometryDomain.Face ? sources.Count : cornerPoints.Count);
+            for (var faceIndex = 0; faceIndex < sources.Count; faceIndex++)
             {
+                var source = sources[faceIndex];
                 var inputIndex = source.Operand == "a" ? 0 : 1;
                 var sourceAttribute = inputs[inputIndex].Attributes.FirstOrDefault(attribute => attribute.Name == schema.Name);
-                var value = sourceAttribute is null ? DefaultValue(schema) : sourceAttribute.Values[faceIndices[inputIndex][source.FaceId]];
-                if (schema.Semantic?.Equals("material-index", StringComparison.OrdinalIgnoreCase) == true &&
-                    value.TryGetInt32(out var materialIndex) && materialIndex >= 0 && materialIndex < attributePlan.SlotMaps[inputIndex].Length)
-                    value = JsonSerializer.SerializeToElement(attributePlan.SlotMaps[inputIndex][materialIndex]);
-                values.Add(value.Clone());
+                if (schema.Domain == RekallAgeGeometryDomain.Face)
+                {
+                    var value = sourceAttribute is null ? DefaultValue(schema) : sourceAttribute.Values[faceIndices[inputIndex][source.FaceId]];
+                    if (schema.Semantic?.Equals("material-index", StringComparison.OrdinalIgnoreCase) == true &&
+                        value.TryGetInt32(out var materialIndex) && materialIndex >= 0 && materialIndex < attributePlan.SlotMaps[inputIndex].Length)
+                        value = JsonSerializer.SerializeToElement(attributePlan.SlotMaps[inputIndex][materialIndex]);
+                    values.Add(value.Clone());
+                }
+                else
+                {
+                    foreach (var pointIndex in faces[faceIndex])
+                    {
+                        if (sourceAttribute is null) values.Add(DefaultValue(schema));
+                        else values.Add(InterpolateCorner(
+                            schema,
+                            sourceAttribute,
+                            source,
+                            positions[pointIndex],
+                            cornerIndices[inputIndex]));
+                    }
+                }
             }
             attributes.Add(schema with { Values = values });
         }
@@ -251,7 +277,67 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         return new(value.X / length, value.Y / length, value.Z / length);
     }
 
-    private sealed record BooleanFaceSource(string Operand, ulong FaceId);
+    private static JsonElement InterpolateCorner(
+        RekallAgeGeometryAttribute schema,
+        RekallAgeGeometryAttribute sourceAttribute,
+        BooleanFaceSource source,
+        RekallAgeGeometryVector3 position,
+        IReadOnlyDictionary<ulong, int> cornerIndices)
+    {
+        var weights = Barycentric(position, source.TrianglePositions[0], source.TrianglePositions[1], source.TrianglePositions[2]);
+        var sourceValues = source.SourceCornerIds.Select(id => sourceAttribute.Values[cornerIndices[id]]).ToArray();
+        var nearest = weights[1] > weights[0] ? 1 : 0;
+        if (weights[2] > weights[nearest]) nearest = 2;
+        if (schema.Interpolation == RekallAgeGeometryInterpolation.Nearest || schema.ValueType is
+            RekallAgeGeometryValueType.Bool or RekallAgeGeometryValueType.Int32 or RekallAgeGeometryValueType.String)
+            return sourceValues[nearest].Clone();
+        if (schema.ValueType == RekallAgeGeometryValueType.Float)
+            return JsonSerializer.SerializeToElement(sourceValues.Select((value, index) => value.GetDouble() * weights[index]).Sum());
+        var componentCount = schema.ValueType switch
+        {
+            RekallAgeGeometryValueType.Float2 => 2,
+            RekallAgeGeometryValueType.Float3 => 3,
+            RekallAgeGeometryValueType.Float4 or RekallAgeGeometryValueType.ColorLinear or RekallAgeGeometryValueType.Quaternion => 4,
+            RekallAgeGeometryValueType.Matrix4x4 => 16,
+            _ => throw new EvaluationException("REKALL_MODELING_BOOLEAN_ATTRIBUTE_TYPE_UNSUPPORTED", $"Boolean corner interpolation does not support {schema.ValueType} values.")
+        };
+        var vectors = sourceValues.Select(value => value.EnumerateArray().Select(component => component.GetDouble()).ToArray()).ToArray();
+        var result = Enumerable.Range(0, componentCount)
+            .Select(component => Enumerable.Range(0, 3).Sum(index => vectors[index][component] * weights[index]))
+            .ToArray();
+        if (schema.Interpolation == RekallAgeGeometryInterpolation.NormalizedLinear)
+        {
+            var length = Math.Sqrt(result.Sum(component => component * component));
+            if (length > 1e-15)
+                for (var component = 0; component < result.Length; component++) result[component] /= length;
+        }
+        return JsonSerializer.SerializeToElement(result);
+    }
+
+    private static double[] Barycentric(
+        RekallAgeGeometryVector3 point,
+        RekallAgeGeometryVector3 a,
+        RekallAgeGeometryVector3 b,
+        RekallAgeGeometryVector3 c)
+    {
+        var v0 = Subtract(b, a); var v1 = Subtract(c, a); var v2 = Subtract(point, a);
+        var d00 = Dot(v0, v0); var d01 = Dot(v0, v1); var d11 = Dot(v1, v1);
+        var d20 = Dot(v2, v0); var d21 = Dot(v2, v1);
+        var denominator = d00 * d11 - d01 * d01;
+        if (Math.Abs(denominator) <= 1e-20)
+            throw new EvaluationException("REKALL_MODELING_BOOLEAN_PROVENANCE_DEGENERATE", "Boolean source triangle is degenerate during corner interpolation.");
+        var v = (d11 * d20 - d01 * d21) / denominator;
+        var w = (d00 * d21 - d01 * d20) / denominator;
+        return [1 - v - w, v, w];
+    }
+
+    private static double Dot(RekallAgeGeometryVector3 a, RekallAgeGeometryVector3 b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;
+
+    private sealed record BooleanFaceSource(
+        string Operand,
+        ulong FaceId,
+        IReadOnlyList<ulong> SourceCornerIds,
+        IReadOnlyList<RekallAgeGeometryVector3> TrianglePositions);
     private sealed record BooleanAttributePlan(
         IReadOnlyList<RekallAgeGeometryAttribute> Schemas,
         IReadOnlyList<RekallAgeMaterialSlot> MaterialSlots,

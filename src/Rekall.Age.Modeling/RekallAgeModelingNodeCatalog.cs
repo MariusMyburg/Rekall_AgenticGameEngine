@@ -58,6 +58,16 @@ public sealed class RekallAgeModelingNodeCatalog
             [Vector3("offset", "Offset")]),
         Node("rekall.modeling.triangulate", "Triangulate", "Triangulates selected polygon faces with source provenance.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("selection", RekallAgeModelingValueType.Selection), Output("geometry", RekallAgeModelingValueType.Geometry)]),
+        Node("rekall.modeling.project_uv", "Project UV", "Projects selected or complete face corners into a named texture-coordinate attribute.",
+            [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("selection", RekallAgeModelingValueType.Selection), Output("geometry", RekallAgeModelingValueType.Geometry)],
+            [
+                Text("attribute", "Attribute", "uv.generated"),
+                Text("axis", "Axis", "xy", ["xy", "xz", "yz"]),
+                Number("scaleU", "Scale U", 1, -1_000_000, 1_000_000),
+                Number("scaleV", "Scale V", 1, -1_000_000, 1_000_000),
+                Number("offsetU", "Offset U", 0, -1_000_000, 1_000_000),
+                Number("offsetV", "Offset V", 0, -1_000_000, 1_000_000)
+            ]),
         Node("rekall.modeling.subdivide", "Subdivide", "Subdivides selected polygon faces into centroid triangle fans with source provenance.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("selection", RekallAgeModelingValueType.Selection), Output("geometry", RekallAgeModelingValueType.Geometry)]),
         Node("rekall.modeling.subdivide_smooth", "Smooth Subdivision", "Applies one Catmull-Clark-style level to a complete manifold or boundary surface.",

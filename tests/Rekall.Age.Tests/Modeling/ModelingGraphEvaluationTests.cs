@@ -465,6 +465,43 @@ public sealed class ModelingGraphEvaluationTests
     }
 
     [Fact]
+    public async Task BooleanInterpolatesCompatibleCornerUvsAtSplitVertices()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "uv-boolean", "UV Boolean",
+            [
+                new("a", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("uv-a", "rekall.modeling.project_uv", 1, new JsonObject { ["attribute"] = "uv.generated", ["axis"] = "xy" }),
+                new("b", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("move-b", "rekall.modeling.transform", 1, new JsonObject { ["translation"] = new JsonArray(0.5, 0.0, 0.0), ["rotation"] = new JsonArray(0.0, 25.0, 0.0) }),
+                new("uv-b", "rekall.modeling.project_uv", 1, new JsonObject { ["attribute"] = "uv.generated", ["axis"] = "xy" }),
+                new("boolean", "rekall.modeling.boolean", 1, new JsonObject()),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("a-uv", "a", "geometry", "uv-a", "geometry"),
+                new("b-move", "b", "geometry", "move-b", "geometry"),
+                new("move-uv", "move-b", "geometry", "uv-b", "geometry"),
+                new("a-boolean", "uv-a", "geometry", "boolean", "a"),
+                new("b-boolean", "uv-b", "geometry", "boolean", "b"),
+                new("boolean-output", "boolean", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics.Select(item => $"{item.Code}: {item.Message}")));
+        var mesh = result.Outputs["mesh"];
+        var uv = Assert.Single(mesh.Attributes, item => item.Name == "uv.generated");
+        Assert.Equal(RekallAgeGeometryDomain.Corner, uv.Domain);
+        Assert.Equal(mesh.Topology.CornerIds.Count, uv.Values.Count);
+        Assert.All(uv.Values, value => Assert.All(value.EnumerateArray(), component => Assert.True(double.IsFinite(component.GetDouble()))));
+        Assert.True(uv.Values.Select(value => value.GetRawText()).Distinct().Count() > 4);
+        Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
+    }
+
+    [Fact]
     public async Task BooleanOutputCanFeedAnotherBooleanWithoutLosingCurrentNodeProvenance()
     {
         var graph = RekallAgeModelingGraphAsset.Create(

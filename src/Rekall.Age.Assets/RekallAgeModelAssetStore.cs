@@ -29,11 +29,10 @@ public sealed class RekallAgeModelAssetStore
         RekallAgeModelAssetDocument model,
         CancellationToken cancellationToken)
     {
-        ValidateForPersistence(model, model.AssetId);
-        await RekallAgeAtomicFile.WriteAllTextAsync(
-            GetModelPath(projectRoot, model.AssetId),
-            Serialize(model),
-            RekallAgeDocumentSchemaProbe.MaximumDocumentBytes,
+        _ = await SaveIfRevisionAsync(
+            projectRoot,
+            model,
+            RekallAgeDocumentRevision.Missing,
             cancellationToken).ConfigureAwait(false);
     }
 

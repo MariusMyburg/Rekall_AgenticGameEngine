@@ -37,6 +37,38 @@ public sealed class ModelAssetPersistenceTests
         Assert.False(File.Exists(store.GetModelPath(root, invalid.AssetId)));
     }
 
+    [Fact]
+    public async Task SaveAsyncRejectsNewModelAssetThatDoesNotStartAtLogicalRevisionOne()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeModelAssetStore();
+        var invalid = CreateDocument() with { Revision = 2 };
+
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            store.SaveAsync(root, invalid, CancellationToken.None).AsTask());
+
+        Assert.Contains("REKALL_MODEL_LOGICAL_REVISION_INVALID", error.Message, StringComparison.Ordinal);
+        Assert.False(File.Exists(store.GetModelPath(root, invalid.AssetId)));
+    }
+
+    [Fact]
+    public async Task SaveAsyncRejectsExistingModelAssetWithoutExpectedFileRevision()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeModelAssetStore();
+        var first = CreateDocument();
+        await store.SaveIfRevisionAsync(root, first, RekallAgeDocumentRevision.Missing, CancellationToken.None);
+
+        var error = await Assert.ThrowsAsync<RekallAgeDocumentRevisionException>(() =>
+            store.SaveAsync(
+                root,
+                first with { Revision = 2, DisplayName = "Unconditionally overwritten" },
+                CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", error.Code);
+        Assert.Equal(first, await store.LoadAsync(root, first.AssetId, CancellationToken.None));
+    }
+
     [Theory]
     [InlineData("../escape")]
     [InlineData("nested/model")]

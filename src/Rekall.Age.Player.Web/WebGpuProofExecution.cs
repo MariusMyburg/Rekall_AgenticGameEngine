@@ -40,7 +40,8 @@ public static class WebGpuProofExecution
             return Evidence(1, flush.Diagnostics, null);
         }
 
-        var readback = await readPixels(cancellationToken).ConfigureAwait(false);
+        var readback = WebGpuProofEvidenceJson.NormalizeReadback(
+            await readPixels(cancellationToken).ConfigureAwait(false));
         return Evidence(1, readback.Diagnostics, readback.PixelProof);
     }
 

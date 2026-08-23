@@ -58,12 +58,35 @@ public static class WebGpuProofEvidenceJson
         try
         {
             var result = JsonSerializer.Deserialize(json, WebGpuProofJsonContext.Default.WebGpuProofReadbackResult);
-            return Valid(result) ? result! : InvalidReadback();
+            return Valid(result) ? NormalizeReadback(result!) : InvalidReadback();
         }
         catch (JsonException)
         {
             return InvalidReadback();
         }
+    }
+
+    public static WebGpuProofReadbackResult NormalizeReadback(WebGpuProofReadbackResult? result)
+    {
+        if (!Valid(result))
+        {
+            return InvalidReadback();
+        }
+
+        var proof = result!.PixelProof!;
+        var recomputed = proof with { Passed = SamplesPass(proof.Samples) };
+        var diagnostics = result.Diagnostics.Take(64).ToList();
+        if (!result.Succeeded && diagnostics.Count == 0)
+        {
+            diagnostics.Add(new("REKALL_WEBGPU_READBACK_FAILED", "The browser did not confirm WebGPU canvas readback success."));
+        }
+        if (!recomputed.Passed && diagnostics.Count < 64
+            && diagnostics.All(item => item.Code != "REKALL_WEBGPU_PIXEL_PROOF_FAILED"))
+        {
+            diagnostics.Add(new("REKALL_WEBGPU_PIXEL_PROOF_FAILED", "Canvas pixels did not contain the expected dark background and distinct cyan, blue, and magenta regions."));
+        }
+
+        return new(result.Succeeded && diagnostics.Count == 0 && recomputed.Passed, diagnostics, recomputed);
     }
 
     private static bool Valid(WebGpuProofReadbackResult? result)
@@ -89,6 +112,24 @@ public static class WebGpuProofEvidenceJson
         sample is not null && sample.X >= 0 && sample.X < proof.Width && sample.Y >= 0 && sample.Y < proof.Height
         && sample.R is >= 0 and <= 255 && sample.G is >= 0 and <= 255
         && sample.B is >= 0 and <= 255 && sample.A is >= 0 and <= 255;
+
+    private static bool SamplesPass(WebGpuPixelSamples samples)
+    {
+        var background = samples.Background;
+        var cyan = samples.Cyan;
+        var blue = samples.Blue;
+        var magenta = samples.Magenta;
+        var dark = background.R < 40 && background.G < 40 && background.B < 40 && background.A >= 240;
+        var cyanLike = cyan.R < 110 && cyan.G >= 150 && cyan.B >= 170 && cyan.A >= 240;
+        var blueLike = blue.R < 110 && blue.G < 140 && blue.B >= 190 && blue.A >= 240;
+        var magentaLike = magenta.R >= 150 && magenta.G < 120 && magenta.B >= 160 && magenta.A >= 240;
+        var allZero = new[] { cyan, blue, magenta }.All(pixel => pixel.R == 0 && pixel.G == 0 && pixel.B == 0 && pixel.A == 0);
+        var distinct = Distance(cyan, blue) >= 80 && Distance(cyan, magenta) >= 80 && Distance(blue, magenta) >= 80;
+        return dark && cyanLike && blueLike && magentaLike && distinct && !allZero;
+    }
+
+    private static int Distance(WebGpuPixelSample left, WebGpuPixelSample right) =>
+        Math.Abs(left.R - right.R) + Math.Abs(left.G - right.G) + Math.Abs(left.B - right.B);
 
     private static WebGpuProofReadbackResult InvalidReadback() => new(
         false,

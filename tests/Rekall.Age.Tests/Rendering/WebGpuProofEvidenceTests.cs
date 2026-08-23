@@ -35,6 +35,36 @@ public sealed class WebGpuProofEvidenceTests
     }
 
     [Fact]
+    public async Task ExecutionRejectsSucceededFalseEvenWhenTheBrowserSelfAssertsAPassingProof()
+    {
+        var evidence = await ExecuteWithReadback(new(false, [], PixelProof(passed: true)));
+
+        Assert.Equal("REKALL_WEBGPU_READBACK_FAILED", Assert.Single(evidence.Diagnostics).Code);
+        Assert.True(evidence.PixelProof!.Passed);
+    }
+
+    [Fact]
+    public async Task ExecutionRecomputesAllDarkSelfAssertedPassAsFailure()
+    {
+        var allDark = new WebGpuPixelSample(1, 1, 4, 6, 10, 255);
+        var asserted = new WebGpuPixelProof(true, 640, 480, 2560, new(allDark, allDark, allDark, allDark));
+
+        var evidence = await ExecuteWithReadback(new(true, [], asserted));
+
+        Assert.False(evidence.PixelProof!.Passed);
+        Assert.Equal("REKALL_WEBGPU_PIXEL_PROOF_FAILED", Assert.Single(evidence.Diagnostics).Code);
+    }
+
+    [Fact]
+    public async Task ExecutionIgnoresTamperedPassedFlagAndAcceptsValidRawSamples()
+    {
+        var evidence = await ExecuteWithReadback(new(true, [], PixelProof(passed: false)));
+
+        Assert.True(evidence.PixelProof!.Passed);
+        Assert.Empty(evidence.Diagnostics);
+    }
+
+    [Fact]
     public void EvidenceSerializationPublishesExactlyTheSixMachineReadableFields()
     {
         var evidence = new WebGpuProofEvidence(
@@ -72,6 +102,30 @@ public sealed class WebGpuProofEvidenceTests
         var malformed = WebGpuProofEvidenceJson.DeserializeReadback("{\"succeeded\":true,\"diagnostics\":[],\"pixelProof\":null}");
         Assert.False(malformed.Succeeded);
         Assert.Equal("REKALL_WEBGPU_READBACK_RESULT_INVALID", Assert.Single(malformed.Diagnostics).Code);
+    }
+
+    [Fact]
+    public void ReadbackDeserializationRejectsSucceededFalseSelfAssertedPass()
+    {
+        var value = new WebGpuProofReadbackResult(false, [], PixelProof(passed: true));
+        var json = JsonSerializer.Serialize(value, WebGpuProofJsonContext.Default.WebGpuProofReadbackResult);
+
+        var result = WebGpuProofEvidenceJson.DeserializeReadback(json);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("REKALL_WEBGPU_READBACK_FAILED", Assert.Single(result.Diagnostics).Code);
+    }
+
+    private static async Task<WebGpuProofEvidence> ExecuteWithReadback(WebGpuProofReadbackResult readback)
+    {
+        var bridge = new LifecycleBridge();
+        using var device = new RekallAgeWebGpuRenderingDevice(bridge, RekallAgeRenderingDeviceCapabilities.DesktopBaseline("WebGPU"));
+        var output = device.ImportCanvasOutput(640, 480, RekallAgeTextureFormat.Bgra8Unorm);
+        return await WebGpuProofExecution.ExecuteAsync(
+            device,
+            output.Handle,
+            RekallAgeTextureFormat.Bgra8Unorm,
+            _ => ValueTask.FromResult(readback));
     }
 
     private static WebGpuPixelProof PixelProof(bool passed) => new(

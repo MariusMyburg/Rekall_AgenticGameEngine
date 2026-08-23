@@ -45,6 +45,8 @@ public sealed class RekallAgeModelingNodeCatalog
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("selection", RekallAgeModelingValueType.Selection), Output("geometry", RekallAgeModelingValueType.Geometry)]),
         Node("rekall.modeling.subdivide", "Subdivide", "Subdivides selected polygon faces into centroid triangle fans with source provenance.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("selection", RekallAgeModelingValueType.Selection), Output("geometry", RekallAgeModelingValueType.Geometry)]),
+        Node("rekall.modeling.subdivide_smooth", "Smooth Subdivision", "Applies one Catmull-Clark-style level to a complete manifold or boundary surface.",
+            [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)]),
         Node("rekall.modeling.merge_by_distance", "Merge by Distance", "Welds selected points using deterministic spatial hashing and stable provenance.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("selection", RekallAgeModelingValueType.Selection), Output("geometry", RekallAgeModelingValueType.Geometry)],
             [Number("distance", "Distance", 0.0001, 0.000000001, 1_000_000, "world-unit")]),

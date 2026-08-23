@@ -15,7 +15,7 @@ public sealed class RekallAgeMeshOperationException : InvalidOperationException
     public string Code { get; }
 }
 
-public sealed class RekallAgeMeshOperationExecutor
+public sealed partial class RekallAgeMeshOperationExecutor
 {
     private static readonly IReadOnlyList<RekallAgeMeshOperationDescriptor> OperationDescriptors =
     [
@@ -73,6 +73,12 @@ public sealed class RekallAgeMeshOperationExecutor
             RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
             []),
         new(
+            "subdivide_smooth",
+            "Applies one Catmull-Clark-style smooth subdivision level to a complete manifold or boundary surface.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
+            []),
+        new(
             "merge_by_distance",
             "Welds selected points within a finite distance using deterministic spatial hashing, deduplicates resulting edges, and preserves stable provenance.",
             RekallAgeGeometryDomain.Point,
@@ -112,6 +118,7 @@ public sealed class RekallAgeMeshOperationExecutor
             "generate_normals" => GenerateNormals(source, request),
             "project_uv" => ProjectUv(source, request),
             "subdivide_faces" => SubdivideFaces(source, request),
+            "subdivide_smooth" => SubdivideSmooth(source, request),
             "merge_by_distance" => MergeByDistance(source, request),
             _ => throw Failure("REKALL_MESH_OPERATION_UNKNOWN", $"Unknown mesh operation '{request.OperationId}'.")
         };

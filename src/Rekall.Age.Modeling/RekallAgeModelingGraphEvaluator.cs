@@ -194,6 +194,12 @@ public sealed class RekallAgeModelingGraphEvaluator
                 InputGeometry(node, "geometry", incoming, values),
                 "subdivide_faces",
                 new JsonObject()),
+            "rekall.modeling.subdivide_smooth" => ApplySemanticOperation(
+                graph,
+                node,
+                InputGeometry(node, "geometry", incoming, values),
+                "subdivide_smooth",
+                new JsonObject()),
             "rekall.modeling.merge_by_distance" => ApplySemanticOperation(
                 graph,
                 node,

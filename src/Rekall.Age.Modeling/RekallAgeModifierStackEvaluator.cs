@@ -75,6 +75,8 @@ public sealed class RekallAgeModifierStackEvaluator
                 Select(source, RekallAgeGeometryDomain.Face, selection), VectorParameters(modifier.Parameters))).Mesh,
             "rekall.modifier.subdivide" => _executor.Execute(source, new("subdivide_faces", RekallAgeGeometryDomain.Face,
                 Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject())).Mesh,
+            "rekall.modifier.subdivide_smooth" => _executor.Execute(source, new("subdivide_smooth", RekallAgeGeometryDomain.Face,
+                source.Topology.FaceIds, new JsonObject())).Mesh,
             "rekall.modifier.merge_by_distance" => _executor.Execute(source, new("merge_by_distance", RekallAgeGeometryDomain.Point,
                 Select(source, RekallAgeGeometryDomain.Point, selection), new JsonObject { ["distance"] = ReadNumber(modifier.Parameters, "distance", 0.0001) })).Mesh,
             _ => throw new RekallAgeMeshOperationException("REKALL_MODIFIER_TYPE_UNKNOWN", $"Modifier type '{modifier.TypeId}' is not executable.")

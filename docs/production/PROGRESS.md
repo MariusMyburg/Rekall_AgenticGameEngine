@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 08:37 Africa/Johannesburg
+Last verified: 2026-08-23 08:43 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -25,6 +25,20 @@ modeling project builds with zero warnings/errors. General remeshing, smoothing
 subdivision, and boolean operations remain open; the next kernel work continues
 with those generic capabilities rather than declaring the modeling tranche
 complete.
+
+True smooth surface subdivision is also verified. `subdivide_smooth` applies
+one Catmull-Clark-style level to a complete manifold or boundary surface,
+deriving shared face and edge points, interior and boundary vertex positions,
+quad topology, stable point/edge/face provenance, expanded edge/face
+selections, and interpolated point/edge/face/corner attributes. It retains
+source IDs where possible, rejects partial-face evaluation until crack-safe
+selection support exists, and reports non-manifold source edges with a stable
+repair code rather than guessing. A boundary quad proof produces 9 points, 12
+edges, 4 quads, 16 corners, and center UV interpolation; a closed box proof
+produces a valid 26-point/48-edge/24-quad surface through both
+`rekall.modeling.subdivide_smooth` and
+`rekall.modifier.subdivide_smooth`. The modeling namespace now passes 85/85
+tests and the modeling project remains zero-warning/zero-error.
 
 The Blender-informed agentic modelling tranche is now the active implementation
 priority after the completed WebGPU and remaining Godot audits. A shallow,

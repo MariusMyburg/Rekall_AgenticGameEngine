@@ -76,7 +76,9 @@
             <Border Grid.Column="1" Grid.Row="0" Margin="0,8,0,8" Background="#090C10"
                     BorderBrush="{StaticResource PanelBorder}" BorderThickness="1">
                 <Grid>
-                    <Image Source="{Binding ViewportImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <Image x:Name="SceneViewportImage" Source="{Binding ViewportImage}" Stretch="Uniform"
+                           RenderOptions.BitmapScalingMode="HighQuality" MouseLeftButtonDown="OnSceneViewportMouseDown"
+                           Cursor="Cross" ToolTip="Select scene entities directly through the rendered viewport." />
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
                         <TextBlock Text="AGE" Foreground="#33404D" FontSize="34" FontWeight="Light" HorizontalAlignment="Center" />
                         <TextBlock Text="Open a project to render the live viewport" Foreground="#607184" Margin="0,8,0,0" />

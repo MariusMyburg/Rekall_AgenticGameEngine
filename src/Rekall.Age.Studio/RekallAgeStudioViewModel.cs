@@ -110,6 +110,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _viewportTitle = "Viewport";
     private string _viewportSummary = "No rendered frame yet.";
     private BitmapSource? _viewportImage;
+    private RekallAgeStudioViewportInteractionSnapshot? _viewportInteraction;
     private int _viewportRenderableCount;
     private bool _viewportVisuallyInformative;
     private RekallAgeWorkbenchModel? _currentModel;
@@ -566,6 +567,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool IsPlaying => Mode == RekallAgeStudioMode.Play && _player is { HasExited: false };
     public bool IsSimulating => Mode == RekallAgeStudioMode.Simulate;
+    public string? SelectedEntityId => _session.SelectedEntityId;
 
     public bool IsLiveViewportEnabled
     {
@@ -600,6 +602,22 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         if (IsBusy) return;
         await RunAsync(() => _session.SelectEntityAsync(entity.EntityId, CancellationToken.None).AsTask());
+    }
+
+    public async Task<bool> SelectViewportEntityAsync(
+        double displayWidth,
+        double displayHeight,
+        double displayX,
+        double displayY)
+    {
+        if (IsBusy || _viewportInteraction is null) return false;
+        var point = _viewportInteraction.MapDisplayPoint(displayWidth, displayHeight, displayX, displayY);
+        if (point is null) return false;
+        var entityId = _viewportInteraction.Pick(point.Value.X, point.Value.Y);
+        if (entityId is null) return false;
+        await RunAsync(() => _session.SelectEntityAsync(entityId, CancellationToken.None).AsTask());
+        OnPropertyChanged(nameof(SelectedEntityId));
+        return string.Equals(_session.SelectedEntityId, entityId, StringComparison.Ordinal);
     }
 
     public ValueTask DisposeAsync()
@@ -1257,6 +1275,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private void ApplyPreviewFrame(RekallAgeStudioPreviewFrame frame)
     {
         ViewportImage = frame.Image;
+        _viewportInteraction = frame.Interaction;
         PreviewFrameIndex = frame.FrameIndex;
         ViewportRenderableCount = frame.RenderableCount;
         ViewportSummary = $"{frame.Image.PixelWidth}×{frame.Image.PixelHeight} · frame {frame.FrameIndex} · "
@@ -1416,6 +1435,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private void ApplyModel(RekallAgeWorkbenchModel model)
     {
         _currentModel = model;
+        OnPropertyChanged(nameof(SelectedEntityId));
         SceneNameInput = model.Scene.Name;
         Replace(EntityNodes, model.Scene.RootEntities);
         Replace(SceneNames, model.Project.Scenes.Select(scene => scene.Name));

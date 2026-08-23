@@ -11,7 +11,8 @@ internal sealed record RekallAgeStudioPreviewFrame(
     int FrameIndex,
     int RenderableCount,
     int ObservationCount,
-    string Backend);
+    string Backend,
+    RekallAgeStudioViewportInteractionSnapshot Interaction);
 
 internal interface IRekallAgeStudioPreviewSession : IAsyncDisposable
 {
@@ -230,7 +231,8 @@ internal sealed class RekallAgeStudioPreviewSession : IRekallAgeStudioPreviewSes
             rendered.FrameIndex,
             rendered.RenderableCount,
             frame.Observations.Count,
-            "software-live");
+            "software-live",
+            RekallAgeStudioViewportInteractionBuilder.Build(frame, world.Entities));
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);

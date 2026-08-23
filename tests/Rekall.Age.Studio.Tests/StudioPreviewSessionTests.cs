@@ -32,6 +32,8 @@ public sealed class StudioPreviewSessionTests
             Assert.Equal(320, seventh.Image.PixelWidth);
             Assert.Equal(180, seventh.Image.PixelHeight);
             Assert.True(seventh.Image.IsFrozen);
+            Assert.Equal(320, seventh.Interaction.FrameWidth);
+            Assert.Equal(180, seventh.Interaction.FrameHeight);
         }
         finally
         {
@@ -108,6 +110,8 @@ public sealed class StudioPreviewSessionTests
             new byte[checked(width * height * 4)],
             checked(width * 4));
         image.Freeze();
-        return new RekallAgeStudioPreviewFrame(image, frameIndex, 0, 0, "test");
+        return new RekallAgeStudioPreviewFrame(
+            image, frameIndex, 0, 0, "test",
+            new RekallAgeStudioViewportInteractionSnapshot(width, height, []));
     }
 }

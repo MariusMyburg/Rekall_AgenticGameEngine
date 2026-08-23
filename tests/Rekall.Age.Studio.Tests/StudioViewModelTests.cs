@@ -14,6 +14,38 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioViewModelTests
 {
     [Fact]
+    public async Task ViewportPickSelectsTheMappedSceneEntityAndRejectsLetterboxSpace()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-pick-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Viewport Pick Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+            var entity = Assert.Single(viewModel.EntityNodes);
+            preview.Regions.Add(new(entity.EntityId, RekallAgeStudioViewportRegionKind.World, 40, 40, 20, 20, 2, 0));
+
+            Assert.True(await viewModel.SelectViewportEntityAsync(200, 100, 100, 50));
+            Assert.Equal(entity.EntityId, viewModel.SelectedEntityId);
+            Assert.False(await viewModel.SelectViewportEntityAsync(200, 100, 20, 50));
+            Assert.Equal(entity.EntityId, viewModel.SelectedEntityId);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ViewModelExposesDistinctEditAndPersistentSimulateModes()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-mode-" + Guid.NewGuid().ToString("N"));
@@ -491,6 +523,7 @@ public sealed class StudioViewModelTests
         private TaskCompletionSource? _disposeEntered;
         public int ResetCount { get; private set; }
         public int StepCount { get; private set; }
+        public List<RekallAgeStudioViewportPickRegion> Regions { get; } = [];
 
         public ValueTask<RekallAgeStudioPreviewFrame> ResetAsync(
             string projectRoot,
@@ -557,12 +590,14 @@ public sealed class StudioViewModelTests
             return CreateFrame(_frame);
         }
 
-        private static RekallAgeStudioPreviewFrame CreateFrame(int frame)
+        private RekallAgeStudioPreviewFrame CreateFrame(int frame)
         {
             var image = BitmapSource.Create(
-                1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[4], 4);
+                100, 100, 96, 96, PixelFormats.Bgra32, null, new byte[40_000], 400);
             image.Freeze();
-            return new RekallAgeStudioPreviewFrame(image, frame, 0, 0, "software-live");
+            return new RekallAgeStudioPreviewFrame(
+                image, frame, 0, 0, "software-live",
+                new RekallAgeStudioViewportInteractionSnapshot(100, 100, Regions));
         }
     }
 

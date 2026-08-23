@@ -66,6 +66,18 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnSceneViewportMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;
+        var position = e.GetPosition(image);
+        await _viewModel.SelectViewportEntityAsync(
+            image.ActualWidth,
+            image.ActualHeight,
+            position.X,
+            position.Y);
+        e.Handled = true;
+    }
+
     private void OnMeshViewportMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;

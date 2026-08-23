@@ -65,4 +65,36 @@ public sealed class WebGpuBrowserPacketFixtureTests
         Assert.False(result.Succeeded);
         Assert.Equal("REKALL_WEBGPU_BRIDGE_RESULT_INVALID", Assert.Single(result.Diagnostics).Code);
     }
+
+    [Theory]
+    [InlineData(RekallAgeIndexFormat.UInt16, "uint16")]
+    [InlineData(RekallAgeIndexFormat.UInt32, "uint32")]
+    public void IndexFormatsUseCanonicalLiteralBrowserSpellings(RekallAgeIndexFormat format, string expected)
+    {
+        var data = RekallAgeWebGpuProtocol.ToJsonElement(new RekallAgeSetIndexBufferCommand(Buffer, format, 0, 16));
+
+        Assert.Equal(expected, data.GetProperty("format").GetString());
+
+        var packet = new RekallAgeWebGpuSubmitPacket(1, null, [new("setIndexBuffer", data)]);
+        var restored = RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuSubmitPacket>(RekallAgeWebGpuProtocol.Serialize(packet));
+        Assert.Equal(expected, restored.Commands[0].Data.GetProperty("format").GetString());
+    }
+
+    [Theory]
+    [InlineData("\"uInt16\"")]
+    [InlineData("\"uInt32\"")]
+    [InlineData("\"unknown\"")]
+    [InlineData("0")]
+    [InlineData("1")]
+    public void IndexFormatsRejectNoncanonicalBrowserSpellings(string formatJson)
+    {
+        var packet = "{\"version\":1,\"operation\":\"submit\",\"commands\":[{\"kind\":\"setIndexBuffer\",\"data\":{\"buffer\":{\"deviceId\":\"11111111-1111-1111-1111-111111111111\",\"kind\":\"buffer\",\"slot\":7,\"generation\":1},\"format\":"
+            + formatJson
+            + ",\"offset\":0,\"sizeBytes\":16}}]}";
+
+        var exception = Assert.Throws<RekallAgeWebGpuProtocolException>(() =>
+            RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuSubmitPacket>(packet));
+
+        Assert.Equal("REKALL_WEBGPU_PROTOCOL_COMMAND_PAYLOAD_INVALID", exception.Diagnostic.Code);
+    }
 }

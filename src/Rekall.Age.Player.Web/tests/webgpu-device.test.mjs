@@ -144,3 +144,33 @@ test('uses explicit texture binding metadata instead of guessing WebGPU defaults
     assert.deepEqual(layout.entries[0].texture, { sampleType: 'depth', viewDimension: 'cube-array', multisampled: true });
     assert.deepEqual(layout.entries[1].storageTexture, { access: 'read-write', format: 'r32float', viewDimension: '3d' });
 });
+
+test('executes canonical uint16 and uint32 index-buffer commands', async () => {
+    const indexFormats = [];
+    const pass = { setIndexBuffer: (_buffer, format) => indexFormats.push(format), end: () => {} };
+    const device = {
+        lost: new Promise(() => {}),
+        queue: { onSubmittedWorkDone: async () => {}, writeBuffer: () => {}, submit: () => {} },
+        pushErrorScope: () => {}, popErrorScope: async () => null, addEventListener: () => {},
+        createBuffer: () => ({ destroy: () => {} }),
+        createCommandEncoder: () => ({ beginRenderPass: () => pass, finish: () => ({}) })
+    };
+    const context = { configure: () => {}, getCurrentTexture: () => ({ createView: () => ({}) }) };
+    const executor = createWebGpuExecutor({ navigator: { gpu: { requestAdapter: async () => ({ requestDevice: async () => device, limits: {} }), getPreferredCanvasFormat: () => 'bgra8unorm' } }, canvas: { getContext: () => context } });
+    await executor.initialize();
+    const handle = (kind, slot) => ({ deviceId: '11111111-1111-1111-1111-111111111111', kind, slot, generation: 1 });
+    const buffer = handle('buffer', 1); const texture = handle('texture', 2); const target = handle('renderTarget', 3);
+    assert.equal(executor.execute(JSON.stringify({ version: 1, operation: 'create', resourceType: 'buffer', handle: buffer, descriptor: { sizeBytes: 32, usage: 'index', memoryAccess: 'deviceLocal' } })).succeeded, true);
+    assert.equal(executor.execute(JSON.stringify({ version: 1, operation: 'importCanvasOutput', texture, renderTarget: target, width: 8, height: 8, format: 'bgra8Unorm' })).succeeded, true);
+
+    for (const format of ['uint16', 'uint32']) {
+        const result = executor.execute(JSON.stringify({ version: 1, operation: 'submit', commands: [
+            { kind: 'beginRenderPass', data: { descriptor: { renderTarget: target, colorClearValues: [] } } },
+            { kind: 'setIndexBuffer', data: { buffer, format, offset: 0, sizeBytes: 16 } },
+            { kind: 'endRenderPass', data: {} }
+        ] }));
+        assert.equal(result.succeeded, true);
+    }
+
+    assert.deepEqual(indexFormats, ['uint16', 'uint32']);
+});

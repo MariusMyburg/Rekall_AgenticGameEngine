@@ -65,11 +65,22 @@ or trimming opt-out was added.
 
 Final GREEN evidence:
 
-- The focused WebGPU C# selection passed 62/62, including complete supported
+- The focused WebGPU C# selection passed 69/69, including complete supported
   descriptor/command/packet dispatch and nested bridge-result rejection.
-- The Node browser-executor suite passed 8/8.
+- The Node browser-executor suite passed 9/9.
 - The Release browser Player build completed with zero warnings and zero errors.
 - A clean-output trimmed browser publish completed with zero warnings and zero
   errors and emitted both the fingerprinted `webgpu-device` JavaScript module
   and `Rekall.Age.Player.Web` WASM module.
 - The Release solution build completed with zero warnings and zero errors.
+
+The final command-variant review exposed one existing wire mismatch:
+`JsonNamingPolicy.CamelCase` serialized `RekallAgeIndexFormat.UInt16` and
+`UInt32` as `uInt16` and `uInt32`, while WebGPU requires `uint16` and `uint32`.
+The new literal fixture was RED for both emitted spellings and proved the legacy
+spellings were accepted on input. A dedicated source-generation-compatible
+`JsonConverter<RekallAgeIndexFormat>` now writes and reads only the two stable
+canonical protocol strings. Numeric, unknown, and legacy `uInt*` spellings fail
+closed as invalid command payloads. A real Node executor test submits both
+canonical variants through `setIndexBuffer` and verifies the exact browser API
+arguments. The updated 69/69 C# and 9/9 Node totals above include this coverage.

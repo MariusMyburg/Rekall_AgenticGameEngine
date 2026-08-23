@@ -58,6 +58,7 @@ internal sealed partial class RekallAgeWebGpuJsonContext : JsonSerializerContext
             IgnoreReadOnlyProperties = true,
             UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
         };
+        options.Converters.Add(new RekallAgeWebGpuIndexFormatJsonConverter());
         options.Converters.Add(new JsonStringEnumConverter<RekallAgeGraphicsResourceKind>(JsonNamingPolicy.CamelCase, allowIntegerEnums));
         options.Converters.Add(new JsonStringEnumConverter<RekallAgeBufferUsage>(JsonNamingPolicy.CamelCase, allowIntegerEnums));
         options.Converters.Add(new JsonStringEnumConverter<RekallAgeMemoryAccess>(JsonNamingPolicy.CamelCase, allowIntegerEnums));
@@ -80,9 +81,29 @@ internal sealed partial class RekallAgeWebGpuJsonContext : JsonSerializerContext
         options.Converters.Add(new JsonStringEnumConverter<RekallAgeFrontFace>(JsonNamingPolicy.CamelCase, allowIntegerEnums));
         options.Converters.Add(new JsonStringEnumConverter<RekallAgeVertexStepMode>(JsonNamingPolicy.CamelCase, allowIntegerEnums));
         options.Converters.Add(new JsonStringEnumConverter<RekallAgeVertexFormat>(JsonNamingPolicy.CamelCase, allowIntegerEnums));
-        options.Converters.Add(new JsonStringEnumConverter<RekallAgeIndexFormat>(JsonNamingPolicy.CamelCase, allowIntegerEnums));
         return options;
     }
+}
+
+internal sealed class RekallAgeWebGpuIndexFormatJsonConverter : JsonConverter<RekallAgeIndexFormat>
+{
+    public override RekallAgeIndexFormat Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType == JsonTokenType.String
+            ? reader.GetString() switch
+            {
+                "uint16" => RekallAgeIndexFormat.UInt16,
+                "uint32" => RekallAgeIndexFormat.UInt32,
+                _ => throw new JsonException("WebGPU index formats must use a canonical protocol spelling.")
+            }
+            : throw new JsonException("WebGPU index formats must be JSON strings.");
+
+    public override void Write(Utf8JsonWriter writer, RekallAgeIndexFormat value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value switch
+        {
+            RekallAgeIndexFormat.UInt16 => "uint16",
+            RekallAgeIndexFormat.UInt32 => "uint32",
+            _ => throw new JsonException("WebGPU index formats must be supported protocol values.")
+        });
 }
 
 internal sealed class RekallAgeWebGpuBridgeEnvelope

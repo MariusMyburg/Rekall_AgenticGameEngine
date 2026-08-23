@@ -257,7 +257,7 @@ public sealed class WebGpuProtocolTests
 
         Assert.Equal(kinds, restored.Commands.Select(command => command.Kind));
         Assert.Equal("render-pass", restored.Commands[1].Data.GetProperty("descriptor").GetProperty("label").GetString());
-        Assert.Equal("uInt32", restored.Commands[5].Data.GetProperty("format").GetString());
+        Assert.Equal("uint32", restored.Commands[5].Data.GetProperty("format").GetString());
     }
 
     [Fact]

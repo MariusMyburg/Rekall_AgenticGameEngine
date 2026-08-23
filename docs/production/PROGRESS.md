@@ -4,9 +4,30 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 09:41 Africa/Johannesburg
+Last verified: 2026-08-23 09:52 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
+
+Studio now opens persisted procedural modelling graphs as exact revisioned
+assets and presents the same canonical node descriptors used by CLI/MCP:
+stable node/type IDs, display names, descriptions, typed parameters with
+resolved defaults, link counts, and named outputs. Evaluation uses a retained
+engine evaluator so repeated output requests expose real per-node timing,
+cache-hit, invalidation, budget, last-good-output, and structured diagnostic
+evidence. A successful output is rendered through the existing deterministic
+mesh viewport rather than an editor-only geometry path. Three focused session
+proofs cover persistence/descriptor discovery, two-node cache reuse, output
+mesh publication, and the closed pre-open failure path. The visible workspace
+adds separate graph-control, node-contract, evaluated-output, and diagnostics
+editors under Modeling. Its first shared design-system slice introduces
+reusable editor panel/header/section tokens and a dense viewport-first dark
+layout inspired by Blender's functional clarity while retaining AGE's cyan
+identity and AI-first evidence surfaces. A real Windows render inspection
+confirmed correct WPF composition and accessibility structure. The Studio
+project builds with zero warnings/errors; the focused graph tests pass 3/3.
+Graph mutation/canvas layout, node linking, attribute/material inspectors,
+persistent docking, orbit/pan/zoom, and broader visual-regression automation
+remain open. The complete Studio suite passes 33/33.
 
 The first optimization primitive is verified across every canonical modeling
 composition path. `merge_by_distance` welds selected points through a bounded,

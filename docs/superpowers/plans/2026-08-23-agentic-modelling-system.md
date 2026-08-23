@@ -117,6 +117,11 @@ then grow it into procedural geometry/material graphs and Studio modelling.
 
 ### Task 9: Studio modelling and advanced world authoring
 
+- [x] Add the first persisted procedural-graph browser/viewer with canonical
+  node contracts, named-output evaluation, per-node cache/timing evidence,
+  diagnostics, and common mesh-output rendering.
+- [x] Establish shared editor panel/header/section tokens and visually inspect
+  the first Blender-informed dense workspace slice in the real Windows Studio.
 - [ ] Add viewport element picking, mesh edit modes, selection history, operation
   previews, attribute/material inspectors, node editor/viewer, evaluation
   diagnostics, and persistent layouts using the same command schemas.

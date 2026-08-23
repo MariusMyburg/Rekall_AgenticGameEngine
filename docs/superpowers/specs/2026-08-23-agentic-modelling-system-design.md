@@ -173,6 +173,30 @@ active/ordered selection history, operation parameter previews, attribute and
 material inspectors, node graphs, evaluation timings, viewer outputs, gizmos,
 and undo groups. No Studio-only modelling mutation logic is permitted.
 
+### Studio design system and workspace ergonomics
+
+Blender is a reference for professional information density, editor boundaries,
+viewport priority, compact controls, predictable properties regions, and
+workspace composition—not a visual skin to copy. AGE retains its own cyan
+identity and makes agent tasks, tool execution, runtime observations,
+assertions, and evaluation evidence first-class editors rather than auxiliary
+dialogs.
+
+Studio uses shared semantic tokens for workbench, chrome, panels, raised
+surfaces, viewport, borders, text hierarchy, selection, status, and accent
+states. Editor regions have consistent compact headers and can progressively
+become dockable/splittable without changing their content contracts. Controls
+use one spacing, typography, focus, hover, disabled, and validation language.
+The central live viewport remains visually dominant; hierarchy, properties,
+asset browsers, graph canvases, diagnostics, timelines, and AI evidence are
+composable editor types with persisted workspace layouts.
+
+Visual changes require real-window inspection at representative window sizes,
+keyboard/accessibility-tree inspection, and interaction tests. Screens must
+remain useful when empty, busy, failed, or displaying bounded agent evidence;
+polish must not hide diagnostics or replace canonical engine data with
+editor-only summaries.
+
 ## Security and licensing
 
 AGE independently implements the design in C#. Blender GPL source is not

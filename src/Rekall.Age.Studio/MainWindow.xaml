@@ -59,7 +59,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="290" /><ColumnDefinition Width="*" /><ColumnDefinition Width="370" />
             </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="260" /></Grid.RowDefinitions>
+            <Grid.RowDefinitions><RowDefinition Height="*" MinHeight="300" /><RowDefinition Height="340" MinHeight="240" /></Grid.RowDefinitions>
 
             <Border Grid.Column="0" Grid.Row="0" Grid.RowSpan="2" Margin="8" Padding="8"
                     Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1">
@@ -126,6 +126,8 @@
 
             <TabControl Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="1" Margin="0,0,8,8">
                 <TabItem Header="Modeling">
+                    <TabControl>
+                    <TabItem Header="Mesh Edit">
                     <Grid Margin="8">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="240" /><ColumnDefinition Width="280" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Margin="0,0,10,0">
@@ -193,6 +195,91 @@
                             </Grid>
                         </Grid>
                     </Grid>
+                    </TabItem>
+                    <TabItem Header="Procedural Graph">
+                        <Grid Margin="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="250" />
+                                <ColumnDefinition Width="360" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Style="{StaticResource EditorPanel}" Margin="0,0,8,0">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}">
+                                        <TextBlock Text="PROCEDURAL GRAPH" FontWeight="SemiBold" FontSize="11" />
+                                    </Border>
+                                    <StackPanel Margin="8">
+                                        <TextBlock Text="Graph asset" Style="{StaticResource SectionLabel}" />
+                                        <ComboBox ItemsSource="{Binding ModelingGraphAssetIds}" SelectedItem="{Binding SelectedModelingGraphAssetId}" Margin="0,3,0,6" />
+                                        <UniformGrid Columns="2">
+                                            <Button Content="Refresh" Command="{Binding RefreshModelingGraphsCommand}" Padding="7,3" Margin="0,0,3,0" />
+                                            <Button Content="Open" Command="{Binding OpenModelingGraphCommand}" Padding="7,3" Margin="3,0,0,0" />
+                                        </UniformGrid>
+                                        <TextBlock Text="Named output" Style="{StaticResource SectionLabel}" Margin="0,12,0,0" />
+                                        <ComboBox ItemsSource="{Binding ModelingGraphOutputNames}" SelectedItem="{Binding SelectedModelingGraphOutput}" Margin="0,3,0,6" />
+                                        <Button Content="Evaluate Output" Command="{Binding EvaluateModelingGraphCommand}" Style="{StaticResource AccentButton}" />
+                                        <TextBlock Text="{Binding ModelingGraphSummary}" TextWrapping="Wrap" Foreground="{StaticResource MutedText}" Margin="0,12,0,0" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                            <Border Grid.Column="1" Style="{StaticResource EditorPanel}" Margin="0,0,8,0">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}">
+                                        <TextBlock Text="NODE CONTRACTS" FontWeight="SemiBold" FontSize="11" />
+                                    </Border>
+                                    <ListBox ItemsSource="{Binding ModelingGraphNodes}" BorderThickness="0">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1" Padding="7">
+                                                    <StackPanel>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                                            <TextBlock Grid.Column="1" Foreground="{StaticResource Accent}" FontSize="10"><Run Text="{Binding IncomingLinkCount}" /><Run Text=" IN · " /><Run Text="{Binding OutgoingLinkCount}" /><Run Text=" OUT" /></TextBlock>
+                                                        </Grid>
+                                                        <TextBlock Text="{Binding NodeId}" Foreground="{StaticResource MutedText}" FontSize="10" />
+                                                        <TextBlock Text="{Binding Description}" Foreground="{StaticResource MutedText}" FontSize="11" TextWrapping="Wrap" Margin="0,3,0,3" />
+                                                        <ItemsControl ItemsSource="{Binding Parameters}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Grid Margin="0,1">
+                                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                                        <TextBlock Text="{Binding DisplayName}" FontSize="11" />
+                                                                        <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{StaticResource Accent}" FontFamily="Cascadia Mono, Consolas" FontSize="10" />
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                        <TextBlock Foreground="{StaticResource MutedText}" FontSize="10" Margin="0,4,0,0"><Run Text="cache: " /><Run Text="{Binding LastEvaluation.CacheHit}" /><Run Text=" · " /><Run Text="{Binding LastEvaluation.DurationMilliseconds, StringFormat={}{0:F2} ms}" /></TextBlock>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </DockPanel>
+                            </Border>
+                            <Grid Grid.Column="2">
+                                <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="100" /></Grid.RowDefinitions>
+                                <Border Style="{StaticResource EditorPanel}" Background="{StaticResource ViewportBackground}" Margin="0,0,0,8">
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}">
+                                            <TextBlock Text="EVALUATED OUTPUT" FontWeight="SemiBold" FontSize="11" />
+                                        </Border>
+                                        <Image Source="{Binding ModelingGraphViewportImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                                    </DockPanel>
+                                </Border>
+                                <Border Grid.Row="1" Style="{StaticResource EditorPanel}">
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}">
+                                            <TextBlock Text="DIAGNOSTICS" FontWeight="SemiBold" FontSize="11" />
+                                        </Border>
+                                        <ListBox ItemsSource="{Binding ModelingGraphDiagnosticLines}" BorderThickness="0" />
+                                    </DockPanel>
+                                </Border>
+                            </Grid>
+                        </Grid>
+                    </TabItem>
+                    </TabControl>
                 </TabItem>
                 <TabItem Header="Validation"><ListBox ItemsSource="{Binding ValidationLines}" /></TabItem>
                 <TabItem Header="Assets"><ListBox ItemsSource="{Binding AssetLines}" /></TabItem>

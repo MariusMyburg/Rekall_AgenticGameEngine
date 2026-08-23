@@ -11,6 +11,8 @@
         <SolidColorBrush x:Key="MutedText" Color="#91A0B2" />
         <SolidColorBrush x:Key="Accent" Color="#48C7E8" />
         <SolidColorBrush x:Key="Selection" Color="#214D61" />
+        <SolidColorBrush x:Key="EditorHeaderBackground" Color="#20262E" />
+        <SolidColorBrush x:Key="ViewportBackground" Color="#090C10" />
         <Style TargetType="{x:Type Window}">
             <Setter Property="FontFamily" Value="Segoe UI" />
             <Setter Property="FontSize" Value="13" />
@@ -79,6 +81,22 @@
         <Style TargetType="{x:Type ToggleButton}">
             <Setter Property="Background" Value="{StaticResource PanelRaised}" /><Setter Property="Foreground" Value="{StaticResource MutedText}" /><Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" /><Setter Property="Padding" Value="10,5" />
             <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton"><Border x:Name="ToggleSurface" CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" /></Border><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="ToggleSurface" Property="Background" Value="{StaticResource Selection}" /><Setter TargetName="ToggleSurface" Property="BorderBrush" Value="{StaticResource Accent}" /><Setter Property="Foreground" Value="{StaticResource Accent}" /></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ToggleSurface" Property="BorderBrush" Value="{StaticResource Accent}" /></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4" /></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="EditorPanel" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PanelBackground}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style x:Key="EditorHeader" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource EditorHeaderBackground}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Padding" Value="8,5" />
+        </Style>
+        <Style x:Key="SectionLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedText}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
     </Application.Resources>
 </Application>

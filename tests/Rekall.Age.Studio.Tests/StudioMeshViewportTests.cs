@@ -39,11 +39,24 @@ public sealed class StudioMeshViewportTests
         Assert.Equal(640, frame.Image.PixelWidth);
         Assert.Equal(360, frame.Image.PixelHeight);
         Assert.True(frame.IsPreview);
+        Assert.True(frame.Points.Max(point => point.Position.X) - frame.Points.Min(point => point.Position.X) < 640 * 0.7);
+        Assert.True(frame.Points.Max(point => point.Position.Y) - frame.Points.Min(point => point.Position.Y) < 360 * 0.7);
         Assert.Equal(21UL, renderer.Pick(frame, RekallAgeGeometryDomain.Face, frame.ElementCenters[(RekallAgeGeometryDomain.Face, 21)].X, frame.ElementCenters[(RekallAgeGeometryDomain.Face, 21)].Y));
         Assert.Equal(1UL, renderer.Pick(frame, RekallAgeGeometryDomain.Point, frame.ElementCenters[(RekallAgeGeometryDomain.Point, 1)].X, frame.ElementCenters[(RekallAgeGeometryDomain.Point, 1)].Y));
         Assert.Equal(11UL, renderer.Pick(frame, RekallAgeGeometryDomain.Edge, frame.ElementCenters[(RekallAgeGeometryDomain.Edge, 11)].X, frame.ElementCenters[(RekallAgeGeometryDomain.Edge, 11)].Y));
         Assert.Equal(31UL, renderer.Pick(frame, RekallAgeGeometryDomain.Corner, frame.ElementCenters[(RekallAgeGeometryDomain.Corner, 31)].X, frame.ElementCenters[(RekallAgeGeometryDomain.Corner, 31)].Y));
         Assert.Null(renderer.Pick(frame, RekallAgeGeometryDomain.Point, -100, -100));
+    }
+
+    [Fact]
+    public void MeshViewportRendersAProductionGridBehindEditableGeometry()
+    {
+        var frame = new RekallAgeStudioMeshViewportRenderer().Render(
+            Quad(), RekallAgeGeometryDomain.Face, [], 640, 360, preview: false);
+        var pixel = new byte[4];
+        frame.Image.CopyPixels(new Int32Rect(40, 20, 1, 1), pixel, 4, 0);
+
+        Assert.NotEqual(new byte[] { 22, 16, 12, 255 }, pixel);
     }
 
     private static RekallAgeMeshAsset Quad() => RekallAgeMeshAsset.Create("quad", "Quad",

@@ -68,11 +68,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _runAgentCommand;
     private readonly RekallAgeAsyncCommand _cancelAgentCommand;
     private readonly RekallAgeStudioModelingSession _modeling = new();
+    private readonly RekallAgeMeshPrimitiveFactory _meshPrimitiveFactory = new();
     private readonly RekallAgeStudioModelingGraphSession _modelingGraph = new();
     private readonly RekallAgeStudioMeshViewportRenderer _meshViewportRenderer = new();
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
     private readonly RekallAgeAsyncCommand _refreshMeshAssetsCommand;
+    private readonly RekallAgeAsyncCommand _createMeshPrimitiveCommand;
     private readonly RekallAgeAsyncCommand _openMeshAssetCommand;
     private readonly RekallAgeAsyncCommand _selectMeshElementCommand;
     private readonly RekallAgeAsyncCommand _clearMeshSelectionCommand;
@@ -105,6 +107,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _selectedOllamaModel = "qwen3.5:35b";
     private string _agentTaskInput = string.Empty;
     private string? _selectedMeshAssetId;
+    private string _selectedMeshPrimitive = "box";
+    private string _meshPrimitiveAssetIdInput = "mesh-box";
     private ulong? _selectedMeshElementId;
     private RekallAgeGeometryDomain _meshEditDomain = RekallAgeGeometryDomain.Face;
     private string? _selectedMeshOperationId;
@@ -203,6 +207,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _runAgentCommand = CreateAsyncCommand(RunAgentAsync, CanRunAgent);
         _cancelAgentCommand = CreateAsyncCommand(CancelAgentAsync, () => IsAgentRunning);
         _refreshMeshAssetsCommand = CreateAsyncCommand(RefreshMeshAssetsAsync, HasOpenProject);
+        _createMeshPrimitiveCommand = CreateAsyncCommand(CreateMeshPrimitiveAsync, CanCreateMeshPrimitive);
         _openMeshAssetCommand = CreateAsyncCommand(OpenMeshAssetAsync, CanOpenMeshAsset);
         _selectMeshElementCommand = CreateAsyncCommand(SelectMeshElementAsync, CanSelectMeshElement);
         _clearMeshSelectionCommand = CreateAsyncCommand(ClearMeshSelectionAsync, HasOpenMesh);
@@ -277,6 +282,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand RunAgentCommand => _runAgentCommand;
     public ICommand CancelAgentCommand => _cancelAgentCommand;
     public ICommand RefreshMeshAssetsCommand => _refreshMeshAssetsCommand;
+    public ICommand CreateMeshPrimitiveCommand => _createMeshPrimitiveCommand;
     public ICommand OpenMeshAssetCommand => _openMeshAssetCommand;
     public ICommand SelectMeshElementCommand => _selectMeshElementCommand;
     public ICommand ClearMeshSelectionCommand => _clearMeshSelectionCommand;
@@ -393,6 +399,32 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         get => _selectedMeshAssetId;
         set { if (Set(ref _selectedMeshAssetId, value)) RefreshCommands(); }
+    }
+
+    public IReadOnlyList<string> MeshPrimitiveTypes => _meshPrimitiveFactory.SupportedPrimitives;
+
+    public string SelectedMeshPrimitive
+    {
+        get => _selectedMeshPrimitive;
+        set
+        {
+            if (!Set(ref _selectedMeshPrimitive, value)) return;
+            if (string.IsNullOrWhiteSpace(MeshPrimitiveAssetIdInput)
+                || MeshPrimitiveAssetIdInput.StartsWith("mesh-", StringComparison.Ordinal))
+            {
+                MeshPrimitiveAssetIdInput = $"mesh-{value.Trim().ToLowerInvariant()}";
+            }
+            RefreshCommands();
+        }
+    }
+
+    public string MeshPrimitiveAssetIdInput
+    {
+        get => _meshPrimitiveAssetIdInput;
+        set
+        {
+            if (Set(ref _meshPrimitiveAssetIdInput, value)) RefreshCommands();
+        }
     }
 
     public ulong? SelectedMeshElementId
@@ -877,6 +909,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         && (File.Exists(LastPackagePath) || Directory.Exists(LastPackagePath));
     private bool HasOpenMesh() => !IsBusy && Mode == RekallAgeStudioMode.Edit && _modeling.Mesh is not null;
     private bool CanOpenMeshAsset() => HasEditableProject() && !string.IsNullOrWhiteSpace(SelectedMeshAssetId);
+    private bool CanCreateMeshPrimitive() => HasEditableProject()
+        && !string.IsNullOrWhiteSpace(SelectedMeshPrimitive)
+        && !string.IsNullOrWhiteSpace(MeshPrimitiveAssetIdInput);
     private bool CanSelectMeshElement() => HasOpenMesh() && SelectedMeshElementId.HasValue;
     private bool CanRunMeshOperation() => HasOpenMesh() && !string.IsNullOrWhiteSpace(SelectedMeshOperationId)
         && MeshParameterEditors.All(item => item.IsValid);
@@ -897,6 +932,38 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         MeshSummary = MeshAssetIds.Count == 0 ? "No persisted mesh assets are present in Modeling/Meshes." : $"{MeshAssetIds.Count} mesh asset(s) available.";
         return Task.CompletedTask;
     });
+
+    private async Task CreateMeshPrimitiveAsync()
+    {
+        if (_session.ProjectRoot is null) return;
+        var primitive = SelectedMeshPrimitive.Trim().ToLowerInvariant();
+        var assetId = MeshPrimitiveAssetIdInput.Trim();
+        var name = $"{char.ToUpperInvariant(primitive[0])}{primitive[1..]}";
+        var mesh = await _meshPrimitiveFactory.CreateAsync(
+            primitive,
+            assetId,
+            name,
+            _lifecycleCancellation.Token);
+        await RunAsync(() => _session.ExecuteAsync(
+            "rekall.mesh.create_asset",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = _session.ProjectRoot,
+                assetId,
+                name,
+                topology = mesh.Topology,
+                attributes = mesh.Attributes,
+                materialSlots = mesh.MaterialSlots,
+                selectionSets = mesh.SelectionSets
+            }),
+            $"Create editable {primitive} mesh {assetId}",
+            "studio",
+            CancellationToken.None).AsTask());
+        if (!_modeling.ListAssets(_session.ProjectRoot).Contains(assetId, StringComparer.Ordinal)) return;
+        Replace(MeshAssetIds, _modeling.ListAssets(_session.ProjectRoot));
+        SelectedMeshAssetId = assetId;
+        await OpenMeshAssetAsync();
+    }
 
     private Task OpenMeshAssetAsync() => RunModelingAsync(async () =>
     {
@@ -2000,6 +2067,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _runAgentCommand.RaiseCanExecuteChanged();
         _cancelAgentCommand.RaiseCanExecuteChanged();
         _refreshMeshAssetsCommand.RaiseCanExecuteChanged();
+        _createMeshPrimitiveCommand.RaiseCanExecuteChanged();
         _openMeshAssetCommand.RaiseCanExecuteChanged();
         _selectMeshElementCommand.RaiseCanExecuteChanged();
         _clearMeshSelectionCommand.RaiseCanExecuteChanged();

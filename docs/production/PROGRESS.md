@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 12:20 Africa/Johannesburg
+Last verified: 2026-08-23 13:30 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -25,8 +25,14 @@ The Studio shell now treats World and Modeling as top-level per-window
 workspaces, following the useful Blender distinction between a workspace and a
 nested tool panel. Modeling hides the game/project bars and fills the client
 area with resizable Mesh Editing, Procedural Geometry, Materials, and
-UV/Attributes surfaces. Mesh and procedural controls are bound to the canonical
-sessions rather than display-only substitutes. World exposes live hierarchy,
+UV/Attributes surfaces. The Mesh Editing surface is now viewport-first: a
+compact functional tool shelf and edit header surround a production grid,
+auto-framed editable geometry, orientation indicator, mesh outliner, and active
+tool/properties region. Its Add action is backed by the generic modeling
+primitive factory and canonical asset transaction; box, grid, sphere, cylinder,
+cone, and torus all create real editable assets which Studio immediately opens.
+Mesh and procedural controls are bound to the canonical sessions rather than
+display-only substitutes. World exposes live hierarchy,
 inspector, and output splitters; panel visibility; Default, Authoring, and Debug
 presets; and versioned, normalized persistence of window bounds, maximization,
 panel sizes/visibility, output tab, and active workspace. Rich scene actions now
@@ -34,8 +40,10 @@ rename, duplicate, delete, show/hide, lock/unlock, parent, and unparent via
 canonical command transactions. A real STA WPF render loads and evaluates the
 populated procedural probe, switches into the dedicated workspace, requires the
 project chrome to disappear and the modeling host to occupy the client area,
-and writes an inspected 1480×820 PNG proof. The complete Studio suite passes
-49/49, and the Release Studio build succeeds with zero warnings and zero errors.
+creates and opens a real cube through the same Add command as the UI, and writes
+an inspected 1480×820 PNG proof. The complete Studio suite passes 51/51, the
+complete modeling namespace passes 145/145, and the Release Studio build
+succeeds with zero warnings and zero errors.
 
 The procedural sphere contract is now a true closed shared-topology surface:
 one vertex per pole, shared periodic seam vertices, outward cap triangles, and

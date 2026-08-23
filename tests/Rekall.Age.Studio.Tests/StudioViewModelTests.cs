@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json.Nodes;
 using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Editor;
+using Rekall.Age.Modeling;
 using Rekall.Age.Rendering;
 using Rekall.Age.Studio;
 using Rekall.Age.Workflows;
@@ -131,6 +132,40 @@ public sealed class StudioViewModelTests
             await ExecuteAsync(viewModel.UndoCommand);
             scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
             Assert.DoesNotContain(scene.Entities, entity => entity.Id != child.EntityId && entity.Name == "Playable Hero Copy");
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ModelingAddMenuCreatesAndOpensACanonicalEditablePrimitiveAsset()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-add-mesh-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Add Mesh Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.SelectedMeshPrimitive = "box";
+            viewModel.MeshPrimitiveAssetIdInput = "hero-box";
+
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+
+            Assert.Equal("hero-box", viewModel.SelectedMeshAssetId);
+            Assert.Contains("hero-box", viewModel.MeshAssetIds);
+            Assert.NotNull(viewModel.MeshViewportImage);
+            var mesh = await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None);
+            Assert.Equal("hero-box", mesh.AssetId);
+            Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
         }
         finally
         {

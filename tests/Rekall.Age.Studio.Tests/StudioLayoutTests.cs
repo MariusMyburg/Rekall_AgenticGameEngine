@@ -84,7 +84,10 @@ public sealed class StudioLayoutTests
         Assert.Contains("x:Name=\"ProjectBar\"", window, StringComparison.Ordinal);
         Assert.Contains("MeshViewportImage", modeling, StringComparison.Ordinal);
         Assert.Contains("ModelingGraphViewportImage", modeling, StringComparison.Ordinal);
-        Assert.Contains("Semantic operation", modeling, StringComparison.Ordinal);
+        Assert.Contains("CreateMeshPrimitiveCommand", modeling, StringComparison.Ordinal);
+        Assert.Contains("MeshOperationIds", modeling, StringComparison.Ordinal);
+        Assert.Contains("PreviewMeshOperationCommand", modeling, StringComparison.Ordinal);
+        Assert.Contains("ApplyMeshOperationCommand", modeling, StringComparison.Ordinal);
         Assert.Contains("NODE CONTRACTS", modeling, StringComparison.Ordinal);
     }
 

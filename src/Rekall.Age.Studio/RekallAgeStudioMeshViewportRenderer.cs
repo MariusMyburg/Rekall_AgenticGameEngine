@@ -44,7 +44,7 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
         var minY = raw.Min(point => point.Y); var maxY = raw.Max(point => point.Y);
         var spanX = Math.Max(maxX - minX, 1e-9); var spanY = Math.Max(maxY - minY, 1e-9);
         const double padding = 28;
-        var scale = Math.Min((width - padding * 2) / spanX, (height - padding * 2) / spanY);
+        var scale = Math.Min((width - padding * 2) / spanX, (height - padding * 2) / spanY) * 0.55;
         if (!double.IsFinite(scale) || scale <= 0) scale = 1;
         var centerX = (minX + maxX) / 2; var centerY = (minY + maxY) / 2;
         var projected = raw.Select(point => new Point(width / 2d + (point.X - centerX) * scale, height / 2d + (point.Y - centerY) * scale)).ToArray();
@@ -89,6 +89,16 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
         using (var drawing = visual.RenderOpen())
         {
             drawing.DrawRectangle(new SolidColorBrush(Color.FromRgb(12, 16, 22)), null, new Rect(0, 0, width, height));
+            var minorGrid = new Pen(new SolidColorBrush(Color.FromRgb(35, 42, 50)), 1);
+            var majorGrid = new Pen(new SolidColorBrush(Color.FromRgb(48, 57, 67)), 1);
+            for (var x = 40; x < width; x += 40)
+                drawing.DrawLine(x % 200 == 0 ? majorGrid : minorGrid, new Point(x + 0.5, 0), new Point(x + 0.5, height));
+            for (var y = 40; y < height; y += 40)
+                drawing.DrawLine(y % 200 == 0 ? majorGrid : minorGrid, new Point(0, y + 0.5), new Point(width, y + 0.5));
+            drawing.DrawLine(new Pen(new SolidColorBrush(Color.FromRgb(91, 54, 58)), 1),
+                new Point(0, height / 2d + 0.5), new Point(width, height / 2d + 0.5));
+            drawing.DrawLine(new Pen(new SolidColorBrush(Color.FromRgb(52, 91, 57)), 1),
+                new Point(width / 2d + 0.5, 0), new Point(width / 2d + 0.5, height));
             var faceBrush = new SolidColorBrush(preview ? Color.FromArgb(165, 57, 102, 112) : Color.FromArgb(165, 38, 67, 91));
             var selectedFaceBrush = new SolidColorBrush(Color.FromArgb(205, 38, 157, 181));
             var outline = new Pen(new SolidColorBrush(Color.FromRgb(86, 108, 132)), 1);

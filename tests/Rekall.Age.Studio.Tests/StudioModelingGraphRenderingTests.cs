@@ -22,6 +22,15 @@ public sealed class StudioModelingGraphRenderingTests
                 var window = new MainWindow();
                 var viewModel = Assert.IsType<RekallAgeStudioViewModel>(window.DataContext);
                 var repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+                var studioProjectRoot = Path.Combine(Path.GetTempPath(), "rekall-age-modeling-render-" + Guid.NewGuid().ToString("N"));
+                viewModel.ProjectPathInput = studioProjectRoot;
+                viewModel.ProjectNameInput = "Modeling Render Probe";
+                viewModel.SceneNameInput = "Main";
+                ((RekallAgeAsyncCommand)viewModel.CreateCommand).ExecuteAsync(null).GetAwaiter().GetResult();
+                viewModel.SelectedMeshPrimitive = "box";
+                viewModel.MeshPrimitiveAssetIdInput = "starter-cube";
+                ((RekallAgeAsyncCommand)viewModel.CreateMeshPrimitiveCommand).ExecuteAsync(null).GetAwaiter().GetResult();
+                Assert.NotNull(viewModel.MeshViewportImage);
                 var projectRoot = Path.Combine(repositoryRoot, "Examples", "ProceduralModelingProbe");
                 var session = new RekallAgeStudioModelingGraphSession();
                 session.OpenAsync(projectRoot, "hero-form", CancellationToken.None).AsTask().GetAwaiter().GetResult();
@@ -61,6 +70,7 @@ public sealed class StudioModelingGraphRenderingTests
 
                 window.Hide();
                 viewModel.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                Directory.Delete(studioProjectRoot, recursive: true);
                 app.Shutdown();
             }
             catch (Exception exception)

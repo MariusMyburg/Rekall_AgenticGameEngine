@@ -19,6 +19,8 @@ export function publishWebGpuEvidence(json, target = globalThis) {
         pixelProof: value.pixelProof === null ? null : sanitizePixelProof(value.pixelProof)
     };
     if (!fields.every((field, index) => Object.keys(published)[index] === field)) throw new Error('REKALL_WEBGPU_EVIDENCE_INVALID');
+    const mirror = target?.document?.querySelector('#rekall-webgpu-evidence');
+    if (mirror) mirror.textContent = JSON.stringify(published);
     target.rekallWebGpuEvidence = published;
     return published;
 }

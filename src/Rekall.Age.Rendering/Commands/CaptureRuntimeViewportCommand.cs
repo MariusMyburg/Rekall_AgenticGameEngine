@@ -438,6 +438,7 @@ public sealed class CaptureRuntimeViewportCommand
 
         if (camera is not null)
         {
+            AddCameraContentVisibilityDiagnostics(frame.Renderables, camera, warnings, hints);
             AddPlaneOrientationDiagnostics(frame.Renderables, camera, warnings, hints);
         }
 
@@ -710,6 +711,61 @@ public sealed class CaptureRuntimeViewportCommand
             {
                 hints.Add($"Plane '{renderable.EntityName}' is nearly edge-on to the active camera. Rekall geometry planes lie on local XZ with a +Y normal; rotate the plane (commonly 90 degrees around X for a Z-facing backdrop) or use an appropriate camera-facing primitive, then recapture.");
             }
+        }
+    }
+
+    private static void AddCameraContentVisibilityDiagnostics(
+        IReadOnlyList<RekallAgeRuntimeViewportRenderable> renderables,
+        RekallAgeRuntimeViewportCamera camera,
+        List<string> warnings,
+        List<string> hints)
+    {
+        if (!camera.Kind.Equals("Camera3D", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var spatial = renderables
+            .Where(renderable => !renderable.Kind.Equals("light", StringComparison.Ordinal)
+                && renderable.UiVisual is null)
+            .ToArray();
+        if (spatial.Length == 0)
+        {
+            return;
+        }
+
+        var forward = RotateDirection(
+            Vector3.UnitZ,
+            camera.RotationX,
+            camera.RotationY,
+            camera.RotationZ);
+        var cameraPosition = new Vector3((float)camera.X, (float)camera.Y, (float)camera.Z);
+        var depths = spatial.Select(renderable =>
+        {
+            var center = new Vector3((float)renderable.X, (float)renderable.Y, (float)renderable.Z);
+            var radius = 0.5 * Math.Sqrt(
+                renderable.ScaleX * renderable.ScaleX
+                + renderable.ScaleY * renderable.ScaleY
+                + renderable.ScaleZ * renderable.ScaleZ);
+            return (Center: center, Depth: Vector3.Dot(center - cameraPosition, forward), Radius: radius);
+        }).ToArray();
+        var near = Math.Min(camera.NearClip, camera.FarClip);
+        var far = Math.Max(camera.NearClip, camera.FarClip);
+        if (depths.Any(item => item.Depth + item.Radius >= near && item.Depth - item.Radius <= far))
+        {
+            return;
+        }
+
+        if (depths.All(item => item.Depth + item.Radius < near))
+        {
+            warnings.Add("REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT");
+            var centroid = depths.Aggregate(Vector3.Zero, (sum, item) => sum + item.Center) / depths.Length;
+            hints.Add(
+                $"Active Camera3D '{camera.EntityName}' has no spatial content in its +Z-forward depth range. "
+                + $"Camera position=({camera.X:F2}, {camera.Y:F2}, {camera.Z:F2}), "
+                + $"forward=({forward.X:F2}, {forward.Y:F2}, {forward.Z:F2}), "
+                + $"content centroid=({centroid.X:F2}, {centroid.Y:F2}, {centroid.Z:F2}). "
+                + "A camera on +Z looking toward lower Z normally needs yaw 180; author the intended rotation, then recapture.");
         }
     }
 

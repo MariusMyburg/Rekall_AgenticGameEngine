@@ -6,6 +6,8 @@ using Rekall.Age.Core.Persistence;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
+using Rekall.Age.Workflows;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace Rekall.Age.Tests.Assets;
@@ -367,6 +369,114 @@ public sealed class ModelAssetPublishingTests
 
         Assert.Equal(first.CompiledContentHash, adopted.CompiledContentHash);
         Assert.True(File.Exists(first.CompiledOutputPath));
+        Assert.Equal(
+            RekallAgeModelBuildState.Current,
+            (await fixture.Service.InspectAsync(fixture.Root, "hero-model", default)).BuildState);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DefaultRegistryRejectsLegacyDeleteOrOverwritePreimageForCurrentImmutableOutput(
+        bool existedBefore)
+    {
+        var fixture = await CreateFixtureAsync();
+        var immutable = await CreateUnreferencedImmutableOutputAsync(fixture);
+        var legacy = RekallAgeTransaction.Begin("legacy publication owns immutable output");
+        legacy.RecordResourcePreimage(
+            immutable.Path,
+            existedBefore,
+            existedBefore ? System.Text.Encoding.UTF8.GetBytes("{\"legacy\":true}") : []);
+        legacy.RecordChangedResource(immutable.Path);
+        var history = new RekallAgeTransactionLogStore();
+        await history.AppendAsync(fixture.Root, legacy, "legacy-agent", default);
+        var adopted = await PublishAsync(fixture);
+        var outputBytes = await File.ReadAllBytesAsync(immutable.Path);
+        var modelBytes = await File.ReadAllBytesAsync(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model"));
+        var catalogBytes = await File.ReadAllBytesAsync(fixture.CatalogStore.GetCatalogPath(fixture.Root));
+        var restoreContext = new RekallAgeCommandContext(
+            "agent", RekallAgeTransaction.Begin("reject legacy immutable restore"), default);
+
+        var result = await RekallAgeDefaultCommandRegistry.Create().ExecuteJsonAsync(
+            "rekall.transaction.restore_preimage",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = fixture.Root,
+                transactionId = legacy.Id,
+                relativePath = Path.GetRelativePath(fixture.Root, immutable.Path)
+            }),
+            restoreContext);
+
+        Assert.False(result.Ok);
+        Assert.Equal("REKALL_RESOURCE_RESTORE_PROTECTED", Assert.Single(result.Errors).Code);
+        Assert.Equal(outputBytes, await File.ReadAllBytesAsync(immutable.Path));
+        Assert.Equal(modelBytes, await File.ReadAllBytesAsync(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model")));
+        Assert.Equal(catalogBytes, await File.ReadAllBytesAsync(fixture.CatalogStore.GetCatalogPath(fixture.Root)));
+        Assert.Empty(restoreContext.Transaction.ResourcePreimages);
+        Assert.Empty(restoreContext.Transaction.ChangedResources);
+        Assert.Equal(adopted.CompiledContentHash, immutable.Hash);
+        Assert.Equal(
+            RekallAgeModelBuildState.Current,
+            (await fixture.Service.InspectAsync(fixture.Root, "hero-model", default)).BuildState);
+    }
+
+    [Fact]
+    public async Task DefaultRegistryRestoresOrdinaryMutableResourceWithProtectedPolicyComposed()
+    {
+        var fixture = await CreateFixtureAsync();
+        var path = Path.Combine(fixture.Root, "ordinary.age.json");
+        await File.WriteAllTextAsync(path, "{\"value\":1}");
+        var transaction = RekallAgeTransaction.Begin("ordinary mutation");
+        transaction.CaptureResourcePreimage(path);
+        await File.WriteAllTextAsync(path, "{\"value\":2}");
+        transaction.RecordChangedResource(path);
+        await new RekallAgeTransactionLogStore().AppendAsync(fixture.Root, transaction, "agent", default);
+
+        var result = await RekallAgeDefaultCommandRegistry.Create().ExecuteJsonAsync(
+            "rekall.transaction.restore_preimage",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = fixture.Root,
+                transactionId = transaction.Id,
+                relativePath = "ordinary.age.json"
+            }),
+            new("agent", RekallAgeTransaction.Begin("restore ordinary mutation"), default));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal("{\"value\":1}", await File.ReadAllTextAsync(path));
+    }
+
+    [Fact]
+    public async Task RegistryRestoreCannotBypassConfinementThroughLinkToImmutableOutput()
+    {
+        var fixture = await CreateFixtureAsync();
+        var published = await PublishAsync(fixture);
+        var outputBytes = await File.ReadAllBytesAsync(published.CompiledOutputPath);
+        var aliasRoot = Path.Combine(fixture.Root, "RestoreAlias");
+        CreateDirectoryLinkOrSkip(aliasRoot, Path.GetDirectoryName(published.CompiledOutputPath)!);
+        var aliasPath = Path.Combine(aliasRoot, Path.GetFileName(published.CompiledOutputPath));
+        var legacy = RekallAgeTransaction.Begin("legacy alias restore");
+        legacy.RecordResourcePreimage(aliasPath, existedBefore: false, content: []);
+        legacy.RecordChangedResource(aliasPath);
+        await new RekallAgeTransactionLogStore().AppendAsync(fixture.Root, legacy, "legacy-agent", default);
+        var context = new RekallAgeCommandContext(
+            "agent", RekallAgeTransaction.Begin("reject linked restore"), default);
+
+        var result = await RekallAgeDefaultCommandRegistry.Create().ExecuteJsonAsync(
+            "rekall.transaction.restore_preimage",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = fixture.Root,
+                transactionId = legacy.Id,
+                relativePath = Path.GetRelativePath(fixture.Root, aliasPath)
+            }),
+            context);
+
+        Assert.False(result.Ok);
+        Assert.Equal("REKALL_RESOURCE_RESTORE_PATH_INVALID", Assert.Single(result.Errors).Code);
+        Assert.Equal(outputBytes, await File.ReadAllBytesAsync(published.CompiledOutputPath));
+        Assert.Empty(context.Transaction.ResourcePreimages);
+        Assert.Empty(context.Transaction.ChangedResources);
         Assert.Equal(
             RekallAgeModelBuildState.Current,
             (await fixture.Service.InspectAsync(fixture.Root, "hero-model", default)).BuildState);
@@ -749,6 +859,19 @@ public sealed class ModelAssetPublishingTests
             RekallAgeTransaction.Begin("publish hero model"),
             default);
 
+    private static async ValueTask<(string Path, string Hash)> CreateUnreferencedImmutableOutputAsync(Fixture fixture)
+    {
+        var source = await fixture.MeshStore.LoadAsync(fixture.Root, "hero-mesh", default);
+        var staged = await fixture.OutputStore.WriteStagedAsync(
+            fixture.Root,
+            "hero-model",
+            new RekallAgeMeshCompiler().Compile(source),
+            default);
+        await fixture.OutputStore.CommitStagedImmutableAsync(fixture.Root, staged, default);
+        await fixture.OutputStore.DeleteStagedAsync(fixture.Root, staged, default);
+        return (fixture.OutputStore.GetFinalPath(fixture.Root, "hero-model", staged.ContentHash), staged.ContentHash);
+    }
+
     private static async ValueTask<string> ReplaceSourceAsync(Fixture fixture, string primitive)
     {
         var current = await fixture.MeshStore.LoadVersionedAsync(fixture.Root, "hero-mesh", default);
@@ -776,6 +899,42 @@ public sealed class ModelAssetPublishingTests
             FileShare.None,
             bufferSize: 1,
             FileOptions.Asynchronous);
+
+    private static void CreateDirectoryLinkOrSkip(string linkPath, string targetPath)
+    {
+        try
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                Directory.CreateSymbolicLink(linkPath, targetPath);
+                return;
+            }
+
+            var startInfo = new ProcessStartInfo("cmd.exe")
+            {
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            startInfo.ArgumentList.Add("/c");
+            startInfo.ArgumentList.Add("mklink");
+            startInfo.ArgumentList.Add("/J");
+            startInfo.ArgumentList.Add(linkPath);
+            startInfo.ArgumentList.Add(targetPath);
+            using var process = Process.Start(startInfo)!;
+            process.WaitForExit();
+            if (process.ExitCode != 0)
+            {
+                throw Xunit.Sdk.SkipException.ForSkip(
+                    $"Filesystem junction capability unavailable (mklink exit {process.ExitCode}): {process.StandardError.ReadToEnd()}");
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            throw Xunit.Sdk.SkipException.ForSkip(
+                $"Filesystem-link confinement capability unavailable: {error.GetType().Name}: {error.Message}");
+        }
+    }
 
     private static async ValueTask WaitForBytesToChangeAsync(string path, byte[] priorBytes)
     {

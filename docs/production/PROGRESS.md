@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 16:10 Africa/Johannesburg
+Last verified: 2026-08-23 16:35 Africa/Johannesburg
 
 Branch: `codex/model-asset-foundation`
 
@@ -30,8 +30,13 @@ Immutable blobs are never rollback-owned, never recorded as deletable transactio
 preimages, and can remain unreachable after a failed pointer publication. Cleanup
 is explicit architecture debt: any future collector must be bounded,
 reachability-aware across Model Asset manifests, and use a grace period rather
-than deleting blobs during rollback or undo. Catalog writers replay pure,
-side-effect-free semantic transforms under optimistic revision conflicts, expose
+than deleting blobs during rollback or undo. Legacy transaction logs that claim
+delete or overwrite ownership of compiled blobs are now rejected before mutation
+by the default registry and Workbench undo, including link/junction aliases; the
+stable errors are `REKALL_RESOURCE_RESTORE_PROTECTED` and
+`REKALL_RESOURCE_RESTORE_PATH_INVALID`. Current and Frozen manifests, compiled
+bytes, and unrelated scene/history resources remain unchanged. Catalog writers
+replay pure, side-effect-free semantic transforms under optimistic revision conflicts, expose
 stable `REKALL_ASSET_CATALOG_BUSY` exhaustion after 16 attempts; correlated
 frozen inspection validates compiled structure and provenance without requiring
 the editable source, all publication preimages are read once under the 64 MiB
@@ -39,7 +44,9 @@ bound, and Model Asset/recovery paths reject filesystem-link traversal. MCP
 discoverability is derived from the registry rather than a parallel tool
 implementation. The focused Model Asset, published-output, placement,
 catalog-revision, and transaction coverage passes 99/99; the complete core
-suite passes 1554/1554; the complete Studio suite passes 51/51;
+suite passes 1559/1559; the focused legacy-restore, transaction, Model Asset,
+Workbench, placement, and MCP coverage passes 75/75; the complete Studio suite
+passes 51/51;
 the Windows player prerequisite and `Rekall.AGE.sln` Release builds both succeed
 with zero warnings and zero errors. The next Studio slice is the Modeling workspace's
 Publish/Update action, a health-aware Asset Browser with viewport drag/drop

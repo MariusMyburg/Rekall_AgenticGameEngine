@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Rekall.Age.Assets;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor.Contracts;
@@ -17,12 +18,17 @@ public sealed class RekallAgeWorkbenchSession
     private readonly RekallAgeCommandRegistry _registry;
     private readonly RekallAgeWorkbenchModelBuilder _modelBuilder;
     private readonly RekallAgeTransactionLogStore _transactionStore;
+    private readonly IRekallAgeResourceRestorationPolicy _restorationPolicy;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Stack<string> _undoTransactions = new();
     private readonly Stack<string> _redoTransactions = new();
 
     public RekallAgeWorkbenchSession(RekallAgeCommandRegistry registry)
-        : this(registry, new RekallAgeWorkbenchModelBuilder(), new RekallAgeTransactionLogStore())
+        : this(
+            registry,
+            new RekallAgeWorkbenchModelBuilder(),
+            new RekallAgeTransactionLogStore(),
+            CreateDefaultRestorationPolicy())
     {
     }
 
@@ -30,13 +36,24 @@ public sealed class RekallAgeWorkbenchSession
         RekallAgeCommandRegistry registry,
         RekallAgeWorkbenchModelBuilder modelBuilder,
         RekallAgeTransactionLogStore transactionStore)
+        : this(registry, modelBuilder, transactionStore, CreateDefaultRestorationPolicy())
+    {
+    }
+
+    public RekallAgeWorkbenchSession(
+        RekallAgeCommandRegistry registry,
+        RekallAgeWorkbenchModelBuilder modelBuilder,
+        RekallAgeTransactionLogStore transactionStore,
+        IRekallAgeResourceRestorationPolicy restorationPolicy)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(modelBuilder);
         ArgumentNullException.ThrowIfNull(transactionStore);
+        ArgumentNullException.ThrowIfNull(restorationPolicy);
         _registry = registry;
         _modelBuilder = modelBuilder;
         _transactionStore = transactionStore;
+        _restorationPolicy = restorationPolicy;
     }
 
     public string? ProjectRoot { get; private set; }
@@ -389,6 +406,18 @@ public sealed class RekallAgeWorkbenchSession
             return (Failure("REKALL_WORKBENCH_HISTORY_NOT_RESTORABLE", "The selected transaction has no restorable preimage.", transactionId), null);
         }
 
+        try
+        {
+            foreach (var preimage in target.ResourcePreimages)
+            {
+                _ = _restorationPolicy.ResolveRestorablePath(ProjectRoot, preimage.RelativePath);
+            }
+        }
+        catch (RekallAgeResourceRestorationException error)
+        {
+            return (Failure(error.Code, error.Message, error.Target), null);
+        }
+
         var inverse = RekallAgeTransaction.Begin($"{operationName} {target.Name}");
         var context = new RekallAgeCommandContext(actor, inverse, cancellationToken);
         foreach (var preimage in target.ResourcePreimages)
@@ -399,7 +428,7 @@ public sealed class RekallAgeWorkbenchSession
                 context).ConfigureAwait(false);
             if (!restored.Ok)
             {
-                RollBackInMemoryPreimages(inverse);
+                RollBackInMemoryPreimages(ProjectRoot, inverse);
                 return (new RekallAgeWorkbenchOperationResult(false, restored.Summary, null, restored.Errors), null);
             }
         }
@@ -415,21 +444,37 @@ public sealed class RekallAgeWorkbenchSession
             []), inverse.Id);
     }
 
-    private static void RollBackInMemoryPreimages(RekallAgeTransaction transaction)
+    private void RollBackInMemoryPreimages(string projectRoot, RekallAgeTransaction transaction)
     {
         foreach (var preimage in transaction.ResourcePreimages.Reverse())
         {
+            string resourcePath;
+            try
+            {
+                resourcePath = _restorationPolicy.ResolveRestorablePath(projectRoot, preimage.Resource);
+            }
+            catch (RekallAgeResourceRestorationException)
+            {
+                // A protected or unconfined resource must never be changed, even while
+                // rolling back a partially completed legacy undo transaction.
+                continue;
+            }
+
             if (preimage.ExistedBefore)
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(preimage.Resource)!);
-                File.WriteAllBytes(preimage.Resource, preimage.Content);
+                Directory.CreateDirectory(Path.GetDirectoryName(resourcePath)!);
+                File.WriteAllBytes(resourcePath, preimage.Content);
             }
-            else if (File.Exists(preimage.Resource))
+            else if (File.Exists(resourcePath))
             {
-                File.Delete(preimage.Resource);
+                File.Delete(resourcePath);
             }
         }
     }
+
+    private static IRekallAgeResourceRestorationPolicy CreateDefaultRestorationPolicy() =>
+        new RekallAgeResourceRestorationPolicy(
+            new RekallAgeModelAssetAppendOnlyResourceClassifier());
 
     private static IEnumerable<RekallAgeSceneEntityNode> Flatten(IEnumerable<RekallAgeSceneEntityNode> roots)
     {

@@ -1,8 +1,14 @@
 using System.Text.Json;
+using Rekall.Age.AssetPipeline;
+using Rekall.Age.Assets;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Persistence;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor;
+using Rekall.Age.Modeling;
 using Rekall.Age.Project.Commands;
+using Rekall.Age.Workflows;
+using Rekall.Age.World;
 using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Tests.Editor;
@@ -230,6 +236,79 @@ public sealed class WorkbenchSessionTests
         Assert.True(redone.Ok, redone.Summary);
         Assert.Contains(session.Model!.Scene.RootEntities, entity => entity.Name == "Undo Me");
         Assert.True(session.CanUndo);
+    }
+
+    [Fact]
+    public async Task WorkbenchUndoRejectsLegacyDeletePreimageForFrozenImmutableOutputBeforeAnyMutation()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = RekallAgeDefaultCommandRegistry.Create();
+        var projectContext = new RekallAgeCommandContext(
+            "setup", RekallAgeTransaction.Begin("create workbench project"), default);
+        Assert.True((await registry.ExecuteAsync<CreateProjectRequest, CreateProjectResult>(
+            "rekall.project.create",
+            new(root, "Protected Undo", ["world"]),
+            projectContext)).Ok);
+        Assert.True((await registry.ExecuteAsync<CreateSceneRequest, CreateSceneResult>(
+            "rekall.scene.create",
+            new(root, "Main", ["world"]),
+            projectContext)).Ok);
+
+        var meshStore = new RekallAgeMeshAssetStore();
+        var mesh = await new RekallAgeMeshPrimitiveFactory().CreateAsync(
+            "box", "hero-mesh", "Hero Mesh", default);
+        await meshStore.SaveAsync(root, mesh, default);
+        var outputStore = new RekallAgePublishedModelOutputStore();
+        var staged = await outputStore.WriteStagedAsync(
+            root,
+            "hero-model",
+            new RekallAgeMeshCompiler().Compile(mesh),
+            default);
+        await outputStore.CommitStagedImmutableAsync(root, staged, default);
+        await outputStore.DeleteStagedAsync(root, staged, default);
+        var outputPath = outputStore.GetFinalPath(root, "hero-model", staged.ContentHash);
+        var legacy = RekallAgeTransaction.Begin("legacy publication owns frozen output");
+        legacy.RecordResourcePreimage(outputPath, existedBefore: false, content: []);
+        legacy.RecordChangedResource(outputPath);
+        var history = new RekallAgeTransactionLogStore();
+        await history.AppendAsync(root, legacy, "legacy-agent", default);
+
+        var publishing = new RekallAgeModelPublishingService();
+        var published = await publishing.PublishAsync(
+            root,
+            new("hero-model", "Hero Model", new(RekallAgeModelSourceKind.Mesh, "hero-mesh"), RekallAgeDocumentRevision.Missing),
+            RekallAgeTransaction.Begin("adopt immutable output"),
+            default);
+        var frozen = await publishing.FreezeAsync(
+            root,
+            "hero-model",
+            published.ModelFileRevision,
+            RekallAgeTransaction.Begin("freeze adopted output"),
+            default);
+        var scenePath = new RekallAgeSceneStore().GetScenePath(root, "Main");
+        var sceneBytes = await File.ReadAllBytesAsync(scenePath);
+        var outputBytes = await File.ReadAllBytesAsync(outputPath);
+        var modelStore = new RekallAgeModelAssetStore();
+        var modelPath = modelStore.GetModelPath(root, "hero-model");
+        var modelBytes = await File.ReadAllBytesAsync(modelPath);
+        var historyBytes = await File.ReadAllBytesAsync(history.GetPath(root));
+        var session = new RekallAgeWorkbenchSession(registry);
+        Assert.True((await session.OpenAsync(root, "Main", default)).Ok);
+        Assert.True(session.CanUndo);
+
+        var result = await session.UndoAsync("studio", default);
+
+        Assert.False(result.Ok);
+        Assert.Equal("REKALL_RESOURCE_RESTORE_PROTECTED", Assert.Single(result.Errors).Code);
+        Assert.True(session.CanUndo);
+        Assert.Equal(outputBytes, await File.ReadAllBytesAsync(outputPath));
+        Assert.Equal(modelBytes, await File.ReadAllBytesAsync(modelPath));
+        Assert.Equal(sceneBytes, await File.ReadAllBytesAsync(scenePath));
+        Assert.Equal(historyBytes, await File.ReadAllBytesAsync(history.GetPath(root)));
+        Assert.Equal(RekallAgeModelBuildState.Frozen, frozen.Value.BuildState);
+        Assert.Equal(
+            RekallAgeModelBuildState.Frozen,
+            (await publishing.InspectAsync(root, "hero-model", default)).BuildState);
     }
 
     private static RekallAgeWorkbenchSession CreateSession()

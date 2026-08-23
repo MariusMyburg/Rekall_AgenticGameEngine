@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Persistence;
 
 namespace Rekall.Age.Core.Transactions;
 
@@ -18,15 +19,31 @@ public sealed class RestoreTransactionPreimageCommand
     : IRekallAgeCommand<RestoreTransactionPreimageRequest, RestoreTransactionPreimageResult>
 {
     private readonly RekallAgeTransactionLogStore _store;
+    private readonly IRekallAgeResourceRestorationPolicy _restorationPolicy;
 
     public RestoreTransactionPreimageCommand()
-        : this(new RekallAgeTransactionLogStore())
+        : this(new RekallAgeTransactionLogStore(), new RekallAgeResourceRestorationPolicy())
     {
     }
 
     public RestoreTransactionPreimageCommand(RekallAgeTransactionLogStore store)
+        : this(store, new RekallAgeResourceRestorationPolicy())
     {
+    }
+
+    public RestoreTransactionPreimageCommand(IRekallAgeResourceRestorationPolicy restorationPolicy)
+        : this(new RekallAgeTransactionLogStore(), restorationPolicy)
+    {
+    }
+
+    public RestoreTransactionPreimageCommand(
+        RekallAgeTransactionLogStore store,
+        IRekallAgeResourceRestorationPolicy restorationPolicy)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(restorationPolicy);
         _store = store;
+        _restorationPolicy = restorationPolicy;
     }
 
     public string Name => "rekall.transaction.restore_preimage";
@@ -51,7 +68,15 @@ public sealed class RestoreTransactionPreimageCommand
             ?? throw new InvalidOperationException(
                 $"Transaction '{request.TransactionId}' has no preimage for '{request.RelativePath}'.");
 
-        var targetPath = ResolveProjectPath(request.ProjectRoot, preimage.RelativePath);
+        string targetPath;
+        try
+        {
+            targetPath = _restorationPolicy.ResolveRestorablePath(request.ProjectRoot, preimage.RelativePath);
+        }
+        catch (RekallAgeResourceRestorationException error)
+        {
+            return Rejected(request, error);
+        }
         context.Transaction.CaptureResourcePreimage(targetPath);
 
         if (!preimage.ExistedBefore)
@@ -118,19 +143,22 @@ public sealed class RestoreTransactionPreimageCommand
     private static string ResolveProjectPath(string projectRoot, string relativePath)
     {
         var root = Path.GetFullPath(projectRoot);
-        var path = Path.GetFullPath(Path.Combine(root, NormalizeRelativePath(relativePath)));
-        var normalizedRoot = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-            + Path.DirectorySeparatorChar;
-        if (!path.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException($"Path '{relativePath}' escapes the project root.");
-        }
-
-        return path;
+        return RekallAgeConfinedPath.Resolve(
+            root,
+            Path.Combine(root, NormalizeRelativePath(relativePath)),
+            "Transaction preimage snapshot path");
     }
 
     private static string NormalizeRelativePath(string relativePath)
     {
         return relativePath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
     }
+
+    private static RekallAgeCommandResult<RestoreTransactionPreimageResult> Rejected(
+        RestoreTransactionPreimageRequest request,
+        RekallAgeResourceRestorationException error) =>
+        RekallAgeCommandResult<RestoreTransactionPreimageResult>.Failure(
+            new(request.TransactionId, request.RelativePath, error.Target, 0),
+            error.Message,
+            [new(error.Code, error.Message, error.Target)]);
 }

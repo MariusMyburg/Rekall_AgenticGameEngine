@@ -33,6 +33,8 @@ public static class RekallAgeDefaultCommandRegistry
         var modifierStackEvaluator = new RekallAgeModifierStackEvaluator();
         var modelAssetStore = new RekallAgeModelAssetStore();
         var modelPublishingService = new RekallAgeModelPublishingService();
+        var resourceRestorationPolicy = new RekallAgeResourceRestorationPolicy(
+            new RekallAgeModelAssetAppendOnlyResourceClassifier());
         registry.Register(new CreateProjectCommand());
         registry.Register(new AddCapabilityCommand());
         registry.Register(new CreateSceneCommand());
@@ -70,7 +72,7 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new RepairProjectValidationCommand(registry));
         registry.Register(new ValidateSceneCommand(shaderPipelineValidation));
         registry.Register(new ListTransactionHistoryCommand());
-        registry.Register(new RestoreTransactionPreimageCommand());
+        registry.Register(new RestoreTransactionPreimageCommand(resourceRestorationPolicy));
         registry.Register(new ListComponentSchemasCommand());
         registry.Register(new InspectModuleTrustCommand());
         registry.Register(new SearchComponentSchemasCommand());

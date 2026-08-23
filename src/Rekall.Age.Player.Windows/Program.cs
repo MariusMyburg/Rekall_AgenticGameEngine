@@ -90,7 +90,12 @@ internal static class Program
         var openXrRequested = HasOption(args, "--xr") || HasOption(args, "--vr");
         var simulateXrInput = HasOption(args, "--simulate-xr") || HasOption(args, "--xr-sim");
         var probeOpenXrCompositor = HasOption(args, "--openxr-compositor-probe");
-        var playableMode = HasOption(args, "--playable");
+        var contentMode = RekallAgePlayerContentModePlanner.Plan(args);
+        var playableMode = contentMode.Mode == RekallAgePlayerContentMode.LegacyProofAdapter;
+        if (contentMode.ObsoletePlayableFlagPresent)
+        {
+            PlayerLog.Write("The obsolete --playable option was ignored; Windows player launches the canonical runtime scene by default. Use --legacy-playable-adapter only for explicit proof-adapter diagnostics.");
+        }
         var sceneSupersampleFactor = ReadPositiveIntOption(args, "--ssaa") ?? RekallAgeVeldridPlayer.DefaultSceneSupersampleFactor;
         var openXrEyeWidth = ReadPositiveIntOption(args, "--vr-eye-width") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeWidth;
         var openXrEyeHeight = ReadPositiveIntOption(args, "--vr-eye-height") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeHeight;
@@ -1061,7 +1066,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         bool simulateXrInput,
         bool playableMode)
     {
-        var suffixes = new List<string> { playableMode ? "Playable" : "Vulkan swapchain" };
+        var suffixes = new List<string> { playableMode ? "Legacy proof adapter" : "Runtime scene" };
         if (openXrRequested)
         {
             suffixes.Add("OpenXR window+headset");
@@ -1915,11 +1920,14 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     private void AdvanceSimulationToWallClock()
     {
+        RekallAgeRuntimeInputState? capturedInput = null;
         var result = _simulationClock.AdvanceToAsync(
                 _runtimeWorld,
                 _clock.Elapsed,
                 CancellationToken.None,
-                step => step == 0 ? ConsumeRuntimeInput() : RekallAgeRuntimeInputState.Empty)
+                step => RekallAgeRuntimeInputPersistence.ForSimulationStep(
+                    capturedInput ??= ConsumeRuntimeInput(),
+                    step))
             .AsTask()
             .GetAwaiter()
             .GetResult();
@@ -2051,18 +2059,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     private static RekallAgeRuntimeInputState KeepHeldRuntimeInput(RekallAgeRuntimeInputState input)
     {
-        return new RekallAgeRuntimeInputState(
-            MouseX: input.MouseX,
-            MouseY: input.MouseY,
-            PressedKeys: input.PressedKeys,
-            PressedButtons: input.PressedButtons,
-            ViewportWidth: input.ViewportWidth,
-            ViewportHeight: input.ViewportHeight,
-            Controllers: input.Controllers?.Select(controller => controller with
-            {
-                PressedButtonsThisFrame = [],
-                ReleasedButtonsThisFrame = []
-            }).ToArray());
+        return RekallAgeRuntimeInputPersistence.ForSimulationStep(input, 1);
     }
 
     private RekallAgePlaybackInput BuildPlayableInput(double deltaSeconds)

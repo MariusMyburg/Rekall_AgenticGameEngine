@@ -1554,7 +1554,7 @@ OpenXR diagnostics report:
 Playable VR rule:
 
 Use the windowed player for playable sessions. It keeps the desktop window alive and publishes SDL keyboard/mouse input plus OpenXR poses/actions into one generic runtime input stream.
-The `--vr` and `--xr` flags start headset scene submission from the windowed player when the OpenXR headset session is ready, including legacy `--playable` module runs.
+The `--vr` and `--xr` flags start headset scene submission from the windowed player when the OpenXR headset session is ready. The Windows player always launches the authored runtime scene by default; `--legacy-playable-adapter` is reserved for explicit deterministic proof-adapter diagnostics.
 The desktop window remains the keyboard/mouse capture surface; click it to capture mouse input and press Escape to release capture.
 
 Local SteamVR note:
@@ -1570,10 +1570,10 @@ Windowed player example:
 Rekall.Age.Player.Windows.exe <projectRoot> <sceneName> --graphics --backend vulkan --vr
 ```
 
-Legacy playable module VR example:
+Runtime-scene VR example:
 
 ```powershell
-Rekall.Age.Player.Windows.exe <projectRoot> <sceneName> --graphics --backend vulkan --playable --vr
+Rekall.Age.Player.Windows.exe <projectRoot> <sceneName> --graphics --backend vulkan --vr
 ```
 
 Eye size can be tuned:

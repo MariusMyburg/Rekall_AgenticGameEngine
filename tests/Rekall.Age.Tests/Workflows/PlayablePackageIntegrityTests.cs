@@ -98,6 +98,8 @@ public sealed class PlayablePackageIntegrityTests
         Assert.True(inspection.Ok, inspection.Summary);
         Assert.EndsWith("Rekall.Age.Player.Windows.exe", inspection.Value.Manifest.LaunchPath, StringComparison.Ordinal);
         Assert.EndsWith("Rekall.Age.Player.exe", inspection.Value.Manifest.ProofLaunchPath, StringComparison.Ordinal);
+        Assert.DoesNotContain("--playable", packaged.Value.Arguments);
+        Assert.DoesNotContain("--playable", inspection.Value.Manifest.Arguments);
         Assert.True(File.Exists(Path.Combine(output, inspection.Value.Manifest.ProofLaunchPath!.Replace('/', Path.DirectorySeparatorChar))));
 
         var capture = await new CapturePlayablePackageFrameCommand().ExecuteAsync(

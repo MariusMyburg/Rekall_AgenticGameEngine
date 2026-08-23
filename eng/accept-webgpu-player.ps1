@@ -488,8 +488,11 @@ function Invoke-Prepare() {
     $serverToken = New-SecureToken
     $preparedUtc = [DateTimeOffset]::UtcNow.ToString('O')
     $ready = Join-Path $run '.server-ready'
-    $serverOut = Join-Path $output 'server.stdout.log'
-    $serverErr = Join-Path $output 'server.stderr.log'
+    $serverOut = Join-Path $run 'server.stdout.log'
+    $serverErr = Join-Path $run 'server.stderr.log'
+    # Bind the immutable publish payload before the server creates and locks its
+    # redirected diagnostic logs in the output directory.
+    $publish = Get-PublishIdentity $output
     $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
     $serverScript = Assert-ExistingFile $PSCommandPath 'Harness server script' 1MB
     $contentRoot = Join-Path $output 'wwwroot'
@@ -505,7 +508,6 @@ function Invoke-Prepare() {
             if ([DateTime]::UtcNow -ge $deadline) { throw 'Web player static server did not become ready within 10 seconds.' }
             Start-Sleep -Milliseconds 100
         }
-        $publish = Get-PublishIdentity $output
         $url = "http://127.0.0.1:$port/?rekallSession=$sessionId&rekallNonce=$nonce"
         $sessionPath = Join-Path $run 'acceptance-session.json'
         $session = [ordered]@{

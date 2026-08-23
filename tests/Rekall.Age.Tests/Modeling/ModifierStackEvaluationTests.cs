@@ -60,7 +60,7 @@ public sealed class ModifierStackEvaluationTests
     {
         var catalog = RekallAgeModifierCatalog.CreateDefault();
 
-        Assert.Equal(4, catalog.Descriptors.Count);
+        Assert.Equal(5, catalog.Descriptors.Count);
         Assert.All(catalog.Descriptors, descriptor => Assert.NotNull(descriptor.AttributePolicy));
         Assert.Contains(catalog.Descriptors, item => item.TypeId == "rekall.modifier.triangulate" && item.AttributePolicy.PreservesUnknownAttributes);
     }

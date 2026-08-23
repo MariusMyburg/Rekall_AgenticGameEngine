@@ -194,6 +194,13 @@ public sealed class RekallAgeModelingGraphEvaluator
                 InputGeometry(node, "geometry", incoming, values),
                 "subdivide_faces",
                 new JsonObject()),
+            "rekall.modeling.merge_by_distance" => ApplySemanticOperation(
+                graph,
+                node,
+                InputGeometry(node, "geometry", incoming, values),
+                "merge_by_distance",
+                new JsonObject { ["distance"] = ReadNumber(node, "distance", 0.0001) },
+                RekallAgeGeometryDomain.Point),
             "rekall.modeling.field.math" => EvaluateFieldMath(node, incoming, values),
             "rekall.modeling.attribute.named" => ReadNamedAttribute(node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.attribute.capture" => CaptureAttribute(
@@ -506,7 +513,8 @@ public sealed class RekallAgeModelingGraphEvaluator
         RekallAgeModelingGraphNode node,
         NodeValue input,
         string operationId,
-        JsonObject parameters)
+        JsonObject parameters,
+        RekallAgeGeometryDomain domain = RekallAgeGeometryDomain.Face)
     {
         var source = input.Mesh
             ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", $"{node.TypeId} requires geometry input.", node.NodeId);
@@ -514,7 +522,9 @@ public sealed class RekallAgeModelingGraphEvaluator
         {
             var result = new RekallAgeMeshOperationExecutor().Execute(
                 source,
-                new(operationId, RekallAgeGeometryDomain.Face, source.Topology.FaceIds.ToArray(), parameters));
+                new(operationId, domain, domain == RekallAgeGeometryDomain.Point
+                    ? source.Topology.PointIds.ToArray()
+                    : source.Topology.FaceIds.ToArray(), parameters));
             return new(result.Mesh with
             {
                 AssetId = $"{graph.AssetId}.{node.NodeId}",

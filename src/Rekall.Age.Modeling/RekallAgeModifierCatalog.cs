@@ -26,9 +26,13 @@ public sealed class RekallAgeModifierCatalog
                 [Number("x", 0), Number("y", 0), Number("z", 1), Text("selection", "")], preserve),
             new("rekall.modifier.subdivide", 1, "Subdivide", "Subdivides selected or all polygon faces into centroid triangle fans.",
                 RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
-                [Text("selection", "")], preserve)
+                [Text("selection", "")], preserve),
+            new("rekall.modifier.merge_by_distance", 1, "Merge by Distance", "Welds selected or all points and deduplicates resulting edges.",
+                RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
+                [PositiveNumber("distance", 0.0001), Text("selection", "")], preserve)
         ]);
     }
     private static RekallAgeModelingParameterDescriptor Number(string id, double value) => new(id, id, RekallAgeModelingValueType.Scalar, JsonValue.Create(value), -1_000_000, 1_000_000);
+    private static RekallAgeModelingParameterDescriptor PositiveNumber(string id, double value) => new(id, id, RekallAgeModelingValueType.Scalar, JsonValue.Create(value), 0.000000001, 1_000_000);
     private static RekallAgeModelingParameterDescriptor Text(string id, string value) => new(id, id, RekallAgeModelingValueType.String, JsonValue.Create(value));
 }

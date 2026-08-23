@@ -71,7 +71,13 @@ public sealed class RekallAgeMeshOperationExecutor
             "Subdivides selected polygon faces into centroid triangle fans with stable source provenance and domain-attribute propagation.",
             RekallAgeGeometryDomain.Face,
             RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
-            [])
+            []),
+        new(
+            "merge_by_distance",
+            "Welds selected points within a finite distance using deterministic spatial hashing, deduplicates resulting edges, and preserves stable provenance.",
+            RekallAgeGeometryDomain.Point,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
+            [new("distance", RekallAgeGeometryValueType.Float, true, null, "Positive finite weld distance in mesh-local units.")])
     ];
     private readonly RekallAgeMeshValidator _validator = new();
 
@@ -106,6 +112,7 @@ public sealed class RekallAgeMeshOperationExecutor
             "generate_normals" => GenerateNormals(source, request),
             "project_uv" => ProjectUv(source, request),
             "subdivide_faces" => SubdivideFaces(source, request),
+            "merge_by_distance" => MergeByDistance(source, request),
             _ => throw Failure("REKALL_MESH_OPERATION_UNKNOWN", $"Unknown mesh operation '{request.OperationId}'.")
         };
         var outputValidation = _validator.Validate(result.Mesh);
@@ -273,6 +280,82 @@ public sealed class RekallAgeMeshOperationExecutor
         var newTopology = topology with { PointIds = pointIds, Positions = positions, EdgeIds = edgeIds, EdgePointIndices = edges, FaceIds = faceIds, FaceOffsets = faceOffsets, CornerIds = cornerIds, CornerPointIndices = cornerPoints, CornerEdgeIndices = cornerEdges };
         var mesh = source with { Revision = checked(source.Revision + 1), Topology = newTopology, Attributes = attributes, SelectionSets = PropagateSubdivisionSelections(source.SelectionSets, faceMap) };
         return Result(source, mesh, ChangeSet(RekallAgeMeshChangeKind.Topology | (source.Attributes.Count > 0 ? RekallAgeMeshChangeKind.Attributes : RekallAgeMeshChangeKind.None) | (source.SelectionSets.Count > 0 ? RekallAgeMeshChangeKind.Selection : RekallAgeMeshChangeKind.None), createdPoints: createdPoints, createdEdges: createdEdges, createdFaces: createdFaces, createdCorners: createdCorners, modifiedFaces: request.ElementIds.Order().ToArray(), changedAttributes: source.Attributes.Select(item => item.Name).Order(StringComparer.Ordinal).ToArray(), affectedBounds: Bounds(selectedIndices.SelectMany(index => FaceCornerSourceIndices(index, topology)).Select(index => topology.Positions[topology.CornerPointIndices[index]]))), provenance);
+    }
+
+    private static RekallAgeMeshOperationResult MergeByDistance(RekallAgeMeshAsset source, RekallAgeMeshOperationRequest request)
+    {
+        RequireDomain(request, RekallAgeGeometryDomain.Point);
+        var selected = ResolveIndices(source.Topology.PointIds, request.ElementIds, "point").Order().ToArray();
+        var distance = ReadFiniteDouble(request.Parameters, "distance");
+        if (distance <= 0) throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "Merge distance must be positive.");
+        var parent = Enumerable.Range(0, source.Topology.PointIds.Count).ToArray();
+        int Find(int index) { while (parent[index] != index) { parent[index] = parent[parent[index]]; index = parent[index]; } return index; }
+        void Union(int first, int second)
+        {
+            var a = Find(first); var b = Find(second); if (a == b) return;
+            if (source.Topology.PointIds[a] <= source.Topology.PointIds[b]) parent[b] = a; else parent[a] = b;
+        }
+        var cells = new Dictionary<(long X, long Y, long Z), List<int>>(); var distanceSquared = distance * distance;
+        if (!double.IsFinite(distanceSquared)) throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "Merge distance is too large for bounded spatial evaluation.");
+        foreach (var pointIndex in selected)
+        {
+            var point = source.Topology.Positions[pointIndex]; var cell = SpatialCell(point, distance);
+            for (var x = -1; x <= 1; x++) for (var y = -1; y <= 1; y++) for (var z = -1; z <= 1; z++)
+            {
+                var neighbor = (X: checked(cell.X + x), Y: checked(cell.Y + y), Z: checked(cell.Z + z));
+                if (!cells.TryGetValue(neighbor, out var candidates)) continue;
+                foreach (var candidate in candidates)
+                {
+                    var other = source.Topology.Positions[candidate]; var dx = point.X - other.X; var dy = point.Y - other.Y; var dz = point.Z - other.Z;
+                    if (dx * dx + dy * dy + dz * dz <= distanceSquared) Union(pointIndex, candidate);
+                }
+            }
+            if (!cells.TryGetValue(cell, out var bucket)) cells[cell] = bucket = []; bucket.Add(pointIndex);
+        }
+        for (var i = 0; i < parent.Length; i++) parent[i] = Find(i);
+        var groups = Enumerable.Range(0, parent.Length).GroupBy(index => parent[index]).ToDictionary(group => group.Key, group => group.ToArray());
+        var pointIds = new List<ulong>(); var positions = new List<RekallAgeGeometryVector3>(); var rootToNew = new Dictionary<int, int>();
+        foreach (var root in groups.Keys.Order())
+        {
+            rootToNew[root] = pointIds.Count; var members = groups[root]; pointIds.Add(source.Topology.PointIds[root]);
+            positions.Add(new(members.Average(index => source.Topology.Positions[index].X), members.Average(index => source.Topology.Positions[index].Y), members.Average(index => source.Topology.Positions[index].Z)));
+        }
+        var oldToNew = Enumerable.Range(0, parent.Length).Select(index => rootToNew[parent[index]]).ToArray();
+        var edgeIds = new List<ulong>(); var edges = new List<RekallAgeMeshEdgePointIndices>(); var edgeSources = new List<int>(); var edgeRemap = new int[source.Topology.EdgeIds.Count];
+        var edgeByPoints = new Dictionary<(int A, int B), int>(); var deletedEdges = new List<ulong>(); var edgeProvenance = new List<RekallAgeMeshElementProvenance>();
+        for (var index = 0; index < source.Topology.EdgeIds.Count; index++)
+        {
+            var edge = source.Topology.EdgePointIndices[index]; var a = oldToNew[edge.A]; var b = oldToNew[edge.B];
+            if (a == b) { edgeRemap[index] = -1; deletedEdges.Add(source.Topology.EdgeIds[index]); edgeProvenance.Add(new(RekallAgeGeometryDomain.Edge, source.Topology.EdgeIds[index], [])); continue; }
+            var key = EdgeKey(a, b);
+            if (edgeByPoints.TryGetValue(key, out var existing)) { edgeRemap[index] = existing; deletedEdges.Add(source.Topology.EdgeIds[index]); edgeProvenance.Add(new(RekallAgeGeometryDomain.Edge, source.Topology.EdgeIds[index], [edgeIds[existing]])); continue; }
+            edgeRemap[index] = edges.Count; edgeByPoints[key] = edges.Count; edgeIds.Add(source.Topology.EdgeIds[index]); edges.Add(new(a, b)); edgeSources.Add(index);
+        }
+        if (source.Topology.CornerEdgeIndices.Any(index => edgeRemap[index] < 0)) throw Failure("REKALL_MESH_OPERATION_WELD_COLLAPSES_FACE_EDGE", "Merge would collapse a face boundary edge; use a smaller distance or remesh explicitly.");
+        var attributes = source.Attributes.Select(attribute => attribute.Domain switch
+        {
+            RekallAgeGeometryDomain.Point => attribute with { Values = groups.Keys.Order().Select(root => Average(attribute, groups[root])).ToArray() },
+            RekallAgeGeometryDomain.Edge => attribute with { Values = edgeSources.Select(index => attribute.Values[index]).ToArray() },
+            _ => attribute
+        }).ToArray();
+        var pointOutputIds = oldToNew.Select(index => pointIds[index]).ToArray(); var nullablePointOutputIds = pointOutputIds.Select(id => (ulong?)id).ToArray(); var edgeOutputIds = edgeRemap.Select(index => index < 0 ? (ulong?)null : edgeIds[index]).ToArray();
+        var selections = source.SelectionSets.Select(selection => selection.Domain switch
+        {
+            RekallAgeGeometryDomain.Point => RemapSelection(selection, source.Topology.PointIds, nullablePointOutputIds),
+            RekallAgeGeometryDomain.Edge => RemapSelection(selection, source.Topology.EdgeIds, edgeOutputIds),
+            _ => selection
+        }).ToArray();
+        var mesh = source with
+        {
+            Revision = checked(source.Revision + 1),
+            Topology = source.Topology with { PointIds = pointIds, Positions = positions, EdgeIds = edgeIds, EdgePointIndices = edges, CornerPointIndices = source.Topology.CornerPointIndices.Select(index => oldToNew[index]).ToArray(), CornerEdgeIndices = source.Topology.CornerEdgeIndices.Select(index => edgeRemap[index]).ToArray() },
+            Attributes = attributes, SelectionSets = selections
+        };
+        var pointIndexById = source.Topology.PointIds.Select((id, index) => (id, index)).ToDictionary(item => item.id, item => item.index);
+        var pointProvenance = request.ElementIds.Select(id => new RekallAgeMeshElementProvenance(RekallAgeGeometryDomain.Point, id, [pointOutputIds[pointIndexById[id]]]));
+        var deletedPoints = Enumerable.Range(0, parent.Length).Where(index => parent[index] != index).Select(index => source.Topology.PointIds[index]).Order().ToArray();
+        var modifiedPoints = groups.Where(item => item.Value.Length > 1).Select(item => source.Topology.PointIds[item.Key]).Order().ToArray();
+        return Result(source, mesh, ChangeSet(RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | (source.Attributes.Any(item => item.Domain is RekallAgeGeometryDomain.Point or RekallAgeGeometryDomain.Edge) ? RekallAgeMeshChangeKind.Attributes : RekallAgeMeshChangeKind.None) | (source.SelectionSets.Count > 0 ? RekallAgeMeshChangeKind.Selection : RekallAgeMeshChangeKind.None), deletedPoints: deletedPoints, deletedEdges: deletedEdges.Order().ToArray(), modifiedPoints: modifiedPoints, modifiedEdges: edgeIds.Where(id => edgeProvenance.Any(item => item.OutputElementIds.Contains(id))).Order().ToArray(), changedAttributes: attributes.Where(item => item.Domain is RekallAgeGeometryDomain.Point or RekallAgeGeometryDomain.Edge).Select(item => item.Name).Order(StringComparer.Ordinal).ToArray(), affectedBounds: Bounds(selected.Select(index => source.Topology.Positions[index]).Concat(positions))), pointProvenance.Concat(edgeProvenance).ToArray());
     }
 
     private RekallAgeMeshOperationResult ReverseFaces(
@@ -943,6 +1026,62 @@ public sealed class RekallAgeMeshOperationExecutor
 
     private static (int A, int B) EdgeKey(int first, int second) =>
         first < second ? (first, second) : (second, first);
+
+    private static (long X, long Y, long Z) SpatialCell(
+        RekallAgeGeometryVector3 point,
+        double distance)
+    {
+        const double cellLimit = 9_000_000_000_000_000_000d;
+        static long Coordinate(double value, double cellSize)
+        {
+            var coordinate = Math.Floor(value / cellSize);
+            if (!double.IsFinite(coordinate) || Math.Abs(coordinate) > cellLimit)
+            {
+                throw Failure(
+                    "REKALL_MESH_OPERATION_PARAMETER_INVALID",
+                    "Merge distance is too small for the mesh coordinate range.");
+            }
+            return checked((long)coordinate);
+        }
+
+        return (
+            Coordinate(point.X, distance),
+            Coordinate(point.Y, distance),
+            Coordinate(point.Z, distance));
+    }
+
+    private static RekallAgeMeshSelection RemapSelection(
+        RekallAgeMeshSelection selection,
+        IReadOnlyList<ulong> sourceIds,
+        IReadOnlyList<ulong?> outputIds)
+    {
+        var map = sourceIds
+            .Select((id, index) => (id, outputId: outputIds[index]))
+            .ToDictionary(item => item.id, item => item.outputId);
+
+        static IReadOnlyList<ulong> Remap(
+            IReadOnlyList<ulong> ids,
+            IReadOnlyDictionary<ulong, ulong?> mapping)
+        {
+            var remapped = new List<ulong>();
+            var seen = new HashSet<ulong>();
+            foreach (var id in ids)
+            {
+                var outputId = mapping.TryGetValue(id, out var mapped) ? mapped : id;
+                if (outputId.HasValue && seen.Add(outputId.Value)) remapped.Add(outputId.Value);
+            }
+            return remapped;
+        }
+
+        ulong? active = selection.ActiveElementId;
+        if (active.HasValue && map.TryGetValue(active.Value, out var mappedActive)) active = mappedActive;
+        return selection with
+        {
+            ElementIds = Remap(selection.ElementIds, map),
+            ActiveElementId = active,
+            OrderedHistory = selection.OrderedHistory is null ? null : Remap(selection.OrderedHistory, map)
+        };
+    }
 
     private static ulong NextId(IReadOnlyCollection<ulong> ids)
     {

@@ -4,9 +4,27 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 08:30 Africa/Johannesburg
+Last verified: 2026-08-23 08:37 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
+
+The first optimization primitive is verified across every canonical modeling
+composition path. `merge_by_distance` welds selected points through a bounded,
+deterministic spatial hash; averages compatible point attributes; remaps face
+corners and point/edge selections; removes collapsed loose edges; deduplicates
+coincident edges; and reports deleted/modified stable IDs plus point/edge
+provenance. It fails closed when a requested weld would collapse a face
+boundary or when coordinate/distance ratios exceed safe cell bounds. The same
+implementation is exposed as `rekall.modeling.merge_by_distance` in procedural
+graphs and `rekall.modifier.merge_by_distance` in immutable cached modifier
+stacks, with descriptor discovery available through the existing graph,
+modifier, and mesh operation commands. A disconnected two-quad seam proof
+reduces 8 points/8 edges to a valid manifold 6 points/7 edges/2 faces while
+retaining both faces. The full modeling namespace passes 82/82 tests and the
+modeling project builds with zero warnings/errors. General remeshing, smoothing
+subdivision, and boolean operations remain open; the next kernel work continues
+with those generic capabilities rather than declaring the modeling tranche
+complete.
 
 The Blender-informed agentic modelling tranche is now the active implementation
 priority after the completed WebGPU and remaining Godot audits. A shallow,

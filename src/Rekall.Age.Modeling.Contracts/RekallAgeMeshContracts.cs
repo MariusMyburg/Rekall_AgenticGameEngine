@@ -164,6 +164,20 @@ public sealed record RekallAgeMeshElementQueryResult(
     int TotalDomainCount,
     bool Truncated);
 
+public sealed record RekallAgeMeshOperationParameterDescriptor(
+    string Name,
+    RekallAgeGeometryValueType ValueType,
+    bool Required,
+    JsonElement? DefaultValue,
+    string Description);
+
+public sealed record RekallAgeMeshOperationDescriptor(
+    string OperationId,
+    string Description,
+    RekallAgeGeometryDomain Domain,
+    RekallAgeMeshChangeKind PossibleChanges,
+    IReadOnlyList<RekallAgeMeshOperationParameterDescriptor> Parameters);
+
 public sealed record RekallAgeMeshTopology(
     IReadOnlyList<ulong> PointIds,
     IReadOnlyList<RekallAgeGeometryVector3> Positions,

@@ -38,10 +38,10 @@ internal static class RekallAgeCli
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken)
     {
         var logDirectory = ConfigureLogging(args);
-        Log.Information("Rekall AGE command starting. Args={Args}", string.Join(' ', args));
+        Log.Information("Rekall AGE command starting. Args={Args}", DescribeInvocation(args));
         if (args.Length == 0)
         {
-            Console.Error.WriteLine("Usage: rekall-age <agent|game|project|capability|scene|entity|component|input|shader|asset|geometry|level|studio|play|playtest|run|runtime|multiplayer|context|compatibility|recovery|diagnostics|transaction|capture|render|module|build|validation|mcp> ...");
+            Console.Error.WriteLine("Usage: rekall-age <agent|game|project|capability|scene|entity|component|input|shader|asset|geometry|mesh|level|studio|play|playtest|run|runtime|multiplayer|context|compatibility|recovery|diagnostics|transaction|capture|render|module|build|validation|command|mcp> ...");
             Log.Information("Rekall AGE command finished with usage error. LogDirectory={LogDirectory}", logDirectory);
             Log.CloseAndFlush();
             return 2;
@@ -50,7 +50,7 @@ internal static class RekallAgeCli
         try
         {
             var registry = BuildRegistry();
-            var transaction = RekallAgeTransaction.Begin(string.Join(' ', args));
+            var transaction = RekallAgeTransaction.Begin(DescribeInvocation(args));
             var context = new RekallAgeCommandContext(IsMcpStdio(args) ? "mcp" : "cli", transaction, cancellationToken);
             var exitCode = args switch
             {
@@ -209,6 +209,8 @@ internal static class RekallAgeCli
                 ["render", "glb", "export", var root, var scene, var outputPath, var frames] =>
                     await ExportSceneGlbAsync(registry, context, root, scene, outputPath, frames),
                 ["mcp", "stdio"] => await RunMcpStdioAsync(registry, context),
+                ["command", "execute", var name, var argumentsJson] =>
+                    await ExecuteRegisteredCommandAsync(registry, context, name, argumentsJson),
                 ["studio", "open", var root, var scene] => await OpenStudioModelAsync(root, scene),
                 ["input", "inspect", var root, var scene] => await InspectInputBindingsAsync(registry, context, root, scene),
                 ["input", "rebind", var root, var scene, var entityId, var actionName, var bindingJson] =>
@@ -418,7 +420,7 @@ internal static class RekallAgeCli
             }
             else
             {
-                Log.Warning("Rekall AGE command returned non-zero exit code. ExitCode={ExitCode} Args={Args}", exitCode, string.Join(' ', args));
+                Log.Warning("Rekall AGE command returned non-zero exit code. ExitCode={ExitCode} Args={Args}", exitCode, DescribeInvocation(args));
             }
 
             Log.Information("Rekall AGE command finished. ExitCode={ExitCode} LogDirectory={LogDirectory}", exitCode, logDirectory);
@@ -426,19 +428,19 @@ internal static class RekallAgeCli
         }
         catch (RekallAgeCodedBoundaryException ex)
         {
-            Log.Error(ex, "CLI command rejected at a coded boundary. Code={Code} Target={Target} Args={Args} LogDirectory={LogDirectory}", ex.Code, ex.Target, string.Join(' ', args), logDirectory);
+            Log.Error(ex, "CLI command rejected at a coded boundary. Code={Code} Target={Target} Args={Args} LogDirectory={LogDirectory}", ex.Code, ex.Target, DescribeInvocation(args), logDirectory);
             Console.Error.WriteLine($"{ex.Code}: {ex.Message}");
             return 1;
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
         {
-            Log.Error(ex, "CLI command failed. Args={Args} LogDirectory={LogDirectory}", string.Join(' ', args), logDirectory);
+            Log.Error(ex, "CLI command failed. Args={Args} LogDirectory={LogDirectory}", DescribeInvocation(args), logDirectory);
             Console.Error.WriteLine(ex.Message);
             return 1;
         }
         catch (Exception ex)
         {
-            Log.Fatal(ex, "Unhandled CLI command exception. Args={Args} LogDirectory={LogDirectory}", string.Join(' ', args), logDirectory);
+            Log.Fatal(ex, "Unhandled CLI command exception. Args={Args} LogDirectory={LogDirectory}", DescribeInvocation(args), logDirectory);
             Console.Error.WriteLine($"Unexpected error. See log: {logDirectory}");
             return 1;
         }
@@ -490,6 +492,28 @@ internal static class RekallAgeCli
     }
 
     private static RekallAgeCommandRegistry BuildRegistry() => RekallAgeDefaultCommandRegistry.Create();
+
+    private static async Task<int> ExecuteRegisteredCommandAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string name,
+        string argumentsJson)
+    {
+        var result = await registry.ExecuteJsonAsync(name, argumentsJson, context);
+        var options = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+            WriteIndented = true
+        };
+        options.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, options));
+        return result.Ok ? 0 : 1;
+    }
+
+    private static string DescribeInvocation(string[] args) =>
+        args is ["command", "execute", var name, _]
+            ? $"command execute {name} <json>"
+            : string.Join(' ', args);
 
     private static async ValueTask PersistTransactionAsync(RekallAgeCommandContext context)
     {

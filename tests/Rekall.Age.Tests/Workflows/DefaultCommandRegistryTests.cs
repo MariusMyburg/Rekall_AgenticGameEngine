@@ -19,6 +19,8 @@ public sealed class DefaultCommandRegistryTests
         Assert.Contains("rekall.workflow.verify_playable_game", names);
         Assert.Contains("rekall.context.engine_status", names);
         Assert.Contains("rekall.module.scaffold_playable", names);
+        Assert.Contains("rekall.mesh.operation.apply", names);
+        Assert.Contains("rekall.mesh.assert", names);
         Assert.Equal(names.Count, registry.Schemas.Count);
         Assert.True(names.Count >= 100, $"Expected the complete engine command surface, found {names.Count} commands.");
     }

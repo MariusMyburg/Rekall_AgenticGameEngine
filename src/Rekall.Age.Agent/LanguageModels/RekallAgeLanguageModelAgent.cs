@@ -954,6 +954,7 @@ public sealed class RekallAgeLanguageModelAgent(
         || toolName.StartsWith("rekall.scene.", StringComparison.Ordinal)
         || toolName.StartsWith("rekall.entity.", StringComparison.Ordinal)
         || toolName.StartsWith("rekall.component.", StringComparison.Ordinal)
+        || toolName.StartsWith("rekall.mesh.", StringComparison.Ordinal)
         || toolName.Equals("rekall.module.search_component_schemas", StringComparison.Ordinal)
         || toolName.Equals("rekall.module.component_schemas", StringComparison.Ordinal)
         || toolName.Equals("rekall.module.inspect_runtime_sdk", StringComparison.Ordinal)

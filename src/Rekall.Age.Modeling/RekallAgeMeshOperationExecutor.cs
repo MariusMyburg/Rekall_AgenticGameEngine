@@ -17,7 +17,42 @@ public sealed class RekallAgeMeshOperationException : InvalidOperationException
 
 public sealed class RekallAgeMeshOperationExecutor
 {
+    private static readonly IReadOnlyList<RekallAgeMeshOperationDescriptor> OperationDescriptors =
+    [
+        new(
+            "transform",
+            "Translates selected mesh points by a finite XYZ offset without changing their stable IDs.",
+            RekallAgeGeometryDomain.Point,
+            RekallAgeMeshChangeKind.Positions,
+            [NumberParameter("x"), NumberParameter("y"), NumberParameter("z")]),
+        new(
+            "reverse_faces",
+            "Reverses selected face winding while preserving stable face/corner identity and corner attributes.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes,
+            []),
+        new(
+            "triangulate_faces",
+            "Triangulates selected polygon faces with derived diagonal edges and source-element provenance.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes,
+            []),
+        new(
+            "extrude_faces",
+            "Extrudes a selected face region by a finite XYZ offset and creates side faces only on its boundary.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
+            [NumberParameter("x"), NumberParameter("y"), NumberParameter("z")]),
+        new(
+            "delete",
+            "Deletes selected faces and their corners while preserving now-loose points and edges for explicit subsequent editing.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
+            [])
+    ];
     private readonly RekallAgeMeshValidator _validator = new();
+
+    public IReadOnlyList<RekallAgeMeshOperationDescriptor> Descriptors => OperationDescriptors;
 
     public RekallAgeMeshOperationResult Execute(
         RekallAgeMeshAsset source,
@@ -44,6 +79,7 @@ public sealed class RekallAgeMeshOperationExecutor
             "reverse_faces" => ReverseFaces(source, request),
             "triangulate_faces" => TriangulateFaces(source, request),
             "extrude_faces" => ExtrudeFaces(source, request),
+            "delete" => DeleteFaces(source, request),
             _ => throw Failure("REKALL_MESH_OPERATION_UNKNOWN", $"Unknown mesh operation '{request.OperationId}'.")
         };
         var outputValidation = _validator.Validate(result.Mesh);
@@ -599,6 +635,118 @@ public sealed class RekallAgeMeshOperationExecutor
             provenance);
     }
 
+    private RekallAgeMeshOperationResult DeleteFaces(
+        RekallAgeMeshAsset source,
+        RekallAgeMeshOperationRequest request)
+    {
+        RequireDomain(request, RekallAgeGeometryDomain.Face);
+        var selectedFaceIndices = ResolveIndices(source.Topology.FaceIds, request.ElementIds, "face").ToHashSet();
+        var topology = source.Topology;
+        var faceIds = new List<ulong>();
+        var faceOffsets = new List<int> { 0 };
+        var faceSourceIndices = new List<int>();
+        var cornerIds = new List<ulong>();
+        var cornerPoints = new List<int>();
+        var cornerEdges = new List<int>();
+        var cornerSourceIndices = new List<int>();
+        var deletedFaceIds = new List<ulong>();
+        var deletedCornerIds = new List<ulong>();
+        var affectedPointIndices = new HashSet<int>();
+
+        for (var faceIndex = 0; faceIndex < topology.FaceIds.Count; faceIndex++)
+        {
+            var start = topology.FaceOffsets[faceIndex];
+            var end = topology.FaceOffsets[faceIndex + 1];
+            if (selectedFaceIndices.Contains(faceIndex))
+            {
+                deletedFaceIds.Add(topology.FaceIds[faceIndex]);
+                for (var cornerIndex = start; cornerIndex < end; cornerIndex++)
+                {
+                    deletedCornerIds.Add(topology.CornerIds[cornerIndex]);
+                    affectedPointIndices.Add(topology.CornerPointIndices[cornerIndex]);
+                }
+                continue;
+            }
+
+            faceIds.Add(topology.FaceIds[faceIndex]);
+            faceSourceIndices.Add(faceIndex);
+            for (var cornerIndex = start; cornerIndex < end; cornerIndex++)
+            {
+                cornerIds.Add(topology.CornerIds[cornerIndex]);
+                cornerPoints.Add(topology.CornerPointIndices[cornerIndex]);
+                cornerEdges.Add(topology.CornerEdgeIndices[cornerIndex]);
+                cornerSourceIndices.Add(cornerIndex);
+            }
+            faceOffsets.Add(cornerIds.Count);
+        }
+
+        var attributes = source.Attributes.Select(attribute => attribute.Domain switch
+        {
+            RekallAgeGeometryDomain.Face => attribute with
+            {
+                Values = faceSourceIndices.Select(index => attribute.Values[index]).ToArray()
+            },
+            RekallAgeGeometryDomain.Corner => attribute with
+            {
+                Values = cornerSourceIndices.Select(index => attribute.Values[index]).ToArray()
+            },
+            _ => attribute
+        }).ToArray();
+        var deletedFaceSet = deletedFaceIds.ToHashSet();
+        var selections = source.SelectionSets.Select(selection =>
+        {
+            if (selection.Domain != RekallAgeGeometryDomain.Face)
+            {
+                return selection;
+            }
+            return selection with
+            {
+                ElementIds = selection.ElementIds.Where(id => !deletedFaceSet.Contains(id)).ToArray(),
+                ActiveElementId = selection.ActiveElementId.HasValue && deletedFaceSet.Contains(selection.ActiveElementId.Value)
+                    ? null
+                    : selection.ActiveElementId,
+                OrderedHistory = selection.OrderedHistory?
+                    .Where(id => !deletedFaceSet.Contains(id))
+                    .ToArray()
+            };
+        }).ToArray();
+        var mesh = source with
+        {
+            Revision = checked(source.Revision + 1),
+            Topology = topology with
+            {
+                FaceIds = faceIds,
+                FaceOffsets = faceOffsets,
+                CornerIds = cornerIds,
+                CornerPointIndices = cornerPoints,
+                CornerEdgeIndices = cornerEdges
+            },
+            Attributes = attributes,
+            SelectionSets = selections
+        };
+        return Result(
+            source,
+            mesh,
+            ChangeSet(
+                RekallAgeMeshChangeKind.Topology
+                | (attributes.Any(item => item.Domain is RekallAgeGeometryDomain.Face or RekallAgeGeometryDomain.Corner)
+                    ? RekallAgeMeshChangeKind.Attributes
+                    : RekallAgeMeshChangeKind.None)
+                | (source.SelectionSets.Count > 0 ? RekallAgeMeshChangeKind.Selection : RekallAgeMeshChangeKind.None),
+                deletedFaces: deletedFaceIds.Order().ToArray(),
+                deletedCorners: deletedCornerIds.Order().ToArray(),
+                changedAttributes: attributes
+                    .Where(item => item.Domain is RekallAgeGeometryDomain.Face or RekallAgeGeometryDomain.Corner)
+                    .Select(item => item.Name)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray(),
+                affectedBounds: Bounds(affectedPointIndices.Select(index => topology.Positions[index]))),
+            deletedFaceIds
+                .Order()
+                .Select(id => new RekallAgeMeshElementProvenance(RekallAgeGeometryDomain.Face, id, []))
+                .ToArray());
+    }
+
     private static RekallAgeMeshOperationResult Result(
         RekallAgeMeshAsset source,
         RekallAgeMeshAsset mesh,
@@ -681,6 +829,14 @@ public sealed class RekallAgeMeshOperationExecutor
             _ => throw Failure("REKALL_MESH_OPERATION_ATTRIBUTE_DEFAULT_INVALID", $"Attribute '{attribute.Name}' has no default value.")
         };
     }
+
+    private static RekallAgeMeshOperationParameterDescriptor NumberParameter(string name) =>
+        new(
+            name,
+            RekallAgeGeometryValueType.Float,
+            false,
+            JsonSerializer.SerializeToElement(0.0),
+            $"Finite {name.ToUpperInvariant()} offset in mesh-local units.");
 
     private static IReadOnlyList<RekallAgeMeshSelection> PropagateExtrusionSelections(
         IReadOnlyList<RekallAgeMeshSelection> selections,

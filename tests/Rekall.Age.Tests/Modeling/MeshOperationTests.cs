@@ -163,6 +163,50 @@ public sealed class MeshOperationTests
         Assert.True(result.Validation.IsValid, string.Join(",", result.Validation.Diagnostics.Select(item => item.Code)));
     }
 
+    [Fact]
+    public void DeleteFacesRemovesCornerDataAndSelectionReferencesAtomically()
+    {
+        var mesh = CreateQuad() with
+        {
+            SelectionSets = [new("selected", RekallAgeGeometryDomain.Face, [21], ActiveElementId: 21, OrderedHistory: [21])]
+        };
+        var executor = new RekallAgeMeshOperationExecutor();
+
+        var result = executor.Execute(
+            mesh,
+            new RekallAgeMeshOperationRequest(
+                "delete",
+                RekallAgeGeometryDomain.Face,
+                [21],
+                new JsonObject()));
+
+        Assert.Single(mesh.Topology.FaceIds);
+        Assert.Empty(result.Mesh.Topology.FaceIds);
+        Assert.Equal([0], result.Mesh.Topology.FaceOffsets);
+        Assert.Empty(result.Mesh.Topology.CornerIds);
+        Assert.Equal([21UL], result.Changes.DeletedFaceIds);
+        Assert.Equal([31UL, 32UL, 33UL, 34UL], result.Changes.DeletedCornerIds);
+        var selection = Assert.Single(result.Mesh.SelectionSets);
+        Assert.Empty(selection.ElementIds);
+        Assert.Null(selection.ActiveElementId);
+        Assert.Empty(selection.OrderedHistory!);
+        Assert.True(result.Validation.IsValid);
+        Assert.Contains(result.Provenance, item => item.InputElementId == 21 && item.OutputElementIds.Count == 0);
+    }
+
+    [Fact]
+    public void OperationDescriptorsAreUniqueSelfDescribingAndMatchExecutorInventory()
+    {
+        var executor = new RekallAgeMeshOperationExecutor();
+
+        Assert.Equal(executor.Descriptors.Count, executor.Descriptors.Select(item => item.OperationId).Distinct().Count());
+        Assert.Contains(executor.Descriptors, item =>
+            item.OperationId == "extrude_faces"
+            && item.Domain == RekallAgeGeometryDomain.Face
+            && item.Parameters.Select(parameter => parameter.Name).SequenceEqual(["x", "y", "z"]));
+        Assert.Contains(executor.Descriptors, item => item.OperationId == "delete");
+    }
+
     private static RekallAgeMeshAsset CreateQuad()
     {
         return RekallAgeMeshAsset.Create(

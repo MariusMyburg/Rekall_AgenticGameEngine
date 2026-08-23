@@ -50,22 +50,22 @@ then grow it into procedural geometry/material graphs and Studio modelling.
 
 ### Task 3: Editable adjacency, queries, and operation framework
 
-- [ ] Write failing adjacency and generic selector tests.
-- [ ] Add compact adjacency indices without managed pointer cycles.
-- [ ] Add canonical operation descriptors and request/result schemas.
-- [ ] Add preview/apply/batch execution, change masks, element provenance, and
+- [x] Write failing adjacency and generic selector tests.
+- [x] Add compact adjacency indices without managed pointer cycles.
+- [x] Add canonical operation descriptors and request/result schemas.
+- [x] Add preview/apply/batch execution, change masks, element provenance, and
   rollback on validation failure.
-- [ ] Implement create, delete, transform, reverse faces, triangulate, and
+- [x] Implement create, delete, transform, reverse faces, triangulate, and
   extrude-region operations with property and regression tests.
 
 ### Task 4: Command, CLI, and MCP surface
 
-- [ ] Write failing registry/schema/JSON-RPC tests for mesh create, inspect,
+- [x] Write failing registry/schema/JSON-RPC tests for mesh create, inspect,
   query, validate, diff, preview, apply, batch, and assert.
 - [ ] Return bounded samples, stable IDs, affected bounds, revisions,
   diagnostics, provenance, and next actions.
-- [ ] Ensure checkpoint gating does not block mesh construction/repair commands.
-- [ ] Prove stale revisions and invalid operations fail without partial writes.
+- [x] Ensure checkpoint gating does not block mesh construction/repair commands.
+- [x] Prove stale revisions and invalid operations fail without partial writes.
 
 ### Task 5: Render compiler and scene reference
 

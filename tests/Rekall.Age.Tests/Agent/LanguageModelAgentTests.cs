@@ -951,6 +951,43 @@ public sealed class LanguageModelAgentTests
     }
 
     [Fact]
+    public async Task RuntimeCheckpointKeepsBoundedMeshConstructionAndRepairAvailable()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.module.scaffold_runtime_system", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.build.modules", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.mesh.operation.apply", new JsonObject())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "", "",
+                [new RekallAgeLanguageModelToolCall("rekall.runtime.inspect_scene", MeaningfulRuntimeCheckpointArguments())],
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse("test", "model", "Complete", "", [], "stop", new(1, 1, 1)));
+        var tools = new RecordingToolExecutor();
+
+        var result = await new RekallAgeLanguageModelAgent(model, tools).RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task")
+            {
+                MaxTurns = 5,
+                RequireRuntimeBehaviorAssertions = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Contains(tools.Executions, execution => execution.Name == "rekall.mesh.operation.apply");
+        Assert.DoesNotContain(result.ToolExecutions, execution =>
+            execution.Name == "rekall.mesh.operation.apply" && !execution.Succeeded);
+    }
+
+    [Fact]
     public async Task RuntimeCheckpointRejectsUnknownFlatInputFieldsWithCopyableSemanticActionGuidance()
     {
         var checkpoint = MeaningfulRuntimeCheckpointArguments();

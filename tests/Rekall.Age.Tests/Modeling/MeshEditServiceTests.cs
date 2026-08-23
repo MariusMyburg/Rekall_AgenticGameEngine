@@ -1,0 +1,142 @@
+using System.Text.Json.Nodes;
+using Rekall.Age.Core.Persistence;
+using Rekall.Age.Core.Transactions;
+using Rekall.Age.Modeling;
+using Rekall.Age.Modeling.Contracts;
+
+namespace Rekall.Age.Tests.Modeling;
+
+public sealed class MeshEditServiceTests
+{
+    [Fact]
+    public async Task PreviewReturnsEvidenceWithoutWritingOrTouchingTransaction()
+    {
+        var (root, store, loaded) = await CreateStoredTriangle();
+        var transaction = RekallAgeTransaction.Begin("preview mesh");
+        var service = new RekallAgeMeshEditService(store);
+
+        var result = await service.PreviewAsync(
+            root,
+            "triangle",
+            loaded.Revision,
+            Transform(1, 2),
+            transaction,
+            CancellationToken.None);
+
+        Assert.False(result.Persisted);
+        Assert.Equal(loaded.Revision, result.BeforeFileRevision);
+        Assert.Equal(loaded.Revision, result.AfterFileRevision);
+        Assert.Equal(2, result.Operation.AfterRevision);
+        Assert.Equal(new RekallAgeGeometryVector3(1, 2, 0), result.Operation.Mesh.Topology.Positions[0]);
+        Assert.Equal(new RekallAgeGeometryVector3(0, 0, 0), (await store.LoadAsync(root, "triangle", CancellationToken.None)).Topology.Positions[0]);
+        Assert.Empty(transaction.ChangedResources);
+        Assert.Empty(transaction.ResourcePreimages);
+    }
+
+    [Fact]
+    public async Task ApplyWritesOnceWithPreimageAndRejectsStaleRevisionWithoutMutation()
+    {
+        var (root, store, loaded) = await CreateStoredTriangle();
+        var transaction = RekallAgeTransaction.Begin("apply mesh");
+        var service = new RekallAgeMeshEditService(store);
+
+        var applied = await service.ApplyAsync(
+            root,
+            "triangle",
+            loaded.Revision,
+            Transform(3, 0),
+            transaction,
+            CancellationToken.None);
+        var persisted = await store.LoadVersionedAsync(root, "triangle", CancellationToken.None);
+
+        Assert.True(applied.Persisted);
+        Assert.NotEqual(applied.BeforeFileRevision, applied.AfterFileRevision);
+        Assert.Equal(2, persisted.Value.Revision);
+        Assert.Equal(new RekallAgeGeometryVector3(3, 0, 0), persisted.Value.Topology.Positions[0]);
+        Assert.Equal([store.GetMeshPath(root, "triangle")], transaction.ChangedResources);
+        Assert.Single(transaction.ResourcePreimages);
+        var staleTransaction = RekallAgeTransaction.Begin("stale mesh");
+        var stale = await Assert.ThrowsAsync<RekallAgeDocumentRevisionException>(() => service.ApplyAsync(
+            root,
+            "triangle",
+            loaded.Revision,
+            Transform(100, 0),
+            staleTransaction,
+            CancellationToken.None).AsTask());
+        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", stale.Code);
+        Assert.Empty(staleTransaction.ChangedResources);
+        Assert.Empty(staleTransaction.ResourcePreimages);
+        Assert.Equal(new RekallAgeGeometryVector3(3, 0, 0), (await store.LoadAsync(root, "triangle", CancellationToken.None)).Topology.Positions[0]);
+    }
+
+    [Fact]
+    public async Task BatchPublishesOneRevisionAndFailedLaterStepRollsBackEntireCandidate()
+    {
+        var (root, store, loaded) = await CreateStoredTriangle();
+        var service = new RekallAgeMeshEditService(store);
+        var transaction = RekallAgeTransaction.Begin("batch mesh");
+
+        var batch = await service.ApplyBatchAsync(
+            root,
+            "triangle",
+            loaded.Revision,
+            [Transform(2, 0), Reverse()],
+            transaction,
+            CancellationToken.None);
+        var persisted = await store.LoadVersionedAsync(root, "triangle", CancellationToken.None);
+
+        Assert.True(batch.Persisted);
+        Assert.Equal(2, batch.Steps.Count);
+        Assert.Equal(2, batch.AfterLogicalRevision);
+        Assert.Equal(2, persisted.Value.Revision);
+        Assert.Equal(new RekallAgeGeometryVector3(2, 0, 0), persisted.Value.Topology.Positions[0]);
+        Assert.Single(transaction.ResourcePreimages);
+        Assert.Single(transaction.ChangedResources);
+
+        var failedTransaction = RekallAgeTransaction.Begin("failed batch");
+        var beforeFailure = await store.LoadVersionedAsync(root, "triangle", CancellationToken.None);
+        var error = await Assert.ThrowsAsync<RekallAgeMeshOperationException>(() => service.ApplyBatchAsync(
+            root,
+            "triangle",
+            beforeFailure.Revision,
+            [Transform(5, 0), new("transform", RekallAgeGeometryDomain.Point, [999], new JsonObject { ["x"] = 1 })],
+            failedTransaction,
+            CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_MESH_OPERATION_SELECTION_INVALID", error.Code);
+        Assert.Empty(failedTransaction.ChangedResources);
+        Assert.Empty(failedTransaction.ResourcePreimages);
+        var afterFailure = await store.LoadVersionedAsync(root, "triangle", CancellationToken.None);
+        Assert.Equal(beforeFailure.Revision, afterFailure.Revision);
+        Assert.Equal(beforeFailure.Value.Topology.Positions, afterFailure.Value.Topology.Positions);
+    }
+
+    private static RekallAgeMeshOperationRequest Transform(double x, double y) =>
+        new("transform", RekallAgeGeometryDomain.Point, [1], new JsonObject { ["x"] = x, ["y"] = y });
+
+    private static RekallAgeMeshOperationRequest Reverse() =>
+        new("reverse_faces", RekallAgeGeometryDomain.Face, [21], new JsonObject());
+
+    private static async Task<(string Root, RekallAgeMeshAssetStore Store, RekallAgeVersionedDocument<RekallAgeMeshAsset> Loaded)> CreateStoredTriangle()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeMeshAssetStore();
+        await store.SaveAsync(
+            root,
+            RekallAgeMeshAsset.Create(
+                "triangle",
+                "Triangle",
+                new RekallAgeMeshTopology(
+                    PointIds: [1, 2, 3],
+                    Positions: [new(0, 0, 0), new(1, 0, 0), new(0, 1, 0)],
+                    EdgeIds: [11, 12, 13],
+                    EdgePointIndices: [new(0, 1), new(1, 2), new(2, 0)],
+                    FaceIds: [21],
+                    FaceOffsets: [0, 3],
+                    CornerIds: [31, 32, 33],
+                    CornerPointIndices: [0, 1, 2],
+                    CornerEdgeIndices: [0, 1, 2])),
+            CancellationToken.None);
+        return (root, store, await store.LoadVersionedAsync(root, "triangle", CancellationToken.None));
+    }
+}

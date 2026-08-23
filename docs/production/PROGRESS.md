@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 05:00 Africa/Johannesburg
+Last verified: 2026-08-23 06:02 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -90,6 +90,31 @@ domain, and truncation counts. Connectivity uses the validated adjacency view,
 spatial predicates use point positions, edge midpoints, face centroids, or
 corner points, and wrong-domain/missing IDs, selections, attributes, bounds,
 and limits fail with stable repairable codes. Three focused query tests pass.
+
+Task 3 and the first agent-facing Task 4 surface are now verified.
+The semantic executor publishes canonical operation descriptors and implements
+face deletion alongside transform, reverse-winding, ngon triangulation, and
+region extrusion. Face deletion removes dependent corners and domain data while
+deliberately preserving now-loose points and edges as editable topology. The
+revision-safe edit service supports read-only preview, one-operation apply, and
+1-128 step atomic batches: candidates execute fully in memory, validation or
+operation failure publishes nothing, and a successful batch advances the mesh
+only one logical revision while capturing one transaction preimage. Eight typed
+commands now expose create, bounded inspect, strict validate, semantic query,
+preview, apply, batch, and deterministic assertions through the default engine
+registry and MCP/JSON-RPC under the dedicated `modeling` category. Evidence is
+bounded to stable-ID samples, counts, affected bounds, revisions, diagnostics,
+change sets, and provenance rather than dumping mesh buffers. Checkpoint policy
+keeps these bounded mesh construction/repair commands available while gameplay
+evidence is being established. The CLI now has a generic registered-command
+gateway (`command execute <name> <arguments-json>`), so the same canonical
+schemas are scriptable without parallel parsers; JSON arguments are redacted
+from logs and transaction names. A physical Release CLI create/inspect run
+created a strict triangle asset and returned a two-ID truncated sample. The
+Release modelling/registry/checkpoint selection passes 35/35 and the Debug
+CLI/MCP/process selection passes 18/18, all with zero build warnings/errors.
+Structured repair/next-action guidance is the remaining Task 4 polish; the
+editable-mesh render compiler and scene asset reference follow it immediately.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

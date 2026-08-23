@@ -14,7 +14,7 @@ public static class RekallAgePlayableGameFactory
     {
         return new RekallAgeRuntimeObservedPlayableGame(
             Create(projectRoot, scene),
-            new RekallAgeRuntimeWorldBuilder().Build(scene),
+            new RekallAgeRuntimeWorldBuilder().Build(scene, projectRoot),
             RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot));
     }
 }

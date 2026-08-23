@@ -13,6 +13,8 @@ public readonly record struct RekallAgeGeometryVector2(double X, double Y);
 
 public readonly record struct RekallAgeGeometryVector3(double X, double Y, double Z);
 
+public readonly record struct RekallAgeGeometryVector4(double X, double Y, double Z, double W);
+
 public readonly record struct RekallAgeMeshEdgePointIndices(int A, int B);
 
 [JsonConverter(typeof(JsonStringEnumConverter<RekallAgeGeometryDomain>))]
@@ -177,6 +179,39 @@ public sealed record RekallAgeMeshOperationDescriptor(
     RekallAgeGeometryDomain Domain,
     RekallAgeMeshChangeKind PossibleChanges,
     IReadOnlyList<RekallAgeMeshOperationParameterDescriptor> Parameters);
+
+public sealed record RekallAgeCompiledMeshVertex(
+    ulong SourcePointId,
+    ulong SourceCornerId,
+    RekallAgeGeometryVector3 Position,
+    RekallAgeGeometryVector3 Normal,
+    RekallAgeGeometryVector4 Tangent,
+    RekallAgeGeometryVector2 Uv,
+    RekallAgeGeometryVector4 Color);
+
+public sealed record RekallAgeCompiledMeshTriangle(
+    int TriangleIndex,
+    ulong SourceFaceId,
+    IReadOnlyList<ulong> SourceCornerIds,
+    IReadOnlyList<ulong> SourcePointIds,
+    int SurfaceIndex);
+
+public sealed record RekallAgeCompiledMeshSurface(
+    int SurfaceIndex,
+    int MaterialSlotIndex,
+    string? MaterialAssetId,
+    int FirstIndex,
+    int IndexCount,
+    IReadOnlyList<ulong> SourceFaceIds);
+
+public sealed record RekallAgeCompiledMeshSnapshot(
+    string SourceAssetId,
+    long SourceLogicalRevision,
+    IReadOnlyList<RekallAgeCompiledMeshVertex> Vertices,
+    IReadOnlyList<uint> Indices,
+    IReadOnlyList<RekallAgeCompiledMeshTriangle> Triangles,
+    IReadOnlyList<RekallAgeCompiledMeshSurface> Surfaces,
+    RekallAgeMeshBounds Bounds);
 
 public sealed record RekallAgeMeshTopology(
     IReadOnlyList<ulong> PointIds,

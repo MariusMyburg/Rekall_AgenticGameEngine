@@ -548,9 +548,9 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
 
         for (var i = 0; i + 2 < geometry.Indices.Count; i += 3)
         {
-            var aIndex = geometry.Indices[i];
-            var bIndex = geometry.Indices[i + 1];
-            var cIndex = geometry.Indices[i + 2];
+            var aIndex = checked((int)geometry.Indices[i]);
+            var bIndex = checked((int)geometry.Indices[i + 1]);
+            var cIndex = checked((int)geometry.Indices[i + 2]);
             if (aIndex >= transformed.Length || bIndex >= transformed.Length || cIndex >= transformed.Length)
             {
                 continue;

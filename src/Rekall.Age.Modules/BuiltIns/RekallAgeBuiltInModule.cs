@@ -30,6 +30,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeNetworkTransformComponent>();
         builder.RegisterComponent<RekallAgeGeometryPrimitiveComponent>();
         builder.RegisterComponent<RekallAgeGeometryMeshComponent>();
+        builder.RegisterComponent<RekallAgeMeshAssetReferenceComponent>();
         builder.RegisterComponent<RekallAgeLineSegmentsComponent>();
         builder.RegisterComponent<RekallAgeGeometryExtrusionComponent>();
         builder.RegisterComponent<RekallAgeMaterialComponent>();
@@ -572,6 +573,16 @@ public sealed class RekallAgeGeometryMeshComponent : RekallAgeComponent
 
     [RekallAgeProperty(Kind = "color")]
     public string Color { get; init; } = "#8ab4f8";
+}
+
+[RekallAgeComponent("Mesh Asset Reference", Description = "References a persistent editable mesh asset by stable logical ID. Rendering, picking, export, and physics consume the same compiled snapshot; expectedRevision optionally pins an exact immutable file revision.")]
+public sealed class RekallAgeMeshAssetReferenceComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "mesh")]
+    public string AssetId { get; init; } = string.Empty;
+
+    [RekallAgeProperty]
+    public string? ExpectedRevision { get; init; }
 }
 
 public sealed record RekallAgeGeometryMeshVertex(

@@ -61,7 +61,7 @@ public sealed class RekallAgeOpenXrSoftwareSceneFrameRenderer
         var executionLoop = RekallAgeRuntimeExecutionLoop.CreateDefault(plan.ProjectRoot);
         var scene = await sceneStore.LoadAsync(plan.ProjectRoot, plan.SceneName, cancellationToken)
             .ConfigureAwait(false);
-        var world = worldBuilder.Build(scene);
+        var world = worldBuilder.Build(scene, plan.ProjectRoot);
         if (plan.SimulationStartFrame > 0)
         {
             world = (await executionLoop.RunAsync(

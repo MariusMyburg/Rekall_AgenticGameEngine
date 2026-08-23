@@ -460,7 +460,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             PlayerLog.Write($"Loaded playable module kind={playableGame.Kind}.");
         }
 
-        var initialWorld = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        var initialWorld = new RekallAgeRuntimeWorldBuilder().Build(scene, projectRoot);
         var runtimeLoop = RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
         var runResult = await runtimeLoop.RunAsync(initialWorld, 1, cancellationToken);
         var world = runResult.World;
@@ -1466,7 +1466,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     private void ApplySceneDocument(RekallAgeSceneDocument scene)
     {
-        var initialWorld = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        var initialWorld = new RekallAgeRuntimeWorldBuilder().Build(scene, _projectRoot);
         var runResult = _runtimeLoop.RunAsync(initialWorld, 1, CancellationToken.None)
             .AsTask()
             .GetAwaiter()

@@ -63,7 +63,7 @@ public sealed class RekallAgeRuntimeSnapshotService
         CancellationToken cancellationToken)
     {
         var scene = await _sceneStore.LoadAsync(projectRoot, sceneName, cancellationToken);
-        var world = _worldBuilder.Build(scene);
+        var world = _worldBuilder.Build(scene, projectRoot);
         if (frames <= 0)
         {
             return world;

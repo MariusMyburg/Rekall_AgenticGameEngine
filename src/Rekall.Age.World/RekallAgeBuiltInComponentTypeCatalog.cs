@@ -28,6 +28,7 @@ public static class RekallAgeBuiltInComponentTypeCatalog
         "Rekall.NetworkTransform",
         "Rekall.GeometryPrimitive",
         "Rekall.GeometryMesh",
+        "Rekall.MeshAssetReference",
         "Rekall.LineSegments",
         "Rekall.GeometryExtrusion",
         "Rekall.Material",

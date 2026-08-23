@@ -7,7 +7,7 @@ namespace Rekall.Age.Runtime;
 
 public sealed class RekallAgeRuntimeWorldBuilder
 {
-    public RekallAgeRuntimeWorld Build(RekallAgeSceneDocument scene)
+    public RekallAgeRuntimeWorld Build(RekallAgeSceneDocument scene, string? projectRoot = null)
     {
         var entities = scene.Entities
             .OrderBy(entity => entity.Name, StringComparer.Ordinal)
@@ -22,7 +22,10 @@ public sealed class RekallAgeRuntimeWorldBuilder
             TimeSpan.Zero,
             entities,
             RekallAgeRuntimeSubsystemViews.Empty,
-            Array.Empty<RekallAgeRuntimeObservation>());
+            Array.Empty<RekallAgeRuntimeObservation>())
+        {
+            ProjectRoot = string.IsNullOrWhiteSpace(projectRoot) ? null : Path.GetFullPath(projectRoot)
+        };
         return new RekallAgeRuntimeProjectionBuilder().Project(world);
     }
 

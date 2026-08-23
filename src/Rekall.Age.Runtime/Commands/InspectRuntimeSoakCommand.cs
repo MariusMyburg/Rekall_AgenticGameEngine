@@ -93,7 +93,7 @@ public sealed class InspectRuntimeSoakCommand
             request.ProjectRoot,
             request.SceneName,
             context.CancellationToken);
-        var initialWorld = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        var initialWorld = new RekallAgeRuntimeWorldBuilder().Build(scene, request.ProjectRoot);
         var world = initialWorld;
         using var loop = RekallAgeRuntimeExecutionLoop.CreateDefault(request.ProjectRoot);
         var checkpoints = new List<RuntimeSoakCheckpoint>();

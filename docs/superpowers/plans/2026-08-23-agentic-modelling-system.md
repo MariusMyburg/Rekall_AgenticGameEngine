@@ -69,11 +69,11 @@ then grow it into procedural geometry/material graphs and Studio modelling.
 
 ### Task 5: Render compiler and scene reference
 
-- [ ] Write failing ngon triangulation, corner UV split, hard-normal, tangent,
+- [x] Write failing ngon triangulation, corner UV split, hard-normal, tangent,
   material-surface, UInt32 index, and triangle-picking provenance tests.
-- [ ] Compile editable assets to immutable runtime meshes and current render
+- [x] Compile editable assets to immutable runtime meshes and current render
   buffers, retaining face/corner/point maps.
-- [ ] Add a generic scene component that references a mesh asset/evaluated
+- [x] Add a generic scene component that references a mesh asset/evaluated
   revision and material slots.
 - [ ] Adapt software/Vulkan/WebGPU, physics cooking, Studio viewport, inspection,
   and GLB paths through the common snapshot without a second renderer model.

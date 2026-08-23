@@ -36,7 +36,7 @@ public sealed class RekallAgeHeadlessRuntime
 
         var frameTime = TimeSpan.FromSeconds(1.0 / 60.0);
         var frames = Math.Max(1, (int)Math.Ceiling(duration.TotalSeconds / frameTime.TotalSeconds));
-        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene, projectRoot);
         using var loop = RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
 
         for (var frame = 0; frame < frames; frame++)

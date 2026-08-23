@@ -358,7 +358,15 @@ public sealed record RekallAgeRuntimeViewportShaderPipeline(
 
 public sealed record RekallAgeRuntimeViewportGeometryMesh(
     IReadOnlyList<RekallAgeRuntimeViewportGeometryVertex> Vertices,
-    IReadOnlyList<ushort> Indices);
+    IReadOnlyList<uint> Indices,
+    IReadOnlyList<RekallAgeRuntimeViewportTriangleProvenance>? TriangleProvenance = null);
+
+public sealed record RekallAgeRuntimeViewportTriangleProvenance(
+    int TriangleIndex,
+    ulong SourceFaceId,
+    IReadOnlyList<ulong> SourceCornerIds,
+    IReadOnlyList<ulong> SourcePointIds,
+    int SurfaceIndex);
 
 public sealed record RekallAgeRuntimeViewportGeometryVertex(
     double X,

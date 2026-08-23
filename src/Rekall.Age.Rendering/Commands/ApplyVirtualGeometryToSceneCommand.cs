@@ -128,7 +128,7 @@ public sealed class ApplyVirtualGeometryToSceneCommand
         RekallAgeSceneDocument scene,
         CancellationToken cancellationToken)
     {
-        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene, request.ProjectRoot);
         var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(
             world,
             request.Width,

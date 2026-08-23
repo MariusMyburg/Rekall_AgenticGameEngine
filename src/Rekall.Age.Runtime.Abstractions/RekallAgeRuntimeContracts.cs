@@ -13,6 +13,8 @@ public sealed record RekallAgeRuntimeWorld(
     IReadOnlyList<RekallAgeRuntimeObservation> Observations)
 {
     public IReadOnlyList<string> SystemsRun { get; init; } = Array.Empty<string>();
+
+    public string? ProjectRoot { get; init; }
 }
 
 public sealed record RekallAgeRuntimeEntity(

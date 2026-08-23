@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 06:02 Africa/Johannesburg
+Last verified: 2026-08-23 06:22 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -116,6 +116,24 @@ CLI/MCP/process selection passes 18/18, all with zero build warnings/errors.
 Every mesh result now also carries bounded canonical next-tool guidance for
 inspection, preview/apply, validation, and assertions. Task 4 is complete; the
 editable-mesh render compiler and scene asset reference are active next.
+
+Task 5 now has a verified runtime compiler and scene-reference slice. Strictly
+validated editable assets compile deterministically into immutable UInt32-indexed
+triangle snapshots with concave-ngon ear clipping, point/corner attribute splits,
+authored or generated normals, finite tangents, material surfaces, and stable
+face/corner/point provenance for every output triangle. The generic
+`Rekall.MeshAssetReference` component resolves a persistent asset and optional
+exact file revision through project-aware runtime worlds; software, Vulkan,
+WebGPU, OpenXR, headless inspection, Player, preview, GLB-consuming render
+frames, and Studio now receive that common geometry model. Resolution failures
+and stale revisions become coded viewport observations instead of silent blank
+geometry or render-loop crashes. Runtime viewport indices are UInt32 end to end,
+and triangle provenance remains attached for picking and repair loops. The
+focused compiler/render/legacy/Vulkan selection passes 38/38, the engine test
+project and Studio build with zero warnings/errors, and Player's changed source
+compiles cleanly. Physics cooking, material-surface draw expansion, explicit GLB
+acceptance, legacy migration, and physical visible evidence remain active Task 5
+work.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

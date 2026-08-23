@@ -8,6 +8,8 @@ namespace Rekall.Age.Rendering;
 
 public sealed class RekallAgeRuntimeRenderFrameBuilder
 {
+    private readonly RekallAgeCompiledMeshResolver _compiledMeshResolver = new();
+
     public RekallAgeRuntimeViewportFrame Build(
         RekallAgeRuntimeWorld world,
         int width,
@@ -65,9 +67,10 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             .ToArray();
         var activeCamera = cameras.FirstOrDefault(camera => camera.Active) ?? cameras.FirstOrDefault();
         var headsetCamera = cameras.FirstOrDefault(IsHeadsetCamera);
+        var meshObservations = new List<RekallAgeRuntimeViewportObservation>();
         var renderableCandidates = (debugOverlay
-            ? BuildRenderables(world, activeCamera, width, height).Concat(BuildColliderDebugRenderables(world))
-            : BuildRenderables(world, activeCamera, width, height))
+            ? BuildRenderables(world, activeCamera, width, height, meshObservations).Concat(BuildColliderDebugRenderables(world))
+            : BuildRenderables(world, activeCamera, width, height, meshObservations))
             .ToArray();
         var renderables = renderableCandidates
             .Where(renderable => RekallAgeRenderLayerMask.IncludesLayer(renderable.Layer, activeCamera?.CullingMask))
@@ -77,6 +80,16 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             .ToArray();
         var culling = BuildCullingDiagnostics(renderableCandidates, activeCamera);
         var cameraViews = BuildCameraViews(cameras, renderableCandidates, width, height);
+
+        var observations = world.Observations
+            .Select(observation => new RekallAgeRuntimeViewportObservation(
+                observation.Code,
+                observation.Severity,
+                observation.Subsystem,
+                observation.TargetName.Length > 0 ? observation.TargetName : observation.TargetId,
+                observation.Message))
+            .Concat(meshObservations)
+            .ToArray();
 
         return new RekallAgeRuntimeViewportFrame(
             world.SceneName,
@@ -88,15 +101,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             cameras,
             renderables,
             world.Subsystems.Rendering.UiLayers.Count,
-            new RekallAgeRuntimeViewportOverlay(debugOverlay, world.Observations.Count),
-            world.Observations
-                .Select(observation => new RekallAgeRuntimeViewportObservation(
-                    observation.Code,
-                    observation.Severity,
-                    observation.Subsystem,
-                    observation.TargetName.Length > 0 ? observation.TargetName : observation.TargetId,
-                    observation.Message))
-                .ToArray(),
+            new RekallAgeRuntimeViewportOverlay(debugOverlay, observations.Length),
+            observations,
             BuildStereoSettings(headsetCamera, width, height),
             BuildPostProcessStack(world))
         {
@@ -260,11 +266,12 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             eyes);
     }
 
-    private static IEnumerable<RekallAgeRuntimeViewportRenderable> BuildRenderables(
+    private IEnumerable<RekallAgeRuntimeViewportRenderable> BuildRenderables(
         RekallAgeRuntimeWorld world,
         RekallAgeRuntimeViewportCamera? activeCamera,
         int viewportWidth,
-        int viewportHeight)
+        int viewportHeight,
+        ICollection<RekallAgeRuntimeViewportObservation> meshObservations)
     {
         foreach (var sprite in world.Subsystems.Rendering.Sprites)
         {
@@ -308,6 +315,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 component.Type.Equals("Rekall.GeometryPrimitive", StringComparison.Ordinal));
             var geometryMeshComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.GeometryMesh", StringComparison.Ordinal));
+            var meshAssetReferenceComponent = entity?.Components.FirstOrDefault(component =>
+                component.Type.Equals("Rekall.MeshAssetReference", StringComparison.Ordinal));
             var lineSegmentsComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.LineSegments", StringComparison.Ordinal));
             var orbitComponent = entity?.Components.FirstOrDefault(component =>
@@ -387,7 +396,20 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 continue;
             }
 
-            var geometryMesh = orbitPathMesh ?? ringMesh ?? starfieldMesh ?? markerMesh ?? haloMesh ?? ReadGeometryMesh(geometryMeshComponent);
+            var compiledMeshResolution = _compiledMeshResolver.Resolve(world.ProjectRoot, meshAssetReferenceComponent);
+            if (compiledMeshResolution.IssueCode is not null)
+            {
+                meshObservations.Add(new RekallAgeRuntimeViewportObservation(
+                    compiledMeshResolution.IssueCode,
+                    "error",
+                    "rendering",
+                    mesh.EntityName,
+                    compiledMeshResolution.IssueMessage ?? "Editable mesh asset could not be resolved."));
+            }
+            var compiledMesh = compiledMeshResolution.Mesh;
+            var geometryMesh = orbitPathMesh ?? ringMesh ?? starfieldMesh ?? markerMesh ?? haloMesh
+                ?? compiledMesh?.Geometry
+                ?? ReadGeometryMesh(geometryMeshComponent);
             var lineSegments = isTextLabelRenderable
                 ? ReadTextLabelLineSegments(textLabelComponent, activeCamera, transform, viewportHeight)
                 : ReadLineSegments(lineSegmentsComponent);
@@ -988,7 +1010,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         RekallAgeRuntimeViewportGeometryMesh geometry)
     {
         var builder = new LineSegmentsBuilder(0.025);
-        var edges = new HashSet<(ushort A, ushort B)>();
+        var edges = new HashSet<(uint A, uint B)>();
         for (var index = 0; index + 2 < geometry.Indices.Count; index += 3)
         {
             AddEdge(edges, geometry.Indices[index], geometry.Indices[index + 1]);
@@ -998,8 +1020,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
 
         foreach (var (a, b) in edges)
         {
-            var from = geometry.Vertices[a];
-            var to = geometry.Vertices[b];
+            var from = geometry.Vertices[checked((int)a)];
+            var to = geometry.Vertices[checked((int)b)];
             builder.AddSegment(
                 new MeshVector3(from.X, from.Y, from.Z),
                 new MeshVector3(to.X, to.Y, to.Z));
@@ -1008,7 +1030,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         return builder.Build();
     }
 
-    private static void AddEdge(HashSet<(ushort A, ushort B)> edges, ushort a, ushort b)
+    private static void AddEdge(HashSet<(uint A, uint B)> edges, uint a, uint b)
     {
         edges.Add(a < b ? (a, b) : (b, a));
     }
@@ -1661,10 +1683,10 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             return null;
         }
 
-        var indices = new List<ushort>(indicesArray.Count);
+        var indices = new List<uint>(indicesArray.Count);
         foreach (var node in indicesArray)
         {
-            if (node is not JsonValue value || !TryReadUInt16(value, verticesArray.Count, out var index))
+            if (node is not JsonValue value || !TryReadUInt32(value, verticesArray.Count, out var index))
             {
                 return null;
             }
@@ -1702,7 +1724,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 ReadNumber(vertex, "v", 0)));
         }
 
-        if (vertices.Count == 0 || vertices.Count > ushort.MaxValue)
+        if (vertices.Count == 0)
         {
             return null;
         }
@@ -1737,7 +1759,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         var argumentOfPeriapsis = DegreesToRadians(ReadNumber(orbitComponent, "argumentOfPeriapsisDegrees", 0));
         var color = ParseColor(ReadString(orbitPathComponent, "color") ?? "#88aaff");
         var vertices = new List<RekallAgeRuntimeViewportGeometryVertex>(segments * 2);
-        var indices = new List<ushort>(segments * 6);
+        var indices = new List<uint>(segments * 6);
         var points = Enumerable.Range(0, segments)
             .Select(index =>
             {
@@ -1788,10 +1810,10 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
 
         for (var index = 0; index < segments; index++)
         {
-            var a = checked((ushort)(index * 2));
-            var b = checked((ushort)(index * 2 + 1));
-            var c = checked((ushort)(((index + 1) % segments) * 2));
-            var d = checked((ushort)(((index + 1) % segments) * 2 + 1));
+            var a = checked((uint)(index * 2));
+            var b = checked((uint)(index * 2 + 1));
+            var c = checked((uint)(((index + 1) % segments) * 2));
+            var d = checked((uint)(((index + 1) % segments) * 2 + 1));
             indices.Add(a);
             indices.Add(c);
             indices.Add(b);
@@ -1815,7 +1837,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         var segments = (int)Math.Clamp(ReadNumber(ringComponent, "segments", ReadNumber(ringComponent, "Segments", 192)), 16, 512);
         var color = ParseColor(ReadString(ringComponent, "color") ?? ReadString(ringComponent, "Color") ?? "#ffffffcc");
         var vertices = new List<RekallAgeRuntimeViewportGeometryVertex>(segments * 2);
-        var indices = new List<ushort>(segments * 6);
+        var indices = new List<uint>(segments * 6);
 
         for (var index = 0; index < segments; index++)
         {
@@ -1853,10 +1875,10 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
 
         for (var index = 0; index < segments; index++)
         {
-            var a = checked((ushort)(index * 2));
-            var b = checked((ushort)(index * 2 + 1));
-            var c = checked((ushort)(((index + 1) % segments) * 2));
-            var d = checked((ushort)(((index + 1) % segments) * 2 + 1));
+            var a = checked((uint)(index * 2));
+            var b = checked((uint)(index * 2 + 1));
+            var c = checked((uint)(((index + 1) % segments) * 2));
+            var d = checked((uint)(((index + 1) % segments) * 2 + 1));
             indices.Add(a);
             indices.Add(c);
             indices.Add(b);
@@ -1883,7 +1905,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         var color = ParseColor(ReadString(starfieldComponent, "color") ?? "#dce8ffff");
         var random = new Random(seed);
         var vertices = new List<RekallAgeRuntimeViewportGeometryVertex>(count * 4);
-        var indices = new List<ushort>(count * 6);
+        var indices = new List<uint>(count * 6);
 
         for (var i = 0; i < count; i++)
         {
@@ -1899,7 +1921,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             var up = Normalize(Cross(normal, right));
             var brightness = 0.45 + random.NextDouble() * random.NextDouble() * 0.95;
             var half = size * (0.35 + brightness * 0.85);
-            var baseIndex = checked((ushort)vertices.Count);
+            var baseIndex = checked((uint)vertices.Count);
             var r = Math.Clamp(color.R * brightness, 0, 1);
             var g = Math.Clamp(color.G * brightness, 0, 1);
             var b = Math.Clamp(color.B * brightness, 0, 1);
@@ -1909,11 +1931,11 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             AddStarVertex(vertices, Add(center, Add(Multiply(right, half), Multiply(up, half))), normal, r, g, b, color.A, 1, 1);
             AddStarVertex(vertices, Add(center, Add(Multiply(right, -half), Multiply(up, half))), normal, r, g, b, color.A, 0, 1);
             indices.Add(baseIndex);
-            indices.Add((ushort)(baseIndex + 1));
-            indices.Add((ushort)(baseIndex + 2));
+            indices.Add(baseIndex + 1);
+            indices.Add(baseIndex + 2);
             indices.Add(baseIndex);
-            indices.Add((ushort)(baseIndex + 2));
-            indices.Add((ushort)(baseIndex + 3));
+            indices.Add(baseIndex + 2);
+            indices.Add(baseIndex + 3);
         }
 
         return new RekallAgeRuntimeViewportGeometryMesh(vertices, indices);
@@ -1956,7 +1978,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         {
             new(0, verticalOffset, 0, 0, 1, 0, color.R, color.G, color.B, color.A, 0.5, 0.5)
         };
-        var indices = new List<ushort>(segments * 3 + Math.Max(0, rings - 1) * segments * 6);
+        var indices = new List<uint>(segments * 3 + Math.Max(0, rings - 1) * segments * 6);
         for (var ring = 1; ring <= rings; ring++)
         {
             var t = ring / (double)rings;
@@ -1986,8 +2008,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         for (var index = 0; index < segments; index++)
         {
             indices.Add(0);
-            indices.Add((ushort)(1 + index));
-            indices.Add((ushort)(1 + ((index + 1) % segments)));
+            indices.Add((uint)(1 + index));
+            indices.Add((uint)(1 + ((index + 1) % segments)));
         }
 
         for (var ring = 2; ring <= rings; ring++)
@@ -1997,10 +2019,10 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             for (var index = 0; index < segments; index++)
             {
                 var next = (index + 1) % segments;
-                var a = checked((ushort)(innerStart + index));
-                var b = checked((ushort)(outerStart + index));
-                var c = checked((ushort)(outerStart + next));
-                var d = checked((ushort)(innerStart + next));
+                var a = checked((uint)(innerStart + index));
+                var b = checked((uint)(outerStart + index));
+                var c = checked((uint)(outerStart + next));
+                var d = checked((uint)(innerStart + next));
                 indices.Add(a);
                 indices.Add(b);
                 indices.Add(c);
@@ -2172,7 +2194,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
 
     private static IReadOnlyList<RekallAgeRuntimeViewportGeometryVertex> CreateGeometryVertices(
         IReadOnlyList<ParsedGeometryVertex> vertices,
-        IReadOnlyList<ushort> indices)
+        IReadOnlyList<uint> indices)
     {
         var inferredNormals = InferNormals(vertices, indices);
         var result = new RekallAgeRuntimeViewportGeometryVertex[vertices.Count];
@@ -2200,7 +2222,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
 
     private static IReadOnlyList<MeshVector3> InferNormals(
         IReadOnlyList<ParsedGeometryVertex> vertices,
-        IReadOnlyList<ushort> indices)
+        IReadOnlyList<uint> indices)
     {
         var normals = Enumerable.Repeat(new MeshVector3(0, 0, 0), vertices.Count).ToArray();
         for (var i = 0; i + 2 < indices.Count; i += 3)
@@ -2208,15 +2230,15 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             var aIndex = indices[i];
             var bIndex = indices[i + 1];
             var cIndex = indices[i + 2];
-            var a = vertices[aIndex];
-            var b = vertices[bIndex];
-            var c = vertices[cIndex];
+            var a = vertices[checked((int)aIndex)];
+            var b = vertices[checked((int)bIndex)];
+            var c = vertices[checked((int)cIndex)];
             var normal = Normalize(Cross(
                 new MeshVector3(b.X - a.X, b.Y - a.Y, b.Z - a.Z),
                 new MeshVector3(c.X - a.X, c.Y - a.Y, c.Z - a.Z)));
-            normals[aIndex] = Add(normals[aIndex], normal);
-            normals[bIndex] = Add(normals[bIndex], normal);
-            normals[cIndex] = Add(normals[cIndex], normal);
+            normals[checked((int)aIndex)] = Add(normals[checked((int)aIndex)], normal);
+            normals[checked((int)bIndex)] = Add(normals[checked((int)bIndex)], normal);
+            normals[checked((int)cIndex)] = Add(normals[checked((int)cIndex)], normal);
         }
 
         for (var i = 0; i < normals.Length; i++)
@@ -2237,7 +2259,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         return inferred.LengthSquared <= 0.000001 ? new MeshVector3(0, 1, 0) : inferred;
     }
 
-    private static bool TryReadUInt16(JsonValue value, int vertexCount, out ushort index)
+    private static bool TryReadUInt32(JsonValue value, int vertexCount, out uint index)
     {
         index = 0;
         int integer;
@@ -2253,12 +2275,12 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             }
         }
 
-        if (integer < 0 || integer >= vertexCount || integer > ushort.MaxValue)
+        if (integer < 0 || integer >= vertexCount)
         {
             return false;
         }
 
-        index = (ushort)integer;
+        index = (uint)integer;
         return true;
     }
 

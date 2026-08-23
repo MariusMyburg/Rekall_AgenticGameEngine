@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 09:30 Africa/Johannesburg
+Last verified: 2026-08-23 09:34 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -139,6 +139,18 @@ known direct or transitive vulnerabilities, the modeling namespace passes
 binary. Attribute interpolation/provenance through split faces and broader
 adversarial Boolean fixtures remain open before this is called a complete
 Boolean system.
+
+Boolean results now carry two typed face-domain provenance attributes:
+`boolean.sourceOperand` (`a` or `b`) and `boolean.sourceFaceId` (the stable
+source-face ID encoded losslessly as a string). Their value counts are required
+to match result faces and the kernel wrapper fails if source metadata is lost.
+These engine-owned attributes are the only attributes accepted back into a
+subsequent Boolean; user-authored attributes and materials still fail closed.
+Boolean input conversion now reuses AGE's canonical deterministic ear-clipping
+compiler, which safely triangulates concave n-gons and prior Boolean faces with
+collinear T-junction split points. A two-stage union-then-frustum-difference
+graph proves that Boolean outputs remain composable, closed, valid, and expose
+fresh current-node provenance. The complete modeling namespace passes 97/97.
 
 The Blender-informed agentic modelling tranche is now the active implementation
 priority after the completed WebGPU and remaining Godot audits. A shallow,

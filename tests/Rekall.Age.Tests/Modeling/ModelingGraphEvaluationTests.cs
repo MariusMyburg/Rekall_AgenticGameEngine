@@ -305,6 +305,12 @@ public sealed class ModelingGraphEvaluationTests
         Assert.Equal(0, validation.Summary.NonManifoldEdgeCount);
         Assert.Equal(expectedMinX, validation.Summary.Bounds.Min.X, 6);
         Assert.Equal(expectedMaxX, validation.Summary.Bounds.Max.X, 6);
+        var sourceOperands = Assert.Single(result.Outputs["mesh"].Attributes, item => item.Name == "boolean.sourceOperand");
+        var sourceFaces = Assert.Single(result.Outputs["mesh"].Attributes, item => item.Name == "boolean.sourceFaceId");
+        Assert.Equal(validation.Summary.FaceCount, sourceOperands.Values.Count);
+        Assert.Equal(validation.Summary.FaceCount, sourceFaces.Values.Count);
+        Assert.All(sourceOperands.Values, value => Assert.Contains(value.GetString(), new[] { "a", "b" }));
+        Assert.All(sourceFaces.Values, value => Assert.True(ulong.TryParse(value.GetString(), out _)));
     }
 
     [Fact]
@@ -391,6 +397,42 @@ public sealed class ModelingGraphEvaluationTests
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Diagnostics, item => item.Code == "REKALL_MODELING_BOOLEAN_ATTRIBUTES_UNSUPPORTED" && item.NodeId == "boolean");
+    }
+
+    [Fact]
+    public async Task BooleanOutputCanFeedAnotherBooleanWithoutLosingCurrentNodeProvenance()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "boolean-chain", "Boolean Chain",
+            [
+                new("a", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("b", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("move-b", "rekall.modeling.transform", 1, new JsonObject { ["translation"] = new JsonArray(0.5, 0.0, 0.0) }),
+                new("c", "rekall.modeling.primitive.frustum", 1, new JsonObject { ["radiusBottom"] = 0.2, ["radiusTop"] = 0.2, ["depth"] = 2.0, ["segments"] = 12 }),
+                new("union", "rekall.modeling.boolean", 1, new JsonObject { ["operation"] = "union" }),
+                new("cut", "rekall.modeling.boolean", 1, new JsonObject { ["operation"] = "difference" }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("b-move", "b", "geometry", "move-b", "geometry"),
+                new("a-union", "a", "geometry", "union", "a"),
+                new("b-union", "move-b", "geometry", "union", "b"),
+                new("union-cut", "union", "geometry", "cut", "a"),
+                new("c-cut", "c", "geometry", "cut", "b"),
+                new("cut-output", "cut", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics.Select(item => $"{item.Code}: {item.Message}")));
+        var mesh = result.Outputs["mesh"];
+        var validation = new RekallAgeMeshValidator().Validate(mesh);
+        Assert.True(validation.IsValid);
+        Assert.Equal(0, validation.Summary.BoundaryEdgeCount);
+        Assert.All(Assert.Single(mesh.Attributes, item => item.Name == "boolean.sourceOperand").Values,
+            value => Assert.Contains(value.GetString(), new[] { "a", "b" }));
     }
 
     [Fact]

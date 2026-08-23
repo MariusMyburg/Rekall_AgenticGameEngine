@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+using System.Text.Json;
 using Csg = CSG.Sharp;
 using Rekall.Age.Modeling.Contracts;
 
@@ -22,8 +22,8 @@ public sealed partial class RekallAgeModelingGraphEvaluator
 
         try
         {
-            var csgA = ToCsg(meshA);
-            var csgB = ToCsg(meshB);
+            var csgA = ToCsg(meshA, "a");
+            var csgB = ToCsg(meshB, "b");
             var result = operation switch
             {
                 "union" => csgA.Union(csgB),
@@ -48,27 +48,24 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         var validation = new RekallAgeMeshValidator().Validate(mesh);
         if (!validation.IsValid || validation.Summary.BoundaryEdgeCount != 0 || validation.Summary.NonManifoldEdgeCount != 0 || validation.Summary.FaceCount == 0)
             throw new EvaluationException("REKALL_MODELING_BOOLEAN_INPUT_NOT_CLOSED_MANIFOLD", $"Boolean input {label} must be a non-empty, closed manifold surface.", nodeId);
-        if (mesh.Attributes.Count != 0 || mesh.MaterialSlots.Count != 0)
+        if (mesh.MaterialSlots.Count != 0 || mesh.Attributes.Any(attribute => attribute.Name is not ("boolean.sourceOperand" or "boolean.sourceFaceId")))
             throw new EvaluationException("REKALL_MODELING_BOOLEAN_ATTRIBUTES_UNSUPPORTED", $"Boolean input {label} contains attributes or materials that cannot yet be interpolated without data loss; apply them after the Boolean node.", nodeId);
     }
 
-    private static Csg.CSG ToCsg(RekallAgeMeshAsset source)
+    private static Csg.CSG ToCsg(RekallAgeMeshAsset source, string operand)
     {
-        var triangulated = new RekallAgeMeshOperationExecutor().Execute(
-            source,
-            new("triangulate_faces", RekallAgeGeometryDomain.Face, source.Topology.FaceIds, new JsonObject())).Mesh;
-        var polygons = new List<Csg.Polygon>(triangulated.Topology.FaceIds.Count);
-        for (var face = 0; face < triangulated.Topology.FaceIds.Count; face++)
+        var compiled = new RekallAgeMeshCompiler().Compile(source);
+        var polygons = new List<Csg.Polygon>(compiled.Triangles.Count);
+        for (var triangle = 0; triangle < compiled.Triangles.Count; triangle++)
         {
-            var start = triangulated.Topology.FaceOffsets[face];
-            var indices = Enumerable.Range(start, 3).Select(corner => triangulated.Topology.CornerPointIndices[corner]).ToArray();
-            var p0 = triangulated.Topology.Positions[indices[0]];
-            var p1 = triangulated.Topology.Positions[indices[1]];
-            var p2 = triangulated.Topology.Positions[indices[2]];
+            var indices = compiled.Indices.Skip(triangle * 3).Take(3).Select(index => checked((int)index)).ToArray();
+            var p0 = compiled.Vertices[indices[0]].Position;
+            var p1 = compiled.Vertices[indices[1]].Position;
+            var p2 = compiled.Vertices[indices[2]].Position;
             var normal = Unit(Cross(Subtract(p1, p0), Subtract(p2, p0)));
             polygons.Add(new(
-                indices.Select(index => new Csg.Vertex(ToCsgVector(triangulated.Topology.Positions[index]), ToCsgVector(normal))).ToArray(),
-                triangulated.Topology.FaceIds[face]));
+                indices.Select(index => new Csg.Vertex(ToCsgVector(compiled.Vertices[index].Position), ToCsgVector(normal))).ToArray(),
+                new BooleanFaceSource(operand, compiled.Triangles[triangle].SourceFaceId)));
         }
         return Csg.CSG.FromPolygons(polygons.ToArray());
     }
@@ -89,13 +86,19 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         var pointMap = new Dictionary<(long X, long Y, long Z), int>();
         var positions = new List<RekallAgeGeometryVector3>();
         var faces = new List<int[]>();
+        var sources = new List<BooleanFaceSource>();
         foreach (var polygon in polygons)
         {
             var face = polygon.Vertices.Select(vertex => Point(vertex.Pos)).ToList();
             for (var index = face.Count - 1; index > 0; index--)
                 if (face[index] == face[index - 1]) face.RemoveAt(index);
             if (face.Count > 1 && face[0] == face[^1]) face.RemoveAt(face.Count - 1);
-            if (face.Count >= 3) faces.Add(face.ToArray());
+            if (face.Count >= 3)
+            {
+                faces.Add(face.ToArray());
+                sources.Add(polygon.Shared as BooleanFaceSource
+                    ?? throw new EvaluationException("REKALL_MODELING_BOOLEAN_PROVENANCE_MISSING", "Boolean kernel output lost source-face provenance.", node.NodeId));
+            }
         }
 
         var boundarySegmentCount = faces.Sum(face => face.Length);
@@ -127,7 +130,18 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             Enumerable.Range(1, edges.Count).Select(value => (ulong)(10_000 + value)).ToArray(), edges,
             Enumerable.Range(1, faces.Count).Select(value => (ulong)(20_000 + value)).ToArray(), faceOffsets,
             Enumerable.Range(1, cornerPoints.Count).Select(value => (ulong)(30_000 + value)).ToArray(), cornerPoints, cornerEdges);
-        var mesh = RekallAgeMeshAsset.Create($"{graph.AssetId}.{node.NodeId}", node.NodeId, topology) with { Revision = graph.Revision };
+        var attributes = new[]
+        {
+            new RekallAgeGeometryAttribute(
+                "boolean.sourceOperand", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.String,
+                sources.Select(source => JsonSerializer.SerializeToElement(source.Operand)).ToArray(),
+                "boolean-source-operand", RekallAgeGeometryInterpolation.Nearest),
+            new RekallAgeGeometryAttribute(
+                "boolean.sourceFaceId", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.String,
+                sources.Select(source => JsonSerializer.SerializeToElement(source.FaceId.ToString(System.Globalization.CultureInfo.InvariantCulture))).ToArray(),
+                "boolean-source-face-id", RekallAgeGeometryInterpolation.Nearest)
+        };
+        var mesh = RekallAgeMeshAsset.Create($"{graph.AssetId}.{node.NodeId}", node.NodeId, topology, attributes) with { Revision = graph.Revision };
         var validation = new RekallAgeMeshValidator().Validate(mesh);
         if (!validation.IsValid || validation.Summary.BoundaryEdgeCount != 0 || validation.Summary.NonManifoldEdgeCount != 0)
             throw new EvaluationException(
@@ -183,4 +197,6 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         var length = Math.Sqrt(value.X * value.X + value.Y * value.Y + value.Z * value.Z);
         return new(value.X / length, value.Y / length, value.Z / length);
     }
+
+    private sealed record BooleanFaceSource(string Operand, ulong FaceId);
 }

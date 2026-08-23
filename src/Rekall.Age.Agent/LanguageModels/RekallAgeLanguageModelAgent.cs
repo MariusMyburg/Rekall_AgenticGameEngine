@@ -1310,9 +1310,11 @@ public sealed class RekallAgeLanguageModelAgent(
         IReadOnlyList<RekallAgeLanguageModelToolExecution> executions,
         int maxMessages)
     {
-        if (transcript.Count <= maxMessages)
+        var needsToolContinuationQuery = transcript.Count > 0
+            && transcript[^1].Role.Equals("tool", StringComparison.Ordinal);
+        if (transcript.Count + (needsToolContinuationQuery ? 1 : 0) <= maxMessages)
         {
-            return transcript.ToArray();
+            return AppendToolContinuationQuery(transcript, needsToolContinuationQuery);
         }
 
         var prefix = new List<RekallAgeLanguageModelMessage>(2);
@@ -1328,7 +1330,9 @@ public sealed class RekallAgeLanguageModelAgent(
             prefix.Add(firstUserMessage);
         }
 
-        var tailCapacity = Math.Max(0, maxMessages - prefix.Count - 1);
+        var tailCapacity = Math.Max(
+            0,
+            maxMessages - prefix.Count - 1 - (needsToolContinuationQuery ? 1 : 0));
         var tail = tailCapacity == 0
             ? []
             : transcript.Skip(transcript.Count - tailCapacity).ToArray();
@@ -1342,11 +1346,21 @@ public sealed class RekallAgeLanguageModelAgent(
             tail = tail[firstCompleteMessage..];
         }
 
-        return prefix
+        var context = prefix
             .Append(CreateLedgerMessage(executions))
             .Concat(tail)
             .ToArray();
+        return AppendToolContinuationQuery(context, needsToolContinuationQuery);
     }
+
+    private static IReadOnlyList<RekallAgeLanguageModelMessage> AppendToolContinuationQuery(
+        IReadOnlyList<RekallAgeLanguageModelMessage> context,
+        bool required) =>
+        required
+            ? context.Append(new RekallAgeLanguageModelMessage(
+                "user",
+                "Use the immediately preceding tool result(s) and persistent tool ledger to continue the original task. Take the single next concrete repair or verification action; do not restart or merely summarize the work.")).ToArray()
+            : context.ToArray();
 
     private static RekallAgeLanguageModelMessage CreateLedgerMessage(
         IReadOnlyList<RekallAgeLanguageModelToolExecution> executions)

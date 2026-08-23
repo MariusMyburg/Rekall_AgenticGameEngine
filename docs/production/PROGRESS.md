@@ -8,6 +8,24 @@ Last verified: 2026-08-23 05:00 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
+The Blender-informed agentic modelling tranche is now the active implementation
+priority after the completed WebGPU and remaining Godot audits. A shallow,
+blobless, sparse Blender reference checkout is pinned at
+`4641b05b1687912ec97d021f12c1076aba3b90ae`; no GPL source is copied. The audit
+establishes that AGE's current packed triangle commands are render ingestion,
+not a modelling system. The accepted architecture introduces persistent mesh
+assets with stable point/edge/face/corner identities, typed domain attributes,
+revision-safe semantic operations, strict validation, provenance/diffs,
+immutable evaluated snapshots, and a deterministic compiler into the existing
+render/physics/GLB/Studio paths. Procedural geometry and semantic material
+graphs will share that substrate and expose one canonical descriptor surface to
+C#, CLI, MCP, Studio, prompts, and documentation. Community Blender MCP research
+reinforces a closed inspect/mutate/viewport-evidence loop, while AGE deliberately
+uses bounded typed operations instead of arbitrary remote scripting as the
+normal path. The design, source audit, first acceptance gate, and staged
+test-driven implementation plan are recorded in the 2026-08-23 modelling docs;
+Task 1 (contracts and strict topology validation) is next.
+
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,
 and a zero-warning, zero-error Release solution build. The Studio ergonomics

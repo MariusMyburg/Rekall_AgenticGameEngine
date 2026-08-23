@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 10:00 Africa/Johannesburg
+Last verified: 2026-08-23 10:05 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -38,6 +38,17 @@ box from two to four world units, advances logical/file revisions, records one
 transaction, and then observes both reachable nodes invalidated on reevaluation.
 The focused graph-session selection passes 4/4. Typed graph-patch controls and
 the visual node canvas remain the next Studio authoring slice.
+
+The modeling/Studio tranche is now fast-forwarded onto local `master` through
+`8b34093`. Integration validation found and repaired two stale transitive lock
+graphs: the Windows and Web players now include the modelling project's
+`SamuelRe.CSG.Sharp` dependency and a solution-wide locked restore succeeds.
+The merged checkout's complete Studio suite passes 34/34. A broader modelling
+test build exhausted the F: volume while copying reproducible CLI runtime
+outputs, not while executing tests; those build outputs were cleaned safely.
+The existing focused modelling evidence remains 100/100 from the feature
+worktree, and the full merged-checkout modelling rerun remains queued once
+adequate build space is available.
 
 The first optimization primitive is verified across every canonical modeling
 composition path. `merge_by_distance` welds selected points through a bounded,

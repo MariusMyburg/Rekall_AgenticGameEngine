@@ -126,7 +126,11 @@ function Assert-WebGpuEvidence([object]$Evidence) {
     if ((Get-RequiredProperty $Evidence 'workloadId' 'Evidence') -cne $ExpectedWorkloadId) { throw "Evidence workloadId must be exactly '$ExpectedWorkloadId'." }
     [void](Assert-Integer (Get-RequiredProperty $Evidence 'submittedFrames' 'Evidence') 'Evidence submittedFrames' 1 ([int]::MaxValue))
 
-    $diagnostics = @(Get-RequiredProperty $Evidence 'diagnostics' 'Evidence')
+    $diagnosticsProperty = $Evidence.PSObject.Properties['diagnostics']
+    if ($null -eq $diagnosticsProperty -or $null -eq $diagnosticsProperty.Value -or $diagnosticsProperty.Value -isnot [Array]) {
+        throw 'Evidence diagnostics must be a JSON array.'
+    }
+    $diagnostics = $diagnosticsProperty.Value
     if ($diagnostics.Count -ne 0) { throw 'Evidence diagnostics must be empty.' }
 
     $proof = Get-RequiredProperty $Evidence 'pixelProof' 'Evidence'
@@ -155,7 +159,11 @@ function Assert-WebGpuEvidence([object]$Evidence) {
 }
 
 function Assert-BrowserLog([object]$Log) {
-    $entries = if ($Log -is [Array]) { @($Log) } else { @(Get-RequiredProperty $Log 'entries' 'Browser log') }
+    $entriesProperty = $Log.PSObject.Properties['entries']
+    if ($null -eq $entriesProperty -or $null -eq $entriesProperty.Value -or $entriesProperty.Value -isnot [Array]) {
+        throw 'Browser log entries must be a JSON array.'
+    }
+    $entries = $entriesProperty.Value
     if ($entries.Count -gt $MaximumLogEntries) { throw "Browser log has more than $MaximumLogEntries entries." }
     foreach ($entry in $entries) {
         $level = [string](Get-RequiredProperty $entry 'level' 'Browser log entry')
@@ -369,6 +377,66 @@ function Invoke-SelfTest() {
         }
     }
     Assert-WebGpuEvidence $valid
+    $literalEvidenceJson = $valid | ConvertTo-Json -Depth 8 -Compress
+    if ($literalEvidenceJson -notmatch '"diagnostics":\[\]') { throw 'Self-test did not produce literal empty diagnostics JSON.' }
+    Assert-WebGpuEvidence ($literalEvidenceJson | ConvertFrom-Json)
+    Assert-BrowserLog ('{"entries":[]}' | ConvertFrom-Json)
+
+    $selfTestRoot = Join-Path $ExplicitTempRoot ('rekall-webgpu-acceptance-self-test-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $selfTestRoot -Force | Out-Null
+    $previousSessionPath = $script:SessionPath
+    $previousEvidencePath = $script:EvidencePath
+    $previousBrowserLogPath = $script:BrowserLogPath
+    $previousScreenshotMetadataPath = $script:ScreenshotMetadataPath
+    try {
+        $selfTestEvidencePath = Join-Path $selfTestRoot 'browser-evidence.json'
+        $selfTestLogPath = Join-Path $selfTestRoot 'browser-log.json'
+        $selfTestScreenshotPath = Join-Path $selfTestRoot 'browser-screenshot.png'
+        $selfTestScreenshotMetadataPath = Join-Path $selfTestRoot 'browser-screenshot.json'
+        $selfTestSessionPath = Join-Path $selfTestRoot 'acceptance-session.json'
+        [IO.File]::WriteAllText($selfTestEvidencePath, $literalEvidenceJson, [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText($selfTestLogPath, '{"entries":[]}', [Text.UTF8Encoding]::new($false))
+        $screenshotBytes = [byte[]]::new(128)
+        ([byte[]]@(137, 80, 78, 71, 13, 10, 26, 10)).CopyTo($screenshotBytes, 0)
+        [IO.File]::WriteAllBytes($selfTestScreenshotPath, $screenshotBytes)
+        $screenshotMetadata = [ordered]@{ path = $selfTestScreenshotPath; mimeType = 'image/png'; bytes = $screenshotBytes.Length; sha256 = (Get-FileHash -LiteralPath $selfTestScreenshotPath -Algorithm SHA256).Hash }
+        [IO.File]::WriteAllText($selfTestScreenshotMetadataPath, ($screenshotMetadata | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+        $session = [ordered]@{ schemaVersion = 1; outputRoot = $selfTestRoot; url = 'http://127.0.0.1:1/'; serverPid = [int]::MaxValue; serverStartTicks = 0 }
+        [IO.File]::WriteAllText($selfTestSessionPath, ($session | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+        $script:SessionPath = $selfTestSessionPath
+        $script:EvidencePath = $selfTestEvidencePath
+        $script:BrowserLogPath = $selfTestLogPath
+        $script:ScreenshotMetadataPath = $selfTestScreenshotMetadataPath
+        $selfTestFinalize = Invoke-Finalize | ConvertFrom-Json
+        if ($selfTestFinalize.acceptance -ne 'validated-browser-supplied-evidence') { throw 'Self-test did not finalize literal empty evidence arrays.' }
+    }
+    finally {
+        $script:SessionPath = $previousSessionPath
+        $script:EvidencePath = $previousEvidencePath
+        $script:BrowserLogPath = $previousBrowserLogPath
+        $script:ScreenshotMetadataPath = $previousScreenshotMetadataPath
+        if (Test-Path -LiteralPath $selfTestRoot) { Remove-Item -LiteralPath $selfTestRoot -Recurse -Force }
+    }
+
+    $rejected = $false
+    try { Assert-WebGpuEvidence (($literalEvidenceJson -replace '"diagnostics":\[\]', '"diagnostics":null') | ConvertFrom-Json) } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Self-test expected null diagnostics to be rejected.' }
+    $rejected = $false
+    try { Assert-WebGpuEvidence (($literalEvidenceJson -replace '"diagnostics":\[\]', '"diagnostics":{}') | ConvertFrom-Json) } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Self-test expected scalar diagnostics to be rejected.' }
+    $rejected = $false
+    try { Assert-WebGpuEvidence (($literalEvidenceJson -replace '"diagnostics":\[\]', '"diagnostics":[{"code":"REKALL_WEBGPU_TEST","message":"failure"}]') | ConvertFrom-Json) } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Self-test expected nonempty diagnostics to be rejected.' }
+    $rejected = $false
+    try { Assert-BrowserLog ('{"entries":null}' | ConvertFrom-Json) } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Self-test expected null browser log entries to be rejected.' }
+    $rejected = $false
+    try { Assert-BrowserLog ('{"entries":{}}' | ConvertFrom-Json) } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Self-test expected scalar browser log entries to be rejected.' }
+    $rejected = $false
+    try { Assert-BrowserLog ('{"entries":[{"level":"error","text":"failure"}]}' | ConvertFrom-Json) } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Self-test expected error-level literal browser log entries to be rejected.' }
+
     $invalid = $valid | ConvertTo-Json -Depth 8 | ConvertFrom-Json
     $invalid.pixelProof.samples.cyan.g = 1
     $rejected = $false

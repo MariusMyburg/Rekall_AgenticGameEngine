@@ -14,7 +14,16 @@ public sealed record RekallAgeAssetDocument(
     public RekallAgeTextureMetadata? TextureMetadata { get; init; }
 
     public RekallAgeAssetProvenance? Provenance { get; init; }
+
+    public RekallAgeModelAssetCatalogMetadata? ModelAssetMetadata { get; init; }
 }
+
+public sealed record RekallAgeModelAssetCatalogMetadata(
+    string ModelDocumentPath,
+    string SourceKind,
+    string SourceAssetId,
+    string CompiledOutputPath,
+    string CompiledContentHash);
 
 public sealed record RekallAgeAssetProvenance(
     string OriginalUrl,

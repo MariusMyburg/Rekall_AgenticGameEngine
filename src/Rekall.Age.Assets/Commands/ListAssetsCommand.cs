@@ -14,7 +14,7 @@ public sealed class ListAssetsCommand : IRekallAgeCommand<ListAssetsRequest, Lis
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Lists imported project assets from the Rekall AGE asset catalog.",
+        "Lists imported project assets from the Rekall AGE asset catalog. Model Asset entries retain the generic catalog shape and may include compact source/output metadata without embedding their editable Model Asset document.",
         typeof(ListAssetsRequest).FullName!,
         typeof(ListAssetsResult).FullName!);
 

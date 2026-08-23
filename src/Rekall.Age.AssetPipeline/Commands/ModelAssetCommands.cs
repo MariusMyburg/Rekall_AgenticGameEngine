@@ -28,6 +28,21 @@ public sealed record ModelAssetInspectionCommandResult(
     RekallAgeModelAssetInspection? Inspection,
     IReadOnlyList<string> NextActions);
 
+public sealed record ListModelAssetsRequest(string ProjectRoot);
+
+public sealed record ModelAssetListItem(
+    string AssetId,
+    string? ModelDocumentPath,
+    RekallAgeModelBuildState BuildState,
+    bool CompiledOutputExists,
+    string? ActualCompiledContentHash,
+    IReadOnlyList<RekallAgeModelBuildDiagnostic> Diagnostics,
+    bool DiagnosticsTruncated);
+
+public sealed record ListModelAssetsResult(
+    IReadOnlyList<ModelAssetListItem> Assets,
+    bool Truncated);
+
 public sealed class PublishModelAssetCommand
     : IRekallAgeCommand<PublishModelAssetRequest, ModelAssetMutationCommandResult>
 {
@@ -194,6 +209,111 @@ public sealed class InspectModelAssetCommand
                 [mapped]);
         }
     }
+}
+
+public sealed class ListModelAssetsCommand
+    : IRekallAgeCommand<ListModelAssetsRequest, ListModelAssetsResult>
+{
+    public const int MaximumAssets = 8;
+    private const int MaximumDiagnosticsPerAsset = 4;
+    private readonly RekallAgeModelAssetStore _modelStore;
+    private readonly RekallAgeModelPublishingService _service;
+
+    public ListModelAssetsCommand()
+        : this(new RekallAgeModelAssetStore(), new RekallAgeModelPublishingService())
+    {
+    }
+
+    public ListModelAssetsCommand(
+        RekallAgeModelAssetStore modelStore,
+        RekallAgeModelPublishingService service)
+    {
+        _modelStore = modelStore ?? throw new ArgumentNullException(nameof(modelStore));
+        _service = service ?? throw new ArgumentNullException(nameof(service));
+    }
+
+    public string Name => "rekall.asset.model.list";
+
+    public RekallAgeCommandSchema Schema => new(
+        Name,
+        "Lists up to 8 live-linked Model Assets in deterministic asset-ID order. Each compact item reports non-mutating dependency health, retained-output evidence, and bounded diagnostics without embedding the Model Asset document.",
+        typeof(ListModelAssetsRequest).FullName!,
+        typeof(ListModelAssetsResult).FullName!);
+
+    public async ValueTask<RekallAgeCommandResult<ListModelAssetsResult>> ExecuteAsync(
+        ListModelAssetsRequest request,
+        RekallAgeCommandContext context)
+    {
+        if (request is null)
+        {
+            return Failure(new ArgumentNullException(nameof(request)), "request");
+        }
+
+        try
+        {
+            var assetIds = _modelStore.ListAssetIds(request.ProjectRoot);
+            var selectedAssetIds = assetIds.Take(MaximumAssets + 1).ToArray();
+            var assets = new List<ModelAssetListItem>(Math.Min(selectedAssetIds.Length, MaximumAssets));
+            foreach (var assetId in selectedAssetIds.Take(MaximumAssets))
+            {
+                assets.Add(await InspectItemAsync(request.ProjectRoot, assetId, context.CancellationToken).ConfigureAwait(false));
+            }
+
+            return RekallAgeCommandResult<ListModelAssetsResult>.Success(
+                new(assets, selectedAssetIds.Length > MaximumAssets),
+                $"Loaded {assets.Count} of {assetIds.Count} Model Asset(s).");
+        }
+        catch (Exception error) when (ModelAssetCommandErrors.IsKnown(error))
+        {
+            return Failure(error, request.ProjectRoot);
+        }
+    }
+
+    private async ValueTask<ModelAssetListItem> InspectItemAsync(
+        string projectRoot,
+        string assetId,
+        CancellationToken cancellationToken)
+    {
+        string? documentPath = null;
+        try
+        {
+            documentPath = ToProjectRelativePath(projectRoot, _modelStore.GetModelPath(projectRoot, assetId));
+            var inspection = await _service.InspectAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+            var diagnostics = inspection.Diagnostics.Take(MaximumDiagnosticsPerAsset).ToArray();
+            return new(
+                assetId,
+                documentPath,
+                inspection.BuildState,
+                inspection.CompiledOutputExists,
+                inspection.ActualCompiledContentHash,
+                diagnostics,
+                diagnostics.Length < inspection.Diagnostics.Count);
+        }
+        catch (Exception error) when (ModelAssetCommandErrors.IsKnown(error))
+        {
+            var mapped = ModelAssetCommandErrors.Map(error, assetId, assetId);
+            return new(
+                assetId,
+                documentPath,
+                RekallAgeModelBuildState.Failed,
+                false,
+                null,
+                [new(mapped.Code, "Error", mapped.Message, mapped.Target)],
+                false);
+        }
+    }
+
+    private static RekallAgeCommandResult<ListModelAssetsResult> Failure(Exception error, string target)
+    {
+        var mapped = ModelAssetCommandErrors.Map(error, target, target);
+        return RekallAgeCommandResult<ListModelAssetsResult>.Failure(
+            new([], false),
+            mapped.Message,
+            [mapped]);
+    }
+
+    private static string ToProjectRelativePath(string projectRoot, string path) =>
+        Path.GetRelativePath(Path.GetFullPath(projectRoot), Path.GetFullPath(path)).Replace('\\', '/');
 }
 
 internal static class ModelAssetCommandErrors

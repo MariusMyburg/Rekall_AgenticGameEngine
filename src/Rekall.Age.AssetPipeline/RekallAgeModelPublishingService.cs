@@ -148,7 +148,15 @@ public sealed class RekallAgeModelPublishingService
                 "model",
                 Path.GetFullPath(_meshStore.GetMeshPath(projectRoot, request.Source.AssetId)),
                 Path.GetFullPath(outputPath),
-                staged.ContentHash);
+                staged.ContentHash)
+            {
+                ModelAssetMetadata = new RekallAgeModelAssetCatalogMetadata(
+                    ToProjectRelativePath(projectRoot, modelPath),
+                    request.Source.Kind.ToString(),
+                    request.Source.AssetId,
+                    staged.RelativeFinalPath,
+                    staged.ContentHash)
+            };
 
             outputMutation.RecordWrite(await _outputStore.CommitStagedIfRevisionAsync(
                 projectRoot,
@@ -568,6 +576,9 @@ public sealed class RekallAgeModelPublishingService
 
     private static StringComparison PathComparison =>
         OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+    private static string ToProjectRelativePath(string projectRoot, string path) =>
+        Path.GetRelativePath(Path.GetFullPath(projectRoot), Path.GetFullPath(path)).Replace('\\', '/');
 
     private sealed class ModelPublicationMutation(
         string path,

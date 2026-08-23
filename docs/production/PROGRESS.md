@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 08:00 Africa/Johannesburg
+Last verified: 2026-08-23 08:14 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -341,6 +341,26 @@ overrides and stale graph revisions publish nothing. The focused material suite
 passes 7/7. Ordered generic modifier descriptors/evaluation are active next;
 physical WebGPU material rendering and richer PBR integration remain required
 before the material path is considered visually complete.
+
+The ordered modifier foundation is now implemented over the same editable mesh
+kernel. Versioned descriptors initially expose transform, triangulate, and
+region-extrude with generic parameters, possible-change masks, deterministic
+flags, and explicit unknown-attribute preservation/loss policy. Persistent
+stacks bind to an exact source-mesh SHA-256 revision and carry stable ordered
+modifier identities, enable state, and typed parameters. Evaluation is
+immutable, budgeted, cancellation-aware, and content-addressed per step; an
+unchanged repeat hits both cached steps, while editing only a downstream
+modifier retains the upstream hit and reports one exact invalidation. Named
+selection sets or complete generic point/face domains drive operations without
+genre assumptions. Atomic 1-256 operation patches add, remove, reorder,
+configure, enable/disable, or retarget a source in memory, validate the complete
+candidate, capture a transaction preimage, and publish only against the exact
+stack file revision. Preview evaluation writes no target. Bake verifies the
+source dependency revision, evaluates the stack, then publishes through the
+ordinary strict mesh store with target revision protection and transaction
+evidence. The five modifier evaluation/persistence/patch/preview/bake proofs
+pass. A bounded command/MCP surface and the broader topology/UV/boolean/
+subdivision/remesh/optimization inventory remain active.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

@@ -110,7 +110,7 @@ then grow it into procedural geometry/material graphs and Studio modelling.
   Vulkan/WebGPU compilers with node/port source mapping.
 - [x] Add initial constant/coordinate/mapping/texture/math/mix/normal/PBR/
   emissive/output nodes.
-- [ ] Add ordered modifier descriptors, immutable evaluation, cache identity,
+- [x] Add ordered modifier descriptors, immutable evaluation, cache identity,
   attribute-propagation policy, preview, reorder, configure, and bake.
 - [ ] Expand generic topology, UV, boolean, subdivision, remesh, and optimization
   operations only behind strict tests.

@@ -9,6 +9,52 @@ namespace Rekall.Age.Tests.Runtime;
 public sealed class RuntimeUiTests
 {
     [Fact]
+    public async Task UiCanvasAndLabelOnSameEntityUseAuthoredLabelBounds()
+    {
+        var hud = RekallAgeEntityDocument.Create("HUD", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject
+                {
+                    ["ReferenceWidth"] = 1920,
+                    ["ReferenceHeight"] = 1080,
+                    ["Layer"] = 10,
+                    ["LayoutDirection"] = "vertical",
+                    ["PaddingLeft"] = 24,
+                    ["PaddingTop"] = 24,
+                    ["Gap"] = 12
+                }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Label",
+                new JsonObject
+                {
+                    ["X"] = 1400,
+                    ["Y"] = 84,
+                    ["Width"] = 520,
+                    ["Height"] = 48,
+                    ["Text"] = "GOAL AHEAD"
+                }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["ui"]).AddEntity(hud);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(new RekallAgeRuntimeWorldBuilder().Build(scene), 1, CancellationToken.None);
+
+        var element = Assert.Single(result.World.Subsystems.Ui.Elements);
+        Assert.Equal(hud.Id, element.Layout!.CanvasEntityId);
+        Assert.Equal(1400, element.Layout.X);
+        Assert.Equal(84, element.Layout.Y);
+        Assert.Equal(520, element.Layout.Width);
+        Assert.Equal(48, element.Layout.Height);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(result.World, 1920, 1080, debugOverlay: false);
+        var visual = Assert.Single(frame.Renderables, renderable => renderable.UiVisual is not null).UiVisual!;
+        Assert.Equal(1400, visual.X);
+        Assert.Equal(84, visual.Y);
+        Assert.Equal(520, visual.Width);
+        Assert.Equal(48, visual.Height);
+    }
+
+    [Fact]
     public async Task UiRuntimeReadsPublishedPascalCaseComponentProperties()
     {
         var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])

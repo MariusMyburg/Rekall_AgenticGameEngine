@@ -38,24 +38,28 @@ public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
                 return cached;
             }
 
-            if (canvasById.TryGetValue(entityId, out var canvas))
-            {
-                return canvas;
-            }
-
             if (!entitiesById.TryGetValue(entityId, out var entity) || !resolving.Add(entityId))
             {
                 return null;
             }
 
             var element = entity.Components.FirstOrDefault(component => ElementTypes.Contains(component.Type, StringComparer.Ordinal));
-            if (element is null || defaultCanvas is null)
+            if (element is null)
+            {
+                resolving.Remove(entityId);
+                return canvasById.GetValueOrDefault(entityId);
+            }
+            if (defaultCanvas is null)
             {
                 resolving.Remove(entityId);
                 return null;
             }
 
-            var parent = entity.ParentId is not null ? Resolve(entity.ParentId) : defaultCanvas;
+            var parent = canvasById.GetValueOrDefault(entityId);
+            if (parent is null && entity.ParentId is not null)
+            {
+                parent = canvasById.GetValueOrDefault(entity.ParentId) ?? Resolve(entity.ParentId);
+            }
             parent ??= defaultCanvas;
             var parentEntity = entitiesById.GetValueOrDefault(entity.ParentId ?? parent.CanvasEntityId);
             var container = parentEntity?.Components.FirstOrDefault(component =>

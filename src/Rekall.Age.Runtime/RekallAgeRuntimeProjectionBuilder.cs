@@ -891,7 +891,10 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             "Rekall.PointLight" or
             "Rekall.DirectionalLight" or
             "Rekall.UiCanvas" or
+            "Rekall.Button" or
             "Rekall.Image" or
+            "Rekall.Label" or
+            "Rekall.Panel" or
             "Rekall.UiElement";
     }
 

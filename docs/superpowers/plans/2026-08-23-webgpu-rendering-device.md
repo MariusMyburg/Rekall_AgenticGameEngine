@@ -411,7 +411,7 @@ Review protocol bounds, rollback, browser object lifecycle, resource-kind
 mapping, WGSL layout compatibility, readback row alignment, device loss, and
 claim wording. Rerun affected tests and browser acceptance after every fix.
 
-- [ ] **Step 6: Commit and push**
+- [x] **Step 6: Commit and push**
 
 ```powershell
 git add eng/accept-webgpu-player.ps1 docs README.md src tests Rekall.Age.sln

@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 20:21 Africa/Johannesburg
+Last verified: 2026-08-23 20:26 Africa/Johannesburg
 
 Branch: `codex/genuine-web-publishing`
 
@@ -52,6 +52,18 @@ invoke a publication command, load the manifest/scene in the browser, create a
 runtime world from the generated registrations, bridge browser input, or render
 that world. The current Web page remains the WebGPU contract proof and does not
 claim browser game playability.
+
+Windows graphics packages now launch the authored runtime scene directly and
+no longer append the misleading legacy `--playable` flag. For compatibility,
+that obsolete flag also selects the canonical runtime; the CPU-raster proof
+adapter is available only through the explicit `--legacy-playable-adapter`
+diagnostic option. Held keyboard, mouse, controller, and semantic-action state
+now persists across fixed-step catch-up ticks while transient press/release
+edges and deltas are cleared, so gameplay input is not render-rate dependent
+after a hitch. The focused player/package/input selection passes 19/19, the
+Windows player Release build has zero warnings/errors, and a real three-frame
+Clockwork Canopy launch through the obsolete flag loaded 25 runtime renderables,
+loaded no legacy adapter, and exited normally.
 
 The runtime UI projection now respects entity visibility for Label, Button,
 Panel, Image, UiElement, and UiCanvas visuals. A single entity may intentionally

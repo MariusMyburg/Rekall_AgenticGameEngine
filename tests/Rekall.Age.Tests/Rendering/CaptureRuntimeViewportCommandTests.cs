@@ -303,6 +303,122 @@ public sealed class CaptureRuntimeViewportCommandTests
     }
 
     [Fact]
+    public async Task CaptureRuntimeViewportCommandWarnsWhenCameraFacesAwayFromSpatialContent()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["z"] = 8,
+                    ["yaw"] = 0
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["nearClip"] = 0.05,
+                    ["farClip"] = 100
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("World Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = 0,
+                    ["y"] = 0,
+                    ["z"] = 0
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+                {
+                    ["primitive"] = "cube",
+                    ["color"] = "#4fc3e8"
+                })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 0, Path.Combine(root, "Viewport"), 320, 180, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("camera faces away"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains(
+            "REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT",
+            result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.Contains(result.Value.LayoutDiagnostics.AuthoringHints, hint =>
+            hint.Contains("+Z", StringComparison.Ordinal)
+            && hint.Contains("yaw 180", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task CaptureRuntimeViewportCommandDoesNotWarnWhenSpatialContentIsInFrontOfCamera()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["z"] = 8,
+                    ["yaw"] = 180
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["nearClip"] = 0.05,
+                    ["farClip"] = 100
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("World Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["z"] = 0
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+                {
+                    ["primitive"] = "cube",
+                    ["color"] = "#4fc3e8"
+                })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 0, Path.Combine(root, "Viewport"), 320, 180, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("camera sees content"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.DoesNotContain(
+            "REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT",
+            result.Value.LayoutDiagnostics.WarningCodes);
+    }
+
+    [Fact]
+    public async Task CaptureRuntimeViewportCommandDoesNotCallContentBeyondFarClipFacingAway()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["nearClip"] = 0.05,
+                    ["farClip"] = 100
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Distant Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["z"] = 200
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+                {
+                    ["primitive"] = "cube"
+                })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 0, Path.Combine(root, "Viewport"), 320, 180, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("content beyond far clip"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.DoesNotContain(
+            "REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT",
+            result.Value.LayoutDiagnostics.WarningCodes);
+    }
+
+    [Fact]
     public async Task CaptureRuntimeViewportCommandWarnsWhenAPlaneIsEdgeOnToTheActiveCamera()
     {
         var root = TestPaths.CreateTempDirectory();

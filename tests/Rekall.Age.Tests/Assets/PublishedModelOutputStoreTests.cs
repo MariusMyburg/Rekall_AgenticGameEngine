@@ -156,6 +156,51 @@ public sealed class PublishedModelOutputStoreTests
     }
 
     [Fact]
+    public async Task WriteStagedAsyncRejectsTriangleSourcePointIdsThatDisagreeWithItsVertices()
+    {
+        var store = new RekallAgePublishedModelOutputStore();
+        var baseline = CompiledBox();
+        var snapshot = baseline with
+        {
+            Triangles = baseline.Triangles.Select((triangle, index) =>
+                index == 0 ? triangle with { SourcePointIds = [1, 2, 3] } : triangle).ToArray()
+        };
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => store.WriteStagedAsync(TestPaths.CreateTempDirectory(), "hero-model", snapshot, default).AsTask());
+    }
+
+    [Fact]
+    public async Task WriteStagedAsyncRejectsTriangleSourceCornerIdsThatDisagreeWithItsVertices()
+    {
+        var store = new RekallAgePublishedModelOutputStore();
+        var baseline = CompiledBox();
+        var snapshot = baseline with
+        {
+            Triangles = baseline.Triangles.Select((triangle, index) =>
+                index == 0 ? triangle with { SourceCornerIds = [1, 2, 3] } : triangle).ToArray()
+        };
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => store.WriteStagedAsync(TestPaths.CreateTempDirectory(), "hero-model", snapshot, default).AsTask());
+    }
+
+    [Fact]
+    public async Task WriteStagedAsyncRejectsTriangleSourceFaceAbsentFromItsSurface()
+    {
+        var store = new RekallAgePublishedModelOutputStore();
+        var baseline = CompiledBox();
+        var snapshot = baseline with
+        {
+            Triangles = baseline.Triangles.Select((triangle, index) =>
+                index == 0 ? triangle with { SourceFaceId = 999 } : triangle).ToArray()
+        };
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => store.WriteStagedAsync(TestPaths.CreateTempDirectory(), "hero-model", snapshot, default).AsTask());
+    }
+
+    [Fact]
     public async Task WriteStagedAsyncRejectsStagingDirectoryReparsePoint()
     {
         var root = TestPaths.CreateTempDirectory();
@@ -247,12 +292,21 @@ public sealed class PublishedModelOutputStoreTests
             0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5
         ];
         var triangles = Enumerable.Range(0, indices.Length / 3)
-            .Select(index => new RekallAgeCompiledMeshTriangle(
-                index,
-                (ulong)(index + 1),
-                [1, 2, 3],
-                [1, 2, 3],
-                0))
+            .Select(triangleIndex =>
+            {
+                var firstIndex = triangleIndex * 3;
+                var triangleVertices = indices
+                    .Skip(firstIndex)
+                    .Take(3)
+                    .Select(vertexIndex => vertices[checked((int)vertexIndex)])
+                    .ToArray();
+                return new RekallAgeCompiledMeshTriangle(
+                    triangleIndex,
+                    (ulong)(triangleIndex + 1),
+                    triangleVertices.Select(vertex => vertex.SourceCornerId).ToArray(),
+                    triangleVertices.Select(vertex => vertex.SourcePointId).ToArray(),
+                    0);
+            })
             .ToArray();
 
         return new RekallAgeCompiledMeshSnapshot(

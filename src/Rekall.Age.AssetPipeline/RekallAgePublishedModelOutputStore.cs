@@ -256,6 +256,20 @@ public sealed class RekallAgePublishedModelOutputStore
             {
                 throw new InvalidDataException("REKALL_MODEL_OUTPUT_TRIANGLES_INVALID: Compiled model output triangle surface metadata must agree with surface ranges.");
             }
+
+            var firstVertex = snapshot.Vertices[checked((int)snapshot.Indices[triangleFirstIndex])];
+            var secondVertex = snapshot.Vertices[checked((int)snapshot.Indices[triangleFirstIndex + 1])];
+            var thirdVertex = snapshot.Vertices[checked((int)snapshot.Indices[triangleFirstIndex + 2])];
+            if (triangle.SourcePointIds[0] != firstVertex.SourcePointId
+                || triangle.SourcePointIds[1] != secondVertex.SourcePointId
+                || triangle.SourcePointIds[2] != thirdVertex.SourcePointId
+                || triangle.SourceCornerIds[0] != firstVertex.SourceCornerId
+                || triangle.SourceCornerIds[1] != secondVertex.SourceCornerId
+                || triangle.SourceCornerIds[2] != thirdVertex.SourceCornerId
+                || !surface.SourceFaceIds.Contains(triangle.SourceFaceId))
+            {
+                throw new InvalidDataException("REKALL_MODEL_OUTPUT_TRIANGLES_INVALID: Compiled model output triangle provenance must match its indexed vertices and referenced surface face IDs.");
+            }
         }
     }
 

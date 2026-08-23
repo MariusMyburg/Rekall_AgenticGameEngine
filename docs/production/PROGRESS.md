@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 07:40 Africa/Johannesburg
+Last verified: 2026-08-23 07:48 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -285,6 +285,25 @@ affected build is zero-warning/zero-error and the new inventory tests pass. The
 remaining Task 7 gate is a bounded default-registry CLI/MCP command surface for
 node discovery and graph create/inspect/patch/validate/evaluate/bake/report
 inspection; it is now an explicit plan item rather than an implicit omission.
+
+Task 7 is now complete. Nine default-registry commands expose bounded node-type
+search/inspection and graph create/inspect/atomic-patch/validate/demand-evaluate/
+bake/latest-evaluation inspection through the same JSON command surface used by
+the CLI and MCP. Evaluation and bake commands share one evaluator per registry,
+so agents receive truthful cache-hit and dependency-invalidation evidence across
+calls. Graph inspection caps node/link/output samples; evaluation and bake return
+topology counts, finite bounds, bounded diagnostics and node timings without
+dumping mesh buffers. Mutations retain exact file revisions, transaction
+preimages, changed-resource facts, strict candidate validation, and atomic
+publication. A default-registry JSON proof discovers and inspects the box node,
+creates and validates a graph without direct document edits, evaluates a width-2
+box, proves two cache hits on repeat, applies a revision-checked width-6 patch,
+proves exactly two invalidated nodes and X bounds changing from +/-1 to +/-3,
+bakes through the normal mesh store, compiles 12 triangles, and inspects the
+latest bounded evaluation. MCP catalog classification publishes all nine under
+`modeling`. The broadened modeling, closed-loop mesh, registry, and MCP selection
+passes 25/25 with zero build warnings/errors. Semantic material graphs and
+generic modifier contracts are the active Task 8 gate.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

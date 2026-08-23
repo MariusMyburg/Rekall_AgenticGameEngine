@@ -28,8 +28,16 @@ public sealed record RekallAgeModelingGraphBakeResult(
 
 public sealed class RekallAgeModelingGraphBakeService
 {
-    private readonly RekallAgeModelingGraphEvaluator _evaluator = new();
-    private readonly RekallAgeMeshAssetStore _meshStore = new();
+    private readonly RekallAgeModelingGraphEvaluator _evaluator;
+    private readonly RekallAgeMeshAssetStore _meshStore;
+
+    public RekallAgeModelingGraphBakeService(
+        RekallAgeModelingGraphEvaluator? evaluator = null,
+        RekallAgeMeshAssetStore? meshStore = null)
+    {
+        _evaluator = evaluator ?? new RekallAgeModelingGraphEvaluator();
+        _meshStore = meshStore ?? new RekallAgeMeshAssetStore();
+    }
 
     public async ValueTask<RekallAgeModelingGraphBakeResult> BakeAsync(
         string projectRoot,

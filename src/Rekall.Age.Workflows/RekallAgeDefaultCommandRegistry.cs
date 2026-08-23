@@ -25,6 +25,7 @@ public static class RekallAgeDefaultCommandRegistry
         var registry = new RekallAgeCommandRegistry();
         var shaderPipelineValidation = new RekallAgeWorkflowShaderPipelineValidationService();
         var componentPropertyAdmission = new RekallAgeBuiltInComponentPropertyAdmissionPolicy();
+        var modelingGraphRuntime = new RekallAgeModelingGraphCommandRuntime();
         registry.Register(new CreateProjectCommand());
         registry.Register(new AddCapabilityCommand());
         registry.Register(new CreateSceneCommand());
@@ -132,6 +133,15 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new ApplyMeshOperationCommand());
         registry.Register(new BatchMeshOperationsCommand());
         registry.Register(new AssertMeshAssetCommand());
+        registry.Register(new SearchModelingNodeTypesCommand());
+        registry.Register(new InspectModelingNodeTypeCommand());
+        registry.Register(new CreateModelingGraphCommand());
+        registry.Register(new InspectModelingGraphCommand());
+        registry.Register(new ApplyModelingGraphPatchCommand());
+        registry.Register(new ValidateModelingGraphCommand());
+        registry.Register(new EvaluateModelingGraphCommand(modelingGraphRuntime));
+        registry.Register(new BakeModelingGraphCommand(modelingGraphRuntime));
+        registry.Register(new InspectModelingEvaluationCommand(modelingGraphRuntime));
         registry.Register(new ImportKsaPlanetCommand());
         registry.Register(new ImportKsaSolarSystemCommand());
         registry.Register(new ParentEntityCommand());

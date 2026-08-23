@@ -97,7 +97,8 @@ internal static class RekallAgeMcpToolClassifier
             return "assets";
         }
 
-        if (name.StartsWith("rekall.mesh.", StringComparison.Ordinal))
+        if (name.StartsWith("rekall.mesh.", StringComparison.Ordinal) ||
+            name.StartsWith("rekall.modeling.", StringComparison.Ordinal))
         {
             return "modeling";
         }
@@ -141,6 +142,12 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.mesh.validate" or
             "rekall.mesh.query_elements" or
             "rekall.mesh.assert" or
+            "rekall.modeling.node_types.search" or
+            "rekall.modeling.node_types.inspect" or
+            "rekall.modeling.graph.inspect" or
+            "rekall.modeling.graph.validate" or
+            "rekall.modeling.graph.evaluate" or
+            "rekall.modeling.inspect_evaluation" or
             "rekall.render.visibility.inspect_scene" or
             "rekall.solar.import_ksa_system" or
             "rekall.workflow.agent_authoring_gauntlet" or
@@ -182,6 +189,7 @@ internal static class RekallAgeMcpToolClassifier
             _ when name.StartsWith("rekall.transaction.", StringComparison.Ordinal) => 35,
             _ when name.StartsWith("rekall.playtest.", StringComparison.Ordinal) => 40,
             _ when name.StartsWith("rekall.mesh.", StringComparison.Ordinal) => 43,
+            _ when name.StartsWith("rekall.modeling.", StringComparison.Ordinal) => 43,
             _ when name.StartsWith("rekall.geometry.", StringComparison.Ordinal) => 45,
             _ when name.StartsWith("rekall.module.", StringComparison.Ordinal) => 50,
             _ when name.StartsWith("rekall.shader.", StringComparison.Ordinal) => 60,

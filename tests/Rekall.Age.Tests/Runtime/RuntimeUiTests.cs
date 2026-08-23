@@ -9,6 +9,101 @@ namespace Rekall.Age.Tests.Runtime;
 public sealed class RuntimeUiTests
 {
     [Fact]
+    public async Task EqualUiAnchorsRetainAuthoredSizeAndApplyPositionAndPivot()
+    {
+        var hud = RekallAgeEntityDocument.Create("HUD", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["ReferenceWidth"] = 1920, ["ReferenceHeight"] = 1080 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Label",
+                new JsonObject
+                {
+                    ["Width"] = 300,
+                    ["Height"] = 44,
+                    ["AnchorMinX"] = 0,
+                    ["AnchorMaxX"] = 0,
+                    ["AnchorMinY"] = 1,
+                    ["AnchorMaxY"] = 1,
+                    ["PivotY"] = 1,
+                    ["X"] = 18,
+                    ["Y"] = 18
+                }));
+
+        var layout = await ResolveOnlyLayoutAsync(
+            RekallAgeSceneDocument.Create("Main", ["ui"]).AddEntity(hud));
+
+        Assert.Equal(18, layout.X);
+        Assert.Equal(1054, layout.Y);
+        Assert.Equal(300, layout.Width);
+        Assert.Equal(44, layout.Height);
+    }
+
+    [Fact]
+    public async Task EqualUiAnchorsApplyRightTopAnchorAndPivotPerAxis()
+    {
+        var canvas = RekallAgeEntityDocument.Create("Canvas", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["ReferenceWidth"] = 400, ["ReferenceHeight"] = 200 }));
+        var label = RekallAgeEntityDocument.Create("Status", ["ui"]) with { ParentId = canvas.Id };
+        label = label.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Label",
+            new JsonObject
+            {
+                ["Width"] = 100,
+                ["Height"] = 30,
+                ["AnchorMinX"] = 1,
+                ["AnchorMaxX"] = 1,
+                ["AnchorMinY"] = 0,
+                ["AnchorMaxY"] = 0,
+                ["PivotX"] = 1,
+                ["PivotY"] = 0,
+                ["X"] = -20,
+                ["Y"] = 20
+            }));
+
+        var layout = await ResolveOnlyLayoutAsync(
+            RekallAgeSceneDocument.Create("Main", ["ui"]).AddEntity(canvas).AddEntity(label));
+
+        Assert.Equal(280, layout.X);
+        Assert.Equal(20, layout.Y);
+        Assert.Equal(100, layout.Width);
+        Assert.Equal(30, layout.Height);
+    }
+
+    [Fact]
+    public async Task UnequalUiAnchorsStretchBetweenAnchorsAndOffsets()
+    {
+        var canvas = RekallAgeEntityDocument.Create("Canvas", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["ReferenceWidth"] = 400, ["ReferenceHeight"] = 200 }));
+        var panel = RekallAgeEntityDocument.Create("Panel", ["ui"]) with { ParentId = canvas.Id };
+        panel = panel.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Panel",
+            new JsonObject
+            {
+                ["AnchorMinX"] = 0.25,
+                ["AnchorMaxX"] = 0.75,
+                ["AnchorMinY"] = 0.1,
+                ["AnchorMaxY"] = 0.9,
+                ["OffsetLeft"] = 10,
+                ["OffsetRight"] = -20,
+                ["OffsetTop"] = 5,
+                ["OffsetBottom"] = -15
+            }));
+
+        var layout = await ResolveOnlyLayoutAsync(
+            RekallAgeSceneDocument.Create("Main", ["ui"]).AddEntity(canvas).AddEntity(panel));
+
+        Assert.Equal(110, layout.X);
+        Assert.Equal(25, layout.Y);
+        Assert.Equal(170, layout.Width);
+        Assert.Equal(140, layout.Height);
+    }
+
+    [Fact]
     public async Task UiCanvasAndLabelOnSameEntityUseAuthoredLabelBounds()
     {
         var hud = RekallAgeEntityDocument.Create("HUD", ["ui"])
@@ -533,5 +628,13 @@ public sealed class RuntimeUiTests
         Assert.InRange(rasterizer.CachedBytes, 1, RekallAgeRuntimeTextRasterizer.MaximumCacheBytes);
         Assert.InRange(extremeLayout.Raster.Width, 1, RekallAgeRuntimeTextRasterizer.MaximumRasterWidth);
         Assert.InRange(extremeLayout.Raster.Height, 1, RekallAgeRuntimeTextRasterizer.MaximumRasterHeight);
+    }
+
+    private static async Task<Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeUiLayout> ResolveOnlyLayoutAsync(
+        RekallAgeSceneDocument scene)
+    {
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(new RekallAgeRuntimeWorldBuilder().Build(scene), 1, CancellationToken.None);
+        return Assert.Single(result.World.Subsystems.Ui.Elements).Layout!;
     }
 }

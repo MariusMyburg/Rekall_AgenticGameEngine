@@ -145,10 +145,22 @@ public abstract class RekallAgeUiElementBase : RekallAgeComponent
     [RekallAgeProperty] public double Y { get; init; }
     [RekallAgeProperty(Minimum = 0)] public double Width { get; init; } = 100;
     [RekallAgeProperty(Minimum = 0)] public double Height { get; init; } = 30;
-    [RekallAgeProperty] public double AnchorMinX { get; init; }
-    [RekallAgeProperty] public double AnchorMinY { get; init; }
-    [RekallAgeProperty] public double AnchorMaxX { get; init; }
-    [RekallAgeProperty] public double AnchorMaxY { get; init; }
+    [RekallAgeProperty(Description = "Normalized horizontal anchor start. When equal to AnchorMaxX, this is a fixed anchor point and authored Width/X/PivotX are retained; unequal anchors stretch between the two anchors using OffsetLeft/OffsetRight.")]
+    public double AnchorMinX { get; init; }
+    [RekallAgeProperty(Description = "Normalized vertical anchor start. When equal to AnchorMaxY, this is a fixed anchor point and authored Height/Y/PivotY are retained; unequal anchors stretch between the two anchors using OffsetTop/OffsetBottom.")]
+    public double AnchorMinY { get; init; }
+    [RekallAgeProperty(Description = "Normalized horizontal anchor end. Equal min/max values define a fixed anchor; unequal values define a stretched interval.")]
+    public double AnchorMaxX { get; init; }
+    [RekallAgeProperty(Description = "Normalized vertical anchor end. Equal min/max values define a fixed anchor; unequal values define a stretched interval.")]
+    public double AnchorMaxY { get; init; }
+    [RekallAgeProperty(Description = "Reference-space inset added to the minimum horizontal edge when AnchorMinX and AnchorMaxX define a stretched interval.")]
+    public double OffsetLeft { get; init; }
+    [RekallAgeProperty(Description = "Reference-space inset added to the minimum vertical edge when AnchorMinY and AnchorMaxY define a stretched interval.")]
+    public double OffsetTop { get; init; }
+    [RekallAgeProperty(Description = "Reference-space offset added to the maximum horizontal edge when AnchorMinX and AnchorMaxX define a stretched interval; use a negative value for a right inset.")]
+    public double OffsetRight { get; init; }
+    [RekallAgeProperty(Description = "Reference-space offset added to the maximum vertical edge when AnchorMinY and AnchorMaxY define a stretched interval; use a negative value for a bottom inset.")]
+    public double OffsetBottom { get; init; }
     [RekallAgeProperty] public double PivotX { get; init; }
     [RekallAgeProperty] public double PivotY { get; init; }
     [RekallAgeProperty] public string Text { get; init; } = string.Empty;

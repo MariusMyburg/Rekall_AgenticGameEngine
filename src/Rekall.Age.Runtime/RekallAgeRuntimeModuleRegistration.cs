@@ -9,4 +9,13 @@ public sealed record RekallAgeRuntimeSystemRegistration(
 public sealed record RekallAgeRuntimeModuleRegistration(
     Type ModuleType,
     Func<RekallAgeModule> CreateModule,
-    IReadOnlyList<RekallAgeRuntimeSystemRegistration> RuntimeSystems);
+    IReadOnlyList<RekallAgeRuntimeSystemRegistration> RuntimeSystems)
+{
+    public string? ModuleId { get; init; }
+
+    public string? ModuleName { get; init; }
+
+    public string? AssemblyIdentity { get; init; }
+
+    public string? SourceFingerprint { get; init; }
+}

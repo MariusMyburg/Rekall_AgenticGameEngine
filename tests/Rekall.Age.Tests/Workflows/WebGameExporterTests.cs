@@ -42,6 +42,10 @@ public sealed class WebGameExporterTests
         var source = await File.ReadAllTextAsync(result.RegistrySourcePath);
         Assert.Contains("typeof(global::Game.Modules.WebRules.WebRulesModule)", source, StringComparison.Ordinal);
         Assert.Contains("static () => new global::Game.Modules.WebRules.WebRulesModule()", source, StringComparison.Ordinal);
+        Assert.Contains("ModuleId = \"game.web-rules\"", source, StringComparison.Ordinal);
+        Assert.Contains("ModuleName = \"WebRules\"", source, StringComparison.Ordinal);
+        Assert.Contains("AssemblyIdentity = \"WebRules, Version=", source, StringComparison.Ordinal);
+        Assert.Contains("SourceFingerprint = \"", source, StringComparison.Ordinal);
         Assert.Contains("typeof(global::Game.Modules.WebRules.WebRulesSystem)", source, StringComparison.Ordinal);
         Assert.Contains("static () => new global::Game.Modules.WebRules.WebRulesSystem()", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Assembly.Load", source, StringComparison.Ordinal);
@@ -94,6 +98,15 @@ public sealed class WebGameExporterTests
         await WriteProjectAsync(root, "Assets/Imported/hero.png");
         await BuildRuntimeModuleAsync(root);
         var registry = new RekallAgeWebModuleRegistryGenerator().Generate(root, generated);
+        var stagedDirectory = TestPaths.CreateTempDirectory();
+        Directory.Delete(stagedDirectory);
+        var staged = await new RekallAgeWebGameExporter().StageAsync(
+            new RekallAgeWebGameStageRequest(
+                root,
+                "Main",
+                stagedDirectory,
+                ModulePlan: new RekallAgeWebModuleRegistryGenerator().Discover(root)),
+            CancellationToken.None);
         var repository = FindRepositoryRoot();
         var webProject = Path.Combine(
             repository,
@@ -118,6 +131,7 @@ public sealed class WebGameExporterTests
             "-p:ILLinkTreatWarningsAsErrors=false",
             "-p:SuppressTrimAnalysisWarnings=true",
             $"-p:RekallAgeWebPublishInputsPath={registry.MsBuildInputsPath}",
+            $"-p:RekallAgeWebGameContentPath={staged.OutputDirectory}",
             "-o",
             publish);
 
@@ -126,6 +140,17 @@ public sealed class WebGameExporterTests
             Directory.EnumerateFiles(publish, "*", SearchOption.AllDirectories),
             path => Path.GetFileName(path).Contains("WebRules", StringComparison.Ordinal));
         var publishedFiles = Directory.EnumerateFiles(publish, "*", SearchOption.AllDirectories).ToArray();
+        var publishedManifest = Assert.Single(
+            publishedFiles,
+            path => Path.GetFileName(path).Equals("game.manifest.json", StringComparison.Ordinal));
+        var publishedContentRoot = Path.GetDirectoryName(publishedManifest)!;
+        foreach (var stagedPath in Directory.EnumerateFiles(staged.OutputDirectory, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(staged.OutputDirectory, stagedPath);
+            var publishedPath = Path.Combine(publishedContentRoot, relativePath);
+            Assert.True(File.Exists(publishedPath), $"Published web package is missing staged content '{relativePath}'.");
+            Assert.Equal(await File.ReadAllBytesAsync(stagedPath), await File.ReadAllBytesAsync(publishedPath));
+        }
         Assert.Contains(publishedFiles, path =>
         {
             var bytes = File.ReadAllBytes(path);

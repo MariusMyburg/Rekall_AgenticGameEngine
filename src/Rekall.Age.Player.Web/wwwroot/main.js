@@ -27,9 +27,16 @@ setModuleImports('main.js', {
         canvasHeight: () => canvas.height
     },
     dom: {
+        baseUri: () => document.baseURI,
         setText: (selector, value) => document.querySelector(selector).textContent = value,
         setReady: ready => document.body.dataset.device = ready ? 'ready' : 'compatibility',
-        publishEvidence: json => publishWebGpuEvidence(json, window)
+        publishEvidence: json => publishWebGpuEvidence(json, window),
+        publishGameBootstrapEvidence: json => {
+            const evidence = JSON.parse(json);
+            document.querySelector('#rekall-web-bootstrap-evidence').textContent = json;
+            window.__rekallAgeWebGameBootstrap = evidence;
+            window.dispatchEvent(new CustomEvent('rekall-age-web-game-bootstrap', { detail: evidence }));
+        }
     }
 });
 await runMain();

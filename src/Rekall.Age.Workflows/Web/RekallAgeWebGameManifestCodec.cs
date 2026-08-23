@@ -26,6 +26,9 @@ public static class RekallAgeWebGameManifestCodec
         WriteIndented = true
     };
 
+    private static readonly RekallAgeWebGameManifestJsonContext CanonicalJsonContext = new(CanonicalOptions);
+    private static readonly RekallAgeWebGameManifestJsonContext FileJsonContext = new(FileOptions);
+
     public static RekallAgeWebGameManifest Create(
         RekallAgeWebProjectIdentity project,
         string entryScenePath,
@@ -54,10 +57,14 @@ public static class RekallAgeWebGameManifestCodec
     }
 
     public static byte[] EncodeCanonical(RekallAgeWebGameManifest manifest) =>
-        JsonSerializer.SerializeToUtf8Bytes(ValidateCanonical(manifest), CanonicalOptions);
+        JsonSerializer.SerializeToUtf8Bytes(
+            ValidateCanonical(manifest),
+            CanonicalJsonContext.RekallAgeWebGameManifest);
 
     public static byte[] EncodeForFile(RekallAgeWebGameManifest manifest) =>
-        JsonSerializer.SerializeToUtf8Bytes(ValidateCanonical(manifest), FileOptions);
+        JsonSerializer.SerializeToUtf8Bytes(
+            ValidateCanonical(manifest),
+            FileJsonContext.RekallAgeWebGameManifest);
 
     public static RekallAgeWebGameManifest DecodeAndValidate(ReadOnlyMemory<byte> bytes)
     {
@@ -69,7 +76,7 @@ public static class RekallAgeWebGameManifestCodec
         RekallAgeWebGameManifest manifest;
         try
         {
-            manifest = JsonSerializer.Deserialize<RekallAgeWebGameManifest>(bytes.Span, CanonicalOptions)
+            manifest = JsonSerializer.Deserialize(bytes.Span, CanonicalJsonContext.RekallAgeWebGameManifest)
                 ?? throw new InvalidDataException("Web game manifest did not contain a document.");
         }
         catch (JsonException error)
@@ -83,7 +90,9 @@ public static class RekallAgeWebGameManifestCodec
     public static string ComputeBuildIdentity(RekallAgeWebGameManifest manifest)
     {
         var normalized = NormalizeStructure(manifest) with { BuildIdentity = string.Empty };
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(normalized, CanonicalOptions);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(
+            normalized,
+            CanonicalJsonContext.RekallAgeWebGameManifest);
         return RekallAgeDocumentRevision.Compute(bytes);
     }
 
@@ -265,3 +274,6 @@ public static class RekallAgeWebGameManifestCodec
         }
     }
 }
+
+[JsonSerializable(typeof(RekallAgeWebGameManifest), GenerationMode = JsonSourceGenerationMode.Metadata)]
+internal sealed partial class RekallAgeWebGameManifestJsonContext : JsonSerializerContext;

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Rekall.Age.Core.Compatibility;
 using Rekall.Age.Core.Product;
 using Rekall.Age.Core.Persistence;
@@ -7,13 +6,6 @@ namespace Rekall.Age.Project;
 
 public sealed class RekallAgeProjectStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        MaxDepth = RekallAgeDocumentSchemaProbe.MaximumDocumentDepth
-    };
-
     public const string ManifestFileName = "rekall.project.json";
 
     public string GetRecoveryPath(string projectRoot) =>
@@ -86,8 +78,7 @@ public sealed class RekallAgeProjectStore
     public string Serialize(RekallAgeProjectManifest manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
-        var current = manifest with { SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion };
-        return JsonSerializer.Serialize(current, JsonOptions) + Environment.NewLine;
+        return RekallAgeProjectManifestCodec.Serialize(manifest);
     }
 
     public async ValueTask<RekallAgeProjectManifest> LoadAsync(
@@ -106,16 +97,13 @@ public sealed class RekallAgeProjectStore
             RekallAgeProductInfo.Current.ProjectSchemaVersion,
             cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        var manifest = snapshot.Deserialize<RekallAgeProjectManifest>(JsonOptions);
-        return new RekallAgeVersionedDocument<RekallAgeProjectManifest>(manifest with
-        {
-            SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion
-        }, snapshot.File.Revision);
+        var manifest = RekallAgeProjectManifestCodec.DeserializeValidated(snapshot.File.Bytes, snapshot.File.Path);
+        return new RekallAgeVersionedDocument<RekallAgeProjectManifest>(manifest, snapshot.File.Revision);
     }
 
     private static void ValidateSnapshot(RekallAgeDocumentSnapshot snapshot)
     {
-        var manifest = snapshot.Deserialize<RekallAgeProjectManifest>(JsonOptions);
+        var manifest = RekallAgeProjectManifestCodec.DeserializeValidated(snapshot.File.Bytes, snapshot.File.Path);
         if (string.IsNullOrWhiteSpace(manifest.Name) || manifest.Capabilities is null)
         {
             throw new InvalidDataException($"Project document '{snapshot.File.Path}' has an invalid required shape.");

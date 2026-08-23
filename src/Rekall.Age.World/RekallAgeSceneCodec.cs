@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Rekall.Age.Core.Compatibility;
 using Rekall.Age.Core.Product;
 
@@ -6,18 +7,20 @@ namespace Rekall.Age.World;
 
 public static class RekallAgeSceneCodec
 {
-    internal static readonly JsonSerializerOptions JsonOptions = new()
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         MaxDepth = RekallAgeDocumentSchemaProbe.MaximumDocumentDepth
     };
 
+    private static readonly RekallAgeSceneJsonContext JsonContext = new(JsonOptions);
+
     public static string Serialize(RekallAgeSceneDocument scene)
     {
         ArgumentNullException.ThrowIfNull(scene);
         var current = scene with { SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion };
-        return JsonSerializer.Serialize(current, JsonOptions) + Environment.NewLine;
+        return JsonSerializer.Serialize(current, JsonContext.RekallAgeSceneDocument) + Environment.NewLine;
     }
 
     public static RekallAgeSceneDocument Deserialize(
@@ -40,7 +43,7 @@ public static class RekallAgeSceneCodec
         string sourceName)
     {
         ValidateArguments(expectedSceneName, sourceName);
-        var scene = JsonSerializer.Deserialize<RekallAgeSceneDocument>(bytes.Span, JsonOptions)
+        var scene = JsonSerializer.Deserialize(bytes.Span, JsonContext.RekallAgeSceneDocument)
             ?? throw new InvalidDataException($"Scene document '{sourceName}' has an invalid required shape.");
         if (string.IsNullOrWhiteSpace(scene.Id)
             || !string.Equals(scene.Name, expectedSceneName, StringComparison.Ordinal)
@@ -59,3 +62,6 @@ public static class RekallAgeSceneCodec
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceName);
     }
 }
+
+[JsonSerializable(typeof(RekallAgeSceneDocument), GenerationMode = JsonSourceGenerationMode.Metadata)]
+internal sealed partial class RekallAgeSceneJsonContext : JsonSerializerContext;

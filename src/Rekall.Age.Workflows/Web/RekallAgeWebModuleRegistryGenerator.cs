@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Rekall.Age.Modules;
 using Rekall.Age.Modules.Security;
 
@@ -259,6 +260,12 @@ public sealed class RekallAgeWebModuleRegistryGenerator
         ? "@" + identifier
         : identifier;
 
+    private static string EscapeCSharpString(string value)
+    {
+        var jsonString = JsonSerializer.Serialize(value);
+        return jsonString[1..^1];
+    }
+
     private static string CreateRegistrySource(IReadOnlyList<RekallAgeWebDiscoveredModule> modules)
     {
         var source = new StringBuilder();
@@ -283,7 +290,13 @@ public sealed class RekallAgeWebModuleRegistryGenerator
                 source.AppendLine($"                    typeof(global::{systemType}),");
                 source.AppendLine($"                    static () => new global::{systemType}()),");
             }
-            source.AppendLine("            ]));");
+            source.AppendLine("            ])");
+            source.AppendLine("        {");
+            source.AppendLine($"            ModuleId = \"{EscapeCSharpString(module.Identity.Id)}\",");
+            source.AppendLine($"            ModuleName = \"{EscapeCSharpString(module.Identity.ModuleName)}\",");
+            source.AppendLine($"            AssemblyIdentity = \"{EscapeCSharpString(module.Identity.AssemblyIdentity)}\",");
+            source.AppendLine($"            SourceFingerprint = \"{EscapeCSharpString(module.Identity.SourceFingerprint)}\"");
+            source.AppendLine("        });");
         }
         source.AppendLine("    }");
         source.AppendLine("}");

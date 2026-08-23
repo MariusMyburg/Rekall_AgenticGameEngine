@@ -53,7 +53,7 @@ public sealed class RekallAgeWebGameExporter
             ProjectPath,
             RekallAgeDocumentSchemaProbe.MaximumDocumentBytes,
             cancellationToken);
-        var project = ReadProject(projectEntry.Bytes, ProjectPath);
+        var project = RekallAgeProjectManifestCodec.Deserialize(projectEntry.Bytes, ProjectPath);
         var scenePath = RekallAgeGameContentPath.Normalize($"Scenes/{request.EntrySceneName}.age.scene.json");
         var sceneEntry = await content.ReadAsync(
             scenePath,
@@ -149,22 +149,6 @@ public sealed class RekallAgeWebGameExporter
             RekallAgeWebGameManifestCodec.EncodeForFile(manifest),
             cancellationToken);
         return new RekallAgeWebGameStageResult(output, manifestPath, manifest);
-    }
-
-    private static RekallAgeProjectManifest ReadProject(ReadOnlyMemory<byte> bytes, string source)
-    {
-        RekallAgeDocumentSchemaProbe.Inspect(
-            bytes,
-            source,
-            "project",
-            RekallAgeProductInfo.Current.ProjectSchemaVersion);
-        var project = JsonSerializer.Deserialize<RekallAgeProjectManifest>(bytes.Span, JsonOptions)
-            ?? throw new InvalidDataException($"Project document '{source}' has an invalid required shape.");
-        if (string.IsNullOrWhiteSpace(project.Name) || project.Capabilities is null)
-        {
-            throw new InvalidDataException($"Project document '{source}' has an invalid required shape.");
-        }
-        return project;
     }
 
     private static RekallAgeAssetCatalogDocument ReadCatalog(ReadOnlyMemory<byte> bytes, string source)

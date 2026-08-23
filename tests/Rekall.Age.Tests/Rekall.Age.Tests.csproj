@@ -18,6 +18,7 @@
     <Compile Include="..\..\src\Rekall.Age.Player.Web\WebGpuProofEvidence.cs" Link="Rendering\WebGpuProofEvidence.cs" />
     <Compile Include="..\..\src\Rekall.Age.Player.Web\WebGpuProofExecution.cs" Link="Rendering\WebGpuProofExecution.cs" />
     <Compile Include="..\..\src\Rekall.Age.Player.Web\WebGpuProofWorkload.cs" Link="Rendering\WebGpuProofWorkload.cs" />
+    <Compile Include="..\..\src\Rekall.Age.Player.Web\WebGameBootstrapEvidenceJson.cs" Link="Workflows\WebGameBootstrapEvidenceJson.cs" />
   </ItemGroup>
 
   <ItemGroup>

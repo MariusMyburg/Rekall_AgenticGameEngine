@@ -4,9 +4,9 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 20:26 Africa/Johannesburg
+Last verified: 2026-08-23 20:57 Africa/Johannesburg
 
-Branch: `codex/genuine-web-publishing`
+Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
 Current execution order is governed by
 [`STRATEGIC-PRIORITIES.md`](STRATEGIC-PRIORITIES.md). The immediate acceptance
@@ -29,13 +29,18 @@ inputs that reference the original authored module projects. Those inputs bind
 the generated registry to per-file source hashes before compilation and after
 publication, while the staging request can consume that same immutable discovery
 plan for its canonical manifest identity. The WebAssembly project conditionally
-imports those inputs and reports only the number of statically bundled modules.
+imports those inputs, binds each generated registration to its canonical module
+ID/name/assembly/source fingerprint, and exposes the loaded module identities in
+structured bootstrap evidence.
 Canonical web manifests now include the verified module ID, assembly identity,
 and source fingerprint.
-A real trimmed `browser-wasm` publish test retains the authored fixture module;
+A real trimmed `browser-wasm` publish test retains the authored fixture module
+and now includes the unchanged staged `game.manifest.json`, project, entry scene,
+asset catalog, and referenced asset bytes in the static web package;
 the test suppresses the repository's pre-existing Core trim-analysis warnings
 because those warnings are still treated as errors outside this slice. This
-proves static compile/link inclusion, not browser execution or game playability.
+proves static compile/link inclusion and package composition, not rendering,
+input, continuous simulation, or game playability.
 
 Shipped game content can be read through one bounded logical-path contract from
 either the filesystem or browser-style memory, and one byte-based scene codec
@@ -47,11 +52,27 @@ exporter preserves the 64 MiB per-read and depth-128 document limits, adds a
 4,096-entry/512 MiB aggregate closure bound, hashes actual staged bytes, and
 emits the canonical `game.manifest.json`. Equivalent projects with relative or
 root-dependent absolute imported asset paths produce the same logical manifest
-and build identity. The staging package plus generated build inputs do not yet
-invoke a publication command, load the manifest/scene in the browser, create a
-runtime world from the generated registrations, bridge browser input, or render
-that world. The current Web page remains the WebGPU contract proof and does not
-claim browser game playability.
+and build identity. The browser-WASM host now performs bounded browser HTTP
+reads, validates canonical manifest identity plus declared size/SHA-256 for the
+project and entry scene, decodes both through trimming-safe shared codecs,
+requires the generated static module IDs to match the manifest, constructs the
+canonical `RekallAgeRuntimeWorld`, and runs one fixed runtime frame through the
+generated authored-module/runtime-system factories. Structured evidence exposes
+build/project/scene/module identities, frame/system facts, bounded entity and
+component facts, and stable failure diagnostics. An executable staged-project
+test proves an authored system changes `Game.BootstrapState.ticks` from 0 to 1
+in that C# runtime world; tampered bytes, project-identity mismatch, oversized
+HTTP content, and excessive registrations fail closed. Browser input, the
+animation/simulation loop, direct WebGPU scene rendering, audio, and playability
+remain unimplemented. The current Web page still renders only the WebGPU
+contract proof and must not be described as a playable game export.
+The consolidated manifest/export/bootstrap/codec/static-loader selection passes
+55/55, including the real trimmed `browser-wasm` publish; Web Player Release
+builds with zero warnings/errors, and the browser-platform JavaScript contract
+selection passes 23/23. Independent review found no blockers. A legacy runtime
+viewport color-threshold test remains red on the unchanged base commit because
+the shared camera-correct software renderer produces a darker valid cube than
+that stale threshold expects; it is not caused by this web-bootstrap slice.
 
 Windows graphics packages now launch the authored runtime scene directly and
 no longer append the misleading legacy `--playable` flag. For compatibility,

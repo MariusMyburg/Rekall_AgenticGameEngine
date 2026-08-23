@@ -2,13 +2,23 @@ using System.Runtime.InteropServices.JavaScript;
 using Rekall.Age.Player.Web;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.WebGpu;
+using Rekall.Age.Workflows.Web;
 
 var webGpu = BrowserHost.HasWebGpu();
 var profile = webGpu ? "WebGPU" : "WebGL 2 compatibility required";
 var publishedModules = RekallAgePublishedModules.Registrations;
+using var contentClient = new HttpClient { BaseAddress = new Uri(BrowserHost.BaseUri()) };
+var contentFetcher = new RekallAgeHttpWebContentFetcher(contentClient);
+using var gameBootstrap = await new RekallAgeWebGameBootstrapper().BootAsync(
+    contentFetcher.FetchAsync,
+    publishedModules,
+    CancellationToken.None);
+BrowserHost.PublishGameBootstrapEvidence(WebGameBootstrapEvidenceJson.Serialize(gameBootstrap.Evidence));
 BrowserHost.SetText(
     "#runtime",
-    $".NET {Environment.Version} / browser-wasm / static modules {publishedModules.Count}");
+    gameBootstrap.Evidence.Succeeded
+        ? $".NET {Environment.Version} / browser-wasm / world frame {gameBootstrap.Evidence.RuntimeFrameIndex} / entities {gameBootstrap.Evidence.Entities.Count} / static modules {publishedModules.Count}"
+        : $".NET {Environment.Version} / browser-wasm / {gameBootstrap.Evidence.Diagnostics.FirstOrDefault()?.Code ?? "BOOTSTRAP FAILED"}");
 BrowserHost.SetText("#graphics", profile);
 
 if (!webGpu)
@@ -100,4 +110,10 @@ internal static partial class BrowserHost
 
     [JSImport("dom.publishEvidence", "main.js")]
     internal static partial void PublishWebGpuEvidence(string json);
+
+    [JSImport("dom.baseUri", "main.js")]
+    internal static partial string BaseUri();
+
+    [JSImport("dom.publishGameBootstrapEvidence", "main.js")]
+    internal static partial void PublishGameBootstrapEvidence(string json);
 }

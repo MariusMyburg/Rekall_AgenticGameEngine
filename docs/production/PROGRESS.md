@@ -82,6 +82,15 @@ attributes, affected bounds, and original-to-top/side mappings. The focused
 quad proof produces 8 points, 12 edges, 5 faces, and 20 corners from an immutable
 4-point source and passes strict validation.
 
+Generic stable-ID element queries are now implemented for point, edge, face,
+and corner domains. Selectors can intersect explicit IDs, named selection sets,
+one-ring connectivity, finite spatial bounds, and typed attribute equality;
+results are deterministically ordered, capped at 4,096, and report matched,
+domain, and truncation counts. Connectivity uses the validated adjacency view,
+spatial predicates use point positions, edge midpoints, face centroids, or
+corner points, and wrong-domain/missing IDs, selections, attributes, bounds,
+and limits fail with stable repairable codes. Three focused query tests pass.
+
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,
 and a zero-warning, zero-error Release solution build. The Studio ergonomics

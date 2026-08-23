@@ -146,6 +146,24 @@ public sealed record RekallAgeMeshOperationResult(
     IReadOnlyList<RekallAgeMeshElementProvenance> Provenance,
     RekallAgeMeshValidationReport Validation);
 
+public sealed record RekallAgeMeshAttributePredicate(string AttributeName, JsonElement EqualsValue);
+
+public sealed record RekallAgeMeshElementSelector(
+    RekallAgeGeometryDomain Domain,
+    IReadOnlyList<ulong>? ExplicitElementIds = null,
+    string? SelectionSetName = null,
+    IReadOnlyList<ulong>? ConnectivitySeedIds = null,
+    bool IncludeConnectivitySeeds = false,
+    RekallAgeMeshBounds? WithinBounds = null,
+    RekallAgeMeshAttributePredicate? AttributePredicate = null);
+
+public sealed record RekallAgeMeshElementQueryResult(
+    RekallAgeGeometryDomain Domain,
+    IReadOnlyList<ulong> ElementIds,
+    int MatchedCount,
+    int TotalDomainCount,
+    bool Truncated);
+
 public sealed record RekallAgeMeshTopology(
     IReadOnlyList<ulong> PointIds,
     IReadOnlyList<RekallAgeGeometryVector3> Positions,

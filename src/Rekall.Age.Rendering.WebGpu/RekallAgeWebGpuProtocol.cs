@@ -1,6 +1,6 @@
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Rekall.Age.Rendering.Abstractions;
 
 namespace Rekall.Age.Rendering.WebGpu;
@@ -73,45 +73,53 @@ public static class RekallAgeWebGpuProtocol
     public const int MaximumPacketBytes = 16 * 1024 * 1024;
     public const int MaximumLabelBytes = 1024;
 
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = false,
-        IgnoreReadOnlyProperties = true,
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
-    };
-
-    private static readonly JsonSerializerOptions DescriptorInputOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
-    };
-
-    private static readonly IReadOnlyDictionary<RekallAgeGraphicsResourceKind, Type> CreateDescriptorTypes =
-        new Dictionary<RekallAgeGraphicsResourceKind, Type>
-        {
-            [RekallAgeGraphicsResourceKind.Buffer] = typeof(RekallAgeBufferDescriptor),
-            [RekallAgeGraphicsResourceKind.Texture] = typeof(RekallAgeTextureDescriptor),
-            [RekallAgeGraphicsResourceKind.Sampler] = typeof(RekallAgeSamplerDescriptor),
-            [RekallAgeGraphicsResourceKind.ShaderModule] = typeof(RekallAgeShaderModuleDescriptor),
-            [RekallAgeGraphicsResourceKind.BindingLayout] = typeof(RekallAgeBindingLayoutDescriptor),
-            [RekallAgeGraphicsResourceKind.BindingSet] = typeof(RekallAgeBindingSetDescriptor),
-            [RekallAgeGraphicsResourceKind.RenderPipeline] = typeof(RekallAgeGraphicsPipelineDescriptor),
-            [RekallAgeGraphicsResourceKind.ComputePipeline] = typeof(RekallAgeComputePipelineDescriptor),
-            [RekallAgeGraphicsResourceKind.RenderTarget] = typeof(RekallAgeRenderTargetDescriptor)
-        };
-
     public static string Serialize<T>(T value)
     {
-        var json = JsonSerializer.Serialize(NormalizeForSerialization(value), SerializerOptions);
+        var normalized = NormalizeForSerialization(value);
+        var json = normalized switch
+        {
+            RekallAgeWebGpuCreatePacket packet => JsonSerializer.Serialize(packet, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuCreatePacket),
+            RekallAgeWebGpuDestroyPacket packet => JsonSerializer.Serialize(packet, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuDestroyPacket),
+            RekallAgeWebGpuWriteBufferPacket packet => JsonSerializer.Serialize(packet, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuWriteBufferPacket),
+            RekallAgeWebGpuWriteTexturePacket packet => JsonSerializer.Serialize(packet, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuWriteTexturePacket),
+            RekallAgeWebGpuSubmitPacket packet => JsonSerializer.Serialize(packet, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuSubmitPacket),
+            RekallAgeWebGpuImportCanvasOutputPacket packet => JsonSerializer.Serialize(packet, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuImportCanvasOutputPacket),
+            _ => throw InvalidPayloadType()
+        };
         EnsurePacketSize(json);
         EnsureSupportedVersion(json);
         return json;
     }
 
-    public static JsonElement ToJsonElement<T>(T value) =>
-        JsonSerializer.SerializeToElement(value, value?.GetType() ?? typeof(T), SerializerOptions);
+    public static JsonElement ToJsonElement<T>(T value) => value switch
+    {
+        RekallAgeBufferDescriptor item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeBufferDescriptor),
+        RekallAgeTextureDescriptor item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeTextureDescriptor),
+        RekallAgeSamplerDescriptor item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeSamplerDescriptor),
+        RekallAgeShaderModuleDescriptor item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeShaderModuleDescriptor),
+        RekallAgeBindingLayoutDescriptor item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeBindingLayoutDescriptor),
+        RekallAgeBindingSetDescriptor item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeBindingSetDescriptor),
+        RekallAgeGraphicsPipelineDescriptor item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeGraphicsPipelineDescriptor),
+        RekallAgeComputePipelineDescriptor item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeComputePipelineDescriptor),
+        RekallAgeRenderTargetDescriptor item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeRenderTargetDescriptor),
+        RekallAgeCopyBufferCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeCopyBufferCommand),
+        RekallAgeBeginRenderPassCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeBeginRenderPassCommand),
+        RekallAgeSetRenderPipelineCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeSetRenderPipelineCommand),
+        RekallAgeSetComputePipelineCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeSetComputePipelineCommand),
+        RekallAgeSetBindingSetCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeSetBindingSetCommand),
+        RekallAgeSetVertexBufferCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeSetVertexBufferCommand),
+        RekallAgeSetIndexBufferCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeSetIndexBufferCommand),
+        RekallAgeDrawCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeDrawCommand),
+        RekallAgeDrawIndexedCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeDrawIndexedCommand),
+        RekallAgeDrawIndirectCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeDrawIndirectCommand),
+        RekallAgeDrawIndexedIndirectCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeDrawIndexedIndirectCommand),
+        RekallAgeEndRenderPassCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeEndRenderPassCommand),
+        RekallAgeBeginComputePassCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeBeginComputePassCommand),
+        RekallAgeDispatchCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeDispatchCommand),
+        RekallAgeDispatchIndirectCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeDispatchIndirectCommand),
+        RekallAgeEndComputePassCommand item => ToJsonElement(item, RekallAgeWebGpuJsonContext.Strict.RekallAgeEndComputePassCommand),
+        _ => throw InvalidPayloadType()
+    };
 
     public static T Deserialize<T>(string json) where T : IRekallAgeWebGpuPacket
     {
@@ -122,8 +130,7 @@ public static class RekallAgeWebGpuProtocol
 
         try
         {
-            var packet = JsonSerializer.Deserialize<T>(json, SerializerOptions)
-                ?? throw InvalidPacket("The WebGPU protocol packet cannot be null.");
+            var packet = DeserializePacket<T>(json);
             return NormalizePacket(packet, allowNumericDescriptorEnums: false);
         }
         catch (JsonException exception)
@@ -136,40 +143,100 @@ public static class RekallAgeWebGpuProtocol
     {
         try
         {
-            using var document = JsonDocument.Parse(json ?? string.Empty);
-            var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object
-                || !root.TryGetProperty("succeeded", out var succeeded)
-                || succeeded.ValueKind is not JsonValueKind.True and not JsonValueKind.False
-                || !root.TryGetProperty("diagnostics", out var diagnostics)
-                || diagnostics.ValueKind != JsonValueKind.Array)
+            var envelope = JsonSerializer.Deserialize(json ?? string.Empty, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuBridgeEnvelope);
+            if (envelope?.Diagnostics is null
+                || envelope.Diagnostics.Any(item => item.Code is null || item.Message is null))
             {
                 return InvalidBridgeResult();
             }
 
-            var items = new List<RekallAgeGraphicsDiagnostic>();
-            foreach (var item in diagnostics.EnumerateArray().Take(64))
-            {
-                if (item.ValueKind != JsonValueKind.Object
-                    || !item.TryGetProperty("code", out var code) || code.ValueKind != JsonValueKind.String
-                    || !item.TryGetProperty("message", out var message) || message.ValueKind != JsonValueKind.String)
-                {
-                    return InvalidBridgeResult();
-                }
-
-                var target = item.TryGetProperty("target", out var candidate) && candidate.ValueKind == JsonValueKind.String
-                    ? candidate.GetString()
-                    : null;
-                items.Add(new(code.GetString()!, message.GetString()!, target));
-            }
-
-            return new(succeeded.GetBoolean(), items);
+            return new(envelope.Succeeded, envelope.Diagnostics
+                .Take(64)
+                .Select(item => new RekallAgeGraphicsDiagnostic(item.Code!, item.Message!, item.Target))
+                .ToArray());
         }
         catch (JsonException)
         {
             return InvalidBridgeResult();
         }
     }
+
+    private static T DeserializePacket<T>(string json) where T : IRekallAgeWebGpuPacket
+    {
+        object? packet = typeof(T) == typeof(RekallAgeWebGpuCreatePacket)
+            ? JsonSerializer.Deserialize(json, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuCreatePacket)
+            : typeof(T) == typeof(RekallAgeWebGpuDestroyPacket)
+                ? JsonSerializer.Deserialize(json, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuDestroyPacket)
+                : typeof(T) == typeof(RekallAgeWebGpuWriteBufferPacket)
+                    ? JsonSerializer.Deserialize(json, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuWriteBufferPacket)
+                    : typeof(T) == typeof(RekallAgeWebGpuWriteTexturePacket)
+                        ? JsonSerializer.Deserialize(json, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuWriteTexturePacket)
+                        : typeof(T) == typeof(RekallAgeWebGpuSubmitPacket)
+                            ? JsonSerializer.Deserialize(json, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuSubmitPacket)
+                            : typeof(T) == typeof(RekallAgeWebGpuImportCanvasOutputPacket)
+                                ? JsonSerializer.Deserialize(json, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuImportCanvasOutputPacket)
+                                : throw InvalidPayloadType();
+        return packet is T typed ? typed : throw InvalidPacket("The WebGPU protocol packet cannot be null.");
+    }
+
+    private static JsonElement ToJsonElement<T>(T value, JsonTypeInfo<T> typeInfo) =>
+        JsonSerializer.SerializeToElement(value, typeInfo);
+
+    private static JsonElement NormalizeDescriptor(
+        JsonElement descriptor,
+        RekallAgeGraphicsResourceKind resourceKind,
+        bool allowNumericDescriptorEnums)
+    {
+        var input = allowNumericDescriptorEnums
+            ? RekallAgeWebGpuJsonContext.DescriptorCompatibility
+            : RekallAgeWebGpuJsonContext.Strict;
+        var output = RekallAgeWebGpuJsonContext.Strict;
+        return resourceKind switch
+        {
+            RekallAgeGraphicsResourceKind.Buffer => NormalizeDescriptor(descriptor, input.RekallAgeBufferDescriptor, output.RekallAgeBufferDescriptor),
+            RekallAgeGraphicsResourceKind.Texture => NormalizeDescriptor(descriptor, input.RekallAgeTextureDescriptor, output.RekallAgeTextureDescriptor),
+            RekallAgeGraphicsResourceKind.Sampler => NormalizeDescriptor(descriptor, input.RekallAgeSamplerDescriptor, output.RekallAgeSamplerDescriptor),
+            RekallAgeGraphicsResourceKind.ShaderModule => NormalizeDescriptor(descriptor, input.RekallAgeShaderModuleDescriptor, output.RekallAgeShaderModuleDescriptor),
+            RekallAgeGraphicsResourceKind.BindingLayout => NormalizeDescriptor(descriptor, input.RekallAgeBindingLayoutDescriptor, output.RekallAgeBindingLayoutDescriptor),
+            RekallAgeGraphicsResourceKind.BindingSet => NormalizeDescriptor(descriptor, input.RekallAgeBindingSetDescriptor, output.RekallAgeBindingSetDescriptor),
+            RekallAgeGraphicsResourceKind.RenderPipeline => NormalizeDescriptor(descriptor, input.RekallAgeGraphicsPipelineDescriptor, output.RekallAgeGraphicsPipelineDescriptor),
+            RekallAgeGraphicsResourceKind.ComputePipeline => NormalizeDescriptor(descriptor, input.RekallAgeComputePipelineDescriptor, output.RekallAgeComputePipelineDescriptor),
+            RekallAgeGraphicsResourceKind.RenderTarget => NormalizeDescriptor(descriptor, input.RekallAgeRenderTargetDescriptor, output.RekallAgeRenderTargetDescriptor),
+            _ => throw InvalidDescriptor()
+        };
+    }
+
+    private static JsonElement NormalizeDescriptor<T>(JsonElement descriptor, JsonTypeInfo<T> input, JsonTypeInfo<T> output)
+        where T : class
+    {
+        var value = JsonSerializer.Deserialize(descriptor.GetRawText(), input)
+            ?? throw InvalidPacket("WebGPU create packet descriptors must not be null.");
+        return JsonSerializer.SerializeToElement(value, output);
+    }
+
+    private static bool DeserializeCommandPayload(RekallAgeWebGpuCommandPacket command) => command.Kind switch
+    {
+        "copyBuffer" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeCopyBufferCommand),
+        "beginRenderPass" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeBeginRenderPassCommand),
+        "setRenderPipeline" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeSetRenderPipelineCommand),
+        "setComputePipeline" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeSetComputePipelineCommand),
+        "setBindingSet" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeSetBindingSetCommand),
+        "setVertexBuffer" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeSetVertexBufferCommand),
+        "setIndexBuffer" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeSetIndexBufferCommand),
+        "draw" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeDrawCommand),
+        "drawIndexed" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeDrawIndexedCommand),
+        "drawIndirect" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeDrawIndirectCommand),
+        "drawIndexedIndirect" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeDrawIndexedIndirectCommand),
+        "endRenderPass" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeEndRenderPassCommand),
+        "beginComputePass" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeBeginComputePassCommand),
+        "dispatch" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeDispatchCommand),
+        "dispatchIndirect" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeDispatchIndirectCommand),
+        "endComputePass" => Deserializes(command.Data, RekallAgeWebGpuJsonContext.Strict.RekallAgeEndComputePassCommand),
+        _ => false
+    };
+
+    private static bool Deserializes<T>(JsonElement data, JsonTypeInfo<T> typeInfo) where T : class =>
+        JsonSerializer.Deserialize(data.GetRawText(), typeInfo) is not null;
 
     private static void EnsurePacketSize(string json)
     {
@@ -184,7 +251,7 @@ public static class RekallAgeWebGpuProtocol
     private static object? NormalizeForSerialization<T>(T value) =>
         value is IRekallAgeWebGpuPacket packet
             ? NormalizePacket(packet, allowNumericDescriptorEnums: true)
-            : value;
+            : throw InvalidPayloadType();
 
     private static T NormalizePacket<T>(T packet, bool allowNumericDescriptorEnums)
         where T : IRekallAgeWebGpuPacket
@@ -227,14 +294,6 @@ public static class RekallAgeWebGpuProtocol
                 "WebGPU create packet resource type must match the handle kind."));
         }
 
-        if (!CreateDescriptorTypes.TryGetValue(resourceKind, out var descriptorType))
-        {
-            throw new RekallAgeWebGpuProtocolException(new(
-                "REKALL_WEBGPU_PROTOCOL_RESOURCE_TYPE_INVALID",
-                "WebGPU create packets must use a resource kind with a public AGE descriptor."));
-        }
-
-        var options = allowNumericDescriptorEnums ? DescriptorInputOptions : SerializerOptions;
         if (packet.Descriptor.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
         {
             throw InvalidDescriptor();
@@ -242,9 +301,8 @@ public static class RekallAgeWebGpuProtocol
 
         try
         {
-            var descriptor = JsonSerializer.Deserialize(packet.Descriptor.GetRawText(), descriptorType, options)
-                ?? throw InvalidPacket("WebGPU create packet descriptors must not be null.");
-            return ValidateOperation(packet with { Descriptor = JsonSerializer.SerializeToElement(descriptor, SerializerOptions) }, packet.Operation, "create", allowMissingOperation: true);
+            var descriptor = NormalizeDescriptor(packet.Descriptor, resourceKind, allowNumericDescriptorEnums);
+            return ValidateOperation(packet with { Descriptor = descriptor }, packet.Operation, "create", allowMissingOperation: true);
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException or NotSupportedException or ArgumentException)
         {
@@ -278,18 +336,13 @@ public static class RekallAgeWebGpuProtocol
             || required.Any(property => !command.Data.TryGetProperty(property, out var value) || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)) return false;
         try
         {
-            if (JsonSerializer.Deserialize(command.Data.GetRawText(), CommandPayloadTypes[command.Kind], SerializerOptions) is null) return false;
+            if (!DeserializeCommandPayload(command)) return false;
             if (command.Kind == "beginRenderPass") return ValidateRenderPassDescriptor(command.Data);
             if (command.Kind == "copyBuffer") return ValidateHandle(command.Data, "source", "buffer") && ValidateHandle(command.Data, "destination", "buffer");
             return !ExpectedHandleKinds.TryGetValue(command.Kind, out var expected) || ValidateHandle(command.Data, expected.Property, expected.Kind);
         }
         catch (JsonException) { return false; }
     }
-
-    private static readonly IReadOnlyDictionary<string, Type> CommandPayloadTypes = new Dictionary<string, Type>
-    {
-        ["copyBuffer"] = typeof(RekallAgeCopyBufferCommand), ["beginRenderPass"] = typeof(RekallAgeBeginRenderPassCommand), ["setRenderPipeline"] = typeof(RekallAgeSetRenderPipelineCommand), ["setComputePipeline"] = typeof(RekallAgeSetComputePipelineCommand), ["setBindingSet"] = typeof(RekallAgeSetBindingSetCommand), ["setVertexBuffer"] = typeof(RekallAgeSetVertexBufferCommand), ["setIndexBuffer"] = typeof(RekallAgeSetIndexBufferCommand), ["draw"] = typeof(RekallAgeDrawCommand), ["drawIndexed"] = typeof(RekallAgeDrawIndexedCommand), ["drawIndirect"] = typeof(RekallAgeDrawIndirectCommand), ["drawIndexedIndirect"] = typeof(RekallAgeDrawIndexedIndirectCommand), ["endRenderPass"] = typeof(RekallAgeEndRenderPassCommand), ["beginComputePass"] = typeof(RekallAgeBeginComputePassCommand), ["dispatch"] = typeof(RekallAgeDispatchCommand), ["dispatchIndirect"] = typeof(RekallAgeDispatchIndirectCommand), ["endComputePass"] = typeof(RekallAgeEndComputePassCommand)
-    };
 
     private static bool ValidateHandle(JsonElement data, string property, string expectedKind)
     {
@@ -371,17 +424,21 @@ public static class RekallAgeWebGpuProtocol
 
     private static bool TryGetResourceKind(string resourceType, out RekallAgeGraphicsResourceKind resourceKind)
     {
-        foreach (var kind in CreateDescriptorTypes.Keys)
+        resourceKind = resourceType switch
         {
-            if (string.Equals(resourceType, JsonNamingPolicy.CamelCase.ConvertName(kind.ToString()), StringComparison.Ordinal))
-            {
-                resourceKind = kind;
-                return true;
-            }
-        }
-
-        resourceKind = default;
-        return false;
+            "buffer" => RekallAgeGraphicsResourceKind.Buffer,
+            "texture" => RekallAgeGraphicsResourceKind.Texture,
+            "sampler" => RekallAgeGraphicsResourceKind.Sampler,
+            "shaderModule" => RekallAgeGraphicsResourceKind.ShaderModule,
+            "bindingLayout" => RekallAgeGraphicsResourceKind.BindingLayout,
+            "bindingSet" => RekallAgeGraphicsResourceKind.BindingSet,
+            "renderPipeline" => RekallAgeGraphicsResourceKind.RenderPipeline,
+            "computePipeline" => RekallAgeGraphicsResourceKind.ComputePipeline,
+            "renderTarget" => RekallAgeGraphicsResourceKind.RenderTarget,
+            _ => default
+        };
+        return resourceType is "buffer" or "texture" or "sampler" or "shaderModule" or "bindingLayout"
+            or "bindingSet" or "renderPipeline" or "computePipeline" or "renderTarget";
     }
 
     private static void EnsureSupportedVersion(string json)
@@ -464,6 +521,9 @@ public static class RekallAgeWebGpuProtocol
     private static RekallAgeWebGpuProtocolException InvalidDescriptor(Exception? exception = null) => new(
         new("REKALL_WEBGPU_PROTOCOL_DESCRIPTOR_INVALID", "WebGPU create packet descriptors must be present, valid, and supported."),
         exception);
+
+    private static RekallAgeWebGpuProtocolException InvalidPayloadType() => new(
+        new("REKALL_WEBGPU_PROTOCOL_PAYLOAD_TYPE_INVALID", "WebGPU protocol serialization requires a supported packet, resource descriptor, or command payload type."));
 
     private static RekallAgeWebGpuProtocolException InvalidPacket(string message) => new(
         new("REKALL_WEBGPU_PROTOCOL_PACKET_INVALID", message));

@@ -40,3 +40,36 @@ execute an AGE scene, compiled game module, audio mixer, semantic input stream,
 or WebGPU draw command. A production claim requires backend implementation,
 WebGL 2 feature lowering, browser services, package generation/audit, and a real
 playable browser acceptance with deterministic gameplay evidence.
+
+## Task 3 linker-safe WebGPU protocol checkpoint
+
+Date: 2026-08-23
+
+The browser executor's trimmed Release publish was initially RED. A clean
+`dotnet publish src/Rekall.Age.Player.Web/Rekall.Age.Player.Web.csproj -c Release`
+reached assembly optimization and then failed with exactly four `IL2026` trim
+analysis errors in `RekallAgeWebGpuProtocol`: generic packet serialization,
+runtime-`Type` descriptor deserialization, descriptor reserialization, and
+runtime-`Type` command-payload deserialization. The SDK then returned
+`NETSDK1144` because trimming could not safely preserve those reflection paths.
+
+The shared WebGPU library now owns source-generated `JsonSerializerContext`
+metadata for every protocol packet, all nine supported resource descriptors,
+all concrete command payloads, and the browser bridge/initialization envelope.
+Protocol entry points explicitly dispatch only those concrete types. Unknown
+payload types fail closed with `REKALL_WEBGPU_PROTOCOL_PAYLOAD_TYPE_INVALID`;
+camel-case fields, nonnumeric string enums, strict unmapped-member rejection,
+the 16 MiB UTF-8 ceiling, and exact nested handle/render-pass validation remain
+enforced. No trim warning suppression, `RequiresUnreferencedCode` annotation,
+or trimming opt-out was added.
+
+Final GREEN evidence:
+
+- The focused WebGPU C# selection passed 62/62, including complete supported
+  descriptor/command/packet dispatch and nested bridge-result rejection.
+- The Node browser-executor suite passed 8/8.
+- The Release browser Player build completed with zero warnings and zero errors.
+- A clean-output trimmed browser publish completed with zero warnings and zero
+  errors and emitted both the fingerprinted `webgpu-device` JavaScript module
+  and `Rekall.Age.Player.Web` WASM module.
+- The Release solution build completed with zero warnings and zero errors.

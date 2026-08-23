@@ -55,4 +55,14 @@ public sealed class WebGpuBrowserPacketFixtureTests
         Assert.False(result.Succeeded);
         Assert.Equal("REKALL_WEBGPU_BRIDGE_RESULT_INVALID", Assert.Single(result.Diagnostics).Code);
     }
+
+    [Fact]
+    public void BrowserBridgeResultsRejectMissingRequiredNestedDiagnosticFields()
+    {
+        var result = RekallAgeWebGpuProtocol.DeserializeBridgeResult(
+            "{\"succeeded\":false,\"diagnostics\":[{\"message\":\"missing code\"}]}");
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("REKALL_WEBGPU_BRIDGE_RESULT_INVALID", Assert.Single(result.Diagnostics).Code);
+    }
 }

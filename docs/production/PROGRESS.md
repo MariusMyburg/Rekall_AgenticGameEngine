@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 09:52 Africa/Johannesburg
+Last verified: 2026-08-23 10:00 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -27,7 +27,17 @@ confirmed correct WPF composition and accessibility structure. The Studio
 project builds with zero warnings/errors; the focused graph tests pass 3/3.
 Graph mutation/canvas layout, node linking, attribute/material inspectors,
 persistent docking, orbit/pan/zoom, and broader visual-regression automation
-remain open. The complete Studio suite passes 33/33.
+remain open. The complete Studio suite passes 34/34.
+
+The Studio graph session now also mutates through the canonical
+`RekallAgeModelingGraphPatchService` against its exact opened file revision.
+Successful batches reload canonical node/output views, clear stale evaluated
+output, retain the evaluator cache for honest dependency invalidation evidence,
+and append recoverable transaction history. A parameter-edit proof changes a
+box from two to four world units, advances logical/file revisions, records one
+transaction, and then observes both reachable nodes invalidated on reevaluation.
+The focused graph-session selection passes 4/4. Typed graph-patch controls and
+the visual node canvas remain the next Studio authoring slice.
 
 The first optimization primitive is verified across every canonical modeling
 composition path. `merge_by_distance` welds selected points through a bounded,

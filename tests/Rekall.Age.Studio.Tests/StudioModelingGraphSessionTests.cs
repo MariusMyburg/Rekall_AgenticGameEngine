@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using System.IO;
+using Rekall.Age.Core.Transactions;
 using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
 
@@ -70,6 +71,43 @@ public sealed class StudioModelingGraphSessionTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await session.EvaluateAsync("mesh", CancellationToken.None));
         Assert.Contains("Open a procedural graph", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AppliesRevisionSafePatchRecordsTransactionAndInvalidatesEvaluation()
+    {
+        var root = TemporaryRoot();
+        try
+        {
+            await new RekallAgeModelingGraphAssetStore().SaveAsync(root, BoxGraph(), CancellationToken.None);
+            var session = new RekallAgeStudioModelingGraphSession();
+            await session.OpenAsync(root, "box-graph", CancellationToken.None);
+            await session.EvaluateAsync("mesh", CancellationToken.None);
+            var beforeRevision = session.FileRevision;
+
+            var result = await session.ApplyPatchAsync(
+                new([new(
+                    RekallAgeModelingGraphPatchKind.SetParameter,
+                    TargetId: "box",
+                    ParameterId: "sizeX",
+                    Value: JsonValue.Create(4.0))]),
+                "studio",
+                CancellationToken.None);
+            var evaluated = await session.EvaluateAsync("mesh", CancellationToken.None);
+
+            Assert.Equal(2, result.Graph.Revision);
+            Assert.NotEqual(beforeRevision, session.FileRevision);
+            Assert.Contains(session.Nodes.Single(item => item.NodeId == "box").Parameters,
+                item => item.ParameterId == "sizeX" && item.Value == "4");
+            Assert.Equal(-2, session.OutputMesh!.Topology.Positions.Min(item => item.X));
+            Assert.Equal(2, session.OutputMesh.Topology.Positions.Max(item => item.X));
+            Assert.Equal(2, evaluated.InvalidatedNodeCount);
+            Assert.Single((await new RekallAgeTransactionLogStore().LoadAsync(root, CancellationToken.None)).Transactions);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
     }
 
     private static string TemporaryRoot() =>

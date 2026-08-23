@@ -1,4 +1,5 @@
 using System.IO;
+using Rekall.Age.Core.Transactions;
 using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
 
@@ -47,15 +48,21 @@ public sealed class RekallAgeStudioModelingGraphSession
     private readonly RekallAgeModelingGraphAssetStore _store;
     private readonly RekallAgeModelingNodeCatalog _catalog;
     private readonly RekallAgeModelingGraphEvaluator _evaluator;
+    private readonly RekallAgeModelingGraphPatchService _patches;
+    private readonly RekallAgeTransactionLogStore _transactions;
 
     public RekallAgeStudioModelingGraphSession(
         RekallAgeModelingGraphAssetStore? store = null,
         RekallAgeModelingNodeCatalog? catalog = null,
-        RekallAgeModelingGraphEvaluator? evaluator = null)
+        RekallAgeModelingGraphEvaluator? evaluator = null,
+        RekallAgeModelingGraphPatchService? patches = null,
+        RekallAgeTransactionLogStore? transactions = null)
     {
         _store = store ?? new RekallAgeModelingGraphAssetStore();
         _catalog = catalog ?? RekallAgeModelingNodeCatalog.CreateDefault();
         _evaluator = evaluator ?? new RekallAgeModelingGraphEvaluator();
+        _patches = patches ?? new RekallAgeModelingGraphPatchService();
+        _transactions = transactions ?? new RekallAgeTransactionLogStore();
     }
 
     public string? ProjectRoot { get; private set; }
@@ -107,6 +114,30 @@ public sealed class RekallAgeStudioModelingGraphSession
             ? $"Evaluated {report.EvaluatedNodeCount} node(s) in {report.DurationMilliseconds:F2} ms; {report.CacheHitCount} cache hit(s), {report.InvalidatedNodeCount} invalidated."
             : $"Evaluation failed with {report.Diagnostics.Count(item => item.Severity == RekallAgeModelingDiagnosticSeverity.Error)} error(s); last-good output retained: {report.RetainedLastGoodOutputs}.";
         return report;
+    }
+
+    public async ValueTask<RekallAgeModelingGraphPatchExecution> ApplyPatchAsync(
+        RekallAgeModelingGraphPatch patch,
+        string actor,
+        CancellationToken cancellationToken)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(patch);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actor);
+        var transaction = RekallAgeTransaction.Begin($"Studio patch modeling graph {Graph!.AssetId}");
+        var result = await _patches.ApplyAsync(
+            ProjectRoot!, Graph.AssetId, FileRevision!, patch, transaction, cancellationToken).ConfigureAwait(false);
+        await _transactions.AppendAsync(ProjectRoot!, transaction, actor, cancellationToken).ConfigureAwait(false);
+        Graph = result.Graph;
+        FileRevision = result.AfterFileRevision;
+        OutputNames = Graph.Outputs.Select(output => output.Name).Order(StringComparer.Ordinal).ToArray();
+        if (SelectedOutputName is null || !OutputNames.Contains(SelectedOutputName, StringComparer.Ordinal))
+            SelectedOutputName = OutputNames.FirstOrDefault();
+        Nodes = BuildNodeViews(Graph);
+        Evaluation = null;
+        OutputMesh = null;
+        EvaluationSummary = $"Applied {result.AppliedOperationCount} graph operation(s); logical revision {Graph.Revision}. Ready to evaluate.";
+        return result;
     }
 
     private IReadOnlyList<RekallAgeStudioModelingGraphNodeView> BuildNodeViews(RekallAgeModelingGraphAsset graph) =>

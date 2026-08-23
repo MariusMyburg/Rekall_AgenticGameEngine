@@ -151,18 +151,36 @@ public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
 
         if (TryGetPropertyValue(properties, "anchorMinX", out _) || TryGetPropertyValue(properties, "anchorMaxX", out _))
         {
-            var left = parent.X + parent.Width * Math.Clamp(ReadNumber(properties, "anchorMinX", 0), 0, 1) + ReadNumber(properties, "offsetLeft", 0);
-            var right = parent.X + parent.Width * Math.Clamp(ReadNumber(properties, "anchorMaxX", 1), 0, 1) + ReadNumber(properties, "offsetRight", 0);
-            x = Math.Min(left, right);
-            width = Math.Max(0, right - left);
+            var anchorMinX = Math.Clamp(ReadNumber(properties, "anchorMinX", 0), 0, 1);
+            var anchorMaxX = Math.Clamp(ReadNumber(properties, "anchorMaxX", 1), 0, 1);
+            if (anchorMinX == anchorMaxX)
+            {
+                x = parent.X + parent.Width * anchorMinX + ReadNumber(properties, "x", 0) - width * pivotX;
+            }
+            else
+            {
+                var left = parent.X + parent.Width * anchorMinX + ReadNumber(properties, "offsetLeft", 0);
+                var right = parent.X + parent.Width * anchorMaxX + ReadNumber(properties, "offsetRight", 0);
+                x = Math.Min(left, right);
+                width = Math.Max(0, right - left);
+            }
         }
 
         if (TryGetPropertyValue(properties, "anchorMinY", out _) || TryGetPropertyValue(properties, "anchorMaxY", out _))
         {
-            var top = parent.Y + parent.Height * Math.Clamp(ReadNumber(properties, "anchorMinY", 0), 0, 1) + ReadNumber(properties, "offsetTop", 0);
-            var bottom = parent.Y + parent.Height * Math.Clamp(ReadNumber(properties, "anchorMaxY", 1), 0, 1) + ReadNumber(properties, "offsetBottom", 0);
-            y = Math.Min(top, bottom);
-            height = Math.Max(0, bottom - top);
+            var anchorMinY = Math.Clamp(ReadNumber(properties, "anchorMinY", 0), 0, 1);
+            var anchorMaxY = Math.Clamp(ReadNumber(properties, "anchorMaxY", 1), 0, 1);
+            if (anchorMinY == anchorMaxY)
+            {
+                y = parent.Y + parent.Height * anchorMinY + ReadNumber(properties, "y", 0) - height * pivotY;
+            }
+            else
+            {
+                var top = parent.Y + parent.Height * anchorMinY + ReadNumber(properties, "offsetTop", 0);
+                var bottom = parent.Y + parent.Height * anchorMaxY + ReadNumber(properties, "offsetBottom", 0);
+                y = Math.Min(top, bottom);
+                height = Math.Max(0, bottom - top);
+            }
         }
 
         if (containerProperties is not null && layoutDirection is "horizontal" or "vertical")

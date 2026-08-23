@@ -21,16 +21,6 @@ public sealed class RestoreTransactionPreimageCommand
     private readonly RekallAgeTransactionLogStore _store;
     private readonly IRekallAgeResourceRestorationPolicy _restorationPolicy;
 
-    public RestoreTransactionPreimageCommand()
-        : this(new RekallAgeTransactionLogStore(), new RekallAgeResourceRestorationPolicy())
-    {
-    }
-
-    public RestoreTransactionPreimageCommand(RekallAgeTransactionLogStore store)
-        : this(store, new RekallAgeResourceRestorationPolicy())
-    {
-    }
-
     public RestoreTransactionPreimageCommand(IRekallAgeResourceRestorationPolicy restorationPolicy)
         : this(new RekallAgeTransactionLogStore(), restorationPolicy)
     {

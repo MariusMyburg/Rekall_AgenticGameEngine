@@ -101,7 +101,9 @@ public sealed class ModelAssetPlacementTests
 
         var history = new RekallAgeTransactionLogStore();
         await history.AppendAsync(fixture.Root, context.Transaction, context.Actor, default);
-        var undo = await new RestoreTransactionPreimageCommand(history).ExecuteAsync(
+        var undo = await new RestoreTransactionPreimageCommand(
+            history,
+            new RekallAgeResourceRestorationPolicy()).ExecuteAsync(
             new(fixture.Root, context.Transaction.Id, "Scenes/Main.age.scene.json"),
             Context("undo placement"));
 

@@ -69,7 +69,9 @@ public sealed class MeshEditServiceTests
         File.Delete(Path.Combine(root, preimage.SnapshotPath!));
         var undo = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("delta undo"), CancellationToken.None);
 
-        var result = await new RestoreTransactionPreimageCommand(history).ExecuteAsync(
+        var result = await new RestoreTransactionPreimageCommand(
+            history,
+            new RekallAgeResourceRestorationPolicy()).ExecuteAsync(
             new(root, edit.Id, Path.GetRelativePath(root, store.GetMeshPath(root, "triangle"))),
             undo);
 
@@ -96,7 +98,9 @@ public sealed class MeshEditServiceTests
         var relativePath = Path.GetRelativePath(root, store.GetMeshPath(root, "triangle"));
         var undo = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("undo grouped mesh edit"), CancellationToken.None);
 
-        var undone = await new RestoreTransactionPreimageCommand(history).ExecuteAsync(
+        var undone = await new RestoreTransactionPreimageCommand(
+            history,
+            new RekallAgeResourceRestorationPolicy()).ExecuteAsync(
             new(root, edit.Id, relativePath),
             undo);
 
@@ -107,7 +111,9 @@ public sealed class MeshEditServiceTests
         await history.AppendAsync(root, undo.Transaction, "agent", CancellationToken.None);
         var redo = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("redo grouped mesh edit"), CancellationToken.None);
 
-        var redone = await new RestoreTransactionPreimageCommand(history).ExecuteAsync(
+        var redone = await new RestoreTransactionPreimageCommand(
+            history,
+            new RekallAgeResourceRestorationPolicy()).ExecuteAsync(
             new(root, undo.Transaction.Id, relativePath),
             redo);
 

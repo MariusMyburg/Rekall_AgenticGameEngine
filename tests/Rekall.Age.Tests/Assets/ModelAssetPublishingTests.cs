@@ -363,7 +363,9 @@ public sealed class ModelAssetPublishingTests
             "agent", RekallAgeTransaction.Begin("attempt immutable restore"), default);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new RestoreTransactionPreimageCommand().ExecuteAsync(
+            new RestoreTransactionPreimageCommand(
+                new RekallAgeResourceRestorationPolicy(
+                    new RekallAgeModelAssetAppendOnlyResourceClassifier())).ExecuteAsync(
                 new(fixture.Root, publicationTransaction.Id, relativeOutputPath),
                 restoreContext).AsTask());
 

@@ -326,7 +326,8 @@ public sealed class WorkbenchSessionTests
         registry.Register(new SetComponentPropertyCommand());
         registry.Register(new RemoveComponentPropertyCommand());
         registry.Register(new RemoveComponentCommand());
-        registry.Register(new RestoreTransactionPreimageCommand());
+        registry.Register(new RestoreTransactionPreimageCommand(
+            new RekallAgeResourceRestorationPolicy()));
         return registry;
     }
 }

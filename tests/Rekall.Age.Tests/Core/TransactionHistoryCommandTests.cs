@@ -49,7 +49,9 @@ public sealed class TransactionHistoryCommandTests
         initial["values"]![129] = 901;
         await File.WriteAllTextAsync(path, initial.ToJsonString(new() { WriteIndented = true }) + Environment.NewLine);
 
-        var result = await new RestoreTransactionPreimageCommand(history).ExecuteAsync(
+        var result = await new RestoreTransactionPreimageCommand(
+            history,
+            new RekallAgeResourceRestorationPolicy()).ExecuteAsync(
             new(root, transaction.Id, "large.age.json"),
             new("agent", RekallAgeTransaction.Begin("restore"), CancellationToken.None));
 
@@ -192,7 +194,8 @@ public sealed class TransactionHistoryCommandTests
         await new RekallAgeTransactionLogStore().AppendAsync(root, mutateContext.Transaction, mutateContext.Actor, CancellationToken.None);
         var restoreContext = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("restore speed"), CancellationToken.None);
 
-        var result = await new RestoreTransactionPreimageCommand().ExecuteAsync(
+        var result = await new RestoreTransactionPreimageCommand(
+            new RekallAgeResourceRestorationPolicy()).ExecuteAsync(
             new RestoreTransactionPreimageRequest(
                 root,
                 mutateContext.Transaction.Id,

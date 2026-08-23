@@ -27,7 +27,8 @@ public sealed class McpCatalogTests
         registry.Register(new ValidateProjectCommand());
         registry.Register(new ValidateSceneCommand());
         registry.Register(new ListTransactionHistoryCommand());
-        registry.Register(new RestoreTransactionPreimageCommand());
+        registry.Register(new RestoreTransactionPreimageCommand(
+            new RekallAgeResourceRestorationPolicy()));
         registry.Register(new CreateProjectCommand());
         registry.Register(new VerifyPlayableGameCommand());
         registry.Register(new PackagePlayableGameCommand());

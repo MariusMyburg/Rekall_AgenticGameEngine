@@ -34,6 +34,24 @@ public sealed class RekallAgeMaterialGraphValidator
             ValidateParameters(node, descriptor, diagnostics);
         }
 
+        var exposedNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var exposed in graph.ExposedParameters)
+        {
+            if (!ValidId(exposed.Name) || !exposedNames.Add(exposed.Name))
+            {
+                Error(diagnostics, "REKALL_MATERIAL_GRAPH_EXPOSED_ID_DUPLICATE", $"Exposed parameter name '{exposed.Name}' is invalid or duplicated.", exposed.NodeId);
+                continue;
+            }
+            if (!descriptors.TryGetValue(exposed.NodeId, out var descriptor))
+            {
+                Error(diagnostics, "REKALL_MATERIAL_GRAPH_EXPOSED_NODE_UNKNOWN", $"Exposed parameter '{exposed.Name}' references an unknown node.", exposed.NodeId);
+                continue;
+            }
+            var parameter = descriptor.Parameters.FirstOrDefault(item => item.ParameterId == exposed.ParameterId);
+            if (parameter is null || parameter.ValueType != exposed.ValueType)
+                Error(diagnostics, "REKALL_MATERIAL_GRAPH_EXPOSED_PARAMETER_INVALID", $"Exposed parameter '{exposed.Name}' does not match a typed node parameter.", exposed.NodeId);
+        }
+
         var linkIds = new HashSet<string>(StringComparer.Ordinal);
         var validLinks = new List<RekallAgeMaterialGraphLink>();
         foreach (var link in graph.Links)

@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 07:54 Africa/Johannesburg
+Last verified: 2026-08-23 08:00 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -322,6 +322,25 @@ atomic publication, recovery preimages, and exact logical-revision progression.
 The material contract/validation/persistence proofs and all procedural graph
 tests pass 19/19. Backend-neutral compilation IR, mapped GLSL/WGSL generation,
 material-instance persistence, and generic modifiers remain active.
+
+The semantic material graph now compiles through one deterministic intermediate
+evaluation into Vulkan GLSL and WebGPU WGSL rather than maintaining backend-
+specific authoring formats. All eleven initial nodes emit typed expressions;
+texture samples receive stable scene-ABI set-2 texture/sampler pairs with an
+explicit seven-texture bound, and both sources carry node/port-to-generated-line
+maps for diagnostic attribution. The generated portable surface contains base
+color, metallic, roughness, normal, and emissive channels and feeds a shared
+lighting closure. Identical graphs produce identical source and SHA-256 content
+identity. The GLSL proof physically compiles the generated fragment source to
+nonempty SPIR-V; the WGSL source uses matching bindings and WebGPU entry syntax.
+Material instances now persist independently under `Materials/Instances`, bind
+to an exact material-graph SHA-256 revision, expose only graph-declared typed and
+ranged overrides, publish atomically with logical revisions and recovery, and
+resolve onto cloned node parameters without mutating the base graph. Unknown
+overrides and stale graph revisions publish nothing. The focused material suite
+passes 7/7. Ordered generic modifier descriptors/evaluation are active next;
+physical WebGPU material rendering and richer PBR integration remain required
+before the material path is considered visually complete.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

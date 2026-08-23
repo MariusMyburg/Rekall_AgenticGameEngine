@@ -114,4 +114,16 @@ public sealed record RekallAgeMaterialInstanceAsset(
     IReadOnlyDictionary<string, JsonNode?> Overrides)
 {
     public const int CurrentSchemaVersion = 1;
+
+    public static RekallAgeMaterialInstanceAsset Create(
+        string assetId,
+        string name,
+        string graphAssetId,
+        string graphFileRevision,
+        IReadOnlyDictionary<string, JsonNode?>? overrides = null) =>
+        new(CurrentSchemaVersion, assetId, name, 1, graphAssetId, graphFileRevision,
+            (overrides ?? new Dictionary<string, JsonNode?>()).ToDictionary(
+                item => item.Key,
+                item => item.Value?.DeepClone(),
+                StringComparer.Ordinal));
 }

@@ -106,9 +106,9 @@ then grow it into procedural geometry/material graphs and Studio modelling.
 
 ### Task 8: Semantic material graphs and modifiers
 
-- [ ] Add typed material graph documents, node descriptors, instances, and
+- [x] Add typed material graph documents, node descriptors, instances, and
   Vulkan/WebGPU compilers with node/port source mapping.
-- [ ] Add initial constant/coordinate/mapping/texture/math/mix/normal/PBR/
+- [x] Add initial constant/coordinate/mapping/texture/math/mix/normal/PBR/
   emissive/output nodes.
 - [ ] Add ordered modifier descriptors, immutable evaluation, cache identity,
   attribute-propagation policy, preview, reorder, configure, and bake.

@@ -4,9 +4,29 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 10:05 Africa/Johannesburg
+Last verified: 2026-08-23 10:22 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
+
+Studio procedural graphs now expose descriptor-driven typed parameter editors
+for scalar, integer, Boolean, string, enum, material, and vector values. Editors
+enforce finite numbers, declared bounds, enum choices, and exact vector arity;
+the apply command is enabled only for a valid changed set. One action publishes
+one exact-revision graph patch through the canonical service, reloads the
+canonical graph, retains honest invalidation state, reevaluates the selected
+output, refreshes its deterministic mesh preview, and reports patch/evaluation
+diagnostics. The reusable `ProceduralModelingProbe` project supplies a populated
+six-node box/sphere/transform/Boolean/UV/output graph for real Studio acceptance.
+The complete Studio suite passes 36/36 and a zero-warning Studio build succeeds.
+
+That probe exposed and drove a generic persistence repair: every modeling asset
+store now canonicalizes relative project roots before publishing mesh, modeling
+graph, material graph, material instance, or modifier-stack resource paths.
+This prevents transaction summarization from resolving a relative root twice.
+A red-to-green five-store regression and a real relative-root CLI graph patch
+both prove an absolute changed resource, correct project-relative display path,
+and `exists: true`. The complete modeling namespace now passes 101/101, and a
+solution-wide locked restore succeeds.
 
 Studio now opens persisted procedural modelling graphs as exact revisioned
 assets and presents the same canonical node descriptors used by CLI/MCP:
@@ -36,19 +56,20 @@ output, retain the evaluator cache for honest dependency invalidation evidence,
 and append recoverable transaction history. A parameter-edit proof changes a
 box from two to four world units, advances logical/file revisions, records one
 transaction, and then observes both reachable nodes invalidated on reevaluation.
-The focused graph-session selection passes 4/4. Typed graph-patch controls and
-the visual node canvas remain the next Studio authoring slice.
+The focused graph-session selection passes 6/6. Typed graph-patch controls are
+now present; the visual node canvas and structural add/link/remove controls
+remain the next Studio authoring slice.
 
 The modeling/Studio tranche is now fast-forwarded onto local `master` through
 `8b34093`. Integration validation found and repaired two stale transitive lock
 graphs: the Windows and Web players now include the modelling project's
 `SamuelRe.CSG.Sharp` dependency and a solution-wide locked restore succeeds.
 The merged checkout's complete Studio suite passes 34/34. A broader modelling
-test build exhausted the F: volume while copying reproducible CLI runtime
-outputs, not while executing tests; those build outputs were cleaned safely.
-The existing focused modelling evidence remains 100/100 from the feature
-worktree, and the full merged-checkout modelling rerun remains queued once
-adequate build space is available.
+test build initially exhausted the F: volume while copying reproducible CLI
+runtime outputs, not while executing tests; those build outputs were cleaned
+safely. With space restored, the active feature worktree now passes the full
+modeling selection at 101/101; the next master merge will rerun that same proof
+on the integrated checkout.
 
 The first optimization primitive is verified across every canonical modeling
 composition path. `merge_by_distance` welds selected points through a bounded,

@@ -9,8 +9,10 @@ using System.Text.Json.Nodes;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using Rekall.Age.Agent.LanguageModels;
+using Rekall.Age.Core.Persistence;
 using Rekall.Age.Editor;
 using Rekall.Age.Editor.Contracts;
+using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
@@ -70,6 +72,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _refreshModelingGraphsCommand;
     private readonly RekallAgeAsyncCommand _openModelingGraphCommand;
     private readonly RekallAgeAsyncCommand _evaluateModelingGraphCommand;
+    private readonly RekallAgeAsyncCommand _applyModelingGraphParametersCommand;
     private Process? _player;
     private CancellationTokenSource? _agentCancellation;
     private bool _isBusy;
@@ -101,6 +104,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string? _selectedModelingGraphOutput;
     private string _modelingGraphSummary = "Open a procedural graph to inspect its nodes and evaluation evidence.";
     private BitmapSource? _modelingGraphViewportImage;
+    private RekallAgeStudioModelingGraphNodeView? _selectedModelingGraphNode;
     private string? _lastPackagePath;
     private string _statusText = "Create or open a Rekall AGE project to begin.";
     private string _viewportTitle = "Viewport";
@@ -177,6 +181,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _refreshModelingGraphsCommand = CreateAsyncCommand(RefreshModelingGraphsAsync, HasOpenProject);
         _openModelingGraphCommand = CreateAsyncCommand(OpenModelingGraphAsync, CanOpenModelingGraph);
         _evaluateModelingGraphCommand = CreateAsyncCommand(EvaluateModelingGraphAsync, CanEvaluateModelingGraph);
+        _applyModelingGraphParametersCommand = CreateAsyncCommand(ApplyModelingGraphParametersAsync, CanApplyModelingGraphParameters);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -203,6 +208,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> ModelingGraphOutputNames { get; } = [];
     public ObservableCollection<RekallAgeStudioModelingGraphNodeView> ModelingGraphNodes { get; } = [];
     public ObservableCollection<string> ModelingGraphDiagnosticLines { get; } = [];
+    public ObservableCollection<RekallAgeStudioModelingGraphParameterModel> ModelingGraphParameterEditors { get; } = [];
     public IReadOnlyList<RekallAgeGeometryDomain> MeshEditDomains { get; } =
         [RekallAgeGeometryDomain.Point, RekallAgeGeometryDomain.Edge, RekallAgeGeometryDomain.Face, RekallAgeGeometryDomain.Corner];
     public IReadOnlyList<RekallAgeLanguageModelToolExecution> LastAgentToolExecutions => _lastAgentToolExecutions;
@@ -240,6 +246,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand RefreshModelingGraphsCommand => _refreshModelingGraphsCommand;
     public ICommand OpenModelingGraphCommand => _openModelingGraphCommand;
     public ICommand EvaluateModelingGraphCommand => _evaluateModelingGraphCommand;
+    public ICommand ApplyModelingGraphParametersCommand => _applyModelingGraphParametersCommand;
 
     public string ProjectPathInput
     {
@@ -405,6 +412,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         get => _modelingGraphViewportImage;
         private set => Set(ref _modelingGraphViewportImage, value);
+    }
+
+    public RekallAgeStudioModelingGraphNodeView? SelectedModelingGraphNode
+    {
+        get => _selectedModelingGraphNode;
+        set
+        {
+            if (!Set(ref _selectedModelingGraphNode, value)) return;
+            RefreshModelingGraphParameterEditors();
+        }
     }
 
     public void SelectMeshViewportElement(double normalizedX, double normalizedY, bool extend, bool toggle)
@@ -631,6 +648,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private bool CanOpenModelingGraph() => HasEditableProject() && !string.IsNullOrWhiteSpace(SelectedModelingGraphAssetId);
     private bool CanEvaluateModelingGraph() => HasEditableProject() && _modelingGraph.Graph is not null
         && !string.IsNullOrWhiteSpace(SelectedModelingGraphOutput);
+    private bool CanApplyModelingGraphParameters() => HasEditableProject()
+        && SelectedModelingGraphNode is not null
+        && ModelingGraphParameterEditors.Count > 0
+        && ModelingGraphParameterEditors.All(item => item.IsValid)
+        && ModelingGraphParameterEditors.Any(item => item.IsModified);
 
     private Task RefreshMeshAssetsAsync() => RunModelingAsync(() =>
     {
@@ -701,6 +723,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         Replace(ModelingGraphDiagnosticLines, []);
         ModelingGraphViewportImage = null;
         ModelingGraphSummary = _modelingGraph.EvaluationSummary;
+        SelectedModelingGraphNode = ModelingGraphNodes.FirstOrDefault();
     });
 
     private Task EvaluateModelingGraphAsync() => RunGraphModelingAsync(async () =>
@@ -721,12 +744,51 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 preview: false).Image;
     });
 
+    private Task ApplyModelingGraphParametersAsync() => RunGraphModelingAsync(async () =>
+    {
+        var selectedNodeId = SelectedModelingGraphNode!.NodeId;
+        var result = await _modelingGraph.ApplyParameterEditsAsync(
+            selectedNodeId,
+            ModelingGraphParameterEditors,
+            "studio",
+            _lifecycleCancellation.Token);
+        Replace(ModelingGraphNodes, _modelingGraph.Nodes);
+        Replace(ModelingGraphOutputNames, _modelingGraph.OutputNames);
+        SelectedModelingGraphOutput = _modelingGraph.SelectedOutputName;
+        SelectedModelingGraphNode = ModelingGraphNodes.FirstOrDefault(item => item.NodeId == selectedNodeId);
+        Replace(ModelingGraphDiagnosticLines, result.Validation.Diagnostics.Select(item =>
+            $"{item.Severity}: {item.Code}{(item.NodeId is null ? string.Empty : $" [{item.NodeId}]")} - {item.Message}"));
+        ModelingGraphSummary = _modelingGraph.EvaluationSummary;
+        if (SelectedModelingGraphOutput is not null)
+        {
+            var evaluation = await _modelingGraph.EvaluateAsync(SelectedModelingGraphOutput, _lifecycleCancellation.Token);
+            Replace(ModelingGraphNodes, _modelingGraph.Nodes);
+            foreach (var diagnostic in evaluation.Diagnostics)
+                ModelingGraphDiagnosticLines.Add($"{diagnostic.Severity}: {diagnostic.Code}{(diagnostic.NodeId is null ? string.Empty : $" [{diagnostic.NodeId}]")} - {diagnostic.Message}");
+            ModelingGraphSummary = _modelingGraph.EvaluationSummary;
+            ModelingGraphViewportImage = _modelingGraph.OutputMesh is null
+                ? null
+                : _meshViewportRenderer.Render(
+                    _modelingGraph.OutputMesh,
+                    RekallAgeGeometryDomain.Face,
+                    [],
+                    640,
+                    360,
+                    preview: false).Image;
+        }
+    });
+
     private async Task RunModelingAsync(Func<Task> operation)
     {
         if (IsBusy) return;
         IsBusy = true;
         try { await operation(); StatusText = MeshSummary; }
-        catch (Exception exception) when (exception is IOException or InvalidOperationException or ArgumentException or JsonException)
+        catch (Exception exception) when (exception is IOException
+                                            or InvalidOperationException
+                                            or ArgumentException
+                                            or JsonException
+                                            or RekallAgeDocumentRevisionException
+                                            or RekallAgeModelingGraphPatchException)
         {
             StatusText = exception.Message;
             Replace(MeshDiagnosticLines, [$"error: REKALL_STUDIO_MODELING_OPERATION_FAILED - {exception.Message}"]);
@@ -739,12 +801,27 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (IsBusy) return;
         IsBusy = true;
         try { await operation(); StatusText = ModelingGraphSummary; }
-        catch (Exception exception) when (exception is IOException or InvalidOperationException or ArgumentException or JsonException)
+        catch (Exception exception) when (exception is IOException
+                                            or InvalidOperationException
+                                            or ArgumentException
+                                            or JsonException
+                                            or RekallAgeDocumentRevisionException
+                                            or RekallAgeModelingGraphPatchException)
         {
             StatusText = exception.Message;
             Replace(ModelingGraphDiagnosticLines, [$"error: REKALL_STUDIO_MODELING_GRAPH_FAILED - {exception.Message}"]);
         }
         finally { IsBusy = false; }
+    }
+
+    private void RefreshModelingGraphParameterEditors()
+    {
+        Replace(ModelingGraphParameterEditors, SelectedModelingGraphNode is null
+            ? []
+            : _modelingGraph.CreateParameterEditors(SelectedModelingGraphNode.NodeId));
+        foreach (var editor in ModelingGraphParameterEditors)
+            editor.PropertyChanged += (_, _) => RefreshCommands();
+        RefreshCommands();
     }
 
     private JsonObject ParseMeshParameters()
@@ -1529,6 +1606,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _refreshModelingGraphsCommand.RaiseCanExecuteChanged();
         _openModelingGraphCommand.RaiseCanExecuteChanged();
         _evaluateModelingGraphCommand.RaiseCanExecuteChanged();
+        _applyModelingGraphParametersCommand.RaiseCanExecuteChanged();
     }
 
     private RekallAgeAsyncCommand CreateAsyncCommand(Func<Task> execute, Func<bool> canExecute) =>

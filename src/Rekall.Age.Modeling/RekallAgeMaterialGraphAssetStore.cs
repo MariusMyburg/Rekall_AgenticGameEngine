@@ -17,7 +17,7 @@ public sealed class RekallAgeMaterialGraphAssetStore
     public string GetGraphPath(string projectRoot, string assetId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot); ValidateId(assetId);
-        return Path.Combine(projectRoot, "Materials", "Graphs", assetId + FileSuffix);
+        return Path.Combine(Path.GetFullPath(projectRoot), "Materials", "Graphs", assetId + FileSuffix);
     }
 
     public string GetRecoveryPath(string projectRoot, string assetId) => RekallAgeDocumentRecoveryStore.GetPreviousPath(projectRoot, GetGraphPath(projectRoot, assetId));

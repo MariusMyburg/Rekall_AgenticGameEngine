@@ -18,7 +18,7 @@ public sealed class RekallAgeMeshAssetStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
         ValidateAssetId(assetId);
-        return Path.Combine(projectRoot, "Modeling", "Meshes", assetId + FileSuffix);
+        return Path.Combine(Path.GetFullPath(projectRoot), "Modeling", "Meshes", assetId + FileSuffix);
     }
 
     public string GetRecoveryPath(string projectRoot, string assetId) =>

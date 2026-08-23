@@ -122,6 +122,10 @@ then grow it into procedural geometry/material graphs and Studio modelling.
   diagnostics, and common mesh-output rendering.
 - [x] Route Studio graph mutations through the canonical revision-safe patch
   service with recoverable transaction history and reevaluation invalidation.
+- [x] Add typed descriptor-driven graph parameter editors that publish one
+  exact-revision patch and automatically reevaluate visible output evidence.
+- [x] Canonicalize relative project roots across every modeling asset store and
+  prove correct transaction resource evidence through the real CLI path.
 - [x] Establish shared editor panel/header/section tokens and visually inspect
   the first Blender-informed dense workspace slice in the real Windows Studio.
 - [ ] Add viewport element picking, mesh edit modes, selection history, operation

@@ -16,7 +16,7 @@ public sealed class RekallAgeMaterialInstanceAssetStore
     public string GetInstancePath(string projectRoot, string assetId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot); ValidateId(assetId, "Material instance");
-        return Path.Combine(projectRoot, "Materials", "Instances", assetId + FileSuffix);
+        return Path.Combine(Path.GetFullPath(projectRoot), "Materials", "Instances", assetId + FileSuffix);
     }
     public string GetRecoveryPath(string projectRoot, string assetId) => RekallAgeDocumentRecoveryStore.GetPreviousPath(projectRoot, GetInstancePath(projectRoot, assetId));
 

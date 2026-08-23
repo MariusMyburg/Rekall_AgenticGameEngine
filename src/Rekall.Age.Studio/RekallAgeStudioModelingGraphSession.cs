@@ -140,6 +140,47 @@ public sealed class RekallAgeStudioModelingGraphSession
         return result;
     }
 
+    public IReadOnlyList<RekallAgeStudioModelingGraphParameterModel> CreateParameterEditors(string nodeId)
+    {
+        EnsureOpen();
+        ArgumentException.ThrowIfNullOrWhiteSpace(nodeId);
+        var node = Graph!.Nodes.SingleOrDefault(item => item.NodeId.Equals(nodeId, StringComparison.Ordinal))
+            ?? throw new ArgumentException($"Node '{nodeId}' does not exist in graph '{Graph.AssetId}'.", nameof(nodeId));
+        var descriptor = _catalog.Find(node.TypeId, node.TypeVersion)
+            ?? throw new InvalidDataException($"Unknown modelling node type '{node.TypeId}' version {node.TypeVersion}.");
+        return descriptor.Parameters.Select(parameter => new RekallAgeStudioModelingGraphParameterModel(
+            parameter,
+            node.Parameters[parameter.ParameterId] ?? parameter.DefaultValue)).ToArray();
+    }
+
+    public async ValueTask<RekallAgeModelingGraphPatchExecution> ApplyParameterEditsAsync(
+        string nodeId,
+        IReadOnlyList<RekallAgeStudioModelingGraphParameterModel> editors,
+        string actor,
+        CancellationToken cancellationToken)
+    {
+        EnsureOpen();
+        ArgumentException.ThrowIfNullOrWhiteSpace(nodeId);
+        ArgumentNullException.ThrowIfNull(editors);
+        var operations = new List<RekallAgeModelingGraphPatchOperation>();
+        foreach (var editor in editors)
+        {
+            if (!editor.TryGetValue(out var value))
+                throw new ArgumentException($"Parameter '{editor.ParameterId}' is invalid.", nameof(editors));
+            if (editor.IsModified)
+                operations.Add(new(
+                    RekallAgeModelingGraphPatchKind.SetParameter,
+                    TargetId: nodeId,
+                    ParameterId: editor.ParameterId,
+                    Value: value));
+        }
+        if (operations.Count == 0)
+            throw new InvalidOperationException("Change at least one node parameter before applying graph edits.");
+        var result = await ApplyPatchAsync(new(operations), actor, cancellationToken).ConfigureAwait(false);
+        foreach (var editor in editors) editor.AcceptChanges();
+        return result;
+    }
+
     private IReadOnlyList<RekallAgeStudioModelingGraphNodeView> BuildNodeViews(RekallAgeModelingGraphAsset graph) =>
         graph.Nodes.Select(node =>
         {

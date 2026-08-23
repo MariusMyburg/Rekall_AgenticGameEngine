@@ -19,7 +19,7 @@ public sealed class RekallAgeModelingGraphAssetStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
         ValidateAssetId(assetId);
-        return Path.Combine(projectRoot, "Modeling", "Graphs", assetId + FileSuffix);
+        return Path.Combine(Path.GetFullPath(projectRoot), "Modeling", "Graphs", assetId + FileSuffix);
     }
 
     public string GetRecoveryPath(string projectRoot, string assetId) =>

@@ -227,7 +227,9 @@
                                     <Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}">
                                         <TextBlock Text="NODE CONTRACTS" FontWeight="SemiBold" FontSize="11" />
                                     </Border>
-                                    <ListBox ItemsSource="{Binding ModelingGraphNodes}" BorderThickness="0">
+                                    <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                    <ListBox ItemsSource="{Binding ModelingGraphNodes}" SelectedItem="{Binding SelectedModelingGraphNode}" BorderThickness="0">
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
                                                 <Border BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1" Padding="7">
@@ -256,6 +258,29 @@
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
                                     </ListBox>
+                                    <Border Grid.Row="1" Background="{StaticResource PanelRaised}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,1,0,0" Padding="8">
+                                        <StackPanel>
+                                            <TextBlock Text="TYPED PARAMETERS" Style="{StaticResource SectionLabel}" />
+                                            <ScrollViewer MaxHeight="112" VerticalScrollBarVisibility="Auto" Margin="0,5,0,5">
+                                                <ItemsControl ItemsSource="{Binding ModelingGraphParameterEditors}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Margin="0,0,0,5" ToolTip="{Binding Description}">
+                                                                <Grid.ColumnDefinitions><ColumnDefinition Width="120" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                                <StackPanel>
+                                                                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="11" />
+                                                                    <TextBlock Foreground="{StaticResource MutedText}" FontSize="9"><Run Text="{Binding TypeLabel}" /><Run Text=" · " /><Run Text="{Binding Unit}" /></TextBlock>
+                                                                </StackPanel>
+                                                                <ComboBox Grid.Column="1" ItemsSource="{Binding EnumChoices}" Text="{Binding ValueText, UpdateSourceTrigger=PropertyChanged}" IsEditable="True" Padding="5,2" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                            <Button Content="Apply Parameters + Re-evaluate" Command="{Binding ApplyModelingGraphParametersCommand}" Style="{StaticResource AccentButton}" Padding="7,3" />
+                                        </StackPanel>
+                                    </Border>
+                                    </Grid>
                                 </DockPanel>
                             </Border>
                             <Grid Grid.Column="2">

@@ -1,0 +1,9 @@
+{
+  "id": "scene_procedural_modeling_probe",
+  "name": "Main",
+  "capabilities": [
+    "rendering3d",
+    "world"
+  ],
+  "entities": []
+}

@@ -110,6 +110,61 @@ public sealed class StudioModelingGraphSessionTests
         }
     }
 
+    [Fact]
+    public async Task TypedParameterEditorsApplyOnlyChangedValuesAsOnePatch()
+    {
+        var root = TemporaryRoot();
+        try
+        {
+            await new RekallAgeModelingGraphAssetStore().SaveAsync(root, BoxGraph(), CancellationToken.None);
+            var session = new RekallAgeStudioModelingGraphSession();
+            await session.OpenAsync(root, "box-graph", CancellationToken.None);
+            var editors = session.CreateParameterEditors("box");
+            var sizeX = editors.Single(item => item.ParameterId == "sizeX");
+
+            Assert.Equal("2", sizeX.ValueText);
+            Assert.False(sizeX.IsModified);
+            sizeX.ValueText = "not-a-number";
+            Assert.False(sizeX.IsValid);
+            sizeX.ValueText = "4";
+            Assert.True(sizeX.IsValid);
+            Assert.True(sizeX.IsModified);
+
+            var result = await session.ApplyParameterEditsAsync("box", editors, "studio", CancellationToken.None);
+
+            Assert.Equal(1, result.AppliedOperationCount);
+            Assert.Equal(4, session.Graph!.Nodes.Single(item => item.NodeId == "box").Parameters["sizeX"]!.GetValue<double>());
+            Assert.All(editors, item => Assert.False(item.IsModified));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void TypedParameterEditorParsesFiniteVectorsAndProvidesEnumChoices()
+    {
+        var transform = RekallAgeModelingNodeCatalog.CreateDefault().Find("rekall.modeling.transform", 1)!;
+        var translation = new RekallAgeStudioModelingGraphParameterModel(
+            transform.Parameters.Single(item => item.ParameterId == "translation"),
+            new JsonArray(1.0, 2.0, 3.0));
+
+        translation.ValueText = "[1, 2]";
+        Assert.False(translation.IsValid);
+        translation.ValueText = "[4, 5, 6]";
+        Assert.True(translation.TryGetValue(out var vector));
+        Assert.Equal(6, vector![2]!.GetValue<double>());
+
+        var boolean = RekallAgeModelingNodeCatalog.CreateDefault().Find("rekall.modeling.boolean", 1)!;
+        var operation = new RekallAgeStudioModelingGraphParameterModel(
+            boolean.Parameters.Single(item => item.ParameterId == "operation"),
+            JsonValue.Create("union"));
+        Assert.Equal(["union", "intersect", "difference"], operation.EnumChoices);
+        operation.ValueText = "unsupported";
+        Assert.False(operation.IsValid);
+    }
+
     private static string TemporaryRoot() =>
         Path.Combine(Path.GetTempPath(), "rekall-age-studio-graph-" + Guid.NewGuid().ToString("N"));
 

@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "assetId": "hero-form",
+  "name": "Hero Form",
+  "revision": 2,
+  "nodes": [
+    {
+      "nodeId": "box",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 2.0,
+        "sizeY": 2.0,
+        "sizeZ": 2.0
+      }
+    },
+    {
+      "nodeId": "sphere",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 1.25,
+        "segments": 24,
+        "rings": 12
+      }
+    },
+    {
+      "nodeId": "move-sphere",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0.7,
+          0.4,
+          0.5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "nodeId": "union",
+      "typeId": "rekall.modeling.boolean",
+      "typeVersion": 1,
+      "parameters": {
+        "operation": "union"
+      }
+    },
+    {
+      "nodeId": "uv",
+      "typeId": "rekall.modeling.project_uv",
+      "typeVersion": 1,
+      "parameters": {
+        "attribute": "uv.generated",
+        "axis": "xy",
+        "scaleU": 0.25,
+        "scaleV": 0.25,
+        "offsetU": 0,
+        "offsetV": 0
+      }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "box-union",
+      "fromNodeId": "box",
+      "fromPortId": "geometry",
+      "toNodeId": "union",
+      "toPortId": "a"
+    },
+    {
+      "linkId": "sphere-move",
+      "fromNodeId": "sphere",
+      "fromPortId": "geometry",
+      "toNodeId": "move-sphere",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "move-union",
+      "fromNodeId": "move-sphere",
+      "fromPortId": "geometry",
+      "toNodeId": "union",
+      "toPortId": "b"
+    },
+    {
+      "linkId": "union-uv",
+      "fromNodeId": "union",
+      "fromPortId": "geometry",
+      "toNodeId": "uv",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "uv-output",
+      "fromNodeId": "uv",
+      "fromPortId": "geometry",
+      "toNodeId": "output",
+      "toPortId": "input"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "output",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

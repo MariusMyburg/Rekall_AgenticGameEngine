@@ -12,7 +12,7 @@ public sealed class RekallAgeModifierStackAssetStore
     private const string Suffix = ".age.modifier-stack.json";
     private static readonly JsonSerializerOptions JsonOptions = new(RekallAgeModelingJson.Options) { MaxDepth = RekallAgeDocumentSchemaProbe.MaximumDocumentDepth };
     private readonly RekallAgeModifierStackValidator _validator = new();
-    public string GetStackPath(string root, string id) { ArgumentException.ThrowIfNullOrWhiteSpace(root); ValidateId(id); return Path.Combine(root, "Modeling", "ModifierStacks", id + Suffix); }
+    public string GetStackPath(string root, string id) { ArgumentException.ThrowIfNullOrWhiteSpace(root); ValidateId(id); return Path.Combine(Path.GetFullPath(root), "Modeling", "ModifierStacks", id + Suffix); }
     public string GetRecoveryPath(string root, string id) => RekallAgeDocumentRecoveryStore.GetPreviousPath(root, GetStackPath(root, id));
     public async ValueTask<string> SaveIfRevisionAsync(string root, RekallAgeModifierStackAsset stack, string expectedRevision, CancellationToken token)
     {

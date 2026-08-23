@@ -31,6 +31,7 @@ Permanent architectural rule:
 - When agent-authored visual output is technically valid but weak, improve generic viewport/camera/layout diagnostics first. Do not add built-in "make a showcase" or game-specific composition workflows when agents can revise ordinary scene blueprints, transforms, cameras, and renderables from better inspection facts.
 - When a user-facing example fails, fix the generic engine contract first, then update the example as a consumer of that contract.
 - Before adding a new built-in runtime behavior, ask whether an AI agent could author it cleanly from existing primitives. If yes, improve the primitives instead.
+- After a clean fast-forward merge or conflict-free cherry-pick of the exact commit that was already built and tested, do not rerun the identical build/test suite solely because the branch name changed. Verify the resulting commit identity, clean worktree, and push instead. Rerun only when integration changed bytes, generated/installed artifacts must be refreshed, the target environment differs, or a broader acceptance gate is genuinely due.
 
 OpenXR operational note from the local FPS test:
 

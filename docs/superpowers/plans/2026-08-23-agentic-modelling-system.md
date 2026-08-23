@@ -92,8 +92,8 @@ then grow it into procedural geometry/material graphs and Studio modelling.
 
 ### Task 7: Procedural modelling graph
 
-- [ ] Add versioned graph/node/port contracts and canonical node descriptors.
-- [ ] Add atomic revision-checked graph patches and structural/type/domain/cycle
+- [x] Add versioned graph/node/port contracts and canonical node descriptors.
+- [x] Add atomic revision-checked graph patches and structural/type/domain/cycle
   validation.
 - [ ] Add deterministic demand evaluation, dependency invalidation, node-hash
   caching, budgets, and bounded reports.

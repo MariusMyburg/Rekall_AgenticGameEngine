@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 07:08 Africa/Johannesburg
+Last verified: 2026-08-23 07:24 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -194,6 +194,29 @@ pick, pixel, SHA-256, undo, and redo facts under
 `docs/production/evidence/agentic-modelling-closed-loop`. The focused modelling,
 MCP-catalog, rendering, and transaction selections remain green. Task 7's
 versioned procedural modelling graph is active next.
+
+Task 7 now has its source-document, descriptor, validation, persistence, and
+atomic-patch foundation. Twelve canonical version-1 node descriptors cover box,
+grid, and sphere primitives plus transform, join, extrude, triangulate, captured
+and named attributes, scalar field math, material assignment, and mesh output.
+Descriptors expose typed directional ports, cardinality, required inputs,
+parameters, defaults, ranges, units, and enum choices from one C#/future-command
+surface. Versioned graph assets carry stable node/link IDs, named outputs, and
+exposed parameters. Strict validation rejects unsupported schemas, unsafe or
+duplicate identities, unknown type versions and directional ports, unknown
+parameters, incompatible value/domain links, missing or multiply connected
+inputs, invalid outputs, and cycles; valid graphs compile to deterministic
+topological plans containing only nodes reachable from requested outputs and
+report unused nodes separately. Canonical graph files persist under
+`Modeling/Graphs` with bounded schema probing and exact SHA-256 file revisions.
+Typed 1-256 operation patch batches add/remove nodes and links, set parameters
+and outputs, and manage exposed parameters entirely in memory; the candidate
+advances one logical revision, passes full validation, captures a transaction
+preimage, and publishes atomically only when the expected file revision still
+matches. Stale writes and cycle-producing batches leave the source bytes
+unchanged. The focused graph contract/persistence/patch suite passes 7/7 with a
+zero-warning, zero-error affected-graph build. Deterministic demand evaluation,
+node hashing, cache invalidation, budgets, and bounded reports are active next.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

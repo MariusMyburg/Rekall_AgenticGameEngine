@@ -269,6 +269,130 @@ public sealed class ModelingGraphEvaluationTests
         Assert.Contains(result.Diagnostics, item => item.Code == "REKALL_MODELING_EVALUATION_PARAMETER_INVALID" && item.NodeId == "shape");
     }
 
+    [Theory]
+    [InlineData("union", -1.0, 2.0)]
+    [InlineData("intersect", 0.0, 1.0)]
+    [InlineData("difference", -1.0, 0.0)]
+    public async Task BooleanCombinesOverlappingClosedMeshesIntoValidatedClosedTopology(
+        string operation,
+        double expectedMinX,
+        double expectedMaxX)
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "boolean-graph", "Boolean Graph",
+            [
+                new("a", "rekall.modeling.primitive.box", 1, new JsonObject { ["sizeX"] = 2.0, ["sizeY"] = 2.0, ["sizeZ"] = 2.0 }),
+                new("b", "rekall.modeling.primitive.box", 1, new JsonObject { ["sizeX"] = 2.0, ["sizeY"] = 2.0, ["sizeZ"] = 2.0 }),
+                new("move-b", "rekall.modeling.transform", 1, new JsonObject { ["translation"] = new JsonArray(1.0, 0.0, 0.0) }),
+                new("boolean", "rekall.modeling.boolean", 1, new JsonObject { ["operation"] = operation }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("b-move", "b", "geometry", "move-b", "geometry"),
+                new("a-boolean", "a", "geometry", "boolean", "a"),
+                new("b-boolean", "move-b", "geometry", "boolean", "b"),
+                new("boolean-output", "boolean", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics.Select(item => $"{item.Code}: {item.Message}")));
+        var validation = new RekallAgeMeshValidator().Validate(result.Outputs["mesh"]);
+        Assert.True(validation.IsValid);
+        Assert.Equal(0, validation.Summary.BoundaryEdgeCount);
+        Assert.Equal(0, validation.Summary.NonManifoldEdgeCount);
+        Assert.Equal(expectedMinX, validation.Summary.Bounds.Min.X, 6);
+        Assert.Equal(expectedMaxX, validation.Summary.Bounds.Max.X, 6);
+    }
+
+    [Fact]
+    public async Task BooleanHandlesNonCoplanarRotatedClosedInputs()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "rotated-boolean", "Rotated Boolean",
+            [
+                new("a", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("b", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("move-b", "rekall.modeling.transform", 1, new JsonObject
+                {
+                    ["translation"] = new JsonArray(0.35, 0.0, 0.0), ["rotation"] = new JsonArray(20.0, 35.0, 10.0)
+                }),
+                new("boolean", "rekall.modeling.boolean", 1, new JsonObject { ["operation"] = "union" }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("b-move", "b", "geometry", "move-b", "geometry"),
+                new("a-boolean", "a", "geometry", "boolean", "a"),
+                new("b-boolean", "move-b", "geometry", "boolean", "b"),
+                new("boolean-output", "boolean", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics.Select(item => $"{item.Code}: {item.Message}")));
+        var validation = new RekallAgeMeshValidator().Validate(result.Outputs["mesh"]);
+        Assert.True(validation.IsValid);
+        Assert.Equal(0, validation.Summary.BoundaryEdgeCount);
+        Assert.Equal(0, validation.Summary.NonManifoldEdgeCount);
+        Assert.True(validation.Summary.PointCount > 8);
+    }
+
+    [Fact]
+    public async Task BooleanRejectsOpenSurfaceInputWithStableDiagnostic()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "open-boolean", "Open Boolean",
+            [
+                new("open", "rekall.modeling.primitive.grid", 1, new JsonObject()),
+                new("closed", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("boolean", "rekall.modeling.boolean", 1, new JsonObject()),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("open-boolean", "open", "geometry", "boolean", "a"),
+                new("closed-boolean", "closed", "geometry", "boolean", "b"),
+                new("boolean-output", "boolean", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, item => item.Code == "REKALL_MODELING_BOOLEAN_INPUT_NOT_CLOSED_MANIFOLD" && item.NodeId == "boolean");
+    }
+
+    [Fact]
+    public async Task BooleanFailsClosedInsteadOfDroppingAuthoredAttributesOrMaterials()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "attributed-boolean", "Attributed Boolean",
+            [
+                new("a", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("material", "rekall.modeling.material.assign", 1, new JsonObject { ["materialAssetId"] = "mat.stone", ["slotName"] = "Stone" }),
+                new("b", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("boolean", "rekall.modeling.boolean", 1, new JsonObject()),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("a-material", "a", "geometry", "material", "geometry"),
+                new("material-boolean", "material", "geometry", "boolean", "a"),
+                new("b-boolean", "b", "geometry", "boolean", "b"),
+                new("boolean-output", "boolean", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, item => item.Code == "REKALL_MODELING_BOOLEAN_ATTRIBUTES_UNSUPPORTED" && item.NodeId == "boolean");
+    }
+
     [Fact]
     public async Task FieldMathCapturedAndNamedAttributesAndMaterialAssignmentAreExecutable()
     {

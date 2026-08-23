@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 09:21 Africa/Johannesburg
+Last verified: 2026-08-23 09:30 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -117,6 +117,28 @@ edges, 32 quads, 128 corners, zero boundary edges, and zero non-manifold edges.
 Self-intersecting radius pairs fail with a stable parameter diagnostic. The
 descriptor inventory is updated and the complete modeling namespace passes
 90/90 after recompilation.
+
+The first strict solid-Boolean graph node is now verified.
+`rekall.modeling.boolean` accepts two required geometry inputs and exposes
+`union`, `intersect`, and ordered `difference` through the same portable graph
+descriptor/patch/evaluate/bake surface. Inputs must be non-empty closed
+manifolds. AGE triangulates them deterministically, invokes the 100% C#
+MIT-licensed `SamuelRe.CSG.Sharp` 1.0.0 BSP kernel, welds the returned vertices
+with a scale-aware tolerance, splits every polygon boundary at coincident
+kernel vertices to eliminate T-junctions under a hard 50-million-check work
+ceiling, rebuilds shared stable topology, and refuses any output with validation
+errors, boundary edges, or non-manifold edges. Overlapping-box union,
+intersection, and difference plus a rotated non-coplanar union all return valid
+closed AGE meshes with expected bounds. Open surfaces fail with
+`REKALL_MODELING_BOOLEAN_INPUT_NOT_CLOSED_MANIFOLD`; attributed/material inputs
+currently fail with `REKALL_MODELING_BOOLEAN_ATTRIBUTES_UNSUPPORTED` rather
+than losing authored data. The dependency is in the distribution lock graph,
+its full MIT notice is shipped in `THIRD-PARTY-NOTICES.txt`, NuGet reports no
+known direct or transitive vulnerabilities, the modeling namespace passes
+96/96, and Studio passes 30/30 with the CSG assembly copied beside the desktop
+binary. Attribute interpolation/provenance through split faces and broader
+adversarial Boolean fixtures remain open before this is called a complete
+Boolean system.
 
 The Blender-informed agentic modelling tranche is now the active implementation
 priority after the completed WebGPU and remaining Godot audits. A shallow,

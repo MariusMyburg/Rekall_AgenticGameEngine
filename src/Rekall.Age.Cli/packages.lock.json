@@ -39,6 +39,11 @@
         "resolved": "10.0.8",
         "contentHash": "J9+VT0lkrA7wW38CGxO2sZd+iH9C0qzioMi/2ztpT32WOVr+04uNqFIrxisTRf+mvtXLtdqcio1AoS0vfAVLLQ=="
       },
+      "SamuelRe.CSG.Sharp": {
+        "type": "Transitive",
+        "resolved": "1.0.0",
+        "contentHash": "O08bJk78p96Nomx3BOctu6Du65lNbYfsow/rWAmD0fa1UqcECK4IV7JPcUPL3CdRodECOuoyq5V0PKkRi+/94w=="
+      },
       "Serilog": {
         "type": "Transitive",
         "resolved": "4.3.1",
@@ -191,7 +196,8 @@
         "type": "Project",
         "dependencies": {
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
-          "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )"
+          "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )",
+          "SamuelRe.CSG.Sharp": "[1.0.0, )"
         }
       },
       "rekall.age.modeling.contracts": {

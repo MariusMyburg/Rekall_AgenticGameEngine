@@ -173,6 +173,11 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             "rekall.modeling.primitive.torus" => new(CreateTorus(graph, node)),
             "rekall.modeling.transform" => TransformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.join" => JoinGeometry(graph, node, incoming, values),
+            "rekall.modeling.boolean" => BooleanGeometry(
+                graph,
+                node,
+                InputGeometry(node, "a", incoming, values),
+                InputGeometry(node, "b", incoming, values)),
             "rekall.modeling.extrude" => ApplySemanticOperation(
                 graph,
                 node,

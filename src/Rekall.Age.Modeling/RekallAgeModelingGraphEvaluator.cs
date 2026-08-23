@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Modeling.Contracts;
 
@@ -167,7 +168,9 @@ public sealed class RekallAgeModelingGraphEvaluator
         {
             "rekall.modeling.primitive.box" => new(CreateBox(graph, node)),
             "rekall.modeling.primitive.grid" => new(CreateGrid(graph, node)),
+            "rekall.modeling.primitive.sphere" => new(CreateSphere(graph, node)),
             "rekall.modeling.transform" => TransformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
+            "rekall.modeling.join" => JoinGeometry(graph, node, incoming, values),
             "rekall.modeling.extrude" => ApplySemanticOperation(
                 graph,
                 node,
@@ -185,12 +188,312 @@ public sealed class RekallAgeModelingGraphEvaluator
                 InputGeometry(node, "geometry", incoming, values),
                 "triangulate_faces",
                 new JsonObject()),
+            "rekall.modeling.field.math" => EvaluateFieldMath(node, incoming, values),
+            "rekall.modeling.attribute.named" => ReadNamedAttribute(node, InputGeometry(node, "geometry", incoming, values)),
+            "rekall.modeling.attribute.capture" => CaptureAttribute(
+                graph, node, InputGeometry(node, "geometry", incoming, values), InputScalars(node, "value", incoming, values)),
+            "rekall.modeling.material.assign" => AssignMaterial(
+                graph, node, InputGeometry(node, "geometry", incoming, values), incoming, values),
             "rekall.modeling.output.mesh" => InputGeometry(node, "input", incoming, values),
             _ => throw new EvaluationException(
                 "REKALL_MODELING_EVALUATION_NODE_NOT_IMPLEMENTED",
                 $"Node type '{node.TypeId}@{node.TypeVersion}' has no evaluator implementation.",
                 node.NodeId)
         };
+
+    private static NodeValue EvaluateFieldMath(
+        RekallAgeModelingGraphNode node,
+        IReadOnlyList<RekallAgeModelingGraphLink> incoming,
+        IReadOnlyDictionary<string, NodeValue> values)
+    {
+        var a = OptionalScalars(node, "a", incoming, values) ?? [ReadNumber(node, "a", 0)];
+        var b = OptionalScalars(node, "b", incoming, values) ?? [ReadNumber(node, "b", 0)];
+        var count = Math.Max(a.Count, b.Count);
+        if (a.Count != 1 && a.Count != count || b.Count != 1 && b.Count != count)
+            throw new EvaluationException("REKALL_MODELING_FIELD_LENGTH_MISMATCH", "Field math inputs must have equal lengths or be scalar-broadcastable.", node.NodeId);
+        var operation = ReadString(node, "operation", "add");
+        var result = new double[count];
+        for (var index = 0; index < count; index++)
+        {
+            var left = a[a.Count == 1 ? 0 : index];
+            var right = b[b.Count == 1 ? 0 : index];
+            result[index] = operation switch
+            {
+                "add" => left + right,
+                "subtract" => left - right,
+                "multiply" => left * right,
+                "divide" when Math.Abs(right) > 1e-15 => left / right,
+                "divide" => throw new EvaluationException("REKALL_MODELING_FIELD_DIVIDE_BY_ZERO", "Field division encountered zero.", node.NodeId),
+                "minimum" => Math.Min(left, right),
+                "maximum" => Math.Max(left, right),
+                _ => throw new EvaluationException("REKALL_MODELING_FIELD_OPERATION_UNKNOWN", $"Field operation '{operation}' is unsupported.", node.NodeId)
+            };
+            if (!double.IsFinite(result[index]))
+                throw new EvaluationException("REKALL_MODELING_FIELD_NONFINITE", "Field math produced a non-finite value.", node.NodeId);
+        }
+        return new(Scalars: result);
+    }
+
+    private static NodeValue ReadNamedAttribute(RekallAgeModelingGraphNode node, NodeValue input)
+    {
+        var mesh = input.Mesh ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", "Named Attribute requires geometry.", node.NodeId);
+        var name = ReadString(node, "name", "attribute");
+        var attribute = mesh.Attributes.FirstOrDefault(item => item.Name == name)
+            ?? throw new EvaluationException("REKALL_MODELING_NAMED_ATTRIBUTE_MISSING", $"Attribute '{name}' was not found.", node.NodeId);
+        if (attribute.ValueType is not (RekallAgeGeometryValueType.Float or RekallAgeGeometryValueType.Int32))
+            throw new EvaluationException("REKALL_MODELING_NAMED_ATTRIBUTE_TYPE_UNSUPPORTED", $"Attribute '{name}' is not scalar numeric.", node.NodeId);
+        return new(Scalars: attribute.Values.Select(value => attribute.ValueType == RekallAgeGeometryValueType.Float
+            ? value.GetDouble()
+            : value.GetInt32()).ToArray());
+    }
+
+    private static NodeValue CaptureAttribute(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        NodeValue geometry,
+        IReadOnlyList<double> scalars)
+    {
+        var mesh = geometry.Mesh ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", "Capture Attribute requires geometry.", node.NodeId);
+        var name = ReadString(node, "name", "attribute");
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 128)
+            throw new EvaluationException("REKALL_MODELING_ATTRIBUTE_NAME_INVALID", "Captured attribute name must contain 1-128 characters.", node.NodeId);
+        var domainText = ReadString(node, "domain", "point");
+        if (!Enum.TryParse<RekallAgeGeometryDomain>(domainText, true, out var domain) || domain == RekallAgeGeometryDomain.Instance)
+            throw new EvaluationException("REKALL_MODELING_ATTRIBUTE_DOMAIN_INVALID", $"Attribute domain '{domainText}' is unsupported.", node.NodeId);
+        var count = DomainCount(mesh.Topology, domain);
+        if (scalars.Count != 1 && scalars.Count != count)
+            throw new EvaluationException("REKALL_MODELING_FIELD_LENGTH_MISMATCH", $"Captured field has {scalars.Count} values for {count} {domain} elements.", node.NodeId);
+        var values = Enumerable.Range(0, count)
+            .Select(index => JsonSerializer.SerializeToElement(scalars[scalars.Count == 1 ? 0 : index]))
+            .ToArray();
+        var attributes = mesh.Attributes.Where(attribute => attribute.Name != name).Append(
+            new RekallAgeGeometryAttribute(name, domain, RekallAgeGeometryValueType.Float, values, Interpolation: RekallAgeGeometryInterpolation.Linear,
+                DefaultValue: JsonSerializer.SerializeToElement(0d))).ToArray();
+        return new(mesh with
+        {
+            AssetId = $"{graph.AssetId}.{node.NodeId}", Name = node.NodeId, Revision = graph.Revision, Attributes = attributes
+        });
+    }
+
+    private static NodeValue AssignMaterial(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        NodeValue geometry,
+        IReadOnlyList<RekallAgeModelingGraphLink> incoming,
+        IReadOnlyDictionary<string, NodeValue> values)
+    {
+        var mesh = geometry.Mesh ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", "Assign Material requires geometry.", node.NodeId);
+        var linked = incoming.FirstOrDefault(link => link.ToPortId == "material");
+        var assetId = linked is null ? ReadString(node, "materialAssetId", "material.default") : values[linked.FromNodeId].MaterialAssetId;
+        if (string.IsNullOrWhiteSpace(assetId))
+            throw new EvaluationException("REKALL_MODELING_MATERIAL_ASSET_ID_MISSING", "Material assignment requires a material asset ID.", node.NodeId);
+        var slotName = ReadString(node, "slotName", "material");
+        var slots = mesh.MaterialSlots.ToList();
+        var slotIndex = slots.FindIndex(slot => slot.MaterialAssetId == assetId && slot.Name == slotName);
+        if (slotIndex < 0) { slotIndex = slots.Count; slots.Add(new(slotName, assetId)); }
+        var indices = Enumerable.Range(0, mesh.Topology.FaceIds.Count).Select(_ => JsonSerializer.SerializeToElement(slotIndex)).ToArray();
+        var attributes = mesh.Attributes.Where(attribute => !string.Equals(attribute.Semantic, "material-index", StringComparison.OrdinalIgnoreCase))
+            .Append(new RekallAgeGeometryAttribute(
+                "material.index", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Int32, indices,
+                "material-index", RekallAgeGeometryInterpolation.Nearest, JsonSerializer.SerializeToElement(0)))
+            .ToArray();
+        return new(mesh with
+        {
+            AssetId = $"{graph.AssetId}.{node.NodeId}", Name = node.NodeId, Revision = graph.Revision,
+            MaterialSlots = slots, Attributes = attributes
+        });
+    }
+
+    private static IReadOnlyList<double> InputScalars(
+        RekallAgeModelingGraphNode node,
+        string portId,
+        IReadOnlyList<RekallAgeModelingGraphLink> incoming,
+        IReadOnlyDictionary<string, NodeValue> values) =>
+        OptionalScalars(node, portId, incoming, values)
+        ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_MISSING", $"Input '{portId}' is missing.", node.NodeId);
+
+    private static IReadOnlyList<double>? OptionalScalars(
+        RekallAgeModelingGraphNode node,
+        string portId,
+        IReadOnlyList<RekallAgeModelingGraphLink> incoming,
+        IReadOnlyDictionary<string, NodeValue> values)
+    {
+        var link = incoming.FirstOrDefault(item => item.ToPortId == portId);
+        if (link is null) return null;
+        return values[link.FromNodeId].Scalars
+            ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", $"Input '{portId}' is not a scalar field.", node.NodeId);
+    }
+
+    private static NodeValue JoinGeometry(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        IReadOnlyList<RekallAgeModelingGraphLink> incoming,
+        IReadOnlyDictionary<string, NodeValue> values)
+    {
+        var inputs = incoming.Where(link => link.ToPortId == "geometry")
+            .Select(link => values[link.FromNodeId].Mesh
+                ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", "Join requires geometry inputs.", node.NodeId))
+            .ToArray();
+        if (inputs.Length == 0)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_MISSING", "Join requires at least one geometry input.", node.NodeId);
+
+        var positions = new List<RekallAgeGeometryVector3>();
+        var edgePoints = new List<RekallAgeMeshEdgePointIndices>();
+        var faceOffsets = new List<int> { 0 };
+        var cornerPoints = new List<int>();
+        var cornerEdges = new List<int>();
+        var pointMaps = new List<Dictionary<ulong, ulong>>();
+        var edgeMaps = new List<Dictionary<ulong, ulong>>();
+        var faceMaps = new List<Dictionary<ulong, ulong>>();
+        var cornerMaps = new List<Dictionary<ulong, ulong>>();
+        foreach (var mesh in inputs)
+        {
+            var pointOffset = positions.Count;
+            var edgeOffset = edgePoints.Count;
+            var cornerOffset = cornerPoints.Count;
+            positions.AddRange(mesh.Topology.Positions);
+            edgePoints.AddRange(mesh.Topology.EdgePointIndices.Select(edge => new RekallAgeMeshEdgePointIndices(edge.A + pointOffset, edge.B + pointOffset)));
+            for (var face = 0; face < mesh.Topology.FaceIds.Count; face++)
+                faceOffsets.Add(faceOffsets[^1] + mesh.Topology.FaceOffsets[face + 1] - mesh.Topology.FaceOffsets[face]);
+            cornerPoints.AddRange(mesh.Topology.CornerPointIndices.Select(index => index + pointOffset));
+            cornerEdges.AddRange(mesh.Topology.CornerEdgeIndices.Select(index => index + edgeOffset));
+            pointMaps.Add(Map(mesh.Topology.PointIds, pointOffset, 1));
+            edgeMaps.Add(Map(mesh.Topology.EdgeIds, edgeOffset, 10_000));
+            faceMaps.Add(Map(mesh.Topology.FaceIds, faceOffsets.Count - mesh.Topology.FaceIds.Count - 1, 20_000));
+            cornerMaps.Add(Map(mesh.Topology.CornerIds, cornerOffset, 30_000));
+        }
+        var topology = new RekallAgeMeshTopology(
+            Enumerable.Range(1, positions.Count).Select(value => (ulong)value).ToArray(),
+            positions,
+            Enumerable.Range(1, edgePoints.Count).Select(value => (ulong)(10_000 + value)).ToArray(),
+            edgePoints,
+            Enumerable.Range(1, faceOffsets.Count - 1).Select(value => (ulong)(20_000 + value)).ToArray(),
+            faceOffsets,
+            Enumerable.Range(1, cornerPoints.Count).Select(value => (ulong)(30_000 + value)).ToArray(),
+            cornerPoints,
+            cornerEdges);
+        var (materialSlots, slotMaps) = MergeMaterialSlots(inputs);
+        var attributes = MergeAttributes(inputs, slotMaps);
+        var selections = MergeSelections(inputs, pointMaps, edgeMaps, faceMaps, cornerMaps);
+        var result = RekallAgeMeshAsset.Create(
+            $"{graph.AssetId}.{node.NodeId}", node.NodeId, topology, attributes, materialSlots, selections) with { Revision = graph.Revision };
+        var validation = new RekallAgeMeshValidator().Validate(result);
+        if (!validation.IsValid)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_OUTPUT_INVALID", "Join evaluator produced invalid topology.", node.NodeId);
+        return new(result);
+    }
+
+    private static Dictionary<ulong, ulong> Map(IReadOnlyList<ulong> source, int offset, int idBase) =>
+        source.Select((id, index) => (id, mapped: (ulong)(idBase + offset + index + 1)))
+            .ToDictionary(item => item.id, item => item.mapped);
+
+    private static (IReadOnlyList<RekallAgeMaterialSlot> Slots, IReadOnlyList<int[]> Maps) MergeMaterialSlots(
+        IReadOnlyList<RekallAgeMeshAsset> inputs)
+    {
+        var slots = new List<RekallAgeMaterialSlot>();
+        var maps = new List<int[]>();
+        foreach (var mesh in inputs)
+        {
+            var map = new int[mesh.MaterialSlots.Count];
+            for (var index = 0; index < mesh.MaterialSlots.Count; index++)
+            {
+                var slot = mesh.MaterialSlots[index];
+                var merged = slots.FindIndex(item => item.Name == slot.Name && item.MaterialAssetId == slot.MaterialAssetId);
+                if (merged < 0) { merged = slots.Count; slots.Add(slot); }
+                map[index] = merged;
+            }
+            maps.Add(map);
+        }
+        return (slots, maps);
+    }
+
+    private static IReadOnlyList<RekallAgeGeometryAttribute> MergeAttributes(
+        IReadOnlyList<RekallAgeMeshAsset> inputs,
+        IReadOnlyList<int[]> slotMaps)
+    {
+        var schemas = inputs.SelectMany(mesh => mesh.Attributes)
+            .GroupBy(attribute => attribute.Name, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .OrderBy(attribute => attribute.Name, StringComparer.Ordinal)
+            .ToArray();
+        var result = new List<RekallAgeGeometryAttribute>();
+        foreach (var schema in schemas)
+        {
+            var values = new List<JsonElement>();
+            for (var inputIndex = 0; inputIndex < inputs.Count; inputIndex++)
+            {
+                var mesh = inputs[inputIndex];
+                var source = mesh.Attributes.FirstOrDefault(attribute => attribute.Name == schema.Name);
+                if (source is not null && (source.Domain != schema.Domain || source.ValueType != schema.ValueType || source.Semantic != schema.Semantic))
+                    throw new EvaluationException("REKALL_MODELING_JOIN_ATTRIBUTE_SCHEMA_CONFLICT", $"Attribute '{schema.Name}' has incompatible schemas.");
+                var count = DomainCount(mesh.Topology, schema.Domain);
+                for (var index = 0; index < count; index++)
+                {
+                    var value = source is null ? DefaultValue(schema) : source.Values[index];
+                    if (schema.Domain == RekallAgeGeometryDomain.Face
+                        && schema.ValueType == RekallAgeGeometryValueType.Int32
+                        && schema.Semantic?.Equals("material-index", StringComparison.OrdinalIgnoreCase) == true
+                        && value.TryGetInt32(out var materialIndex)
+                        && materialIndex >= 0 && materialIndex < slotMaps[inputIndex].Length)
+                        value = JsonSerializer.SerializeToElement(slotMaps[inputIndex][materialIndex]);
+                    values.Add(value.Clone());
+                }
+            }
+            result.Add(schema with { Values = values });
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<RekallAgeMeshSelection> MergeSelections(
+        IReadOnlyList<RekallAgeMeshAsset> inputs,
+        IReadOnlyList<Dictionary<ulong, ulong>> pointMaps,
+        IReadOnlyList<Dictionary<ulong, ulong>> edgeMaps,
+        IReadOnlyList<Dictionary<ulong, ulong>> faceMaps,
+        IReadOnlyList<Dictionary<ulong, ulong>> cornerMaps)
+    {
+        var result = new List<RekallAgeMeshSelection>();
+        for (var index = 0; index < inputs.Count; index++)
+        foreach (var selection in inputs[index].SelectionSets)
+        {
+            var map = selection.Domain switch
+            {
+                RekallAgeGeometryDomain.Point => pointMaps[index],
+                RekallAgeGeometryDomain.Edge => edgeMaps[index],
+                RekallAgeGeometryDomain.Face => faceMaps[index],
+                RekallAgeGeometryDomain.Corner => cornerMaps[index],
+                _ => throw new EvaluationException("REKALL_MODELING_JOIN_SELECTION_DOMAIN_UNSUPPORTED", $"Selection domain '{selection.Domain}' cannot be joined.")
+            };
+            result.Add(new(
+                $"input-{index}.{selection.Name}",
+                selection.Domain,
+                selection.ElementIds.Select(id => map[id]).ToArray(),
+                selection.ActiveElementId is { } active ? map[active] : null,
+                selection.OrderedHistory?.Select(id => map[id]).ToArray()));
+        }
+        return result;
+    }
+
+    private static int DomainCount(RekallAgeMeshTopology topology, RekallAgeGeometryDomain domain) => domain switch
+    {
+        RekallAgeGeometryDomain.Point => topology.PointIds.Count,
+        RekallAgeGeometryDomain.Edge => topology.EdgeIds.Count,
+        RekallAgeGeometryDomain.Face => topology.FaceIds.Count,
+        RekallAgeGeometryDomain.Corner => topology.CornerIds.Count,
+        _ => 0
+    };
+
+    private static JsonElement DefaultValue(RekallAgeGeometryAttribute attribute) => attribute.DefaultValue ?? attribute.ValueType switch
+    {
+        RekallAgeGeometryValueType.Bool => JsonSerializer.SerializeToElement(false),
+        RekallAgeGeometryValueType.Int32 => JsonSerializer.SerializeToElement(0),
+        RekallAgeGeometryValueType.Float => JsonSerializer.SerializeToElement(0d),
+        RekallAgeGeometryValueType.Float2 => JsonSerializer.SerializeToElement(new double[2]),
+        RekallAgeGeometryValueType.Float3 => JsonSerializer.SerializeToElement(new double[3]),
+        RekallAgeGeometryValueType.Float4 or RekallAgeGeometryValueType.ColorLinear or RekallAgeGeometryValueType.Quaternion => JsonSerializer.SerializeToElement(new double[4]),
+        RekallAgeGeometryValueType.Matrix4x4 => JsonSerializer.SerializeToElement(new double[16]),
+        RekallAgeGeometryValueType.String => JsonSerializer.SerializeToElement(string.Empty),
+        _ => JsonSerializer.SerializeToElement(0d)
+    };
 
     private static NodeValue ApplySemanticOperation(
         RekallAgeModelingGraphAsset graph,
@@ -368,6 +671,52 @@ public sealed class RekallAgeModelingGraphEvaluator
         int Vertical(int x, int y) => verticalStart + y * (segmentsX + 1) + x;
     }
 
+    private static RekallAgeMeshAsset CreateSphere(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node)
+    {
+        var radius = ReadPositive(node, "radius", 0.5);
+        var segments = ReadInteger(node, "segments", 16, 3, 4_096);
+        var rings = ReadInteger(node, "rings", 8, 2, 4_096);
+        var vertexCount = checked((segments + 1) * (rings + 1));
+        var triangleCount = checked(segments * 2 * (rings - 1));
+        if (vertexCount > 2_000_000 || triangleCount > 2_000_000)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_ELEMENT_BUDGET_EXCEEDED", "Sphere parameters exceed the hard element ceiling.", node.NodeId);
+        var vertices = new List<RekallAgeLegacyGeometryVertex>(vertexCount);
+        for (var ring = 0; ring <= rings; ring++)
+        {
+            var v = ring / (double)rings;
+            var theta = Math.PI * v;
+            for (var segment = 0; segment <= segments; segment++)
+            {
+                var u = segment / (double)segments;
+                var phi = Math.PI * 2 * u;
+                var normal = new RekallAgeGeometryVector3(
+                    Math.Sin(theta) * Math.Cos(phi),
+                    Math.Cos(theta),
+                    Math.Sin(theta) * Math.Sin(phi));
+                vertices.Add(new(
+                    new(normal.X * radius, normal.Y * radius, normal.Z * radius),
+                    normal,
+                    new(u, v)));
+            }
+        }
+        var indices = new List<uint>(triangleCount * 3);
+        var stride = segments + 1;
+        for (var ring = 0; ring < rings; ring++)
+        for (var segment = 0; segment < segments; segment++)
+        {
+            var a = checked((uint)(ring * stride + segment));
+            var b = a + 1;
+            var c = checked((uint)((ring + 1) * stride + segment));
+            var d = c + 1;
+            if (ring > 0) indices.AddRange([a, c, b]);
+            if (ring < rings - 1) indices.AddRange([b, c, d]);
+        }
+        return new RekallAgeLegacyGeometryMeshAdapter().Convert(
+            $"{graph.AssetId}.{node.NodeId}", node.NodeId, vertices, indices) with { Revision = graph.Revision };
+    }
+
     private static double ReadPositive(RekallAgeModelingGraphNode node, string name, double fallback)
     {
         var value = node.Parameters[name] is JsonValue json && json.TryGetValue<double>(out var number) ? number : fallback;
@@ -377,6 +726,19 @@ public sealed class RekallAgeModelingGraphEvaluator
         }
         return value;
     }
+
+    private static double ReadNumber(RekallAgeModelingGraphNode node, string name, double fallback)
+    {
+        var value = node.Parameters[name] is JsonValue json && json.TryGetValue<double>(out var number) ? number : fallback;
+        if (!double.IsFinite(value))
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", $"Parameter '{name}' must be finite.", node.NodeId);
+        return value;
+    }
+
+    private static string ReadString(RekallAgeModelingGraphNode node, string name, string fallback) =>
+        node.Parameters[name] is JsonValue json && json.TryGetValue<string>(out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value.Trim()
+            : fallback;
 
     private static int ReadInteger(RekallAgeModelingGraphNode node, string name, int fallback, int minimum, int maximum)
     {
@@ -528,7 +890,10 @@ public sealed class RekallAgeModelingGraphEvaluator
     private static string LastGoodKey(string assetId, IReadOnlyList<string> outputs) =>
         assetId + "|" + string.Join(",", outputs.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
 
-    private sealed record NodeValue(RekallAgeMeshAsset? Mesh);
+    private sealed record NodeValue(
+        RekallAgeMeshAsset? Mesh = null,
+        IReadOnlyList<double>? Scalars = null,
+        string? MaterialAssetId = null);
 
     private sealed class EvaluationException : Exception
     {

@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 07:34 Africa/Johannesburg
+Last verified: 2026-08-23 07:40 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -266,6 +266,25 @@ ordinary stable-ID provenance, attribute propagation, region-boundary rules,
 and strict validation rather than maintaining a parallel modelling kernel. The
 focused chain test and affected build pass with zero warnings/errors. Join,
 sphere, field/attribute, and material-assignment evaluators remain active.
+
+The full initial procedural evaluator inventory is now implemented. The sphere
+primitive generates bounded UV/normal-bearing latitude geometry and deterministic
+triangle topology. Join consumes ordered multi-links, remaps point/edge/face/
+corner IDs and references, merges compatible attributes with typed defaults,
+remaps face material indices into deduplicated slots, and preserves selections
+under deterministic input-qualified names. Scalar field math supports broadcast
+inputs or parameter constants for add/subtract/multiply/divide/min/max with coded
+length, zero-division, and nonfinite failures. Named scalar attributes become
+fields; capture writes or replaces finite float attributes at exact point/edge/
+face/corner cardinality; material assignment creates/reuses a slot and publishes
+face-domain `material.index` data. One proof joins a 48-face UV sphere and
+translated six-face box into a valid 54-face mesh with unique stable domains.
+Another evaluates 0.25*2, captures `weight=0.5`, reads it back, adds 0.5, captures
+`weight.final=1.0`, assigns `mat.stone`, and passes strict mesh validation. The
+affected build is zero-warning/zero-error and the new inventory tests pass. The
+remaining Task 7 gate is a bounded default-registry CLI/MCP command surface for
+node discovery and graph create/inspect/patch/validate/evaluate/bake/report
+inspection; it is now an explicit plan item rather than an implicit omission.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

@@ -50,10 +50,15 @@ public sealed class RekallAgeModelingNodeCatalog
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Output("value", RekallAgeModelingValueType.Scalar)],
             [Text("name", "Name", "attribute")]),
         Node("rekall.modeling.field.math", "Field Math", "Applies deterministic scalar field arithmetic.",
-            [Input("a", RekallAgeModelingValueType.Scalar, required: true), Input("b", RekallAgeModelingValueType.Scalar), Output("value", RekallAgeModelingValueType.Scalar)],
-            [Text("operation", "Operation", "add", ["add", "subtract", "multiply", "divide", "minimum", "maximum"])]),
+            [Input("a", RekallAgeModelingValueType.Scalar), Input("b", RekallAgeModelingValueType.Scalar), Output("value", RekallAgeModelingValueType.Scalar)],
+            [
+                Text("operation", "Operation", "add", ["add", "subtract", "multiply", "divide", "minimum", "maximum"]),
+                Number("a", "A", 0, -1_000_000_000, 1_000_000_000),
+                Number("b", "B", 0, -1_000_000_000, 1_000_000_000)
+            ]),
         Node("rekall.modeling.material.assign", "Assign Material", "Assigns a material slot to a selected geometry region.",
-            [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("selection", RekallAgeModelingValueType.Selection), Input("material", RekallAgeModelingValueType.Material, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)]),
+            [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("selection", RekallAgeModelingValueType.Selection), Input("material", RekallAgeModelingValueType.Material), Output("geometry", RekallAgeModelingValueType.Geometry)],
+            [Text("materialAssetId", "Material Asset ID", "material.default"), Text("slotName", "Slot Name", "material")]),
         Node("rekall.modeling.output.mesh", "Mesh Output", "Publishes evaluated geometry as a named graph output.",
             [Input("input", RekallAgeModelingValueType.Geometry, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)])
     ]);

@@ -121,6 +121,83 @@ public sealed class ModelingGraphEvaluationTests
         Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
     }
 
+    [Fact]
+    public async Task SphereAndJoinProduceValidatedCombinedGeometry()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "join-graph",
+            "Join Graph",
+            [
+                new("sphere", "rekall.modeling.primitive.sphere", 1, new JsonObject { ["radius"] = 1.0, ["segments"] = 8, ["rings"] = 4 }),
+                new("box", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("move", "rekall.modeling.transform", 1, new JsonObject { ["translation"] = new JsonArray(3.0, 0.0, 0.0) }),
+                new("join", "rekall.modeling.join", 1, new JsonObject()),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("box-move", "box", "geometry", "move", "geometry"),
+                new("sphere-join", "sphere", "geometry", "join", "geometry"),
+                new("move-join", "move", "geometry", "join", "geometry"),
+                new("join-output", "join", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var mesh = result.Outputs["mesh"];
+        Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
+        Assert.Equal(54, mesh.Topology.FaceIds.Count);
+        Assert.Equal(-1, mesh.Topology.Positions.Min(position => position.X), 6);
+        Assert.Equal(3.5, mesh.Topology.Positions.Max(position => position.X), 6);
+        Assert.Equal(mesh.Topology.PointIds.Count, mesh.Topology.PointIds.Distinct().Count());
+        Assert.Equal(mesh.Topology.FaceIds.Count, mesh.Topology.FaceIds.Distinct().Count());
+    }
+
+    [Fact]
+    public async Task FieldMathCapturedAndNamedAttributesAndMaterialAssignmentAreExecutable()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "attribute-graph",
+            "Attribute Graph",
+            [
+                new("grid", "rekall.modeling.primitive.grid", 1, new JsonObject()),
+                new("constant-math", "rekall.modeling.field.math", 1, new JsonObject { ["operation"] = "multiply", ["a"] = 0.25, ["b"] = 2.0 }),
+                new("capture", "rekall.modeling.attribute.capture", 1, new JsonObject { ["name"] = "weight", ["domain"] = "point" }),
+                new("named", "rekall.modeling.attribute.named", 1, new JsonObject { ["name"] = "weight" }),
+                new("add", "rekall.modeling.field.math", 1, new JsonObject { ["operation"] = "add", ["b"] = 0.5 }),
+                new("capture-final", "rekall.modeling.attribute.capture", 1, new JsonObject { ["name"] = "weight.final", ["domain"] = "point" }),
+                new("material", "rekall.modeling.material.assign", 1, new JsonObject { ["materialAssetId"] = "mat.stone", ["slotName"] = "Stone" }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("grid-capture", "grid", "geometry", "capture", "geometry"),
+                new("constant-capture", "constant-math", "value", "capture", "value"),
+                new("capture-named", "capture", "geometry", "named", "geometry"),
+                new("named-add", "named", "value", "add", "a"),
+                new("capture-final-geometry", "capture", "geometry", "capture-final", "geometry"),
+                new("add-capture-final", "add", "value", "capture-final", "value"),
+                new("capture-material", "capture-final", "geometry", "material", "geometry"),
+                new("material-output", "material", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var mesh = result.Outputs["mesh"];
+        var weight = Assert.Single(mesh.Attributes, attribute => attribute.Name == "weight");
+        var finalWeight = Assert.Single(mesh.Attributes, attribute => attribute.Name == "weight.final");
+        Assert.All(weight.Values, value => Assert.Equal(0.5, value.GetDouble()));
+        Assert.All(finalWeight.Values, value => Assert.Equal(1.0, value.GetDouble()));
+        Assert.Equal("mat.stone", Assert.Single(mesh.MaterialSlots).MaterialAssetId);
+        var materialIndices = Assert.Single(mesh.Attributes, attribute => attribute.Semantic == "material-index");
+        Assert.All(materialIndices.Values, value => Assert.Equal(0, value.GetInt32()));
+        Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
+    }
+
     private static RekallAgeModelingGraphAsset Graph(double sizeX, long revision)
     {
         var graph = RekallAgeModelingGraphAsset.Create(

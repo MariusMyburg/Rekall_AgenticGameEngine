@@ -97,10 +97,12 @@ then grow it into procedural geometry/material graphs and Studio modelling.
   validation.
 - [x] Add deterministic demand evaluation, dependency invalidation, node-hash
   caching, budgets, and bounded reports.
-- [ ] Supply initial primitives, transform, join, extrude, triangulate,
+- [x] Supply initial primitives, transform, join, extrude, triangulate,
   named/captured attributes, field math, material assignment, and output nodes.
 - [x] Bake through the same mesh asset and runtime compiler and prove a parameter
   edit changes evaluated bounds with cache/invalidation evidence.
+- [ ] Expose bounded node discovery and graph create/inspect/patch/validate/
+  evaluate/bake/evaluation-inspection commands through CLI/MCP.
 
 ### Task 8: Semantic material graphs and modifiers
 

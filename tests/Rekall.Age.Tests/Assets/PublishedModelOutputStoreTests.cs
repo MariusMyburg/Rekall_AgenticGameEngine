@@ -10,16 +10,14 @@ namespace Rekall.Age.Tests.Assets;
 public sealed class PublishedModelOutputStoreTests
 {
     [Fact]
-    public async Task RevisionCheckedCommitRejectsStaleOutputAndRetainsConcurrentBytes()
+    public async Task ContentAddressedCommitsPreserveEveryValidatedRevision()
     {
         var root = TestPaths.CreateTempDirectory();
         var store = new RekallAgePublishedModelOutputStore();
         var initial = await store.WriteStagedAsync(root, "hero-model", CompiledBox(), default);
-        var initialRevision = await store.CommitStagedIfRevisionAsync(
-            root,
-            initial,
-            Rekall.Age.Core.Persistence.RekallAgeDocumentRevision.Missing,
-            default);
+        var initialCommit = await store.CommitStagedImmutableAsync(root, initial, default);
+        var duplicate = await store.WriteStagedAsync(root, "hero-model", CompiledBox(), default);
+        var duplicateCommit = await store.CommitStagedImmutableAsync(root, duplicate, default);
         var stale = await store.WriteStagedAsync(
             root,
             "hero-model",
@@ -30,15 +28,15 @@ public sealed class PublishedModelOutputStoreTests
             "hero-model",
             CompiledBox() with { SourceLogicalRevision = 3 },
             default);
-        var concurrentRevision = await store.CommitStagedIfRevisionAsync(root, concurrent, initialRevision, default);
-        var concurrentBytes = await File.ReadAllBytesAsync(store.GetFinalPath(root, "hero-model"));
+        var concurrentCommit = await store.CommitStagedImmutableAsync(root, concurrent, default);
+        var staleCommit = await store.CommitStagedImmutableAsync(root, stale, default);
 
-        var error = await Assert.ThrowsAsync<Rekall.Age.Core.Persistence.RekallAgeDocumentRevisionException>(() =>
-            store.CommitStagedIfRevisionAsync(root, stale, initialRevision, default).AsTask());
-
-        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", error.Code);
-        Assert.Equal(concurrentRevision, await store.HashAsync(root, "hero-model", default));
-        Assert.Equal(concurrentBytes, await File.ReadAllBytesAsync(store.GetFinalPath(root, "hero-model")));
+        Assert.True(initialCommit.Created);
+        Assert.False(duplicateCommit.Created);
+        Assert.Equal(initialCommit.Revision, duplicateCommit.Revision);
+        Assert.Equal(initialCommit.Revision, await store.HashAsync(root, "hero-model", initial.ContentHash, default));
+        Assert.Equal(concurrentCommit.Revision, await store.HashAsync(root, "hero-model", concurrent.ContentHash, default));
+        Assert.Equal(staleCommit.Revision, await store.HashAsync(root, "hero-model", stale.ContentHash, default));
     }
 
     [Fact]
@@ -54,20 +52,20 @@ public sealed class PublishedModelOutputStoreTests
         Assert.Equal(first.ContentHash, second.ContentHash);
         Assert.Matches("^[0-9a-f]{64}$", first.ContentHash);
         Assert.Equal(await File.ReadAllBytesAsync(first.Path), await File.ReadAllBytesAsync(second.Path));
-        Assert.Equal("Assets/Models/Compiled/hero-model.age.compiled-mesh.json", first.RelativeFinalPath);
+        Assert.Equal($"Assets/Models/Compiled/hero-model/{first.ContentHash}.age.compiled-mesh.json", first.RelativeFinalPath);
         Assert.StartsWith(
             Path.Combine(root, "Assets", "Models", ".staging"),
             first.Path,
             StringComparison.OrdinalIgnoreCase);
-        Assert.False(File.Exists(store.GetFinalPath(root, "hero-model")));
+        Assert.False(File.Exists(store.GetFinalPath(root, "hero-model", first.ContentHash)));
 
         await store.CommitStagedAsync(root, first, default);
 
-        var finalPath = store.GetFinalPath(root, "hero-model");
+        var finalPath = store.GetFinalPath(root, "hero-model", first.ContentHash);
         var publishedBytes = await File.ReadAllBytesAsync(finalPath);
         Assert.Equal(await File.ReadAllBytesAsync(first.Path), publishedBytes);
-        Assert.Equal(first.ContentHash, await store.HashAsync(root, "hero-model", default));
-        Assert.Equal(snapshot.SourceAssetId, (await store.LoadAsync(root, "hero-model", default)).SourceAssetId);
+        Assert.Equal(first.ContentHash, await store.HashAsync(root, "hero-model", first.ContentHash, default));
+        Assert.Equal(snapshot.SourceAssetId, (await store.LoadAsync(root, "hero-model", first.ContentHash, default)).SourceAssetId);
 
         var changed = snapshot with { SourceLogicalRevision = snapshot.SourceLogicalRevision + 1 };
         var replacement = await store.WriteStagedAsync(root, "hero-model", changed, default);
@@ -75,7 +73,8 @@ public sealed class PublishedModelOutputStoreTests
 
         await store.CommitStagedAsync(root, replacement, default);
 
-        Assert.NotEqual(publishedBytes, await File.ReadAllBytesAsync(finalPath));
+        Assert.Equal(publishedBytes, await File.ReadAllBytesAsync(finalPath));
+        Assert.NotEqual(publishedBytes, await File.ReadAllBytesAsync(store.GetFinalPath(root, "hero-model", replacement.ContentHash)));
     }
 
     [Fact]
@@ -84,11 +83,13 @@ public sealed class PublishedModelOutputStoreTests
         var root = TestPaths.CreateTempDirectory();
         var store = new RekallAgePublishedModelOutputStore();
         var staged = await store.WriteStagedAsync(root, "hero-model", CompiledBox(), default);
+        var transactionDirectory = Path.GetDirectoryName(staged.Path)!;
 
         await store.DeleteStagedAsync(root, staged, default);
 
         Assert.False(File.Exists(staged.Path));
-        Assert.False(File.Exists(store.GetFinalPath(root, "hero-model")));
+        Assert.False(Directory.Exists(transactionDirectory));
+        Assert.False(File.Exists(store.GetFinalPath(root, "hero-model", staged.ContentHash)));
     }
 
     [Theory]
@@ -239,10 +240,7 @@ public sealed class PublishedModelOutputStoreTests
         var outside = TestPaths.CreateTempDirectory();
         var stagingPath = Path.Combine(root, "Assets", "Models", ".staging");
         Directory.CreateDirectory(Path.GetDirectoryName(stagingPath)!);
-        if (!TryCreateDirectoryLink(stagingPath, outside))
-        {
-            return;
-        }
+        CreateDirectoryLinkOrSkip(stagingPath, outside);
 
         var store = new RekallAgePublishedModelOutputStore();
 
@@ -260,10 +258,7 @@ public sealed class PublishedModelOutputStoreTests
         var store = new RekallAgePublishedModelOutputStore();
         var staged = await store.WriteStagedAsync(root, "hero-model", CompiledBox(), default);
         var compiledPath = Path.Combine(root, "Assets", "Models", "Compiled");
-        if (!TryCreateDirectoryLink(compiledPath, outside))
-        {
-            return;
-        }
+        CreateDirectoryLinkOrSkip(compiledPath, outside);
 
         await Assert.ThrowsAsync<InvalidDataException>(
             () => store.CommitStagedAsync(root, staged, default).AsTask());
@@ -278,9 +273,9 @@ public sealed class PublishedModelOutputStoreTests
         var store = new RekallAgePublishedModelOutputStore();
         var initial = await store.WriteStagedAsync(root, "hero-model", CompiledBox(), default);
         await store.CommitStagedAsync(root, initial, default);
-        var finalPath = store.GetFinalPath(root, "hero-model");
+        var finalPath = store.GetFinalPath(root, "hero-model", initial.ContentHash);
         var priorBytes = await File.ReadAllBytesAsync(finalPath);
-        var priorHash = await store.HashAsync(root, "hero-model", default);
+        var priorHash = await store.HashAsync(root, "hero-model", initial.ContentHash, default);
 
         var staged = await store.WriteStagedAsync(root, "hero-model", CompiledBox() with { SourceLogicalRevision = 8 }, default);
         var malformedSnapshot = staged.Snapshot with
@@ -294,12 +289,16 @@ public sealed class PublishedModelOutputStoreTests
             ContentHash = Convert.ToHexString(SHA256.HashData(malformedBytes)).ToLowerInvariant(),
             Snapshot = malformedSnapshot
         };
+        forged = forged with
+        {
+            RelativeFinalPath = $"Assets/Models/Compiled/hero-model/{forged.ContentHash}.age.compiled-mesh.json"
+        };
 
         await Assert.ThrowsAsync<InvalidDataException>(
             () => store.CommitStagedAsync(root, forged, default).AsTask());
 
         Assert.Equal(priorBytes, await File.ReadAllBytesAsync(finalPath));
-        Assert.Equal(priorHash, await store.HashAsync(root, "hero-model", default));
+        Assert.Equal(priorHash, await store.HashAsync(root, "hero-model", initial.ContentHash, default));
     }
 
     private static RekallAgeCompiledMeshSnapshot CompiledBox()
@@ -360,14 +359,14 @@ public sealed class PublishedModelOutputStoreTests
             MaxDepth = 128
         }) + "\n");
 
-    private static bool TryCreateDirectoryLink(string linkPath, string targetPath)
+    private static void CreateDirectoryLinkOrSkip(string linkPath, string targetPath)
     {
         try
         {
             if (!OperatingSystem.IsWindows())
             {
                 Directory.CreateSymbolicLink(linkPath, targetPath);
-                return true;
+                return;
             }
 
             var startInfo = new ProcessStartInfo("cmd.exe")
@@ -383,11 +382,16 @@ public sealed class PublishedModelOutputStoreTests
             startInfo.ArgumentList.Add(targetPath);
             using var process = Process.Start(startInfo)!;
             process.WaitForExit();
-            return process.ExitCode == 0;
+            if (process.ExitCode != 0)
+            {
+                throw Xunit.Sdk.SkipException.ForSkip(
+                    $"Filesystem junction capability unavailable (mklink exit {process.ExitCode}): {process.StandardError.ReadToEnd()}");
+            }
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
         {
-            return false;
+            throw Xunit.Sdk.SkipException.ForSkip(
+                $"Filesystem-link confinement capability unavailable: {error.GetType().Name}: {error.Message}");
         }
     }
 }

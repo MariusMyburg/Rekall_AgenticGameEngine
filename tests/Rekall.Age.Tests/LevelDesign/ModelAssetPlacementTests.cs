@@ -49,7 +49,7 @@ public sealed class ModelAssetPlacementTests
         Assert.Empty(result.Errors);
         Assert.Empty(result.Value.Warnings);
         Assert.Equal(RekallAgeModelBuildState.Current, result.Value.BuildState);
-        Assert.Equal("Assets/Models/Compiled/hero-model.age.compiled-mesh.json", result.Value.CompiledMeshPath);
+        Assert.Equal(fixture.Publication.Asset.LastSuccessfulBuild!.CompiledMeshPath, result.Value.CompiledMeshPath);
         var scene = Assert.IsType<RekallAgeSceneDocument>(result.Value.Scene);
         var entity = scene.GetRequiredEntity(result.Value.EntityId);
         Assert.Equal("Hero Instance", entity.Name);
@@ -122,7 +122,7 @@ public sealed class ModelAssetPlacementTests
 
         Assert.True(result.Ok, result.Summary);
         Assert.Equal(RekallAgeModelBuildState.Stale, result.Value.BuildState);
-        Assert.Equal("Assets/Models/Compiled/hero-model.age.compiled-mesh.json", result.Value.CompiledMeshPath);
+        Assert.Equal(fixture.Publication.Asset.LastSuccessfulBuild!.CompiledMeshPath, result.Value.CompiledMeshPath);
         var warning = Assert.Single(result.Value.Warnings);
         Assert.Equal("REKALL_MODEL_SOURCE_STALE", warning.Code);
         Assert.Equal("Warning", warning.Severity);

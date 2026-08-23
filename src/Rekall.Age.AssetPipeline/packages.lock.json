@@ -2,6 +2,11 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "SamuelRe.CSG.Sharp": {
+        "type": "Transitive",
+        "resolved": "1.0.0",
+        "contentHash": "O08bJk78p96Nomx3BOctu6Du65lNbYfsow/rWAmD0fa1UqcECK4IV7JPcUPL3CdRodECOuoyq5V0PKkRi+/94w=="
+      },
       "rekall.age.assets": {
         "type": "Project",
         "dependencies": {
@@ -9,6 +14,17 @@
         }
       },
       "rekall.age.core": {
+        "type": "Project"
+      },
+      "rekall.age.modeling": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )",
+          "SamuelRe.CSG.Sharp": "[1.0.0, )"
+        }
+      },
+      "rekall.age.modeling.contracts": {
         "type": "Project"
       }
     },

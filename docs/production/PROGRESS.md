@@ -4,14 +4,15 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 14:34 Africa/Johannesburg
+Last verified: 2026-08-23 15:30 Africa/Johannesburg
 
 Branch: `codex/model-asset-foundation`
 
-The first stable Model Asset lifecycle is now available through the default
+The first stable Model Asset metadata and publishing foundation is now available through the default
 CLI/Studio command registry and its derived MCP catalog. The canonical surface
 is `rekall.asset.model.publish`, `rekall.asset.model.rebuild`,
-`rekall.asset.model.inspect`, `rekall.asset.model.list`, and
+`rekall.asset.model.inspect`, `rekall.asset.model.list`,
+`rekall.asset.model.freeze`, `rekall.asset.model.unfreeze`, and
 `rekall.scene.instantiate_asset`. One shared concrete publishing service now
 supplies dependency health to placement through the dependency-neutral Assets
 contract; LevelDesign does not depend on AssetPipeline. A registry-only
@@ -19,15 +20,26 @@ end-to-end proof creates an editable mesh, publishes and lists a stable Model
 Asset, creates a scene, places the asset, inspects the entity, attaches and
 retains `Game.HeroState`, edits the source into Stale health, rebuilds to
 Current, and proves the same entity ID, `Rekall.ModelAssetReference` asset ID,
-and agent-owned component values survive. MCP discoverability is derived from
-the registry rather than a parallel tool implementation. The focused contract
-passes 1/1; Model Asset/published-output coverage passes 79/79; the modeling
-selection passes 145/145; the complete Studio suite passes 51/51; the Windows
-player prerequisite and `Rekall.AGE.sln` Release builds both succeed with zero
-warnings and zero errors. The next Studio slice is the Modeling workspace's
+and agent-owned component values survive in persisted scene metadata. This is
+not yet proof that the placed Model Asset renders in a player or hot-refreshes
+visibly after rebuild. Published geometry is now content-addressed and immutable;
+the revision-checked Model Asset manifest is the durable commit pointer, exact
+validated output races are safely reused, and deterministic interruption tests
+prove a valid last-successful manifest/output pair at every publication boundary.
+Catalog writers replay semantic mutations under optimistic revision conflicts,
+frozen inspection validates compiled structure and provenance without requiring
+the editable source, all publication preimages are read once under the 64 MiB
+bound, and Model Asset/recovery paths reject filesystem-link traversal. MCP
+discoverability is derived from the registry rather than a parallel tool
+implementation. The focused registry lifecycle passes 1/1; Model Asset,
+published-output, placement, and catalog-revision coverage passes 87/87; the
+complete core suite passes 1549/1549; the complete Studio suite passes 51/51;
+the Windows player prerequisite and `Rekall.AGE.sln` Release builds both succeed
+with zero warnings and zero errors. The next Studio slice is the Modeling workspace's
 Publish/Update action, a health-aware Asset Browser with viewport drag/drop
 preview, and Inspector component attachment, all as clients of these same
-commands.
+commands. Visible runtime Model Asset resolution and hot-refresh acceptance are
+the next engine/runtime proof after that Studio surface.
 
 Studio scene interaction now uses a render-derived interaction snapshot rather
 than guessed editor geometry. Uniform-stretch letterboxing is mapped exactly;

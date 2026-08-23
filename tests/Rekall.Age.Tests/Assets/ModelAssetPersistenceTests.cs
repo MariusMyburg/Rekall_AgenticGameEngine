@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Rekall.Age.Assets;
 using Rekall.Age.Core.Persistence;
 
@@ -129,6 +130,52 @@ public sealed class ModelAssetPersistenceTests
                 CancellationToken.None).AsTask());
 
         Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", error.Code);
+    }
+
+    [Fact]
+    public async Task ModelAssetSaveLoadListAndRecoveryPathsRejectLinkedModelsRoot()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var outside = TestPaths.CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(root, "Assets"));
+        var linkedModels = Path.Combine(root, "Assets", "Models");
+        if (!OperatingSystem.IsWindows())
+        {
+            Directory.CreateSymbolicLink(linkedModels, outside);
+        }
+        else
+        {
+            var startInfo = new ProcessStartInfo("cmd.exe")
+            {
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            startInfo.ArgumentList.Add("/c");
+            startInfo.ArgumentList.Add("mklink");
+            startInfo.ArgumentList.Add("/J");
+            startInfo.ArgumentList.Add(linkedModels);
+            startInfo.ArgumentList.Add(outside);
+            using var process = Process.Start(startInfo)!;
+            process.WaitForExit();
+            Assert.True(
+                process.ExitCode == 0,
+                $"Filesystem junction capability unavailable (mklink exit {process.ExitCode}): {process.StandardError.ReadToEnd()}");
+        }
+
+        var store = new RekallAgeModelAssetStore();
+        var pathError = Assert.Throws<InvalidDataException>(() => store.GetModelPath(root, "hero-model"));
+        Assert.Contains("REKALL_PATH_REPARSE_REJECTED", pathError.Message, StringComparison.Ordinal);
+        var listError = Assert.Throws<InvalidDataException>(() => store.ListAssetIds(root));
+        Assert.Contains("REKALL_PATH_REPARSE_REJECTED", listError.Message, StringComparison.Ordinal);
+        var recoveryError = Assert.Throws<InvalidDataException>(() => store.GetRecoveryPath(root, "hero-model"));
+        Assert.Contains("REKALL_PATH_REPARSE_REJECTED", recoveryError.Message, StringComparison.Ordinal);
+        var loadError = await Assert.ThrowsAsync<InvalidDataException>(
+            () => store.LoadAsync(root, "hero-model", default).AsTask());
+        Assert.Contains("REKALL_PATH_REPARSE_REJECTED", loadError.Message, StringComparison.Ordinal);
+        var saveError = await Assert.ThrowsAsync<InvalidDataException>(
+            () => store.SaveAsync(root, CreateDocument(), default).AsTask());
+        Assert.Contains("REKALL_PATH_REPARSE_REJECTED", saveError.Message, StringComparison.Ordinal);
     }
 
     private static RekallAgeModelAssetDocument CreateDocument() =>

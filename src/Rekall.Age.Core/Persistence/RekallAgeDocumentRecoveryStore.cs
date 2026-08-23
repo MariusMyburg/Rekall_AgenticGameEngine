@@ -35,14 +35,20 @@ public static class RekallAgeDocumentRecoveryStore
     {
         var (root, document, relative) = ResolveConfined(projectRoot, documentPath);
         _ = document;
-        return Path.Combine(root, ".rekall", "recovery", relative + ".previous");
+        return RekallAgeConfinedPath.Resolve(
+            root,
+            Path.Combine(root, ".rekall", "recovery", relative + ".previous"),
+            "Recovery previous-version path");
     }
 
     public static string GetQuarantineDirectory(string projectRoot, string documentPath)
     {
         var (root, _, relative) = ResolveConfined(projectRoot, documentPath);
         var relativeDirectory = Path.GetDirectoryName(relative);
-        return Path.Combine(root, ".rekall", "recovery", "quarantine", relativeDirectory ?? string.Empty);
+        return RekallAgeConfinedPath.Resolve(
+            root,
+            Path.Combine(root, ".rekall", "recovery", "quarantine", relativeDirectory ?? string.Empty),
+            "Recovery quarantine path");
     }
 
     public static async ValueTask<RekallAgeDocumentRecoveryInspection> InspectAsync(
@@ -169,7 +175,7 @@ public static class RekallAgeDocumentRecoveryStore
         ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(documentPath);
         var root = Path.GetFullPath(projectRoot);
-        var document = Path.GetFullPath(documentPath);
+        var document = RekallAgeConfinedPath.Resolve(root, documentPath, "Recovery document path");
         var relative = Path.GetRelativePath(root, document);
         if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
         {

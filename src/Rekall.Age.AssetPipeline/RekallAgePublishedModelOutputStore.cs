@@ -17,11 +17,15 @@ public sealed class RekallAgePublishedModelOutputStore
         MaxDepth = RekallAgePersistedJson.MaximumDocumentDepth
     };
 
-    public string GetFinalPath(string projectRoot, string assetId)
+    public string GetFinalPath(string projectRoot, string assetId, string contentHash)
     {
         ValidateAssetId(assetId);
+        if (!IsLowercaseSha256(contentHash))
+        {
+            throw new ArgumentException("Compiled model output hash must be a lowercase SHA-256 token.", nameof(contentHash));
+        }
         var modelAssetRoot = GetModelAssetRoot(projectRoot);
-        var finalPath = Path.Combine(modelAssetRoot, "Compiled", assetId + CompiledFileSuffix);
+        var finalPath = Path.Combine(modelAssetRoot, "Compiled", assetId, contentHash + CompiledFileSuffix);
         EnsurePathWithin(modelAssetRoot, finalPath, "Compiled model output path");
         return finalPath;
     }
@@ -56,7 +60,7 @@ public sealed class RekallAgePublishedModelOutputStore
 
         return new RekallAgeStagedModelOutput(
             stagedPath,
-            $"{RelativeCompiledDirectory}/{assetId}{CompiledFileSuffix}",
+            $"{RelativeCompiledDirectory}/{assetId}/{ComputeHash(bytes)}{CompiledFileSuffix}",
             ComputeHash(bytes),
             snapshot);
     }
@@ -66,37 +70,63 @@ public sealed class RekallAgePublishedModelOutputStore
         RekallAgeStagedModelOutput staged,
         CancellationToken cancellationToken)
     {
-        var validated = await ReadValidatedStagedAsync(projectRoot, staged, cancellationToken).ConfigureAwait(false);
-
-        await RekallAgeAtomicFile.WriteAllTextAsync(
-            GetFinalPath(projectRoot, validated.AssetId),
-            validated.Contents,
-            RekallAgePersistedJson.MaximumDocumentBytes,
-            cancellationToken).ConfigureAwait(false);
+        _ = await CommitStagedImmutableAsync(projectRoot, staged, cancellationToken).ConfigureAwait(false);
     }
 
-    public async ValueTask<string> CommitStagedIfRevisionAsync(
+    public async ValueTask<RekallAgeImmutableModelOutputCommit> CommitStagedImmutableAsync(
         string projectRoot,
         RekallAgeStagedModelOutput staged,
-        string expectedRevision,
         CancellationToken cancellationToken)
     {
         var validated = await ReadValidatedStagedAsync(projectRoot, staged, cancellationToken).ConfigureAwait(false);
-        return await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
-            GetFinalPath(projectRoot, validated.AssetId),
-            validated.Contents,
-            RekallAgePersistedJson.MaximumDocumentBytes,
-            expectedRevision,
-            cancellationToken).ConfigureAwait(false);
+        var finalPath = GetFinalPath(projectRoot, validated.AssetId, staged.ContentHash);
+        if (File.Exists(finalPath))
+        {
+            return await ValidateExistingCommitAsync(finalPath, staged.ContentHash, cancellationToken).ConfigureAwait(false);
+        }
+
+        try
+        {
+            var revision = await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
+                finalPath,
+                validated.Contents,
+                RekallAgePersistedJson.MaximumDocumentBytes,
+                RekallAgeDocumentRevision.Missing,
+                cancellationToken).ConfigureAwait(false);
+            return new(revision, true);
+        }
+        catch (RekallAgeDocumentRevisionException)
+        {
+            // Another publisher may have won the immutable create race. Exact bytes are reusable;
+            // differing bytes at a content-addressed path are corruption and must never be replaced.
+            return await ValidateExistingCommitAsync(finalPath, staged.ContentHash, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static async ValueTask<RekallAgeImmutableModelOutputCommit> ValidateExistingCommitAsync(
+        string finalPath,
+        string expectedHash,
+        CancellationToken cancellationToken)
+    {
+        var existing = await RekallAgeBoundedFileSnapshot.ReadAsync(
+            finalPath, RekallAgePersistedJson.MaximumDocumentBytes, cancellationToken).ConfigureAwait(false);
+        if (!string.Equals(existing.Revision, expectedHash, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "REKALL_MODEL_OUTPUT_HASH_COLLISION: Existing immutable output bytes do not match their content-addressed path.");
+        }
+        _ = DeserializeAndValidate(existing.Bytes);
+        return new(existing.Revision, false);
     }
 
     public async ValueTask<RekallAgeCompiledMeshSnapshot> LoadAsync(
         string projectRoot,
         string assetId,
+        string contentHash,
         CancellationToken cancellationToken)
     {
         var snapshot = await RekallAgePersistedJson.ReadAsync<RekallAgeCompiledMeshSnapshot>(
-            GetFinalPath(projectRoot, assetId),
+            GetFinalPath(projectRoot, assetId, contentHash),
             JsonOptions,
             cancellationToken).ConfigureAwait(false);
         ValidateSnapshot(snapshot);
@@ -106,10 +136,11 @@ public sealed class RekallAgePublishedModelOutputStore
     public async ValueTask<string> HashAsync(
         string projectRoot,
         string assetId,
+        string contentHash,
         CancellationToken cancellationToken)
     {
         var snapshot = await RekallAgeBoundedFileSnapshot.ReadAsync(
-            GetFinalPath(projectRoot, assetId),
+            GetFinalPath(projectRoot, assetId, contentHash),
             RekallAgePersistedJson.MaximumDocumentBytes,
             cancellationToken).ConfigureAwait(false);
         return ComputeHash(snapshot.Bytes);
@@ -126,6 +157,13 @@ public sealed class RekallAgePublishedModelOutputStore
         if (File.Exists(staged.Path))
         {
             File.Delete(staged.Path);
+        }
+
+        var transactionDirectory = Path.GetDirectoryName(staged.Path);
+        if (transactionDirectory is not null && Directory.Exists(transactionDirectory)
+            && !Directory.EnumerateFileSystemEntries(transactionDirectory).Any())
+        {
+            Directory.Delete(transactionDirectory);
         }
 
         return ValueTask.CompletedTask;
@@ -331,6 +369,15 @@ public sealed class RekallAgePublishedModelOutputStore
             throw new ArgumentException("Staged model output content hash must be a lowercase SHA-256 token.", nameof(staged));
         }
 
+        var pathParts = staged.RelativeFinalPath[(RelativeCompiledDirectory.Length + 1)..^CompiledFileSuffix.Length]
+            .Split('/');
+        if (pathParts.Length != 2 || !string.Equals(pathParts[1], staged.ContentHash, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "Staged model output final path must contain its exact content hash.",
+                nameof(staged));
+        }
+
         var expectedStagedPath = Path.Combine(
             GetStagingRoot(projectRoot),
             Path.GetFileName(Path.GetDirectoryName(Path.GetFullPath(staged.Path))!),
@@ -350,12 +397,12 @@ public sealed class RekallAgePublishedModelOutputStore
         var prefix = RelativeCompiledDirectory + "/";
         if (!relativeFinalPath.StartsWith(prefix, StringComparison.Ordinal)
             || !relativeFinalPath.EndsWith(CompiledFileSuffix, StringComparison.Ordinal)
-            || relativeFinalPath[prefix.Length..^CompiledFileSuffix.Length].Contains('/'))
+            || relativeFinalPath[prefix.Length..^CompiledFileSuffix.Length].Split('/').Length != 2)
         {
             throw new ArgumentException("Staged model output final path must be the canonical project-relative compiled-output path.", nameof(relativeFinalPath));
         }
 
-        return relativeFinalPath[prefix.Length..^CompiledFileSuffix.Length];
+        return relativeFinalPath[prefix.Length..^CompiledFileSuffix.Length].Split('/')[0];
     }
 
     private static string GetModelAssetRoot(string projectRoot)
@@ -363,8 +410,7 @@ public sealed class RekallAgePublishedModelOutputStore
         ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
         var fullProjectRoot = Path.GetFullPath(projectRoot);
         var modelAssetRoot = Path.Combine(fullProjectRoot, "Assets", "Models");
-        RejectReparsePointTraversal(fullProjectRoot, modelAssetRoot, "Model Asset root path");
-        return modelAssetRoot;
+        return RekallAgeConfinedPath.Resolve(fullProjectRoot, modelAssetRoot, "Model Asset root path");
     }
 
     private static string GetStagingRoot(string projectRoot) =>
@@ -382,50 +428,7 @@ public sealed class RekallAgePublishedModelOutputStore
             throw new ArgumentException($"{description} must remain inside '{fullRoot}'.", nameof(candidate));
         }
 
-        RejectReparsePointTraversal(fullRoot, fullCandidate, description);
-    }
-
-    private static void RejectReparsePointTraversal(string trustedRoot, string candidate, string description)
-    {
-        var fullRoot = Path.GetFullPath(trustedRoot);
-        var fullCandidate = Path.GetFullPath(candidate);
-        var relative = Path.GetRelativePath(fullRoot, fullCandidate);
-        if (relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, PathComparison))
-        {
-            throw new ArgumentException($"{description} must remain inside '{fullRoot}'.", nameof(candidate));
-        }
-
-        var current = fullRoot;
-        if (IsReparsePoint(current))
-        {
-            throw new InvalidDataException($"REKALL_MODEL_OUTPUT_PATH_REPARSE_REJECTED: {description} cannot traverse a filesystem link or junction.");
-        }
-
-        if (relative == ".")
-        {
-            return;
-        }
-
-        foreach (var segment in relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
-        {
-            current = Path.Combine(current, segment);
-            if (IsReparsePoint(current))
-            {
-                throw new InvalidDataException($"REKALL_MODEL_OUTPUT_PATH_REPARSE_REJECTED: {description} cannot traverse a filesystem link or junction.");
-            }
-        }
-    }
-
-    private static bool IsReparsePoint(string path)
-    {
-        try
-        {
-            return File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint);
-        }
-        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
-        {
-            return false;
-        }
+        _ = RekallAgeConfinedPath.Resolve(fullRoot, fullCandidate, description);
     }
 
     private static StringComparison PathComparison =>
@@ -459,3 +462,5 @@ public sealed record RekallAgeStagedModelOutput(
     string RelativeFinalPath,
     string ContentHash,
     RekallAgeCompiledMeshSnapshot Snapshot);
+
+public sealed record RekallAgeImmutableModelOutputCommit(string Revision, bool Created);

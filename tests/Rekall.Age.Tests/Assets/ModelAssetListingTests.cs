@@ -55,7 +55,7 @@ public sealed class ModelAssetListingTests
         Assert.Equal("Assets/Models/hero-model.age.model.json", metadata.ModelDocumentPath);
         Assert.Equal("Mesh", metadata.SourceKind);
         Assert.Equal("hero-mesh", metadata.SourceAssetId);
-        Assert.Equal("Assets/Models/Compiled/hero-model.age.compiled-mesh.json", metadata.CompiledOutputPath);
+        Assert.Equal(publication.Asset.LastSuccessfulBuild!.CompiledMeshPath, metadata.CompiledOutputPath);
         Assert.Equal(publication.CompiledContentHash, metadata.CompiledContentHash);
         Assert.False(Path.IsPathFullyQualified(metadata.ModelDocumentPath));
         Assert.False(Path.IsPathFullyQualified(metadata.CompiledOutputPath));

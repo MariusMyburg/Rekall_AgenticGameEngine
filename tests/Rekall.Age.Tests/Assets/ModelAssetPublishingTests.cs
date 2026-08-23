@@ -42,7 +42,9 @@ public sealed class ModelAssetPublishingTests
         Assert.Equal(Path.GetFullPath(publish.CompiledOutputPath), catalogAsset.ImportedPath);
 
         Assert.Contains(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model"), transaction.ChangedResources);
-        Assert.Contains(fixture.OutputStore.GetFinalPath(fixture.Root, "hero-model"), transaction.ChangedResources);
+        Assert.Contains(
+            fixture.OutputStore.GetFinalPath(fixture.Root, "hero-model", publish.CompiledContentHash),
+            transaction.ChangedResources);
         Assert.Contains(fixture.CatalogStore.GetCatalogPath(fixture.Root), transaction.ChangedResources);
         Assert.DoesNotContain(transaction.ChangedResources, path => path.Contains(".staging", StringComparison.Ordinal));
         Assert.Empty(EnumerateStagingFiles(fixture.Root));
@@ -87,7 +89,8 @@ public sealed class ModelAssetPublishingTests
         Assert.Equal(changedMeshRevision, rebuild.Asset.LastSuccessfulBuild!.SourceFileRevision);
         Assert.Equal(2, rebuild.Asset.LastSuccessfulBuild.SourceLogicalRevision);
         Assert.NotEqual(first.CompiledContentHash, rebuild.CompiledContentHash);
-        var compiled = await fixture.OutputStore.LoadAsync(fixture.Root, "hero-model", default);
+        var compiled = await fixture.OutputStore.LoadAsync(
+            fixture.Root, "hero-model", rebuild.CompiledContentHash, default);
         Assert.Equal("hero-mesh", compiled.SourceAssetId);
         Assert.Equal(2, compiled.SourceLogicalRevision);
     }
@@ -179,198 +182,166 @@ public sealed class ModelAssetPublishingTests
         Assert.Empty(EnumerateStagingFiles(fixture.Root));
     }
 
-    [Fact]
-    public async Task CancellationAfterOutputCommitRestoresOnlyTheWrittenOutput()
+    [Theory]
+    [InlineData("immutable-output-committed", RekallAgeModelBuildState.Stale)]
+    [InlineData("model-pointer-committed", RekallAgeModelBuildState.Current)]
+    [InlineData("catalog-committed", RekallAgeModelBuildState.Current)]
+    public async Task ProcessInterruptionAtDurableWriteBoundariesRetainsAValidManifestOutputPair(
+        string boundary,
+        RekallAgeModelBuildState expectedState)
     {
         var fixture = await CreateFixtureAsync();
         var first = await PublishAsync(fixture);
-        _ = await ReplaceSourceAsync(fixture, "sphere");
-        var priorModel = await File.ReadAllBytesAsync(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model"));
-        var priorOutput = await File.ReadAllBytesAsync(first.CompiledOutputPath);
-        var priorCatalog = await File.ReadAllBytesAsync(fixture.CatalogStore.GetCatalogPath(fixture.Root));
-        var transaction = RekallAgeTransaction.Begin("cancel rebuild after output");
-        await using var heldModelLock = HoldDocumentLock(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model"));
-        using var cancellation = new CancellationTokenSource();
+        await ReplaceSourceAsync(fixture, "sphere");
+        var interrupting = new RekallAgeModelPublishingService(
+            fixture.MeshStore,
+            new RekallAgeMeshCompiler(),
+            fixture.ModelStore,
+            fixture.OutputStore,
+            fixture.CatalogStore,
+            reached =>
+            {
+                if (reached == boundary)
+                {
+                    throw new RekallAgeModelPublicationInterruptionException(reached);
+                }
+            });
 
-        var rebuild = fixture.Service.RebuildAsync(
+        await Assert.ThrowsAsync<RekallAgeModelPublicationInterruptionException>(() =>
+            interrupting.RebuildAsync(
+                fixture.Root,
+                "hero-model",
+                first.ModelFileRevision,
+                RekallAgeTransaction.Begin("interrupt publication"),
+                default).AsTask());
+
+        var inspection = await fixture.Service.InspectAsync(fixture.Root, "hero-model", default);
+        Assert.Equal(expectedState, inspection.BuildState);
+        Assert.True(inspection.CompiledOutputExists);
+        var retained = Assert.IsType<RekallAgeModelAssetDocument>(inspection.Asset);
+        Assert.True(File.Exists(Path.Combine(fixture.Root, retained.LastSuccessfulBuild!.CompiledMeshPath)));
+        Assert.True(File.Exists(first.CompiledOutputPath));
+
+        var loaded = await fixture.ModelStore.LoadVersionedAsync(fixture.Root, "hero-model", default);
+        var recovered = await fixture.Service.RebuildAsync(
             fixture.Root,
             "hero-model",
-            first.ModelFileRevision,
-            transaction,
-            cancellation.Token).AsTask();
-        await WaitForBytesToChangeAsync(first.CompiledOutputPath, priorOutput);
-        cancellation.Cancel();
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => rebuild);
-        Assert.Equal(priorModel, await File.ReadAllBytesAsync(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model")));
-        Assert.Equal(priorOutput, await File.ReadAllBytesAsync(first.CompiledOutputPath));
-        Assert.Equal(priorCatalog, await File.ReadAllBytesAsync(fixture.CatalogStore.GetCatalogPath(fixture.Root)));
-        Assert.Empty(transaction.ChangedResources);
-        Assert.Empty(EnumerateStagingFiles(fixture.Root));
+            loaded.Revision,
+            RekallAgeTransaction.Begin("recover publication"),
+            default);
+        Assert.Equal(RekallAgeModelBuildState.Current, recovered.Asset.BuildState);
     }
 
     [Fact]
-    public async Task ConcurrentCatalogRevisionIsNotOverwrittenWhenCatalogCommitConflicts()
+    public async Task OversizedPreexistingImmutableOutputFailsBeforePublishingAnyMetadata()
     {
         var fixture = await CreateFixtureAsync();
-        var first = await PublishAsync(fixture);
-        _ = await ReplaceSourceAsync(fixture, "sphere");
-        var priorModel = await File.ReadAllBytesAsync(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model"));
-        var priorOutput = await File.ReadAllBytesAsync(first.CompiledOutputPath);
-        var catalogBefore = await fixture.CatalogStore.LoadVersionedAsync(fixture.Root, default);
-        var transaction = RekallAgeTransaction.Begin("catalog conflict rebuild");
-        var heldModelLock = HoldDocumentLock(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model"));
-        var rebuild = fixture.Service.RebuildAsync(
-            fixture.Root,
-            "hero-model",
-            first.ModelFileRevision,
-            transaction,
-            default).AsTask();
-        await WaitForBytesToChangeAsync(first.CompiledOutputPath, priorOutput);
-        var concurrentCatalog = catalogBefore.Value.AddOrReplace(ConcurrentCatalogAsset());
-        var concurrentRevision = await fixture.CatalogStore.SaveIfRevisionAsync(
-            fixture.Root,
-            concurrentCatalog,
-            catalogBefore.Revision,
-            default);
-        await heldModelLock.DisposeAsync();
-
-        var error = await Assert.ThrowsAsync<RekallAgeDocumentRevisionException>(() => rebuild);
-
-        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", error.Code);
-        Assert.Equal(priorModel, await File.ReadAllBytesAsync(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model")));
-        Assert.Equal(priorOutput, await File.ReadAllBytesAsync(first.CompiledOutputPath));
-        var retainedCatalog = await fixture.CatalogStore.LoadVersionedAsync(fixture.Root, default);
-        Assert.Equal(concurrentRevision, retainedCatalog.Revision);
-        Assert.Contains(retainedCatalog.Value.Assets, asset => asset.Id == "concurrent-audio");
-        Assert.Empty(transaction.ChangedResources);
-    }
-
-    [Fact]
-    public async Task AbaBeforeForwardWriteNeverRestoresJournalBytesThatWereNotTheWritePreimage()
-    {
-        var fixture = await CreateFixtureAsync();
-        var first = await PublishAsync(fixture);
-        _ = await ReplaceSourceAsync(fixture, "sphere");
-        var modelPath = fixture.ModelStore.GetModelPath(fixture.Root, "hero-model");
-        var originalModelBytes = await File.ReadAllBytesAsync(modelPath);
-        var originalOutputBytes = await File.ReadAllBytesAsync(first.CompiledOutputPath);
-        var catalogBefore = await fixture.CatalogStore.LoadVersionedAsync(fixture.Root, default);
-        var concurrentModel = first.Asset with { DisplayName = "Concurrent B" };
-        var concurrentModelBytes = System.Text.Encoding.UTF8.GetBytes(
-            fixture.ModelStore.Serialize(concurrentModel));
-        var concurrentModelRevision = await RekallAgeAtomicFile.WriteAllBytesIfRevisionAsync(
-            modelPath,
-            concurrentModelBytes,
-            RekallAgePersistedJson.MaximumDocumentBytes,
-            first.ModelFileRevision,
-            previousVersionPath: null,
-            default);
-        await using var heldOutputLock = HoldDocumentLock(first.CompiledOutputPath);
-        var transaction = RekallAgeTransaction.Begin("ABA rebuild");
-
-        var rebuild = fixture.Service.RebuildAsync(
-            fixture.Root,
-            "hero-model",
-            first.ModelFileRevision,
-            transaction,
-            default).AsTask();
-        await WaitForCapturedPreimagesAsync(transaction, 3);
-        var restoredOriginalRevision = await RekallAgeAtomicFile.WriteAllBytesIfRevisionAsync(
-            modelPath,
-            originalModelBytes,
-            RekallAgePersistedJson.MaximumDocumentBytes,
-            concurrentModelRevision,
-            previousVersionPath: null,
-            default);
-        var concurrentCatalog = catalogBefore.Value.AddOrReplace(ConcurrentCatalogAsset());
-        var concurrentCatalogRevision = await fixture.CatalogStore.SaveIfRevisionAsync(
-            fixture.Root,
-            concurrentCatalog,
-            catalogBefore.Revision,
-            default);
-        await heldOutputLock.DisposeAsync();
-
-        var error = await Assert.ThrowsAsync<RekallAgeDocumentRevisionException>(() => rebuild);
-
-        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", error.Code);
-        Assert.Equal(first.ModelFileRevision, restoredOriginalRevision);
-        Assert.Equal(originalModelBytes, await File.ReadAllBytesAsync(modelPath));
-        Assert.Equal(originalOutputBytes, await File.ReadAllBytesAsync(first.CompiledOutputPath));
-        var retainedCatalog = await fixture.CatalogStore.LoadVersionedAsync(fixture.Root, default);
-        Assert.Equal(concurrentCatalogRevision, retainedCatalog.Revision);
-        Assert.Contains(retainedCatalog.Value.Assets, asset => asset.Id == "concurrent-audio");
-        Assert.Empty(transaction.ChangedResources);
-    }
-
-    [Fact]
-    public async Task RollbackConflictOnModelStillRestoresOutputAndRetainsConcurrentResources()
-    {
-        var fixture = await CreateFixtureAsync();
-        var first = await PublishAsync(fixture);
-        _ = await ReplaceSourceAsync(fixture, "sphere");
-        var priorOutput = await File.ReadAllBytesAsync(first.CompiledOutputPath);
-        var priorModelBytes = await File.ReadAllBytesAsync(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model"));
-        var catalogBefore = await fixture.CatalogStore.LoadVersionedAsync(fixture.Root, default);
-        var catalogPath = fixture.CatalogStore.GetCatalogPath(fixture.Root);
-        var heldCatalogLock = HoldDocumentLock(catalogPath);
-        var transaction = RekallAgeTransaction.Begin("rollback conflict rebuild");
-        var rebuild = fixture.Service.RebuildAsync(
-            fixture.Root,
-            "hero-model",
-            first.ModelFileRevision,
-            transaction,
-            default).AsTask();
-        await WaitForBytesToChangeAsync(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model"), priorModelBytes);
-        var serviceModel = await fixture.ModelStore.LoadVersionedAsync(fixture.Root, "hero-model", default);
-        var concurrentModel = serviceModel.Value with
+        var source = await fixture.MeshStore.LoadAsync(fixture.Root, "hero-mesh", default);
+        var staged = await fixture.OutputStore.WriteStagedAsync(
+            fixture.Root, "hero-model", new RekallAgeMeshCompiler().Compile(source), default);
+        await fixture.OutputStore.DeleteStagedAsync(fixture.Root, staged, default);
+        var outputPath = fixture.OutputStore.GetFinalPath(fixture.Root, "hero-model", staged.ContentHash);
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        await using (var oversized = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
-            Revision = serviceModel.Value.Revision + 1,
-            DisplayName = "Concurrent Model"
-        };
-        var concurrentModelRevision = await fixture.ModelStore.SaveIfRevisionAsync(
-            fixture.Root,
-            concurrentModel,
-            serviceModel.Revision,
-            default);
-        var concurrentCatalog = catalogBefore.Value.AddOrReplace(ConcurrentCatalogAsset());
-        var concurrentCatalogBytes = CatalogBytes(concurrentCatalog);
-        await File.WriteAllBytesAsync(catalogPath, concurrentCatalogBytes);
-        var concurrentCatalogRevision = RekallAgeDocumentRevision.Compute(concurrentCatalogBytes);
-        await heldCatalogLock.DisposeAsync();
+            oversized.SetLength(RekallAgePersistedJson.MaximumDocumentBytes + 1L);
+        }
+        var transaction = RekallAgeTransaction.Begin("reject oversized immutable output");
 
-        var error = await Assert.ThrowsAsync<RekallAgeModelPublishingException>(() => rebuild);
+        await Assert.ThrowsAsync<RekallAgeBoundedFileSnapshotException>(() =>
+            fixture.Service.PublishAsync(
+                fixture.Root,
+                new("hero-model", "Hero Model", new(RekallAgeModelSourceKind.Mesh, "hero-mesh"), RekallAgeDocumentRevision.Missing),
+                transaction,
+                default).AsTask());
 
-        Assert.Equal("REKALL_MODEL_ROLLBACK_FAILED", error.Code);
-        var aggregate = Assert.IsType<AggregateException>(error.InnerException);
-        Assert.True(aggregate.InnerExceptions.Count >= 2);
-        Assert.Equal(priorOutput, await File.ReadAllBytesAsync(first.CompiledOutputPath));
-        var retainedModel = await fixture.ModelStore.LoadVersionedAsync(fixture.Root, "hero-model", default);
-        Assert.Equal(concurrentModelRevision, retainedModel.Revision);
-        Assert.Equal("Concurrent Model", retainedModel.Value.DisplayName);
-        var retainedCatalog = await fixture.CatalogStore.LoadVersionedAsync(fixture.Root, default);
-        Assert.Equal(concurrentCatalogRevision, retainedCatalog.Revision);
-        Assert.Contains(retainedCatalog.Value.Assets, asset => asset.Id == "concurrent-audio");
+        Assert.False(File.Exists(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model")));
+        Assert.False(File.Exists(fixture.CatalogStore.GetCatalogPath(fixture.Root)));
         Assert.Empty(transaction.ChangedResources);
+        Assert.Empty(transaction.ResourcePreimages);
     }
 
     [Fact]
-    public async Task StagingCleanupFailureDoesNotTurnCommittedPublicationIntoFailure()
+    public async Task PublicationMergesAConcurrentIndependentCatalogMutationWithoutLoss()
     {
         var fixture = await CreateFixtureAsync();
-        var stagingRoot = Path.Combine(fixture.Root, "Assets", "Models", ".staging");
-        Directory.CreateDirectory(stagingRoot);
-        Directory.CreateDirectory(Path.Combine(fixture.Root, "Assets", "Models", "Compiled"));
-        await using var heldOutputLock = HoldDocumentLock(
-            fixture.OutputStore.GetFinalPath(fixture.Root, "hero-model"));
-        var publicationTask = PublishAsync(fixture).AsTask();
-        await using var heldStagedFile = await WaitForStagedFileAsync(stagingRoot);
-        await heldOutputLock.DisposeAsync();
-        var publication = await publicationTask;
+        var service = new RekallAgeModelPublishingService(
+            fixture.MeshStore,
+            new RekallAgeMeshCompiler(),
+            fixture.ModelStore,
+            fixture.OutputStore,
+            fixture.CatalogStore,
+            boundary =>
+            {
+                if (boundary == "model-pointer-committed")
+                {
+                    fixture.CatalogStore.AddOrReplaceAsync(
+                        fixture.Root, ConcurrentCatalogAsset(), default).AsTask().GetAwaiter().GetResult();
+                }
+            });
 
-        Assert.Equal(RekallAgeModelBuildState.Current, publication.Asset.BuildState);
-        Assert.True(File.Exists(publication.CompiledOutputPath));
-        Assert.True(File.Exists(heldStagedFile.Name));
+        var result = await service.PublishAsync(
+            fixture.Root,
+            new("hero-model", "Hero Model", new(RekallAgeModelSourceKind.Mesh, "hero-mesh"), RekallAgeDocumentRevision.Missing),
+            RekallAgeTransaction.Begin("merge concurrent catalog writer"),
+            default);
+
+        Assert.Equal("hero-model", result.Asset.AssetId);
+        var catalog = await fixture.CatalogStore.LoadAsync(fixture.Root, default);
+        Assert.Equal(["concurrent-audio", "hero-model"], catalog.Assets.Select(asset => asset.Id).Order().ToArray());
+        Assert.NotNull(catalog.Assets.Single(asset => asset.Id == "hero-model").ModelAssetMetadata);
+    }
+
+    [Fact]
+    public async Task OversizedExistingModelDocumentFailsBeforeRebuildMutation()
+    {
+        var fixture = await CreateFixtureAsync();
+        var first = await PublishAsync(fixture);
+        var modelPath = fixture.ModelStore.GetModelPath(fixture.Root, "hero-model");
+        await using (var oversized = new FileStream(modelPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            oversized.SetLength(RekallAgePersistedJson.MaximumDocumentBytes + 1L);
+        }
+        var outputBytes = await File.ReadAllBytesAsync(first.CompiledOutputPath);
+        var transaction = RekallAgeTransaction.Begin("reject oversized model document");
+
+        var error = await Assert.ThrowsAsync<Rekall.Age.Core.Compatibility.RekallAgeDocumentCompatibilityException>(() =>
+            fixture.Service.RebuildAsync(
+                fixture.Root, "hero-model", first.ModelFileRevision, transaction, default).AsTask());
+        Assert.IsType<RekallAgeBoundedFileSnapshotException>(error.InnerException);
+
+        Assert.Equal(RekallAgePersistedJson.MaximumDocumentBytes + 1L, new FileInfo(modelPath).Length);
+        Assert.Equal(outputBytes, await File.ReadAllBytesAsync(first.CompiledOutputPath));
+        Assert.Empty(transaction.ChangedResources);
+        Assert.Empty(transaction.ResourcePreimages);
+    }
+
+    [Fact]
+    public async Task OversizedExistingCatalogRollsBackNewPointerAndImmutableOutput()
+    {
+        var fixture = await CreateFixtureAsync();
+        var catalogPath = fixture.CatalogStore.GetCatalogPath(fixture.Root);
+        Directory.CreateDirectory(Path.GetDirectoryName(catalogPath)!);
+        await using (var oversized = new FileStream(catalogPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            oversized.SetLength(RekallAgePersistedJson.MaximumDocumentBytes + 1L);
+        }
+        var transaction = RekallAgeTransaction.Begin("reject oversized catalog");
+
+        await Assert.ThrowsAsync<RekallAgeBoundedFileSnapshotException>(() =>
+            fixture.Service.PublishAsync(
+                fixture.Root,
+                new("hero-model", "Hero Model", new(RekallAgeModelSourceKind.Mesh, "hero-mesh"), RekallAgeDocumentRevision.Missing),
+                transaction,
+                default).AsTask());
+
+        Assert.Equal(RekallAgePersistedJson.MaximumDocumentBytes + 1L, new FileInfo(catalogPath).Length);
+        Assert.False(File.Exists(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model")));
+        Assert.Empty(Directory.EnumerateFiles(
+            Path.Combine(fixture.Root, "Assets", "Models", "Compiled"),
+            "*.age.compiled-mesh.json",
+            SearchOption.AllDirectories));
+        Assert.Empty(transaction.ChangedResources);
     }
 
     [Fact]
@@ -400,6 +371,49 @@ public sealed class ModelAssetPublishingTests
         Assert.Equal(RekallAgeModelBuildState.Frozen, inspection.BuildState);
         Assert.True(inspection.CompiledOutputExists);
         Assert.Equal(first.CompiledContentHash, inspection.ActualCompiledContentHash);
+    }
+
+    [Fact]
+    public async Task FrozenInspectionRejectsCorrelatedHashAndManifestTamperingWithWrongProvenance()
+    {
+        var fixture = await CreateFixtureAsync();
+        var first = await PublishAsync(fixture);
+        var frozen = await fixture.Service.FreezeAsync(
+            fixture.Root,
+            "hero-model",
+            first.ModelFileRevision,
+            RekallAgeTransaction.Begin("freeze for tamper proof"),
+            default);
+        var snapshot = await fixture.OutputStore.LoadAsync(
+            fixture.Root, "hero-model", first.CompiledContentHash, default);
+        var tampered = snapshot with { SourceAssetId = "attacker-mesh" };
+        var bytes = System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(tampered, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true,
+            MaxDepth = RekallAgePersistedJson.MaximumDocumentDepth
+        }) + Environment.NewLine);
+        var tamperedHash = RekallAgeDocumentRevision.Compute(bytes);
+        var tamperedPath = fixture.OutputStore.GetFinalPath(fixture.Root, "hero-model", tamperedHash);
+        Directory.CreateDirectory(Path.GetDirectoryName(tamperedPath)!);
+        await File.WriteAllBytesAsync(tamperedPath, bytes);
+        var relativePath = Path.GetRelativePath(fixture.Root, tamperedPath).Replace('\\', '/');
+        var corrupted = frozen.Value with
+        {
+            Revision = frozen.Value.Revision + 1,
+            LastSuccessfulBuild = frozen.Value.LastSuccessfulBuild! with
+            {
+                CompiledMeshPath = relativePath,
+                CompiledContentHash = tamperedHash
+            }
+        };
+        await fixture.ModelStore.SaveIfRevisionAsync(
+            fixture.Root, corrupted, frozen.Revision, default);
+
+        var inspection = await fixture.Service.InspectAsync(fixture.Root, "hero-model", default);
+
+        Assert.Equal(RekallAgeModelBuildState.Failed, inspection.BuildState);
+        Assert.Contains(inspection.Diagnostics, item => item.Code == "REKALL_MODEL_OUTPUT_PROVENANCE_INVALID");
     }
 
     [Fact]
@@ -434,8 +448,8 @@ public sealed class ModelAssetPublishingTests
         var inspection = await fixture.Service.InspectAsync(fixture.Root, "hero-model", default);
 
         Assert.Equal(RekallAgeModelBuildState.Failed, inspection.BuildState);
-        Assert.True(inspection.CompiledOutputExists);
-        Assert.Equal(first.CompiledContentHash, inspection.ActualCompiledContentHash);
+        Assert.False(inspection.CompiledOutputExists);
+        Assert.Null(inspection.ActualCompiledContentHash);
         Assert.Contains(inspection.Diagnostics, diagnostic => diagnostic.Code == "REKALL_MODEL_LAST_BUILD_FAILED");
     }
 
@@ -611,6 +625,19 @@ public sealed class ModelAssetPublishingTests
         Assert.Equal("REKALL_MODEL_REQUEST_INVALID", Assert.Single(result.Errors).Code);
         Assert.Null(result.Value.Publication);
         Assert.Empty(context.Transaction.ChangedResources);
+    }
+
+    [Fact]
+    public async Task RebuildCommandMapsMissingModelAssetPrecisely()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var result = await new RebuildModelAssetCommand().ExecuteAsync(
+            new(root, "missing-model", RekallAgeDocumentRevision.Missing),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("missing rebuild"), default));
+
+        Assert.False(result.Ok);
+        Assert.Equal("REKALL_MODEL_ASSET_MISSING", Assert.Single(result.Errors).Code);
+        Assert.Equal("missing-model", Assert.Single(result.Errors).Target);
     }
 
     [Fact]

@@ -32,11 +32,7 @@ public sealed class ImportAssetCommand : IRekallAgeCommand<ImportAssetRequest, I
             request.Kind,
             request.DisplayName,
             context.CancellationToken);
-        var catalog = await _store.LoadAsync(request.ProjectRoot, context.CancellationToken);
-        await _store.SaveAsync(
-            request.ProjectRoot,
-            catalog.AddOrReplace(asset),
-            context.CancellationToken);
+        await _store.AddOrReplaceAsync(request.ProjectRoot, asset, context.CancellationToken);
         context.Transaction.RecordChangedResource(asset.ImportedPath);
         context.Transaction.RecordChangedResource(_store.GetCatalogPath(request.ProjectRoot));
 

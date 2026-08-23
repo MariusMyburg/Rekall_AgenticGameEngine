@@ -89,7 +89,10 @@ public sealed class ImportKsaSolarSystemCommand
                 assetIdsByPath[NormalizeKsaRelativePath(texture.Path)] = asset.Id;
             }
 
-            await _assetStore.SaveAsync(request.ProjectRoot, catalog, context.CancellationToken);
+            await _assetStore.MutateAsync(
+                request.ProjectRoot,
+                (current, _) => ValueTask.FromResult(imported.Aggregate(current, (value, asset) => value.AddOrReplace(asset))),
+                context.CancellationToken);
             context.Transaction.RecordChangedResource(_assetStore.GetCatalogPath(request.ProjectRoot));
             foreach (var asset in imported)
             {

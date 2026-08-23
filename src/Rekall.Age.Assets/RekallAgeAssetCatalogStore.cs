@@ -5,6 +5,7 @@ namespace Rekall.Age.Assets;
 
 public sealed class RekallAgeAssetCatalogStore
 {
+    public const int MaximumMutationAttempts = 16;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -67,6 +68,49 @@ public sealed class RekallAgeAssetCatalogStore
             RekallAgePersistedJson.MaximumDocumentBytes,
             expectedRevision,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    public async ValueTask<RekallAgeVersionedDocument<RekallAgeAssetCatalogDocument>> MutateAsync(
+        string projectRoot,
+        Func<RekallAgeAssetCatalogDocument, CancellationToken, ValueTask<RekallAgeAssetCatalogDocument>> mutation,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        for (var attempt = 1; attempt <= MaximumMutationAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var loaded = await LoadVersionedAsync(projectRoot, cancellationToken).ConfigureAwait(false);
+            var updated = await mutation(loaded.Value, cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("Asset catalog mutation returned null.");
+            try
+            {
+                var revision = await SaveIfRevisionAsync(
+                    projectRoot,
+                    updated,
+                    loaded.Revision,
+                    cancellationToken).ConfigureAwait(false);
+                return new(updated, revision);
+            }
+            catch (RekallAgeDocumentRevisionException) when (attempt < MaximumMutationAttempts)
+            {
+                // Reload and replay the semantic mutation against the winner.
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Asset catalog remained contended for {MaximumMutationAttempts} mutation attempts.");
+    }
+
+    public ValueTask<RekallAgeVersionedDocument<RekallAgeAssetCatalogDocument>> AddOrReplaceAsync(
+        string projectRoot,
+        RekallAgeAssetDocument asset,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(asset);
+        return MutateAsync(
+            projectRoot,
+            (catalog, _) => ValueTask.FromResult(catalog.AddOrReplace(asset)),
+            cancellationToken);
     }
 
     private static string Serialize(RekallAgeAssetCatalogDocument catalog)

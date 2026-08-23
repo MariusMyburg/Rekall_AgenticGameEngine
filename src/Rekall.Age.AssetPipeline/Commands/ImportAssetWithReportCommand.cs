@@ -37,8 +37,7 @@ public sealed class ImportAssetWithReportCommand
             request.Kind,
             request.DisplayName,
             context.CancellationToken);
-        var catalog = await _assetStore.LoadAsync(request.ProjectRoot, context.CancellationToken);
-        await _assetStore.SaveAsync(request.ProjectRoot, catalog.AddOrReplace(asset), context.CancellationToken);
+        await _assetStore.AddOrReplaceAsync(request.ProjectRoot, asset, context.CancellationToken);
 
         var pipeline = await _pipelineStore.LoadAsync(request.ProjectRoot, context.CancellationToken);
         var updatedPipeline = pipeline.AddImport(asset, request.SourcePath, request.Kind);

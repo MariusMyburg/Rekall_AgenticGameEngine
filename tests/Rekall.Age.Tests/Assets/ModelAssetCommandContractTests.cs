@@ -26,6 +26,8 @@ public sealed class ModelAssetCommandContractTests
             "rekall.asset.model.rebuild",
             "rekall.asset.model.inspect",
             "rekall.asset.model.list",
+            "rekall.asset.model.freeze",
+            "rekall.asset.model.unfreeze",
             "rekall.scene.instantiate_asset"
         };
 
@@ -57,6 +59,22 @@ public sealed class ModelAssetCommandContractTests
         Assert.True(published.Ok, published.Summary);
         var publication = Assert.IsType<Rekall.Age.AssetPipeline.RekallAgePublishModelResult>(published.Value.Publication);
         Assert.Equal("hero-model", publication.Asset.AssetId);
+
+        var frozen = await Execute<SetModelAssetFreezeRequest, ModelAssetFreezeCommandResult>(
+            registry,
+            "rekall.asset.model.freeze",
+            new(root, "hero-model", publication.ModelFileRevision),
+            "freeze model asset");
+        Assert.True(frozen.Ok, frozen.Summary);
+        Assert.Equal(RekallAgeModelBuildState.Frozen, frozen.Value.Asset!.BuildState);
+        var unfrozen = await Execute<SetModelAssetFreezeRequest, ModelAssetFreezeCommandResult>(
+            registry,
+            "rekall.asset.model.unfreeze",
+            new(root, "hero-model", frozen.Value.ModelFileRevision!),
+            "unfreeze model asset");
+        Assert.True(unfrozen.Ok, unfrozen.Summary);
+        Assert.Equal(RekallAgeModelBuildState.Current, unfrozen.Value.Asset!.BuildState);
+        publication = publication with { ModelFileRevision = unfrozen.Value.ModelFileRevision! };
 
         var listed = await Execute<ListModelAssetsRequest, ListModelAssetsResult>(
             registry,

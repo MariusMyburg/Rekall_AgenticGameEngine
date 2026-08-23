@@ -32,6 +32,12 @@ public sealed class RekallAgeModelPublishingException : InvalidOperationExceptio
     public string? Target { get; }
 }
 
+public sealed class RekallAgeModelPublicationInterruptionException(string boundary)
+    : Exception($"Simulated process interruption at Model Asset publication boundary '{boundary}'.")
+{
+    public string Boundary { get; } = boundary;
+}
+
 public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealthInspector
 {
     private const int MaximumDiagnostics = 16;
@@ -40,6 +46,7 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
     private readonly RekallAgeModelAssetStore _modelStore;
     private readonly RekallAgePublishedModelOutputStore _outputStore;
     private readonly RekallAgeAssetCatalogStore _catalogStore;
+    private readonly Action<string>? _publicationBoundary;
 
     public RekallAgeModelPublishingService()
         : this(
@@ -56,13 +63,15 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
         RekallAgeMeshCompiler compiler,
         RekallAgeModelAssetStore modelStore,
         RekallAgePublishedModelOutputStore outputStore,
-        RekallAgeAssetCatalogStore catalogStore)
+        RekallAgeAssetCatalogStore catalogStore,
+        Action<string>? publicationBoundary = null)
     {
         _meshStore = meshStore ?? throw new ArgumentNullException(nameof(meshStore));
         _compiler = compiler ?? throw new ArgumentNullException(nameof(compiler));
         _modelStore = modelStore ?? throw new ArgumentNullException(nameof(modelStore));
         _outputStore = outputStore ?? throw new ArgumentNullException(nameof(outputStore));
         _catalogStore = catalogStore ?? throw new ArgumentNullException(nameof(catalogStore));
+        _publicationBoundary = publicationBoundary;
     }
 
     public async ValueTask<RekallAgePublishModelResult> PublishAsync(
@@ -90,7 +99,6 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
 
         var source = await LoadSourceAsync(projectRoot, request.Source, cancellationToken).ConfigureAwait(false);
         var compiled = _compiler.Compile(source.Value);
-        var catalog = await _catalogStore.LoadVersionedAsync(projectRoot, cancellationToken).ConfigureAwait(false);
         RekallAgeStagedModelOutput? staged = null;
         IReadOnlyList<ModelPublicationMutation>? mutationJournal = null;
         try
@@ -101,18 +109,16 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
                 compiled,
                 cancellationToken).ConfigureAwait(false);
 
-            var outputPath = _outputStore.GetFinalPath(projectRoot, request.AssetId);
+            var outputPath = Path.GetFullPath(Path.Combine(projectRoot, staged.RelativeFinalPath));
             var catalogPath = _catalogStore.GetCatalogPath(projectRoot);
             mutationJournal = await CaptureMutationJournalAsync(
                 transaction,
-                [outputPath, modelPath, catalogPath],
+                [outputPath, modelPath],
                 cancellationToken).ConfigureAwait(false);
             var outputMutation = mutationJournal[0];
             var modelMutation = mutationJournal[1];
-            var catalogMutation = mutationJournal[2];
             RequireMatchingPreimageRevision(request.ExpectedModelFileRevision, modelMutation);
             RequireMatchingPreimageRevision(loadedModelRevision, modelMutation);
-            RequireMatchingPreimageRevision(catalog.Revision, catalogMutation);
 
             var manifest = RekallAgeModelBuildManifest.Success(
                 source.Revision,
@@ -148,29 +154,36 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
                     staged.ContentHash)
             };
 
-            outputMutation.RecordWrite(await _outputStore.CommitStagedIfRevisionAsync(
+            var outputCommit = await _outputStore.CommitStagedImmutableAsync(
                 projectRoot,
                 staged,
-                outputMutation.BeforeRevision,
-                cancellationToken).ConfigureAwait(false));
+                cancellationToken).ConfigureAwait(false);
+            if (outputCommit.Created)
+            {
+                outputMutation.RecordWrite(outputCommit.Revision);
+            }
+            _publicationBoundary?.Invoke("immutable-output-committed");
             var modelRevision = await _modelStore.SaveIfRevisionAsync(
                 projectRoot,
                 model,
                 modelMutation.BeforeRevision,
                 cancellationToken).ConfigureAwait(false);
             modelMutation.RecordWrite(modelRevision);
-            catalogMutation.RecordWrite(await _catalogStore.SaveIfRevisionAsync(
-                projectRoot,
-                catalog.Value.AddOrReplace(catalogAsset),
-                catalogMutation.BeforeRevision,
-                cancellationToken).ConfigureAwait(false));
+            _publicationBoundary?.Invoke("model-pointer-committed");
+            await _catalogStore.AddOrReplaceAsync(projectRoot, catalogAsset, cancellationToken).ConfigureAwait(false);
+            _publicationBoundary?.Invoke("catalog-committed");
 
-            transaction.RecordChangedResource(outputPath);
+            if (outputMutation.Written)
+            {
+                transaction.RecordChangedResource(outputPath);
+            }
             transaction.RecordChangedResource(modelPath);
             transaction.RecordChangedResource(catalogPath);
             return new(model, modelRevision, outputPath, staged.ContentHash);
         }
-        catch (Exception publicationError) when (mutationJournal?.Any(item => item.Written) == true)
+        catch (Exception publicationError) when (
+            publicationError is not RekallAgeModelPublicationInterruptionException
+            && mutationJournal?.Any(item => item.Written) == true)
         {
             var rollbackErrors = await RestoreMutationsAsync(mutationJournal).ConfigureAwait(false);
             if (rollbackErrors.Count > 0)
@@ -208,13 +221,119 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
         RekallAgeTransaction transaction,
         CancellationToken cancellationToken)
     {
-        var current = await _modelStore.LoadVersionedAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+        RekallAgeVersionedDocument<RekallAgeModelAssetDocument> current;
+        try
+        {
+            current = await _modelStore.LoadVersionedAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+        {
+            throw new RekallAgeModelPublishingException(
+                "REKALL_MODEL_ASSET_MISSING",
+                $"Model Asset '{assetId}' was not found.",
+                assetId,
+                error);
+        }
         RejectFrozen(current.Value);
         return await PublishAsync(
             projectRoot,
             new(current.Value.AssetId, current.Value.DisplayName, current.Value.Source, expectedModelFileRevision),
             transaction,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    public ValueTask<RekallAgeVersionedDocument<RekallAgeModelAssetDocument>> FreezeAsync(
+        string projectRoot,
+        string assetId,
+        string expectedModelFileRevision,
+        RekallAgeTransaction transaction,
+        CancellationToken cancellationToken) =>
+        SetFrozenAsync(projectRoot, assetId, expectedModelFileRevision, frozen: true, transaction, cancellationToken);
+
+    public ValueTask<RekallAgeVersionedDocument<RekallAgeModelAssetDocument>> UnfreezeAsync(
+        string projectRoot,
+        string assetId,
+        string expectedModelFileRevision,
+        RekallAgeTransaction transaction,
+        CancellationToken cancellationToken) =>
+        SetFrozenAsync(projectRoot, assetId, expectedModelFileRevision, frozen: false, transaction, cancellationToken);
+
+    private async ValueTask<RekallAgeVersionedDocument<RekallAgeModelAssetDocument>> SetFrozenAsync(
+        string projectRoot,
+        string assetId,
+        string expectedModelFileRevision,
+        bool frozen,
+        RekallAgeTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        var loaded = await _modelStore.LoadVersionedAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+        if (!string.Equals(loaded.Revision, expectedModelFileRevision, StringComparison.Ordinal))
+        {
+            throw new RekallAgeDocumentRevisionException(
+                "REKALL_DOCUMENT_REVISION_CONFLICT",
+                _modelStore.GetModelPath(projectRoot, assetId),
+                $"Model Asset '{assetId}' changed after revision '{expectedModelFileRevision}'.",
+                expectedModelFileRevision,
+                loaded.Revision);
+        }
+
+        var manifest = loaded.Value.LastSuccessfulBuild
+            ?? throw new RekallAgeModelPublishingException(
+                "REKALL_MODEL_NOT_PLACEABLE",
+                $"Model Asset '{assetId}' has no successful output to freeze.",
+                assetId);
+        var state = RekallAgeModelBuildState.Frozen;
+        if (frozen)
+        {
+            var inspection = await InspectAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+            if (!inspection.CompiledOutputExists
+                || inspection.BuildState is not RekallAgeModelBuildState.Current and not RekallAgeModelBuildState.Stale)
+            {
+                var diagnostic = inspection.Diagnostics.FirstOrDefault();
+                throw new RekallAgeModelPublishingException(
+                    diagnostic?.Code ?? "REKALL_MODEL_NOT_PLACEABLE",
+                    diagnostic?.Message ?? $"Model Asset '{assetId}' has no validated output to freeze.",
+                    diagnostic?.Target ?? assetId);
+            }
+        }
+        else
+        {
+            RekallAgeVersionedDocument<Rekall.Age.Modeling.Contracts.RekallAgeMeshAsset> source;
+            try
+            {
+                source = await LoadSourceAsync(projectRoot, loaded.Value.Source, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+            {
+                throw new RekallAgeModelPublishingException(
+                    "REKALL_MODEL_SOURCE_MISSING",
+                    $"Model Asset '{assetId}' cannot be unfrozen because editable source '{loaded.Value.Source.AssetId}' is missing.",
+                    loaded.Value.Source.AssetId,
+                    error);
+            }
+
+            state = string.Equals(source.Revision, manifest.SourceFileRevision, StringComparison.Ordinal)
+                && source.Value.Revision == manifest.SourceLogicalRevision
+                && string.Equals(manifest.CompilerVersion, RekallAgeModelBuildManifest.CurrentCompilerVersion, StringComparison.Ordinal)
+                    ? RekallAgeModelBuildState.Current
+                    : RekallAgeModelBuildState.Stale;
+        }
+
+        var path = _modelStore.GetModelPath(projectRoot, assetId);
+        var before = await RekallAgeBoundedFileSnapshot.ReadAsync(
+            path, RekallAgePersistedJson.MaximumDocumentBytes, cancellationToken).ConfigureAwait(false);
+        var updated = loaded.Value with
+        {
+            Revision = loaded.Value.Revision + 1,
+            BuildState = state,
+            Frozen = frozen
+        };
+        var revision = await _modelStore.SaveIfRevisionAsync(
+            projectRoot, updated, loaded.Revision, cancellationToken).ConfigureAwait(false);
+        transaction.RecordResourcePreimage(path, existedBefore: true, before.Bytes);
+        transaction.RecordChangedResource(path);
+        return new(updated, revision);
     }
 
     public async ValueTask<RekallAgeModelAssetInspection> InspectAsync(
@@ -259,7 +378,7 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
         }
         catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
         {
-            var retainedOutput = await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+            var retainedOutput = await InspectOutputAsync(projectRoot, assetId, model.LastSuccessfulBuild, cancellationToken).ConfigureAwait(false);
             return Inspection(
                 loadedModel,
                 RekallAgeModelBuildState.Failed,
@@ -271,7 +390,7 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
         }
         catch (Exception error) when (error is JsonException or InvalidDataException)
         {
-            var retainedOutput = await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+            var retainedOutput = await InspectOutputAsync(projectRoot, assetId, model.LastSuccessfulBuild, cancellationToken).ConfigureAwait(false);
             return Inspection(
                 loadedModel,
                 RekallAgeModelBuildState.Failed,
@@ -285,7 +404,7 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
         var manifest = model.LastSuccessfulBuild;
         if (model.BuildState == RekallAgeModelBuildState.Failed || manifest is null)
         {
-            var retainedOutput = await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+            var retainedOutput = await InspectOutputAsync(projectRoot, assetId, manifest, cancellationToken).ConfigureAwait(false);
             return Inspection(
                 loadedModel,
                 RekallAgeModelBuildState.Failed,
@@ -296,8 +415,8 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
                 [Diagnostic("REKALL_MODEL_LAST_BUILD_FAILED", "Error", "Model Asset has no usable successful build manifest.", assetId)]);
         }
 
-        var finalPath = _outputStore.GetFinalPath(projectRoot, assetId);
-        var canonicalOutput = await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+        var finalPath = _outputStore.GetFinalPath(projectRoot, assetId, manifest.CompiledContentHash);
+        var canonicalOutput = await InspectOutputAsync(projectRoot, assetId, manifest, cancellationToken).ConfigureAwait(false);
         if (!string.Equals(
                 Path.GetFullPath(Path.Combine(projectRoot, manifest.CompiledMeshPath)),
                 Path.GetFullPath(finalPath),
@@ -328,8 +447,8 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
         var actualHash = canonicalOutput.Hash;
         try
         {
-            actualHash ??= await _outputStore.HashAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
-            var actualOutput = await _outputStore.LoadAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+            actualHash ??= await _outputStore.HashAsync(projectRoot, assetId, manifest.CompiledContentHash, cancellationToken).ConfigureAwait(false);
+            var actualOutput = await _outputStore.LoadAsync(projectRoot, assetId, manifest.CompiledContentHash, cancellationToken).ConfigureAwait(false);
             if (!string.Equals(actualOutput.SourceAssetId, model.Source.AssetId, StringComparison.Ordinal)
                 || actualOutput.SourceLogicalRevision != manifest.SourceLogicalRevision)
             {
@@ -398,7 +517,7 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
         CancellationToken cancellationToken)
     {
         var manifest = loadedModel.Value.LastSuccessfulBuild;
-        var canonicalOutput = await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+        var canonicalOutput = await InspectOutputAsync(projectRoot, assetId, manifest, cancellationToken).ConfigureAwait(false);
         if (manifest is null)
         {
             return Inspection(
@@ -411,7 +530,7 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
                 [Diagnostic("REKALL_MODEL_LAST_BUILD_FAILED", "Error", "Frozen Model Asset has no usable successful build manifest.", assetId)]);
         }
 
-        var finalPath = _outputStore.GetFinalPath(projectRoot, assetId);
+        var finalPath = _outputStore.GetFinalPath(projectRoot, assetId, manifest.CompiledContentHash);
         if (!string.Equals(
                 Path.GetFullPath(Path.Combine(projectRoot, manifest.CompiledMeshPath)),
                 Path.GetFullPath(finalPath),
@@ -461,6 +580,38 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
                 true,
                 canonicalOutput.Hash,
                 [Diagnostic("REKALL_MODEL_OUTPUT_HASH_MISMATCH", "Error", "The frozen compiled output hash does not match its successful build manifest.", manifest.CompiledMeshPath)]);
+        }
+
+        try
+        {
+            var snapshot = await _outputStore.LoadAsync(
+                projectRoot,
+                assetId,
+                manifest.CompiledContentHash,
+                cancellationToken).ConfigureAwait(false);
+            if (!string.Equals(snapshot.SourceAssetId, loadedModel.Value.Source.AssetId, StringComparison.Ordinal)
+                || snapshot.SourceLogicalRevision != manifest.SourceLogicalRevision)
+            {
+                return Inspection(
+                    loadedModel,
+                    RekallAgeModelBuildState.Failed,
+                    null,
+                    null,
+                    true,
+                    canonicalOutput.Hash,
+                    [Diagnostic("REKALL_MODEL_OUTPUT_PROVENANCE_INVALID", "Error", "The frozen compiled output provenance does not agree with its source reference and successful manifest.", manifest.CompiledMeshPath)]);
+            }
+        }
+        catch (Exception error) when (error is JsonException or InvalidDataException or IOException)
+        {
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Failed,
+                null,
+                null,
+                true,
+                canonicalOutput.Hash,
+                [Diagnostic("REKALL_MODEL_OUTPUT_INVALID", "Error", $"The frozen compiled output is invalid: {error.Message}", manifest.CompiledMeshPath)]);
         }
 
         return Inspection(
@@ -524,9 +675,9 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
         var journal = new List<ModelPublicationMutation>(paths.Count);
         foreach (var path in paths)
         {
-            transaction.CaptureResourcePreimage(path);
             if (!File.Exists(path))
             {
+                transaction.RecordResourcePreimage(path, existedBefore: false, content: null);
                 journal.Add(new(Path.GetFullPath(path), null, RekallAgeDocumentRevision.Missing));
                 continue;
             }
@@ -537,10 +688,12 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
                     path,
                     RekallAgePersistedJson.MaximumDocumentBytes,
                     cancellationToken).ConfigureAwait(false);
+                transaction.RecordResourcePreimage(snapshot.Path, existedBefore: true, snapshot.Bytes);
                 journal.Add(new(snapshot.Path, snapshot.Bytes, snapshot.Revision));
             }
             catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
             {
+                transaction.RecordResourcePreimage(path, existedBefore: false, content: null);
                 journal.Add(new(Path.GetFullPath(path), null, RekallAgeDocumentRevision.Missing));
             }
         }
@@ -625,16 +778,17 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
     private async ValueTask<(bool Exists, string? Hash)> InspectOutputAsync(
         string projectRoot,
         string assetId,
+        RekallAgeModelBuildManifest? manifest,
         CancellationToken cancellationToken)
     {
-        if (!File.Exists(_outputStore.GetFinalPath(projectRoot, assetId)))
+        if (manifest is null || !File.Exists(_outputStore.GetFinalPath(projectRoot, assetId, manifest.CompiledContentHash)))
         {
             return (false, null);
         }
 
         try
         {
-            return (true, await _outputStore.HashAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false));
+            return (true, await _outputStore.HashAsync(projectRoot, assetId, manifest.CompiledContentHash, cancellationToken).ConfigureAwait(false));
         }
         catch (Exception error) when (error is InvalidDataException or IOException or UnauthorizedAccessException)
         {

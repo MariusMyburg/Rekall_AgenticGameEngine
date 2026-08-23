@@ -129,6 +129,8 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new RebuildModelAssetCommand(modelPublishingService));
         registry.Register(new InspectModelAssetCommand(modelPublishingService));
         registry.Register(new ListModelAssetsCommand(modelAssetStore, modelPublishingService));
+        registry.Register(new FreezeModelAssetCommand(modelPublishingService));
+        registry.Register(new UnfreezeModelAssetCommand(modelPublishingService));
         registry.Register(new InstantiateModelAssetCommand(
             new RekallAgeSceneStore(),
             modelAssetStore,

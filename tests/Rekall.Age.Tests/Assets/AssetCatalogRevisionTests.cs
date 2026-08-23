@@ -69,6 +69,42 @@ public sealed class AssetCatalogRevisionTests
         Assert.Equal("Replacement", asset.DisplayName);
     }
 
+    [Fact]
+    public async Task ConcurrentCatalogMutationsRetryAndPreserveIndependentAssets()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeAssetCatalogStore();
+        var firstEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstCalls = 0;
+        var secondCalls = 0;
+
+        var first = store.MutateAsync(root, async (catalog, cancellationToken) =>
+        {
+            if (Interlocked.Increment(ref firstCalls) == 1)
+            {
+                firstEntered.SetResult();
+                await secondEntered.Task.WaitAsync(cancellationToken);
+            }
+            return catalog.AddOrReplace(Asset("hero-model", "Hero"));
+        }, default).AsTask();
+        var second = store.MutateAsync(root, async (catalog, cancellationToken) =>
+        {
+            if (Interlocked.Increment(ref secondCalls) == 1)
+            {
+                secondEntered.SetResult();
+                await firstEntered.Task.WaitAsync(cancellationToken);
+            }
+            return catalog.AddOrReplace(Asset("concurrent-audio", "Concurrent"));
+        }, default).AsTask();
+
+        await Task.WhenAll(first, second);
+
+        var loaded = await store.LoadAsync(root, default);
+        Assert.Equal(["concurrent-audio", "hero-model"], loaded.Assets.Select(asset => asset.Id).Order().ToArray());
+        Assert.True(firstCalls > 1 || secondCalls > 1, "One stale mutation must retry against the winner's revision.");
+    }
+
     private static RekallAgeAssetDocument Asset(string id, string displayName) =>
         new(
             id,

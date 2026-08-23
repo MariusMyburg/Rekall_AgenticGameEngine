@@ -20,6 +20,16 @@ public sealed record RebuildModelAssetRequest(
 
 public sealed record InspectModelAssetRequest(string ProjectRoot, string AssetId);
 
+public sealed record SetModelAssetFreezeRequest(
+    string ProjectRoot,
+    string AssetId,
+    string ExpectedModelFileRevision);
+
+public sealed record ModelAssetFreezeCommandResult(
+    RekallAgeModelAssetDocument? Asset,
+    string? ModelFileRevision,
+    IReadOnlyList<string> NextActions);
+
 public sealed record ModelAssetMutationCommandResult(
     RekallAgePublishModelResult? Publication,
     IReadOnlyList<string> NextActions);
@@ -314,6 +324,90 @@ public sealed class ListModelAssetsCommand
 
     private static string ToProjectRelativePath(string projectRoot, string path) =>
         Path.GetRelativePath(Path.GetFullPath(projectRoot), Path.GetFullPath(path)).Replace('\\', '/');
+}
+
+public sealed class FreezeModelAssetCommand
+    : IRekallAgeCommand<SetModelAssetFreezeRequest, ModelAssetFreezeCommandResult>
+{
+    private readonly RekallAgeModelPublishingService _service;
+    public FreezeModelAssetCommand(RekallAgeModelPublishingService service) =>
+        _service = service ?? throw new ArgumentNullException(nameof(service));
+    public string Name => "rekall.asset.model.freeze";
+    public RekallAgeCommandSchema Schema => new(
+        Name,
+        "Revision-checks and freezes a Model Asset at its last validated immutable compiled output. Frozen placement remains independent of the editable source while compiled structure, content hash, and provenance are still validated.",
+        typeof(SetModelAssetFreezeRequest).FullName!,
+        typeof(ModelAssetFreezeCommandResult).FullName!);
+
+    public async ValueTask<RekallAgeCommandResult<ModelAssetFreezeCommandResult>> ExecuteAsync(
+        SetModelAssetFreezeRequest request,
+        RekallAgeCommandContext context)
+    {
+        if (request is null)
+        {
+            var mapped = ModelAssetCommandErrors.Map(new ArgumentNullException(nameof(request)), "request", "request");
+            return RekallAgeCommandResult<ModelAssetFreezeCommandResult>.Failure(
+                new(null, null, ["rekall.asset.model.inspect"]), mapped.Message, [mapped]);
+        }
+
+        try
+        {
+            var result = await _service.FreezeAsync(
+                request.ProjectRoot, request.AssetId, request.ExpectedModelFileRevision,
+                context.Transaction, context.CancellationToken).ConfigureAwait(false);
+            return RekallAgeCommandResult<ModelAssetFreezeCommandResult>.Success(
+                new(result.Value, result.Revision, ["rekall.asset.model.inspect", "rekall.asset.model.unfreeze"]),
+                $"Froze Model Asset '{request.AssetId}' at revision {result.Value.Revision}.");
+        }
+        catch (Exception error) when (ModelAssetCommandErrors.IsKnown(error))
+        {
+            var mapped = ModelAssetCommandErrors.Map(error, request.AssetId, request.AssetId);
+            return RekallAgeCommandResult<ModelAssetFreezeCommandResult>.Failure(
+                new(null, null, ["rekall.asset.model.inspect"]), mapped.Message, [mapped]);
+        }
+    }
+}
+
+public sealed class UnfreezeModelAssetCommand
+    : IRekallAgeCommand<SetModelAssetFreezeRequest, ModelAssetFreezeCommandResult>
+{
+    private readonly RekallAgeModelPublishingService _service;
+    public UnfreezeModelAssetCommand(RekallAgeModelPublishingService service) =>
+        _service = service ?? throw new ArgumentNullException(nameof(service));
+    public string Name => "rekall.asset.model.unfreeze";
+    public RekallAgeCommandSchema Schema => new(
+        Name,
+        "Revision-checks and returns a frozen Model Asset to live linking. A valid editable source is required; exact source/compiler revisions determine Current or Stale health without rebuilding.",
+        typeof(SetModelAssetFreezeRequest).FullName!,
+        typeof(ModelAssetFreezeCommandResult).FullName!);
+
+    public async ValueTask<RekallAgeCommandResult<ModelAssetFreezeCommandResult>> ExecuteAsync(
+        SetModelAssetFreezeRequest request,
+        RekallAgeCommandContext context)
+    {
+        if (request is null)
+        {
+            var mapped = ModelAssetCommandErrors.Map(new ArgumentNullException(nameof(request)), "request", "request");
+            return RekallAgeCommandResult<ModelAssetFreezeCommandResult>.Failure(
+                new(null, null, ["rekall.asset.model.inspect"]), mapped.Message, [mapped]);
+        }
+
+        try
+        {
+            var result = await _service.UnfreezeAsync(
+                request.ProjectRoot, request.AssetId, request.ExpectedModelFileRevision,
+                context.Transaction, context.CancellationToken).ConfigureAwait(false);
+            return RekallAgeCommandResult<ModelAssetFreezeCommandResult>.Success(
+                new(result.Value, result.Revision, ["rekall.asset.model.inspect", "rekall.asset.model.rebuild"]),
+                $"Unfroze Model Asset '{request.AssetId}' with {result.Value.BuildState} health.");
+        }
+        catch (Exception error) when (ModelAssetCommandErrors.IsKnown(error))
+        {
+            var mapped = ModelAssetCommandErrors.Map(error, request.AssetId, request.AssetId);
+            return RekallAgeCommandResult<ModelAssetFreezeCommandResult>.Failure(
+                new(null, null, ["rekall.asset.model.inspect"]), mapped.Message, [mapped]);
+        }
+    }
 }
 
 internal static class ModelAssetCommandErrors

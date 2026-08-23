@@ -18,7 +18,11 @@ public sealed class RekallAgeModelAssetStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
         ValidateAssetId(assetId);
-        return Path.Combine(Path.GetFullPath(projectRoot), "Assets", "Models", assetId + FileSuffix);
+        var root = Path.GetFullPath(projectRoot);
+        return RekallAgeConfinedPath.Resolve(
+            root,
+            Path.Combine(root, "Assets", "Models", assetId + FileSuffix),
+            "Model Asset document path");
     }
 
     public string GetRecoveryPath(string projectRoot, string assetId) =>
@@ -95,7 +99,11 @@ public sealed class RekallAgeModelAssetStore
     public IReadOnlyList<string> ListAssetIds(string projectRoot)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
-        var directory = Path.Combine(Path.GetFullPath(projectRoot), "Assets", "Models");
+        var root = Path.GetFullPath(projectRoot);
+        var directory = RekallAgeConfinedPath.Resolve(
+            root,
+            Path.Combine(root, "Assets", "Models"),
+            "Model Asset listing root");
         if (!Directory.Exists(directory))
         {
             return [];

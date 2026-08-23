@@ -31,6 +31,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeGeometryPrimitiveComponent>();
         builder.RegisterComponent<RekallAgeGeometryMeshComponent>();
         builder.RegisterComponent<RekallAgeMeshAssetReferenceComponent>();
+        builder.RegisterComponent<RekallAgeModelAssetReferenceComponent>();
         builder.RegisterComponent<RekallAgeLineSegmentsComponent>();
         builder.RegisterComponent<RekallAgeGeometryExtrusionComponent>();
         builder.RegisterComponent<RekallAgeMaterialComponent>();
@@ -583,6 +584,13 @@ public sealed class RekallAgeMeshAssetReferenceComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public string? ExpectedRevision { get; init; }
+}
+
+[RekallAgeComponent("Model Asset Reference", Description = "References a published Model Asset by stable logical ID. The asset manifest selects an immutable compiled revision so scene entities keep a durable authoring link while runtime systems resolve validated geometry.")]
+public sealed class RekallAgeModelAssetReferenceComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "model")]
+    public string AssetId { get; init; } = string.Empty;
 }
 
 public sealed record RekallAgeGeometryMeshVertex(

@@ -56,6 +56,8 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new RunPlayablePackageCommand());
         registry.Register(new CapturePlayablePackageFrameCommand());
         registry.Register(new AuditPlayablePackageCommand());
+        registry.Register(new PublishWebGameCommand());
+        registry.Register(new AuditWebGameCommand());
         registry.Register(new RunAgentAuthoringGauntletCommand());
         registry.Register(new CreateBlueprintProjectCommand());
         registry.Register(new AssembleDistributionCommand());

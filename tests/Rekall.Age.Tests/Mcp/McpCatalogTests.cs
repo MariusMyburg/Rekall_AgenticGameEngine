@@ -37,6 +37,8 @@ public sealed class McpCatalogTests
         registry.Register(new RunPlayablePackageCommand());
         registry.Register(new CapturePlayablePackageFrameCommand());
         registry.Register(new AuditPlayablePackageCommand());
+        registry.Register(new PublishWebGameCommand());
+        registry.Register(new AuditWebGameCommand());
         registry.Register(new RunAgentAuthoringGauntletCommand());
         registry.Register(new PlaytestSceneCommand());
         registry.Register(new RunSceneCommand());
@@ -109,6 +111,8 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.run_playable_package");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.capture_playable_package_frame");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.audit_playable_package");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.game.publish_web" && tool.Category == "workflow");
+        Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.game.audit_web" && tool.Category == "workflow");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.workflow.agent_authoring_gauntlet");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.playtest.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.run.scene");
@@ -172,6 +176,24 @@ public sealed class McpCatalogTests
         Assert.Equal("workflow", audit.Category);
         Assert.True(audit.Recommended);
         Assert.True(audit.AgentPriority > package.AgentPriority);
+
+        var publishWeb = catalog.Tools.Single(tool => tool.Name == "rekall.game.publish_web");
+        Assert.Equal("workflow", publishWeb.Category);
+        Assert.True(publishWeb.Recommended);
+        var auditWeb = catalog.Tools.Single(tool => tool.Name == "rekall.game.audit_web");
+        Assert.Equal("workflow", auditWeb.Category);
+        Assert.True(auditWeb.Recommended);
+        Assert.True(auditWeb.AgentPriority >= publishWeb.AgentPriority);
+
+        // Per AGENTS.md, the engine stays generic: publish/audit are project-shape-agnostic (any authored project,
+        // any genre), so the exposed surface must never grow a platformer- or genre-specific authoring tool.
+        Assert.DoesNotContain(catalog.Tools, tool => tool.Name.Contains("platformer", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(catalog.Tools, tool => tool.Name.Contains("clockwork_canopy", StringComparison.OrdinalIgnoreCase));
+        foreach (var tool in new[] { publishWeb, auditWeb })
+        {
+            Assert.DoesNotContain("platformer", tool.Description, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("jump", tool.Description, StringComparison.OrdinalIgnoreCase);
+        }
 
         var renderTool = catalog.Tools.Single(tool => tool.Name == "rekall.render.vulkan.render_pass.capture_clear");
         Assert.Equal("rendering", renderTool.Category);

@@ -32,7 +32,8 @@ internal static class RekallAgeMcpToolClassifier
             return "context";
         }
 
-        if (name.StartsWith("rekall.workflow.", StringComparison.Ordinal))
+        if (name.StartsWith("rekall.workflow.", StringComparison.Ordinal)
+            || name.StartsWith("rekall.game.", StringComparison.Ordinal))
         {
             return "workflow";
         }
@@ -165,7 +166,9 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.workflow.agent_authoring_gauntlet" or
             "rekall.workflow.package_playable_game" or
             "rekall.workflow.relocate_playable_package" or
-            "rekall.workflow.audit_playable_package";
+            "rekall.workflow.audit_playable_package" or
+            "rekall.game.publish_web" or
+            "rekall.game.audit_web";
     }
 
     public static int GetAgentPriority(string name)
@@ -183,6 +186,8 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.workflow.package_playable_game" => 11,
             "rekall.workflow.relocate_playable_package" => 14,
             "rekall.workflow.audit_playable_package" => 15,
+            "rekall.game.publish_web" => 13,
+            "rekall.game.audit_web" => 15,
             "rekall.live.status" => 16,
             "rekall.live.apply_scene_blueprint" => 17,
             "rekall.live.apply_scene_diff" => 18,

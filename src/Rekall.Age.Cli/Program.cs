@@ -291,6 +291,14 @@ internal static class RekallAgeCli
                     await CapturePlayablePackageFrameAsync(registry, context, packagePath, outputDirectory, "1"),
                 ["game", "capture-package-frame", var packagePath, var outputDirectory, var frameIndex] =>
                     await CapturePlayablePackageFrameAsync(registry, context, packagePath, outputDirectory, frameIndex),
+                ["game", "publish-web", var root] => await PublishWebGameAsync(registry, context, root, "Main", null),
+                ["game", "publish-web", var root, var scene] => await PublishWebGameAsync(registry, context, root, scene, null),
+                ["game", "publish-web", var root, var scene, var outputDirectory] =>
+                    await PublishWebGameAsync(registry, context, root, scene, outputDirectory),
+                ["game", "audit-web", var root] => await AuditWebGameAsync(registry, context, root, "Main", null),
+                ["game", "audit-web", var root, var scene] => await AuditWebGameAsync(registry, context, root, scene, null),
+                ["game", "audit-web", var root, var scene, var outputDirectory] =>
+                    await AuditWebGameAsync(registry, context, root, scene, outputDirectory),
                 ["project", "create", var root, var name, var capabilities] => await CreateProjectAsync(registry, context, root, name, capabilities),
                 ["capability", "add", var root, var capability] => await AddCapabilityAsync(registry, context, root, capability),
                 ["capability", "add", var root, var capability, var expectedRevision] =>
@@ -2569,6 +2577,62 @@ internal static class RekallAgeCli
             {
                 Console.WriteLine($"{error.Code}: {error.Message}");
             }
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> PublishWebGameAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string? outputDirectory)
+    {
+        var result = await registry.ExecuteAsync<PublishWebGameRequest, PublishWebGameResult>(
+            "rekall.game.publish_web",
+            new PublishWebGameRequest(root, scene, outputDirectory),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Ready: {result.Value.Ready}");
+        if (result.Ok)
+        {
+            Console.WriteLine($"Output: {result.Value.OutputDirectory}");
+            Console.WriteLine($"Manifest: {result.Value.ManifestPath}");
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+            {
+                Console.WriteLine($"{error.Code}: {error.Message}");
+            }
+        }
+
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> AuditWebGameAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string? outputDirectory)
+    {
+        var result = await registry.ExecuteAsync<AuditWebGameRequest, AuditWebGameResult>(
+            "rekall.game.audit_web",
+            new AuditWebGameRequest(root, scene, outputDirectory),
+            context);
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Ready: {result.Value.Ready}");
+        Console.WriteLine($"Output: {result.Value.Publish.OutputDirectory}");
+        foreach (var check in result.Value.Checks)
+        {
+            Console.WriteLine($"  [{(check.Passed ? "pass" : "fail")}] {check.Name}: {check.Summary}");
+        }
+        Console.WriteLine($"Browser smoke frame verified: {result.Value.BrowserSmokeFrameVerified} ({result.Value.BrowserSmokeFrameSummary})");
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
         }
 
         return result.Ok ? 0 : 1;

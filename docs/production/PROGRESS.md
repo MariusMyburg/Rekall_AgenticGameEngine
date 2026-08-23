@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 00:45 Africa/Johannesburg
+Last verified: 2026-08-24 02:10 Africa/Johannesburg
 
 Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
@@ -4177,6 +4177,104 @@ until completion; a clean rerun with `--blame-hang-timeout` for diagnostics
 completed in 13 seconds once contention cleared). **This checkpoint remains
 tiers 1-2 evidence only: no real browser or Chromium session has exercised
 the resize/depth/exception-safety paths added here.**
+
+Task 8 of the genuine-web-game-publishing plan ("expose publish/audit
+through CLI, MCP, Studio") is done. Recon confirmed neither
+`PublishWebGameCommand` nor `AuditWebGameCommand` existed yet -- only the
+Task 3 content-closure exporter (`RekallAgeWebGameExporter`) and module
+registry generator (`RekallAgeWebModuleRegistryGenerator`) did -- so both
+were built as thin orchestration commands over the existing building
+blocks, following `AuditPlayablePackageCommand`'s composite-audit shape and
+`BuildPlayerCommand`'s subprocess-invocation shape.
+`PublishWebGameCommand` (`rekall.game.publish_web`) runs the exact sequence
+already proven by
+`WebGameExporterTests.TrimmedWebAssemblyPublishIncludesTheStaticallyRegisteredAuthoredModule`:
+discover the authored static module(s), generate the registry + MSBuild
+inputs, stage the declarative content closure, restore the freshly
+generated module project(s), then one real trimmed `dotnet publish` of the
+generic `Rekall.Age.Player.Web` project (never a project-specific web
+player, per AGENTS.md) using `--artifacts-path` to isolate the shared
+engine project's own obj/bin per request -- this is required, not
+cosmetic: without it, a concurrent publish (a second agent session, or this
+command racing an unrelated build of the same project, as the conformance
+test suite does) collides writing the same
+`obj/Release/net10.0/Rekall.Age.Player.Web.dll` and fails with a
+file-locked CSC error instead of a graceful command failure; this was
+caught empirically mid-task by a real collision in the full-suite run, not
+by code review, and fixed by switching from an initial (broken)
+`-p:BaseIntermediateOutputPath`/`-p:BaseOutputPath` attempt -- which
+silently produced a `project.assets.json` missing the `browser-wasm`
+target -- to `--artifacts-path`, the same isolation `BuildPlayerCommand`
+already uses successfully for the same class of shared-project problem.
+`AuditWebGameCommand` (`rekall.game.audit_web`) republishes the project
+itself (the same self-contained shape as `AuditPlayablePackageCommand`,
+not a wrapper requiring a prior publish) and then verifies: manifest
+decode/hash/compatibility integrity (via the existing
+`RekallAgeWebGameManifestCodec.DecodeAndValidate`, which already checks
+engine/project-schema/module-SDK identity), module-registry coverage
+against a fresh `Discover()` of the authored project, byte-identical
+content relocation from the manifest's declared hashes, WebAssembly
+runtime-identity artifacts (`dotnet.js`, `*.wasm`, `index.html`), and a
+real static-server-boot check (a loopback `HttpListener` actually serving
+`index.html` and `game.manifest.json`, not a filesystem existence check).
+Per the plan, the audit list also calls for "a browser smoke frame"; that
+is tier 3+ evidence this checkpoint does not claim --
+`AuditWebGameResult.BrowserSmokeFrameVerified` is always `false` with an
+explicit "not yet implemented, requires a real browser session" message,
+kept outside the `Ready` gate so the command stays usable rather than
+silently omitting or faking that check. Both commands are registered in
+`RekallAgeDefaultCommandRegistry`, wired as CLI `game publish-web` /
+`game audit-web` in `Rekall.Age.Cli/Program.cs`, exposed as Publish Web /
+Audit Web buttons in Studio (`RekallAgeStudioViewModel.cs`,
+`MainWindow.xaml` -- the plan referenced a `RekallAgeStudioWindow.xaml`
+that does not exist; the actual Studio window file is `MainWindow.xaml`),
+and classified in `RekallAgeMcpCatalog` under the existing `workflow`
+category (a new `rekall.game.` prefix branch was added to the classifier)
+so agent tool discovery surfaces them without inventing a new category or
+any platformer-specific tool. Verification: a real, end-to-end
+`WebGamePublishingTests.PublishesAndAuditsARealWebGameEndToEnd` test
+(scaffolds a runtime module, builds it, publishes it through the real
+trimmed WebAssembly pipeline, then audits the result -- all five audit
+checks pass, `BrowserSmokeFrameVerified` is confirmed `false`) plus an
+overlap-rejection test; CLI failure-path tests proving the command names
+are reachable and fail closed; an expanded `McpCatalogTests` asserting
+both tools are categorized `workflow`, recommended, and -- per AGENTS.md --
+that no platformer- or genre-specific wording ever appears in the exposed
+tool surface; two Studio `ICommand.CanExecute` tests. The full engine
+suite was run four times total across this checkpoint (two before the
+`--artifacts-path` fix, two after); every run showed a nonzero,
+non-identical failure count (17, 15) confined to tests this session did
+not touch, and root-caused to one specific, reproducible mechanism:
+`BuildPlayerCommand`-based tests (`PlayablePackageIntegrityTests`,
+`BuildPlayerCommandTests`, `AgentAuthoringGauntletTests`, and others)
+invoke real `dotnet publish` against the shared `Rekall.Age.Player`/
+`Rekall.Age.Player.Windows` projects and collide with each other under
+xUnit's default test parallelism -- the same class of contention this
+checkpoint's own fix addresses for `Rekall.Age.Player.Web`, just not yet
+applied to those other commands (out of scope for this task). A
+deliberately concurrent 3-way stress test (the new end-to-end test, the
+pre-existing `WebGameExporterTests` trimmed-publish test, and the overlap
+test, run together) was used to directly confirm the `--artifacts-path`
+fix eliminates the collision for the files this task touched; that
+combination now passes reliably. Studio passed 55/55 (53 pre-existing +
+2 new). The zero-warning/zero-error Release solution build succeeded. A
+second, distinct correctness bug was also caught and fixed mid-task,
+directly by observing its effect rather than by inspection: running
+`PublishWebGameCommand` without `--locked-mode` (necessary, since a
+freshly generated module project cannot be in any committed lock file)
+let `dotnet publish`'s implicit restore silently rewrite the engine's own
+checked-in `src/Rekall.Age.Player.Web/packages.lock.json` with the test
+run's transient temp-module project reference -- caught by `git status`
+showing a real, checked-in file dirtied by a test run, not by code review.
+Fixed with `-p:NuGetLockFilePath` redirecting the lock file into the same
+per-request working directory `--artifacts-path` already isolates;
+verified clean by rerunning the full end-to-end test and confirming
+`git status` reports no diff on either engine `packages.lock.json`
+afterward. **This checkpoint is tiers 1-3 evidence (source/build/test plus
+a real static-server-boot proof): no real browser or Chromium session has
+loaded a published web game this session, so `BrowserSmokeFrameVerified`
+stays `false` and Task 5 step 7's original browser-execution gap remains
+open.** Task 9 (accept Clockwork Canopy unchanged in the browser) is next.
 
 ## Next after the current item
 

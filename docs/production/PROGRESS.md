@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-22 23:21 Africa/Johannesburg
+Last verified: 2026-08-23 04:50 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -3349,6 +3349,32 @@ completed 5/5 frames with one enabled/one executed workload. The focused GPU
 selection passes 59/59, the full engine suite passes 1,201/1,201, Studio passes
 25/25, and the Release solution builds with zero warnings/errors. WebGPU backend
 execution parity is the next rendering tranche.
+WebGPU execution parity is now physically proven for the portable GPU workload
+boundary. The conformance-backed C# adapter, strict versioned protocol, trimmed
+browser-WASM bridge, and browser WebGPU executor cover resource creation,
+bounded uploads, binding/pipeline resolution, compute/render/transfer command
+streams, indirect commands, submission, and readback without exposing native
+handles. A runtime-compiled WGSL workload uploaded a 24-byte `Uint32x2` vertex
+buffer and indirect arguments `[3, 1, 0, 0]`, drew through `engine.output`, and
+returned the same frame's padded canvas readback to C# for independent raw-pixel
+validation. Physical Chromium acceptance recorded one submitted frame, no GPU
+diagnostics, no browser warning/error logs, and the expected background plus
+cyan/blue/magenta samples. The committed PNG and structured evidence are under
+`docs/production/evidence/webgpu-physical-proof-2026-08-23.*`; the PNG SHA-256
+is `69411E4435E077180018BAF82465491FC138D5A33B5213594536D9AD725652DB`.
+The final schema-v2 rerun used Google Chrome 151.0.7922.170 and bound the
+decoded 1280x720 capture, zero-entry browser log, and evidence to one prepared
+session plus an immutable 92-file/14,210,180-byte publish whose manifest
+SHA-256 is `8EC7A673243B33CD0056E78BFA5EA8AF78A02567D1C0E3F6742837D42239B2A6`.
+Adversarial harness tests reject truncated/header-only PNGs, stale or
+cross-session artifacts, tampered publish identity, out-of-run paths, and
+unrelated server processes.
+This proves programmable WebGPU execution, not complete game export. Browser
+scene/module loading, semantic input, audio, storage, networking, packaging,
+audit, and deterministic gameplay acceptance remain the platform track. The
+safety checkpoint passed a zero-warning, zero-error Release solution build,
+1,303/1,303 engine tests, 25/25 Studio tests, and the browser acceptance harness
+self-test.
 After its Windows programmable-compositor proof, resume Pong through the generic
 portable authoring path, followed by a Galaga-class game in Studio. The queued
 Rain Glass shader acceptance follows those playable proofs

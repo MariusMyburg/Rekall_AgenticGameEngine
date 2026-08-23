@@ -94,6 +94,7 @@ Rekall AGE is a proprietary Windows-first Developer Preview with a substantial t
 | --- | --- |
 | project, scene, entity, component, transaction, and module authoring | supported |
 | Windows desktop runtime and Vulkan player | supported |
+| .NET browser-WASM runtime and WebGPU RenderingDevice | experimental |
 | CLI, MCP, diagnostics, validation, capture, and packaging | supported |
 | OpenXR and windowed playable VR | experimental |
 | multiplayer sessions, snapshots, deltas, and reconciliation | experimental |
@@ -1087,10 +1088,13 @@ dotnet publish src/Rekall.Age.Player.Web/Rekall.Age.Player.Web.csproj -c Release
 python -m http.server 9327 --bind 127.0.0.1 --directory src/Rekall.Age.Player.Web/bin/Release/net10.0/publish/wwwroot
 ```
 
-This proves the C# runtime and portable graphics contracts can execute in a
-browser; it is not yet a playable export. Completion still requires the WebGPU
-adapter, WebGL 2 compatibility adapter, scene/module package loader, browser
-input/audio/storage/network bridges, package audit, and playable acceptance.
+The WebGPU adapter now executes a real compiler-authored WGSL indirect-draw
+workload in Chromium and passes same-frame pixel readback acceptance. The
+committed physical proof is
+`docs/production/evidence/webgpu-physical-proof-2026-08-23.png`. This is not yet
+a playable game export: completion still requires the scene/module package
+loader, browser input/audio/storage/network bridges, package audit, and
+deterministic playable acceptance. WebGL 2 is a later compatibility tier.
 
 Vulkan scene rendering handles:
 

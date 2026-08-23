@@ -13,8 +13,10 @@ contract, then migrate AGE rendering and add web-capable adapters incrementally.
 - [x] Add CLI/MCP capability and workload inspection commands.
 - [x] Implement a Veldrid/Vulkan Player adapter and migrate one real render path.
   The present pass completed a live 5/5-frame Vulkan acceptance.
-- [ ] Expose bounded declarative GPU workloads to agent-authored C# modules.
-- [ ] Add compute/storage/indirect operations and programmable compositor proof.
-- [ ] Implement WebGPU and WebGL 2 compatibility adapters behind the same API.
+- [x] Expose bounded declarative GPU workloads to agent-authored C# modules.
+- [x] Add compute/storage/indirect operations and programmable compositor proof.
+- [x] Implement the primary WebGPU adapter behind the same API and physically
+  prove a compiler-authored WGSL indirect draw with same-frame pixel readback.
+- [ ] Implement the later WebGL 2 compatibility adapter behind the same API.
 - [ ] Verify native and browser playable acceptance, package relocation, audit,
   full suites, and zero-warning Release builds.

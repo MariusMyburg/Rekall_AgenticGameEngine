@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 2,
+  "sessionId": "182e3dfa-35ce-496c-bd26-447d2e090929",
+  "capturedAtUtc": "2026-08-23T02:46:43.7107882+00:00",
+  "acceptance": "validated-browser-supplied-evidence",
+  "backend": "WebGPU",
+  "runtime": ".NET 10.0.11 / browser-wasm",
+  "deviceStatus": "ready",
+  "browser": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+    "version": "Google Chrome 151.0.7922.170"
+  },
+  "publish": {
+    "fileCount": 92,
+    "totalBytes": 14210180,
+    "manifestSha256": "8EC7A673243B33CD0056E78BFA5EA8AF78A02567D1C0E3F6742837D42239B2A6"
+  },
+  "protocolVersion": 1,
+  "workloadId": "proof.webgpu.asset-independent",
+  "commandCount": 5,
+  "submittedFrames": 1,
+  "diagnostics": [],
+  "browserLogEntries": [],
+  "pixelProof": {
+    "passed": true,
+    "width": 1564,
+    "height": 1308,
+    "bytesPerRow": 6400,
+    "samples": {
+      "background": { "x": 125, "y": 104, "r": 4, "g": 6, "b": 10, "a": 255 },
+      "cyan": { "x": 430, "y": 984, "r": 53, "g": 193, "b": 231, "a": 255 },
+      "blue": { "x": 782, "y": 412, "r": 53, "g": 81, "b": 247, "a": 255 },
+      "magenta": { "x": 1133, "y": 984, "r": 188, "g": 57, "b": 223, "a": 255 }
+    }
+  },
+  "screenshot": {
+    "path": "docs/production/evidence/webgpu-physical-proof-2026-08-23.png",
+    "bytes": 104336,
+    "width": 1280,
+    "height": 720,
+    "sha256": "69411E4435E077180018BAF82465491FC138D5A33B5213594536D9AD725652DB"
+  }
+}

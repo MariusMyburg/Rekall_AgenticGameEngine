@@ -37,9 +37,11 @@ Primary references:
 
 This is runtime/interop/contract evidence, not a game export. It does not yet
 execute an AGE scene, compiled game module, audio mixer, semantic input stream,
-or WebGPU draw command. A production claim requires backend implementation,
-WebGL 2 feature lowering, browser services, package generation/audit, and a real
-playable browser acceptance with deterministic gameplay evidence.
+or browser gameplay loop. The WebGPU draw boundary is now physically proven
+below. A production game-export claim still requires scene/module loading,
+browser services, package generation/audit, and a real playable browser
+acceptance with deterministic gameplay evidence. WebGL 2 remains a later
+compatibility tier rather than a prerequisite for the primary WebGPU path.
 
 ## Task 3 linker-safe WebGPU protocol checkpoint
 
@@ -103,3 +105,52 @@ exact immutable enabled-feature set, gated BGRA8 storage on the generic
 made render-pass target lookup kind-strict. The focused follow-up C# selection
 passed 13/13 and contains the conformance cases; the complete WebGPU protocol
 selection and Node executor totals above remain green.
+
+## Physical WebGPU workload acceptance
+
+Date: 2026-08-23
+
+A trimmed Release browser-WASM publish executed the ordinary AGE runtime GPU
+workload compiler through the production C# WebGPU RenderingDevice and the
+browser WebGPU executor in the in-app Chromium browser. The workload uploaded
+the six `UInt32` values of its 24-byte `Uint32x2` vertex buffer, uploaded the
+four `UInt32` indirect-draw arguments `[3, 1, 0, 0]`, compiled runtime WGSL,
+bound `engine.output`, and submitted a five-command stream ending in
+`DrawIndirect`. The visible runtime identified itself as `.NET 10.0.11 /
+browser-wasm`; graphics and state fields reported `WebGPU` and
+`GPU WORKLOAD EXECUTED`, proving adapter/device initialization reached the
+ready state. Protocol-v1 evidence does not expose a hardware adapter name, so
+none is claimed.
+
+Acceptance was not inferred from DOM text. The browser copied the same rendered
+canvas texture into a map-readable buffer in that frame and sampled four
+locations from that mapped data. C# independently validated the returned
+dimensions, 256-byte-aligned row pitch, bounded readback envelope, sample
+coordinate bounds, and the expected dark-background plus cyan, blue, and
+magenta color thresholds. The bridge reported one submitted
+frame, no WebGPU diagnostics, and browser automation found no warning/error log
+entries. The final schema-v2 acceptance used Google Chrome 151.0.7922.170 and
+bound all controller artifacts to one nonce-bearing prepared session. It
+recomputed an immutable 92-file, 14,210,180-byte publish identity with manifest
+SHA-256 `8EC7A673243B33CD0056E78BFA5EA8AF78A02567D1C0E3F6742837D42239B2A6`,
+decoded the physical 1280x720 PNG through a real image decoder, required varied
+nonblank pixels, verified its byte count and SHA-256, and stopped only the exact
+token-bound server process. It completed with
+`validated-browser-supplied-evidence`.
+
+Committed evidence:
+
+- `docs/production/evidence/webgpu-physical-proof-2026-08-23.json`
+- `docs/production/evidence/webgpu-physical-proof-2026-08-23.png`
+- screenshot SHA-256 `69411E4435E077180018BAF82465491FC138D5A33B5213594536D9AD725652DB`
+
+The Node executor tests remain intentionally narrower: they prove protocol and
+readback transport mechanics and cannot synthesize acceptance pixels. The
+physical browser capture above is the real shader-execution evidence.
+
+The safety checkpoint completed with a zero-warning, zero-error Release
+solution build, 1,303/1,303 engine tests, 25/25 Studio tests, and the acceptance
+harness self-test green. Independent review required stronger PNG decoding,
+publish/session binding, owned-server verification, and exact browser/publish
+identity. Those repairs are covered by adversarial self-tests, and the fresh
+physical run above passed the strengthened gate.

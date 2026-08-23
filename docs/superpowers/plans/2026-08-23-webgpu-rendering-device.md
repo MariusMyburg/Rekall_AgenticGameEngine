@@ -35,7 +35,7 @@
 - Produces: `RekallAgeWebGpuProtocol.Version == 1`, `Serialize<T>(T packet)`, `Deserialize<T>(string json)`, `RekallAgeWebGpuBridgeResult`, `IRekallAgeWebGpuBridge.Execute(string packetJson)`, and `FlushAsync(CancellationToken)`.
 - Packets use public AGE descriptors/handles/commands as immutable payload data and never contain browser objects.
 
-- [ ] **Step 1: Write failing protocol tests**
+- [x] **Step 1: Write failing protocol tests**
 
 ```csharp
 [Fact]
@@ -60,13 +60,13 @@ public void ProtocolRejectsUnknownVersionsAndOversizedPackets()
 }
 ```
 
-- [ ] **Step 2: Run the tests and verify RED**
+- [x] **Step 2: Run the tests and verify RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --filter FullyQualifiedName~WebGpuProtocolTests`
 
 Expected: compile failure because the WebGPU protocol project and types do not exist.
 
-- [ ] **Step 3: Implement the bounded protocol and bridge result**
+- [x] **Step 3: Implement the bounded protocol and bridge result**
 
 ```csharp
 public static class RekallAgeWebGpuProtocol
@@ -91,13 +91,13 @@ public sealed record RekallAgeWebGpuBridgeResult(bool Succeeded, IReadOnlyList<R
 
 Use camel-case JSON, string enums, strict version validation, bounded UTF-8 byte counts, and stable `REKALL_WEBGPU_PROTOCOL_*` exception diagnostics.
 
-- [ ] **Step 4: Run protocol tests and verify GREEN**
+- [x] **Step 4: Run protocol tests and verify GREEN**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --filter FullyQualifiedName~WebGpuProtocolTests`
 
 Expected: all WebGPU protocol tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add Rekall.Age.sln src/Rekall.Age.Rendering.WebGpu tests/Rekall.Age.Tests
@@ -115,7 +115,7 @@ git commit -m "feat(webgpu): add bounded rendering protocol"
 - Consumes: Task 1 bridge/protocol and `RekallAgeInMemoryRenderingDevice`.
 - Produces: `RekallAgeWebGpuRenderingDevice(IRekallAgeWebGpuBridge bridge, RekallAgeRenderingDeviceCapabilities capabilities)` implementing the complete public device interface, plus concrete `ImportCanvasOutput(...)` and `FlushAsync(...)` lifecycle operations.
 
-- [ ] **Step 1: Write failing creation/rollback/language tests**
+- [x] **Step 1: Write failing creation/rollback/language tests**
 
 ```csharp
 [Fact]
@@ -140,20 +140,20 @@ public void BrowserBackendRejectsNonWgslShadersBeforeBridgeMutation()
 }
 ```
 
-- [ ] **Step 2: Run device tests and verify RED**
+- [x] **Step 2: Run device tests and verify RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --filter FullyQualifiedName~WebGpuRenderingDeviceTests`
 
 Expected: compile failure because the adapter does not exist.
 
-- [ ] **Step 3: Implement all resource operations with rollback**
+- [x] **Step 3: Implement all resource operations with rollback**
 
 Each create method calls the conformance device, emits one typed create packet,
 and destroys the conformance handle if the bridge result fails. `WriteBuffer`,
 `WriteTexture`, and `Destroy` validate through conformance first and emit exact
 offset/subresource/base64 data. No bridge call occurs after a conformance error.
 
-- [ ] **Step 4: Add failing submission-order and backend-failure tests**
+- [x] **Step 4: Add failing submission-order and backend-failure tests**
 
 ```csharp
 [Fact]
@@ -168,7 +168,7 @@ public void SubmitValidatesBeforeBridgeAndPropagatesBackendFailure()
 }
 ```
 
-- [ ] **Step 5: Implement encoder delegation and submission**
+- [x] **Step 5: Implement encoder delegation and submission**
 
 `BeginCommandEncoder` returns an adapter over the real conformance encoder.
 `Finish` preserves the conformance command buffer. `Submit` validates/submits
@@ -177,27 +177,27 @@ bridge. Preserve command order exactly. `ImportCanvasOutput` creates validated
 conformance color/present texture and render-target handles and emits an import
 packet; authored modules see only the resulting `engine.output` handle.
 
-- [ ] **Step 6: Add failing asynchronous flush/device-loss tests**
+- [x] **Step 6: Add failing asynchronous flush/device-loss tests**
 
 Use a bridge whose immediate operations succeed but whose `FlushAsync` returns
 `REKALL_WEBGPU_DEVICE_LOST`. Assert the concrete device becomes faulted, later
 mutations fail closed without bridge calls, and disposal destroys all retained
 resources.
 
-- [ ] **Step 7: Implement and verify asynchronous flush**
+- [x] **Step 7: Implement and verify asynchronous flush**
 
 `FlushAsync` awaits bridge error scopes/queue completion. On failure it records
 bounded diagnostics, marks the adapter faulted, and blocks future creates,
 uploads, encoders, and submissions. The browser player disposes its compiled
 workload on any flush failure.
 
-- [ ] **Step 8: Run all WebGPU C# tests and verify GREEN**
+- [x] **Step 8: Run all WebGPU C# tests and verify GREEN**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --filter FullyQualifiedName~WebGpu`
 
 Expected: protocol and device tests pass with zero warnings.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```powershell
 git add src/Rekall.Age.Rendering.WebGpu tests/Rekall.Age.Tests
@@ -217,20 +217,20 @@ git commit -m "feat(webgpu): implement conformance-backed device"
 - Consumes: `IRekallAgeWebGpuBridge.Execute` packets.
 - Produces: JS module imports `webgpu.execute(packetJson)` for synchronous recording, `webgpu.flush()` for asynchronous error-scope/queue completion, and `webgpu.initialize(canvasSelector)` for device/canvas capabilities.
 
-- [ ] **Step 1: Write failing packet-fixture tests**
+- [x] **Step 1: Write failing packet-fixture tests**
 
 Build literal create/upload/submit JSON fixtures and assert the C# serializer
 matches the field names, enum strings, handle identity, command order, and
 base64 bytes the JavaScript executor consumes. Mutating version, resource kind,
 or command kind must fail deserialization.
 
-- [ ] **Step 2: Run fixture tests and verify RED**
+- [x] **Step 2: Run fixture tests and verify RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --filter FullyQualifiedName~WebGpuBrowserPacketFixtureTests`
 
 Expected: failures identify missing browser packet shapes.
 
-- [ ] **Step 3: Implement initialization and resource maps**
+- [x] **Step 3: Implement initialization and resource maps**
 
 `initialize` must await adapter/device, configure `#viewport` using the preferred
 format, register uncaptured-error/device-lost handlers, and create per-kind maps.
@@ -241,7 +241,7 @@ Every operation uses a WebGPU error scope; `flush` awaits pending scope results,
 shader compilation information, `queue.onSubmittedWorkDone()`, and device loss,
 then returns one bounded diagnostic list.
 
-- [ ] **Step 4: Implement the complete WebGPU mapping**
+- [x] **Step 4: Implement the complete WebGPU mapping**
 
 Map AGE usages/formats/stages/topologies/vertex formats/blend/depth/samplers to
 WebGPU literals. Resolve binding layouts/sets and pipelines from handle keys.
@@ -249,7 +249,7 @@ Execute render/compute pass commands, buffer copies, direct/indirect draws and
 dispatches. `engine.output` resolves to `context.getCurrentTexture().createView()`
 at render-pass execution time, never at compile time.
 
-- [ ] **Step 5: Implement C# source-generated interop bridge**
+- [x] **Step 5: Implement C# source-generated interop bridge**
 
 ```csharp
 internal sealed class WebGpuBrowserBridge : IRekallAgeWebGpuBridge
@@ -262,14 +262,14 @@ internal sealed class WebGpuBrowserBridge : IRekallAgeWebGpuBridge
 Initialization occurs before device construction. Any malformed or empty JS
 result becomes `REKALL_WEBGPU_BRIDGE_RESULT_INVALID`.
 
-- [ ] **Step 6: Publish and verify no browser-load regression**
+- [x] **Step 6: Publish and verify no browser-load regression**
 
 Run: `dotnet publish src/Rekall.Age.Player.Web/Rekall.Age.Player.Web.csproj -c Release --no-restore`
 
 Expected: publish succeeds with zero warnings/errors and all referenced JS
 modules appear in `publish/wwwroot`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add src/Rekall.Age.Player.Web src/Rekall.Age.Rendering.WebGpu tests/Rekall.Age.Tests
@@ -289,7 +289,7 @@ git commit -m "feat(webgpu): execute AGE packets in browser"
 - Consumes: `RekallAgeRuntimeGpuWorkloadCompiler` and WebGPU device.
 - Produces: a WGSL workload named `proof.webgpu.asset-independent`, machine-readable `window.rekallWebGpuEvidence`, and browser pixel samples.
 
-- [ ] **Step 1: Write failing proof-workload test**
+- [x] **Step 1: Write failing proof-workload test**
 
 ```csharp
 [Fact]
@@ -303,13 +303,13 @@ public void ProofCompilesToAnIndirectColorTriangleOnWebGpu()
 }
 ```
 
-- [ ] **Step 2: Run proof test and verify RED**
+- [x] **Step 2: Run proof test and verify RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --filter FullyQualifiedName~WebGpuProofWorkloadTests`
 
 Expected: compile failure because the proof workload does not exist.
 
-- [ ] **Step 3: Implement the WGSL proof**
+- [x] **Step 3: Implement the WGSL proof**
 
 Use one 24-byte vertex buffer encoded through six `InitialDataUInt32` values,
 one 16-byte indirect buffer `[3, 1, 0, 0]`, explicit `Uint32x2` vertex layout,
@@ -317,7 +317,7 @@ WGSL vertex/fragment shaders, one render pipeline targeting the browser preferre
 format, `engine.output`, and one `DrawIndirect` command. The shader decodes the
 same L/D/R/U byte convention as the Vulkan proof and writes interpolated color.
 
-- [ ] **Step 4: Replace the 2D canvas animation with real workload execution**
+- [x] **Step 4: Replace the 2D canvas animation with real workload execution**
 
 Program startup initializes WebGPU, constructs the C# device, calls its concrete
 `ImportCanvasOutput` operation, compiles/submits the proof against the returned
@@ -326,14 +326,14 @@ target, and publishes literal state fields:
 `pixelProof`. State becomes `GPU WORKLOAD EXECUTED` only after `FlushAsync`,
 submission completion, and readback succeed.
 
-- [ ] **Step 5: Add browser readback**
+- [x] **Step 5: Add browser readback**
 
 Copy the canvas render result to a `MAP_READ` buffer with 256-byte row alignment,
 sample three fixed triangle-interior coordinates, and return their RGBA bytes.
 Acceptance bounds must require a dark background plus distinct cyan/blue/magenta
 samples; identical or all-zero samples fail.
 
-- [ ] **Step 6: Verify tests and publish**
+- [x] **Step 6: Verify tests and publish**
 
 Run:
 
@@ -344,7 +344,7 @@ dotnet publish src/Rekall.Age.Player.Web/Rekall.Age.Player.Web.csproj -c Release
 
 Expected: all WebGPU tests and Release publish pass with zero warnings/errors.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add src/Rekall.Age.Player.Web tests/Rekall.Age.Tests
@@ -364,7 +364,7 @@ git commit -m "feat(web): render runtime workload with WebGPU"
 - Consumes: published Web player and `window.rekallWebGpuEvidence`.
 - Produces: deterministic JSON acceptance output and a committed browser capture.
 
-- [ ] **Step 1: Write the acceptance script around observable evidence**
+- [x] **Step 1: Write the acceptance script around observable evidence**
 
 The script publishes to a clean temporary directory, starts a loopback static
 server, and reports the URL/output root. Browser control opens that URL, waits
@@ -372,7 +372,7 @@ for `body[data-device="ready"]`, reads `window.rekallWebGpuEvidence`, checks
 `submittedFrames >= 1`, asserts empty diagnostics and literal pixel bounds,
 checks browser warnings/errors, and captures the real canvas.
 
-- [ ] **Step 2: Run real Chromium acceptance**
+- [x] **Step 2: Run real Chromium acceptance**
 
 Expected machine state:
 
@@ -387,7 +387,7 @@ Expected machine state:
 }
 ```
 
-- [ ] **Step 3: Run the full release gate**
+- [x] **Step 3: Run the full release gate**
 
 ```powershell
 dotnet build Rekall.Age.sln -c Release --no-restore
@@ -399,13 +399,13 @@ git diff --check
 Expected: zero warnings/errors, all engine and Studio tests pass, and no diff
 errors.
 
-- [ ] **Step 4: Update evidence without overstating web export**
+- [x] **Step 4: Update evidence without overstating web export**
 
 Record exact test counts, publish output, browser/runtime versions, WebGPU
 adapter/device status, command count, pixel samples, screenshot path, and the
 remaining AOT/input/audio/storage/WebGL/package/gameplay gates.
 
-- [ ] **Step 5: Request focused review and fix all blockers**
+- [x] **Step 5: Request focused review and fix all blockers**
 
 Review protocol bounds, rollback, browser object lifecycle, resource-kind
 mapping, WGSL layout compatibility, readback row alignment, device loss, and

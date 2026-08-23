@@ -129,6 +129,40 @@ public sealed class MeshOperationTests
         Assert.True(result.Validation.IsValid, string.Join(",", result.Validation.Diagnostics.Select(item => item.Code)));
     }
 
+    [Fact]
+    public void ExtrudeFaceRegionCreatesTopAndBoundarySidesWithPointProvenance()
+    {
+        var mesh = CreateQuad();
+        var executor = new RekallAgeMeshOperationExecutor();
+
+        var result = executor.Execute(
+            mesh,
+            new RekallAgeMeshOperationRequest(
+                "extrude_faces",
+                RekallAgeGeometryDomain.Face,
+                [21],
+                new JsonObject { ["x"] = 0, ["y"] = 0, ["z"] = 2 }));
+
+        Assert.Equal(4, mesh.Topology.PointIds.Count);
+        Assert.Equal(8, result.Mesh.Topology.PointIds.Count);
+        Assert.Equal(12, result.Mesh.Topology.EdgeIds.Count);
+        Assert.Equal(5, result.Mesh.Topology.FaceIds.Count);
+        Assert.Equal(20, result.Mesh.Topology.CornerIds.Count);
+        Assert.Equal(4, result.Changes.CreatedPointIds.Count);
+        Assert.Equal(8, result.Changes.CreatedEdgeIds.Count);
+        Assert.Equal(4, result.Changes.CreatedFaceIds.Count);
+        Assert.Equal(16, result.Changes.CreatedCornerIds.Count);
+        Assert.Contains(result.Mesh.Topology.Positions, item => item == new RekallAgeGeometryVector3(0, 0, 2));
+        var faceProvenance = Assert.Single(result.Provenance, item =>
+            item.Domain == RekallAgeGeometryDomain.Face && item.InputElementId == 21);
+        Assert.Equal(5, faceProvenance.OutputElementIds.Count);
+        var pointProvenance = Assert.Single(result.Provenance, item =>
+            item.Domain == RekallAgeGeometryDomain.Point && item.InputElementId == 1);
+        Assert.Equal(2, pointProvenance.OutputElementIds.Count);
+        Assert.Contains(1UL, pointProvenance.OutputElementIds);
+        Assert.True(result.Validation.IsValid, string.Join(",", result.Validation.Diagnostics.Select(item => item.Code)));
+    }
+
     private static RekallAgeMeshAsset CreateQuad()
     {
         return RekallAgeMeshAsset.Create(

@@ -43,6 +43,7 @@ public sealed class RekallAgeMeshOperationExecutor
             "transform" => Transform(source, request),
             "reverse_faces" => ReverseFaces(source, request),
             "triangulate_faces" => TriangulateFaces(source, request),
+            "extrude_faces" => ExtrudeFaces(source, request),
             _ => throw Failure("REKALL_MESH_OPERATION_UNKNOWN", $"Unknown mesh operation '{request.OperationId}'.")
         };
         var outputValidation = _validator.Validate(result.Mesh);
@@ -342,6 +343,262 @@ public sealed class RekallAgeMeshOperationExecutor
             provenance);
     }
 
+    private RekallAgeMeshOperationResult ExtrudeFaces(
+        RekallAgeMeshAsset source,
+        RekallAgeMeshOperationRequest request)
+    {
+        RequireDomain(request, RekallAgeGeometryDomain.Face);
+        var selectedFaceIndices = ResolveIndices(source.Topology.FaceIds, request.ElementIds, "face").ToHashSet();
+        var offset = new RekallAgeGeometryVector3(
+            ReadFiniteDouble(request.Parameters, "x"),
+            ReadFiniteDouble(request.Parameters, "y"),
+            ReadFiniteDouble(request.Parameters, "z"));
+        var topology = source.Topology;
+        var selectedPointIndices = new HashSet<int>();
+        var selectedEdgeUse = new Dictionary<int, int>();
+        var boundaryCornerByEdge = new Dictionary<int, (int FaceIndex, int CornerIndex)>();
+        foreach (var faceIndex in selectedFaceIndices)
+        {
+            var start = topology.FaceOffsets[faceIndex];
+            var end = topology.FaceOffsets[faceIndex + 1];
+            for (var cornerIndex = start; cornerIndex < end; cornerIndex++)
+            {
+                selectedPointIndices.Add(topology.CornerPointIndices[cornerIndex]);
+                var edgeIndex = topology.CornerEdgeIndices[cornerIndex];
+                selectedEdgeUse[edgeIndex] = selectedEdgeUse.GetValueOrDefault(edgeIndex) + 1;
+                boundaryCornerByEdge.TryAdd(edgeIndex, (faceIndex, cornerIndex));
+            }
+        }
+
+        var boundaryEdges = selectedEdgeUse
+            .Where(pair => pair.Value == 1)
+            .Select(pair => pair.Key)
+            .OrderBy(index => topology.EdgeIds[index])
+            .ToArray();
+        var boundaryPoints = boundaryEdges
+            .SelectMany(index =>
+            {
+                var edge = topology.EdgePointIndices[index];
+                return new[] { edge.A, edge.B };
+            })
+            .Distinct()
+            .OrderBy(index => topology.PointIds[index])
+            .ToArray();
+
+        var pointIds = topology.PointIds.ToList();
+        var positions = topology.Positions.ToList();
+        var pointSourceIndices = Enumerable.Range(0, pointIds.Count).ToList();
+        var duplicatePointBySource = new Dictionary<int, int>();
+        var createdPointIds = new List<ulong>();
+        var nextPointId = NextId(pointIds);
+        foreach (var sourcePointIndex in selectedPointIndices.OrderBy(index => topology.PointIds[index]))
+        {
+            var sourcePosition = topology.Positions[sourcePointIndex];
+            var position = new RekallAgeGeometryVector3(
+                sourcePosition.X + offset.X,
+                sourcePosition.Y + offset.Y,
+                sourcePosition.Z + offset.Z);
+            if (!IsFinite(position.X) || !IsFinite(position.Y) || !IsFinite(position.Z))
+            {
+                throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "Extrusion offset produces a non-finite position.");
+            }
+            var pointIndex = pointIds.Count;
+            var pointId = nextPointId++;
+            duplicatePointBySource.Add(sourcePointIndex, pointIndex);
+            pointIds.Add(pointId);
+            positions.Add(position);
+            pointSourceIndices.Add(sourcePointIndex);
+            createdPointIds.Add(pointId);
+        }
+
+        var edgeIds = topology.EdgeIds.ToList();
+        var edgePoints = topology.EdgePointIndices.ToList();
+        var edgeSourceIndices = Enumerable.Range(0, edgeIds.Count).Select<int, int?>(index => index).ToList();
+        var topEdgeBySource = new Dictionary<int, int>();
+        var verticalEdgeByPoint = new Dictionary<int, int>();
+        var createdEdgeIds = new List<ulong>();
+        var nextEdgeId = NextId(edgeIds);
+        foreach (var sourceEdgeIndex in selectedEdgeUse.Keys.OrderBy(index => topology.EdgeIds[index]))
+        {
+            var sourceEdge = topology.EdgePointIndices[sourceEdgeIndex];
+            var edgeIndex = edgeIds.Count;
+            var edgeId = nextEdgeId++;
+            topEdgeBySource.Add(sourceEdgeIndex, edgeIndex);
+            edgeIds.Add(edgeId);
+            edgePoints.Add(new(duplicatePointBySource[sourceEdge.A], duplicatePointBySource[sourceEdge.B]));
+            edgeSourceIndices.Add(sourceEdgeIndex);
+            createdEdgeIds.Add(edgeId);
+        }
+        foreach (var sourcePointIndex in boundaryPoints)
+        {
+            var edgeIndex = edgeIds.Count;
+            var edgeId = nextEdgeId++;
+            verticalEdgeByPoint.Add(sourcePointIndex, edgeIndex);
+            edgeIds.Add(edgeId);
+            edgePoints.Add(new(sourcePointIndex, duplicatePointBySource[sourcePointIndex]));
+            edgeSourceIndices.Add(null);
+            createdEdgeIds.Add(edgeId);
+        }
+
+        var faceIds = new List<ulong>();
+        var faceOffsets = new List<int> { 0 };
+        var faceSourceIndices = new List<int>();
+        var cornerIds = new List<ulong>();
+        var cornerPoints = new List<int>();
+        var cornerEdges = new List<int>();
+        var cornerSourceIndices = new List<int>();
+        var createdFaceIds = new List<ulong>();
+        var createdCornerIds = new List<ulong>();
+        var nextFaceId = NextId(topology.FaceIds);
+        var nextCornerId = NextId(topology.CornerIds);
+        var faceProvenance = selectedFaceIndices.ToDictionary(
+            index => topology.FaceIds[index],
+            index => new List<ulong> { topology.FaceIds[index] });
+
+        for (var faceIndex = 0; faceIndex < topology.FaceIds.Count; faceIndex++)
+        {
+            var selected = selectedFaceIndices.Contains(faceIndex);
+            faceIds.Add(topology.FaceIds[faceIndex]);
+            faceSourceIndices.Add(faceIndex);
+            for (var cornerIndex = topology.FaceOffsets[faceIndex]; cornerIndex < topology.FaceOffsets[faceIndex + 1]; cornerIndex++)
+            {
+                cornerIds.Add(topology.CornerIds[cornerIndex]);
+                cornerPoints.Add(selected
+                    ? duplicatePointBySource[topology.CornerPointIndices[cornerIndex]]
+                    : topology.CornerPointIndices[cornerIndex]);
+                cornerEdges.Add(selected
+                    ? topEdgeBySource[topology.CornerEdgeIndices[cornerIndex]]
+                    : topology.CornerEdgeIndices[cornerIndex]);
+                cornerSourceIndices.Add(cornerIndex);
+            }
+            faceOffsets.Add(cornerIds.Count);
+        }
+
+        foreach (var boundaryEdgeIndex in boundaryEdges)
+        {
+            var (sourceFaceIndex, sourceCornerIndex) = boundaryCornerByEdge[boundaryEdgeIndex];
+            var sourceFaceStart = topology.FaceOffsets[sourceFaceIndex];
+            var sourceFaceEnd = topology.FaceOffsets[sourceFaceIndex + 1];
+            var nextSourceCornerIndex = sourceCornerIndex + 1 == sourceFaceEnd
+                ? sourceFaceStart
+                : sourceCornerIndex + 1;
+            var firstPoint = topology.CornerPointIndices[sourceCornerIndex];
+            var secondPoint = topology.CornerPointIndices[nextSourceCornerIndex];
+            var sideFaceId = nextFaceId++;
+            createdFaceIds.Add(sideFaceId);
+            faceProvenance[topology.FaceIds[sourceFaceIndex]].Add(sideFaceId);
+            faceIds.Add(sideFaceId);
+            faceSourceIndices.Add(sourceFaceIndex);
+            var sidePoints = new[]
+            {
+                firstPoint,
+                secondPoint,
+                duplicatePointBySource[secondPoint],
+                duplicatePointBySource[firstPoint]
+            };
+            var sideEdges = new[]
+            {
+                boundaryEdgeIndex,
+                verticalEdgeByPoint[secondPoint],
+                topEdgeBySource[boundaryEdgeIndex],
+                verticalEdgeByPoint[firstPoint]
+            };
+            var sideSources = new[]
+            {
+                sourceCornerIndex,
+                nextSourceCornerIndex,
+                nextSourceCornerIndex,
+                sourceCornerIndex
+            };
+            for (var i = 0; i < 4; i++)
+            {
+                var cornerId = nextCornerId++;
+                createdCornerIds.Add(cornerId);
+                cornerIds.Add(cornerId);
+                cornerPoints.Add(sidePoints[i]);
+                cornerEdges.Add(sideEdges[i]);
+                cornerSourceIndices.Add(sideSources[i]);
+            }
+            faceOffsets.Add(cornerIds.Count);
+        }
+
+        var attributes = source.Attributes.Select(attribute => attribute.Domain switch
+        {
+            RekallAgeGeometryDomain.Point => attribute with
+            {
+                Values = pointSourceIndices.Select(index => attribute.Values[index]).ToArray()
+            },
+            RekallAgeGeometryDomain.Edge => attribute with
+            {
+                Values = edgeSourceIndices.Select(index =>
+                    index.HasValue ? attribute.Values[index.Value] : DefaultValue(attribute)).ToArray()
+            },
+            RekallAgeGeometryDomain.Face => attribute with
+            {
+                Values = faceSourceIndices.Select(index => attribute.Values[index]).ToArray()
+            },
+            RekallAgeGeometryDomain.Corner => attribute with
+            {
+                Values = cornerSourceIndices.Select(index => attribute.Values[index]).ToArray()
+            },
+            _ => attribute
+        }).ToArray();
+        var pointProvenance = selectedPointIndices
+            .OrderBy(index => topology.PointIds[index])
+            .Select(index => new RekallAgeMeshElementProvenance(
+                RekallAgeGeometryDomain.Point,
+                topology.PointIds[index],
+                [topology.PointIds[index], pointIds[duplicatePointBySource[index]]]))
+            .ToArray();
+        var provenance = faceProvenance
+            .OrderBy(pair => pair.Key)
+            .Select(pair => new RekallAgeMeshElementProvenance(RekallAgeGeometryDomain.Face, pair.Key, pair.Value))
+            .Concat(pointProvenance)
+            .ToArray();
+        var selectionSets = PropagateExtrusionSelections(source.SelectionSets, faceProvenance, pointProvenance);
+        var mesh = source with
+        {
+            Revision = checked(source.Revision + 1),
+            Topology = topology with
+            {
+                PointIds = pointIds,
+                Positions = positions,
+                EdgeIds = edgeIds,
+                EdgePointIndices = edgePoints,
+                FaceIds = faceIds,
+                FaceOffsets = faceOffsets,
+                CornerIds = cornerIds,
+                CornerPointIndices = cornerPoints,
+                CornerEdgeIndices = cornerEdges
+            },
+            Attributes = attributes,
+            SelectionSets = selectionSets
+        };
+        var affectedPositions = selectedPointIndices
+            .SelectMany(index => new[] { topology.Positions[index], positions[duplicatePointBySource[index]] });
+        return Result(
+            source,
+            mesh,
+            ChangeSet(
+                RekallAgeMeshChangeKind.Topology
+                | RekallAgeMeshChangeKind.Positions
+                | (attributes.Length > 0 ? RekallAgeMeshChangeKind.Attributes : RekallAgeMeshChangeKind.None)
+                | (selectionSets.Count > 0 ? RekallAgeMeshChangeKind.Selection : RekallAgeMeshChangeKind.None),
+                createdPoints: createdPointIds,
+                createdEdges: createdEdgeIds,
+                createdFaces: createdFaceIds,
+                createdCorners: createdCornerIds,
+                modifiedFaces: request.ElementIds.Order().ToArray(),
+                modifiedCorners: selectedFaceIndices
+                    .SelectMany(index => Enumerable.Range(topology.FaceOffsets[index], topology.FaceOffsets[index + 1] - topology.FaceOffsets[index]))
+                    .Select(index => topology.CornerIds[index])
+                    .Order()
+                    .ToArray(),
+                changedAttributes: attributes.Select(item => item.Name).Order(StringComparer.Ordinal).ToArray(),
+                affectedBounds: Bounds(affectedPositions)),
+            provenance);
+    }
+
     private static RekallAgeMeshOperationResult Result(
         RekallAgeMeshAsset source,
         RekallAgeMeshAsset mesh,
@@ -423,6 +680,56 @@ public sealed class RekallAgeMeshOperationExecutor
             RekallAgeGeometryValueType.String => JsonSerializer.SerializeToElement(string.Empty),
             _ => throw Failure("REKALL_MESH_OPERATION_ATTRIBUTE_DEFAULT_INVALID", $"Attribute '{attribute.Name}' has no default value.")
         };
+    }
+
+    private static IReadOnlyList<RekallAgeMeshSelection> PropagateExtrusionSelections(
+        IReadOnlyList<RekallAgeMeshSelection> selections,
+        IReadOnlyDictionary<ulong, List<ulong>> faceProvenance,
+        IReadOnlyList<RekallAgeMeshElementProvenance> pointProvenance)
+    {
+        var pointMap = pointProvenance.ToDictionary(item => item.InputElementId, item => item.OutputElementIds);
+        return selections.Select(selection =>
+        {
+            IReadOnlyDictionary<ulong, IReadOnlyList<ulong>>? map = selection.Domain switch
+            {
+                RekallAgeGeometryDomain.Face => faceProvenance.ToDictionary(
+                    pair => pair.Key,
+                    pair => (IReadOnlyList<ulong>)pair.Value),
+                RekallAgeGeometryDomain.Point => pointMap,
+                _ => null
+            };
+            if (map is null)
+            {
+                return selection;
+            }
+            return selection with
+            {
+                ElementIds = Expand(selection.ElementIds, map),
+                OrderedHistory = selection.OrderedHistory is null
+                    ? null
+                    : Expand(selection.OrderedHistory, map)
+            };
+        }).ToArray();
+    }
+
+    private static IReadOnlyList<ulong> Expand(
+        IReadOnlyList<ulong> source,
+        IReadOnlyDictionary<ulong, IReadOnlyList<ulong>> map)
+    {
+        var result = new List<ulong>();
+        var seen = new HashSet<ulong>();
+        foreach (var id in source)
+        {
+            var outputs = map.TryGetValue(id, out var mapped) ? mapped : [id];
+            foreach (var output in outputs)
+            {
+                if (seen.Add(output))
+                {
+                    result.Add(output);
+                }
+            }
+        }
+        return result;
     }
 
     private static IReadOnlyList<int> ResolveIndices(

@@ -71,6 +71,17 @@ and passing the strict validator before returning. The focused quad test proves
 one diagonal edge, two triangle faces, six corners, stable source provenance,
 and six propagated UV values. Extrude remains the next topology operation.
 
+`extrude_faces` is now implemented as a true region operation rather than an
+isolated generator. It duplicates each selected point once, duplicates selected
+edges for the translated top region, creates vertical edges only for unique
+boundary points, preserves selected face and corner identities on the top,
+creates side quads only on region boundary edges, propagates point/edge/face/
+corner attributes through explicit source maps and defaults, expands named
+point/face selections through provenance, and reports created elements, changed
+attributes, affected bounds, and original-to-top/side mappings. The focused
+quad proof produces 8 points, 12 edges, 5 faces, and 20 corners from an immutable
+4-point source and passes strict validation.
+
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,
 and a zero-warning, zero-error Release solution build. The Studio ergonomics

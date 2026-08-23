@@ -40,6 +40,11 @@ public sealed class RekallAgeModelingNodeCatalog
             Integer("segments", "Segments", 16, 3, 4_096),
             Boolean("capBottom", "Cap Bottom", true),
             Boolean("capTop", "Cap Top", true)]),
+        Primitive("rekall.modeling.primitive.torus", "Torus", [
+            Number("majorRadius", "Major Radius", 1, 0.0001, 1_000_000, "world-unit"),
+            Number("minorRadius", "Minor Radius", 0.25, 0.0001, 1_000_000, "world-unit"),
+            Integer("majorSegments", "Major Segments", 24, 3, 4_096),
+            Integer("minorSegments", "Minor Segments", 12, 3, 4_096)]),
         Node("rekall.modeling.transform", "Transform", "Transforms geometry without mutating its upstream snapshot.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)],
             [Vector3("translation", "Translation"), Vector3("rotation", "Rotation", "degree"), Vector3("scale", "Scale", defaultValue: 1)]),

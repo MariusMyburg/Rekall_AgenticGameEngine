@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 09:19 Africa/Johannesburg
+Last verified: 2026-08-23 09:21 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -107,6 +107,16 @@ two zero-radius ends fail with a stable parameter diagnostic. Descriptor
 inventory discovery and the full modeling namespace pass 88/88 after
 recompilation. Robust arbitrary-mesh booleans, remeshing, and a broader
 primitive inventory remain open.
+
+`rekall.modeling.primitive.torus` adds a second periodic-surface primitive with
+positive major/minor radii and independently bounded 3-4,096 segment counts in
+both directions. It creates one shared point at each periodic coordinate and
+deduplicated shared edges across both seams, rather than overlapping seam
+rings. An 8x4 proof produces a closed manifold with exactly 32 points, 64
+edges, 32 quads, 128 corners, zero boundary edges, and zero non-manifold edges.
+Self-intersecting radius pairs fail with a stable parameter diagnostic. The
+descriptor inventory is updated and the complete modeling namespace passes
+90/90 after recompilation.
 
 The Blender-informed agentic modelling tranche is now the active implementation
 priority after the completed WebGPU and remaining Godot audits. A shallow,

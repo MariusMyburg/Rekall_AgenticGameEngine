@@ -218,6 +218,58 @@ public sealed class ModelingGraphEvaluationTests
     }
 
     [Fact]
+    public async Task TorusCreatesClosedPeriodicSharedTopologyWithoutSeamDuplicates()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "torus-graph",
+            "Torus Graph",
+            [
+                new("shape", "rekall.modeling.primitive.torus", 1, new JsonObject
+                {
+                    ["majorRadius"] = 2.0, ["minorRadius"] = 0.5,
+                    ["majorSegments"] = 8, ["minorSegments"] = 4
+                }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [new("shape-output", "shape", "geometry", "output", "input")],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var mesh = result.Outputs["mesh"];
+        Assert.Equal(32, mesh.Topology.PointIds.Count);
+        Assert.Equal(64, mesh.Topology.EdgeIds.Count);
+        Assert.Equal(32, mesh.Topology.FaceIds.Count);
+        Assert.Equal(128, mesh.Topology.CornerIds.Count);
+        Assert.Equal(32, mesh.Topology.Positions.Distinct().Count());
+        var validation = new RekallAgeMeshValidator().Validate(mesh);
+        Assert.True(validation.IsValid);
+        Assert.Equal(0, validation.Summary.BoundaryEdgeCount);
+        Assert.Equal(0, validation.Summary.NonManifoldEdgeCount);
+    }
+
+    [Fact]
+    public async Task TorusRejectsSelfIntersectingRadiusPairWithStableDiagnostic()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "invalid-torus", "Invalid Torus",
+            [
+                new("shape", "rekall.modeling.primitive.torus", 1, new JsonObject { ["majorRadius"] = 1.0, ["minorRadius"] = 1.0 }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [new("shape-output", "shape", "geometry", "output", "input")],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, item => item.Code == "REKALL_MODELING_EVALUATION_PARAMETER_INVALID" && item.NodeId == "shape");
+    }
+
+    [Fact]
     public async Task FieldMathCapturedAndNamedAttributesAndMaterialAssignmentAreExecutable()
     {
         var graph = RekallAgeModelingGraphAsset.Create(

@@ -170,6 +170,7 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             "rekall.modeling.primitive.grid" => new(CreateGrid(graph, node)),
             "rekall.modeling.primitive.sphere" => new(CreateSphere(graph, node)),
             "rekall.modeling.primitive.frustum" => new(CreateFrustum(graph, node)),
+            "rekall.modeling.primitive.torus" => new(CreateTorus(graph, node)),
             "rekall.modeling.transform" => TransformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.join" => JoinGeometry(graph, node, incoming, values),
             "rekall.modeling.extrude" => ApplySemanticOperation(

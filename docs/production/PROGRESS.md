@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 19:25 Africa/Johannesburg
+Last verified: 2026-08-23 20:02 Africa/Johannesburg
 
 Branch: `codex/genuine-web-publishing`
 
@@ -41,8 +41,14 @@ slices.
 The runtime UI projection now respects entity visibility for Label, Button,
 Panel, Image, UiElement, and UiCanvas visuals. A single entity may intentionally
 carry both UiCanvas and one visual without expanding that visual to the full
-canvas; its authored bounds are retained. The generic Runtime/Rendering
-verification for this correction passes 731/731. Software viewport capture now
+canvas; its authored bounds are retained. Fixed anchors (equal minimum and
+maximum anchors) now retain authored size and apply position/pivot at the anchor,
+while differing anchors retain stretch semantics and apply the newly
+agent-visible left/top/right/bottom offsets. The combined Runtime, Rendering,
+and Modules verification for these UI contracts passes 849/849. A fresh
+Clockwork Canopy capture reports zero UI observations; its remaining invisible
+HUD is an authored positive bottom-edge offset, not a missing-canvas or
+zero-sized-layout engine defect. Software viewport capture now
 routes 3D meshes through the same mesh, model-matrix, authored-camera, and depth
 pipeline used to prepare Vulkan scenes, then composites remaining 2D/UI content.
 This removes the legacy fixed-oblique cube projection that drew rear faces and

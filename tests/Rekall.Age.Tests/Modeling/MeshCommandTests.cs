@@ -46,8 +46,9 @@ public sealed class MeshCommandTests
 
         Assert.True(created.Ok);
         Assert.NotNull(created.Value.Mesh);
+        Assert.Contains("rekall.mesh.operation.preview", created.Value.Mesh!.NextActions);
         Assert.Single(createContext.Transaction.ChangedResources);
-        var revision = created.Value.Mesh!.FileRevision;
+        var revision = created.Value.Mesh.FileRevision;
 
         var queried = await new QueryMeshElementsCommand().ExecuteAsync(
             new(root, "triangle", new(RekallAgeGeometryDomain.Point, ExplicitElementIds: [1, 2]), 8),
@@ -66,6 +67,7 @@ public sealed class MeshCommandTests
             previewContext);
         Assert.True(preview.Ok);
         Assert.False(preview.Value.Evidence!.Persisted);
+        Assert.Contains("rekall.mesh.operation.apply", preview.Value.Evidence.NextActions);
         Assert.Empty(previewContext.Transaction.ChangedResources);
 
         var applyContext = Context("apply");
@@ -123,6 +125,9 @@ public sealed class MeshCommandTests
         Assert.Equal(3, mesh.GetProperty("topology").GetProperty("pointCount").GetInt32());
         Assert.Equal(2, mesh.GetProperty("pointIdSample").GetArrayLength());
         Assert.True(mesh.GetProperty("samplesTruncated").GetBoolean());
+        Assert.Contains(
+            mesh.GetProperty("nextActions").EnumerateArray(),
+            action => action.GetString() == "rekall.mesh.operation.preview");
     }
 
     private static RekallAgeCommandContext Context(string name) =>

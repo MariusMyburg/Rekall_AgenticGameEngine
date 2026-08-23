@@ -62,7 +62,7 @@ then grow it into procedural geometry/material graphs and Studio modelling.
 
 - [x] Write failing registry/schema/JSON-RPC tests for mesh create, inspect,
   query, validate, diff, preview, apply, batch, and assert.
-- [ ] Return bounded samples, stable IDs, affected bounds, revisions,
+- [x] Return bounded samples, stable IDs, affected bounds, revisions,
   diagnostics, provenance, and next actions.
 - [x] Ensure checkpoint gating does not block mesh construction/repair commands.
 - [x] Prove stale revisions and invalid operations fail without partial writes.

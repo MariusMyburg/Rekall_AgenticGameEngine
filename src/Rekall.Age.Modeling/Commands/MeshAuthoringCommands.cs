@@ -26,7 +26,8 @@ public sealed record RekallAgeMeshAssetSummary(
     IReadOnlyList<ulong> CornerIdSample,
     bool SamplesTruncated,
     IReadOnlyList<RekallAgeMeshDiagnostic> Diagnostics,
-    bool DiagnosticsTruncated);
+    bool DiagnosticsTruncated,
+    IReadOnlyList<string> NextActions);
 
 public sealed record RekallAgeMeshChangeEvidence(
     RekallAgeMeshChangeKind Kind,
@@ -67,7 +68,8 @@ public sealed record RekallAgeMeshOperationEvidence(
     bool ProvenanceTruncated,
     RekallAgeMeshValidationSummary Validation,
     IReadOnlyList<RekallAgeMeshDiagnostic> Diagnostics,
-    bool DiagnosticsTruncated);
+    bool DiagnosticsTruncated,
+    IReadOnlyList<string> NextActions);
 
 public sealed record CreateMeshAssetRequest(
     string ProjectRoot,
@@ -176,7 +178,8 @@ public sealed record ValidateMeshAssetResult(
     bool IsValid,
     RekallAgeMeshValidationSummary Summary,
     IReadOnlyList<RekallAgeMeshDiagnostic> Diagnostics,
-    bool DiagnosticsTruncated);
+    bool DiagnosticsTruncated,
+    IReadOnlyList<string> NextActions);
 
 public sealed class ValidateMeshAssetCommand : IRekallAgeCommand<ValidateMeshAssetRequest, ValidateMeshAssetResult>
 {
@@ -205,7 +208,10 @@ public sealed class ValidateMeshAssetCommand : IRekallAgeCommand<ValidateMeshAss
             report.IsValid,
             report.Summary,
             diagnostics,
-            diagnostics.Length < report.Diagnostics.Count);
+            diagnostics.Length < report.Diagnostics.Count,
+            report.IsValid
+                ? ["rekall.mesh.query_elements", "rekall.mesh.operation.preview", "rekall.mesh.assert"]
+                : ["rekall.mesh.inspect", "rekall.mesh.operation.preview"]);
         return report.IsValid
             ? RekallAgeCommandResult<ValidateMeshAssetResult>.Success(result, $"Mesh '{request.AssetId}' passes strict validation.")
             : RekallAgeCommandResult<ValidateMeshAssetResult>.Failure(
@@ -227,7 +233,8 @@ public sealed record QueryMeshElementsResult(
     string AssetId,
     string FileRevision,
     long LogicalRevision,
-    RekallAgeMeshElementQueryResult Query);
+    RekallAgeMeshElementQueryResult Query,
+    IReadOnlyList<string> NextActions);
 
 public sealed class QueryMeshElementsCommand : IRekallAgeCommand<QueryMeshElementsRequest, QueryMeshElementsResult>
 {
@@ -251,13 +258,15 @@ public sealed class QueryMeshElementsCommand : IRekallAgeCommand<QueryMeshElemen
             var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.AssetId, context.CancellationToken);
             var query = _query.Resolve(loaded.Value, request.Selector, request.MaximumResults);
             return RekallAgeCommandResult<QueryMeshElementsResult>.Success(
-                new(request.AssetId, loaded.Revision, loaded.Value.Revision, query),
+                new(request.AssetId, loaded.Revision, loaded.Value.Revision, query,
+                    ["rekall.mesh.operation.preview", "rekall.mesh.inspect"]),
                 $"Mesh query matched {query.MatchedCount} {query.Domain} element(s) and returned {query.ElementIds.Count}.");
         }
         catch (RekallAgeMeshQueryException error)
         {
             return RekallAgeCommandResult<QueryMeshElementsResult>.Failure(
-                new(request.AssetId, string.Empty, 0, new(request.Selector.Domain, [], 0, 0, false)),
+                new(request.AssetId, string.Empty, 0, new(request.Selector.Domain, [], 0, 0, false),
+                    ["rekall.mesh.inspect", "rekall.mesh.query_elements"]),
                 error.Message,
                 [new(error.Code, error.Message, request.AssetId)]);
         }
@@ -347,7 +356,8 @@ public sealed record BatchMeshOperationsResult(
     long AfterLogicalRevision,
     IReadOnlyList<RekallAgeMeshOperationEvidence> Steps,
     bool StepsTruncated,
-    RekallAgeMeshValidationSummary? Validation);
+    RekallAgeMeshValidationSummary? Validation,
+    IReadOnlyList<string> NextActions);
 
 public sealed class BatchMeshOperationsCommand : IRekallAgeCommand<BatchMeshOperationsRequest, BatchMeshOperationsResult>
 {
@@ -383,7 +393,10 @@ public sealed class BatchMeshOperationsCommand : IRekallAgeCommand<BatchMeshOper
                 execution.AfterLogicalRevision,
                 stepEvidence,
                 stepEvidence.Length < execution.Steps.Count,
-                execution.Validation.Summary);
+                execution.Validation.Summary,
+                execution.Persisted
+                    ? ["rekall.mesh.validate", "rekall.mesh.assert", "rekall.mesh.inspect"]
+                    : ["rekall.mesh.operation.batch", "rekall.mesh.validate"]);
             return RekallAgeCommandResult<BatchMeshOperationsResult>.Success(
                 result,
                 $"{(execution.Persisted ? "Applied" : "Previewed")} {execution.Steps.Count} mesh operation(s) atomically; logical revision {execution.BeforeLogicalRevision} -> {execution.AfterLogicalRevision}.");
@@ -397,7 +410,8 @@ public sealed class BatchMeshOperationsCommand : IRekallAgeCommand<BatchMeshOper
                 _ => "REKALL_MESH_BATCH_INVALID"
             };
             return RekallAgeCommandResult<BatchMeshOperationsResult>.Failure(
-                new(request.AssetId, false, request.ExpectedRevision, request.ExpectedRevision, 0, 0, [], false, null),
+                new(request.AssetId, false, request.ExpectedRevision, request.ExpectedRevision, 0, 0, [], false, null,
+                    ["rekall.mesh.inspect", "rekall.mesh.operation.preview"]),
                 error.Message,
                 [new(code, error.Message, request.AssetId)]);
         }
@@ -420,7 +434,8 @@ public sealed record AssertMeshAssetResult(
     long LogicalRevision,
     bool Passed,
     IReadOnlyList<string> FailedAssertions,
-    RekallAgeMeshValidationSummary Summary);
+    RekallAgeMeshValidationSummary Summary,
+    IReadOnlyList<string> NextActions);
 
 public sealed class AssertMeshAssetCommand : IRekallAgeCommand<AssertMeshAssetRequest, AssertMeshAssetResult>
 {
@@ -441,7 +456,8 @@ public sealed class AssertMeshAssetCommand : IRekallAgeCommand<AssertMeshAssetRe
         {
             const string message = "Mesh assertion minimum counts must be non-negative.";
             return RekallAgeCommandResult<AssertMeshAssetResult>.Failure(
-                new(request.AssetId, string.Empty, 0, false, [message], new(0, 0, 0, 0, 0, 0, 0, new(new(0, 0, 0), new(0, 0, 0)))),
+                new(request.AssetId, string.Empty, 0, false, [message], new(0, 0, 0, 0, 0, 0, 0, new(new(0, 0, 0), new(0, 0, 0))),
+                    ["rekall.mesh.inspect"]),
                 message,
                 [new("REKALL_MESH_ASSERTION_INVALID", message, request.AssetId)]);
         }
@@ -466,7 +482,10 @@ public sealed class AssertMeshAssetCommand : IRekallAgeCommand<AssertMeshAssetRe
             loaded.Value.Revision,
             failed.Count == 0,
             failed,
-            validation.Summary);
+            validation.Summary,
+            failed.Count == 0
+                ? ["rekall.mesh.inspect"]
+                : ["rekall.mesh.inspect", "rekall.mesh.query_elements", "rekall.mesh.operation.preview"]);
         return result.Passed
             ? RekallAgeCommandResult<AssertMeshAssetResult>.Success(result, $"Mesh '{request.AssetId}' passed all requested assertions.")
             : RekallAgeCommandResult<AssertMeshAssetResult>.Failure(
@@ -552,7 +571,8 @@ internal static class MeshCommandEvidence
             mesh.Topology.CornerIds.Take(maximumSamples).ToArray(),
             samplesTruncated,
             diagnostics,
-            diagnostics.Length < validation.Diagnostics.Count);
+            diagnostics.Length < validation.Diagnostics.Count,
+            ["rekall.mesh.query_elements", "rekall.mesh.operation.preview", "rekall.mesh.validate", "rekall.mesh.assert"]);
     }
 
     public static RekallAgeMeshOperationEvidence Operation(string operationId, RekallAgeMeshEditExecution execution)
@@ -578,7 +598,10 @@ internal static class MeshCommandEvidence
             provenance.Length < operation.Provenance.Count,
             operation.Validation.Summary,
             diagnostics,
-            diagnostics.Length < operation.Validation.Diagnostics.Count);
+            diagnostics.Length < operation.Validation.Diagnostics.Count,
+            execution.Persisted
+                ? ["rekall.mesh.validate", "rekall.mesh.assert", "rekall.mesh.inspect"]
+                : ["rekall.mesh.operation.apply", "rekall.mesh.validate"]);
     }
 
     private static RekallAgeMeshChangeEvidence Change(RekallAgeMeshChangeSet changes)

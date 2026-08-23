@@ -113,8 +113,9 @@ from logs and transaction names. A physical Release CLI create/inspect run
 created a strict triangle asset and returned a two-ID truncated sample. The
 Release modelling/registry/checkpoint selection passes 35/35 and the Debug
 CLI/MCP/process selection passes 18/18, all with zero build warnings/errors.
-Structured repair/next-action guidance is the remaining Task 4 polish; the
-editable-mesh render compiler and scene asset reference follow it immediately.
+Every mesh result now also carries bounded canonical next-tool guidance for
+inspection, preview/apply, validation, and assertions. Task 4 is complete; the
+editable-mesh render compiler and scene asset reference are active next.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

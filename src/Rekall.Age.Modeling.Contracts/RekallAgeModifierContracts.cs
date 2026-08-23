@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace Rekall.Age.Modeling.Contracts;
 
@@ -64,6 +65,7 @@ public sealed record RekallAgeModifierStackEvaluationReport(
     double DurationMilliseconds,
     IReadOnlyList<RekallAgeModelingGraphDiagnostic> Diagnostics);
 
+[JsonConverter(typeof(JsonStringEnumConverter<RekallAgeModifierStackPatchKind>))]
 public enum RekallAgeModifierStackPatchKind { Add, Remove, Move, Configure, SetEnabled, SetSource }
 
 public sealed record RekallAgeModifierStackPatchOperation(

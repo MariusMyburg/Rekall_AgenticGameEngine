@@ -98,7 +98,9 @@ internal static class RekallAgeMcpToolClassifier
         }
 
         if (name.StartsWith("rekall.mesh.", StringComparison.Ordinal) ||
-            name.StartsWith("rekall.modeling.", StringComparison.Ordinal))
+            name.StartsWith("rekall.modeling.", StringComparison.Ordinal) ||
+            name.StartsWith("rekall.material.", StringComparison.Ordinal) ||
+            name.StartsWith("rekall.modifier.", StringComparison.Ordinal))
         {
             return "modeling";
         }
@@ -148,6 +150,14 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.modeling.graph.validate" or
             "rekall.modeling.graph.evaluate" or
             "rekall.modeling.inspect_evaluation" or
+            "rekall.material.node_types.search" or
+            "rekall.material.node_types.inspect" or
+            "rekall.material.graph.inspect" or
+            "rekall.material.graph.validate" or
+            "rekall.material.graph.compile" or
+            "rekall.modifier.types.search" or
+            "rekall.modifier.stack.inspect" or
+            "rekall.modifier.stack.evaluate" or
             "rekall.render.visibility.inspect_scene" or
             "rekall.solar.import_ksa_system" or
             "rekall.workflow.agent_authoring_gauntlet" or
@@ -190,6 +200,8 @@ internal static class RekallAgeMcpToolClassifier
             _ when name.StartsWith("rekall.playtest.", StringComparison.Ordinal) => 40,
             _ when name.StartsWith("rekall.mesh.", StringComparison.Ordinal) => 43,
             _ when name.StartsWith("rekall.modeling.", StringComparison.Ordinal) => 43,
+            _ when name.StartsWith("rekall.material.", StringComparison.Ordinal) => 44,
+            _ when name.StartsWith("rekall.modifier.", StringComparison.Ordinal) => 44,
             _ when name.StartsWith("rekall.geometry.", StringComparison.Ordinal) => 45,
             _ when name.StartsWith("rekall.module.", StringComparison.Ordinal) => 50,
             _ when name.StartsWith("rekall.shader.", StringComparison.Ordinal) => 60,

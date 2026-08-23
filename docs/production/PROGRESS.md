@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 08:14 Africa/Johannesburg
+Last verified: 2026-08-23 08:22 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -361,6 +361,24 @@ ordinary strict mesh store with target revision protection and transaction
 evidence. The five modifier evaluation/persistence/patch/preview/bake proofs
 pass. A bounded command/MCP surface and the broader topology/UV/boolean/
 subdivision/remesh/optimization inventory remain active.
+
+Material graphs and modifier stacks are now portable agent surfaces rather than
+library-only capabilities. Fifteen default-registry commands cover semantic
+material-node and modifier-type discovery; material graph create, bounded
+inspect, atomic patch, validate, and dual-backend compile; exact-revision
+material instance create/inspect; and modifier stack create, bounded inspect,
+atomic patch, preview evaluate, and bake. Material patches apply 1-256 typed
+add/remove/configure/link/output/exposure operations in memory, reject stale or
+invalid candidates without changing bytes, and publish one logical revision
+with transaction preimage. Compilation omits shader sources by default and can
+return at most 65,536 characters when explicitly requested, while always
+returning bounded resource/source-map/diagnostic evidence. Modifier evaluation
+returns topology and bounds rather than raw buffers. All fifteen tools are MCP-
+classified under `modeling`, with inspection/discovery/validation/compilation/
+preview tools recommended. A JSON-only registry proof creates, revision-patches,
+compiles, and instances a material without direct document editing; the focused
+command and atomic material-patch proofs pass 4/4. Broader modifier inventory
+and visual backend acceptance remain active.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

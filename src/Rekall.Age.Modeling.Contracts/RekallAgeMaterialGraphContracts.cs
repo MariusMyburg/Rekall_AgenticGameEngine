@@ -104,6 +104,25 @@ public sealed record RekallAgeMaterialGraphValidationReport(
     IReadOnlyList<string> UnreachableNodeIds,
     IReadOnlyList<RekallAgeModelingGraphDiagnostic> Diagnostics);
 
+[JsonConverter(typeof(JsonStringEnumConverter<RekallAgeMaterialGraphPatchKind>))]
+public enum RekallAgeMaterialGraphPatchKind
+{
+    AddNode, RemoveNode, SetParameter, AddLink, RemoveLink, SetOutput,
+    ExposeParameter, RemoveExposedParameter
+}
+
+public sealed record RekallAgeMaterialGraphPatchOperation(
+    RekallAgeMaterialGraphPatchKind Kind,
+    RekallAgeMaterialGraphNode? Node = null,
+    RekallAgeMaterialGraphLink? Link = null,
+    RekallAgeMaterialGraphOutput? Output = null,
+    RekallAgeMaterialGraphExposedParameter? ExposedParameter = null,
+    string? TargetId = null,
+    string? ParameterId = null,
+    JsonNode? Value = null);
+
+public sealed record RekallAgeMaterialGraphPatch(IReadOnlyList<RekallAgeMaterialGraphPatchOperation> Operations);
+
 public sealed record RekallAgeMaterialInstanceAsset(
     int SchemaVersion,
     string AssetId,

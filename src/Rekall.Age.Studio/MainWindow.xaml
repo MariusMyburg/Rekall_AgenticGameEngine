@@ -151,8 +151,23 @@
                         <StackPanel Grid.Column="1" Margin="0,0,10,0">
                             <TextBlock Text="Semantic operation" Foreground="#9FB0C4" />
                             <ComboBox ItemsSource="{Binding MeshOperationIds}" SelectedItem="{Binding SelectedMeshOperationId}" Margin="0,3,0,5" />
-                            <TextBlock Text="Parameters (JSON object)" Foreground="#9FB0C4" />
-                            <TextBox Text="{Binding MeshOperationParameters, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="62" TextWrapping="Wrap" Padding="4" Margin="0,3,0,5" />
+                            <TextBlock Text="Typed parameters" Foreground="#9FB0C4" />
+                            <ScrollViewer Height="72" VerticalScrollBarVisibility="Auto" Margin="0,3,0,5">
+                                <ItemsControl ItemsSource="{Binding MeshParameterEditors}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,4" ToolTip="{Binding Description}">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="100" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                    <TextBlock FontSize="10" Foreground="#75869A"><Run Text="{Binding TypeLabel}" /><Run Text=" · " /><Run Text="{Binding RequirementLabel}" /></TextBlock>
+                                                </StackPanel>
+                                                <TextBox Grid.Column="1" Text="{Binding ValueText, UpdateSourceTrigger=PropertyChanged}" Padding="4,2" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                             <UniformGrid Columns="3">
                                 <Button Content="Preview" Command="{Binding PreviewMeshOperationCommand}" Padding="7,3" Margin="0,0,3,0" />
                                 <Button Content="Apply" Command="{Binding ApplyMeshOperationCommand}" Style="{StaticResource AccentButton}" Padding="7,3" Margin="3,0" />

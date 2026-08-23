@@ -186,6 +186,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> MeshOperationIds { get; } = [];
     public ObservableCollection<string> MeshSelectionLines { get; } = [];
     public ObservableCollection<string> MeshDiagnosticLines { get; } = [];
+    public ObservableCollection<RekallAgeStudioMeshParameterModel> MeshParameterEditors { get; } = [];
     public IReadOnlyList<RekallAgeGeometryDomain> MeshEditDomains { get; } =
         [RekallAgeGeometryDomain.Point, RekallAgeGeometryDomain.Edge, RekallAgeGeometryDomain.Face, RekallAgeGeometryDomain.Corner];
     public IReadOnlyList<RekallAgeLanguageModelToolExecution> LastAgentToolExecutions => _lastAgentToolExecutions;
@@ -330,7 +331,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public string? SelectedMeshOperationId
     {
         get => _selectedMeshOperationId;
-        set { if (Set(ref _selectedMeshOperationId, value)) RefreshCommands(); }
+        set { if (Set(ref _selectedMeshOperationId, value)) RefreshMeshParameterEditors(); }
     }
 
     public string MeshOperationParameters
@@ -529,7 +530,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private bool CanOpenMeshAsset() => HasEditableProject() && !string.IsNullOrWhiteSpace(SelectedMeshAssetId);
     private bool CanSelectMeshElement() => HasOpenMesh() && SelectedMeshElementId.HasValue;
     private bool CanRunMeshOperation() => HasOpenMesh() && !string.IsNullOrWhiteSpace(SelectedMeshOperationId)
-        && !string.IsNullOrWhiteSpace(MeshOperationParameters);
+        && MeshParameterEditors.All(item => item.IsValid);
 
     private Task RefreshMeshAssetsAsync() => RunModelingAsync(() =>
     {
@@ -594,8 +595,22 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private JsonObject ParseMeshParameters()
     {
-        try { return JsonNode.Parse(MeshOperationParameters) as JsonObject ?? throw new JsonException("Mesh operation parameters must be a JSON object."); }
-        catch (JsonException error) { throw new JsonException("Mesh operation parameters must be valid JSON object syntax.", error); }
+        var result = new JsonObject();
+        foreach (var editor in MeshParameterEditors)
+        {
+            if (!editor.TryGetValue(out var value)) throw new ArgumentException($"Parameter '{editor.Name}' must be a valid {editor.TypeLabel} value.");
+            if (value is not null) result[editor.Name] = value;
+        }
+        return result;
+    }
+
+    private void RefreshMeshParameterEditors()
+    {
+        var descriptor = _modeling.AvailableOperations.FirstOrDefault(item => item.OperationId == SelectedMeshOperationId);
+        Replace(MeshParameterEditors, descriptor?.Parameters.Select(item => new RekallAgeStudioMeshParameterModel(item)) ?? []);
+        foreach (var editor in MeshParameterEditors) editor.PropertyChanged += (_, _) => RefreshCommands();
+        MeshOperationParameters = "{" + string.Join(", ", MeshParameterEditors.Select(item => $"\"{item.Name}\": {JsonSerializer.Serialize(item.ValueText)}")) + "}";
+        RefreshCommands();
     }
 
     private void RefreshMeshEditingState()

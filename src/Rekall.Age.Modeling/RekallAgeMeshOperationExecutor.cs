@@ -42,7 +42,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
             "Extrudes a selected face region by a finite XYZ offset and creates side faces only on its boundary.",
             RekallAgeGeometryDomain.Face,
             RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
-            [NumberParameter("x"), NumberParameter("y"), NumberParameter("z")]),
+            [NumberParameter("x"), NumberParameter("y"), NumberParameter("z", 1)]),
         new(
             "delete",
             "Deletes selected faces and their corners while preserving now-loose points and edges for explicit subsequent editing.",

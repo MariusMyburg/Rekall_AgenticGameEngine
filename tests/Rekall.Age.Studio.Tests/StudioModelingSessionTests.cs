@@ -9,6 +9,20 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioModelingSessionTests
 {
     [Fact]
+    public void TypedParameterEditorUsesDescriptorDefaultsAndRejectsInvalidNumbers()
+    {
+        var descriptor = new RekallAgeMeshOperationExecutor().Descriptors.Single(item => item.OperationId == "extrude_faces");
+        var z = new RekallAgeStudioMeshParameterModel(descriptor.Parameters.Single(item => item.Name == "z"));
+
+        Assert.Equal("1", z.ValueText);
+        Assert.True(z.TryGetValue(out var defaultValue));
+        Assert.Equal(1, defaultValue!.GetValue<double>());
+        z.ValueText = "not-a-number";
+        Assert.False(z.IsValid);
+        Assert.False(z.TryGetValue(out _));
+    }
+
+    [Fact]
     public async Task StudioMeshSessionPreviewsWithoutMutationThenAppliesThroughTransactionHistory()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-modeling-" + Guid.NewGuid().ToString("N"));

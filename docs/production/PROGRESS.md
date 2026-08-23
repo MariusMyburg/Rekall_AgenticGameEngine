@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 08:57 Africa/Johannesburg
+Last verified: 2026-08-23 09:04 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -67,6 +67,18 @@ locations and rejects an out-of-frame point. The complete Studio suite passes
 27/27. This is a deterministic edit viewport, while orbit/pan/zoom, occlusion-
 aware GPU picking, transform handles, and compiled material display remain
 open.
+
+Studio mesh operations now use typed, descriptor-driven parameter controls
+instead of requiring authors to write JSON. Each compatible operation exposes
+its canonical parameter name, data type, required/optional state, default, and
+help text; malformed numeric values disable preview/apply, and only validated
+values are converted into the operation request. Extrusion advertises a useful
+one-unit Z default while generic point transforms retain zero offsets. A focused
+proof verifies descriptor defaults and invalid-number rejection. After fresh
+recompilation, the complete Studio suite passes 28/28 and the modeling namespace
+passes 85/85. Direct manipulation, richer attribute/material editing, and graph
+authoring remain open, so this advances but does not complete the Studio
+modeling tranche.
 
 The Blender-informed agentic modelling tranche is now the active implementation
 priority after the completed WebGPU and remaining Godot audits. A shallow,

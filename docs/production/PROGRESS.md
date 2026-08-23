@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 08:50 Africa/Johannesburg
+Last verified: 2026-08-23 08:57 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -54,6 +54,19 @@ state, and verifies one transaction-log entry. The complete Studio suite passes
 26/26. This is a usable schema-driven edit slice, not completion of Task 9:
 viewport element picking/overlays, direct manipulation, parameter-schema
 editors, attributes/materials, graph editors, and sculpt/paint remain open.
+
+The first mesh viewport and element-picking layer is now integrated into that
+tab. It auto-frames finite 3D mesh positions through a deterministic isometric
+projection, draws shaded face regions, stable edges, point/corner markers,
+active-domain selection highlights, and an explicit preview watermark, and
+retains bounded screen-space hit records for point, edge, face, and corner IDs.
+Mouse clicks select the returned stable ID through the same ordered modeling
+session; Shift extends and Ctrl toggles. A 640x360 proof independently picks the
+expected point `1`, edge `11`, face `21`, and corner `31` from their projected
+locations and rejects an out-of-frame point. The complete Studio suite passes
+27/27. This is a deterministic edit viewport, while orbit/pan/zoom, occlusion-
+aware GPU picking, transform handles, and compiled material display remain
+open.
 
 The Blender-informed agentic modelling tranche is now the active implementation
 priority after the completed WebGPU and remaining Godot audits. A shallow,

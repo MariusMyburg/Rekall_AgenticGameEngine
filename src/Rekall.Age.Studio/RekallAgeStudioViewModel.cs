@@ -56,6 +56,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _runAgentCommand;
     private readonly RekallAgeAsyncCommand _cancelAgentCommand;
     private readonly RekallAgeStudioModelingSession _modeling = new();
+    private readonly RekallAgeStudioMeshViewportRenderer _meshViewportRenderer = new();
+    private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private readonly RekallAgeAsyncCommand _refreshMeshAssetsCommand;
     private readonly RekallAgeAsyncCommand _openMeshAssetCommand;
     private readonly RekallAgeAsyncCommand _selectMeshElementCommand;
@@ -89,6 +91,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _meshSummary = "Open a persisted mesh asset to begin modeling.";
     private bool _extendMeshSelection;
     private bool _toggleMeshSelection;
+    private BitmapSource? _meshViewportImage;
     private string? _lastPackagePath;
     private string _statusText = "Create or open a Rekall AGE project to begin.";
     private string _viewportTitle = "Viewport";
@@ -354,6 +357,24 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         set => Set(ref _toggleMeshSelection, value);
     }
 
+    public BitmapSource? MeshViewportImage
+    {
+        get => _meshViewportImage;
+        private set => Set(ref _meshViewportImage, value);
+    }
+
+    public void SelectMeshViewportElement(double normalizedX, double normalizedY, bool extend, bool toggle)
+    {
+        if (_meshViewportFrame is null || _modeling.Mesh is null || normalizedX is < 0 or > 1 || normalizedY is < 0 or > 1) return;
+        var id = _meshViewportRenderer.Pick(_meshViewportFrame, MeshEditDomain,
+            normalizedX * _meshViewportFrame.Image.PixelWidth,
+            normalizedY * _meshViewportFrame.Image.PixelHeight);
+        if (!id.HasValue) return;
+        SelectedMeshElementId = id;
+        _modeling.Select(id.Value, extend || ExtendMeshSelection, toggle || ToggleMeshSelection);
+        RefreshMeshEditingState();
+    }
+
     public string? LastPackagePath
     {
         get => _lastPackagePath;
@@ -581,7 +602,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         if (_modeling.Mesh is null)
         {
-            Replace(MeshElementIds, []); Replace(MeshOperationIds, []); Replace(MeshSelectionLines, []); RefreshCommands(); return;
+            Replace(MeshElementIds, []); Replace(MeshOperationIds, []); Replace(MeshSelectionLines, []);
+            _meshViewportFrame = null; MeshViewportImage = null; RefreshCommands(); return;
         }
         var mesh = _modeling.Preview?.Mesh ?? _modeling.Mesh;
         var ids = MeshEditDomain switch
@@ -598,6 +620,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (SelectedMeshElementId is null || !MeshElementIds.Contains(SelectedMeshElementId.Value)) SelectedMeshElementId = MeshElementIds.Count == 0 ? null : MeshElementIds[0];
         Replace(MeshSelectionLines, _modeling.SelectedElementIds.Select((id, index) => $"{index + 1}. {MeshEditDomain} {id}{(id == _modeling.ActiveElementId ? " (active)" : string.Empty)}"));
         MeshSummary = $"{mesh.Name} r{mesh.Revision} · {mesh.Topology.PointIds.Count} points · {mesh.Topology.EdgeIds.Count} edges · {mesh.Topology.FaceIds.Count} faces · {_modeling.SelectedElementIds.Count} selected{(_modeling.Preview is null ? string.Empty : " · PREVIEW")}";
+        _meshViewportFrame = _meshViewportRenderer.Render(mesh, MeshEditDomain, _modeling.SelectedElementIds, 640, 360, _modeling.Preview is not null);
+        MeshViewportImage = _meshViewportFrame.Image;
         OnPropertyChanged(nameof(MeshEditDomain)); RefreshCommands();
     }
 

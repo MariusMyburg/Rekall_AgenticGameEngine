@@ -161,15 +161,21 @@
                             <TextBlock Text="{Binding MeshSummary}" TextWrapping="Wrap" Foreground="#AAB6C5" Margin="0,9,0,0" />
                         </StackPanel>
                         <Grid Grid.Column="2">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                            <DockPanel Margin="0,0,5,0">
-                                <TextBlock DockPanel.Dock="Top" Text="Selection history" FontWeight="SemiBold" Margin="0,0,0,4" />
-                                <ListBox ItemsSource="{Binding MeshSelectionLines}" />
-                            </DockPanel>
-                            <DockPanel Grid.Column="1" Margin="5,0,0,0">
-                                <TextBlock DockPanel.Dock="Top" Text="Evaluation diagnostics" FontWeight="SemiBold" Margin="0,0,0,4" />
-                                <ListBox ItemsSource="{Binding MeshDiagnosticLines}" />
-                            </DockPanel>
+                            <Grid.RowDefinitions><RowDefinition Height="140" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                            <Border Background="#0C1016" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" Margin="0,0,0,6">
+                                <Image Source="{Binding MeshViewportImage}" Stretch="Fill" MouseLeftButtonDown="OnMeshViewportMouseDown" Cursor="Cross" ToolTip="Click a visible element to select it. Shift extends; Ctrl toggles." />
+                            </Border>
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <DockPanel Margin="0,0,5,0">
+                                    <TextBlock DockPanel.Dock="Top" Text="Selection history" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                    <ListBox ItemsSource="{Binding MeshSelectionLines}" />
+                                </DockPanel>
+                                <DockPanel Grid.Column="1" Margin="5,0,0,0">
+                                    <TextBlock DockPanel.Dock="Top" Text="Evaluation diagnostics" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                    <ListBox ItemsSource="{Binding MeshDiagnosticLines}" />
+                                </DockPanel>
+                            </Grid>
                         </Grid>
                     </Grid>
                 </TabItem>

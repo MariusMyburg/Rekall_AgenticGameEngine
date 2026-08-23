@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
+using System.Windows.Controls;
+using System.Windows.Input;
 using Rekall.Age.Editor.Contracts;
 using Serilog;
 
@@ -61,6 +63,19 @@ public partial class MainWindow : Window
         {
             await _viewModel.SelectEntityAsync(entity);
         }
+    }
+
+    private void OnMeshViewportMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;
+        var position = e.GetPosition(image);
+        var modifiers = Keyboard.Modifiers;
+        _viewModel.SelectMeshViewportElement(
+            position.X / image.ActualWidth,
+            position.Y / image.ActualHeight,
+            modifiers.HasFlag(ModifierKeys.Shift),
+            modifiers.HasFlag(ModifierKeys.Control));
+        e.Handled = true;
     }
 
     protected override async void OnClosing(CancelEventArgs e)

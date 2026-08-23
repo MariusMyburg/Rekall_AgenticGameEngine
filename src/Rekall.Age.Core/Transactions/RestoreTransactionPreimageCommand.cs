@@ -67,6 +67,24 @@ public sealed class RestoreTransactionPreimageCommand
                 $"Restored deleted preimage for '{preimage.RelativePath}'.");
         }
 
+        var delta = transaction.ResourceDeltas.FirstOrDefault(item =>
+            item.RelativePath.Equals(preimage.RelativePath, StringComparison.Ordinal));
+        if (delta is not null && File.Exists(targetPath))
+        {
+            var currentBytes = await File.ReadAllBytesAsync(targetPath, context.CancellationToken);
+            var currentSha256 = Convert.ToHexString(SHA256.HashData(currentBytes)).ToLowerInvariant();
+            if (currentSha256.Equals(delta.AfterSha256, StringComparison.Ordinal))
+            {
+                var restoredBytes = RekallAgeReversibleJsonDelta.ApplyInverse(delta, currentBytes);
+                Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+                await File.WriteAllBytesAsync(targetPath, restoredBytes, context.CancellationToken);
+                context.Transaction.RecordChangedResource(targetPath);
+                return RekallAgeCommandResult<RestoreTransactionPreimageResult>.Success(
+                    new RestoreTransactionPreimageResult(transaction.Id, preimage.RelativePath, targetPath, restoredBytes.LongLength),
+                    $"Restored '{preimage.RelativePath}' from reversible transaction delta '{transaction.Id}'.");
+            }
+        }
+
         if (preimage.SnapshotPath is null)
         {
             throw new InvalidOperationException($"Preimage for '{preimage.RelativePath}' has no snapshot path.");

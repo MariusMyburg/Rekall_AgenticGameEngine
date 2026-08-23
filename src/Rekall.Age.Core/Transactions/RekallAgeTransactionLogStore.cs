@@ -22,6 +22,9 @@ public sealed record RekallAgeTransactionLogEntry(
 
     public IReadOnlyList<RekallAgeTransactionResourcePreimageEntry> ResourcePreimages { get; init; } =
         Array.Empty<RekallAgeTransactionResourcePreimageEntry>();
+
+    public IReadOnlyList<RekallAgeTransactionResourceDeltaEntry> ResourceDeltas { get; init; } =
+        Array.Empty<RekallAgeTransactionResourceDeltaEntry>();
 }
 
 public sealed record RekallAgeTransactionResourceChange(
@@ -76,6 +79,7 @@ public sealed class RekallAgeTransactionLogStore
         CancellationToken cancellationToken)
     {
         var resourcePreimages = await PersistPreimagesAsync(projectRoot, transaction, cancellationToken);
+        var resourceDeltas = await BuildResourceDeltasAsync(projectRoot, transaction, cancellationToken);
         var entry = new RekallAgeTransactionLogEntry(
             transaction.Id,
             transaction.Name,
@@ -86,7 +90,8 @@ public sealed class RekallAgeTransactionLogStore
             ResourceChanges = transaction.ChangedResources
                 .Select(resource => RekallAgeTransactionResourceChangeSummarizer.Summarize(projectRoot, resource))
                 .ToArray(),
-            ResourcePreimages = resourcePreimages
+            ResourcePreimages = resourcePreimages,
+            ResourceDeltas = resourceDeltas
         };
         var path = GetPath(projectRoot);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -182,6 +187,31 @@ public sealed class RekallAgeTransactionLogStore
                 sha256));
         }
 
+        return entries;
+    }
+
+    private static async ValueTask<IReadOnlyList<RekallAgeTransactionResourceDeltaEntry>> BuildResourceDeltasAsync(
+        string projectRoot,
+        RekallAgeTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        var entries = new List<RekallAgeTransactionResourceDeltaEntry>();
+        foreach (var preimage in transaction.ResourcePreimages.Where(item => item.ExistedBefore))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!File.Exists(preimage.Resource)) continue;
+            var after = await RekallAgeBoundedFileSnapshot.ReadAsync(
+                preimage.Resource,
+                RekallAgePersistedJson.MaximumDocumentBytes,
+                cancellationToken).ConfigureAwait(false);
+            var fullPath = Path.GetFullPath(preimage.Resource);
+            var delta = RekallAgeReversibleJsonDelta.Create(
+                fullPath,
+                GetRelativePath(projectRoot, fullPath),
+                preimage.Content,
+                after.Bytes);
+            if (delta is not null) entries.Add(delta);
+        }
         return entries;
     }
 

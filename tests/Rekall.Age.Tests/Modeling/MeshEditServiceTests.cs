@@ -10,6 +10,74 @@ namespace Rekall.Age.Tests.Modeling;
 public sealed class MeshEditServiceTests
 {
     [Fact]
+    public async Task MeshEditPersistsCompactReversibleDeltaSmallerThanFullPreimage()
+    {
+        var (root, store, initial) = await CreateStoredTriangle();
+        var padded = initial.Value with
+        {
+            Revision = 2,
+            SelectionSets = Enumerable.Range(0, 128)
+                .Select(index => new RekallAgeMeshSelection(
+                    $"selection-{index:D3}",
+                    RekallAgeGeometryDomain.Point,
+                    [1, 2, 3]))
+                .ToArray()
+        };
+        await store.SaveIfRevisionAsync(root, padded, initial.Revision, CancellationToken.None);
+        var loaded = await store.LoadVersionedAsync(root, "triangle", CancellationToken.None);
+        var edit = RekallAgeTransaction.Begin("compact mesh edit");
+        await new RekallAgeMeshEditService(store).ApplyAsync(
+            root,
+            "triangle",
+            loaded.Revision,
+            Transform(0.25, 0),
+            edit,
+            CancellationToken.None);
+        await new RekallAgeTransactionLogStore().AppendAsync(root, edit, "agent", CancellationToken.None);
+
+        var log = JsonNode.Parse(await File.ReadAllTextAsync(
+            new RekallAgeTransactionLogStore().GetPath(root),
+            CancellationToken.None))!.AsObject();
+        var transaction = log["transactions"]!.AsArray().Single()!.AsObject();
+        var preimageBytes = transaction["resourcePreimages"]!.AsArray().Single()!["sizeBytes"]!.GetValue<long>();
+        var delta = transaction["resourceDeltas"]!.AsArray().Single()!.AsObject();
+
+        Assert.Equal("reversible-json-splice-v1", delta["format"]!.GetValue<string>());
+        Assert.True(delta["encodedSizeBytes"]!.GetValue<long>() < preimageBytes);
+        Assert.NotEmpty(delta["operations"]!.AsArray());
+        Assert.NotNull(delta["beforeSha256"]);
+        Assert.NotNull(delta["afterSha256"]);
+    }
+
+    [Fact]
+    public async Task MeshUndoRestoresExactAssetFromDeltaWhenSnapshotFallbackIsUnavailable()
+    {
+        var (root, store, loaded) = await CreateStoredTriangle();
+        var beforeBytes = await File.ReadAllBytesAsync(store.GetMeshPath(root, "triangle"), CancellationToken.None);
+        var edit = RekallAgeTransaction.Begin("delta-backed mesh edit");
+        await new RekallAgeMeshEditService(store).ApplyAsync(
+            root,
+            "triangle",
+            loaded.Revision,
+            Transform(2, 0),
+            edit,
+            CancellationToken.None);
+        var history = new RekallAgeTransactionLogStore();
+        await history.AppendAsync(root, edit, "agent", CancellationToken.None);
+        var document = await history.LoadAsync(root, CancellationToken.None);
+        var preimage = Assert.Single(Assert.Single(document.Transactions).ResourcePreimages);
+        File.Delete(Path.Combine(root, preimage.SnapshotPath!));
+        var undo = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("delta undo"), CancellationToken.None);
+
+        var result = await new RestoreTransactionPreimageCommand(history).ExecuteAsync(
+            new(root, edit.Id, Path.GetRelativePath(root, store.GetMeshPath(root, "triangle"))),
+            undo);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(beforeBytes, await File.ReadAllBytesAsync(store.GetMeshPath(root, "triangle"), CancellationToken.None));
+    }
+
+    [Fact]
     public async Task GroupedMeshEditSupportsTransactionUndoAndRedoWithoutPartialTopology()
     {
         var (root, store, loaded) = await CreateStoredTriangle();

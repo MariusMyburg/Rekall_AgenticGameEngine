@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 06:42 Africa/Johannesburg
+Last verified: 2026-08-23 06:48 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -159,6 +159,19 @@ mapping from the undo transaction's captured preimage. The focused edit-service
 selection passes 4/4. Compact element-delta persistence remains the active next
 step; the test deliberately proves existing lossless behavior before replacing
 full mesh snapshots with bounded reversible deltas.
+
+Compact reversible transaction deltas are now implemented and verified. For
+changed JSON resources, the transaction log recursively records only changed
+object values and bounded array splices, retains before/after SHA-256 identities,
+and admits a delta only when its encoded operations are smaller than the full
+preimage. Mesh undo prefers the exact-after-state delta, reconstructs canonical
+before bytes, and verifies the before SHA; a missing snapshot therefore no
+longer prevents exact undo. If the resource advanced after the transaction, the
+delta is not force-applied and the integrity-checked full preimage remains the
+safe compatibility fallback. Compactness, delta-only mesh restoration, grouped
+undo/redo, stale-after fallback, transaction persistence, and history behavior
+pass a combined 12/12 focused selection with zero build warnings/errors. The
+deterministic closed-loop modelling fixture is active next.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

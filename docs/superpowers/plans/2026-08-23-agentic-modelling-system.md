@@ -82,7 +82,7 @@ then grow it into procedural geometry/material graphs and Studio modelling.
 ### Task 6: Element-delta undo and closed-loop acceptance
 
 - [x] Write failing mesh edit undo/redo and grouped-operation tests.
-- [ ] Record compact reversible deltas in AGE transactions.
+- [x] Record compact reversible deltas in AGE transactions.
 - [ ] Create a deterministic acceptance fixture with an ngon, shared-point
   corner UV variants, multiple material slots, and an extrusion.
 - [ ] Prove inspect -> mutate -> validate -> compile -> render -> pick -> undo ->

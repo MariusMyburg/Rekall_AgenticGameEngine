@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.World;
@@ -7,6 +8,35 @@ namespace Rekall.Age.Tests.Core;
 
 public sealed class TransactionHistoryCommandTests
 {
+    [Fact]
+    public async Task RestoreFallsBackToFullPreimageWhenResourceAdvancedBeyondDeltaAfterState()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, "large.age.json");
+        var initial = new JsonObject
+        {
+            ["values"] = new JsonArray(Enumerable.Range(0, 256).Select(index => JsonValue.Create(index)).ToArray())
+        };
+        await File.WriteAllTextAsync(path, initial.ToJsonString(new() { WriteIndented = true }) + Environment.NewLine);
+        var originalBytes = await File.ReadAllBytesAsync(path);
+        var transaction = RekallAgeTransaction.Begin("first edit");
+        transaction.CaptureResourcePreimage(path);
+        initial["values"]![128] = 900;
+        await File.WriteAllTextAsync(path, initial.ToJsonString(new() { WriteIndented = true }) + Environment.NewLine);
+        transaction.RecordChangedResource(path);
+        var history = new RekallAgeTransactionLogStore();
+        await history.AppendAsync(root, transaction, "agent", CancellationToken.None);
+        initial["values"]![129] = 901;
+        await File.WriteAllTextAsync(path, initial.ToJsonString(new() { WriteIndented = true }) + Environment.NewLine);
+
+        var result = await new RestoreTransactionPreimageCommand(history).ExecuteAsync(
+            new(root, transaction.Id, "large.age.json"),
+            new("agent", RekallAgeTransaction.Begin("restore"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(path));
+    }
+
     [Fact]
     public async Task ListTransactionHistoryReturnsRecentProjectTransactions()
     {

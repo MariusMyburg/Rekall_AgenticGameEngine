@@ -7,6 +7,8 @@ The engine must be designed for AI agents and users to author arbitrary games, n
 Permanent architectural rule:
 
 - Prefer generic authoring primitives over genre-specific built-ins.
+- Prioritize substantial, user-visible, end-to-end game-engine capability over exhaustive hardening of extremely unlikely edge cases while core authoring, gameplay, Studio, rendering, and deployment workflows remain incomplete. Apply verification and defensive engineering in proportion to realistic risk; record pathological residual risks as technical debt and return to them after the relevant playable milestone unless they present a credible security, data-loss, or common-workflow threat.
+- Use playable acceptance evidence to set implementation priorities. When a real authored game exposes a generic engine deficiency, fix that engine contract before spending the same effort on theoretical failure modes that do not materially affect ordinary game creation or delivery.
 - Rekall AGE must never allow agents to ask the engine to author content for them. The engine should enable agents to author games themselves through inspectable primitives, diagnostics, templates, SDK helpers, and generic runtime contracts.
 - Put game behavior in agent-authored modules, templates, or examples unless it is truly engine-general.
 - Engine input should provide capture, normalization, semantic action projection, inspection, and SDK helpers. It should not hard-code first-person, top-down, shooter, platformer, or other genre behavior as the default path.

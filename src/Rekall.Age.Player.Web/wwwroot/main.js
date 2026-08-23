@@ -1,18 +1,35 @@
 import { dotnet } from './_framework/dotnet.js';
 import { createWebGpuExecutor } from './webgpu-device.js';
 import { publishWebGpuEvidence } from './webgpu-evidence.js';
+import { createWebInputBridge, fullscreenEvent, resizeEvent, visibilityEvent } from './web-input.js';
 
+const MAX_LIFECYCLE_EVENTS = 32;
 const canvas = document.querySelector('#viewport');
 const webgpu = createWebGpuExecutor();
+const input = createWebInputBridge({ window, document, canvas, navigator });
+const lifecycleEvents = [];
+
+function queueLifecycleEvent(event) {
+    if (lifecycleEvents.length < MAX_LIFECYCLE_EVENTS) {
+        lifecycleEvents.push(event);
+    }
+}
 
 function fitCanvas() {
     const scale = window.devicePixelRatio || 1;
     const bounds = canvas.getBoundingClientRect();
+    const previousWidth = canvas.width;
+    const previousHeight = canvas.height;
     canvas.width = Math.max(1, Math.floor(bounds.width * scale));
     canvas.height = Math.max(1, Math.floor(bounds.height * scale));
+    if (canvas.width !== previousWidth || canvas.height !== previousHeight) {
+        queueLifecycleEvent(resizeEvent(canvas.width, canvas.height));
+    }
 }
 
 window.addEventListener('resize', fitCanvas);
+document.addEventListener('visibilitychange', () => queueLifecycleEvent(visibilityEvent(!document.hidden)));
+document.addEventListener('fullscreenchange', () => queueLifecycleEvent(fullscreenEvent(Boolean(document.fullscreenElement))));
 fitCanvas();
 
 const { setModuleImports, runMain } = await dotnet.create();
@@ -25,6 +42,10 @@ setModuleImports('main.js', {
         readPixels: async () => JSON.stringify(await webgpu.readPixels()),
         canvasWidth: () => canvas.width,
         canvasHeight: () => canvas.height
+    },
+    input: {
+        snapshot: () => JSON.stringify(input.snapshot()),
+        pullLifecycleEvents: () => JSON.stringify(lifecycleEvents.splice(0))
     },
     dom: {
         baseUri: () => document.baseURI,
@@ -39,4 +60,5 @@ setModuleImports('main.js', {
         }
     }
 });
+
 await runMain();

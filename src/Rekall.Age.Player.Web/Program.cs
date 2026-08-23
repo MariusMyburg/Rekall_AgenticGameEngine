@@ -14,10 +14,17 @@ using var gameBootstrap = await new RekallAgeWebGameBootstrapper().BootAsync(
     publishedModules,
     CancellationToken.None);
 BrowserHost.PublishGameBootstrapEvidence(WebGameBootstrapEvidenceJson.Serialize(gameBootstrap.Evidence));
+
+// Prove the browser input bridge round-trip (JS raw snapshot -> RekallAgeWebInputSnapshotJson -> the same
+// RekallAgeRuntimeInputState the Windows player produces) as part of ordinary bootstrap, not as dead code.
+var inputBridge = new RekallAgeWebInputBridge();
+var inputSnapshot = RekallAgeWebInputSnapshotJson.Parse(BrowserHost.SnapshotInput());
+var inputState = inputBridge.Capture(inputSnapshot);
+
 BrowserHost.SetText(
     "#runtime",
     gameBootstrap.Evidence.Succeeded
-        ? $".NET {Environment.Version} / browser-wasm / world frame {gameBootstrap.Evidence.RuntimeFrameIndex} / entities {gameBootstrap.Evidence.Entities.Count} / static modules {publishedModules.Count}"
+        ? $".NET {Environment.Version} / browser-wasm / world frame {gameBootstrap.Evidence.RuntimeFrameIndex} / entities {gameBootstrap.Evidence.Entities.Count} / static modules {publishedModules.Count} / input {inputState.ViewportWidth:0}x{inputState.ViewportHeight:0}"
         : $".NET {Environment.Version} / browser-wasm / {gameBootstrap.Evidence.Diagnostics.FirstOrDefault()?.Code ?? "BOOTSTRAP FAILED"}");
 BrowserHost.SetText("#graphics", profile);
 
@@ -116,4 +123,10 @@ internal static partial class BrowserHost
 
     [JSImport("dom.publishGameBootstrapEvidence", "main.js")]
     internal static partial void PublishGameBootstrapEvidence(string json);
+
+    [JSImport("input.snapshot", "main.js")]
+    internal static partial string SnapshotInput();
+
+    [JSImport("input.pullLifecycleEvents", "main.js")]
+    internal static partial string PullInputLifecycleEvents();
 }

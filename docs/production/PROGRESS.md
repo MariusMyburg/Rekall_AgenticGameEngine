@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 22:50 Africa/Johannesburg
+Last verified: 2026-08-23 23:15 Africa/Johannesburg
 
 Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
@@ -4039,6 +4039,41 @@ executable from a Release-only build); the change set is strictly additive
 (three new files, nothing existing modified), so none of the five are
 attributable to this slice. Studio passed 53/53. Task 6 (browser input
 bridge) is next.
+
+Task 6 (the browser input bridge) is now complete. `RekallAgeWebInputBridge`
+converts successive raw `RekallAgeWebInputSnapshot` polls into the same
+`RekallAgeRuntimeInputState` the Windows SDL2 player produces: it owns
+held/pressed/released edge detection for keys, pointer buttons, and
+per-gamepad buttons, releases every held key/button on a focus-loss fact
+(matching the Windows player's mouse-capture release), and normalizes browser
+`KeyboardEvent.code` values against the same canonical key names the
+`Silk.NET.Input.Key` enum produces on Windows (`KeyW` -> `W`, `ArrowUp` ->
+`Up`, `Digit1` -> `Number1`, `ShiftLeft` -> `ShiftLeft`, and so on), so one
+authored `Rekall.InputActionMap` binds identically in both environments.
+`RekallAgeWebInputSnapshotJson` parses the bounded JSON payload the browser
+side produces without throwing on missing optional fields. On the JavaScript
+side, `web-input.js` (`createWebInputBridge`) captures only raw, unmapped
+device facts -- held key codes, pointer position scaled from CSS to canvas
+pixels, accumulated pointer/wheel deltas reset after each poll, held pointer
+buttons with capture, touch points, and polled Gamepad API state -- plus
+stable resize/visibility/fullscreen/device-loss lifecycle event constructors;
+it makes no gameplay decisions. `main.js` wires the bridge in, queues
+lifecycle facts from `resize`/`visibilitychange`/`fullscreenchange`, and
+exposes `input.snapshot`/`input.pullLifecycleEvents` through the existing
+`setModuleImports` seam. `Program.cs` calls the real round trip once during
+bootstrap (JS snapshot -> `RekallAgeWebInputSnapshotJson.Parse` ->
+`RekallAgeWebInputBridge.Capture`) and folds the confirmed viewport size into
+the existing runtime status text, so this is exercised on every load rather
+than being dead code awaiting Task 7's continuous loop. Verification: the
+focused selection passed 20/20 C# tests (11 bridge/edge-detection tests plus
+9 JSON-parsing/round-trip tests) and 10/10 new Node tests (33/33 including the
+existing WebGPU suite); the zero-warning/zero-error Release solution built
+cleanly for both the desktop and `browser-wasm` targets; and the complete
+engine suite passed 1,644/1,649 with the same five pre-existing,
+environment-caused failures (the two `BuildModulesCommandTests` cases now
+fail because `pwsh` is not on this shell's `PATH` rather than the earlier
+timeout symptom, confirming they are environment-dependent, not regressions).
+Studio passed 53/53. Continuous simulation/presentation (Task 7) is next.
 
 ## Next after the current item
 

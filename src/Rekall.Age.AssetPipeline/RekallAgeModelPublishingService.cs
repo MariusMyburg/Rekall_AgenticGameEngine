@@ -18,16 +18,6 @@ public sealed record RekallAgePublishModelResult(
     string CompiledOutputPath,
     string CompiledContentHash);
 
-public sealed record RekallAgeModelAssetInspection(
-    RekallAgeModelAssetDocument? Asset,
-    string ModelFileRevision,
-    RekallAgeModelBuildState BuildState,
-    string? CurrentSourceFileRevision,
-    long? CurrentSourceLogicalRevision,
-    bool CompiledOutputExists,
-    string? ActualCompiledContentHash,
-    IReadOnlyList<RekallAgeModelBuildDiagnostic> Diagnostics);
-
 public sealed class RekallAgeModelPublishingException : InvalidOperationException
 {
     public RekallAgeModelPublishingException(string code, string message, string? target = null, Exception? innerException = null)
@@ -42,7 +32,7 @@ public sealed class RekallAgeModelPublishingException : InvalidOperationExceptio
     public string? Target { get; }
 }
 
-public sealed class RekallAgeModelPublishingService
+public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealthInspector
 {
     private const int MaximumDiagnostics = 16;
     private readonly RekallAgeMeshAssetStore _meshStore;
@@ -253,6 +243,15 @@ public sealed class RekallAgeModelPublishingService
         }
 
         var model = loadedModel.Value;
+        if (model.Frozen || model.BuildState == RekallAgeModelBuildState.Frozen)
+        {
+            return await InspectFrozenAsync(
+                projectRoot,
+                assetId,
+                loadedModel,
+                cancellationToken).ConfigureAwait(false);
+        }
+
         RekallAgeVersionedDocument<Rekall.Age.Modeling.Contracts.RekallAgeMeshAsset> source;
         try
         {
@@ -281,19 +280,6 @@ public sealed class RekallAgeModelPublishingService
                 retainedOutput.Exists,
                 retainedOutput.Hash,
                 [Diagnostic("REKALL_MODEL_SOURCE_INVALID", "Error", $"Linked mesh source '{model.Source.AssetId}' is invalid: {error.Message}", model.Source.AssetId)]);
-        }
-
-        if (model.Frozen || model.BuildState == RekallAgeModelBuildState.Frozen)
-        {
-            var frozenOutput = await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
-            return Inspection(
-                loadedModel,
-                RekallAgeModelBuildState.Frozen,
-                source.Revision,
-                source.Value.Revision,
-                frozenOutput.Exists,
-                frozenOutput.Hash,
-                []);
         }
 
         var manifest = model.LastSuccessfulBuild;
@@ -402,6 +388,88 @@ public sealed class RekallAgeModelPublishingService
             source.Value.Revision,
             true,
             actualHash,
+            []);
+    }
+
+    private async ValueTask<RekallAgeModelAssetInspection> InspectFrozenAsync(
+        string projectRoot,
+        string assetId,
+        RekallAgeVersionedDocument<RekallAgeModelAssetDocument> loadedModel,
+        CancellationToken cancellationToken)
+    {
+        var manifest = loadedModel.Value.LastSuccessfulBuild;
+        var canonicalOutput = await InspectOutputAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+        if (manifest is null)
+        {
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Failed,
+                null,
+                null,
+                canonicalOutput.Exists,
+                canonicalOutput.Hash,
+                [Diagnostic("REKALL_MODEL_LAST_BUILD_FAILED", "Error", "Frozen Model Asset has no usable successful build manifest.", assetId)]);
+        }
+
+        var finalPath = _outputStore.GetFinalPath(projectRoot, assetId);
+        if (!string.Equals(
+                Path.GetFullPath(Path.Combine(projectRoot, manifest.CompiledMeshPath)),
+                Path.GetFullPath(finalPath),
+                PathComparison))
+        {
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Failed,
+                null,
+                null,
+                canonicalOutput.Exists,
+                canonicalOutput.Hash,
+                [Diagnostic("REKALL_MODEL_OUTPUT_PATH_MISMATCH", "Error", "The frozen build manifest does not reference this Model Asset's canonical compiled output path.", manifest.CompiledMeshPath)]);
+        }
+
+        if (!canonicalOutput.Exists)
+        {
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Failed,
+                null,
+                null,
+                false,
+                null,
+                [Diagnostic("REKALL_MODEL_OUTPUT_MISSING", "Error", "The frozen Model Asset's last successful compiled output is missing.", manifest.CompiledMeshPath)]);
+        }
+
+        if (canonicalOutput.Hash is null)
+        {
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Failed,
+                null,
+                null,
+                true,
+                null,
+                [Diagnostic("REKALL_MODEL_OUTPUT_INVALID", "Error", "The frozen Model Asset's compiled output could not be read and hashed.", manifest.CompiledMeshPath)]);
+        }
+
+        if (!string.Equals(canonicalOutput.Hash, manifest.CompiledContentHash, StringComparison.Ordinal))
+        {
+            return Inspection(
+                loadedModel,
+                RekallAgeModelBuildState.Failed,
+                null,
+                null,
+                true,
+                canonicalOutput.Hash,
+                [Diagnostic("REKALL_MODEL_OUTPUT_HASH_MISMATCH", "Error", "The frozen compiled output hash does not match its successful build manifest.", manifest.CompiledMeshPath)]);
+        }
+
+        return Inspection(
+            loadedModel,
+            RekallAgeModelBuildState.Frozen,
+            null,
+            null,
+            true,
+            canonicalOutput.Hash,
             []);
     }
 

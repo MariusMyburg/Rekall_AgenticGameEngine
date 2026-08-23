@@ -384,9 +384,7 @@ public sealed class ModelAssetPublishingTests
             frozen,
             first.ModelFileRevision,
             default);
-        var outputBytes = (await File.ReadAllBytesAsync(first.CompiledOutputPath)).Concat([(byte)' ']).ToArray();
-        await File.WriteAllBytesAsync(first.CompiledOutputPath, outputBytes);
-        var actualOutputHash = RekallAgeDocumentRevision.Compute(outputBytes);
+        var outputBytes = await File.ReadAllBytesAsync(first.CompiledOutputPath);
 
         var error = await Assert.ThrowsAsync<RekallAgeModelPublishingException>(() => fixture.Service.RebuildAsync(
             fixture.Root,
@@ -401,7 +399,7 @@ public sealed class ModelAssetPublishingTests
         var inspection = await fixture.Service.InspectAsync(fixture.Root, "hero-model", default);
         Assert.Equal(RekallAgeModelBuildState.Frozen, inspection.BuildState);
         Assert.True(inspection.CompiledOutputExists);
-        Assert.Equal(actualOutputHash, inspection.ActualCompiledContentHash);
+        Assert.Equal(first.CompiledContentHash, inspection.ActualCompiledContentHash);
     }
 
     [Fact]

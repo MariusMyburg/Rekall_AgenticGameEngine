@@ -9,6 +9,26 @@ namespace Rekall.Age.Tests.Core;
 public sealed class TransactionHistoryCommandTests
 {
     [Fact]
+    public async Task DeferredResourcePreimageRecordsSuppliedPreSaveBytesAfterTheResourceChanges()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = Path.Combine(root, "deferred.age.json");
+        await File.WriteAllTextAsync(path, "{\"value\":1}");
+        var before = await File.ReadAllBytesAsync(path);
+        await File.WriteAllTextAsync(path, "{\"value\":2}");
+        var transaction = RekallAgeTransaction.Begin("deferred preimage");
+
+        transaction.RecordResourcePreimage(path, existedBefore: true, before);
+
+        before[0] = (byte)'!';
+        var preimage = Assert.Single(transaction.ResourcePreimages);
+        Assert.Equal(path, preimage.Resource);
+        Assert.True(preimage.ExistedBefore);
+        Assert.Equal("{\"value\":1}", preimage.ReadUtf8Text());
+        Assert.NotEqual(await File.ReadAllBytesAsync(path), preimage.Content);
+    }
+
+    [Fact]
     public async Task RestoreFallsBackToFullPreimageWhenResourceAdvancedBeyondDeltaAfterState()
     {
         var root = TestPaths.CreateTempDirectory();

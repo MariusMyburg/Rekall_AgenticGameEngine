@@ -13,6 +13,14 @@ namespace Rekall.Age.Tests.LevelDesign;
 public sealed class ModelAssetPlacementTests
 {
     [Fact]
+    public void LevelDesignPlacementAssemblyDoesNotReferenceAssetPipeline()
+    {
+        Assert.DoesNotContain(
+            typeof(InstantiateModelAssetCommand).Assembly.GetReferencedAssemblies(),
+            assembly => assembly.Name == "Rekall.Age.AssetPipeline");
+    }
+
+    [Fact]
     public async Task CurrentModelAssetPlacementRetainsExactTransformParentAndStableReference()
     {
         var fixture = await CreatePublishedFixtureAsync();
@@ -22,7 +30,7 @@ public sealed class ModelAssetPlacementTests
             (await fixture.SceneStore.LoadAsync(fixture.Root, "Main", default)).AddEntity(parent),
             default);
         var context = Context("place current model");
-        var registry = Registry();
+        var registry = Registry(fixture);
 
         var result = await registry.ExecuteAsync<InstantiateModelAssetRequest, InstantiateModelAssetResult>(
             "rekall.scene.instantiate_asset",
@@ -79,7 +87,7 @@ public sealed class ModelAssetPlacementTests
         var before = await File.ReadAllBytesAsync(scenePath);
         var context = Context("undoable model placement");
 
-        var placed = await new InstantiateModelAssetCommand().ExecuteAsync(
+        var placed = await Command(fixture).ExecuteAsync(
             Request(fixture.Root),
             context);
 
@@ -108,7 +116,7 @@ public sealed class ModelAssetPlacementTests
         var fixture = await CreatePublishedFixtureAsync();
         await ReplaceMeshAsync(fixture, "sphere");
 
-        var result = await new InstantiateModelAssetCommand().ExecuteAsync(
+        var result = await Command(fixture).ExecuteAsync(
             Request(fixture.Root),
             Context("place stale model"));
 
@@ -142,7 +150,7 @@ public sealed class ModelAssetPlacementTests
             loaded.Revision,
             default);
 
-        var result = await new InstantiateModelAssetCommand().ExecuteAsync(
+        var result = await Command(fixture).ExecuteAsync(
             Request(fixture.Root),
             Context("place frozen model"));
 
@@ -150,6 +158,59 @@ public sealed class ModelAssetPlacementTests
         Assert.Equal(RekallAgeModelBuildState.Frozen, result.Value.BuildState);
         Assert.Empty(result.Value.Warnings);
         Assert.NotNull(result.Value.Scene);
+    }
+
+    [Fact]
+    public async Task FrozenModelAssetWithMissingEditableSourceAndValidOutputRemainsPlaceable()
+    {
+        var fixture = await CreatePublishedFixtureAsync();
+        await FreezeAsync(fixture);
+        File.Delete(fixture.MeshStore.GetMeshPath(fixture.Root, "hero-mesh"));
+        Assert.True(File.Exists(fixture.Publication.CompiledOutputPath));
+
+        var result = await Command(fixture).ExecuteAsync(
+            Request(fixture.Root),
+            Context("place source-independent frozen model"));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(RekallAgeModelBuildState.Frozen, result.Value.BuildState);
+        Assert.NotNull(result.Value.Scene);
+        Assert.Empty(result.Value.Warnings);
+    }
+
+    [Fact]
+    public async Task FrozenModelAssetWithNoncanonicalManifestPathFailsWithoutMutation()
+    {
+        var fixture = await CreatePublishedFixtureAsync();
+        const string noncanonicalPath = "Assets/Models/Compiled/copied-hero.age.compiled-mesh.json";
+        await FreezeAsync(
+            fixture,
+            fixture.Publication.Asset.LastSuccessfulBuild! with { CompiledMeshPath = noncanonicalPath });
+        var copiedOutputPath = Path.Combine(fixture.Root, noncanonicalPath);
+        await File.WriteAllBytesAsync(
+            copiedOutputPath,
+            await File.ReadAllBytesAsync(fixture.Publication.CompiledOutputPath));
+
+        await AssertFailureWithoutMutationAsync(
+            fixture,
+            Request(fixture.Root),
+            "REKALL_MODEL_OUTPUT_PATH_MISMATCH");
+    }
+
+    [Fact]
+    public async Task FrozenModelAssetWithOutputHashMismatchFailsWithoutMutation()
+    {
+        var fixture = await CreatePublishedFixtureAsync();
+        await FreezeAsync(fixture);
+        var corruptBytes = (await File.ReadAllBytesAsync(fixture.Publication.CompiledOutputPath))
+            .Concat([(byte)' '])
+            .ToArray();
+        await File.WriteAllBytesAsync(fixture.Publication.CompiledOutputPath, corruptBytes);
+
+        await AssertFailureWithoutMutationAsync(
+            fixture,
+            Request(fixture.Root),
+            "REKALL_MODEL_OUTPUT_HASH_MISMATCH");
     }
 
     [Fact]
@@ -252,6 +313,33 @@ public sealed class ModelAssetPlacementTests
             "REKALL_DOCUMENT_REVISION_CONFLICT");
     }
 
+    [Fact]
+    public async Task SaveTimeSceneConflictLeavesConcurrentSceneAndTransactionUntouched()
+    {
+        var fixture = await CreatePublishedFixtureAsync();
+        var context = Context("racing model placement");
+        var racingHealth = new ConcurrentSceneMutationHealthInspector(
+            fixture.SceneStore,
+            fixture.PublishingService);
+        var command = new InstantiateModelAssetCommand(
+            fixture.SceneStore,
+            fixture.ModelStore,
+            racingHealth);
+
+        var result = await command.ExecuteAsync(Request(fixture.Root), context);
+
+        Assert.False(result.Ok);
+        Assert.Equal("REKALL_DOCUMENT_REVISION_CONFLICT", Assert.Single(result.Errors).Code);
+        Assert.Empty(context.Transaction.ChangedResources);
+        Assert.Empty(context.Transaction.ResourcePreimages);
+        var scene = await fixture.SceneStore.LoadAsync(fixture.Root, "Main", default);
+        var concurrent = Assert.Single(scene.Entities);
+        Assert.Equal("Concurrent Winner", concurrent.Name);
+        Assert.DoesNotContain(
+            concurrent.Components,
+            component => component.Type == "Rekall.ModelAssetReference");
+    }
+
     public static IEnumerable<object[]> InvalidTransforms()
     {
         yield return
@@ -290,10 +378,13 @@ public sealed class ModelAssetPlacementTests
             new(0, 0, 0),
             new(1, 1, 1));
 
-    private static RekallAgeCommandRegistry Registry()
+    private static InstantiateModelAssetCommand Command(Fixture fixture) =>
+        new(fixture.SceneStore, fixture.ModelStore, fixture.PublishingService);
+
+    private static RekallAgeCommandRegistry Registry(Fixture fixture)
     {
         var registry = new RekallAgeCommandRegistry();
-        registry.Register(new InstantiateModelAssetCommand());
+        registry.Register(Command(fixture));
         return registry;
     }
 
@@ -309,7 +400,7 @@ public sealed class ModelAssetPlacementTests
         var before = await File.ReadAllBytesAsync(scenePath);
         var context = Context("rejected model placement");
 
-        var result = await new InstantiateModelAssetCommand().ExecuteAsync(request, context);
+        var result = await Command(fixture).ExecuteAsync(request, context);
 
         Assert.False(result.Ok);
         Assert.Contains(result.Errors, error => error.Code == expectedCode);
@@ -359,6 +450,24 @@ public sealed class ModelAssetPlacementTests
             default);
     }
 
+    private static async ValueTask FreezeAsync(
+        Fixture fixture,
+        RekallAgeModelBuildManifest? manifest = null)
+    {
+        var loaded = await fixture.ModelStore.LoadVersionedAsync(fixture.Root, "hero-model", default);
+        await fixture.ModelStore.SaveIfRevisionAsync(
+            fixture.Root,
+            loaded.Value with
+            {
+                Revision = loaded.Value.Revision + 1,
+                BuildState = RekallAgeModelBuildState.Frozen,
+                LastSuccessfulBuild = manifest ?? loaded.Value.LastSuccessfulBuild,
+                Frozen = true
+            },
+            loaded.Revision,
+            default);
+    }
+
     private sealed record Fixture(string Root)
     {
         public RekallAgeSceneStore SceneStore { get; } = new();
@@ -371,5 +480,26 @@ public sealed class ModelAssetPlacementTests
 
         public RekallAgePublishModelResult Publication { get; set; } = null!;
 
+    }
+
+    private sealed class ConcurrentSceneMutationHealthInspector(
+        RekallAgeSceneStore sceneStore,
+        IRekallAgeModelAssetHealthInspector inner) : IRekallAgeModelAssetHealthInspector
+    {
+        public async ValueTask<RekallAgeModelAssetInspection> InspectAsync(
+            string projectRoot,
+            string assetId,
+            CancellationToken cancellationToken)
+        {
+            var loaded = await sceneStore.LoadVersionedAsync(projectRoot, "Main", cancellationToken);
+            var concurrent = loaded.Value.AddEntity(
+                RekallAgeEntityDocument.Create("Concurrent Winner", ["race"]));
+            await sceneStore.SaveIfRevisionAsync(
+                projectRoot,
+                concurrent,
+                loaded.Revision,
+                cancellationToken);
+            return await inner.InspectAsync(projectRoot, assetId, cancellationToken);
+        }
     }
 }

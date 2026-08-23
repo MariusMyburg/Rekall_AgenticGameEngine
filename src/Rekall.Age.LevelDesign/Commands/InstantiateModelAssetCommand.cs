@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Rekall.Age.AssetPipeline;
 using Rekall.Age.Assets;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Persistence;
@@ -36,24 +35,16 @@ public sealed class InstantiateModelAssetCommand
     private const double MinimumScaleMagnitude = 0.000001;
     private readonly RekallAgeSceneStore _sceneStore;
     private readonly RekallAgeModelAssetStore _modelStore;
-    private readonly RekallAgeModelPublishingService _publishingService;
-
-    public InstantiateModelAssetCommand()
-        : this(
-            new RekallAgeSceneStore(),
-            new RekallAgeModelAssetStore(),
-            new RekallAgeModelPublishingService())
-    {
-    }
+    private readonly IRekallAgeModelAssetHealthInspector _healthInspector;
 
     public InstantiateModelAssetCommand(
         RekallAgeSceneStore sceneStore,
         RekallAgeModelAssetStore modelStore,
-        RekallAgeModelPublishingService publishingService)
+        IRekallAgeModelAssetHealthInspector healthInspector)
     {
         _sceneStore = sceneStore ?? throw new ArgumentNullException(nameof(sceneStore));
         _modelStore = modelStore ?? throw new ArgumentNullException(nameof(modelStore));
-        _publishingService = publishingService ?? throw new ArgumentNullException(nameof(publishingService));
+        _healthInspector = healthInspector ?? throw new ArgumentNullException(nameof(healthInspector));
     }
 
     public string Name => "rekall.scene.instantiate_asset";
@@ -116,7 +107,7 @@ public sealed class InstantiateModelAssetCommand
                     request.ModelAssetId));
             }
 
-            var inspection = await _publishingService.InspectAsync(
+            var inspection = await _healthInspector.InspectAsync(
                 request.ProjectRoot,
                 request.ModelAssetId,
                 context.CancellationToken).ConfigureAwait(false);
@@ -157,12 +148,19 @@ public sealed class InstantiateModelAssetCommand
             var entity = CreateEntity(request, asset, parentId);
             var updated = scene.AddEntity(entity);
             var scenePath = _sceneStore.GetScenePath(request.ProjectRoot, request.SceneName);
-            context.Transaction.CaptureResourcePreimage(scenePath);
+            var scenePreimage = await RekallAgeBoundedFileSnapshot.ReadAsync(
+                scenePath,
+                RekallAgePersistedJson.MaximumDocumentBytes,
+                context.CancellationToken).ConfigureAwait(false);
             await _sceneStore.SaveIfRevisionAsync(
                 request.ProjectRoot,
                 updated,
                 request.ExpectedSceneRevision ?? loadedScene.Revision,
                 context.CancellationToken).ConfigureAwait(false);
+            context.Transaction.RecordResourcePreimage(
+                scenePath,
+                existedBefore: true,
+                scenePreimage.Bytes);
             context.Transaction.RecordChangedResource(scenePath);
 
             return RekallAgeCommandResult<InstantiateModelAssetResult>.Success(

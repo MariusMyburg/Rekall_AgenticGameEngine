@@ -47,6 +47,13 @@ public sealed class RekallAgeTransaction
 
     public void CaptureResourcePreimage(string resource)
     {
+        var existedBefore = File.Exists(resource);
+        var content = existedBefore ? File.ReadAllBytes(resource) : Array.Empty<byte>();
+        RecordResourcePreimage(resource, existedBefore, content);
+    }
+
+    public void RecordResourcePreimage(string resource, bool existedBefore, ReadOnlySpan<byte> content)
+    {
         if (string.IsNullOrWhiteSpace(resource))
         {
             throw new ArgumentException("Resource preimage path is required.", nameof(resource));
@@ -57,10 +64,7 @@ public sealed class RekallAgeTransaction
             return;
         }
 
-        var content = File.Exists(resource)
-            ? File.ReadAllBytes(resource)
-            : Array.Empty<byte>();
-        _resourcePreimages.Add(new RekallAgeTransactionResourcePreimage(resource, File.Exists(resource), content));
+        _resourcePreimages.Add(new RekallAgeTransactionResourcePreimage(resource, existedBefore, content.ToArray()));
     }
 }
 

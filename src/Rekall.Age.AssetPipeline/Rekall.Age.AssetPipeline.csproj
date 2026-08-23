@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Rekall.Age.Core\Rekall.Age.Core.csproj" />
     <ProjectReference Include="..\Rekall.Age.Assets\Rekall.Age.Assets.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Modeling.Contracts\Rekall.Age.Modeling.Contracts.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

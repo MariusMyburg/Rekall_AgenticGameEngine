@@ -66,6 +66,104 @@ public sealed class WebGpuBrowserPacketFixtureTests
         Assert.Equal("REKALL_WEBGPU_BRIDGE_RESULT_INVALID", Assert.Single(result.Diagnostics).Code);
     }
 
+    [Fact]
+    public void BrowserBridgeResultsRejectOversizedUtf8ResponsesAndDiagnostics()
+    {
+        var response = "{\"succeeded\":false,\"diagnostics\":[{\"code\":\"X\",\"message\":\""
+            + new string('\u20ac', RekallAgeWebGpuProtocol.MaximumBridgeDiagnosticMessageBytes)
+            + "\"}]}";
+
+        var result = RekallAgeWebGpuProtocol.DeserializeBridgeResult(response);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("REKALL_WEBGPU_BRIDGE_RESULT_INVALID", Assert.Single(result.Diagnostics).Code);
+        Assert.Equal("REKALL_WEBGPU_BRIDGE_RESULT_INVALID", RekallAgeWebGpuProtocol.DeserializeBridgeResult(
+            new string('x', RekallAgeWebGpuProtocol.MaximumBridgeResultBytes + 1)).Diagnostics.Single().Code);
+    }
+
+    [Fact]
+    public void BrowserInitializationRequiresEveryDeviceLimitAndRetainsPreferredCanvasFormat()
+    {
+        const string complete = """
+            {"succeeded":true,"diagnostics":[],"capabilities":{"preferredCanvasFormat":"rgba8unorm","limits":{"maxBufferSize":268435456,"maxTextureDimension1D":8192,"maxTextureDimension2D":8192,"maxTextureDimension3D":2048,"maxTextureArrayLayers":256,"maxColorAttachments":8,"maxBindingsPerBindGroup":1000,"maxVertexBuffers":8,"maxVertexAttributes":16,"maxVertexBufferArrayStride":2048,"maxComputeWorkgroupsPerDimension":65535},"features":["timestamp-query"]}}
+            """;
+        const string missing = """
+            {"succeeded":true,"diagnostics":[],"capabilities":{"preferredCanvasFormat":"bgra8unorm","limits":{"maxBufferSize":268435456},"features":[]}}
+            """;
+
+        var initialized = RekallAgeWebGpuProtocol.DeserializeInitializationResult(complete);
+        var invalid = RekallAgeWebGpuProtocol.DeserializeInitializationResult(missing);
+
+        Assert.True(initialized.Succeeded, string.Join(Environment.NewLine, initialized.Diagnostics.Select(item => item.Message)));
+        Assert.Equal(RekallAgeTextureFormat.Rgba8Unorm, initialized.PreferredCanvasFormat);
+        Assert.Equal(268435456UL, initialized.Capabilities!.MaximumBufferSizeBytes);
+        Assert.Equal(1000, initialized.Capabilities.MaximumBindingsPerLayout);
+        Assert.Equal(8, initialized.Capabilities.MaximumVertexBuffers);
+        Assert.True(initialized.Capabilities.SupportsTimestampQueries);
+        Assert.False(invalid.Succeeded);
+        Assert.Null(invalid.Capabilities);
+        Assert.Equal("REKALL_WEBGPU_CAPABILITIES_INVALID", Assert.Single(invalid.Diagnostics).Code);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("depth24plus")]
+    [InlineData("bgra8unorm-srgb")]
+    public void BrowserInitializationRejectsMissingOrUnsupportedPreferredCanvasFormats(string format)
+    {
+        var json = "{\"succeeded\":true,\"diagnostics\":[],\"capabilities\":{\"preferredCanvasFormat\":\"" + format
+            + "\",\"limits\":{\"maxBufferSize\":1,\"maxTextureDimension1D\":1,\"maxTextureDimension2D\":1,\"maxTextureDimension3D\":1,\"maxTextureArrayLayers\":1,\"maxColorAttachments\":1,\"maxBindingsPerBindGroup\":1,\"maxVertexBuffers\":1,\"maxVertexAttributes\":1,\"maxVertexBufferArrayStride\":1,\"maxComputeWorkgroupsPerDimension\":1},\"features\":[]}}";
+
+        var result = RekallAgeWebGpuProtocol.DeserializeInitializationResult(json);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("REKALL_WEBGPU_CAPABILITIES_INVALID", Assert.Single(result.Diagnostics).Code);
+    }
+
+    [Fact]
+    public void StrictV1ThreeDimensionalWritePacketHasNoAdditiveDepthField()
+    {
+        var texture = new RekallAgeGraphicsResourceHandle(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"), RekallAgeGraphicsResourceKind.Texture, 9, 1);
+
+        var json = RekallAgeWebGpuProtocol.Serialize(new RekallAgeWebGpuWriteTexturePacket(
+            1, texture, 1, 0, Convert.ToBase64String(new byte[64])));
+        var nodeFixture = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "webgpu-write-texture-3d-v1.json")).Trim();
+
+        using var document = JsonDocument.Parse(json);
+        Assert.Equal(nodeFixture, json);
+        Assert.Equal(1, document.RootElement.GetProperty("mipLevel").GetInt32());
+        Assert.Equal(0, document.RootElement.GetProperty("arrayLayer").GetInt32());
+        Assert.False(document.RootElement.TryGetProperty("depth", out _));
+        Assert.Equal("writeTexture", document.RootElement.GetProperty("operation").GetString());
+    }
+
+    [Theory]
+    [InlineData("{\"version\":1,\"operation\":\"writeBuffer\",\"handle\":{\"deviceId\":\"11111111-1111-1111-1111-111111111111\",\"kind\":\"texture\",\"slot\":1,\"generation\":1},\"offset\":0,\"dataBase64\":\"AA==\"}", typeof(RekallAgeWebGpuWriteBufferPacket))]
+    [InlineData("{\"version\":1,\"operation\":\"writeTexture\",\"handle\":{\"deviceId\":\"11111111-1111-1111-1111-111111111111\",\"kind\":\"buffer\",\"slot\":1,\"generation\":1},\"mipLevel\":0,\"arrayLayer\":0,\"dataBase64\":\"AA==\"}", typeof(RekallAgeWebGpuWriteTexturePacket))]
+    [InlineData("{\"version\":1,\"operation\":\"importCanvasOutput\",\"texture\":{\"deviceId\":\"11111111-1111-1111-1111-111111111111\",\"kind\":\"buffer\",\"slot\":1,\"generation\":1},\"renderTarget\":{\"deviceId\":\"11111111-1111-1111-1111-111111111111\",\"kind\":\"renderTarget\",\"slot\":2,\"generation\":1},\"width\":1,\"height\":1,\"format\":\"bgra8Unorm\"}", typeof(RekallAgeWebGpuImportCanvasOutputPacket))]
+    public void LiteralWrongKindOperationPacketsFailClosed(string json, Type packetType)
+    {
+        var exception = packetType == typeof(RekallAgeWebGpuWriteBufferPacket)
+            ? Assert.Throws<RekallAgeWebGpuProtocolException>(() => RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuWriteBufferPacket>(json))
+            : packetType == typeof(RekallAgeWebGpuWriteTexturePacket)
+                ? Assert.Throws<RekallAgeWebGpuProtocolException>(() => RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuWriteTexturePacket>(json))
+                : Assert.Throws<RekallAgeWebGpuProtocolException>(() => RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuImportCanvasOutputPacket>(json));
+
+        Assert.Equal("REKALL_WEBGPU_PROTOCOL_RESOURCE_TYPE_MISMATCH", exception.Diagnostic.Code);
+    }
+
+    [Fact]
+    public void LiteralRenderTargetPacketRejectsWrongKindAttachmentTexture()
+    {
+        const string json = "{\"version\":1,\"operation\":\"create\",\"resourceType\":\"renderTarget\",\"handle\":{\"deviceId\":\"11111111-1111-1111-1111-111111111111\",\"kind\":\"renderTarget\",\"slot\":2,\"generation\":1},\"descriptor\":{\"colorAttachments\":[{\"texture\":{\"deviceId\":\"11111111-1111-1111-1111-111111111111\",\"kind\":\"buffer\",\"slot\":1,\"generation\":1},\"mipLevel\":0,\"arrayLayer\":0}],\"depthStencilAttachment\":null,\"width\":1,\"height\":1}}";
+
+        var exception = Assert.Throws<RekallAgeWebGpuProtocolException>(() =>
+            RekallAgeWebGpuProtocol.Deserialize<RekallAgeWebGpuCreatePacket>(json));
+
+        Assert.Equal("REKALL_WEBGPU_PROTOCOL_DESCRIPTOR_INVALID", exception.Diagnostic.Code);
+    }
+
     [Theory]
     [InlineData(RekallAgeIndexFormat.UInt16, "uint16")]
     [InlineData(RekallAgeIndexFormat.UInt32, "uint32")]

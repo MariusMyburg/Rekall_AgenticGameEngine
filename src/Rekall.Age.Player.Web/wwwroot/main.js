@@ -20,7 +20,9 @@ setModuleImports('main.js', {
     webgpu: {
         initialize: async canvasSelector => JSON.stringify(await webgpu.initialize(canvasSelector)),
         execute: packet => JSON.stringify(webgpu.execute(packet)),
-        flush: async () => JSON.stringify(await webgpu.flush())
+        flush: async () => JSON.stringify(await webgpu.flush()),
+        canvasWidth: () => canvas.width,
+        canvasHeight: () => canvas.height
     },
     dom: {
         setText: (selector, value) => document.querySelector(selector).textContent = value,

@@ -68,6 +68,22 @@ public static class RekallAgeRenderingDeviceValidator
                 "Readback memory requires Readback buffer usage.",
                 descriptor.Label));
         }
+        if (descriptor.Usage.HasFlag(RekallAgeBufferUsage.Readback)
+            && descriptor.MemoryAccess != RekallAgeMemoryAccess.Readback)
+        {
+            diagnostics.Add(new(
+                "REKALL_GPU_BUFFER_ACCESS_INVALID",
+                "Readback usage requires Readback memory access.",
+                descriptor.Label));
+        }
+        if (descriptor.Usage.HasFlag(RekallAgeBufferUsage.Readback)
+            && (descriptor.Usage & ~RekallAgeBufferUsage.Readback) != RekallAgeBufferUsage.TransferDestination)
+        {
+            diagnostics.Add(new(
+                "REKALL_GPU_BUFFER_USAGE_COMBINATION_UNSUPPORTED",
+                "Readback buffers must combine Readback with exactly TransferDestination usage.",
+                descriptor.Label));
+        }
 
         return new(diagnostics);
     }

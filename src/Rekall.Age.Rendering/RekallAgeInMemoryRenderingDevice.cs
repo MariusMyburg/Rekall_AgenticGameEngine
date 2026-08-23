@@ -132,6 +132,10 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
                         {
                             diagnostics.Add(new("REKALL_GPU_TEXTURE_BINDING_RANGE_INVALID", $"Binding {expected.Binding} texture bindings cannot declare byte ranges.", descriptor.Label));
                         }
+                        if (!TextureBindingMetadataMatches(expected, texture))
+                        {
+                            diagnostics.Add(new("REKALL_GPU_TEXTURE_BINDING_METADATA_MISMATCH", $"Binding {expected.Binding} texture metadata does not match the referenced texture descriptor.", descriptor.Label));
+                        }
                     }
                 }
                 if (descriptor.Entries.Select(entry => entry.Binding).Distinct().Count() != descriptor.Entries.Count)
@@ -148,6 +152,36 @@ public sealed class RekallAgeInMemoryRenderingDevice : IRekallAgeRenderingDevice
         return diagnostics.Count == 0
             ? Create(RekallAgeGraphicsResourceKind.BindingSet, descriptor, descriptor.Label, 0)
             : new(default, diagnostics);
+    }
+
+    private static bool TextureBindingMetadataMatches(RekallAgeBindingLayoutEntry entry, RekallAgeTextureDescriptor texture)
+    {
+        var metadata = entry.Texture ?? new RekallAgeTextureBindingMetadata();
+        var viewMatches = metadata.ViewDimension switch
+        {
+            RekallAgeTextureViewDimension.Texture1D => texture.Dimension == RekallAgeTextureDimension.Texture1D,
+            RekallAgeTextureViewDimension.Texture2D => texture.Dimension == RekallAgeTextureDimension.Texture2D && texture.ArrayLayers == 1,
+            RekallAgeTextureViewDimension.Texture2DArray => texture.Dimension == RekallAgeTextureDimension.Texture2D && texture.ArrayLayers > 1,
+            RekallAgeTextureViewDimension.Cube => texture.Dimension == RekallAgeTextureDimension.Cube && texture.ArrayLayers == 6,
+            RekallAgeTextureViewDimension.CubeArray => texture.Dimension == RekallAgeTextureDimension.Cube && texture.ArrayLayers > 6 && texture.ArrayLayers % 6 == 0,
+            RekallAgeTextureViewDimension.Texture3D => texture.Dimension == RekallAgeTextureDimension.Texture3D,
+            _ => false
+        };
+        var expectedSampleType = texture.Format switch
+        {
+            RekallAgeTextureFormat.Depth24Stencil8 or RekallAgeTextureFormat.Depth32Float => RekallAgeTextureSampleType.Depth,
+            RekallAgeTextureFormat.R32Float => RekallAgeTextureSampleType.UnfilterableFloat,
+            _ => RekallAgeTextureSampleType.Float
+        };
+        var sampleMatches = entry.Type != RekallAgeBindingType.SampledTexture
+            || metadata.SampleType == expectedSampleType && metadata.Multisampled == (texture.SampleCount > 1);
+        var storageMatches = entry.Type switch
+        {
+            RekallAgeBindingType.ReadOnlyStorageTexture => metadata.StorageFormat == texture.Format && metadata.StorageAccess == RekallAgeStorageTextureAccess.ReadOnly && texture.SampleCount == 1,
+            RekallAgeBindingType.StorageTexture => metadata.StorageFormat == texture.Format && metadata.StorageAccess is RekallAgeStorageTextureAccess.WriteOnly or RekallAgeStorageTextureAccess.ReadWrite && texture.SampleCount == 1,
+            _ => true
+        };
+        return viewMatches && sampleMatches && storageMatches;
     }
 
     public RekallAgeGraphicsResourceCreationResult CreateGraphicsPipeline(RekallAgeGraphicsPipelineDescriptor descriptor)

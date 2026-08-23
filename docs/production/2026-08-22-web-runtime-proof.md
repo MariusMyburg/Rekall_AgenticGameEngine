@@ -65,9 +65,9 @@ or trimming opt-out was added.
 
 Final GREEN evidence:
 
-- The focused WebGPU C# selection passed 69/69, including complete supported
+- The focused WebGPU C# selection passed 80/80, including complete supported
   descriptor/command/packet dispatch and nested bridge-result rejection.
-- The Node browser-executor suite passed 9/9.
+- The Node browser-executor suite passed 15/15.
 - The Release browser Player build completed with zero warnings and zero errors.
 - A clean-output trimmed browser publish completed with zero warnings and zero
   errors and emitted both the fingerprinted `webgpu-device` JavaScript module
@@ -83,4 +83,15 @@ spellings were accepted on input. A dedicated source-generation-compatible
 canonical protocol strings. Numeric, unknown, and legacy `uInt*` spellings fail
 closed as invalid command payloads. A real Node executor test submits both
 canonical variants through `setIndexBuffer` and verifies the exact browser API
-arguments. The updated 69/69 C# and 9/9 Node totals above include this coverage.
+arguments. The updated totals above include this coverage.
+
+The final Task 3 review also proved bounded and balanced validation error
+scopes under more than 64 operations, strict protocol-v1 3D writes whose full
+mip depth is derived from the retained texture descriptor, declared bind-group
+texture views and generic texture-metadata compatibility, requested-device
+limits/features plus a typed preferred canvas format, legal readback usage,
+strict resource-kind lookup, and bounded bridge responses. The final 80/80 C#
+and 15/15 Node totals include these cases. A fresh clean-output Release publish
+again completed trimming and native WASM linking with zero warnings/errors and
+emitted fingerprinted `main`, `webgpu-device`, and
+`Rekall.Age.Rendering.WebGpu` WASM modules.

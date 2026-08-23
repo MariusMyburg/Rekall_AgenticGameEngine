@@ -13,6 +13,9 @@
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\src\Rekall.Age.Player.Web\tests\fixtures\webgpu-write-texture-3d-v1.json" Link="Fixtures\webgpu-write-texture-3d-v1.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />

@@ -5,6 +5,7 @@ const MAX_DIAGNOSTIC_CODE_BYTES = 128;
 const MAX_DIAGNOSTIC_MESSAGE_BYTES = 2048;
 const MAX_DIAGNOSTIC_TARGET_BYTES = 1024;
 const MAX_PENDING = 64;
+const deviceLimitNames = ['maxBufferSize', 'maxTextureDimension1D', 'maxTextureDimension2D', 'maxTextureDimension3D', 'maxTextureArrayLayers', 'maxColorAttachments', 'maxBindingsPerBindGroup', 'maxVertexBuffers', 'maxVertexAttributes', 'maxVertexBufferArrayStride', 'maxComputeWorkgroupsPerDimension'];
 
 const bufferUsage = { mapRead: 1, mapWrite: 2, copySource: 4, copyDestination: 8, index: 16, vertex: 32, uniform: 64, storage: 128, indirect: 256 };
 const textureUsage = { copySource: 1, copyDestination: 2, textureBinding: 4, storageBinding: 8, renderAttachment: 16 };
@@ -18,8 +19,16 @@ const filterModes = { nearest: 'nearest', linear: 'linear' };
 const addressModes = { clampToEdge: 'clamp-to-edge', repeat: 'repeat', mirrorRepeat: 'mirror-repeat' };
 const stageVisibility = { vertex: 1, fragment: 2, compute: 4 };
 
-function bounded(value, maximum) { const text = String(value ?? ''); let end = text.length; while (end > 0 && bytes(text.slice(0, end)) > maximum) end--; return text.slice(0, end); }
-function result(succeeded = true, diagnostics = [], extra = {}) { return { succeeded: succeeded && diagnostics.length === 0, diagnostics: diagnostics.slice(0, MAX_DIAGNOSTICS), ...extra }; }
+function bounded(value, maximum) {
+    const text = String(value ?? ''); let used = 0; let output = '';
+    for (const character of text) {
+        const codePoint = character.codePointAt(0); const size = codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4;
+        if (used + size > maximum) break;
+        used += size; output += character;
+    }
+    return output;
+}
+function result(succeeded = true, diagnostics = [], extra = {}) { return { succeeded: succeeded && diagnostics.length === 0, diagnostics: diagnostics.slice(0, MAX_DIAGNOSTICS).map(item => diagnostic(item?.code, item?.message, item?.target)), ...extra }; }
 function diagnostic(code, message, target) { return { code: bounded(code, MAX_DIAGNOSTIC_CODE_BYTES), message: bounded(message, MAX_DIAGNOSTIC_MESSAGE_BYTES), ...(target ? { target: bounded(target, MAX_DIAGNOSTIC_TARGET_BYTES) } : {}) }; }
 function enumValue(map, value, name) { const mapped = map[value]; if (!mapped) throw new Error(`REKALL_WEBGPU_${name}_INVALID`); return mapped; }
 function key(handle) {
@@ -51,7 +60,7 @@ export function createWebGpuExecutor(environment = {}) {
     const object = (handle, expectedKind) => { if (expectedKind && handle?.kind !== expectedKind) throw new Error('REKALL_WEBGPU_RESOURCE_KIND_MISMATCH'); const map = maps[expectedKind ?? handle?.kind]; const value = map?.get(key(handle)); if (!value) throw new Error('REKALL_WEBGPU_RESOURCE_MISSING'); return value; };
     const store = (handle, value) => { const map = maps[handle.kind]; if (!map || map.has(key(handle))) throw new Error('REKALL_WEBGPU_RESOURCE_DUPLICATE'); map.set(key(handle), value); };
     const beginScope = () => device.pushErrorScope?.('validation');
-    const endScope = () => { if (pendingScopes.length >= MAX_PENDING) { pendingOverflow = true; return; } pendingScopes.push(Promise.resolve(device.popErrorScope?.()).then(error => { if (error) addDiagnostic(diagnostic('REKALL_WEBGPU_VALIDATION_ERROR', error.message ?? 'WebGPU validation failed.')); }).catch(error => addDiagnostic(diagnostic('REKALL_WEBGPU_ERROR_SCOPE_FAILED', 'WebGPU error scope failed.', error?.name)))); };
+    const endScope = () => { pendingScopes.push(Promise.resolve(device.popErrorScope?.()).then(error => { if (error) addDiagnostic(diagnostic('REKALL_WEBGPU_VALIDATION_ERROR', error.message ?? 'WebGPU validation failed.')); }).catch(error => addDiagnostic(diagnostic('REKALL_WEBGPU_ERROR_SCOPE_FAILED', 'WebGPU error scope failed.', error?.name)))); };
 
     async function initialize(canvasSelector = '#viewport') {
         try {
@@ -68,7 +77,8 @@ export function createWebGpuExecutor(environment = {}) {
             device.addEventListener?.('uncapturederror', event => addDiagnostic(diagnostic('REKALL_WEBGPU_UNCAPTURED_ERROR', event.error?.message ?? 'WebGPU reported an uncaptured error.')));
             device.lost?.then(info => { lost = true; addDiagnostic(diagnostic('REKALL_WEBGPU_DEVICE_LOST', info?.message ?? 'The WebGPU device was lost.', info?.reason)); });
             initialized = true;
-            return result(true, pendingDiagnostics.splice(0), { capabilities: { preferredCanvasFormat: canvasFormat, limits: adapter.limits ?? device.limits ?? {}, features: Array.from(device.features ?? []) } });
+            const limits = Object.fromEntries(deviceLimitNames.filter(name => device.limits?.[name] !== undefined).map(name => [name, device.limits[name]]));
+            return result(true, pendingDiagnostics.splice(0), { capabilities: { preferredCanvasFormat: canvasFormat, limits, features: Array.from(device.features ?? []) } });
         } catch (error) { return result(false, [diagnostic('REKALL_WEBGPU_INITIALIZE_FAILED', 'WebGPU initialization failed.', error?.name)]); }
     }
 
@@ -80,8 +90,11 @@ export function createWebGpuExecutor(environment = {}) {
             case 'buffer': {
                 let usage = bitFlags(descriptor.usage, Object.fromEntries(Object.entries(bufferUsageMap).map(([age, gpu]) => [age, gpuBufferUsage(gpu)])), 'BUFFER_USAGE');
                 if (descriptor.memoryAccess === 'upload') usage |= gpuBufferUsage('copyDestination');
-                else if (descriptor.memoryAccess === 'readback') usage |= gpuBufferUsage('mapRead');
+                else if (descriptor.memoryAccess === 'readback') {
+                    if (usage !== (gpuBufferUsage('mapRead') | gpuBufferUsage('copyDestination'))) throw new Error('REKALL_WEBGPU_BUFFER_USAGE_COMBINATION_UNSUPPORTED');
+                }
                 else if (descriptor.memoryAccess !== 'deviceLocal') throw new Error('REKALL_WEBGPU_MEMORY_ACCESS_INVALID');
+                if (descriptor.memoryAccess !== 'readback' && (usage & gpuBufferUsage('mapRead')) !== 0) throw new Error('REKALL_WEBGPU_MEMORY_ACCESS_INVALID');
                 store(packet.handle, { value: device.createBuffer({ size: descriptor.sizeBytes, usage, label: descriptor.label }), descriptor }); break;
             }
             case 'texture': store(packet.handle, { value: device.createTexture({ size: { width: descriptor.width, height: descriptor.height, depthOrArrayLayers: descriptor.dimension === 'texture3D' ? descriptor.depth : descriptor.arrayLayers }, dimension: enumValue({ texture1D: '1d', texture2D: '2d', texture3D: '3d', cube: '2d' }, descriptor.dimension, 'TEXTURE_DIMENSION'), format: enumValue(textureFormats, descriptor.format, 'TEXTURE_FORMAT'), usage: bitFlags(descriptor.usage, Object.fromEntries(Object.entries(textureUsageMap).map(([age, gpu]) => [age, gpuTextureUsage(gpu)])), 'TEXTURE_USAGE'), mipLevelCount: descriptor.mipLevels, sampleCount: descriptor.sampleCount, label: descriptor.label }), descriptor }); break;
@@ -103,7 +116,11 @@ export function createWebGpuExecutor(environment = {}) {
             }
             case 'renderPipeline': store(packet.handle, createRenderPipeline(descriptor)); break;
             case 'computePipeline': store(packet.handle, createComputePipeline(descriptor)); break;
-            case 'renderTarget': store(packet.handle, { descriptor }); break;
+            case 'renderTarget': {
+                descriptor.colorAttachments?.forEach(attachment => object(attachment.texture, 'texture'));
+                if (descriptor.depthStencilAttachment) object(descriptor.depthStencilAttachment.texture, 'texture');
+                store(packet.handle, { descriptor }); break;
+            }
             default: throw new Error('REKALL_WEBGPU_RESOURCE_KIND_INVALID');
         }
     }
@@ -126,8 +143,10 @@ export function createWebGpuExecutor(environment = {}) {
         const type = layoutEntry.type;
         if (type.endsWith('Buffer')) { const resource = object(entry.resource, 'buffer'); return { buffer: resource.value, offset: entry.offset ?? 0, ...(entry.sizeBytes ? { size: entry.sizeBytes } : {}) }; }
         if (type === 'sampler' || type === 'comparisonSampler') return object(entry.resource, 'sampler').value;
-        const resource = object(entry.resource, 'texture');
-        return resource.value.createView();
+        const resource = object(entry.resource, 'texture'); const metadata = layoutEntry.texture ?? {};
+        const dimension = enumValue({ texture1D: '1d', texture2D: '2d', texture2DArray: '2d-array', cube: 'cube', cubeArray: 'cube-array', texture3D: '3d' }, metadata.viewDimension ?? 'texture2D', 'TEXTURE_VIEW_DIMENSION');
+        const aspect = metadata.sampleType === 'depth' ? 'depth-only' : 'all';
+        return resource.value.createView({ dimension, aspect, baseMipLevel: 0, mipLevelCount: resource.descriptor.mipLevels, baseArrayLayer: 0, arrayLayerCount: resource.descriptor.dimension === 'texture3D' ? 1 : resource.descriptor.arrayLayers });
     }
     function createRenderPipeline(descriptor) {
         const vertex = object(descriptor.vertexShader, 'shaderModule'); const fragment = object(descriptor.fragmentShader, 'shaderModule');
@@ -136,7 +155,7 @@ export function createWebGpuExecutor(environment = {}) {
     }
     function createComputePipeline(descriptor) { const shader = object(descriptor.computeShader, 'shaderModule'); return { value: device.createComputePipeline({ layout: device.createPipelineLayout({ bindGroupLayouts: descriptor.bindingLayouts.map(handle => object(handle, 'bindingLayout').value) }), compute: { module: shader.value, entryPoint: shader.descriptor.entryPoint }, label: descriptor.label }), descriptor }; }
     function attachmentView(attachment) {
-        const texture = object(attachment.texture);
+        const texture = object(attachment.texture, 'texture');
         if (texture.canvasOutput) return context.getCurrentTexture().createView();
         return texture.value.createView({ baseMipLevel: attachment.mipLevel ?? 0, mipLevelCount: 1, baseArrayLayer: attachment.arrayLayer ?? 0, arrayLayerCount: 1 });
     }
@@ -183,19 +202,22 @@ export function createWebGpuExecutor(environment = {}) {
             if (!initialized || lost) return result(false, [diagnostic(lost ? 'REKALL_WEBGPU_DEVICE_LOST' : 'REKALL_WEBGPU_NOT_INITIALIZED', 'The WebGPU executor is not available.')]);
             if (typeof packetJson !== 'string' || bytes(packetJson) > MAX_PACKET_BYTES) return result(false, [diagnostic('REKALL_WEBGPU_PROTOCOL_PACKET_TOO_LARGE', 'WebGPU protocol packets must not exceed 16777216 UTF-8 bytes.')]);
             const packet = JSON.parse(packetJson); if (!packet || packet.version !== VERSION || typeof packet.operation !== 'string') throw new Error('REKALL_WEBGPU_PROTOCOL_INVALID');
+            if (pendingScopes.length >= MAX_PENDING || packet.operation === 'create' && packet.resourceType === 'shaderModule' && pendingCompilations.length >= MAX_PENDING) {
+                return result(false, [diagnostic('REKALL_WEBGPU_PENDING_OVERFLOW', 'WebGPU pending completion work exceeded the bounded limit; flush before recording more work.')]);
+            }
             beginScope(); scoped = true;
             if (packet.operation === 'create') create(packet);
             else if (packet.operation === 'destroy') { const resource = object(packet.handle); resource.value?.destroy?.(); maps[packet.handle.kind].delete(key(packet.handle)); }
-            else if (packet.operation === 'writeBuffer') device.queue.writeBuffer(object(packet.handle).value, packet.offset, decodeBase64(packet.dataBase64));
+            else if (packet.operation === 'writeBuffer') device.queue.writeBuffer(object(packet.handle, 'buffer').value, packet.offset, decodeBase64(packet.dataBase64));
             else if (packet.operation === 'writeTexture') {
-                const resource = object(packet.handle); const descriptor = resource.descriptor; const data = decodeBase64(packet.dataBase64);
+                const resource = object(packet.handle, 'texture'); const descriptor = resource.descriptor; const data = decodeBase64(packet.dataBase64);
                 const bytesPerPixel = descriptor.format === 'r8Unorm' ? 1 : descriptor.format === 'rg8Unorm' ? 2 : descriptor.format === 'rgba16Float' ? 8 : 4;
                 const width = Math.max(1, descriptor.width >> packet.mipLevel); const height = descriptor.dimension === 'texture1D' ? 1 : Math.max(1, descriptor.height >> packet.mipLevel);
-                const depth = packet.depth ?? 1;
-                if (!Number.isInteger(packet.mipLevel) || packet.mipLevel < 0 || !Number.isInteger(packet.arrayLayer) || packet.arrayLayer < 0 || !Number.isInteger(depth) || depth < 1) throw new Error('REKALL_WEBGPU_TEXTURE_UPLOAD_INVALID');
+                const depth = descriptor.dimension === 'texture3D' ? Math.max(1, descriptor.depth >> packet.mipLevel) : 1;
+                if (!Number.isInteger(packet.mipLevel) || packet.mipLevel < 0 || packet.mipLevel >= descriptor.mipLevels || !Number.isInteger(packet.arrayLayer) || packet.arrayLayer < 0 || descriptor.dimension === 'texture3D' && packet.arrayLayer !== 0 || descriptor.dimension !== 'texture3D' && packet.arrayLayer >= descriptor.arrayLayers) throw new Error('REKALL_WEBGPU_TEXTURE_UPLOAD_INVALID');
                 device.queue.writeTexture({ texture: resource.value, mipLevel: packet.mipLevel, origin: { x: 0, y: 0, z: packet.arrayLayer } }, data, { bytesPerRow: width * bytesPerPixel, rowsPerImage: height }, { width, height, depthOrArrayLayers: depth });
             }
-            else if (packet.operation === 'importCanvasOutput') { if (enumValue(textureFormats, packet.format, 'TEXTURE_FORMAT') !== canvasFormat) throw new Error('REKALL_WEBGPU_CANVAS_FORMAT_MISMATCH'); store(packet.texture, { canvasOutput: true, descriptor: { format: packet.format, width: packet.width, height: packet.height } }); store(packet.renderTarget, { descriptor: { colorAttachments: [{ texture: packet.texture }], depthStencilAttachment: null, width: packet.width, height: packet.height, label: packet.label } }); }
+            else if (packet.operation === 'importCanvasOutput') { if (packet.texture?.kind !== 'texture' || packet.renderTarget?.kind !== 'renderTarget') throw new Error('REKALL_WEBGPU_RESOURCE_KIND_MISMATCH'); if (enumValue(textureFormats, packet.format, 'TEXTURE_FORMAT') !== canvasFormat) throw new Error('REKALL_WEBGPU_CANVAS_FORMAT_MISMATCH'); store(packet.texture, { canvasOutput: true, descriptor: { dimension: 'texture2D', format: packet.format, width: packet.width, height: packet.height, depth: 1, mipLevels: 1, arrayLayers: 1, sampleCount: 1 } }); store(packet.renderTarget, { descriptor: { colorAttachments: [{ texture: packet.texture }], depthStencilAttachment: null, width: packet.width, height: packet.height, label: packet.label } }); }
             else if (packet.operation === 'submit') executeSubmission(packet);
             else throw new Error('REKALL_WEBGPU_OPERATION_INVALID');
             endScope(); scoped = false;

@@ -20,11 +20,22 @@ else
         BrowserHost.SetText("#state", initialization.Diagnostics.FirstOrDefault()?.Code ?? "WEBGPU INITIALIZATION FAILED");
         BrowserHost.SetReady(false);
     }
-    else if (bridge.Capabilities is { } capabilities)
+    else if (bridge.Initialization is { Succeeded: true, Capabilities: { } capabilities, PreferredCanvasFormat: { } canvasFormat })
     {
-        _ = new Rekall.Age.Rendering.WebGpu.RekallAgeWebGpuRenderingDevice(bridge, capabilities);
-        BrowserHost.SetText("#state", "WEBGPU DEVICE READY");
-        BrowserHost.SetReady(true);
+        using var device = new Rekall.Age.Rendering.WebGpu.RekallAgeWebGpuRenderingDevice(bridge, capabilities);
+        var output = device.ImportCanvasOutput(BrowserHost.CanvasWidth(), BrowserHost.CanvasHeight(), canvasFormat);
+        var flush = output.Created ? await device.FlushAsync() : new RekallAgeGraphicsValidationResult(output.Diagnostics);
+        if (flush.Valid)
+        {
+            BrowserHost.SetText("#state", "WEBGPU DEVICE READY");
+            BrowserHost.SetReady(true);
+            await Task.Delay(Timeout.InfiniteTimeSpan);
+        }
+        else
+        {
+            BrowserHost.SetText("#state", flush.Diagnostics.FirstOrDefault()?.Code ?? "REKALL_WEBGPU_CANVAS_IMPORT_FAILED");
+            BrowserHost.SetReady(false);
+        }
     }
     else { BrowserHost.SetText("#state", "REKALL_WEBGPU_CAPABILITIES_INVALID"); BrowserHost.SetReady(false); }
 }
@@ -44,6 +55,12 @@ internal static partial class BrowserHost
 
     [JSImport("webgpu.flush", "main.js")]
     internal static partial Task<string> FlushWebGpuAsync();
+
+    [JSImport("webgpu.canvasWidth", "main.js")]
+    internal static partial int CanvasWidth();
+
+    [JSImport("webgpu.canvasHeight", "main.js")]
+    internal static partial int CanvasHeight();
 
     [JSImport("dom.setText", "main.js")]
     internal static partial void SetText(string selector, string value);

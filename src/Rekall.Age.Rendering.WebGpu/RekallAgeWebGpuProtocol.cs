@@ -35,7 +35,6 @@ public sealed record RekallAgeWebGpuWriteTexturePacket(
     int MipLevel,
     int ArrayLayer,
     string DataBase64,
-    int Depth = 1,
     string Operation = "writeTexture") : IRekallAgeWebGpuPacket;
 
 public sealed record RekallAgeWebGpuCommandPacket(string Kind, JsonElement Data);
@@ -56,6 +55,14 @@ public sealed record RekallAgeWebGpuImportCanvasOutputPacket(
     string? Label,
     string Operation = "importCanvasOutput") : IRekallAgeWebGpuPacket;
 
+public sealed record RekallAgeWebGpuInitializationResult(
+    RekallAgeRenderingDeviceCapabilities? Capabilities,
+    RekallAgeTextureFormat? PreferredCanvasFormat,
+    IReadOnlyList<RekallAgeGraphicsDiagnostic> Diagnostics)
+{
+    public bool Succeeded => Capabilities is not null && PreferredCanvasFormat.HasValue && Diagnostics.Count == 0;
+}
+
 public sealed class RekallAgeWebGpuProtocolException : Exception
 {
     public RekallAgeWebGpuProtocolException(RekallAgeGraphicsDiagnostic diagnostic, Exception? innerException = null)
@@ -72,6 +79,11 @@ public static class RekallAgeWebGpuProtocol
     public const int Version = 1;
     public const int MaximumPacketBytes = 16 * 1024 * 1024;
     public const int MaximumLabelBytes = 1024;
+    public const int MaximumBridgeResultBytes = 256 * 1024;
+    public const int MaximumBridgeDiagnosticCount = 64;
+    public const int MaximumBridgeDiagnosticCodeBytes = 128;
+    public const int MaximumBridgeDiagnosticMessageBytes = 2048;
+    public const int MaximumBridgeDiagnosticTargetBytes = 1024;
 
     public static string Serialize<T>(T value)
     {
@@ -141,23 +153,87 @@ public static class RekallAgeWebGpuProtocol
 
     public static RekallAgeWebGpuBridgeResult DeserializeBridgeResult(string? json)
     {
+        if (json is null || Encoding.UTF8.GetByteCount(json) > MaximumBridgeResultBytes)
+        {
+            return InvalidBridgeResult();
+        }
         try
         {
-            var envelope = JsonSerializer.Deserialize(json ?? string.Empty, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuBridgeEnvelope);
+            var envelope = JsonSerializer.Deserialize(json, RekallAgeWebGpuJsonContext.Strict.RekallAgeWebGpuBridgeEnvelope);
             if (envelope?.Diagnostics is null
-                || envelope.Diagnostics.Any(item => item.Code is null || item.Message is null))
+                || envelope.Diagnostics.Count > MaximumBridgeDiagnosticCount
+                || envelope.Diagnostics.Any(item => item.Code is null || item.Message is null
+                    || !WithinBound(item.Code, MaximumBridgeDiagnosticCodeBytes)
+                    || !WithinBound(item.Message, MaximumBridgeDiagnosticMessageBytes)
+                    || item.Target is not null && !WithinBound(item.Target, MaximumBridgeDiagnosticTargetBytes)))
             {
                 return InvalidBridgeResult();
             }
 
             return new(envelope.Succeeded, envelope.Diagnostics
-                .Take(64)
                 .Select(item => new RekallAgeGraphicsDiagnostic(item.Code!, item.Message!, item.Target))
                 .ToArray());
         }
         catch (JsonException)
         {
             return InvalidBridgeResult();
+        }
+    }
+
+    public static RekallAgeWebGpuInitializationResult DeserializeInitializationResult(string? json)
+    {
+        var bridge = DeserializeBridgeResult(json);
+        if (!bridge.Succeeded)
+        {
+            return new(null, null, bridge.Diagnostics);
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json!);
+            if (!document.RootElement.TryGetProperty("capabilities", out var capabilities)
+                || capabilities.ValueKind != JsonValueKind.Object
+                || !capabilities.TryGetProperty("preferredCanvasFormat", out var preferred)
+                || preferred.ValueKind != JsonValueKind.String
+                || !TryParseCanvasFormat(preferred.GetString(), out var format)
+                || !capabilities.TryGetProperty("limits", out var limits)
+                || limits.ValueKind != JsonValueKind.Object
+                || !capabilities.TryGetProperty("features", out var featuresElement)
+                || featuresElement.ValueKind != JsonValueKind.Array
+                || featuresElement.EnumerateArray().Any(item => item.ValueKind != JsonValueKind.String)
+                || !TryGetPositiveUInt64(limits, "maxBufferSize", out var maxBufferSize)
+                || !TryGetPositiveInt32(limits, "maxTextureDimension1D", out var maxTexture1D)
+                || !TryGetPositiveInt32(limits, "maxTextureDimension2D", out var maxTexture2D)
+                || !TryGetPositiveInt32(limits, "maxTextureDimension3D", out var maxTexture3D)
+                || !TryGetPositiveInt32(limits, "maxTextureArrayLayers", out var maxTextureLayers)
+                || !TryGetPositiveInt32(limits, "maxColorAttachments", out var maxColorAttachments)
+                || !TryGetPositiveInt32(limits, "maxBindingsPerBindGroup", out var maxBindings)
+                || !TryGetPositiveInt32(limits, "maxVertexBuffers", out var maxVertexBuffers)
+                || !TryGetPositiveInt32(limits, "maxVertexAttributes", out var maxVertexAttributes)
+                || !TryGetPositiveInt32(limits, "maxVertexBufferArrayStride", out var maxVertexStride)
+                || !TryGetPositiveUInt32(limits, "maxComputeWorkgroupsPerDimension", out var maxComputeWorkgroups))
+            {
+                return InvalidInitializationResult();
+            }
+
+            var features = featuresElement.EnumerateArray().Select(item => item.GetString()!).ToHashSet(StringComparer.Ordinal);
+            var deviceCapabilities = new RekallAgeRenderingDeviceCapabilities(
+                "WebGPU", maxBufferSize, maxTexture1D, maxTexture2D, maxTexture3D, maxTextureLayers,
+                maxColorAttachments, maxBindings, MaximumSamplerAnisotropy: 16,
+                MaximumShaderSourceBytes: 1024 * 1024, SupportsCompute: true, SupportsStorageBuffers: true,
+                SupportsStorageTextures: true, SupportsIndirectDrawing: true, SupportsTimestampQueries: features.Contains("timestamp-query"))
+            {
+                MaximumVertexBuffers = maxVertexBuffers,
+                MaximumVertexAttributes = maxVertexAttributes,
+                MaximumVertexBufferStrideBytes = maxVertexStride,
+                MaximumComputeWorkgroupsPerDimension = maxComputeWorkgroups,
+                SupportsIndirectDispatch = true
+            };
+            return new(deviceCapabilities, format, []);
+        }
+        catch (JsonException)
+        {
+            return InvalidInitializationResult();
         }
     }
 
@@ -267,10 +343,10 @@ public static class RekallAgeWebGpuProtocol
         {
             RekallAgeWebGpuCreatePacket createPacket => (T)(object)NormalizeCreatePacket(createPacket, allowNumericDescriptorEnums),
             RekallAgeWebGpuDestroyPacket destroyPacket => (T)(object)ValidateOperation(destroyPacket, destroyPacket.Operation, "destroy"),
-            RekallAgeWebGpuWriteBufferPacket writeBufferPacket => (T)(object)ValidateOperation(writeBufferPacket, writeBufferPacket.Operation, "writeBuffer"),
-            RekallAgeWebGpuWriteTexturePacket writeTexturePacket => (T)(object)ValidateOperation(writeTexturePacket, writeTexturePacket.Operation, "writeTexture"),
+            RekallAgeWebGpuWriteBufferPacket writeBufferPacket => (T)(object)ValidateHandleKind(ValidateOperation(writeBufferPacket, writeBufferPacket.Operation, "writeBuffer"), writeBufferPacket.Handle, RekallAgeGraphicsResourceKind.Buffer),
+            RekallAgeWebGpuWriteTexturePacket writeTexturePacket => (T)(object)ValidateHandleKind(ValidateOperation(writeTexturePacket, writeTexturePacket.Operation, "writeTexture"), writeTexturePacket.Handle, RekallAgeGraphicsResourceKind.Texture),
             RekallAgeWebGpuSubmitPacket submitPacket => (T)(object)ValidateSubmission(submitPacket),
-            RekallAgeWebGpuImportCanvasOutputPacket importPacket => (T)(object)ValidateOperation(importPacket, importPacket.Operation, "importCanvasOutput"),
+            RekallAgeWebGpuImportCanvasOutputPacket importPacket => (T)(object)ValidateImportPacket(importPacket),
             _ => throw InvalidPacket("WebGPU protocol packets must use a known packet type.")
         };
     }
@@ -302,6 +378,10 @@ public static class RekallAgeWebGpuProtocol
         try
         {
             var descriptor = NormalizeDescriptor(packet.Descriptor, resourceKind, allowNumericDescriptorEnums);
+            if (resourceKind == RekallAgeGraphicsResourceKind.RenderTarget && !ValidateRenderTargetAttachmentHandles(descriptor))
+            {
+                throw InvalidDescriptor();
+            }
             return ValidateOperation(packet with { Descriptor = descriptor }, packet.Operation, "create", allowMissingOperation: true);
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException or NotSupportedException or ArgumentException)
@@ -416,6 +496,68 @@ public static class RekallAgeWebGpuProtocol
             "WebGPU protocol packets must use the expected operation name."));
     }
 
+    private static T ValidateHandleKind<T>(T packet, RekallAgeGraphicsResourceHandle handle, RekallAgeGraphicsResourceKind expected)
+    {
+        if (!handle.IsValid || handle.Kind != expected)
+        {
+            throw new RekallAgeWebGpuProtocolException(new(
+                "REKALL_WEBGPU_PROTOCOL_RESOURCE_TYPE_MISMATCH",
+                "WebGPU protocol operation handle kind does not match the required resource type."));
+        }
+        return packet;
+    }
+
+    private static RekallAgeWebGpuImportCanvasOutputPacket ValidateImportPacket(RekallAgeWebGpuImportCanvasOutputPacket packet)
+    {
+        ValidateOperation(packet, packet.Operation, "importCanvasOutput");
+        ValidateHandleKind(packet, packet.Texture, RekallAgeGraphicsResourceKind.Texture);
+        return ValidateHandleKind(packet, packet.RenderTarget, RekallAgeGraphicsResourceKind.RenderTarget);
+    }
+
+    private static bool ValidateRenderTargetAttachmentHandles(JsonElement descriptor)
+    {
+        if (!descriptor.TryGetProperty("colorAttachments", out var colors) || colors.ValueKind != JsonValueKind.Array
+            || colors.EnumerateArray().Any(attachment => !ValidateHandle(attachment, "texture", "texture"))) return false;
+        return !descriptor.TryGetProperty("depthStencilAttachment", out var depth)
+            || depth.ValueKind == JsonValueKind.Null
+            || depth.ValueKind == JsonValueKind.Object && ValidateHandle(depth, "texture", "texture");
+    }
+
+    private static bool WithinBound(string value, int maximumBytes) =>
+        value.Length <= maximumBytes && Encoding.UTF8.GetByteCount(value) <= maximumBytes;
+
+    private static bool TryParseCanvasFormat(string? value, out RekallAgeTextureFormat format)
+    {
+        format = value switch
+        {
+            "bgra8unorm" => RekallAgeTextureFormat.Bgra8Unorm,
+            "rgba8unorm" => RekallAgeTextureFormat.Rgba8Unorm,
+            _ => default
+        };
+        return value is "bgra8unorm" or "rgba8unorm";
+    }
+
+    private static bool TryGetPositiveUInt64(JsonElement limits, string name, out ulong value)
+    {
+        value = 0;
+        return limits.TryGetProperty(name, out var element) && element.ValueKind == JsonValueKind.Number
+            && element.TryGetUInt64(out value) && value > 0;
+    }
+
+    private static bool TryGetPositiveInt32(JsonElement limits, string name, out int value)
+    {
+        value = 0;
+        return limits.TryGetProperty(name, out var element) && element.ValueKind == JsonValueKind.Number
+            && element.TryGetInt32(out value) && value > 0;
+    }
+
+    private static bool TryGetPositiveUInt32(JsonElement limits, string name, out uint value)
+    {
+        value = 0;
+        return limits.TryGetProperty(name, out var element) && element.ValueKind == JsonValueKind.Number
+            && element.TryGetUInt32(out value) && value > 0;
+    }
+
     private static bool IsKnownCommand(string? kind) => kind is
         "copyBuffer" or "beginRenderPass" or "setRenderPipeline" or "setComputePipeline"
         or "setBindingSet" or "setVertexBuffer" or "setIndexBuffer" or "draw" or "drawIndexed"
@@ -517,6 +659,9 @@ public static class RekallAgeWebGpuProtocol
 
     private static RekallAgeWebGpuBridgeResult InvalidBridgeResult() =>
         new(false, [new("REKALL_WEBGPU_BRIDGE_RESULT_INVALID", "The browser WebGPU bridge returned an invalid result.")]);
+
+    private static RekallAgeWebGpuInitializationResult InvalidInitializationResult() =>
+        new(null, null, [new("REKALL_WEBGPU_CAPABILITIES_INVALID", "The browser WebGPU bridge did not report complete valid device capabilities.")]);
 
     private static RekallAgeWebGpuProtocolException InvalidDescriptor(Exception? exception = null) => new(
         new("REKALL_WEBGPU_PROTOCOL_DESCRIPTOR_INVALID", "WebGPU create packet descriptors must be present, valid, and supported."),

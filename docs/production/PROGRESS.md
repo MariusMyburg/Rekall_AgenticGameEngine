@@ -4,9 +4,30 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 13:30 Africa/Johannesburg
+Last verified: 2026-08-23 14:34 Africa/Johannesburg
 
-Branch: `codex/studio-interaction`
+Branch: `codex/model-asset-foundation`
+
+The first stable Model Asset lifecycle is now available through the default
+CLI/Studio command registry and its derived MCP catalog. The canonical surface
+is `rekall.asset.model.publish`, `rekall.asset.model.rebuild`,
+`rekall.asset.model.inspect`, `rekall.asset.model.list`, and
+`rekall.scene.instantiate_asset`. One shared concrete publishing service now
+supplies dependency health to placement through the dependency-neutral Assets
+contract; LevelDesign does not depend on AssetPipeline. A registry-only
+end-to-end proof creates an editable mesh, publishes and lists a stable Model
+Asset, creates a scene, places the asset, inspects the entity, attaches and
+retains `Game.HeroState`, edits the source into Stale health, rebuilds to
+Current, and proves the same entity ID, `Rekall.ModelAssetReference` asset ID,
+and agent-owned component values survive. MCP discoverability is derived from
+the registry rather than a parallel tool implementation. The focused contract
+passes 1/1; Model Asset/published-output coverage passes 79/79; the modeling
+selection passes 145/145; the complete Studio suite passes 51/51; the Windows
+player prerequisite and `Rekall.AGE.sln` Release builds both succeed with zero
+warnings and zero errors. The next Studio slice is the Modeling workspace's
+Publish/Update action, a health-aware Asset Browser with viewport drag/drop
+preview, and Inspector component attachment, all as clients of these same
+commands.
 
 Studio scene interaction now uses a render-derived interaction snapshot rather
 than guessed editor geometry. Uniform-stretch letterboxing is mapped exactly;

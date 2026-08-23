@@ -1,5 +1,7 @@
 using Rekall.Age.Agent.Commands;
+using Rekall.Age.AssetPipeline;
 using Rekall.Age.AssetPipeline.Commands;
+using Rekall.Age.Assets;
 using Rekall.Age.Assets.Commands;
 using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
@@ -15,6 +17,7 @@ using Rekall.Age.Runtime.Commands;
 using Rekall.Age.Validation;
 using Rekall.Age.Validation.Commands;
 using Rekall.Age.Workflows.Commands;
+using Rekall.Age.World;
 using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Workflows;
@@ -28,6 +31,8 @@ public static class RekallAgeDefaultCommandRegistry
         var componentPropertyAdmission = new RekallAgeBuiltInComponentPropertyAdmissionPolicy();
         var modelingGraphRuntime = new RekallAgeModelingGraphCommandRuntime();
         var modifierStackEvaluator = new RekallAgeModifierStackEvaluator();
+        var modelAssetStore = new RekallAgeModelAssetStore();
+        var modelPublishingService = new RekallAgeModelPublishingService();
         registry.Register(new CreateProjectCommand());
         registry.Register(new AddCapabilityCommand());
         registry.Register(new CreateSceneCommand());
@@ -120,6 +125,14 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new ImportAssetWithReportCommand());
         registry.Register(new GenerateTripoModelCommand());
         registry.Register(new ListAssetsCommand());
+        registry.Register(new PublishModelAssetCommand(modelPublishingService));
+        registry.Register(new RebuildModelAssetCommand(modelPublishingService));
+        registry.Register(new InspectModelAssetCommand(modelPublishingService));
+        registry.Register(new ListModelAssetsCommand(modelAssetStore, modelPublishingService));
+        registry.Register(new InstantiateModelAssetCommand(
+            new RekallAgeSceneStore(),
+            modelAssetStore,
+            modelPublishingService));
         registry.Register(new DuplicateEntityCommand());
         registry.Register(new CreateGeometryPrimitiveCommand());
         registry.Register(new CreateGeometryMeshCommand());

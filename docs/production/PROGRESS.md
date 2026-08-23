@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 09:34 Africa/Johannesburg
+Last verified: 2026-08-23 09:38 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -151,6 +151,19 @@ compiler, which safely triangulates concave n-gons and prior Boolean faces with
 collinear T-junction split points. A two-stage union-then-frustum-difference
 graph proves that Boolean outputs remain composable, closed, valid, and expose
 fresh current-node provenance. The complete modeling namespace passes 97/97.
+
+Boolean evaluation now preserves compatible face-domain authored data. Operand
+attribute schemas are matched by name/type/semantic/interpolation; each result
+face copies the value belonging to its source face, while missing non-material
+face attributes use their typed default. Material slots from both operands are
+deduplicated by slot name and asset ID and source `material-index` values are
+remapped into the merged slot table, so split faces retain the correct material.
+A two-material overlapping-solid proof returns both `mat.stone` and `mat.metal`
+and result faces referencing both remapped indices. One-sided material schemas
+fail with `REKALL_MODELING_BOOLEAN_MATERIAL_SCHEMA_MISMATCH`; point/edge/corner
+attributes fail with `REKALL_MODELING_BOOLEAN_ATTRIBUTES_UNSUPPORTED` until
+true split-vertex interpolation is implemented. The modeling namespace passes
+99/99 after recompilation.
 
 The Blender-informed agentic modelling tranche is now the active implementation
 priority after the completed WebGPU and remaining Godot audits. A shallow,

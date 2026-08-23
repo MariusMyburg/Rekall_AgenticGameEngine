@@ -16,6 +16,7 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         var meshB = b.Mesh ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", "Boolean input B must be geometry.", node.NodeId);
         RequireBooleanInput(meshA, "A", node.NodeId);
         RequireBooleanInput(meshB, "B", node.NodeId);
+        var attributePlan = PrepareBooleanAttributes(meshA, meshB, node.NodeId);
         var operation = ReadString(node, "operation", "union");
         if (operation is not ("union" or "intersect" or "difference"))
             throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Boolean operation must be union, intersect, or difference.", node.NodeId);
@@ -31,7 +32,7 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                 "difference" => csgA.Subtract(csgB),
                 _ => throw new InvalidOperationException()
             };
-            return new(FromCsg(graph, node, result));
+            return new(FromCsg(graph, node, result, meshA, meshB, attributePlan));
         }
         catch (EvaluationException)
         {
@@ -48,9 +49,37 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         var validation = new RekallAgeMeshValidator().Validate(mesh);
         if (!validation.IsValid || validation.Summary.BoundaryEdgeCount != 0 || validation.Summary.NonManifoldEdgeCount != 0 || validation.Summary.FaceCount == 0)
             throw new EvaluationException("REKALL_MODELING_BOOLEAN_INPUT_NOT_CLOSED_MANIFOLD", $"Boolean input {label} must be a non-empty, closed manifold surface.", nodeId);
-        if (mesh.MaterialSlots.Count != 0 || mesh.Attributes.Any(attribute => attribute.Name is not ("boolean.sourceOperand" or "boolean.sourceFaceId")))
-            throw new EvaluationException("REKALL_MODELING_BOOLEAN_ATTRIBUTES_UNSUPPORTED", $"Boolean input {label} contains attributes or materials that cannot yet be interpolated without data loss; apply them after the Boolean node.", nodeId);
+        if (mesh.Attributes.Any(attribute => !IsBooleanProvenance(attribute) && attribute.Domain != RekallAgeGeometryDomain.Face))
+            throw new EvaluationException("REKALL_MODELING_BOOLEAN_ATTRIBUTES_UNSUPPORTED", $"Boolean input {label} contains non-face attributes that cannot yet be interpolated without data loss; apply them after the Boolean node.", nodeId);
     }
+
+    private static BooleanAttributePlan PrepareBooleanAttributes(RekallAgeMeshAsset a, RekallAgeMeshAsset b, string nodeId)
+    {
+        var inputs = new[] { a, b };
+        var schemas = inputs.SelectMany(mesh => mesh.Attributes.Where(attribute => !IsBooleanProvenance(attribute)))
+            .GroupBy(attribute => attribute.Name, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .OrderBy(attribute => attribute.Name, StringComparer.Ordinal)
+            .ToArray();
+        foreach (var schema in schemas)
+        {
+            var matches = inputs.Select(mesh => mesh.Attributes.FirstOrDefault(attribute => attribute.Name == schema.Name)).ToArray();
+            if (matches.Any(attribute => attribute is not null &&
+                (attribute.Domain != schema.Domain || attribute.ValueType != schema.ValueType || attribute.Semantic != schema.Semantic || attribute.Interpolation != schema.Interpolation)))
+                throw new EvaluationException("REKALL_MODELING_BOOLEAN_ATTRIBUTE_SCHEMA_CONFLICT", $"Boolean attribute '{schema.Name}' has incompatible operand schemas.", nodeId);
+            if (schema.Semantic?.Equals("material-index", StringComparison.OrdinalIgnoreCase) == true &&
+                (matches.Any(attribute => attribute is null) || inputs.Any(mesh => mesh.MaterialSlots.Count == 0)))
+                throw new EvaluationException("REKALL_MODELING_BOOLEAN_MATERIAL_SCHEMA_MISMATCH", "Both Boolean operands must carry a material-index face attribute and material slots when either operand is material-assigned.", nodeId);
+        }
+        var hasMaterialSchema = schemas.Any(schema => schema.Semantic?.Equals("material-index", StringComparison.OrdinalIgnoreCase) == true);
+        if (!hasMaterialSchema && inputs.Any(mesh => mesh.MaterialSlots.Count > 0))
+            throw new EvaluationException("REKALL_MODELING_BOOLEAN_MATERIAL_SCHEMA_MISMATCH", "Boolean material slots require a compatible material-index face attribute on both operands.", nodeId);
+        var (slots, maps) = MergeMaterialSlots(inputs);
+        return new(schemas, slots, maps);
+    }
+
+    private static bool IsBooleanProvenance(RekallAgeGeometryAttribute attribute) =>
+        attribute.Name is "boolean.sourceOperand" or "boolean.sourceFaceId";
 
     private static Csg.CSG ToCsg(RekallAgeMeshAsset source, string operand)
     {
@@ -73,7 +102,10 @@ public sealed partial class RekallAgeModelingGraphEvaluator
     private static RekallAgeMeshAsset FromCsg(
         RekallAgeModelingGraphAsset graph,
         RekallAgeModelingGraphNode node,
-        Csg.CSG csg)
+        Csg.CSG csg,
+        RekallAgeMeshAsset meshA,
+        RekallAgeMeshAsset meshB,
+        BooleanAttributePlan attributePlan)
     {
         var polygons = csg.ToPolygons();
         if (polygons.Sum(polygon => polygon.Vertices.Length) > 8_000_000)
@@ -130,8 +162,29 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             Enumerable.Range(1, edges.Count).Select(value => (ulong)(10_000 + value)).ToArray(), edges,
             Enumerable.Range(1, faces.Count).Select(value => (ulong)(20_000 + value)).ToArray(), faceOffsets,
             Enumerable.Range(1, cornerPoints.Count).Select(value => (ulong)(30_000 + value)).ToArray(), cornerPoints, cornerEdges);
-        var attributes = new[]
+        var faceIndices = new[]
         {
+            meshA.Topology.FaceIds.Select((id, index) => (id, index)).ToDictionary(item => item.id, item => item.index),
+            meshB.Topology.FaceIds.Select((id, index) => (id, index)).ToDictionary(item => item.id, item => item.index)
+        };
+        var inputs = new[] { meshA, meshB };
+        var attributes = new List<RekallAgeGeometryAttribute>();
+        foreach (var schema in attributePlan.Schemas)
+        {
+            var values = new List<JsonElement>(sources.Count);
+            foreach (var source in sources)
+            {
+                var inputIndex = source.Operand == "a" ? 0 : 1;
+                var sourceAttribute = inputs[inputIndex].Attributes.FirstOrDefault(attribute => attribute.Name == schema.Name);
+                var value = sourceAttribute is null ? DefaultValue(schema) : sourceAttribute.Values[faceIndices[inputIndex][source.FaceId]];
+                if (schema.Semantic?.Equals("material-index", StringComparison.OrdinalIgnoreCase) == true &&
+                    value.TryGetInt32(out var materialIndex) && materialIndex >= 0 && materialIndex < attributePlan.SlotMaps[inputIndex].Length)
+                    value = JsonSerializer.SerializeToElement(attributePlan.SlotMaps[inputIndex][materialIndex]);
+                values.Add(value.Clone());
+            }
+            attributes.Add(schema with { Values = values });
+        }
+        attributes.AddRange([
             new RekallAgeGeometryAttribute(
                 "boolean.sourceOperand", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.String,
                 sources.Select(source => JsonSerializer.SerializeToElement(source.Operand)).ToArray(),
@@ -140,8 +193,8 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                 "boolean.sourceFaceId", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.String,
                 sources.Select(source => JsonSerializer.SerializeToElement(source.FaceId.ToString(System.Globalization.CultureInfo.InvariantCulture))).ToArray(),
                 "boolean-source-face-id", RekallAgeGeometryInterpolation.Nearest)
-        };
-        var mesh = RekallAgeMeshAsset.Create($"{graph.AssetId}.{node.NodeId}", node.NodeId, topology, attributes) with { Revision = graph.Revision };
+        ]);
+        var mesh = RekallAgeMeshAsset.Create($"{graph.AssetId}.{node.NodeId}", node.NodeId, topology, attributes, attributePlan.MaterialSlots) with { Revision = graph.Revision };
         var validation = new RekallAgeMeshValidator().Validate(mesh);
         if (!validation.IsValid || validation.Summary.BoundaryEdgeCount != 0 || validation.Summary.NonManifoldEdgeCount != 0)
             throw new EvaluationException(
@@ -199,4 +252,8 @@ public sealed partial class RekallAgeModelingGraphEvaluator
     }
 
     private sealed record BooleanFaceSource(string Operand, ulong FaceId);
+    private sealed record BooleanAttributePlan(
+        IReadOnlyList<RekallAgeGeometryAttribute> Schemas,
+        IReadOnlyList<RekallAgeMaterialSlot> MaterialSlots,
+        IReadOnlyList<int[]> SlotMaps);
 }

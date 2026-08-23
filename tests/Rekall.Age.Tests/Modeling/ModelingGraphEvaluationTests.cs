@@ -373,7 +373,7 @@ public sealed class ModelingGraphEvaluationTests
     }
 
     [Fact]
-    public async Task BooleanFailsClosedInsteadOfDroppingAuthoredAttributesOrMaterials()
+    public async Task BooleanFailsClosedOnOneSidedMaterialSchema()
     {
         var graph = RekallAgeModelingGraphAsset.Create(
             "attributed-boolean", "Attributed Boolean",
@@ -396,7 +396,72 @@ public sealed class ModelingGraphEvaluationTests
             graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
 
         Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, item => item.Code == "REKALL_MODELING_BOOLEAN_MATERIAL_SCHEMA_MISMATCH" && item.NodeId == "boolean");
+    }
+
+    [Fact]
+    public async Task BooleanRejectsPointAttributesUntilVertexInterpolationIsAvailable()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "point-attribute-boolean", "Point Attribute Boolean",
+            [
+                new("a", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("value", "rekall.modeling.field.math", 1, new JsonObject { ["operation"] = "add", ["a"] = 0.25, ["b"] = 0.25 }),
+                new("capture", "rekall.modeling.attribute.capture", 1, new JsonObject { ["name"] = "weight", ["domain"] = "point" }),
+                new("b", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("boolean", "rekall.modeling.boolean", 1, new JsonObject()),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("a-capture", "a", "geometry", "capture", "geometry"),
+                new("value-capture", "value", "value", "capture", "value"),
+                new("capture-boolean", "capture", "geometry", "boolean", "a"),
+                new("b-boolean", "b", "geometry", "boolean", "b"),
+                new("boolean-output", "boolean", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.False(result.Succeeded);
         Assert.Contains(result.Diagnostics, item => item.Code == "REKALL_MODELING_BOOLEAN_ATTRIBUTES_UNSUPPORTED" && item.NodeId == "boolean");
+    }
+
+    [Fact]
+    public async Task BooleanPreservesAndRemapsCompatibleFaceMaterialsFromBothOperands()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "material-boolean", "Material Boolean",
+            [
+                new("a", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("mat-a", "rekall.modeling.material.assign", 1, new JsonObject { ["materialAssetId"] = "mat.stone", ["slotName"] = "Stone" }),
+                new("b", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("move-b", "rekall.modeling.transform", 1, new JsonObject { ["translation"] = new JsonArray(0.5, 0.0, 0.0) }),
+                new("mat-b", "rekall.modeling.material.assign", 1, new JsonObject { ["materialAssetId"] = "mat.metal", ["slotName"] = "Metal" }),
+                new("boolean", "rekall.modeling.boolean", 1, new JsonObject()),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("a-material", "a", "geometry", "mat-a", "geometry"),
+                new("b-move", "b", "geometry", "move-b", "geometry"),
+                new("b-material", "move-b", "geometry", "mat-b", "geometry"),
+                new("a-boolean", "mat-a", "geometry", "boolean", "a"),
+                new("b-boolean", "mat-b", "geometry", "boolean", "b"),
+                new("boolean-output", "boolean", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics.Select(item => $"{item.Code}: {item.Message}")));
+        var mesh = result.Outputs["mesh"];
+        Assert.Equal(["mat.stone", "mat.metal"], mesh.MaterialSlots.Select(slot => slot.MaterialAssetId));
+        var materialIndices = Assert.Single(mesh.Attributes, item => item.Semantic == "material-index");
+        Assert.Contains(materialIndices.Values, value => value.GetInt32() == 0);
+        Assert.Contains(materialIndices.Values, value => value.GetInt32() == 1);
+        Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
     }
 
     [Fact]

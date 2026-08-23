@@ -125,6 +125,54 @@
             </Border>
 
             <TabControl Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="1" Margin="0,0,8,8">
+                <TabItem Header="Modeling">
+                    <Grid Margin="8">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="240" /><ColumnDefinition Width="280" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                            <TextBlock Text="Mesh asset" Foreground="#9FB0C4" />
+                            <ComboBox ItemsSource="{Binding MeshAssetIds}" SelectedItem="{Binding SelectedMeshAssetId}" Margin="0,3,0,5" />
+                            <UniformGrid Columns="2">
+                                <Button Content="Refresh" Command="{Binding RefreshMeshAssetsCommand}" Padding="7,3" Margin="0,0,3,0" />
+                                <Button Content="Open" Command="{Binding OpenMeshAssetCommand}" Padding="7,3" Margin="3,0,0,0" />
+                            </UniformGrid>
+                            <TextBlock Text="Edit domain" Foreground="#9FB0C4" Margin="0,9,0,0" />
+                            <ComboBox ItemsSource="{Binding MeshEditDomains}" SelectedItem="{Binding MeshEditDomain}" Margin="0,3,0,5" />
+                            <TextBlock Text="Stable element ID" Foreground="#9FB0C4" />
+                            <ComboBox ItemsSource="{Binding MeshElementIds}" SelectedItem="{Binding SelectedMeshElementId}" Margin="0,3,0,5" />
+                            <StackPanel Orientation="Horizontal">
+                                <CheckBox Content="Extend" IsChecked="{Binding ExtendMeshSelection}" Margin="0,0,12,0" />
+                                <CheckBox Content="Toggle" IsChecked="{Binding ToggleMeshSelection}" />
+                            </StackPanel>
+                            <UniformGrid Columns="2" Margin="0,5,0,0">
+                                <Button Content="Select" Command="{Binding SelectMeshElementCommand}" Padding="7,3" Margin="0,0,3,0" />
+                                <Button Content="Clear" Command="{Binding ClearMeshSelectionCommand}" Padding="7,3" Margin="3,0,0,0" />
+                            </UniformGrid>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                            <TextBlock Text="Semantic operation" Foreground="#9FB0C4" />
+                            <ComboBox ItemsSource="{Binding MeshOperationIds}" SelectedItem="{Binding SelectedMeshOperationId}" Margin="0,3,0,5" />
+                            <TextBlock Text="Parameters (JSON object)" Foreground="#9FB0C4" />
+                            <TextBox Text="{Binding MeshOperationParameters, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="62" TextWrapping="Wrap" Padding="4" Margin="0,3,0,5" />
+                            <UniformGrid Columns="3">
+                                <Button Content="Preview" Command="{Binding PreviewMeshOperationCommand}" Padding="7,3" Margin="0,0,3,0" />
+                                <Button Content="Apply" Command="{Binding ApplyMeshOperationCommand}" Style="{StaticResource AccentButton}" Padding="7,3" Margin="3,0" />
+                                <Button Content="Cancel" Command="{Binding CancelMeshPreviewCommand}" Padding="7,3" Margin="3,0,0,0" />
+                            </UniformGrid>
+                            <TextBlock Text="{Binding MeshSummary}" TextWrapping="Wrap" Foreground="#AAB6C5" Margin="0,9,0,0" />
+                        </StackPanel>
+                        <Grid Grid.Column="2">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <DockPanel Margin="0,0,5,0">
+                                <TextBlock DockPanel.Dock="Top" Text="Selection history" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                <ListBox ItemsSource="{Binding MeshSelectionLines}" />
+                            </DockPanel>
+                            <DockPanel Grid.Column="1" Margin="5,0,0,0">
+                                <TextBlock DockPanel.Dock="Top" Text="Evaluation diagnostics" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                <ListBox ItemsSource="{Binding MeshDiagnosticLines}" />
+                            </DockPanel>
+                        </Grid>
+                    </Grid>
+                </TabItem>
                 <TabItem Header="Validation"><ListBox ItemsSource="{Binding ValidationLines}" /></TabItem>
                 <TabItem Header="Assets"><ListBox ItemsSource="{Binding AssetLines}" /></TabItem>
                 <TabItem Header="Overview"><ListBox ItemsSource="{Binding SceneSummaryLines}" /></TabItem>

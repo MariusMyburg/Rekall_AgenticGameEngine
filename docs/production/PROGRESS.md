@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 08:43 Africa/Johannesburg
+Last verified: 2026-08-23 08:50 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -39,6 +39,21 @@ produces a valid 26-point/48-edge/24-quad surface through both
 `rekall.modeling.subdivide_smooth` and
 `rekall.modifier.subdivide_smooth`. The modeling namespace now passes 85/85
 tests and the modeling project remains zero-warning/zero-error.
+
+Studio now has its first native modeling workflow, implemented as a client of
+the same mesh contracts rather than a parallel editor-only mutation system.
+The Modeling tab discovers persisted mesh assets, opens exact file revisions,
+switches point/edge/face/corner edit domains, exposes stable element IDs,
+maintains ordered/active extend-or-toggle selection state, lists compatible
+semantic operations, accepts their structured parameters, previews without
+disk mutation, cancels previews, and applies through optimistic revision checks
+plus reversible transaction history. The session proof previews a quad
+extrusion to five faces while the stored source stays at one, then applies the
+same operation, reloads the five-face mesh, clears stale selection/preview
+state, and verifies one transaction-log entry. The complete Studio suite passes
+26/26. This is a usable schema-driven edit slice, not completion of Task 9:
+viewport element picking/overlays, direct manipulation, parameter-schema
+editors, attributes/materials, graph editors, and sculpt/paint remain open.
 
 The Blender-informed agentic modelling tranche is now the active implementation
 priority after the completed WebGPU and remaining Godot audits. A shallow,

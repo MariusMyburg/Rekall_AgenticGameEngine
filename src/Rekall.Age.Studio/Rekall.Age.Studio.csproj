@@ -16,6 +16,8 @@
     <ProjectReference Include="..\Rekall.Age.Agent\Rekall.Age.Agent.csproj" />
     <ProjectReference Include="..\Rekall.Age.Editor\Rekall.Age.Editor.csproj" />
     <ProjectReference Include="..\Rekall.Age.Editor.Contracts\Rekall.Age.Editor.Contracts.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Modeling\Rekall.Age.Modeling.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Modeling.Contracts\Rekall.Age.Modeling.Contracts.csproj" />
     <ProjectReference Include="..\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj" />
     <ProjectReference Include="..\Rekall.Age.Runtime\Rekall.Age.Runtime.csproj" />
     <ProjectReference Include="..\Rekall.Age.Workflows\Rekall.Age.Workflows.csproj" />

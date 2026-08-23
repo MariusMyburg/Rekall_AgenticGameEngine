@@ -11,6 +11,7 @@ using System.Windows.Media.Imaging;
 using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Editor;
 using Rekall.Age.Editor.Contracts;
+using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Workflows;
@@ -54,6 +55,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _discoverModelsCommand;
     private readonly RekallAgeAsyncCommand _runAgentCommand;
     private readonly RekallAgeAsyncCommand _cancelAgentCommand;
+    private readonly RekallAgeStudioModelingSession _modeling = new();
+    private readonly RekallAgeAsyncCommand _refreshMeshAssetsCommand;
+    private readonly RekallAgeAsyncCommand _openMeshAssetCommand;
+    private readonly RekallAgeAsyncCommand _selectMeshElementCommand;
+    private readonly RekallAgeAsyncCommand _clearMeshSelectionCommand;
+    private readonly RekallAgeAsyncCommand _previewMeshOperationCommand;
+    private readonly RekallAgeAsyncCommand _applyMeshOperationCommand;
+    private readonly RekallAgeAsyncCommand _cancelMeshPreviewCommand;
     private Process? _player;
     private CancellationTokenSource? _agentCancellation;
     private bool _isBusy;
@@ -72,6 +81,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _propertySchemaHelp = "Select a registered property to see its type and constraints.";
     private string _selectedOllamaModel = "qwen3.5:35b";
     private string _agentTaskInput = string.Empty;
+    private string? _selectedMeshAssetId;
+    private ulong? _selectedMeshElementId;
+    private RekallAgeGeometryDomain _meshEditDomain = RekallAgeGeometryDomain.Face;
+    private string? _selectedMeshOperationId;
+    private string _meshOperationParameters = "{}";
+    private string _meshSummary = "Open a persisted mesh asset to begin modeling.";
+    private bool _extendMeshSelection;
+    private bool _toggleMeshSelection;
     private string? _lastPackagePath;
     private string _statusText = "Create or open a Rekall AGE project to begin.";
     private string _viewportTitle = "Viewport";
@@ -138,6 +155,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _discoverModelsCommand = CreateAsyncCommand(DiscoverModelsAsync, () => !IsBusy && !IsAgentRunning);
         _runAgentCommand = CreateAsyncCommand(RunAgentAsync, CanRunAgent);
         _cancelAgentCommand = CreateAsyncCommand(CancelAgentAsync, () => IsAgentRunning);
+        _refreshMeshAssetsCommand = CreateAsyncCommand(RefreshMeshAssetsAsync, HasOpenProject);
+        _openMeshAssetCommand = CreateAsyncCommand(OpenMeshAssetAsync, CanOpenMeshAsset);
+        _selectMeshElementCommand = CreateAsyncCommand(SelectMeshElementAsync, CanSelectMeshElement);
+        _clearMeshSelectionCommand = CreateAsyncCommand(ClearMeshSelectionAsync, HasOpenMesh);
+        _previewMeshOperationCommand = CreateAsyncCommand(PreviewMeshOperationAsync, CanRunMeshOperation);
+        _applyMeshOperationCommand = CreateAsyncCommand(ApplyMeshOperationAsync, CanRunMeshOperation);
+        _cancelMeshPreviewCommand = CreateAsyncCommand(CancelMeshPreviewAsync, () => HasOpenMesh() && _modeling.Preview is not null);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -154,6 +178,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> RuntimeObservationLines { get; } = [];
     public ObservableCollection<string> OllamaModels { get; } = [];
     public ObservableCollection<string> AgentLines { get; } = [];
+    public ObservableCollection<string> MeshAssetIds { get; } = [];
+    public ObservableCollection<ulong> MeshElementIds { get; } = [];
+    public ObservableCollection<string> MeshOperationIds { get; } = [];
+    public ObservableCollection<string> MeshSelectionLines { get; } = [];
+    public ObservableCollection<string> MeshDiagnosticLines { get; } = [];
+    public IReadOnlyList<RekallAgeGeometryDomain> MeshEditDomains { get; } =
+        [RekallAgeGeometryDomain.Point, RekallAgeGeometryDomain.Edge, RekallAgeGeometryDomain.Face, RekallAgeGeometryDomain.Corner];
     public IReadOnlyList<RekallAgeLanguageModelToolExecution> LastAgentToolExecutions => _lastAgentToolExecutions;
     public ObservableCollection<RekallAgeInspectorComponentSchemaModel> ComponentSchemas { get; } = [];
     public ObservableCollection<RekallAgeInspectorPropertySchemaModel> PropertySchemas { get; } = [];
@@ -179,6 +210,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand DiscoverModelsCommand => _discoverModelsCommand;
     public ICommand RunAgentCommand => _runAgentCommand;
     public ICommand CancelAgentCommand => _cancelAgentCommand;
+    public ICommand RefreshMeshAssetsCommand => _refreshMeshAssetsCommand;
+    public ICommand OpenMeshAssetCommand => _openMeshAssetCommand;
+    public ICommand SelectMeshElementCommand => _selectMeshElementCommand;
+    public ICommand ClearMeshSelectionCommand => _clearMeshSelectionCommand;
+    public ICommand PreviewMeshOperationCommand => _previewMeshOperationCommand;
+    public ICommand ApplyMeshOperationCommand => _applyMeshOperationCommand;
+    public ICommand CancelMeshPreviewCommand => _cancelMeshPreviewCommand;
 
     public string ProjectPathInput
     {
@@ -261,6 +299,59 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             if (Set(ref _agentTaskInput, value)) RefreshCommands();
         }
+    }
+
+    public string? SelectedMeshAssetId
+    {
+        get => _selectedMeshAssetId;
+        set { if (Set(ref _selectedMeshAssetId, value)) RefreshCommands(); }
+    }
+
+    public ulong? SelectedMeshElementId
+    {
+        get => _selectedMeshElementId;
+        set { if (Set(ref _selectedMeshElementId, value)) RefreshCommands(); }
+    }
+
+    public RekallAgeGeometryDomain MeshEditDomain
+    {
+        get => _meshEditDomain;
+        set
+        {
+            if (!Set(ref _meshEditDomain, value)) return;
+            if (_modeling.Mesh is not null) _modeling.SetDomain(value);
+            RefreshMeshEditingState();
+        }
+    }
+
+    public string? SelectedMeshOperationId
+    {
+        get => _selectedMeshOperationId;
+        set { if (Set(ref _selectedMeshOperationId, value)) RefreshCommands(); }
+    }
+
+    public string MeshOperationParameters
+    {
+        get => _meshOperationParameters;
+        set { if (Set(ref _meshOperationParameters, value)) RefreshCommands(); }
+    }
+
+    public string MeshSummary
+    {
+        get => _meshSummary;
+        private set => Set(ref _meshSummary, value);
+    }
+
+    public bool ExtendMeshSelection
+    {
+        get => _extendMeshSelection;
+        set => Set(ref _extendMeshSelection, value);
+    }
+
+    public bool ToggleMeshSelection
+    {
+        get => _toggleMeshSelection;
+        set => Set(ref _toggleMeshSelection, value);
     }
 
     public string? LastPackagePath
@@ -413,6 +504,102 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private bool CanAuditPackage() => HasOpenProject()
         && LastPackagePath is not null
         && (File.Exists(LastPackagePath) || Directory.Exists(LastPackagePath));
+    private bool HasOpenMesh() => !IsBusy && Mode == RekallAgeStudioMode.Edit && _modeling.Mesh is not null;
+    private bool CanOpenMeshAsset() => HasEditableProject() && !string.IsNullOrWhiteSpace(SelectedMeshAssetId);
+    private bool CanSelectMeshElement() => HasOpenMesh() && SelectedMeshElementId.HasValue;
+    private bool CanRunMeshOperation() => HasOpenMesh() && !string.IsNullOrWhiteSpace(SelectedMeshOperationId)
+        && !string.IsNullOrWhiteSpace(MeshOperationParameters);
+
+    private Task RefreshMeshAssetsAsync() => RunModelingAsync(() =>
+    {
+        if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project before browsing mesh assets.");
+        Replace(MeshAssetIds, _modeling.ListAssets(_session.ProjectRoot));
+        if (SelectedMeshAssetId is null || !MeshAssetIds.Contains(SelectedMeshAssetId)) SelectedMeshAssetId = MeshAssetIds.FirstOrDefault();
+        MeshSummary = MeshAssetIds.Count == 0 ? "No persisted mesh assets are present in Modeling/Meshes." : $"{MeshAssetIds.Count} mesh asset(s) available.";
+        return Task.CompletedTask;
+    });
+
+    private Task OpenMeshAssetAsync() => RunModelingAsync(async () =>
+    {
+        await _modeling.OpenAsync(_session.ProjectRoot!, SelectedMeshAssetId!, _lifecycleCancellation.Token);
+        _modeling.SetDomain(MeshEditDomain);
+        RefreshMeshEditingState();
+    });
+
+    private Task SelectMeshElementAsync() => RunModelingAsync(() =>
+    {
+        _modeling.Select(SelectedMeshElementId!.Value, ExtendMeshSelection, ToggleMeshSelection);
+        RefreshMeshEditingState();
+        return Task.CompletedTask;
+    });
+
+    private Task ClearMeshSelectionAsync() => RunModelingAsync(() =>
+    {
+        _modeling.ClearSelection(); RefreshMeshEditingState(); return Task.CompletedTask;
+    });
+
+    private Task PreviewMeshOperationAsync() => RunModelingAsync(async () =>
+    {
+        var result = await _modeling.PreviewAsync(SelectedMeshOperationId!, ParseMeshParameters(), _lifecycleCancellation.Token);
+        RefreshMeshEditingState();
+        Replace(MeshDiagnosticLines, result.Validation.Diagnostics.Select(item => $"{item.Severity}: {item.Code} - {item.Message}"));
+    });
+
+    private Task ApplyMeshOperationAsync() => RunModelingAsync(async () =>
+    {
+        var result = await _modeling.ApplyAsync(SelectedMeshOperationId!, ParseMeshParameters(), "studio", _lifecycleCancellation.Token);
+        RefreshMeshEditingState();
+        Replace(MeshDiagnosticLines, result.Validation.Diagnostics.Select(item => $"{item.Severity}: {item.Code} - {item.Message}"));
+        if (IsLiveViewportEnabled) await RefreshEditPreviewAsync($"Applied {SelectedMeshOperationId} to mesh {SelectedMeshAssetId}.");
+    });
+
+    private Task CancelMeshPreviewAsync() => RunModelingAsync(() =>
+    {
+        _modeling.CancelPreview(); RefreshMeshEditingState(); return Task.CompletedTask;
+    });
+
+    private async Task RunModelingAsync(Func<Task> operation)
+    {
+        if (IsBusy) return;
+        IsBusy = true;
+        try { await operation(); StatusText = MeshSummary; }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException or ArgumentException or JsonException)
+        {
+            StatusText = exception.Message;
+            Replace(MeshDiagnosticLines, [$"error: REKALL_STUDIO_MODELING_OPERATION_FAILED - {exception.Message}"]);
+        }
+        finally { IsBusy = false; }
+    }
+
+    private JsonObject ParseMeshParameters()
+    {
+        try { return JsonNode.Parse(MeshOperationParameters) as JsonObject ?? throw new JsonException("Mesh operation parameters must be a JSON object."); }
+        catch (JsonException error) { throw new JsonException("Mesh operation parameters must be valid JSON object syntax.", error); }
+    }
+
+    private void RefreshMeshEditingState()
+    {
+        if (_modeling.Mesh is null)
+        {
+            Replace(MeshElementIds, []); Replace(MeshOperationIds, []); Replace(MeshSelectionLines, []); RefreshCommands(); return;
+        }
+        var mesh = _modeling.Preview?.Mesh ?? _modeling.Mesh;
+        var ids = MeshEditDomain switch
+        {
+            RekallAgeGeometryDomain.Point => mesh.Topology.PointIds,
+            RekallAgeGeometryDomain.Edge => mesh.Topology.EdgeIds,
+            RekallAgeGeometryDomain.Face => mesh.Topology.FaceIds,
+            RekallAgeGeometryDomain.Corner => mesh.Topology.CornerIds,
+            _ => []
+        };
+        Replace(MeshElementIds, ids);
+        Replace(MeshOperationIds, _modeling.AvailableOperations.Select(item => item.OperationId));
+        if (SelectedMeshOperationId is null || !MeshOperationIds.Contains(SelectedMeshOperationId)) SelectedMeshOperationId = MeshOperationIds.FirstOrDefault();
+        if (SelectedMeshElementId is null || !MeshElementIds.Contains(SelectedMeshElementId.Value)) SelectedMeshElementId = MeshElementIds.Count == 0 ? null : MeshElementIds[0];
+        Replace(MeshSelectionLines, _modeling.SelectedElementIds.Select((id, index) => $"{index + 1}. {MeshEditDomain} {id}{(id == _modeling.ActiveElementId ? " (active)" : string.Empty)}"));
+        MeshSummary = $"{mesh.Name} r{mesh.Revision} · {mesh.Topology.PointIds.Count} points · {mesh.Topology.EdgeIds.Count} edges · {mesh.Topology.FaceIds.Count} faces · {_modeling.SelectedElementIds.Count} selected{(_modeling.Preview is null ? string.Empty : " · PREVIEW")}";
+        OnPropertyChanged(nameof(MeshEditDomain)); RefreshCommands();
+    }
 
     private Task OpenFromInputsAsync() => RunAsync(
         () => _session.OpenAsync(ProjectPathInput, NormalizeSceneName(), CancellationToken.None).AsTask(),
@@ -975,6 +1162,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
         RefreshPropertySchemas();
         Replace(AssetLines, model.Assets.Assets.Select(asset => $"{asset.Kind}: {asset.DisplayName} ({asset.AssetId})"));
+        if (_session.ProjectRoot is not null)
+        {
+            Replace(MeshAssetIds, _modeling.ListAssets(_session.ProjectRoot));
+            if (SelectedMeshAssetId is null || !MeshAssetIds.Contains(SelectedMeshAssetId)) SelectedMeshAssetId = MeshAssetIds.FirstOrDefault();
+        }
         Replace(ValidationLines, model.Diagnostics.Issues.Select(issue => $"{issue.Severity}: {issue.Code} - {issue.Message}"));
         Replace(TransactionLines, model.Transactions.Transactions.Select(transaction => $"{transaction.Name}: {transaction.ChangedResources.Count} changes"));
         Replace(ImportLines, model.ImportQueue.Jobs.Select(job => $"{job.Status}: {job.SourcePath}"));
@@ -1131,6 +1323,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _discoverModelsCommand.RaiseCanExecuteChanged();
         _runAgentCommand.RaiseCanExecuteChanged();
         _cancelAgentCommand.RaiseCanExecuteChanged();
+        _refreshMeshAssetsCommand.RaiseCanExecuteChanged();
+        _openMeshAssetCommand.RaiseCanExecuteChanged();
+        _selectMeshElementCommand.RaiseCanExecuteChanged();
+        _clearMeshSelectionCommand.RaiseCanExecuteChanged();
+        _previewMeshOperationCommand.RaiseCanExecuteChanged();
+        _applyMeshOperationCommand.RaiseCanExecuteChanged();
+        _cancelMeshPreviewCommand.RaiseCanExecuteChanged();
     }
 
     private RekallAgeAsyncCommand CreateAsyncCommand(Func<Task> execute, Func<bool> canExecute) =>

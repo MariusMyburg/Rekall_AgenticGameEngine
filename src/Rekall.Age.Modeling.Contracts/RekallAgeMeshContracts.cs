@@ -217,7 +217,8 @@ public sealed record RekallAgeCompiledMeshSnapshot(
     IReadOnlyList<uint> Indices,
     IReadOnlyList<RekallAgeCompiledMeshTriangle> Triangles,
     IReadOnlyList<RekallAgeCompiledMeshSurface> Surfaces,
-    RekallAgeMeshBounds Bounds);
+    RekallAgeMeshBounds Bounds,
+    bool HasVertexColors = false);
 
 public sealed record RekallAgeMeshTopology(
     IReadOnlyList<ulong> PointIds,

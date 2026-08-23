@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 06:48 Africa/Johannesburg
+Last verified: 2026-08-23 07:08 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -172,6 +172,28 @@ safe compatibility fallback. Compactness, delta-only mesh restoration, grouped
 undo/redo, stale-after fallback, transaction persistence, and history behavior
 pass a combined 12/12 focused selection with zero build warnings/errors. The
 deterministic closed-loop modelling fixture is active next.
+
+Task 6 is now complete with a real MCP JSON-RPC closed loop and committed
+evidence. The default registry exposes bounded compiled inspection and local-ray
+picking commands; both return immutable material-surface facts and exact source
+face/corner/point provenance without dumping raw buffers. The deterministic
+fixture authors a strict ngon plus a shared-point triangle with distinct corner
+UVs, two material slots, and a named face selection; extruding through MCP yields
+11 points, 17 edges, 7 faces, 28 corners, 14 triangles, and three contiguous draw
+surfaces spanning both material slots. The same agent path validates, compiles,
+picks source face 21, creates the scene and camera, captures a software runtime
+frame, discovers the edit in transaction history, undoes exactly to logical
+revision 1, and redoes exactly to revision 2, with no direct mesh or scene JSON
+editing. Independent PNG inspection exposed and fixed a generic compiled-mesh
+material bug: the compiler/runtime contract now preserves whether vertex colors
+were actually authored, so absent colors defer to `Rekall.Material.baseColor`
+through both software and Vulkan paths instead of default white masking the
+material. The final 640x360 proof contains 65,841 cyan foreground pixels (28.6%
+of the frame), and its bounded JSON report records topology, compiler, surface,
+pick, pixel, SHA-256, undo, and redo facts under
+`docs/production/evidence/agentic-modelling-closed-loop`. The focused modelling,
+MCP-catalog, rendering, and transaction selections remain green. Task 7's
+versioned procedural modelling graph is active next.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

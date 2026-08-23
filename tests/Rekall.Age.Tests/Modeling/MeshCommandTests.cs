@@ -19,6 +19,8 @@ public sealed class MeshCommandTests
 
         Assert.Contains("rekall.mesh.create_asset", names);
         Assert.Contains("rekall.mesh.inspect", names);
+        Assert.Contains("rekall.mesh.inspect_compiled", names);
+        Assert.Contains("rekall.mesh.pick_compiled", names);
         Assert.Contains("rekall.mesh.validate", names);
         Assert.Contains("rekall.mesh.query_elements", names);
         Assert.Contains("rekall.mesh.operation.preview", names);
@@ -29,9 +31,11 @@ public sealed class MeshCommandTests
         var tools = RekallAgeMcpCatalog.FromRegistry(registry).Tools
             .Where(tool => tool.Name.StartsWith("rekall.mesh.", StringComparison.Ordinal))
             .ToArray();
-        Assert.Equal(8, tools.Length);
+        Assert.Equal(10, tools.Length);
         Assert.All(tools, tool => Assert.Equal("modeling", tool.Category));
         Assert.True(tools.Single(tool => tool.Name == "rekall.mesh.inspect").Recommended);
+        Assert.True(tools.Single(tool => tool.Name == "rekall.mesh.inspect_compiled").Recommended);
+        Assert.True(tools.Single(tool => tool.Name == "rekall.mesh.pick_compiled").Recommended);
         Assert.False(tools.Single(tool => tool.Name == "rekall.mesh.operation.apply").Recommended);
     }
 
@@ -128,6 +132,71 @@ public sealed class MeshCommandTests
         Assert.Contains(
             mesh.GetProperty("nextActions").EnumerateArray(),
             action => action.GetString() == "rekall.mesh.operation.preview");
+    }
+
+    [Fact]
+    public async Task CompiledInspectionExposesBoundedTrianglePickingProvenanceThroughRegistryJson()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var created = await new CreateMeshAssetCommand().ExecuteAsync(
+            new(root, "triangle", "Triangle", Triangle()),
+            Context("create"));
+        Assert.True(created.Ok);
+        var registry = RekallAgeDefaultCommandRegistry.Create();
+
+        var result = await registry.ExecuteJsonAsync(
+            "rekall.mesh.inspect_compiled",
+            JsonSerializer.Serialize(new { projectRoot = root, assetId = "triangle", maximumTriangles = 1 }),
+            Context("compiled inspect"));
+
+        Assert.True(result.Ok, result.Summary);
+        var json = JsonSerializer.SerializeToElement(
+            result.Value,
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        Assert.Equal(3, json.GetProperty("vertexCount").GetInt32());
+        Assert.False(json.GetProperty("hasVertexColors").GetBoolean());
+        Assert.Equal(3, json.GetProperty("indexCount").GetInt32());
+        var triangle = json.GetProperty("triangles")[0];
+        Assert.Equal(21UL, triangle.GetProperty("sourceFaceId").GetUInt64());
+        Assert.Equal([31UL, 32UL, 33UL], triangle.GetProperty("sourceCornerIds").EnumerateArray().Select(item => item.GetUInt64()));
+        Assert.Equal([1UL, 2UL, 3UL], triangle.GetProperty("sourcePointIds").EnumerateArray().Select(item => item.GetUInt64()));
+        Assert.False(json.GetProperty("trianglesTruncated").GetBoolean());
+    }
+
+    [Fact]
+    public async Task CompiledPickReturnsNearestHitAndSourceProvenanceThroughRegistryJson()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var created = await new CreateMeshAssetCommand().ExecuteAsync(
+            new(root, "triangle", "Triangle", Triangle()),
+            Context("create"));
+        Assert.True(created.Ok);
+        var registry = RekallAgeDefaultCommandRegistry.Create();
+
+        var result = await registry.ExecuteJsonAsync(
+            "rekall.mesh.pick_compiled",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = root,
+                assetId = "triangle",
+                origin = new { x = 0.25, y = 0.25, z = -2.0 },
+                direction = new { x = 0.0, y = 0.0, z = 1.0 },
+                maximumDistance = 10.0,
+                maximumHits = 4
+            }),
+            Context("compiled pick"));
+
+        Assert.True(result.Ok, result.Summary);
+        var json = JsonSerializer.SerializeToElement(
+            result.Value,
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        Assert.Equal(1, json.GetProperty("totalHitCount").GetInt32());
+        var hit = json.GetProperty("hits")[0];
+        Assert.Equal(21UL, hit.GetProperty("sourceFaceId").GetUInt64());
+        Assert.Equal([31UL, 32UL, 33UL], hit.GetProperty("sourceCornerIds").EnumerateArray().Select(item => item.GetUInt64()));
+        Assert.Equal([1UL, 2UL, 3UL], hit.GetProperty("sourcePointIds").EnumerateArray().Select(item => item.GetUInt64()));
+        Assert.Equal(2.0, hit.GetProperty("distance").GetDouble(), 6);
+        Assert.False(json.GetProperty("hitsTruncated").GetBoolean());
     }
 
     private static RekallAgeCommandContext Context(string name) =>

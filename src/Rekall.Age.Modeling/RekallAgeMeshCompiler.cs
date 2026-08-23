@@ -118,7 +118,8 @@ public sealed class RekallAgeMeshCompiler
             indices,
             triangles,
             surfaces.Select(surface => surface.Build()).ToArray(),
-            validation.Summary.Bounds);
+            validation.Summary.Bounds,
+            HasVertexColors: colorAttribute is not null);
     }
 
     private static RekallAgeGeometryAttribute? FindAttribute(

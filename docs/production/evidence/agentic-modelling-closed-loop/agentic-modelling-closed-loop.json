@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "generatedAtUtc": "2026-08-23T05:10:04.0962833+00:00",
+  "transport": "MCP JSON-RPC default command registry",
+  "directAssetJsonEditing": false,
+  "assetId": "agent-world",
+  "finalLogicalRevision": 2,
+  "topology": {
+    "pointCount": 11,
+    "edgeCount": 17,
+    "faceCount": 7,
+    "cornerCount": 28
+  },
+  "compiled": {
+    "vertexCount": 28,
+    "hasVertexColors": false,
+    "indexCount": 42,
+    "triangleCount": 14,
+    "surfaceCount": 3,
+    "materialSlotIndices": [
+      0,
+      1
+    ]
+  },
+  "pick": {
+    "totalHitCount": 1,
+    "nearestDistance": 3,
+    "sourceFaceId": 21,
+    "sourceCornerIds": [
+      35,
+      32,
+      33
+    ],
+    "sourcePointIds": [
+      11,
+      8,
+      9
+    ],
+    "surfaceIndex": 0
+  },
+  "render": {
+    "width": 640,
+    "height": 360,
+    "distinctPixelCount": 5,
+    "foregroundPixelCount": 65841,
+    "cyanPixelCount": 65841,
+    "foregroundRatio": 0.28576822916666667,
+    "sha256": "e35dc84fde6657072f7fdace03cf4081c1ebccbbd4326d18af80df32dd14004f",
+    "file": "agentic-modelling-closed-loop.png"
+  },
+  "undo": {
+    "restoredLogicalRevision": 1
+  },
+  "redo": {
+    "restoredLogicalRevision": 2
+  }
+}

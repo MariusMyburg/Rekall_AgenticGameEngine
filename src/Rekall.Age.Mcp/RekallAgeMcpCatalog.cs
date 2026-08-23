@@ -136,6 +136,8 @@ internal static class RekallAgeMcpToolClassifier
             "rekall.multiplayer.delta" or
             "rekall.input.inspect_bindings" or
             "rekall.mesh.inspect" or
+            "rekall.mesh.inspect_compiled" or
+            "rekall.mesh.pick_compiled" or
             "rekall.mesh.validate" or
             "rekall.mesh.query_elements" or
             "rekall.mesh.assert" or

@@ -169,6 +169,281 @@ public sealed class InspectMeshAssetCommand : IRekallAgeCommand<InspectMeshAsset
     }
 }
 
+public sealed record RekallAgeCompiledTriangleEvidence(
+    int TriangleIndex,
+    ulong SourceFaceId,
+    IReadOnlyList<ulong> SourceCornerIds,
+    IReadOnlyList<ulong> SourcePointIds,
+    int SurfaceIndex);
+
+public sealed record RekallAgeCompiledSurfaceEvidence(
+    int SurfaceIndex,
+    int MaterialSlotIndex,
+    string? MaterialAssetId,
+    int FirstIndex,
+    int IndexCount,
+    IReadOnlyList<ulong> SourceFaceIds);
+
+public sealed record InspectCompiledMeshRequest(
+    string ProjectRoot,
+    string AssetId,
+    int MaximumTriangles = 32);
+
+public sealed record InspectCompiledMeshResult(
+    string AssetId,
+    string FileRevision,
+    long LogicalRevision,
+    int VertexCount,
+    bool HasVertexColors,
+    int IndexCount,
+    int TriangleCount,
+    int SurfaceCount,
+    RekallAgeMeshBounds Bounds,
+    IReadOnlyList<RekallAgeCompiledTriangleEvidence> Triangles,
+    bool TrianglesTruncated,
+    IReadOnlyList<RekallAgeCompiledSurfaceEvidence> Surfaces,
+    IReadOnlyList<string> NextActions);
+
+public sealed class InspectCompiledMeshCommand
+    : IRekallAgeCommand<InspectCompiledMeshRequest, InspectCompiledMeshResult>
+{
+    private readonly RekallAgeMeshAssetStore _store = new();
+    private readonly RekallAgeMeshCompiler _compiler = new();
+
+    public string Name => "rekall.mesh.inspect_compiled";
+
+    public RekallAgeCommandSchema Schema => new(
+        Name,
+        "Compiles a strict editable mesh and returns bounded immutable runtime counts, material surfaces, bounds, and triangle-to-source face/corner/point provenance for picking and repair loops without dumping vertex/index buffers.",
+        typeof(InspectCompiledMeshRequest).FullName!,
+        typeof(InspectCompiledMeshResult).FullName!);
+
+    public async ValueTask<RekallAgeCommandResult<InspectCompiledMeshResult>> ExecuteAsync(
+        InspectCompiledMeshRequest request,
+        RekallAgeCommandContext context)
+    {
+        if (request.MaximumTriangles < 1 || request.MaximumTriangles > 256)
+        {
+            const string message = "Compiled mesh inspection maximumTriangles must be between 1 and 256.";
+            return RekallAgeCommandResult<InspectCompiledMeshResult>.Failure(
+                default!,
+                message,
+                [new("REKALL_MESH_COMPILED_INSPECTION_LIMIT_INVALID", message, request.AssetId)]);
+        }
+        try
+        {
+            var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.AssetId, context.CancellationToken);
+            var compiled = _compiler.Compile(loaded.Value);
+            var result = new InspectCompiledMeshResult(
+                request.AssetId,
+                loaded.Revision,
+                compiled.SourceLogicalRevision,
+                compiled.Vertices.Count,
+                compiled.HasVertexColors,
+                compiled.Indices.Count,
+                compiled.Triangles.Count,
+                compiled.Surfaces.Count,
+                compiled.Bounds,
+                compiled.Triangles.Take(request.MaximumTriangles)
+                    .Select(triangle => new RekallAgeCompiledTriangleEvidence(
+                        triangle.TriangleIndex,
+                        triangle.SourceFaceId,
+                        triangle.SourceCornerIds,
+                        triangle.SourcePointIds,
+                        triangle.SurfaceIndex))
+                    .ToArray(),
+                compiled.Triangles.Count > request.MaximumTriangles,
+                compiled.Surfaces.Select(surface => new RekallAgeCompiledSurfaceEvidence(
+                    surface.SurfaceIndex,
+                    surface.MaterialSlotIndex,
+                    surface.MaterialAssetId,
+                    surface.FirstIndex,
+                    surface.IndexCount,
+                    surface.SourceFaceIds)).ToArray(),
+                ["rekall.mesh.inspect", "rekall.mesh.validate", "rekall.render.capture_runtime_viewport"]);
+            return RekallAgeCommandResult<InspectCompiledMeshResult>.Success(
+                result,
+                $"Compiled mesh '{request.AssetId}' to {result.TriangleCount} triangle(s) across {result.SurfaceCount} surface(s).");
+        }
+        catch (RekallAgeMeshCompileException error)
+        {
+            return RekallAgeCommandResult<InspectCompiledMeshResult>.Failure(
+                default!,
+                error.Message,
+                [new(error.Code, error.Message, request.AssetId)]);
+        }
+    }
+}
+
+public sealed record PickCompiledMeshRequest(
+    string ProjectRoot,
+    string AssetId,
+    RekallAgeGeometryVector3 Origin,
+    RekallAgeGeometryVector3 Direction,
+    double MaximumDistance = 1_000,
+    int MaximumHits = 16);
+
+public sealed record RekallAgeCompiledMeshPickHit(
+    int TriangleIndex,
+    double Distance,
+    RekallAgeGeometryVector3 Position,
+    ulong SourceFaceId,
+    IReadOnlyList<ulong> SourceCornerIds,
+    IReadOnlyList<ulong> SourcePointIds,
+    int SurfaceIndex);
+
+public sealed record PickCompiledMeshResult(
+    string AssetId,
+    string FileRevision,
+    long LogicalRevision,
+    int TotalHitCount,
+    IReadOnlyList<RekallAgeCompiledMeshPickHit> Hits,
+    bool HitsTruncated,
+    IReadOnlyList<string> NextActions);
+
+public sealed class PickCompiledMeshCommand
+    : IRekallAgeCommand<PickCompiledMeshRequest, PickCompiledMeshResult>
+{
+    private const double IntersectionEpsilon = 1e-9;
+    private readonly RekallAgeMeshAssetStore _store = new();
+    private readonly RekallAgeMeshCompiler _compiler = new();
+
+    public string Name => "rekall.mesh.pick_compiled";
+
+    public RekallAgeCommandSchema Schema => new(
+        Name,
+        "Ray-picks an immutable compiled editable mesh in asset-local coordinates and returns bounded nearest hits with source face/corner/point and material-surface provenance.",
+        typeof(PickCompiledMeshRequest).FullName!,
+        typeof(PickCompiledMeshResult).FullName!);
+
+    public async ValueTask<RekallAgeCommandResult<PickCompiledMeshResult>> ExecuteAsync(
+        PickCompiledMeshRequest request,
+        RekallAgeCommandContext context)
+    {
+        var lengthSquared = Dot(request.Direction, request.Direction);
+        if (!Finite(request.Origin) || !Finite(request.Direction)
+            || !double.IsFinite(request.MaximumDistance) || request.MaximumDistance <= 0
+            || !double.IsFinite(lengthSquared) || lengthSquared <= IntersectionEpsilon
+            || request.MaximumHits < 1 || request.MaximumHits > 256)
+        {
+            const string message = "Compiled mesh pick requires finite origin/direction, a nonzero direction, positive finite maximumDistance, and maximumHits between 1 and 256.";
+            return RekallAgeCommandResult<PickCompiledMeshResult>.Failure(
+                default!,
+                message,
+                [new("REKALL_MESH_COMPILED_PICK_INPUT_INVALID", message, request.AssetId)]);
+        }
+
+        try
+        {
+            var loaded = await _store.LoadVersionedAsync(request.ProjectRoot, request.AssetId, context.CancellationToken);
+            var compiled = _compiler.Compile(loaded.Value);
+            var inverseLength = 1d / Math.Sqrt(lengthSquared);
+            var direction = Scale(request.Direction, inverseLength);
+            var hits = new List<RekallAgeCompiledMeshPickHit>();
+            foreach (var triangle in compiled.Triangles)
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                var firstIndex = checked(triangle.TriangleIndex * 3);
+                var a = compiled.Vertices[checked((int)compiled.Indices[firstIndex])].Position;
+                var b = compiled.Vertices[checked((int)compiled.Indices[firstIndex + 1])].Position;
+                var c = compiled.Vertices[checked((int)compiled.Indices[firstIndex + 2])].Position;
+                if (!TryIntersect(request.Origin, direction, a, b, c, request.MaximumDistance, out var distance))
+                {
+                    continue;
+                }
+                hits.Add(new(
+                    triangle.TriangleIndex,
+                    distance,
+                    Add(request.Origin, Scale(direction, distance)),
+                    triangle.SourceFaceId,
+                    triangle.SourceCornerIds,
+                    triangle.SourcePointIds,
+                    triangle.SurfaceIndex));
+            }
+
+            var ordered = hits.OrderBy(hit => hit.Distance).ThenBy(hit => hit.TriangleIndex).ToArray();
+            var result = new PickCompiledMeshResult(
+                request.AssetId,
+                loaded.Revision,
+                compiled.SourceLogicalRevision,
+                ordered.Length,
+                ordered.Take(request.MaximumHits).ToArray(),
+                ordered.Length > request.MaximumHits,
+                ["rekall.mesh.inspect_compiled", "rekall.mesh.inspect", "rekall.render.capture_runtime_viewport"]);
+            return RekallAgeCommandResult<PickCompiledMeshResult>.Success(
+                result,
+                ordered.Length == 0
+                    ? $"Ray did not hit compiled mesh '{request.AssetId}'."
+                    : $"Ray hit compiled mesh '{request.AssetId}' {ordered.Length} time(s); nearest distance {ordered[0].Distance:0.######}.");
+        }
+        catch (RekallAgeMeshCompileException error)
+        {
+            return RekallAgeCommandResult<PickCompiledMeshResult>.Failure(
+                default!,
+                error.Message,
+                [new(error.Code, error.Message, request.AssetId)]);
+        }
+    }
+
+    private static bool TryIntersect(
+        RekallAgeGeometryVector3 origin,
+        RekallAgeGeometryVector3 direction,
+        RekallAgeGeometryVector3 a,
+        RekallAgeGeometryVector3 b,
+        RekallAgeGeometryVector3 c,
+        double maximumDistance,
+        out double distance)
+    {
+        var edge1 = Subtract(b, a);
+        var edge2 = Subtract(c, a);
+        var p = Cross(direction, edge2);
+        var determinant = Dot(edge1, p);
+        if (Math.Abs(determinant) <= IntersectionEpsilon)
+        {
+            distance = 0;
+            return false;
+        }
+        var inverseDeterminant = 1d / determinant;
+        var fromA = Subtract(origin, a);
+        var u = Dot(fromA, p) * inverseDeterminant;
+        if (u < 0 || u > 1)
+        {
+            distance = 0;
+            return false;
+        }
+        var q = Cross(fromA, edge1);
+        var v = Dot(direction, q) * inverseDeterminant;
+        if (v < 0 || u + v > 1)
+        {
+            distance = 0;
+            return false;
+        }
+        distance = Dot(edge2, q) * inverseDeterminant;
+        return distance >= 0 && distance <= maximumDistance;
+    }
+
+    private static bool Finite(RekallAgeGeometryVector3 value) =>
+        double.IsFinite(value.X) && double.IsFinite(value.Y) && double.IsFinite(value.Z);
+
+    private static RekallAgeGeometryVector3 Add(RekallAgeGeometryVector3 left, RekallAgeGeometryVector3 right) =>
+        new(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
+
+    private static RekallAgeGeometryVector3 Subtract(RekallAgeGeometryVector3 left, RekallAgeGeometryVector3 right) =>
+        new(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
+
+    private static RekallAgeGeometryVector3 Scale(RekallAgeGeometryVector3 value, double scalar) =>
+        new(value.X * scalar, value.Y * scalar, value.Z * scalar);
+
+    private static double Dot(RekallAgeGeometryVector3 left, RekallAgeGeometryVector3 right) =>
+        left.X * right.X + left.Y * right.Y + left.Z * right.Z;
+
+    private static RekallAgeGeometryVector3 Cross(RekallAgeGeometryVector3 left, RekallAgeGeometryVector3 right) =>
+        new(
+            left.Y * right.Z - left.Z * right.Y,
+            left.Z * right.X - left.X * right.Z,
+            left.X * right.Y - left.Y * right.X);
+}
+
 public sealed record ValidateMeshAssetRequest(string ProjectRoot, string AssetId);
 
 public sealed record ValidateMeshAssetResult(

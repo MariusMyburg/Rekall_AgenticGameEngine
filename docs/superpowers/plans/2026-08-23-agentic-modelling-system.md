@@ -83,11 +83,11 @@ then grow it into procedural geometry/material graphs and Studio modelling.
 
 - [x] Write failing mesh edit undo/redo and grouped-operation tests.
 - [x] Record compact reversible deltas in AGE transactions.
-- [ ] Create a deterministic acceptance fixture with an ngon, shared-point
+- [x] Create a deterministic acceptance fixture with an ngon, shared-point
   corner UV variants, multiple material slots, and an extrusion.
-- [ ] Prove inspect -> mutate -> validate -> compile -> render -> pick -> undo ->
+- [x] Prove inspect -> mutate -> validate -> compile -> render -> pick -> undo ->
   redo using commands/MCP with no direct JSON editing.
-- [ ] Capture and independently inspect a visible runtime frame; commit bounded
+- [x] Capture and independently inspect a visible runtime frame; commit bounded
   structured and visual evidence.
 
 ### Task 7: Procedural modelling graph

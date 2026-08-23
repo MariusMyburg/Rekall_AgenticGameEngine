@@ -28,6 +28,7 @@ public sealed class MeshCompilerTests
         Assert.Equal(2, editable.Topology.FaceIds.Count);
         Assert.True(new RekallAgeMeshValidator().Validate(editable).IsValid);
         Assert.Equal(2, compiled.Triangles.Count);
+        Assert.True(compiled.HasVertexColors);
         Assert.Equal(new RekallAgeGeometryVector2(1, 1), compiled.Vertices[2].Uv);
         Assert.Equal(new RekallAgeGeometryVector4(0, 0, 1, 1), compiled.Vertices[2].Color);
     }
@@ -42,6 +43,7 @@ public sealed class MeshCompilerTests
         var compiled = new RekallAgeMeshCompiler().Compile(mesh);
 
         Assert.Equal(3, compiled.Triangles.Count);
+        Assert.False(compiled.HasVertexColors);
         Assert.Equal(9, compiled.Indices.Count);
         Assert.All(compiled.Triangles, triangle => Assert.Equal(41UL, triangle.SourceFaceId));
         Assert.All(compiled.Triangles, triangle => Assert.Equal(3, triangle.SourceCornerIds.Count));

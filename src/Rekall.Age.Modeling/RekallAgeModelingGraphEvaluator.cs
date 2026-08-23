@@ -8,7 +8,7 @@ using Rekall.Age.Modeling.Contracts;
 
 namespace Rekall.Age.Modeling;
 
-public sealed class RekallAgeModelingGraphEvaluator
+public sealed partial class RekallAgeModelingGraphEvaluator
 {
     private readonly RekallAgeModelingGraphValidator _validator =
         new(RekallAgeModelingNodeCatalog.CreateDefault());
@@ -169,6 +169,7 @@ public sealed class RekallAgeModelingGraphEvaluator
             "rekall.modeling.primitive.box" => new(CreateBox(graph, node)),
             "rekall.modeling.primitive.grid" => new(CreateGrid(graph, node)),
             "rekall.modeling.primitive.sphere" => new(CreateSphere(graph, node)),
+            "rekall.modeling.primitive.frustum" => new(CreateFrustum(graph, node)),
             "rekall.modeling.transform" => TransformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.join" => JoinGeometry(graph, node, incoming, values),
             "rekall.modeling.extrude" => ApplySemanticOperation(

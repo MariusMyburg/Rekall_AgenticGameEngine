@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 09:14 Africa/Johannesburg
+Last verified: 2026-08-23 09:19 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -93,6 +93,20 @@ Focused proofs cover axis selection/projection math, off-gizmo rejection,
 persisted two-point translation, and selection retention. The complete Studio
 suite passes 30/30 after recompilation. This is translation-only on the current
 fixed isometric view; rotation/scale handles and orbit/pan/zoom remain open.
+
+The procedural primitive substrate now includes
+`rekall.modeling.primitive.frustum`, a bounded descriptor-driven node covering
+cylinders, cones, and tapered solids with independent non-negative top/bottom
+radii, positive depth, 3-4,096 radial segments, and independent cap controls.
+A zero-radius end is represented by one true apex with triangular side faces,
+not a ring of coincident degenerate points. Its topology is assembled through
+shared stable edges, deterministic face winding and IDs, then passed through
+the strict mesh validator before publication. Cylinder and true-apex cone
+proofs respectively produce valid 16-point/10-face and 9-point/9-face meshes;
+two zero-radius ends fail with a stable parameter diagnostic. Descriptor
+inventory discovery and the full modeling namespace pass 88/88 after
+recompilation. Robust arbitrary-mesh booleans, remeshing, and a broader
+primitive inventory remain open.
 
 The Blender-informed agentic modelling tranche is now the active implementation
 priority after the completed WebGPU and remaining Godot audits. A shallow,

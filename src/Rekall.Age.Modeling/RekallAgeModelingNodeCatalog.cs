@@ -33,6 +33,13 @@ public sealed class RekallAgeModelingNodeCatalog
             Number("radius", "Radius", 0.5, 0.0001, 1_000_000, "world-unit"),
             Integer("segments", "Segments", 16, 3, 4_096),
             Integer("rings", "Rings", 8, 2, 4_096)]),
+        Primitive("rekall.modeling.primitive.frustum", "Frustum", [
+            Number("radiusBottom", "Bottom Radius", 0.5, 0, 1_000_000, "world-unit"),
+            Number("radiusTop", "Top Radius", 0.5, 0, 1_000_000, "world-unit"),
+            Number("depth", "Depth", 1, 0.0001, 1_000_000, "world-unit"),
+            Integer("segments", "Segments", 16, 3, 4_096),
+            Boolean("capBottom", "Cap Bottom", true),
+            Boolean("capTop", "Cap Top", true)]),
         Node("rekall.modeling.transform", "Transform", "Transforms geometry without mutating its upstream snapshot.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)],
             [Vector3("translation", "Translation"), Vector3("rotation", "Rotation", "degree"), Vector3("scale", "Scale", defaultValue: 1)]),
@@ -102,6 +109,9 @@ public sealed class RekallAgeModelingNodeCatalog
     private static RekallAgeModelingParameterDescriptor Integer(
         string id, string name, int value, int minimum, int maximum) =>
         new(id, name, RekallAgeModelingValueType.Integer, JsonValue.Create(value), minimum, maximum);
+
+    private static RekallAgeModelingParameterDescriptor Boolean(string id, string name, bool value) =>
+        new(id, name, RekallAgeModelingValueType.Boolean, JsonValue.Create(value));
 
     private static RekallAgeModelingParameterDescriptor Vector3(
         string id, string name, string? unit = null, double defaultValue = 0) =>

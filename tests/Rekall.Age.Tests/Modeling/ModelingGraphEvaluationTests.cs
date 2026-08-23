@@ -155,6 +155,68 @@ public sealed class ModelingGraphEvaluationTests
         Assert.Equal(mesh.Topology.FaceIds.Count, mesh.Topology.FaceIds.Distinct().Count());
     }
 
+    [Theory]
+    [InlineData(1.0, 16, 48, 10)]
+    [InlineData(0.0, 9, 32, 9)]
+    public async Task FrustumCreatesValidatedCylinderOrTrueApexCone(
+        double radiusTop,
+        int expectedPoints,
+        int expectedCorners,
+        int expectedFaces)
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "frustum-graph",
+            "Frustum Graph",
+            [
+                new("shape", "rekall.modeling.primitive.frustum", 1, new JsonObject
+                {
+                    ["radiusBottom"] = 1.0,
+                    ["radiusTop"] = radiusTop,
+                    ["depth"] = 2.0,
+                    ["segments"] = 8,
+                    ["capBottom"] = true,
+                    ["capTop"] = true
+                }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [new("shape-output", "shape", "geometry", "output", "input")],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var mesh = result.Outputs["mesh"];
+        Assert.Equal(expectedPoints, mesh.Topology.PointIds.Count);
+        Assert.Equal(expectedCorners, mesh.Topology.CornerIds.Count);
+        Assert.Equal(expectedFaces, mesh.Topology.FaceIds.Count);
+        Assert.Equal(expectedPoints, mesh.Topology.Positions.Distinct().Count());
+        Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
+    }
+
+    [Fact]
+    public async Task FrustumRejectsTwoZeroRadiusRingsWithStableDiagnostic()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "degenerate-frustum",
+            "Degenerate Frustum",
+            [
+                new("shape", "rekall.modeling.primitive.frustum", 1, new JsonObject
+                {
+                    ["radiusBottom"] = 0.0, ["radiusTop"] = 0.0
+                }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [new("shape-output", "shape", "geometry", "output", "input")],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, item => item.Code == "REKALL_MODELING_EVALUATION_PARAMETER_INVALID" && item.NodeId == "shape");
+    }
+
     [Fact]
     public async Task FieldMathCapturedAndNamedAttributesAndMaterialAssignmentAreExecutable()
     {

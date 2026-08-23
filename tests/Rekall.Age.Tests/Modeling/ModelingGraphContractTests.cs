@@ -11,8 +11,9 @@ public sealed class ModelingGraphContractTests
     {
         var catalog = RekallAgeModelingNodeCatalog.CreateDefault();
 
-        Assert.Equal(15, catalog.Descriptors.Count);
+        Assert.Equal(16, catalog.Descriptors.Count);
         Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.primitive.box");
+        Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.primitive.frustum");
         Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.transform");
         Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.join");
         Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.extrude");

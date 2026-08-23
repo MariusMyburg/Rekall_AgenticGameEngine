@@ -1,9 +1,7 @@
-using System.Text.Json.Nodes;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using Rekall.Age.Modeling;
-using Rekall.Age.Modeling.Contracts;
 
 namespace Rekall.Age.Studio.Tests;
 
@@ -22,14 +20,14 @@ public sealed class StudioModelingGraphRenderingTests
                 app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 var window = new MainWindow();
                 var viewModel = Assert.IsType<RekallAgeStudioViewModel>(window.DataContext);
-                var descriptor = RekallAgeModelingNodeCatalog.CreateDefault()
-                    .Find("rekall.modeling.primitive.box", 1)!;
-                viewModel.ModelingGraphNodes.Add(new RekallAgeStudioModelingGraphNodeView(
-                    new("box", descriptor.TypeId, descriptor.TypeVersion, new JsonObject()),
-                    descriptor,
-                    [],
-                    incomingLinkCount: 2,
-                    outgoingLinkCount: 3));
+                var repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+                var projectRoot = Path.Combine(repositoryRoot, "Examples", "ProceduralModelingProbe");
+                var session = new RekallAgeStudioModelingGraphSession();
+                session.OpenAsync(projectRoot, "hero-form", CancellationToken.None).AsTask().GetAwaiter().GetResult();
+                session.EvaluateAsync("mesh", CancellationToken.None).AsTask().GetAwaiter().GetResult();
+                foreach (var node in session.Nodes) viewModel.ModelingGraphNodes.Add(node);
+                foreach (var parameter in session.CreateParameterEditors("box"))
+                    viewModel.ModelingGraphParameterEditors.Add(parameter);
 
                 window.Width = 1480;
                 window.Height = 820;

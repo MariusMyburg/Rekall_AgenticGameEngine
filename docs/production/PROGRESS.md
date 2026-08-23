@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 10:22 Africa/Johannesburg
+Last verified: 2026-08-23 10:28 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -17,7 +17,14 @@ canonical graph, retains honest invalidation state, reevaluates the selected
 output, refreshes its deterministic mesh preview, and reports patch/evaluation
 diagnostics. The reusable `ProceduralModelingProbe` project supplies a populated
 six-node box/sphere/transform/Boolean/UV/output graph for real Studio acceptance.
-The complete Studio suite passes 36/36 and a zero-warning Studio build succeeds.
+The complete Studio suite passes 37/37 and a zero-warning Studio build succeeds.
+
+Real UI acceptance caught a populated-graph crash that source-level and session
+tests could not: WPF `Run.Text` attempted to write link-count display bindings
+back into read-only node-view properties. The link metrics are now explicitly
+one-way. A new STA layout test instantiates the real Studio window, materializes
+the procedural-graph tab with a populated node, and exercises layout; it fails
+with the former `XamlParseException` if either read-only binding regresses.
 
 That probe exposed and drove a generic persistence repair: every modeling asset
 store now canonicalizes relative project roots before publishing mesh, modeling

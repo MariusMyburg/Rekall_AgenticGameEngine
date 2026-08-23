@@ -128,6 +128,8 @@ then grow it into procedural geometry/material graphs and Studio modelling.
   prove correct transaction resource evidence through the real CLI path.
 - [x] Establish shared editor panel/header/section tokens and visually inspect
   the first Blender-informed dense workspace slice in the real Windows Studio.
+- [x] Materialize a populated procedural graph in a real STA WPF layout test so
+  read-only binding regressions cannot crash the visible workspace silently.
 - [ ] Add viewport element picking, mesh edit modes, selection history, operation
   previews, attribute/material inspectors, node editor/viewer, evaluation
   diagnostics, and persistent layouts using the same command schemas.

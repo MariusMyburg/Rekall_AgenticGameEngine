@@ -237,7 +237,7 @@
                                                         <Grid>
                                                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                                             <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
-                                                            <TextBlock Grid.Column="1" Foreground="{StaticResource Accent}" FontSize="10"><Run Text="{Binding IncomingLinkCount}" /><Run Text=" IN · " /><Run Text="{Binding OutgoingLinkCount}" /><Run Text=" OUT" /></TextBlock>
+                                                            <TextBlock Grid.Column="1" Foreground="{StaticResource Accent}" FontSize="10"><Run Text="{Binding IncomingLinkCount, Mode=OneWay}" /><Run Text=" IN · " /><Run Text="{Binding OutgoingLinkCount, Mode=OneWay}" /><Run Text=" OUT" /></TextBlock>
                                                         </Grid>
                                                         <TextBlock Text="{Binding NodeId}" Foreground="{StaticResource MutedText}" FontSize="10" />
                                                         <TextBlock Text="{Binding Description}" Foreground="{StaticResource MutedText}" FontSize="11" TextWrapping="Wrap" Margin="0,3,0,3" />

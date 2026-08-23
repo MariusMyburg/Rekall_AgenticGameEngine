@@ -60,12 +60,37 @@ public static class RekallAgeDocumentSchemaProbe
             throw Failure(code, documentKind, fullPath, null, currentVersion, error.Message, error);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+        return new RekallAgeDocumentSnapshot(
+            Inspect(snapshot.Bytes, fullPath, documentKind, currentVersion),
+            snapshot);
+    }
+
+    public static RekallAgeDocumentSchema Inspect(
+        ReadOnlyMemory<byte> documentBytes,
+        string documentPath,
+        string documentKind,
+        int currentVersion)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentKind);
+        ArgumentOutOfRangeException.ThrowIfLessThan(currentVersion, 1);
+        if (documentBytes.Length > MaximumDocumentBytes)
+        {
+            throw Failure(
+                "REKALL_DOCUMENT_TOO_LARGE",
+                documentKind,
+                documentPath,
+                null,
+                currentVersion,
+                $"{documentKind} document '{documentPath}' exceeds the {MaximumDocumentBytes}-byte limit.");
+        }
+
         JsonDocument document;
         try
         {
-            cancellationToken.ThrowIfCancellationRequested();
             document = JsonDocument.Parse(
-                snapshot.Bytes,
+                documentBytes,
                 new JsonDocumentOptions { MaxDepth = MaximumDocumentDepth });
         }
         catch (JsonException error)
@@ -73,10 +98,10 @@ public static class RekallAgeDocumentSchemaProbe
             throw Failure(
                 "REKALL_DOCUMENT_JSON_MALFORMED",
                 documentKind,
-                fullPath,
+                documentPath,
                 null,
                 currentVersion,
-                $"{documentKind} document '{fullPath}' is not valid bounded JSON.",
+                $"{documentKind} document '{documentPath}' is not valid bounded JSON.",
                 error);
         }
 
@@ -87,10 +112,10 @@ public static class RekallAgeDocumentSchemaProbe
                 throw Failure(
                     "REKALL_DOCUMENT_SCHEMA_INVALID",
                     documentKind,
-                    fullPath,
+                    documentPath,
                     null,
                     currentVersion,
-                    $"{documentKind} document '{fullPath}' must have a JSON object root.");
+                    $"{documentKind} document '{documentPath}' must have a JSON object root.");
             }
 
             var schemaProperties = document.RootElement
@@ -99,9 +124,7 @@ public static class RekallAgeDocumentSchemaProbe
                 .ToArray();
             if (schemaProperties.Length == 0)
             {
-                return new RekallAgeDocumentSnapshot(
-                    new RekallAgeDocumentSchema(0, currentVersion, IsLegacy: true),
-                    snapshot);
+                return new RekallAgeDocumentSchema(0, currentVersion, IsLegacy: true);
             }
 
             if (schemaProperties.Length != 1 ||
@@ -112,10 +135,10 @@ public static class RekallAgeDocumentSchemaProbe
                 throw Failure(
                     "REKALL_DOCUMENT_SCHEMA_INVALID",
                     documentKind,
-                    fullPath,
+                    documentPath,
                     null,
                     currentVersion,
-                    $"{documentKind} document '{fullPath}' must contain one non-negative integer schemaVersion.");
+                    $"{documentKind} document '{documentPath}' must contain one non-negative integer schemaVersion.");
             }
 
             if (detectedVersion > currentVersion)
@@ -123,18 +146,16 @@ public static class RekallAgeDocumentSchemaProbe
                 throw Failure(
                     "REKALL_DOCUMENT_SCHEMA_FUTURE",
                     documentKind,
-                    fullPath,
+                    documentPath,
                     detectedVersion,
                     currentVersion,
-                    $"{documentKind} document '{fullPath}' uses future schema {detectedVersion}; this engine supports through schema {currentVersion}.");
+                    $"{documentKind} document '{documentPath}' uses future schema {detectedVersion}; this engine supports through schema {currentVersion}.");
             }
 
-            return new RekallAgeDocumentSnapshot(
-                new RekallAgeDocumentSchema(
-                    detectedVersion,
-                    currentVersion,
-                    IsLegacy: detectedVersion < currentVersion),
-                snapshot);
+            return new RekallAgeDocumentSchema(
+                detectedVersion,
+                currentVersion,
+                IsLegacy: detectedVersion < currentVersion);
         }
     }
 

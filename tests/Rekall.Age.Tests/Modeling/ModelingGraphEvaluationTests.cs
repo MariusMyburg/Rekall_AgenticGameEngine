@@ -52,6 +52,39 @@ public sealed class ModelingGraphEvaluationTests
         Assert.Contains(failed.Diagnostics, diagnostic => diagnostic.Code == "REKALL_MODELING_EVALUATION_POINT_BUDGET_EXCEEDED");
     }
 
+    [Fact]
+    public async Task TransformNodeAppliesScaleRotationAndTranslationWithoutMutatingInput()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "transform-graph",
+            "Transform Graph",
+            [
+                new("box", "rekall.modeling.primitive.box", 1, new JsonObject { ["sizeX"] = 2.0, ["sizeY"] = 2.0, ["sizeZ"] = 2.0 }),
+                new("move", "rekall.modeling.transform", 1, new JsonObject
+                {
+                    ["translation"] = new JsonArray(3.0, 0.0, 0.0),
+                    ["rotation"] = new JsonArray(0.0, 0.0, 90.0),
+                    ["scale"] = new JsonArray(2.0, 1.0, 1.0)
+                }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("box-move", "box", "geometry", "move", "geometry"),
+                new("move-output", "move", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var positions = result.Outputs["mesh"].Topology.Positions;
+        Assert.Equal(2, positions.Min(position => position.X), 6);
+        Assert.Equal(4, positions.Max(position => position.X), 6);
+        Assert.Equal(-2, positions.Min(position => position.Y), 6);
+        Assert.Equal(2, positions.Max(position => position.Y), 6);
+    }
+
     private static RekallAgeModelingGraphAsset Graph(double sizeX, long revision)
     {
         var graph = RekallAgeModelingGraphAsset.Create(

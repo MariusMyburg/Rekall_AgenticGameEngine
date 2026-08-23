@@ -99,7 +99,7 @@ then grow it into procedural geometry/material graphs and Studio modelling.
   caching, budgets, and bounded reports.
 - [ ] Supply initial primitives, transform, join, extrude, triangulate,
   named/captured attributes, field math, material assignment, and output nodes.
-- [ ] Bake through the same mesh asset and runtime compiler and prove a parameter
+- [x] Bake through the same mesh asset and runtime compiler and prove a parameter
   edit changes evaluated bounds with cache/invalidation evidence.
 
 ### Task 8: Semantic material graphs and modifiers

@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 07:29 Africa/Johannesburg
+Last verified: 2026-08-23 07:32 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -237,6 +237,22 @@ budget proof rejects the eight-point box under a four-point limit and returns
 the exact prior output. All 9 graph contract, persistence, patch, and evaluation
 tests pass with a zero-warning, zero-error affected build. Initial node evaluator
 coverage and bake-through to persistent editable meshes are active next.
+
+The procedural graph now crosses the production mesh boundary. The transform
+evaluator applies nonzero per-axis scale followed by deterministic X/Y/Z Euler
+rotation and translation to a replacement topology while retaining upstream
+immutability and strict mesh validation. The bake service demands one named
+graph output, refuses failed evaluation, checks the target mesh's exact file
+revision, derives precisely one next logical mesh revision, captures a
+transaction preimage, and atomically publishes through the existing
+`RekallAgeMeshAssetStore`; new targets require the explicit missing-document
+revision. A transform proof scales a two-unit box on X, rotates 90 degrees about
+Z, and translates it to produce X bounds 2..4 and Y bounds -2..2. A two-bake
+proof changes the source width from 2 to 6, advances the persistent target from
+logical revision 1 to 2, and compiles that same baked asset through the ordinary
+runtime compiler to 12 triangles with X bounds -3..3. The focused transform and
+bake tests pass with zero build warnings/errors. Remaining Task 7 work is the
+broader executable node inventory and its agent command/MCP surface.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

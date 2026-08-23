@@ -166,12 +166,45 @@ public sealed class RekallAgeModelingGraphEvaluator
         node.TypeId switch
         {
             "rekall.modeling.primitive.box" => new(CreateBox(graph, node)),
+            "rekall.modeling.transform" => TransformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.output.mesh" => InputGeometry(node, "input", incoming, values),
             _ => throw new EvaluationException(
                 "REKALL_MODELING_EVALUATION_NODE_NOT_IMPLEMENTED",
                 $"Node type '{node.TypeId}@{node.TypeVersion}' has no evaluator implementation.",
                 node.NodeId)
         };
+
+    private static NodeValue TransformGeometry(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        NodeValue input)
+    {
+        var source = input.Mesh
+            ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", "Transform requires geometry input.", node.NodeId);
+        var translation = ReadVector3(node, "translation", new(0, 0, 0));
+        var rotation = ReadVector3(node, "rotation", new(0, 0, 0));
+        var scale = ReadVector3(node, "scale", new(1, 1, 1));
+        if (Math.Abs(scale.X) < 1e-12 || Math.Abs(scale.Y) < 1e-12 || Math.Abs(scale.Z) < 1e-12)
+        {
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Transform scale components must be nonzero.", node.NodeId);
+        }
+        var positions = source.Topology.Positions
+            .Select(position => Add(Rotate(new(position.X * scale.X, position.Y * scale.Y, position.Z * scale.Z), rotation), translation))
+            .ToArray();
+        var mesh = source with
+        {
+            AssetId = $"{graph.AssetId}.{node.NodeId}",
+            Name = node.NodeId,
+            Revision = graph.Revision,
+            Topology = source.Topology with { Positions = positions }
+        };
+        var validation = new RekallAgeMeshValidator().Validate(mesh);
+        if (!validation.IsValid)
+        {
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_OUTPUT_INVALID", "Transform evaluator produced invalid topology.", node.NodeId);
+        }
+        return new(mesh);
+    }
 
     private static NodeValue InputGeometry(
         RekallAgeModelingGraphNode node,
@@ -241,6 +274,51 @@ public sealed class RekallAgeModelingGraphEvaluator
         }
         return value;
     }
+
+    private static RekallAgeGeometryVector3 ReadVector3(
+        RekallAgeModelingGraphNode node,
+        string name,
+        RekallAgeGeometryVector3 fallback)
+    {
+        if (node.Parameters[name] is null) return fallback;
+        if (node.Parameters[name] is not JsonArray { Count: 3 } array
+            || !TryDouble(array[0], out var x)
+            || !TryDouble(array[1], out var y)
+            || !TryDouble(array[2], out var z)
+            || !double.IsFinite(x) || !double.IsFinite(y) || !double.IsFinite(z))
+        {
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", $"Parameter '{name}' must be a finite three-number array.", node.NodeId);
+        }
+        return new(x, y, z);
+    }
+
+    private static bool TryDouble(JsonNode? node, out double value)
+    {
+        value = default;
+        return node is JsonValue json && json.TryGetValue(out value);
+    }
+
+    private static RekallAgeGeometryVector3 Rotate(RekallAgeGeometryVector3 value, RekallAgeGeometryVector3 degrees)
+    {
+        var x = degrees.X * Math.PI / 180;
+        var y = degrees.Y * Math.PI / 180;
+        var z = degrees.Z * Math.PI / 180;
+        var afterX = new RekallAgeGeometryVector3(
+            value.X,
+            value.Y * Math.Cos(x) - value.Z * Math.Sin(x),
+            value.Y * Math.Sin(x) + value.Z * Math.Cos(x));
+        var afterY = new RekallAgeGeometryVector3(
+            afterX.X * Math.Cos(y) + afterX.Z * Math.Sin(y),
+            afterX.Y,
+            -afterX.X * Math.Sin(y) + afterX.Z * Math.Cos(y));
+        return new(
+            afterY.X * Math.Cos(z) - afterY.Y * Math.Sin(z),
+            afterY.X * Math.Sin(z) + afterY.Y * Math.Cos(z),
+            afterY.Z);
+    }
+
+    private static RekallAgeGeometryVector3 Add(RekallAgeGeometryVector3 left, RekallAgeGeometryVector3 right) =>
+        new(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
 
     private static string CacheKey(
         RekallAgeModelingGraphAsset graph,

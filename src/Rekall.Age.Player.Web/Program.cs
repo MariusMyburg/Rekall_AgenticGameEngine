@@ -55,8 +55,31 @@ else
             BrowserHost.SetText("#state", output.Diagnostics.FirstOrDefault()?.Code ?? "REKALL_WEBGPU_CANVAS_IMPORT_FAILED");
             BrowserHost.SetReady(false);
         }
+        else if (gameBootstrap.Session is { } session)
+        {
+            // A real published AGE project booted: run it, not the compatibility proof workload. Startup already
+            // failed closed above for every earlier missing prerequisite (WebGPU, device init, canvas import).
+            var player = new RekallAgeWebPlayer(session.World, session.ExecutionLoop, device);
+            BrowserHost.SetText("#state", "GAME RUNNING");
+            BrowserHost.SetReady(true);
+            BrowserHost.StartFrameLoop();
+            while (true)
+            {
+                var elapsedSeconds = await BrowserHost.AwaitNextFrameAsync();
+                var tickInputSnapshot = RekallAgeWebInputSnapshotJson.Parse(BrowserHost.SnapshotInput());
+                var tick = await player.TickAsync(elapsedSeconds, tickInputSnapshot, output.Handle, canvasFormat, CancellationToken.None);
+                BrowserHost.SetText(
+                    "#state",
+                    tick.Rendered
+                        ? $"GAME RUNNING / tick {tick.TickSequence} / frame {tick.FrameIndex} / draws {tick.DrawCount}"
+                        : tick.Diagnostics.FirstOrDefault()?.Code ?? "REKALL_WEB_PLAYER_TICK_FAILED");
+                BrowserHost.SetReady(tick.Rendered);
+            }
+        }
         else
         {
+            // No published project manifest is present (the standalone proof page); keep the bounded WebGPU
+            // triangle proof as the compatibility demonstration until a real project replaces it.
             var evidence = await WebGpuProofExecution.ExecuteAsync(device, output.Handle, canvasFormat, bridge.ReadPixelsAsync);
             Publish(evidence);
             if (evidence.SubmittedFrames > 0 && evidence.Diagnostics.Count == 0 && evidence.PixelProof is { Passed: true })
@@ -129,4 +152,19 @@ internal static partial class BrowserHost
 
     [JSImport("input.pullLifecycleEvents", "main.js")]
     internal static partial string PullInputLifecycleEvents();
+
+    [JSImport("frame.start", "main.js")]
+    internal static partial void StartFrameLoop();
+
+    [JSImport("frame.stop", "main.js")]
+    internal static partial void StopFrameLoop();
+
+    [JSImport("frame.pause", "main.js")]
+    internal static partial void PauseFrameLoop();
+
+    [JSImport("frame.resume", "main.js")]
+    internal static partial void ResumeFrameLoop();
+
+    [JSImport("frame.awaitNext", "main.js")]
+    internal static partial Task<double> AwaitNextFrameAsync();
 }

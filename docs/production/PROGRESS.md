@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 23:15 Africa/Johannesburg
+Last verified: 2026-08-23 23:35 Africa/Johannesburg
 
 Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
@@ -4074,6 +4074,55 @@ environment-caused failures (the two `BuildModulesCommandTests` cases now
 fail because `pwsh` is not on this shell's `PATH` rather than the earlier
 timeout symptom, confirming they are environment-dependent, not regressions).
 Studio passed 53/53. Continuous simulation/presentation (Task 7) is next.
+
+Task 7 (the browser simulation/presentation loop) is now wired end to end at
+the build/test evidence tier; it has not yet been exercised in a real
+browser. `RekallAgeWebPlayer` owns one bootstrapped session's play loop: each
+tick captures the browser input snapshot through the Task 6 bridge (so a
+held key's edge is never lost or double-fired across a pause boundary),
+advances `RekallAgeRuntimeSimulationClock` only while unpaused and only when
+elapsed time is positive, then always builds the current viewport frame
+(`RekallAgeRuntimeRenderFrameBuilder`), projects it into backend-neutral
+scene meshes (`RekallAgeVulkanSceneMeshBuilder`), and presents through the
+Task 5 `RekallAgeRenderingDeviceSceneRenderer` -- once per visual tick,
+regardless of whether that tick simulated zero, one, or several fixed steps,
+so a paused or sub-frame-rate tick still redraws the current world instead of
+a stale or blank canvas. On the JavaScript side, `web-player-loop.js`
+(`createFrameLoop`) is a thin `requestAnimationFrame` driver owning only
+timing, pause/resume, and one clamp on an oversized frame gap (a backgrounded
+tab); it delegates all fixed-step/catch-up/clamping semantics to the existing
+C# `RekallAgeRuntimeSimulationClock` rather than re-implementing them. `main.js`
+bridges that push-style loop to a pull-style `frame.awaitNext` JS import so
+`Program.cs` drives its own `while (true) { var elapsed = await
+BrowserHost.AwaitNextFrameAsync(); ... }` loop the same way it already awaits
+every other browser I/O call, without introducing any JS-to-.NET export --
+this codebase had none before and still has none. `Program.cs` now runs the
+real bootstrapped project continuously once one exists
+(`gameBootstrap.Session is { } session`); the bounded WebGPU triangle proof
+remains the fallback compatibility demonstration only when no published
+project manifest is present. Verification: the focused C# selection passed
+6/6 new `RekallAgeWebPlayer` tests (ordinary tick, zero-elapsed
+zero-step-still-renders, pause/resume never advancing simulation while still
+presenting and preserving frame identity, held-key survival across a pause
+boundary, monotonic tick sequence regardless of pause, and resize between
+ticks) against a real `Rekall.Camera3D`/`Rekall.GeometryPrimitive` scene
+executed through the unmodified `RekallAgeRuntimeExecutionLoop`; 10/10 new
+Node tests for `web-player-loop.js` (43/43 including the existing WebGPU and
+input suites); the zero-warning/zero-error Release solution built cleanly;
+and a real trimmed `browser-wasm` publish (`-p:PublishTrimmed=true
+-p:ILLinkTreatWarningsAsErrors=false -p:SuppressTrimAnalysisWarnings=true`,
+the same flags the existing `WebGameExporterTests` harness uses to suppress
+the repository's pre-existing Core/Runtime/BepuPhysics trim-analysis findings
+that are unrelated to this slice) succeeded and correctly fingerprinted both
+new JavaScript modules into the published `wwwroot`. The complete engine
+suite passed 1,650/1,655 with the same five pre-existing, environment-caused
+failures as the prior two checkpoints. Studio passed 53/53. **This is
+source/build/test evidence only (evidence-hierarchy tiers 1-2): no real
+browser or Chromium session exercised this loop this session, so real
+player launch, visual review, and gameplay-input-changes-state proof (tiers
+4-5) remain outstanding and must not be read as claimed.** CLI/MCP/Studio
+publish-web and audit-web commands (Task 8) are next, followed by the
+Clockwork Canopy browser acceptance (Task 9).
 
 ## Next after the current item
 

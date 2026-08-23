@@ -2,12 +2,41 @@ import { dotnet } from './_framework/dotnet.js';
 import { createWebGpuExecutor } from './webgpu-device.js';
 import { publishWebGpuEvidence } from './webgpu-evidence.js';
 import { createWebInputBridge, fullscreenEvent, resizeEvent, visibilityEvent } from './web-input.js';
+import { createFrameLoop } from './web-player-loop.js';
 
 const MAX_LIFECYCLE_EVENTS = 32;
 const canvas = document.querySelector('#viewport');
 const webgpu = createWebGpuExecutor();
 const input = createWebInputBridge({ window, document, canvas, navigator });
 const lifecycleEvents = [];
+
+// Bridges the push-style frame loop (JS owns requestAnimationFrame timing) to the pull-style await .NET drives its
+// simulate/present loop with -- .NET never needs a JS->.NET export, it just awaits "the next frame" like it awaits
+// any other browser I/O. Only the latest pending tick is kept: presentation happens once per visual frame, so an
+// unconsumed earlier tick would only ever be stale by the time it was read.
+let resolveNextFrame = null;
+let pendingElapsedSeconds = null;
+const frameLoop = createFrameLoop({
+    onTick: elapsedSeconds => {
+        if (resolveNextFrame) {
+            const resolve = resolveNextFrame;
+            resolveNextFrame = null;
+            resolve(elapsedSeconds);
+        } else {
+            pendingElapsedSeconds = elapsedSeconds;
+        }
+    }
+});
+
+function awaitNextFrame() {
+    if (pendingElapsedSeconds !== null) {
+        const value = pendingElapsedSeconds;
+        pendingElapsedSeconds = null;
+        return Promise.resolve(value);
+    }
+
+    return new Promise(resolve => { resolveNextFrame = resolve; });
+}
 
 function queueLifecycleEvent(event) {
     if (lifecycleEvents.length < MAX_LIFECYCLE_EVENTS) {
@@ -46,6 +75,13 @@ setModuleImports('main.js', {
     input: {
         snapshot: () => JSON.stringify(input.snapshot()),
         pullLifecycleEvents: () => JSON.stringify(lifecycleEvents.splice(0))
+    },
+    frame: {
+        start: () => frameLoop.start(),
+        stop: () => frameLoop.stop(),
+        pause: () => frameLoop.pause(),
+        resume: () => frameLoop.resume(),
+        awaitNext: () => awaitNextFrame()
     },
     dom: {
         baseUri: () => document.baseURI,

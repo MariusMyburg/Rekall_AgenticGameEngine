@@ -1,5 +1,7 @@
 using Rekall.Age.Assets;
+using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Persistence;
+using Rekall.Age.Core.Transactions;
 
 namespace Rekall.Age.Tests.Assets;
 
@@ -74,35 +76,132 @@ public sealed class AssetCatalogRevisionTests
     {
         var root = TestPaths.CreateTempDirectory();
         var store = new RekallAgeAssetCatalogStore();
-        var firstEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var secondEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var firstAttemptBarrier = new Barrier(2);
         var firstCalls = 0;
         var secondCalls = 0;
 
-        var first = store.MutateAsync(root, async (catalog, cancellationToken) =>
-        {
-            if (Interlocked.Increment(ref firstCalls) == 1)
+        var first = Task.Run(async () => await store.MutateAsync(root, catalog =>
             {
-                firstEntered.SetResult();
-                await secondEntered.Task.WaitAsync(cancellationToken);
-            }
-            return catalog.AddOrReplace(Asset("hero-model", "Hero"));
-        }, default).AsTask();
-        var second = store.MutateAsync(root, async (catalog, cancellationToken) =>
-        {
-            if (Interlocked.Increment(ref secondCalls) == 1)
+                if (Interlocked.Increment(ref firstCalls) == 1)
+                {
+                    Assert.True(firstAttemptBarrier.SignalAndWait(TimeSpan.FromSeconds(10)));
+                }
+                return catalog.AddOrReplace(Asset("hero-model", "Hero"));
+            }, default));
+        var second = Task.Run(async () => await store.MutateAsync(root, catalog =>
             {
-                secondEntered.SetResult();
-                await firstEntered.Task.WaitAsync(cancellationToken);
-            }
-            return catalog.AddOrReplace(Asset("concurrent-audio", "Concurrent"));
-        }, default).AsTask();
+                if (Interlocked.Increment(ref secondCalls) == 1)
+                {
+                    Assert.True(firstAttemptBarrier.SignalAndWait(TimeSpan.FromSeconds(10)));
+                }
+                return catalog.AddOrReplace(Asset("concurrent-audio", "Concurrent"));
+            }, default));
 
         await Task.WhenAll(first, second);
 
         var loaded = await store.LoadAsync(root, default);
         Assert.Equal(["concurrent-audio", "hero-model"], loaded.Assets.Select(asset => asset.Id).Order().ToArray());
         Assert.True(firstCalls > 1 || secondCalls > 1, "One stale mutation must retry against the winner's revision.");
+    }
+
+    [Fact]
+    public async Task CatalogMutationExhaustionMapsSixteenRevisionConflictsToStableBusyError()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeAssetCatalogStore();
+        using var attemptBarrier = new Barrier(2);
+        var calls = 0;
+        var competitor = Task.Run(async () =>
+        {
+            for (var attempt = 1; attempt <= RekallAgeAssetCatalogStore.MaximumMutationAttempts; attempt++)
+            {
+                Assert.True(attemptBarrier.SignalAndWait(TimeSpan.FromSeconds(10)));
+                var loaded = await store.LoadVersionedAsync(root, default);
+                await store.SaveIfRevisionAsync(
+                    root,
+                    loaded.Value.AddOrReplace(Asset($"competitor-{attempt:D2}", $"Competitor {attempt:D2}")),
+                    loaded.Revision,
+                    default);
+                Assert.True(attemptBarrier.SignalAndWait(TimeSpan.FromSeconds(10)));
+            }
+        });
+
+        var error = await Assert.ThrowsAsync<RekallAgeAssetCatalogBusyException>(() =>
+            store.MutateAsync(root, catalog =>
+            {
+                Interlocked.Increment(ref calls);
+                Assert.True(attemptBarrier.SignalAndWait(TimeSpan.FromSeconds(10)));
+                Assert.True(attemptBarrier.SignalAndWait(TimeSpan.FromSeconds(10)));
+                return catalog.AddOrReplace(Asset("hero-model", "Hero"));
+            }, default).AsTask());
+        await competitor;
+
+        Assert.Equal("REKALL_ASSET_CATALOG_BUSY", error.Code);
+        Assert.Equal(RekallAgeAssetCatalogStore.MaximumMutationAttempts, calls);
+        Assert.IsType<RekallAgeDocumentRevisionException>(error.InnerException);
+    }
+
+    [Fact]
+    public async Task CatalogMutationDoesNotRetryOrMapNonRevisionFailures()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeAssetCatalogStore();
+        var expected = new InvalidDataException("non-retryable mutation failure");
+        var calls = 0;
+
+        var actual = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            store.MutateAsync(root, _ =>
+            {
+                Interlocked.Increment(ref calls);
+                throw expected;
+            }, default).AsTask());
+
+        Assert.Same(expected, actual);
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task DynamicCommandBoundaryPreservesStableCatalogBusyCodeAndTarget()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var path = new RekallAgeAssetCatalogStore().GetCatalogPath(root);
+        var busy = new RekallAgeAssetCatalogBusyException(
+            path,
+            RekallAgeAssetCatalogStore.MaximumMutationAttempts,
+            new InvalidOperationException("forced contention"));
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CatalogBusyCommand(busy));
+
+        var result = await registry.ExecuteJsonAsync(
+            "rekall.test.catalog_busy",
+            "{}",
+            new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("catalog busy"), default));
+
+        Assert.False(result.Ok);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal("REKALL_ASSET_CATALOG_BUSY", error.Code);
+        Assert.Equal(path, error.Target);
+    }
+
+    private sealed record CatalogBusyRequest(string? Marker = null);
+
+    private sealed record CatalogBusyResult;
+
+    private sealed class CatalogBusyCommand(RekallAgeAssetCatalogBusyException error)
+        : IRekallAgeCommand<CatalogBusyRequest, CatalogBusyResult>
+    {
+        public string Name => "rekall.test.catalog_busy";
+
+        public RekallAgeCommandSchema Schema => new(
+            Name,
+            "Throws a deterministic catalog contention error.",
+            typeof(CatalogBusyRequest).FullName!,
+            typeof(CatalogBusyResult).FullName!);
+
+        public ValueTask<RekallAgeCommandResult<CatalogBusyResult>> ExecuteAsync(
+            CatalogBusyRequest request,
+            RekallAgeCommandContext context) =>
+            throw error;
     }
 
     private static RekallAgeAssetDocument Asset(string id, string displayName) =>

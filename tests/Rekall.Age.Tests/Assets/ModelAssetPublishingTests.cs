@@ -42,10 +42,13 @@ public sealed class ModelAssetPublishingTests
         Assert.Equal(Path.GetFullPath(publish.CompiledOutputPath), catalogAsset.ImportedPath);
 
         Assert.Contains(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model"), transaction.ChangedResources);
-        Assert.Contains(
+        Assert.DoesNotContain(
             fixture.OutputStore.GetFinalPath(fixture.Root, "hero-model", publish.CompiledContentHash),
             transaction.ChangedResources);
         Assert.Contains(fixture.CatalogStore.GetCatalogPath(fixture.Root), transaction.ChangedResources);
+        Assert.DoesNotContain(
+            transaction.ResourcePreimages,
+            preimage => preimage.Resource.Equals(publish.CompiledOutputPath, StringComparison.Ordinal));
         Assert.DoesNotContain(transaction.ChangedResources, path => path.Contains(".staging", StringComparison.Ordinal));
         Assert.Empty(EnumerateStagingFiles(fixture.Root));
     }
@@ -293,6 +296,83 @@ public sealed class ModelAssetPublishingTests
     }
 
     [Fact]
+    public async Task LosingPublisherCannotDeleteImmutableOutputAdoptedByConcurrentWinner()
+    {
+        var fixture = await CreateFixtureAsync();
+        RekallAgePublishModelResult? winner = null;
+        var winnerService = new RekallAgeModelPublishingService(
+            fixture.MeshStore,
+            new RekallAgeMeshCompiler(),
+            fixture.ModelStore,
+            fixture.OutputStore,
+            fixture.CatalogStore);
+        var losingService = new RekallAgeModelPublishingService(
+            fixture.MeshStore,
+            new RekallAgeMeshCompiler(),
+            fixture.ModelStore,
+            fixture.OutputStore,
+            fixture.CatalogStore,
+            boundary =>
+            {
+                if (boundary == "immutable-output-committed")
+                {
+                    winner = winnerService.PublishAsync(
+                        fixture.Root,
+                        new("hero-model", "Winner", new(RekallAgeModelSourceKind.Mesh, "hero-mesh"), RekallAgeDocumentRevision.Missing),
+                        RekallAgeTransaction.Begin("winner adopts immutable output"),
+                        default).AsTask().GetAwaiter().GetResult();
+                }
+            });
+
+        await Assert.ThrowsAsync<RekallAgeDocumentRevisionException>(() =>
+            losingService.PublishAsync(
+                fixture.Root,
+                new("hero-model", "Loser", new(RekallAgeModelSourceKind.Mesh, "hero-mesh"), RekallAgeDocumentRevision.Missing),
+                RekallAgeTransaction.Begin("loser creates immutable output"),
+                default).AsTask());
+
+        var adopted = Assert.IsType<RekallAgePublishModelResult>(winner);
+        Assert.True(File.Exists(adopted.CompiledOutputPath));
+        var inspection = await winnerService.InspectAsync(fixture.Root, "hero-model", default);
+        Assert.Equal(RekallAgeModelBuildState.Current, inspection.BuildState);
+        Assert.Equal("Winner", inspection.Asset!.DisplayName);
+    }
+
+    [Fact]
+    public async Task PersistedPublicationTransactionCannotRestoreDeleteAnAdoptedImmutableOutput()
+    {
+        var fixture = await CreateFixtureAsync();
+        var publicationTransaction = RekallAgeTransaction.Begin("publish immutable output");
+        var first = await fixture.Service.PublishAsync(
+            fixture.Root,
+            new("hero-model", "Hero Model", new(RekallAgeModelSourceKind.Mesh, "hero-mesh"), RekallAgeDocumentRevision.Missing),
+            publicationTransaction,
+            default);
+        await new RekallAgeTransactionLogStore().AppendAsync(
+            fixture.Root, publicationTransaction, "agent", default);
+        var adopted = await fixture.Service.RebuildAsync(
+            fixture.Root,
+            "hero-model",
+            first.ModelFileRevision,
+            RekallAgeTransaction.Begin("later revision adopts output"),
+            default);
+        var relativeOutputPath = Path.GetRelativePath(fixture.Root, first.CompiledOutputPath);
+        var restoreContext = new RekallAgeCommandContext(
+            "agent", RekallAgeTransaction.Begin("attempt immutable restore"), default);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new RestoreTransactionPreimageCommand().ExecuteAsync(
+                new(fixture.Root, publicationTransaction.Id, relativeOutputPath),
+                restoreContext).AsTask());
+
+        Assert.Equal(first.CompiledContentHash, adopted.CompiledContentHash);
+        Assert.True(File.Exists(first.CompiledOutputPath));
+        Assert.Equal(
+            RekallAgeModelBuildState.Current,
+            (await fixture.Service.InspectAsync(fixture.Root, "hero-model", default)).BuildState);
+    }
+
+    [Fact]
     public async Task OversizedExistingModelDocumentFailsBeforeRebuildMutation()
     {
         var fixture = await CreateFixtureAsync();
@@ -317,7 +397,7 @@ public sealed class ModelAssetPublishingTests
     }
 
     [Fact]
-    public async Task OversizedExistingCatalogRollsBackNewPointerAndImmutableOutput()
+    public async Task OversizedExistingCatalogRollsBackNewPointerButRetainsUnreachableImmutableOutput()
     {
         var fixture = await CreateFixtureAsync();
         var catalogPath = fixture.CatalogStore.GetCatalogPath(fixture.Root);
@@ -337,7 +417,7 @@ public sealed class ModelAssetPublishingTests
 
         Assert.Equal(RekallAgePersistedJson.MaximumDocumentBytes + 1L, new FileInfo(catalogPath).Length);
         Assert.False(File.Exists(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model")));
-        Assert.Empty(Directory.EnumerateFiles(
+        Assert.Single(Directory.EnumerateFiles(
             Path.Combine(fixture.Root, "Assets", "Models", "Compiled"),
             "*.age.compiled-mesh.json",
             SearchOption.AllDirectories));

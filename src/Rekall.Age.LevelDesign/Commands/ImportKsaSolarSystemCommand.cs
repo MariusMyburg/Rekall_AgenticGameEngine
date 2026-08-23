@@ -91,7 +91,7 @@ public sealed class ImportKsaSolarSystemCommand
 
             await _assetStore.MutateAsync(
                 request.ProjectRoot,
-                (current, _) => ValueTask.FromResult(imported.Aggregate(current, (value, asset) => value.AddOrReplace(asset))),
+                current => imported.Aggregate(current, (value, asset) => value.AddOrReplace(asset)),
                 context.CancellationToken);
             context.Transaction.RecordChangedResource(_assetStore.GetCatalogPath(request.ProjectRoot));
             foreach (var asset in imported)

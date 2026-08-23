@@ -1,7 +1,32 @@
+using System.Diagnostics;
 using System.Text.Json;
+using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Persistence;
 
 namespace Rekall.Age.Assets;
+
+public sealed class RekallAgeAssetCatalogBusyException : RekallAgeCodedBoundaryException
+{
+    public const string ErrorCode = "REKALL_ASSET_CATALOG_BUSY";
+
+    public RekallAgeAssetCatalogBusyException(
+        string path,
+        int attempts,
+        Exception innerException)
+        : base(
+            ErrorCode,
+            $"Asset catalog '{path}' remained contended for {attempts} mutation attempts. Retry the semantic mutation against fresh catalog state.",
+            path,
+            innerException)
+    {
+        Path = path;
+        Attempts = attempts;
+    }
+
+    public string Path { get; }
+
+    public int Attempts { get; }
+}
 
 public sealed class RekallAgeAssetCatalogStore
 {
@@ -70,9 +95,14 @@ public sealed class RekallAgeAssetCatalogStore
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Replays a pure semantic catalog transform against fresh state after document revision
+    /// conflicts. The transform must be deterministic and side-effect free because it may run
+    /// up to <see cref="MaximumMutationAttempts"/> times.
+    /// </summary>
     public async ValueTask<RekallAgeVersionedDocument<RekallAgeAssetCatalogDocument>> MutateAsync(
         string projectRoot,
-        Func<RekallAgeAssetCatalogDocument, CancellationToken, ValueTask<RekallAgeAssetCatalogDocument>> mutation,
+        Func<RekallAgeAssetCatalogDocument, RekallAgeAssetCatalogDocument> mutation,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(mutation);
@@ -80,7 +110,7 @@ public sealed class RekallAgeAssetCatalogStore
         {
             cancellationToken.ThrowIfCancellationRequested();
             var loaded = await LoadVersionedAsync(projectRoot, cancellationToken).ConfigureAwait(false);
-            var updated = await mutation(loaded.Value, cancellationToken).ConfigureAwait(false)
+            var updated = mutation(loaded.Value)
                 ?? throw new InvalidOperationException("Asset catalog mutation returned null.");
             try
             {
@@ -91,14 +121,22 @@ public sealed class RekallAgeAssetCatalogStore
                     cancellationToken).ConfigureAwait(false);
                 return new(updated, revision);
             }
-            catch (RekallAgeDocumentRevisionException) when (attempt < MaximumMutationAttempts)
+            catch (RekallAgeDocumentRevisionException error) when (
+                error.Code == "REKALL_DOCUMENT_REVISION_CONFLICT")
             {
-                // Reload and replay the semantic mutation against the winner.
+                if (attempt == MaximumMutationAttempts)
+                {
+                    throw new RekallAgeAssetCatalogBusyException(
+                        GetCatalogPath(projectRoot),
+                        MaximumMutationAttempts,
+                        error);
+                }
+
+                // Reload and replay the pure semantic mutation against the winner.
             }
         }
 
-        throw new InvalidOperationException(
-            $"Asset catalog remained contended for {MaximumMutationAttempts} mutation attempts.");
+        throw new UnreachableException();
     }
 
     public ValueTask<RekallAgeVersionedDocument<RekallAgeAssetCatalogDocument>> AddOrReplaceAsync(
@@ -109,7 +147,7 @@ public sealed class RekallAgeAssetCatalogStore
         ArgumentNullException.ThrowIfNull(asset);
         return MutateAsync(
             projectRoot,
-            (catalog, _) => ValueTask.FromResult(catalog.AddOrReplace(asset)),
+            catalog => catalog.AddOrReplace(asset),
             cancellationToken);
     }
 

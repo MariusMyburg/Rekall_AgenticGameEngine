@@ -111,15 +111,6 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
 
             var outputPath = Path.GetFullPath(Path.Combine(projectRoot, staged.RelativeFinalPath));
             var catalogPath = _catalogStore.GetCatalogPath(projectRoot);
-            mutationJournal = await CaptureMutationJournalAsync(
-                transaction,
-                [outputPath, modelPath],
-                cancellationToken).ConfigureAwait(false);
-            var outputMutation = mutationJournal[0];
-            var modelMutation = mutationJournal[1];
-            RequireMatchingPreimageRevision(request.ExpectedModelFileRevision, modelMutation);
-            RequireMatchingPreimageRevision(loadedModelRevision, modelMutation);
-
             var manifest = RekallAgeModelBuildManifest.Success(
                 source.Revision,
                 source.Value.Revision,
@@ -154,15 +145,25 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
                     staged.ContentHash)
             };
 
-            var outputCommit = await _outputStore.CommitStagedImmutableAsync(
+            _ = await _outputStore.CommitStagedImmutableAsync(
                 projectRoot,
                 staged,
                 cancellationToken).ConfigureAwait(false);
-            if (outputCommit.Created)
-            {
-                outputMutation.RecordWrite(outputCommit.Revision);
-            }
             _publicationBoundary?.Invoke("immutable-output-committed");
+
+            // Immutable outputs are append-only shared resources once visible. They are never
+            // rollback-owned or recorded as deletable transaction preimages. A failed pointer
+            // publication may intentionally leave an unreachable blob for a future guarded GC.
+            mutationJournal = await CaptureMutationJournalAsync(
+                [modelPath],
+                cancellationToken).ConfigureAwait(false);
+            var modelMutation = mutationJournal[0];
+            RequireMatchingPreimageRevision(request.ExpectedModelFileRevision, modelMutation);
+            RequireMatchingPreimageRevision(loadedModelRevision, modelMutation);
+            transaction.RecordResourcePreimage(
+                modelMutation.Path,
+                modelMutation.BeforeBytes is not null,
+                modelMutation.BeforeBytes ?? []);
             var modelRevision = await _modelStore.SaveIfRevisionAsync(
                 projectRoot,
                 model,
@@ -173,10 +174,6 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
             await _catalogStore.AddOrReplaceAsync(projectRoot, catalogAsset, cancellationToken).ConfigureAwait(false);
             _publicationBoundary?.Invoke("catalog-committed");
 
-            if (outputMutation.Written)
-            {
-                transaction.RecordChangedResource(outputPath);
-            }
             transaction.RecordChangedResource(modelPath);
             transaction.RecordChangedResource(catalogPath);
             return new(model, modelRevision, outputPath, staged.ContentHash);
@@ -668,7 +665,6 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
     }
 
     private static async ValueTask<IReadOnlyList<ModelPublicationMutation>> CaptureMutationJournalAsync(
-        RekallAgeTransaction transaction,
         IReadOnlyList<string> paths,
         CancellationToken cancellationToken)
     {
@@ -677,7 +673,6 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
         {
             if (!File.Exists(path))
             {
-                transaction.RecordResourcePreimage(path, existedBefore: false, content: null);
                 journal.Add(new(Path.GetFullPath(path), null, RekallAgeDocumentRevision.Missing));
                 continue;
             }
@@ -688,12 +683,10 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
                     path,
                     RekallAgePersistedJson.MaximumDocumentBytes,
                     cancellationToken).ConfigureAwait(false);
-                transaction.RecordResourcePreimage(snapshot.Path, existedBefore: true, snapshot.Bytes);
                 journal.Add(new(snapshot.Path, snapshot.Bytes, snapshot.Revision));
             }
             catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
             {
-                transaction.RecordResourcePreimage(path, existedBefore: false, content: null);
                 journal.Add(new(Path.GetFullPath(path), null, RekallAgeDocumentRevision.Missing));
             }
         }

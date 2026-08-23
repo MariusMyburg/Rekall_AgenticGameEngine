@@ -81,7 +81,7 @@ public sealed class ImportKsaPlanetCommand
         var normalTexture = await ImportTextureAsync("Normal", "Normal");
         await _assetStore.MutateAsync(
             request.ProjectRoot,
-            (current, _) => ValueTask.FromResult(imported.Aggregate(current, (value, asset) => value.AddOrReplace(asset))),
+            current => imported.Aggregate(current, (value, asset) => value.AddOrReplace(asset)),
             context.CancellationToken);
 
         var loaded = await LoadOrCreateSceneAsync(request.ProjectRoot, request.SceneName, context.CancellationToken);

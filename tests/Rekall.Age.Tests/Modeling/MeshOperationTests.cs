@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.Json;
 using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
 
@@ -77,6 +78,54 @@ public sealed class MeshOperationTests
         Assert.Equal([31UL, 34UL, 33UL, 32UL], result.Mesh.Topology.CornerIds);
         Assert.Equal([3, 2, 1, 0], result.Mesh.Topology.CornerEdgeIndices);
         Assert.Equal([21UL], result.Changes.ModifiedFaceIds);
+        Assert.True(result.Validation.IsValid, string.Join(",", result.Validation.Diagnostics.Select(item => item.Code)));
+    }
+
+    [Fact]
+    public void TriangulateNgonDerivesFacesAndPreservesSourceProvenanceAndCornerData()
+    {
+        var mesh = CreateQuad() with
+        {
+            Attributes =
+            [
+                new RekallAgeGeometryAttribute(
+                    "uv.main",
+                    RekallAgeGeometryDomain.Corner,
+                    RekallAgeGeometryValueType.Float2,
+                    [
+                        JsonSerializer.SerializeToElement(new[] { 0.0, 0.0 }),
+                        JsonSerializer.SerializeToElement(new[] { 1.0, 0.0 }),
+                        JsonSerializer.SerializeToElement(new[] { 1.0, 1.0 }),
+                        JsonSerializer.SerializeToElement(new[] { 0.0, 1.0 })
+                    ],
+                    Semantic: "texcoord")
+            ]
+        };
+        var executor = new RekallAgeMeshOperationExecutor();
+
+        var result = executor.Execute(
+            mesh,
+            new RekallAgeMeshOperationRequest(
+                "triangulate_faces",
+                RekallAgeGeometryDomain.Face,
+                [21],
+                new JsonObject()));
+
+        Assert.Equal(4, mesh.Topology.CornerIds.Count);
+        Assert.Equal(5, result.Mesh.Topology.EdgeIds.Count);
+        Assert.Equal(2, result.Mesh.Topology.FaceIds.Count);
+        Assert.Equal([0, 3, 6], result.Mesh.Topology.FaceOffsets);
+        Assert.Equal(6, result.Mesh.Topology.CornerIds.Count);
+        Assert.Single(result.Changes.CreatedEdgeIds);
+        Assert.Single(result.Changes.CreatedFaceIds);
+        Assert.Equal(2, result.Changes.CreatedCornerIds.Count);
+        Assert.True(result.Changes.Kind.HasFlag(RekallAgeMeshChangeKind.Topology));
+        var provenance = Assert.Single(result.Provenance, item =>
+            item.Domain == RekallAgeGeometryDomain.Face && item.InputElementId == 21);
+        Assert.Equal(2, provenance.OutputElementIds.Count);
+        Assert.Contains(21UL, provenance.OutputElementIds);
+        var uv = Assert.Single(result.Mesh.Attributes);
+        Assert.Equal(6, uv.Values.Count);
         Assert.True(result.Validation.IsValid, string.Join(",", result.Validation.Diagnostics.Select(item => item.Code)));
     }
 

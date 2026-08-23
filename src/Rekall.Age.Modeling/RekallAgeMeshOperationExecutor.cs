@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.Json;
 using Rekall.Age.Modeling.Contracts;
 
 namespace Rekall.Age.Modeling;
@@ -41,6 +42,7 @@ public sealed class RekallAgeMeshOperationExecutor
         {
             "transform" => Transform(source, request),
             "reverse_faces" => ReverseFaces(source, request),
+            "triangulate_faces" => TriangulateFaces(source, request),
             _ => throw Failure("REKALL_MESH_OPERATION_UNKNOWN", $"Unknown mesh operation '{request.OperationId}'.")
         };
         var outputValidation = _validator.Validate(result.Mesh);
@@ -176,6 +178,170 @@ public sealed class RekallAgeMeshOperationExecutor
             faceIds.Select(id => Preserve(RekallAgeGeometryDomain.Face, id)).ToArray());
     }
 
+    private RekallAgeMeshOperationResult TriangulateFaces(
+        RekallAgeMeshAsset source,
+        RekallAgeMeshOperationRequest request)
+    {
+        RequireDomain(request, RekallAgeGeometryDomain.Face);
+        _ = ResolveIndices(source.Topology.FaceIds, request.ElementIds, "face");
+        var selected = request.ElementIds.ToHashSet();
+        var topology = source.Topology;
+        var edgeIds = topology.EdgeIds.ToList();
+        var edgePoints = topology.EdgePointIndices.ToList();
+        var edgeSourceIndices = Enumerable.Range(0, edgeIds.Count).Select<int, int?>(index => index).ToList();
+        var edgeLookup = edgePoints
+            .Select((edge, index) => (Key: EdgeKey(edge.A, edge.B), Index: index))
+            .ToDictionary(item => item.Key, item => item.Index);
+        var faceIds = new List<ulong>();
+        var faceOffsets = new List<int> { 0 };
+        var faceSourceIndices = new List<int>();
+        var cornerIds = new List<ulong>();
+        var cornerPoints = new List<int>();
+        var cornerEdges = new List<int>();
+        var cornerSourceIndices = new List<int>();
+        var createdEdgeIds = new List<ulong>();
+        var createdFaceIds = new List<ulong>();
+        var createdCornerIds = new List<ulong>();
+        var modifiedFaceIds = new List<ulong>();
+        var modifiedCornerIds = new HashSet<ulong>();
+        var provenance = new List<RekallAgeMeshElementProvenance>();
+        var affectedPointIndices = new HashSet<int>();
+        var nextEdgeId = NextId(edgeIds);
+        var nextFaceId = NextId(topology.FaceIds);
+        var nextCornerId = NextId(topology.CornerIds);
+
+        for (var faceIndex = 0; faceIndex < topology.FaceIds.Count; faceIndex++)
+        {
+            var faceId = topology.FaceIds[faceIndex];
+            var start = topology.FaceOffsets[faceIndex];
+            var end = topology.FaceOffsets[faceIndex + 1];
+            var cornerCount = end - start;
+            if (!selected.Contains(faceId) || cornerCount == 3)
+            {
+                faceIds.Add(faceId);
+                faceSourceIndices.Add(faceIndex);
+                for (var cornerIndex = start; cornerIndex < end; cornerIndex++)
+                {
+                    cornerIds.Add(topology.CornerIds[cornerIndex]);
+                    cornerPoints.Add(topology.CornerPointIndices[cornerIndex]);
+                    cornerEdges.Add(topology.CornerEdgeIndices[cornerIndex]);
+                    cornerSourceIndices.Add(cornerIndex);
+                }
+                faceOffsets.Add(cornerIds.Count);
+                if (selected.Contains(faceId))
+                {
+                    provenance.Add(Preserve(RekallAgeGeometryDomain.Face, faceId));
+                }
+                continue;
+            }
+
+            var originalCorners = Enumerable.Range(start, cornerCount).ToArray();
+            var usedOriginalCorners = new HashSet<int>();
+            var outputFaceIds = new List<ulong>();
+            modifiedFaceIds.Add(faceId);
+            foreach (var cornerIndex in originalCorners)
+            {
+                modifiedCornerIds.Add(topology.CornerIds[cornerIndex]);
+                affectedPointIndices.Add(topology.CornerPointIndices[cornerIndex]);
+            }
+
+            for (var triangle = 1; triangle < cornerCount - 1; triangle++)
+            {
+                var triangleFaceId = triangle == 1 ? faceId : nextFaceId++;
+                if (triangleFaceId != faceId)
+                {
+                    createdFaceIds.Add(triangleFaceId);
+                }
+                outputFaceIds.Add(triangleFaceId);
+                faceIds.Add(triangleFaceId);
+                faceSourceIndices.Add(faceIndex);
+                var localCorners = new[] { 0, triangle, triangle + 1 };
+                for (var triangleCorner = 0; triangleCorner < 3; triangleCorner++)
+                {
+                    var local = localCorners[triangleCorner];
+                    var nextLocal = localCorners[(triangleCorner + 1) % 3];
+                    var sourceCornerIndex = start + local;
+                    var pointIndex = topology.CornerPointIndices[sourceCornerIndex];
+                    var nextPointIndex = topology.CornerPointIndices[start + nextLocal];
+                    var key = EdgeKey(pointIndex, nextPointIndex);
+                    if (!edgeLookup.TryGetValue(key, out var edgeIndex))
+                    {
+                        edgeIndex = edgeIds.Count;
+                        var edgeId = nextEdgeId++;
+                        edgeLookup.Add(key, edgeIndex);
+                        edgeIds.Add(edgeId);
+                        edgePoints.Add(new(pointIndex, nextPointIndex));
+                        edgeSourceIndices.Add(null);
+                        createdEdgeIds.Add(edgeId);
+                    }
+
+                    var canReuse = topology.CornerEdgeIndices[sourceCornerIndex] == edgeIndex
+                                   && usedOriginalCorners.Add(sourceCornerIndex);
+                    var cornerId = canReuse ? topology.CornerIds[sourceCornerIndex] : nextCornerId++;
+                    if (!canReuse)
+                    {
+                        createdCornerIds.Add(cornerId);
+                    }
+                    cornerIds.Add(cornerId);
+                    cornerPoints.Add(pointIndex);
+                    cornerEdges.Add(edgeIndex);
+                    cornerSourceIndices.Add(sourceCornerIndex);
+                }
+                faceOffsets.Add(cornerIds.Count);
+            }
+            provenance.Add(new(
+                RekallAgeGeometryDomain.Face,
+                faceId,
+                outputFaceIds));
+        }
+
+        var attributes = source.Attributes.Select(attribute => attribute.Domain switch
+        {
+            RekallAgeGeometryDomain.Edge => attribute with
+            {
+                Values = edgeSourceIndices.Select(index =>
+                    index.HasValue ? attribute.Values[index.Value] : DefaultValue(attribute)).ToArray()
+            },
+            RekallAgeGeometryDomain.Face => attribute with
+            {
+                Values = faceSourceIndices.Select(index => attribute.Values[index]).ToArray()
+            },
+            RekallAgeGeometryDomain.Corner => attribute with
+            {
+                Values = cornerSourceIndices.Select(index => attribute.Values[index]).ToArray()
+            },
+            _ => attribute
+        }).ToArray();
+        var mesh = source with
+        {
+            Revision = checked(source.Revision + 1),
+            Topology = topology with
+            {
+                EdgeIds = edgeIds,
+                EdgePointIndices = edgePoints,
+                FaceIds = faceIds,
+                FaceOffsets = faceOffsets,
+                CornerIds = cornerIds,
+                CornerPointIndices = cornerPoints,
+                CornerEdgeIndices = cornerEdges
+            },
+            Attributes = attributes
+        };
+        return Result(
+            source,
+            mesh,
+            ChangeSet(
+                RekallAgeMeshChangeKind.Topology | (attributes.Length > 0 ? RekallAgeMeshChangeKind.Attributes : RekallAgeMeshChangeKind.None),
+                createdEdges: createdEdgeIds,
+                createdFaces: createdFaceIds,
+                createdCorners: createdCornerIds,
+                modifiedFaces: modifiedFaceIds,
+                modifiedCorners: modifiedCornerIds.Order().ToArray(),
+                changedAttributes: attributes.Select(item => item.Name).Order(StringComparer.Ordinal).ToArray(),
+                affectedBounds: Bounds(affectedPointIndices.Select(index => topology.Positions[index]))),
+            provenance);
+    }
+
     private static RekallAgeMeshOperationResult Result(
         RekallAgeMeshAsset source,
         RekallAgeMeshAsset mesh,
@@ -230,6 +396,34 @@ public sealed class RekallAgeMeshOperationExecutor
 
     private static RekallAgeMeshElementProvenance Preserve(RekallAgeGeometryDomain domain, ulong id) =>
         new(domain, id, [id]);
+
+    private static (int A, int B) EdgeKey(int first, int second) =>
+        first < second ? (first, second) : (second, first);
+
+    private static ulong NextId(IReadOnlyCollection<ulong> ids)
+    {
+        return ids.Count == 0 ? 1 : checked(ids.Max() + 1);
+    }
+
+    private static JsonElement DefaultValue(RekallAgeGeometryAttribute attribute)
+    {
+        if (attribute.DefaultValue.HasValue)
+        {
+            return attribute.DefaultValue.Value;
+        }
+        return attribute.ValueType switch
+        {
+            RekallAgeGeometryValueType.Bool => JsonSerializer.SerializeToElement(false),
+            RekallAgeGeometryValueType.Int32 => JsonSerializer.SerializeToElement(0),
+            RekallAgeGeometryValueType.Float => JsonSerializer.SerializeToElement(0.0),
+            RekallAgeGeometryValueType.Float2 => JsonSerializer.SerializeToElement(new double[2]),
+            RekallAgeGeometryValueType.Float3 => JsonSerializer.SerializeToElement(new double[3]),
+            RekallAgeGeometryValueType.Float4 or RekallAgeGeometryValueType.ColorLinear or RekallAgeGeometryValueType.Quaternion => JsonSerializer.SerializeToElement(new double[4]),
+            RekallAgeGeometryValueType.Matrix4x4 => JsonSerializer.SerializeToElement(new double[16]),
+            RekallAgeGeometryValueType.String => JsonSerializer.SerializeToElement(string.Empty),
+            _ => throw Failure("REKALL_MESH_OPERATION_ATTRIBUTE_DEFAULT_INVALID", $"Attribute '{attribute.Name}' has no default value.")
+        };
+    }
 
     private static IReadOnlyList<int> ResolveIndices(
         IReadOnlyList<ulong> availableIds,

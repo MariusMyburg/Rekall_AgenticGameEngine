@@ -61,6 +61,16 @@ stable corner identities, and refuses to return invalid output. All 20 modelling
 namespace tests pass. Generic selectors, topology-creating operations, batch/
 preview persistence, and element deltas remain active Task 3 work.
 
+The first topology-creating operation is now implemented and verified.
+`triangulate_faces` derives triangle faces from selected ngons while keeping the
+source asset immutable, retaining the original face ID where possible, creating
+only the required diagonal edges/faces/corners, returning source-face to output-
+face provenance, copying face and corner attributes through explicit source
+maps, initializing newly created edge attributes from declared/type defaults,
+and passing the strict validator before returning. The focused quad test proves
+one diagonal edge, two triangle faces, six corners, stable source provenance,
+and six propagated UV values. Extrude remains the next topology operation.
+
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,
 and a zero-warning, zero-error Release solution build. The Studio ergonomics

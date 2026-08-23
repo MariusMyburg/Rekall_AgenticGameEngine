@@ -387,8 +387,10 @@ public sealed class StudioViewModelTests
             analysis with { DominantColorRatio = 0.7, WarningCodes = [] }));
     }
 
-    [Fact]
-    public void StudioRejectsCameraFacingAwayLayoutAsTaskSpecificVisualProof()
+    [Theory]
+    [InlineData("REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT")]
+    [InlineData("REKALL_VIEWPORT_UI_LARGE_COVERAGE")]
+    public void StudioRejectsBlockingLayoutWarningsAsTaskSpecificVisualProof(string warningCode)
     {
         var informative = new RekallAgeViewportFrameAnalysis(
             true,
@@ -404,7 +406,7 @@ public sealed class StudioViewModelTests
 
         Assert.False(RekallAgeStudioViewModel.IsStudioVisualProofAcceptable(
             informative,
-            ["REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT"]));
+            [warningCode]));
     }
 
     [Fact]

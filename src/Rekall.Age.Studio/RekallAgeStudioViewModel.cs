@@ -1564,6 +1564,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             StringComparer.Ordinal)
         && !layoutWarningCodes.Contains(
             "REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT",
+            StringComparer.Ordinal)
+        && !layoutWarningCodes.Contains(
+            "REKALL_VIEWPORT_UI_LARGE_COVERAGE",
             StringComparer.Ordinal);
 
     private async Task StartSimulationAsync()

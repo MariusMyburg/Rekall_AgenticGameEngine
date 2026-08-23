@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 07:48 Africa/Johannesburg
+Last verified: 2026-08-23 07:54 Africa/Johannesburg
 
 Branch: `codex/studio-interaction`
 
@@ -304,6 +304,24 @@ latest bounded evaluation. MCP catalog classification publishes all nine under
 `modeling`. The broadened modeling, closed-loop mesh, registry, and MCP selection
 passes 25/25 with zero build warnings/errors. Semantic material graphs and
 generic modifier contracts are the active Task 8 gate.
+
+Task 8 has its first verified foundation. A distinct material-graph document
+keeps semantic authoring independent from backend shader text and carries stable
+node/link IDs, one typed surface output, logical/file revisions, and typed
+instance-facing exposed parameters. Eleven version-1 descriptors cover scalar
+and color constants, UV coordinates, mapping, texture sampling, float math,
+color mixing, normal mapping, PBR and emissive closures, and material output.
+Their shared catalog declares typed directional ports, required/cardinality
+rules, defaults, finite ranges, enum choices, and texture-asset references.
+Strict validation rejects unsafe/duplicate IDs, unknown type versions,
+parameters and directional ports, incompatible links, missing or multiply
+connected inputs, invalid outputs, and cycles, then produces a deterministic
+reachable execution plan and separately reports unused nodes. Canonical files
+under `Materials/Graphs` use AGE's bounded schema probe, SHA-256 file revisions,
+atomic publication, recovery preimages, and exact logical-revision progression.
+The material contract/validation/persistence proofs and all procedural graph
+tests pass 19/19. Backend-neutral compilation IR, mapped GLSL/WGSL generation,
+material-instance persistence, and generic modifiers remain active.
 
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,

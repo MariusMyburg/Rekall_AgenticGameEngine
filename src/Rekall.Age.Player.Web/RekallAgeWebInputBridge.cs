@@ -322,6 +322,49 @@ public sealed class RekallAgeWebInputBridge
 }
 
 /// <summary>
+/// Parses the JSON array <c>main.js</c>'s <c>input.pullLifecycleEvents()</c> produces (queued
+/// <c>REKALL_WEB_VIEWPORT_RESIZED</c>/<c>_VISIBLE</c>/<c>_HIDDEN</c>/<c>REKALL_WEB_FULLSCREEN_*</c> facts) into the
+/// one lifecycle fact the frame loop currently acts on: the latest queued resize, if any. Only the latest resize
+/// matters because presentation happens once per visual frame -- an intermediate resize queued between two polls
+/// would only ever be stale by the time it was read, same reasoning as the frame-loop's single pending-tick slot.
+/// </summary>
+public static class RekallAgeWebPlayerLifecycleEventsJson
+{
+    public const int MaximumJsonBytes = 16 * 1024;
+
+    public readonly record struct ResizeFact(int Width, int Height);
+
+    public static ResizeFact? TryGetLatestResize(string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        if (System.Text.Encoding.UTF8.GetByteCount(json) > MaximumJsonBytes)
+        {
+            return null;
+        }
+
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        ResizeFact? latest = null;
+        foreach (var item in document.RootElement.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object) continue;
+            if (!item.TryGetProperty("code", out var code) || code.ValueKind != JsonValueKind.String) continue;
+            if (code.GetString() != "REKALL_WEB_VIEWPORT_RESIZED") continue;
+            if (!item.TryGetProperty("width", out var width) || width.ValueKind != JsonValueKind.Number) continue;
+            if (!item.TryGetProperty("height", out var height) || height.ValueKind != JsonValueKind.Number) continue;
+
+            latest = new ResizeFact((int)width.GetDouble(), (int)height.GetDouble());
+        }
+
+        return latest;
+    }
+}
+
+/// <summary>
 /// Parses the plain JSON object <c>web-input.js</c>'s <c>snapshot()</c> produces into a
 /// <see cref="RekallAgeWebInputSnapshot"/>. Bounded like every other browser-supplied payload this player reads;
 /// missing or malformed optional fields fall back to empty/zero rather than throwing, since a dropped browser event

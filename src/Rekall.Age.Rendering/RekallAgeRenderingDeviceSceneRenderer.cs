@@ -11,8 +11,10 @@ namespace Rekall.Age.Rendering;
 /// the native Vulkan scene path (<see cref="RekallAgeVulkanSceneBatchBuilder"/>,
 /// <see cref="RekallAgeVulkanSceneDrawPlanBuilder"/>, <see cref="RekallAgeVulkanSceneGeometryUploadBuilder"/>) so
 /// both backends stay behaviorally identical instead of diverging into parallel scene renderers.
-/// Texture sampling, depth testing, skinning/morphing, and UI canvas draws are not yet covered by this renderer;
-/// they are deferred, still-unimplemented slices of the same Task 5 tranche.
+/// A depth attachment (<see cref="RekallAgeRenderingDeviceSceneResources.ResolveRenderTarget"/>) is composed onto
+/// the caller's color target automatically so overlapping 3D geometry occludes correctly. Texture sampling,
+/// skinning/morphing, and UI canvas draws are not yet covered by this renderer; they are deferred, still-
+/// unimplemented slices of the same Task 5 tranche.
 /// </summary>
 public sealed class RekallAgeRenderingDeviceSceneRenderer
 {
@@ -55,6 +57,12 @@ public sealed class RekallAgeRenderingDeviceSceneRenderer
             return Failed(geometry, diagnostics);
         }
 
+        var renderTarget = _resources.ResolveRenderTarget(colorTarget, diagnostics);
+        if (renderTarget is not { } resolvedRenderTarget)
+        {
+            return Failed(geometry, diagnostics);
+        }
+
         var geometryBuffers = _resources.WriteGeometry(geometry, diagnostics);
         if (geometryBuffers is not { } buffers)
         {
@@ -77,8 +85,9 @@ public sealed class RekallAgeRenderingDeviceSceneRenderer
         using var encoder = _device.BeginCommandEncoder("rekall-scene-frame");
         var clearColor = ParseClearColor(frame.ActiveCamera?.ClearColor);
         var begin = encoder.BeginRenderPass(new RekallAgeRenderPassDescriptor(
-            colorTarget,
+            resolvedRenderTarget,
             [clearColor],
+            DepthClearValue: 1.0f,
             Label: "rekall-scene-pass"));
         if (!Validate(begin, diagnostics))
         {

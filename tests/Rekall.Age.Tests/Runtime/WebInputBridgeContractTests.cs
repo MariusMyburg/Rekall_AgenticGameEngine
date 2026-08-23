@@ -244,4 +244,49 @@ public sealed class WebInputBridgeContractTests
 
         Assert.Throws<FormatException>(() => RekallAgeWebInputSnapshotJson.Parse(oversized));
     }
+
+    [Fact]
+    public void FindsAResizeFactAmongOtherQueuedLifecycleEvents()
+    {
+        var json = """
+        [
+            {"code":"REKALL_WEB_VIEWPORT_VISIBLE"},
+            {"code":"REKALL_WEB_VIEWPORT_RESIZED","width":128,"height":96},
+            {"code":"REKALL_WEB_FULLSCREEN_ENTERED"}
+        ]
+        """;
+
+        var resize = RekallAgeWebPlayerLifecycleEventsJson.TryGetLatestResize(json);
+
+        Assert.Equal(new RekallAgeWebPlayerLifecycleEventsJson.ResizeFact(128, 96), resize);
+    }
+
+    [Fact]
+    public void ReturnsTheLatestResizeWhenSeveralWereQueuedBetweenPolls()
+    {
+        var json = """
+        [
+            {"code":"REKALL_WEB_VIEWPORT_RESIZED","width":100,"height":100},
+            {"code":"REKALL_WEB_VIEWPORT_RESIZED","width":200,"height":150}
+        ]
+        """;
+
+        var resize = RekallAgeWebPlayerLifecycleEventsJson.TryGetLatestResize(json);
+
+        Assert.Equal(new RekallAgeWebPlayerLifecycleEventsJson.ResizeFact(200, 150), resize);
+    }
+
+    [Fact]
+    public void ReturnsNullWhenNoResizeWasQueued()
+    {
+        var resize = RekallAgeWebPlayerLifecycleEventsJson.TryGetLatestResize("[{\"code\":\"REKALL_WEB_VIEWPORT_HIDDEN\"}]");
+
+        Assert.Null(resize);
+    }
+
+    [Fact]
+    public void ReturnsNullForAnEmptyQueue()
+    {
+        Assert.Null(RekallAgeWebPlayerLifecycleEventsJson.TryGetLatestResize("[]"));
+    }
 }

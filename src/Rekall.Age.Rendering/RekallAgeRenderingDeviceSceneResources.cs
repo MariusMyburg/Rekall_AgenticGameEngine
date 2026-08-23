@@ -16,11 +16,24 @@ public sealed class RekallAgeRenderingDeviceSceneResources
     public const uint DrawUniformSizeBytes = 96;
     public const int VertexStrideBytes = 48;
 
+    /// <summary>
+    /// The depth format the scene renderer always requests for its own, internally-composed depth attachment. A
+    /// fixed format keeps the pipeline's <see cref="RekallAgeDepthStencilDescriptor"/> stable across frames instead
+    /// of depending on whatever the caller's color target happens to be formatted as.
+    /// </summary>
+    public const RekallAgeTextureFormat DepthFormat = RekallAgeTextureFormat.Depth32Float;
+
     private readonly IRekallAgeRenderingDevice _device;
 
     private RekallAgeGraphicsResourceHandle _pipeline;
     private RekallAgeGraphicsResourceHandle _bindingLayout;
     private RekallAgeTextureFormat? _pipelineColorFormat;
+
+    private RekallAgeGraphicsResourceHandle _composedTargetSourceColorTarget;
+    private RekallAgeGraphicsResourceHandle _composedTarget;
+    private RekallAgeGraphicsResourceHandle _depthTexture;
+    private int _composedWidth;
+    private int _composedHeight;
 
     private RekallAgeGraphicsResourceHandle _vertexBuffer;
     private ulong _vertexBufferCapacity;
@@ -90,7 +103,7 @@ public sealed class RekallAgeRenderingDeviceSceneResources
             fragmentShader.Handle,
             [bindingLayout.Handle],
             [new RekallAgeColorTargetDescriptor(colorFormat)],
-            DepthStencil: null,
+            DepthStencil: new RekallAgeDepthStencilDescriptor(DepthFormat),
             Label: "rekall-scene-pipeline")
         {
             VertexBuffers =
@@ -116,6 +129,71 @@ public sealed class RekallAgeRenderingDeviceSceneResources
         _pipeline = pipeline.Handle;
         _pipelineColorFormat = colorFormat;
         return new ResolvedPipeline(_pipeline, _bindingLayout);
+    }
+
+    /// <summary>
+    /// Composes the caller's color target with an internally-owned depth attachment sized to match it, entirely
+    /// through the generic <see cref="IRekallAgeRenderingDevice"/> contract (no backend-specific canvas API): the
+    /// caller's color target is inspected for its existing color attachments/dimensions via
+    /// <see cref="IRekallAgeRenderingDevice.InspectResources"/>, and a depth texture plus a new render target
+    /// combining both are created (or resized) only when the caller's color target handle or size actually changes
+    /// -- including across a browser resize, since the caller creates a new color target handle on resize.
+    /// </summary>
+    public RekallAgeGraphicsResourceHandle? ResolveRenderTarget(
+        RekallAgeGraphicsResourceHandle colorTarget,
+        List<RekallAgeGraphicsDiagnostic> diagnostics)
+    {
+        var inspection = _device.InspectResources().FirstOrDefault(resource => resource.Handle == colorTarget);
+        if (inspection?.Descriptor is not RekallAgeRenderTargetDescriptor colorDescriptor)
+        {
+            diagnostics.Add(new RekallAgeGraphicsDiagnostic(
+                "REKALL_RENDERING_DEVICE_SCENE_COLOR_TARGET_NOT_FOUND",
+                "The color target passed to the scene renderer was not found on the device.",
+                colorTarget.ToString()));
+            return null;
+        }
+
+        if (_composedTarget.IsValid
+            && _composedTargetSourceColorTarget == colorTarget
+            && _composedWidth == colorDescriptor.Width
+            && _composedHeight == colorDescriptor.Height)
+        {
+            return _composedTarget;
+        }
+
+        if (_composedTarget.IsValid) _device.Destroy(_composedTarget);
+        if (_depthTexture.IsValid) _device.Destroy(_depthTexture);
+        _composedTarget = default;
+        _depthTexture = default;
+
+        var depth = _device.CreateTexture(new RekallAgeTextureDescriptor(
+            RekallAgeTextureDimension.Texture2D, colorDescriptor.Width, colorDescriptor.Height, 1, 1, 1, 1,
+            DepthFormat, RekallAgeTextureUsage.DepthStencilAttachment, "rekall-scene-depth"));
+        if (!depth.Created)
+        {
+            diagnostics.AddRange(depth.Diagnostics);
+            return null;
+        }
+
+        var composed = _device.CreateRenderTarget(new RekallAgeRenderTargetDescriptor(
+            colorDescriptor.ColorAttachments,
+            new RekallAgeRenderTargetAttachment(depth.Handle),
+            colorDescriptor.Width,
+            colorDescriptor.Height,
+            "rekall-scene-target"));
+        if (!composed.Created)
+        {
+            diagnostics.AddRange(composed.Diagnostics);
+            _device.Destroy(depth.Handle);
+            return null;
+        }
+
+        _depthTexture = depth.Handle;
+        _composedTarget = composed.Handle;
+        _composedTargetSourceColorTarget = colorTarget;
+        _composedWidth = colorDescriptor.Width;
+        _composedHeight = colorDescriptor.Height;
+        return _composedTarget;
     }
 
     public readonly record struct GeometryBuffers(

@@ -81,6 +81,53 @@ public sealed class RenderingDeviceSceneRendererTests
     }
 
     [Fact]
+    public void ComposesADepthAttachmentSoOverlappingGeometryOccludesCorrectly()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(RekallAgeRenderingDeviceCapabilities.DesktopBaseline("in-memory"));
+        var colorTarget = CreateColorTarget(device, 64, 64);
+        var renderer = new RekallAgeRenderingDeviceSceneRenderer(device);
+
+        var result = renderer.RenderFrame(TriangleFrame(), [TriangleMesh()], colorTarget, RekallAgeTextureFormat.Rgba8Unorm);
+
+        Assert.True(result.Rendered, string.Join(Environment.NewLine, result.Diagnostics.Select(item => item.Message)));
+        var resources = device.InspectResources();
+        Assert.Contains(resources, item => item.Descriptor is RekallAgeTextureDescriptor texture
+            && texture.Format == RekallAgeTextureFormat.Depth32Float);
+        Assert.Contains(resources, item => item.Descriptor is RekallAgeRenderTargetDescriptor target
+            && target.DepthStencilAttachment is not null);
+        Assert.Contains(resources, item => item.Descriptor is RekallAgeGraphicsPipelineDescriptor pipeline
+            && pipeline.DepthStencil is not null);
+    }
+
+    [Fact]
+    public void RecomposesTheDepthTargetWhenTheColorTargetIsRecreatedAtANewSize()
+    {
+        using var device = new RekallAgeInMemoryRenderingDevice(RekallAgeRenderingDeviceCapabilities.DesktopBaseline("in-memory"));
+        var renderer = new RekallAgeRenderingDeviceSceneRenderer(device);
+
+        var firstTarget = CreateColorTarget(device, 64, 64);
+        var firstResult = renderer.RenderFrame(TriangleFrame(), [TriangleMesh()], firstTarget, RekallAgeTextureFormat.Rgba8Unorm);
+        Assert.True(firstResult.Rendered, string.Join(Environment.NewLine, firstResult.Diagnostics.Select(item => item.Message)));
+        var depthAfterFirst = device.InspectResources()
+            .Single(item => item.Descriptor is RekallAgeTextureDescriptor texture && texture.Format == RekallAgeTextureFormat.Depth32Float);
+        Assert.Equal(64, ((RekallAgeTextureDescriptor)depthAfterFirst.Descriptor).Width);
+
+        // A resize replaces the color target with a differently-sized handle (the browser cannot resize a canvas
+        // texture in place); the composed depth target must follow the new size, not silently keep serving 64x64.
+        var secondTarget = CreateColorTarget(device, 128, 96);
+        var secondResult = renderer.RenderFrame(TriangleFrame(), [TriangleMesh()], secondTarget, RekallAgeTextureFormat.Rgba8Unorm);
+        Assert.True(secondResult.Rendered, string.Join(Environment.NewLine, secondResult.Diagnostics.Select(item => item.Message)));
+
+        var depthTextures = device.InspectResources()
+            .Where(item => item.Descriptor is RekallAgeTextureDescriptor texture && texture.Format == RekallAgeTextureFormat.Depth32Float)
+            .ToArray();
+        var liveDepth = Assert.Single(depthTextures);
+        var liveDescriptor = (RekallAgeTextureDescriptor)liveDepth.Descriptor;
+        Assert.Equal(128, liveDescriptor.Width);
+        Assert.Equal(96, liveDescriptor.Height);
+    }
+
+    [Fact]
     public void ReportsADiagnosticInsteadOfRenderingAnEmptyFrame()
     {
         using var device = new RekallAgeInMemoryRenderingDevice(RekallAgeRenderingDeviceCapabilities.DesktopBaseline("in-memory"));

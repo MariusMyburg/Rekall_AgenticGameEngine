@@ -60,14 +60,63 @@ else
             // A real published AGE project booted: run it, not the compatibility proof workload. Startup already
             // failed closed above for every earlier missing prerequisite (WebGPU, device init, canvas import).
             var player = new RekallAgeWebPlayer(session.World, session.ExecutionLoop, device);
+            var colorTarget = output.Handle;
             BrowserHost.SetText("#state", "GAME RUNNING");
             BrowserHost.SetReady(true);
             BrowserHost.StartFrameLoop();
             while (true)
             {
-                var elapsedSeconds = await BrowserHost.AwaitNextFrameAsync();
+                double elapsedSeconds;
+                try
+                {
+                    elapsedSeconds = await BrowserHost.AwaitNextFrameAsync();
+                }
+                catch (Exception ex)
+                {
+                    // requestAnimationFrame itself does not throw; a rejected promise here means the JS side (or
+                    // the WebAssembly host underneath it) is gone. Fail closed instead of leaving the last #state
+                    // text lying about the game still running.
+                    BrowserHost.SetText("#state", $"REKALL_WEB_FRAME_LOOP_FAILED / {ex.Message}");
+                    BrowserHost.SetReady(false);
+                    BrowserHost.StopFrameLoop();
+                    break;
+                }
+
+                // Consume queued resize facts before rendering: the canvas cannot be resized in place, so a new,
+                // correctly-sized color target must exist before this tick's frame is built and drawn into it.
+                // Without this, every tick after a browser resize renders the new viewport into the old-sized
+                // target (silent scale/aspect corruption on real WebGPU, not an error).
+                if (RekallAgeWebPlayerLifecycleEventsJson.TryGetLatestResize(BrowserHost.PullInputLifecycleEvents())
+                    is { } resize && resize.Width > 0 && resize.Height > 0)
+                {
+                    var resized = device.ImportCanvasOutput(resize.Width, resize.Height, canvasFormat);
+                    if (resized.Created)
+                    {
+                        device.Destroy(colorTarget);
+                        colorTarget = resized.Handle;
+                    }
+                    // A failed resize import (e.g. a dimension over the device's texture limit) keeps the
+                    // previous, still-valid color target instead of losing rendering entirely; the next resize
+                    // (or the next frame at the same size) gets another chance.
+                }
+
                 var tickInputSnapshot = RekallAgeWebInputSnapshotJson.Parse(BrowserHost.SnapshotInput());
-                var tick = await player.TickAsync(elapsedSeconds, tickInputSnapshot, output.Handle, canvasFormat, CancellationToken.None);
+                RekallAgeWebPlayerTickResult tick;
+                try
+                {
+                    tick = await player.TickAsync(elapsedSeconds, tickInputSnapshot, colorTarget, canvasFormat, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    // Never let an unhandled exception (a device-lost fault, an out-of-bounds asset reference, a
+                    // simulation bug) escape into an unattended page: fail closed, report why, and stop cleanly
+                    // instead of the browser tab silently freezing on the last-rendered frame.
+                    BrowserHost.SetText("#state", $"REKALL_WEB_PLAYER_TICK_EXCEPTION / {ex.Message}");
+                    BrowserHost.SetReady(false);
+                    BrowserHost.StopFrameLoop();
+                    break;
+                }
+
                 BrowserHost.SetText(
                     "#state",
                     tick.Rendered

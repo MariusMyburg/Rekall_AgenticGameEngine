@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 23:35 Africa/Johannesburg
+Last verified: 2026-08-24 00:45 Africa/Johannesburg
 
 Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
@@ -4123,6 +4123,60 @@ player launch, visual review, and gameplay-input-changes-state proof (tiers
 4-5) remain outstanding and must not be read as claimed.** CLI/MCP/Studio
 publish-web and audit-web commands (Task 8) are next, followed by the
 Clockwork Canopy browser acceptance (Task 9).
+
+A pre-commit review of the Task 5/7 work surfaced three real correctness
+gaps that build/test evidence alone had not caught, and all three are fixed
+in this checkpoint before Task 8 begins. (1) The browser tick loop captured
+`output.Handle` once, before the frame loop started, and kept rendering into
+it on every tick even after a `REKALL_WEB_VIEWPORT_RESIZED` lifecycle fact
+was queued by `main.js`'s `fitCanvas()` -- `input.pullLifecycleEvents()` was
+already wired end-to-end but nothing ever called it, so a real browser
+resize would have silently rendered the new viewport into an old-sized
+target. `RekallAgeWebPlayerLifecycleEventsJson.TryGetLatestResize` now
+parses the queued lifecycle facts each tick in `Program.cs`; on a resize the
+loop calls `ImportCanvasOutput` again at the new size and destroys the old
+target, keeping the previous target only if the re-import itself fails. (2)
+`RekallAgeRenderingDeviceSceneRenderer`'s pipeline had no depth attachment
+(`DepthStencil: null`), so any 3D scene with overlapping geometry -- the
+`WebPlayerTests` sphere included -- had undefined occlusion once actually
+rasterized; correctness of this was invisible to build/test evidence because
+the in-memory conformance device does not rasterize. Fixed generically,
+without touching the WebGPU canvas-import protocol or JavaScript: the new
+`RekallAgeRenderingDeviceSceneResources.ResolveRenderTarget` inspects the
+caller's color target through the already-generic
+`IRekallAgeRenderingDevice.InspectResources()` contract, and composes a
+`Depth32Float` depth texture plus a new render target combining both,
+recreating them only when the caller's color target handle or size changes
+(so it also naturally follows the resize fix above, since a resize produces
+a new color target handle). (3) The `while (true)` browser tick loop had no
+exception handling; any tick exception or a rejected `AwaitNextFrameAsync()`
+promise would have escaped `Main` entirely and frozen the tab on its last
+`#state` text with no diagnostic. Both awaits are now wrapped: a failure
+sets an explicit `REKALL_WEB_FRAME_LOOP_FAILED` / `REKALL_WEB_PLAYER_TICK_EXCEPTION`
+`#state` code, calls `SetReady(false)`, stops the frame loop, and exits the
+loop instead of hanging silently. Verification: 6 new/expanded C# tests (2
+composed-depth-attachment tests in `RenderingDeviceSceneRendererTests`, 4
+resize-lifecycle-JSON tests in `WebInputBridgeContractTests`) plus all
+existing focused suites (`RenderingDeviceSceneRendererTests` 6/6,
+`WebPlayerTests` 6/6, `WebInputBridgeContractTests` 24/24 -- 36/36 total);
+the zero-warning/zero-error Release solution build; a real trimmed
+`browser-wasm` publish with the same suppression flags as prior checkpoints,
+succeeding unchanged. The complete engine suite was run twice under this
+checkpoint; each run showed a small, non-overlapping set of failures (15 in
+one run, 7 in the other, only `WindowsPlayerRecoveryTests` common to both)
+in tests unrelated to any file this session touched (`BuildModulesCommandTests`
+wedged-compiler-timeout tests, `PlayablePackageIntegrityTests` player-publish
+tests, `McpAgentToolExecutorTests` token-budget test, module-schema/scaffold
+tests, `WindowsPlayerRecoveryTests` needing a built Windows player exe) --
+consistent with pre-existing environment/resource-contention flakiness under
+this session's heavy concurrent background test/build load, not a
+regression from this checkpoint's changes. Studio passed 53/53 (a first
+attempt at this same command stalled for roughly an hour under that same
+concurrent load without producing output, since `dotnet test` buffers stdout
+until completion; a clean rerun with `--blame-hang-timeout` for diagnostics
+completed in 13 seconds once contention cleared). **This checkpoint remains
+tiers 1-2 evidence only: no real browser or Chromium session has exercised
+the resize/depth/exception-safety paths added here.**
 
 ## Next after the current item
 

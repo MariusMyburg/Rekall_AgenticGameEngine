@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 18:27 Africa/Johannesburg
+Last verified: 2026-08-23 19:06 Africa/Johannesburg
 
 Branch: `master`
 
@@ -17,17 +17,26 @@ The current moving-dot and triangle pages remain RenderingDevice proofs only;
 CPU-frame upload, JavaScript gameplay rewrites, remote desktop streaming, and
 other visually convincing substitutes are explicitly not web game publication.
 
-The genuine web-publishing branch now has its first two shared-runtime seams.
+The genuine web-publishing branch now has its first bounded staging exporter in
+addition to its shared-runtime seams.
 Agent-authored module types can be registered statically for browser WASM/AOT
 without weakening the ordinary desktop module loader. Shipped game content can
 be read through one bounded logical-path contract from either the filesystem or
 browser-style memory, and one byte-based scene codec now supplies identical
 schema/shape validation to both the desktop scene store and future browser
-bootstrap. Focused static-module tests pass 6/6; focused content, scene codec,
-scene store, and project compatibility tests pass 48/48. No browser gameplay,
-scene rendering, or input parity is claimed yet. The next implementation slice
-is the deterministic hashed web-game manifest/exporter, followed by direct
-RenderingDevice scene rendering and the generic browser-input bridge.
+bootstrap. An ordinary project and entry scene can now be staged into a
+path-confined deterministic inventory containing the project document, scene,
+referenced-only sanitized asset catalog, and referenced asset bytes. The
+exporter preserves the 64 MiB per-read and depth-128 document limits, adds a
+4,096-entry/512 MiB aggregate closure bound, hashes actual staged bytes, and
+emits the canonical `game.manifest.json`. Equivalent projects with relative or
+root-dependent absolute imported asset paths produce the same logical manifest
+and build identity. Focused exporter tests pass 4/4; the combined content,
+scene-codec, manifest, and exporter selection passes 25/25. This is only a
+deterministic content staging package: it does not include a WASM host, compiled
+module registry, browser scene loader, input loop, or scene renderer, and does
+not claim browser playability. Those are the remaining genuine web-publication
+slices.
 
 The first stable Model Asset metadata and publishing foundation is now available through the default
 CLI/Studio command registry and its derived MCP catalog. The canonical surface

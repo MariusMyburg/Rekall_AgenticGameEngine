@@ -47,6 +47,20 @@ rejection. All 15 modelling kernel/store test cases pass and the Release
 solution remains zero-warning/zero-error. Task 3, editable adjacency, selectors,
 and the semantic operation framework, is active next.
 
+Task 3 has its first verified slice. `RekallAgeMeshAdjacency` derives stable-ID
+point-to-edge, point-to-face, edge-to-point, edge-to-face, and face-neighbor
+facts only from strictly valid assets, including loose-edge and shared-edge
+cases. Public operation contracts now carry revision lineage, fine-grained
+created/deleted/modified element sets, changed attributes, affected bounds,
+stable-ID provenance, and output validation. The pure operation executor
+implements atomic point transforms and face-winding reversal, preserves the
+input snapshot, advances the logical output revision, rejects missing IDs,
+wrong domains, duplicate selections, unknown operations, and non-finite
+parameters with stable codes, reorders corner-domain attributes with their
+stable corner identities, and refuses to return invalid output. All 20 modelling
+namespace tests pass. Generic selectors, topology-creating operations, batch/
+preview persistence, and element deltas remain active Task 3 work.
+
 Earlier merged baseline: the engine-owned graphics/agent tranche is merged to
 `master` at `7f71694`, green at 1,111/1,111 engine tests, 11/11 Studio tests,
 and a zero-warning, zero-error Release solution build. The Studio ergonomics

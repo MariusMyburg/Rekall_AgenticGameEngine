@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Nodes;
 
 namespace Rekall.Age.Modeling.Contracts;
 
@@ -65,6 +66,85 @@ public sealed record RekallAgeMeshSelection(
     IReadOnlyList<ulong> ElementIds,
     ulong? ActiveElementId = null,
     IReadOnlyList<ulong>? OrderedHistory = null);
+
+public enum RekallAgeMeshDiagnosticSeverity
+{
+    Info,
+    Warning,
+    Error
+}
+
+public sealed record RekallAgeMeshDiagnostic(
+    string Code,
+    RekallAgeMeshDiagnosticSeverity Severity,
+    string Message,
+    IReadOnlyList<ulong> ElementIds);
+
+public sealed record RekallAgeMeshBounds(
+    RekallAgeGeometryVector3 Min,
+    RekallAgeGeometryVector3 Max);
+
+public sealed record RekallAgeMeshValidationSummary(
+    int PointCount,
+    int EdgeCount,
+    int FaceCount,
+    int CornerCount,
+    int LooseEdgeCount,
+    int BoundaryEdgeCount,
+    int NonManifoldEdgeCount,
+    RekallAgeMeshBounds Bounds);
+
+public sealed record RekallAgeMeshValidationReport(
+    bool IsValid,
+    RekallAgeMeshValidationSummary Summary,
+    IReadOnlyList<RekallAgeMeshDiagnostic> Diagnostics);
+
+[Flags]
+public enum RekallAgeMeshChangeKind
+{
+    None = 0,
+    Positions = 1,
+    Topology = 2,
+    Attributes = 4,
+    Selection = 8,
+    Materials = 16
+}
+
+public sealed record RekallAgeMeshChangeSet(
+    RekallAgeMeshChangeKind Kind,
+    IReadOnlyList<ulong> CreatedPointIds,
+    IReadOnlyList<ulong> CreatedEdgeIds,
+    IReadOnlyList<ulong> CreatedFaceIds,
+    IReadOnlyList<ulong> CreatedCornerIds,
+    IReadOnlyList<ulong> DeletedPointIds,
+    IReadOnlyList<ulong> DeletedEdgeIds,
+    IReadOnlyList<ulong> DeletedFaceIds,
+    IReadOnlyList<ulong> DeletedCornerIds,
+    IReadOnlyList<ulong> ModifiedPointIds,
+    IReadOnlyList<ulong> ModifiedEdgeIds,
+    IReadOnlyList<ulong> ModifiedFaceIds,
+    IReadOnlyList<ulong> ModifiedCornerIds,
+    IReadOnlyList<string> ChangedAttributes,
+    RekallAgeMeshBounds AffectedBounds);
+
+public sealed record RekallAgeMeshElementProvenance(
+    RekallAgeGeometryDomain Domain,
+    ulong InputElementId,
+    IReadOnlyList<ulong> OutputElementIds);
+
+public sealed record RekallAgeMeshOperationRequest(
+    string OperationId,
+    RekallAgeGeometryDomain Domain,
+    IReadOnlyList<ulong> ElementIds,
+    JsonObject Parameters);
+
+public sealed record RekallAgeMeshOperationResult(
+    RekallAgeMeshAsset Mesh,
+    long BeforeRevision,
+    long AfterRevision,
+    RekallAgeMeshChangeSet Changes,
+    IReadOnlyList<RekallAgeMeshElementProvenance> Provenance,
+    RekallAgeMeshValidationReport Validation);
 
 public sealed record RekallAgeMeshTopology(
     IReadOnlyList<ulong> PointIds,

@@ -3,38 +3,6 @@ using Rekall.Age.Modeling.Contracts;
 
 namespace Rekall.Age.Modeling;
 
-public enum RekallAgeMeshDiagnosticSeverity
-{
-    Info,
-    Warning,
-    Error
-}
-
-public sealed record RekallAgeMeshDiagnostic(
-    string Code,
-    RekallAgeMeshDiagnosticSeverity Severity,
-    string Message,
-    IReadOnlyList<ulong> ElementIds);
-
-public sealed record RekallAgeMeshValidationSummary(
-    int PointCount,
-    int EdgeCount,
-    int FaceCount,
-    int CornerCount,
-    int LooseEdgeCount,
-    int BoundaryEdgeCount,
-    int NonManifoldEdgeCount,
-    RekallAgeMeshBounds Bounds);
-
-public sealed record RekallAgeMeshBounds(
-    RekallAgeGeometryVector3 Min,
-    RekallAgeGeometryVector3 Max);
-
-public sealed record RekallAgeMeshValidationReport(
-    bool IsValid,
-    RekallAgeMeshValidationSummary Summary,
-    IReadOnlyList<RekallAgeMeshDiagnostic> Diagnostics);
-
 public sealed class RekallAgeMeshValidator
 {
     public RekallAgeMeshValidationReport Validate(RekallAgeMeshAsset mesh)

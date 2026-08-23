@@ -20,7 +20,10 @@ public sealed class RekallAgePublishedModelOutputStore
     public string GetFinalPath(string projectRoot, string assetId)
     {
         ValidateAssetId(assetId);
-        return Path.Combine(GetModelAssetRoot(projectRoot), "Compiled", assetId + CompiledFileSuffix);
+        var modelAssetRoot = GetModelAssetRoot(projectRoot);
+        var finalPath = Path.Combine(modelAssetRoot, "Compiled", assetId + CompiledFileSuffix);
+        EnsurePathWithin(modelAssetRoot, finalPath, "Compiled model output path");
+        return finalPath;
     }
 
     public async ValueTask<RekallAgeStagedModelOutput> WriteStagedAsync(
@@ -197,6 +200,63 @@ public sealed class RekallAgePublishedModelOutputStore
         {
             throw new InvalidDataException("REKALL_MODEL_OUTPUT_INDICES_INVALID: Compiled model output contains an index outside its vertex buffer.");
         }
+
+        var expectedTriangleCount = snapshot.Indices.Count / 3;
+        if (snapshot.Triangles.Count != expectedTriangleCount)
+        {
+            throw new InvalidDataException("REKALL_MODEL_OUTPUT_TRIANGLES_INVALID: Compiled model output triangle metadata must match its index buffer.");
+        }
+
+        var expectedFirstIndex = 0;
+        for (var surfacePosition = 0; surfacePosition < snapshot.Surfaces.Count; surfacePosition++)
+        {
+            var surface = snapshot.Surfaces[surfacePosition]
+                ?? throw new InvalidDataException("REKALL_MODEL_OUTPUT_SURFACES_INVALID: Compiled model output surfaces cannot contain null entries.");
+            if (surface.SurfaceIndex != surfacePosition || surface.MaterialSlotIndex < 0)
+            {
+                throw new InvalidDataException("REKALL_MODEL_OUTPUT_SURFACES_INVALID: Compiled model output surfaces must have sequential nonnegative indices and material slots.");
+            }
+
+            if (surface.SourceFaceIds is null || surface.SourceFaceIds.Count == 0
+                || surface.FirstIndex != expectedFirstIndex
+                || surface.FirstIndex % 3 != 0
+                || surface.IndexCount <= 0
+                || surface.IndexCount % 3 != 0
+                || surface.IndexCount > snapshot.Indices.Count - expectedFirstIndex)
+            {
+                throw new InvalidDataException("REKALL_MODEL_OUTPUT_SURFACES_INVALID: Compiled model output surface ranges must be nonempty, aligned, contiguous, and bounded by the index buffer.");
+            }
+
+            expectedFirstIndex += surface.IndexCount;
+        }
+
+        if (expectedFirstIndex != snapshot.Indices.Count)
+        {
+            throw new InvalidDataException("REKALL_MODEL_OUTPUT_SURFACES_INVALID: Compiled model output surface ranges must cover the complete index buffer.");
+        }
+
+        for (var trianglePosition = 0; trianglePosition < snapshot.Triangles.Count; trianglePosition++)
+        {
+            var triangle = snapshot.Triangles[trianglePosition]
+                ?? throw new InvalidDataException("REKALL_MODEL_OUTPUT_TRIANGLES_INVALID: Compiled model output triangles cannot contain null entries.");
+            if (triangle.TriangleIndex != trianglePosition
+                || triangle.SourceCornerIds is null
+                || triangle.SourceCornerIds.Count != 3
+                || triangle.SourcePointIds is null
+                || triangle.SourcePointIds.Count != 3
+                || triangle.SurfaceIndex < 0
+                || triangle.SurfaceIndex >= snapshot.Surfaces.Count)
+            {
+                throw new InvalidDataException("REKALL_MODEL_OUTPUT_TRIANGLES_INVALID: Compiled model output triangles must have sequential indices, three source corners and points, and a valid surface index.");
+            }
+
+            var surface = snapshot.Surfaces[triangle.SurfaceIndex];
+            var triangleFirstIndex = trianglePosition * 3;
+            if (triangleFirstIndex < surface.FirstIndex || triangleFirstIndex >= surface.FirstIndex + surface.IndexCount)
+            {
+                throw new InvalidDataException("REKALL_MODEL_OUTPUT_TRIANGLES_INVALID: Compiled model output triangle surface metadata must agree with surface ranges.");
+            }
+        }
     }
 
     private static void ValidateFinite(RekallAgeGeometryVector2 value, string description)
@@ -237,7 +297,7 @@ public sealed class RekallAgePublishedModelOutputStore
             Path.GetFileName(Path.GetDirectoryName(Path.GetFullPath(staged.Path))!),
             assetId + CompiledFileSuffix);
         EnsurePathWithin(GetStagingRoot(projectRoot), staged.Path, "Staged model output path");
-        if (!string.Equals(Path.GetFullPath(staged.Path), expectedStagedPath, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(Path.GetFullPath(staged.Path), expectedStagedPath, PathComparison))
         {
             throw new ArgumentException("Staged model output path must be contained in a single model-output staging transaction.", nameof(staged));
         }
@@ -262,7 +322,10 @@ public sealed class RekallAgePublishedModelOutputStore
     private static string GetModelAssetRoot(string projectRoot)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
-        return Path.Combine(Path.GetFullPath(projectRoot), "Assets", "Models");
+        var fullProjectRoot = Path.GetFullPath(projectRoot);
+        var modelAssetRoot = Path.Combine(fullProjectRoot, "Assets", "Models");
+        RejectReparsePointTraversal(fullProjectRoot, modelAssetRoot, "Model Asset root path");
+        return modelAssetRoot;
     }
 
     private static string GetStagingRoot(string projectRoot) =>
@@ -275,11 +338,59 @@ public sealed class RekallAgePublishedModelOutputStore
         var rootWithSeparator = fullRoot.EndsWith(Path.DirectorySeparatorChar)
             ? fullRoot
             : fullRoot + Path.DirectorySeparatorChar;
-        if (!fullCandidate.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase))
+        if (!fullCandidate.StartsWith(rootWithSeparator, PathComparison))
         {
             throw new ArgumentException($"{description} must remain inside '{fullRoot}'.", nameof(candidate));
         }
+
+        RejectReparsePointTraversal(fullRoot, fullCandidate, description);
     }
+
+    private static void RejectReparsePointTraversal(string trustedRoot, string candidate, string description)
+    {
+        var fullRoot = Path.GetFullPath(trustedRoot);
+        var fullCandidate = Path.GetFullPath(candidate);
+        var relative = Path.GetRelativePath(fullRoot, fullCandidate);
+        if (relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, PathComparison))
+        {
+            throw new ArgumentException($"{description} must remain inside '{fullRoot}'.", nameof(candidate));
+        }
+
+        var current = fullRoot;
+        if (IsReparsePoint(current))
+        {
+            throw new InvalidDataException($"REKALL_MODEL_OUTPUT_PATH_REPARSE_REJECTED: {description} cannot traverse a filesystem link or junction.");
+        }
+
+        if (relative == ".")
+        {
+            return;
+        }
+
+        foreach (var segment in relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+        {
+            current = Path.Combine(current, segment);
+            if (IsReparsePoint(current))
+            {
+                throw new InvalidDataException($"REKALL_MODEL_OUTPUT_PATH_REPARSE_REJECTED: {description} cannot traverse a filesystem link or junction.");
+            }
+        }
+    }
+
+    private static bool IsReparsePoint(string path)
+    {
+        try
+        {
+            return File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint);
+        }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    private static StringComparison PathComparison =>
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
     private static void ValidateAssetId(string assetId)
     {

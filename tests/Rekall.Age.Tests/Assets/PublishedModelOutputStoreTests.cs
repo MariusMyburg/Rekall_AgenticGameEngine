@@ -1,3 +1,7 @@
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Rekall.Age.AssetPipeline;
 using Rekall.Age.Modeling.Contracts;
 
@@ -93,6 +97,134 @@ public sealed class PublishedModelOutputStoreTests
             () => store.WriteStagedAsync(TestPaths.CreateTempDirectory(), "hero-model", snapshot, default).AsTask());
     }
 
+    [Fact]
+    public async Task WriteStagedAsyncRejectsIncompleteTriangleMetadata()
+    {
+        var store = new RekallAgePublishedModelOutputStore();
+        var snapshot = CompiledBox() with
+        {
+            Triangles =
+            [
+                CompiledBox().Triangles[0] with { SourceCornerIds = [1, 2] }
+            ]
+        };
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => store.WriteStagedAsync(TestPaths.CreateTempDirectory(), "hero-model", snapshot, default).AsTask());
+    }
+
+    [Fact]
+    public async Task WriteStagedAsyncRejectsUnalignedSurfaceRanges()
+    {
+        var store = new RekallAgePublishedModelOutputStore();
+        var snapshot = CompiledBox() with
+        {
+            Surfaces = [CompiledBox().Surfaces[0] with { FirstIndex = 1, IndexCount = 3 }]
+        };
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => store.WriteStagedAsync(TestPaths.CreateTempDirectory(), "hero-model", snapshot, default).AsTask());
+    }
+
+    [Fact]
+    public async Task WriteStagedAsyncRejectsNonSequentialTriangleIndices()
+    {
+        var store = new RekallAgePublishedModelOutputStore();
+        var baseline = CompiledBox();
+        var snapshot = baseline with
+        {
+            Triangles = baseline.Triangles.Select((triangle, index) =>
+                index == 0 ? triangle with { TriangleIndex = 4 } : triangle).ToArray()
+        };
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => store.WriteStagedAsync(TestPaths.CreateTempDirectory(), "hero-model", snapshot, default).AsTask());
+    }
+
+    [Fact]
+    public async Task WriteStagedAsyncRejectsNonSequentialSurfaceIndices()
+    {
+        var store = new RekallAgePublishedModelOutputStore();
+        var baseline = CompiledBox();
+        var snapshot = baseline with
+        {
+            Surfaces = [baseline.Surfaces[0] with { SurfaceIndex = 2 }]
+        };
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => store.WriteStagedAsync(TestPaths.CreateTempDirectory(), "hero-model", snapshot, default).AsTask());
+    }
+
+    [Fact]
+    public async Task WriteStagedAsyncRejectsStagingDirectoryReparsePoint()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var outside = TestPaths.CreateTempDirectory();
+        var stagingPath = Path.Combine(root, "Assets", "Models", ".staging");
+        Directory.CreateDirectory(Path.GetDirectoryName(stagingPath)!);
+        if (!TryCreateDirectoryLink(stagingPath, outside))
+        {
+            return;
+        }
+
+        var store = new RekallAgePublishedModelOutputStore();
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => store.WriteStagedAsync(root, "hero-model", CompiledBox(), default).AsTask());
+
+        Assert.Empty(Directory.EnumerateFiles(outside, "*", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task CommitStagedAsyncRejectsCompiledDirectoryReparsePoint()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var outside = TestPaths.CreateTempDirectory();
+        var store = new RekallAgePublishedModelOutputStore();
+        var staged = await store.WriteStagedAsync(root, "hero-model", CompiledBox(), default);
+        var compiledPath = Path.Combine(root, "Assets", "Models", "Compiled");
+        if (!TryCreateDirectoryLink(compiledPath, outside))
+        {
+            return;
+        }
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => store.CommitStagedAsync(root, staged, default).AsTask());
+
+        Assert.Empty(Directory.EnumerateFiles(outside, "*", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task CommitStagedAsyncRejectsForgedMalformedOutputAndRetainsPublishedBytes()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgePublishedModelOutputStore();
+        var initial = await store.WriteStagedAsync(root, "hero-model", CompiledBox(), default);
+        await store.CommitStagedAsync(root, initial, default);
+        var finalPath = store.GetFinalPath(root, "hero-model");
+        var priorBytes = await File.ReadAllBytesAsync(finalPath);
+        var priorHash = await store.HashAsync(root, "hero-model", default);
+
+        var staged = await store.WriteStagedAsync(root, "hero-model", CompiledBox() with { SourceLogicalRevision = 8 }, default);
+        var malformedSnapshot = staged.Snapshot with
+        {
+            Triangles = staged.Snapshot.Triangles.Take(staged.Snapshot.Triangles.Count - 1).ToArray()
+        };
+        var malformedBytes = CanonicalBytes(malformedSnapshot);
+        await File.WriteAllBytesAsync(staged.Path, malformedBytes);
+        var forged = staged with
+        {
+            ContentHash = Convert.ToHexString(SHA256.HashData(malformedBytes)).ToLowerInvariant(),
+            Snapshot = malformedSnapshot
+        };
+
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => store.CommitStagedAsync(root, forged, default).AsTask());
+
+        Assert.Equal(priorBytes, await File.ReadAllBytesAsync(finalPath));
+        Assert.Equal(priorHash, await store.HashAsync(root, "hero-model", default));
+    }
+
     private static RekallAgeCompiledMeshSnapshot CompiledBox()
     {
         var positions = new[]
@@ -132,5 +264,44 @@ public sealed class PublishedModelOutputStoreTests
             [new(0, 0, null, 0, indices.Length, Enumerable.Range(1, triangles.Length).Select(value => (ulong)value).ToArray())],
             new(new(-1, -1, -1), new(1, 1, 1)),
             HasVertexColors: true);
+    }
+
+    private static byte[] CanonicalBytes(RekallAgeCompiledMeshSnapshot snapshot) =>
+        Encoding.UTF8.GetBytes(JsonSerializer.Serialize(snapshot, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true,
+            MaxDepth = 128
+        }) + "\n");
+
+    private static bool TryCreateDirectoryLink(string linkPath, string targetPath)
+    {
+        try
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                Directory.CreateSymbolicLink(linkPath, targetPath);
+                return true;
+            }
+
+            var startInfo = new ProcessStartInfo("cmd.exe")
+            {
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            startInfo.ArgumentList.Add("/c");
+            startInfo.ArgumentList.Add("mklink");
+            startInfo.ArgumentList.Add("/J");
+            startInfo.ArgumentList.Add(linkPath);
+            startInfo.ArgumentList.Add(targetPath);
+            using var process = Process.Start(startInfo)!;
+            process.WaitForExit();
+            return process.ExitCode == 0;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return false;
+        }
     }
 }

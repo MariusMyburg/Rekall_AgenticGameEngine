@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 04:20 Africa/Johannesburg
+Last verified: 2026-08-24 05:10 Africa/Johannesburg
 
 Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
@@ -4401,7 +4401,99 @@ that the page boots. This directly de-risks Task 9's planned semantic
 input checks (movement/jump/grounding/etc.), which all depend on this same
 path. No further code changes resulted; these were verification-only.
 
-## Next after the current item
+Also fixed while starting Task 9, caught the same way -- by actually
+running a real, larger published scene rather than trusting the smaller
+one to represent it: `MAX_PENDING` in `webgpu-device.js` (bounding
+`pendingScopes`/`pendingCompilations`, a JS safety limit, not a WebGPU or
+hardware constraint) was 64, and a real 28-entity scene's first tick
+creates enough packets to trip `REKALL_WEBGPU_PENDING_OVERFLOW` before the
+per-tick drain gets a chance to run once, dropping that frame. Raised to
+512 for real headroom; reverified clean against the same scene, and the
+compatibility proof page (republished fresh) still passes its pixel proof
+afterward, confirming the raised compilation-pending bound didn't regress
+its shader-compilation path.
+
+**Task 9 is blocked on a finding that needs the user's decision, not
+further autonomous guessing.** Attempting to "accept Clockwork Canopy
+unchanged in the browser" surfaced that the project's *current* authored
+state cannot be verified against any valid accepted baseline, on any
+platform -- not a web-publishing defect. Sequence of evidence, gathered
+directly rather than assumed:
+
+1. Copied `Artifacts/AgentGames/OriginalPlatformer` (gitignored, no git
+   ref -- see below) into scratch, content-hashed the authored source
+   (`rekall.project.json`, `Scenes/`, `Modules/*.cs`/`*.csproj`,
+   `Assets/`, `Shaders/`) as its frozen identity:
+   `5289b667730b6c0f8835f17128723e75d176214a1730279dd187fe975ab7f4bf`.
+   Installed the module SDK and built both modules
+   (`ClockworkPlayable`, `ClockworkRules`) fresh against the copy, then
+   published it through `rekall.game.publish_web` -- all 5
+   `rekall.game.audit_web` checks passed (manifest-integrity,
+   module-registry-coverage, content-relocation, runtime-identity,
+   static-server-boot).
+2. Loaded the real published build in the same real browser used above:
+   it boots, bootstraps a real 28-entity physics/UI scene, and sustains
+   real ticks with zero diagnostics -- the web publishing pipeline itself
+   is working correctly. But the canvas shows almost nothing: three flat
+   color bands (the three giant backdrop planes) and one small cube, no
+   player, platforms, collectibles, hazards, or goal, despite the runtime
+   correctly reporting 28 renderable entities and zero culled.
+3. To rule out this being a web-specific defect, captured the *same*
+   frozen copy through `render viewport capture ... vulkan` (real native
+   Vulkan GPU rendering, not the browser) and `... software` (the
+   software rasterizer): both show the *same* near-empty result. This is
+   not a browser/WebGPU bug -- it reproduces identically across all three
+   independent rendering backends the engine has, so it predates and is
+   unrelated to this session's web-publishing work.
+4. To test whether the three giant backdrop planes (they sit at
+   Z = -2..-3.2, "behind" the Z=0 gameplay layer from the camera's
+   position at Z=8) were winning the depth test against nearer gameplay
+   geometry and hiding it, set their `visible` to `false` in the frozen
+   copy's scene JSON and recaptured with `software`: gameplay still did
+   not appear -- only the background clear color replaced the backdrop
+   bands, and the same one small cube remained. This rules out depth
+   ordering/occlusion; whatever is wrong is per-entity (most entities
+   never rasterize a visible pixel at all), not a compositing order bug.
+   The frame builder's own layout diagnostics (`Layout bounds: spatial=21,
+   x=51.50, ...`) confirm every entity's authored transform is read
+   correctly and spans the full ~43-unit level width, so the defect is
+   downstream of transform ingestion -- in mesh building or rasterization,
+   not scene loading. The exact defect was not pinned down further within
+   this session's time budget once point 5 below made root-causing
+   secondary to the acceptance question itself.
+5. **The project's own prior accepted evidence does not match the
+   project's current state.** `Artifacts/AgentGames/OriginalPlatformer/
+   _visual_evidence/Main_runtime_002.png` (and the matching image in
+   `_diag/` and `_evidence/`) shows a `PLAYING`-scored scene with visible
+   platforms and a `GOAL AHEAD ->` HUD hint, rendered with converging
+   edges and multiple visible cube faces (front, top, *and* side) --
+   unmistakably a **perspective** camera. The scene's currently authored
+   `CameraRig` entity has `"ProjectionMode": "Orthographic"`. An
+   axis-aligned orthographic camera cannot produce the converging-edge,
+   multi-face perspective look in that accepted image. That means the
+   accepted evidence was captured under a different camera configuration
+   than what the project currently contains -- either the orthographic
+   camera is a later authoring change nobody has visually verified since,
+   or the accepted evidence is stale/from an unrelated run. Either way,
+   **there is no currently-valid "accepted" reference to check an
+   unchanged web publish against**, and this project has no git history
+   to date the change against (`Artifacts/` is gitignored by design, since
+   it holds generated/session-local game output, not engine source).
+
+None of this is a defect in the web publishing pipeline built this
+session (Tasks 5-8), which is now demonstrably solid against a real,
+substantial, 28-entity scene. It is a question about what "the accepted
+Clockwork Canopy" actually is, which is the user's call, not an
+engineering judgment to make alone: whether to treat the orthographic
+camera as an unverified authoring regression to fix (and re-accept on
+Windows first, under whichever camera is correct, before touching the
+browser again), to accept it as intentional and debug why gameplay
+entities don't rasterize under it, or something else entirely. Diagnostic
+screenshots from this investigation (native Vulkan capture, software
+capture, backdrops-hidden capture, and the prior accepted evidence for
+comparison) are preserved for that decision. Task 9 is paused here
+pending it; the frozen copy, its content hash, and this evidence remain
+available to resume from once the user decides.
 
 The first Godot-reference graphics milestone is verified. A shallow,
 blob-filtered sparse reference checkout at `F:\Dev\godot-reference` pins Godot

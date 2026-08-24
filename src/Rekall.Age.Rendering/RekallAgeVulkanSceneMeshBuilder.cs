@@ -48,7 +48,7 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             normalized = normalized["rekall.primitive.".Length..];
         }
 
-        return normalized is "cube" or "sphere" or "cylinder" or "cone" or "plane" or "surface" or "atmosphere" or "cloud-layer"
+        return normalized is "cube" or "sphere" or "cylinder" or "cone" or "torus" or "octahedron" or "plane" or "surface" or "atmosphere" or "cloud-layer"
             ? normalized
             : null;
     }
@@ -93,6 +93,8 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
                 "cloud-layer" => BuildSphere(renderable, "cloud-layer", ResolveSlices(renderable, 384), ResolveStacks(renderable, 192)),
                 "cylinder" => BuildCylinder(renderable, primitive, 16),
                 "cone" => BuildCone(renderable, primitive, 16),
+                "torus" => BuildTorus(renderable, primitive, 16, 8),
+                "octahedron" => BuildOctahedron(renderable, primitive),
                 _ => throw new InvalidOperationException($"Unsupported primitive '{primitive}'.")
             };
             yield return ApplyVirtualGeometry(BindRenderableMaterial(mesh, renderable, assets), renderable, activeCamera);
@@ -750,6 +752,103 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
 
         AddCap(vertices, indices, color, slices, -0.5f, (0, -1, 0), top: false);
         return new RekallAgeVulkanSceneMesh(renderable.EntityId, renderable.EntityName, primitive, vertices, indices);
+    }
+
+    private static RekallAgeVulkanSceneMesh BuildTorus(
+        RekallAgeRuntimeViewportRenderable renderable,
+        string primitive,
+        int majorSegments,
+        int minorSegments)
+    {
+        const float majorRadius = 0.35f;
+        const float minorRadius = 0.15f;
+        var color = ParseColor(renderable.MaterialColor);
+        var vertices = new List<RekallAgeVulkanSceneVertex>((majorSegments + 1) * (minorSegments + 1));
+        var indices = new List<uint>(majorSegments * minorSegments * 6);
+        for (var major = 0; major <= majorSegments; major++)
+        {
+            var u = major / (float)majorSegments;
+            var theta = MathF.PI * 2 * u;
+            var cosTheta = MathF.Cos(theta);
+            var sinTheta = MathF.Sin(theta);
+            for (var minor = 0; minor <= minorSegments; minor++)
+            {
+                var v = minor / (float)minorSegments;
+                var phi = MathF.PI * 2 * v;
+                var cosPhi = MathF.Cos(phi);
+                var sinPhi = MathF.Sin(phi);
+                var ringRadius = majorRadius + minorRadius * cosPhi;
+                vertices.Add(Vertex(
+                    (ringRadius * cosTheta, minorRadius * sinPhi, ringRadius * sinTheta),
+                    Normalize(cosPhi * cosTheta, sinPhi, cosPhi * sinTheta),
+                    color,
+                    u,
+                    v));
+            }
+        }
+
+        var row = minorSegments + 1;
+        for (var major = 0; major < majorSegments; major++)
+        {
+            for (var minor = 0; minor < minorSegments; minor++)
+            {
+                var a = checked((uint)(major * row + minor));
+                var b = checked((uint)((major + 1) * row + minor));
+                indices.Add(a);
+                indices.Add(b);
+                indices.Add(a + 1);
+                indices.Add(a + 1);
+                indices.Add(b);
+                indices.Add(b + 1);
+            }
+        }
+
+        return new RekallAgeVulkanSceneMesh(renderable.EntityId, renderable.EntityName, primitive, vertices, indices);
+    }
+
+    private static RekallAgeVulkanSceneMesh BuildOctahedron(
+        RekallAgeRuntimeViewportRenderable renderable,
+        string primitive)
+    {
+        var color = ParseColor(renderable.MaterialColor);
+        var vertices = new List<RekallAgeVulkanSceneVertex>(24);
+        var indices = new List<uint>(24);
+        var top = new Vector3(0, 0.5f, 0);
+        var bottom = new Vector3(0, -0.5f, 0);
+        var east = new Vector3(0.5f, 0, 0);
+        var north = new Vector3(0, 0, 0.5f);
+        var west = new Vector3(-0.5f, 0, 0);
+        var south = new Vector3(0, 0, -0.5f);
+
+        AddFace(top, north, east);
+        AddFace(top, west, north);
+        AddFace(top, south, west);
+        AddFace(top, east, south);
+        AddFace(bottom, east, north);
+        AddFace(bottom, north, west);
+        AddFace(bottom, west, south);
+        AddFace(bottom, south, east);
+        return new RekallAgeVulkanSceneMesh(renderable.EntityId, renderable.EntityName, primitive, vertices, indices);
+
+        void AddFace(Vector3 a, Vector3 b, Vector3 c)
+        {
+            var normal = Vector3.Normalize(Vector3.Cross(b - a, c - a));
+            var center = (a + b + c) / 3;
+            if (Vector3.Dot(normal, center) < 0)
+            {
+                (b, c) = (c, b);
+                normal = Vector3.Normalize(Vector3.Cross(b - a, c - a));
+            }
+
+            var start = checked((uint)vertices.Count);
+            var normalized = (normal.X, normal.Y, normal.Z);
+            vertices.Add(Vertex((a.X, a.Y, a.Z), normalized, color, 0.5f, 0));
+            vertices.Add(Vertex((b.X, b.Y, b.Z), normalized, color, 0, 1));
+            vertices.Add(Vertex((c.X, c.Y, c.Z), normalized, color, 1, 1));
+            indices.Add(start);
+            indices.Add(start + 1);
+            indices.Add(start + 2);
+        }
     }
 
     private static void AddQuad(

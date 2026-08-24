@@ -61,6 +61,42 @@ public sealed class VulkanSceneMeshBuilderTests
         });
     }
 
+    [Theory]
+    [InlineData("torus")]
+    [InlineData("octahedron")]
+    public void BuildMeshesSupportsEveryGenericScenePrimitiveUsedByAuthoredWorlds(string primitive)
+    {
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "entity-1",
+            "Extended Primitive",
+            "mesh",
+            $"rekall.primitive.{primitive}",
+            0,
+            0,
+            0,
+            1,
+            Variant: $"rekall.geometry.{primitive}",
+            MaterialColor: "#ffcc66"));
+
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame));
+
+        Assert.Equal(primitive, mesh.Primitive);
+        Assert.True(mesh.Vertices.Count >= 6);
+        Assert.True(mesh.Indices.Count >= 18);
+        Assert.Equal(0, mesh.Indices.Count % 3);
+        Assert.All(mesh.Indices, index => Assert.True(index < mesh.Vertices.Count));
+        Assert.All(mesh.Vertices, vertex =>
+        {
+            Assert.True(float.IsFinite(vertex.X));
+            Assert.True(float.IsFinite(vertex.Y));
+            Assert.True(float.IsFinite(vertex.Z));
+            Assert.InRange(
+                MathF.Sqrt(vertex.NormalX * vertex.NormalX + vertex.NormalY * vertex.NormalY + vertex.NormalZ * vertex.NormalZ),
+                0.99f,
+                1.01f);
+        });
+    }
+
     [Fact]
     public void BuildMeshesCreatesHighResolutionPlanetSurfaceMesh()
     {

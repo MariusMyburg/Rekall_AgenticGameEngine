@@ -18,7 +18,52 @@ public sealed record PackagePlayableGameRequest(
     int Frames = 2,
     IReadOnlyList<RekallAgePlaybackInput>? Inputs = null,
     IReadOnlyList<RekallAgeFrameAssertion>? Assertions = null,
-    bool Graphics = false);
+    bool Graphics = false,
+    string? Target = null);
+
+public sealed record RekallAgePlayablePackageTargetResolution(
+    bool Ok,
+    string Target,
+    RekallAgeCommandError? Error);
+
+public static class RekallAgePlayablePackageTargets
+{
+    public const string Headless = "headless";
+    public const string Windows = "windows";
+
+    public static RekallAgePlayablePackageTargetResolution Resolve(string? target, bool graphics)
+    {
+        var normalized = target?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return new(true, graphics ? Windows : Headless, null);
+        }
+
+        if (normalized is not (Windows or Headless))
+        {
+            return new(
+                false,
+                normalized,
+                new RekallAgeCommandError(
+                    "REKALL_PLAYABLE_PACKAGE_TARGET_UNSUPPORTED",
+                    $"Package target '{target}' is unsupported. Use '{Windows}' or '{Headless}'.",
+                    target));
+        }
+
+        if (normalized == Headless && graphics)
+        {
+            return new(
+                false,
+                normalized,
+                new RekallAgeCommandError(
+                    "REKALL_PLAYABLE_PACKAGE_TARGET_CONFLICT",
+                    "Package target 'headless' conflicts with the legacy graphics option.",
+                    target));
+        }
+
+        return new(true, normalized, null);
+    }
+}
 
 public sealed record PackagePlayableGameResult(
     bool Ready,
@@ -31,6 +76,7 @@ public sealed record PackagePlayableGameResult(
     string BuildOutput)
 {
     public string? ProofLaunchPath { get; init; }
+    public string Target { get; init; } = RekallAgePlayablePackageTargets.Headless;
 }
 
 public sealed class PackagePlayableGameCommand
@@ -62,6 +108,27 @@ public sealed class PackagePlayableGameCommand
         PackagePlayableGameRequest request,
         RekallAgeCommandContext context)
     {
+        var targetResolution = RekallAgePlayablePackageTargets.Resolve(request.Target, request.Graphics);
+        if (!targetResolution.Ok)
+        {
+            return RekallAgeCommandResult<PackagePlayableGameResult>.Failure(
+                new PackagePlayableGameResult(
+                    Ready: false,
+                    OutputDirectory: request.OutputDirectory ?? string.Empty,
+                    LaunchPath: string.Empty,
+                    ManifestPath: string.Empty,
+                    ArchivePath: string.Empty,
+                    Arguments: [],
+                    Checks: [],
+                    BuildOutput: string.Empty)
+                {
+                    Target = targetResolution.Target
+                },
+                "Playable package target is invalid.",
+                [targetResolution.Error!]);
+        }
+
+        var graphics = targetResolution.Target == RekallAgePlayablePackageTargets.Windows;
         var verification = await _verifyPlayableGame.ExecuteAsync(
             new VerifyPlayableGameRequest(
                 request.ProjectRoot,
@@ -81,7 +148,10 @@ public sealed class PackagePlayableGameCommand
                     ArchivePath: string.Empty,
                     Arguments: [],
                     Checks: verification.Value.Checks,
-                    BuildOutput: string.Empty),
+                    BuildOutput: string.Empty)
+                {
+                    Target = targetResolution.Target
+                },
                 verification.Summary,
                 verification.Errors);
         }
@@ -101,16 +171,19 @@ public sealed class PackagePlayableGameCommand
                     ArchivePath: string.Empty,
                     Arguments: [],
                     Checks: verification.Value.Checks,
-                    BuildOutput: string.Empty),
+                    BuildOutput: string.Empty)
+                {
+                    Target = targetResolution.Target
+                },
                 "Playable package output directory is unsafe.",
                 [outputPreparationError]);
         }
 
         var player = await _buildPlayer.ExecuteAsync(
-            new BuildPlayerRequest(request.ProjectRoot, request.SceneName, outputDirectory, request.Graphics),
+            new BuildPlayerRequest(request.ProjectRoot, request.SceneName, outputDirectory, graphics),
             context);
         RekallAgeCommandResult<BuildPlayerResult>? proofPlayer = null;
-        if (player.Ok && request.Graphics)
+        if (player.Ok && graphics)
         {
             proofPlayer = await _buildPlayer.ExecuteAsync(
                 new BuildPlayerRequest(
@@ -124,7 +197,7 @@ public sealed class PackagePlayableGameCommand
         var manifestPath = Path.Combine(outputDirectory, "rekall.package.json");
         var archivePath = $"{Path.GetFullPath(outputDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)}.zip";
         var arguments = player.Ok
-            ? CreateLaunchArguments(bundledGameRoot, request.SceneName, request.Graphics)
+            ? CreateLaunchArguments(bundledGameRoot, request.SceneName, graphics)
             : player.Value.Arguments;
         var result = new PackagePlayableGameResult(
             Ready: player.Ok && (proofPlayer?.Ok ?? true),
@@ -135,7 +208,10 @@ public sealed class PackagePlayableGameCommand
             Arguments: arguments,
             Checks: verification.Value.Checks,
             BuildOutput: string.Join(Environment.NewLine, new[] { player.Value.Output, proofPlayer?.Value.Output }
-                .Where(output => !string.IsNullOrWhiteSpace(output))));
+                .Where(output => !string.IsNullOrWhiteSpace(output))))
+        {
+            Target = targetResolution.Target
+        };
         if (!player.Ok || proofPlayer is { Ok: false })
         {
             return RekallAgeCommandResult<PackagePlayableGameResult>.Failure(
@@ -161,7 +237,7 @@ public sealed class PackagePlayableGameCommand
             request.ProjectRoot,
             bundledGameRoot,
             context.CancellationToken);
-        var packagedLaunchPath = request.Graphics
+        var packagedLaunchPath = graphics
             ? CreateWindowsLaunchers(outputDirectory, player.Value.LaunchPath)
             : player.Value.LaunchPath;
         var manifestGameRoot = "Game";
@@ -169,7 +245,7 @@ public sealed class PackagePlayableGameCommand
         var manifestProofLaunchPath = proofPlayer is null
             ? null
             : NormalizePath(Path.GetRelativePath(outputDirectory, proofPlayer.Value.LaunchPath));
-        var manifestArguments = CreateLaunchArguments(manifestGameRoot, request.SceneName, request.Graphics);
+        var manifestArguments = CreateLaunchArguments(manifestGameRoot, request.SceneName, graphics);
         var files = BuildFileInventory(outputDirectory, manifestPath);
         await WriteManifestAsync(
             manifestPath,

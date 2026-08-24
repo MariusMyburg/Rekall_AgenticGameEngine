@@ -62,6 +62,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _switchSceneCommand;
     private readonly RekallAgeAsyncCommand _packageCommand;
     private readonly RekallAgeAsyncCommand _auditPackageCommand;
+    private readonly RekallAgeAsyncCommand _openPackageFolderCommand;
     private readonly RekallAgeAsyncCommand _publishWebCommand;
     private readonly RekallAgeAsyncCommand _auditWebCommand;
     private readonly RekallAgeAsyncCommand _undoCommand;
@@ -73,6 +74,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeMeshPrimitiveFactory _meshPrimitiveFactory = new();
     private readonly RekallAgeStudioModelingGraphSession _modelingGraph = new();
     private readonly RekallAgeStudioMeshViewportRenderer _meshViewportRenderer = new();
+    private readonly Action<string> _openPackageFolder;
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
     private readonly RekallAgeAsyncCommand _refreshMeshAssetsCommand;
@@ -125,6 +127,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private BitmapSource? _modelingGraphViewportImage;
     private RekallAgeStudioModelingGraphNodeView? _selectedModelingGraphNode;
     private string? _lastPackagePath;
+    private string? _lastPackageOutputDirectory;
+    private string? _lastPackageLaunchPath;
+    private string _selectedPackageTarget = RekallAgePlayablePackageTargets.Windows;
     private string? _lastWebPublishPath;
     private string _statusText = "Create or open a Rekall AGE project to begin.";
     private string _viewportTitle = "Viewport";
@@ -157,6 +162,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
     }
 
+    internal RekallAgeStudioViewModel(Action<string> openPackageFolder)
+        : this(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            null,
+            new RekallAgeStudioPreviewSession(),
+            openPackageFolder)
+    {
+    }
+
     internal RekallAgeStudioViewModel(
         RekallAgeWorkbenchSession session,
         IRekallAgeLanguageModelClient? languageModelClient)
@@ -167,10 +181,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     internal RekallAgeStudioViewModel(
         RekallAgeWorkbenchSession session,
         IRekallAgeLanguageModelClient? languageModelClient,
-        IRekallAgeStudioPreviewSession previewSession)
+        IRekallAgeStudioPreviewSession previewSession,
+        Action<string>? openPackageFolder = null)
     {
         _session = session;
         _previewSession = previewSession;
+        _openPackageFolder = openPackageFolder ?? OpenDirectoryInExplorer;
         if (languageModelClient is null)
         {
             _ollamaHttpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
@@ -204,6 +220,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _switchSceneCommand = CreateAsyncCommand(SwitchSceneAsync, CanSwitchScene);
         _packageCommand = CreateAsyncCommand(PackageAsync, HasOpenProject);
         _auditPackageCommand = CreateAsyncCommand(AuditPackageAsync, CanAuditPackage);
+        _openPackageFolderCommand = CreateAsyncCommand(OpenPackageFolderAsync, CanOpenPackageFolder);
         _publishWebCommand = CreateAsyncCommand(PublishWebAsync, HasOpenProject);
         _auditWebCommand = CreateAsyncCommand(AuditWebAsync, CanAuditWeb);
         _undoCommand = CreateAsyncCommand(UndoAsync, () => HasEditableProject() && _session.CanUndo);
@@ -239,6 +256,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> RuntimeObservationLines { get; } = [];
     public ObservableCollection<string> OllamaModels { get; } = [];
     public ObservableCollection<string> AgentLines { get; } = [];
+    public IReadOnlyList<string> PackageTargets { get; } =
+        [RekallAgePlayablePackageTargets.Windows, RekallAgePlayablePackageTargets.Headless];
     public ObservableCollection<string> MeshAssetIds { get; } = [];
     public ObservableCollection<ulong> MeshElementIds { get; } = [];
     public ObservableCollection<string> MeshOperationIds { get; } = [];
@@ -281,6 +300,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand SwitchSceneCommand => _switchSceneCommand;
     public ICommand PackageCommand => _packageCommand;
     public ICommand AuditPackageCommand => _auditPackageCommand;
+    public ICommand OpenPackageFolderCommand => _openPackageFolderCommand;
     public ICommand PublishWebCommand => _publishWebCommand;
     public ICommand AuditWebCommand => _auditWebCommand;
     public ICommand UndoCommand => _undoCommand;
@@ -594,6 +614,27 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             if (Set(ref _lastPackagePath, value)) RefreshCommands();
         }
+    }
+
+    public string? LastPackageOutputDirectory
+    {
+        get => _lastPackageOutputDirectory;
+        private set
+        {
+            if (Set(ref _lastPackageOutputDirectory, value)) RefreshCommands();
+        }
+    }
+
+    public string? LastPackageLaunchPath
+    {
+        get => _lastPackageLaunchPath;
+        private set => Set(ref _lastPackageLaunchPath, value);
+    }
+
+    public string SelectedPackageTarget
+    {
+        get => _selectedPackageTarget;
+        set => Set(ref _selectedPackageTarget, value);
     }
 
     public string? LastWebPublishPath
@@ -923,6 +964,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private bool CanAuditPackage() => HasOpenProject()
         && LastPackagePath is not null
         && (File.Exists(LastPackagePath) || Directory.Exists(LastPackagePath));
+    private bool CanOpenPackageFolder() => LastPackageOutputDirectory is not null
+        && Directory.Exists(LastPackageOutputDirectory);
     // Unlike CanAuditPackage, rekall.game.audit_web is self-contained -- it republishes the project itself before
     // verifying it (the same shape as AuditPlayablePackageCommand's own inspect/run/capture, just for the web
     // target) -- so it does not depend on a prior successful Publish Web click.
@@ -1376,23 +1419,48 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         var result = await _session.ExecuteAsync(
             "rekall.workflow.package_playable_game",
-            JsonSerializer.Serialize(new
-            {
-                projectRoot = _session.ProjectRoot,
-                sceneName = _session.SceneName,
-                outputDirectory = Path.Combine(_session.ProjectRoot!, "Builds", "StudioPackage"),
-                frames = 2,
-                graphics = false
-            }),
+            CreatePackageRequestJson(_session.ProjectRoot!, _session.SceneName!),
             "Package playable game",
             "studio",
             CancellationToken.None);
         if (result.Ok && result.Value is PackagePlayableGameResult package && package.Ready)
         {
-            LastPackagePath = package.ArchivePath;
+            ApplyPackageResult(package);
             AppendAgentLine($"package: {package.ArchivePath}");
         }
         return result;
+    }
+
+    internal string CreatePackageRequestJson(string projectRoot, string sceneName) =>
+        JsonSerializer.Serialize(new
+        {
+            projectRoot,
+            sceneName,
+            outputDirectory = Path.Combine(projectRoot, "Builds", "StudioPackage"),
+            frames = 2,
+            target = SelectedPackageTarget
+        });
+
+    internal void ApplyPackageResult(PackagePlayableGameResult package)
+    {
+        LastPackageOutputDirectory = package.OutputDirectory;
+        LastPackageLaunchPath = package.LaunchPath;
+        LastPackagePath = package.ArchivePath;
+    }
+
+    private Task OpenPackageFolderAsync()
+    {
+        _openPackageFolder(LastPackageOutputDirectory!);
+        return Task.CompletedTask;
+    }
+
+    private static void OpenDirectoryInExplorer(string path)
+    {
+        Process.Start(new ProcessStartInfo("explorer.exe")
+        {
+            ArgumentList = { path },
+            UseShellExecute = true
+        });
     }
 
     private Task AuditPackageAsync() => RunAsync(() => _session.ExecuteAsync(
@@ -2129,6 +2197,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _switchSceneCommand.RaiseCanExecuteChanged();
         _packageCommand.RaiseCanExecuteChanged();
         _auditPackageCommand.RaiseCanExecuteChanged();
+        _openPackageFolderCommand.RaiseCanExecuteChanged();
         _publishWebCommand.RaiseCanExecuteChanged();
         _auditWebCommand.RaiseCanExecuteChanged();
         _undoCommand.RaiseCanExecuteChanged();

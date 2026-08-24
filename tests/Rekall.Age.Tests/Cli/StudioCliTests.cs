@@ -7,6 +7,22 @@ namespace Rekall.Age.Tests.Cli;
 public sealed class StudioCliTests
 {
     [Fact]
+    public async Task PackagePlayableExposesExplicitTargetsAndLegacyGraphicsAlias()
+    {
+        var source = await File.ReadAllTextAsync(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Rekall.Age.Cli",
+            "Program.cs"));
+
+        Assert.Contains("\"--target\", \"windows\"", source, StringComparison.Ordinal);
+        Assert.Contains("\"--target\", \"headless\"", source, StringComparison.Ordinal);
+        Assert.Contains("\"--graphics\"", source, StringComparison.Ordinal);
+        Assert.Contains("Target: target", source, StringComparison.Ordinal);
+        Assert.Contains("$\"Target: {result.Value.Target}\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task StudioOpenPrintsWorkbenchSummary()
     {
         var root = TestPaths.CreateTempDirectory();

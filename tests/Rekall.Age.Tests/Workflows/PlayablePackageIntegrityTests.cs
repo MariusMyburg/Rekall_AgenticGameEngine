@@ -89,10 +89,11 @@ public sealed class PlayablePackageIntegrityTests
         Assert.True(authored.Ok, authored.Summary);
 
         var packaged = await new PackagePlayableGameCommand().ExecuteAsync(
-            new PackagePlayableGameRequest(root, "Main", output, Graphics: true),
+            new PackagePlayableGameRequest(root, "Main", output, Target: RekallAgePlayablePackageTargets.Windows),
             context);
 
         Assert.True(packaged.Ok, packaged.Summary);
+        Assert.Equal(RekallAgePlayablePackageTargets.Windows, packaged.Value.Target);
         var inspection = await new InspectPlayablePackageCommand().ExecuteAsync(
             new InspectPlayablePackageRequest(output),
             context);

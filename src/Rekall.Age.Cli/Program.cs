@@ -273,12 +273,16 @@ internal static class RekallAgeCli
                     await VerifyPlayableGameAsync(registry, context, root, scene, frames, inputsJson, assertionsJson, null),
                 ["game", "verify-playable", var root, var scene, var frames, var inputsJson, var assertionsJson, var drawAssertionsJson] =>
                     await VerifyPlayableGameAsync(registry, context, root, scene, frames, inputsJson, assertionsJson, drawAssertionsJson),
-                ["game", "package-playable", var root] => await PackagePlayableGameAsync(registry, context, root, "Main", null, graphics: false),
-                ["game", "package-playable", var root, var scene] => await PackagePlayableGameAsync(registry, context, root, scene, null, graphics: false),
+                ["game", "package-playable", var root] => await PackagePlayableGameAsync(registry, context, root, "Main", null),
+                ["game", "package-playable", var root, var scene] => await PackagePlayableGameAsync(registry, context, root, scene, null),
                 ["game", "package-playable", var root, var scene, var outputDirectory] =>
-                    await PackagePlayableGameAsync(registry, context, root, scene, outputDirectory, graphics: false),
+                    await PackagePlayableGameAsync(registry, context, root, scene, outputDirectory),
                 ["game", "package-playable", var root, var scene, var outputDirectory, "--graphics"] =>
                     await PackagePlayableGameAsync(registry, context, root, scene, outputDirectory, graphics: true),
+                ["game", "package-playable", var root, var scene, var outputDirectory, "--target", "windows"] =>
+                    await PackagePlayableGameAsync(registry, context, root, scene, outputDirectory, target: RekallAgePlayablePackageTargets.Windows),
+                ["game", "package-playable", var root, var scene, var outputDirectory, "--target", "headless"] =>
+                    await PackagePlayableGameAsync(registry, context, root, scene, outputDirectory, target: RekallAgePlayablePackageTargets.Headless),
                 ["game", "inspect-package", var packagePath] => await InspectPlayablePackageAsync(registry, context, packagePath),
                 ["game", "relocate-package", var packagePath, var destination] =>
                     await RelocatePlayablePackageAsync(registry, context, packagePath, destination),
@@ -2558,16 +2562,18 @@ internal static class RekallAgeCli
         string root,
         string scene,
         string? outputDirectory,
-        bool graphics)
+        bool graphics = false,
+        string? target = null)
     {
         var result = await registry.ExecuteAsync<PackagePlayableGameRequest, PackagePlayableGameResult>(
             "rekall.workflow.package_playable_game",
-            new PackagePlayableGameRequest(root, scene, outputDirectory, Graphics: graphics),
+            new PackagePlayableGameRequest(root, scene, outputDirectory, Graphics: graphics, Target: target),
             context);
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Ready: {result.Value.Ready}");
         if (result.Ok)
         {
+            Console.WriteLine($"Target: {result.Value.Target}");
             Console.WriteLine($"Launch: {result.Value.LaunchPath}");
             Console.WriteLine($"Manifest: {result.Value.ManifestPath}");
             Console.WriteLine($"Archive: {result.Value.ArchivePath}");

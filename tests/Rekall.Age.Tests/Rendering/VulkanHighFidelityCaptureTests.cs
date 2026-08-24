@@ -6,6 +6,166 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VulkanHighFidelityCaptureTests
 {
     [Fact]
+    public async Task BloomDisabledGraphDoesNotAllocateDispatchOrReportBloom()
+    {
+        var frame = EmissiveFrame();
+        var quality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("Performance", Bloom: false),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("native-test"),
+            frame.Width,
+            frame.Height);
+        frame = frame with
+        {
+            ResolvedQualityPlan = quality,
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post",
+                "Tone Map Only",
+                true,
+                [new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")])
+        };
+
+        var result = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            frame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            TestPaths.CreateTempDirectory(),
+            "discrete-gpu",
+            CancellationToken.None);
+
+        Assert.True(result.Captured, string.Join(Environment.NewLine, result.Errors));
+        var report = Assert.IsType<RekallAgeHighFidelityFrameReport>(result.HighFidelityFrame);
+        Assert.True(report.Executed, string.Join(Environment.NewLine, report.Diagnostics));
+        Assert.DoesNotContain(report.Resources, resource => resource.Name == "bloom-pyramid");
+        Assert.DoesNotContain(report.Passes, pass => pass.Name == "bloom");
+        Assert.Contains(report.Passes, pass => pass.Name == "tone-map" && pass.Executed);
+    }
+
+    [Fact]
+    public async Task ResolvedRenderScaleControlsHdrSceneExtentWhileOutputStaysViewportSized()
+    {
+        var frame = EmissiveFrame();
+        var capabilities = RekallAgeRenderingDeviceCapabilities.DesktopBaseline("native-test");
+        var fullQuality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High", ResolutionScale: 1, Bloom: false),
+            capabilities,
+            frame.Width,
+            frame.Height);
+        var scaledQuality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High", ResolutionScale: 0.5, Bloom: false),
+            capabilities,
+            frame.Width,
+            frame.Height);
+        var post = new RekallAgeRuntimeViewportPostProcessStack(
+            "post",
+            "HDR Post",
+            true,
+            [new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")]);
+        var output = TestPaths.CreateTempDirectory();
+        var capture = new RekallAgeNativeVulkanSceneCapture();
+
+        var full = await capture.CaptureSceneAsync(
+            frame with { ResolvedQualityPlan = fullQuality, PostProcessStack = post },
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            output,
+            "discrete-gpu",
+            CancellationToken.None);
+        var scaled = await capture.CaptureSceneAsync(
+            frame with { ResolvedQualityPlan = scaledQuality, PostProcessStack = post },
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            output,
+            "discrete-gpu",
+            CancellationToken.None);
+
+        Assert.True(full.Captured, string.Join(Environment.NewLine, full.Errors));
+        Assert.True(scaled.Captured, string.Join(Environment.NewLine, scaled.Errors));
+        Assert.NotEqual(full.ByteChecksum, scaled.ByteChecksum);
+        var scaledReport = Assert.IsType<RekallAgeHighFidelityFrameReport>(scaled.HighFidelityFrame);
+        Assert.Contains(scaledReport.Resources, resource => resource is
+        { Name: "scene-hdr", Width: 48, Height: 32, Allocated: true });
+        Assert.Contains(scaledReport.Resources, resource => resource is
+        { Name: "ldr-color", Width: 96, Height: 64, Allocated: true });
+        var outputImage = await RekallAgePngReader.ReadRgbaAsync(scaled.OutputPath, CancellationToken.None);
+        Assert.Equal(96, outputImage.Width);
+        Assert.Equal(64, outputImage.Height);
+    }
+
+    [Fact]
+    public async Task AuthoredBloomRadiusChangesNativeBloomReconstruction()
+    {
+        var frame = EmissiveFrame();
+        var quality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High", Bloom: true),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("native-test"),
+            frame.Width,
+            frame.Height);
+        var output = TestPaths.CreateTempDirectory();
+        var capture = new RekallAgeNativeVulkanSceneCapture();
+
+        var narrow = await capture.CaptureSceneAsync(
+            frame with
+            {
+                ResolvedQualityPlan = quality,
+                PostProcessStack = BloomPostStack(radius: 0.5)
+            },
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            output,
+            "discrete-gpu",
+            CancellationToken.None);
+        var wide = await capture.CaptureSceneAsync(
+            frame with
+            {
+                ResolvedQualityPlan = quality,
+                PostProcessStack = BloomPostStack(radius: 3)
+            },
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            output,
+            "discrete-gpu",
+            CancellationToken.None);
+
+        Assert.True(narrow.Captured, string.Join(Environment.NewLine, narrow.Errors));
+        Assert.True(wide.Captured, string.Join(Environment.NewLine, wide.Errors));
+        Assert.NotEqual(narrow.ByteChecksum, wide.ByteChecksum);
+    }
+
+    [Fact]
+    public async Task NativeFrameReportSurfacesAuthoredPostDegradationFacts()
+    {
+        var frame = EmissiveFrame();
+        var quality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("Performance", Bloom: false),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("native-test"),
+            frame.Width,
+            frame.Height);
+        frame = frame with
+        {
+            ResolvedQualityPlan = quality,
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post",
+                "Inspectable Post",
+                true,
+                [
+                    new RekallAgeRuntimeViewportPostProcessPass("Lens", "vignette"),
+                    new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")
+                ])
+        };
+
+        var result = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            frame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            TestPaths.CreateTempDirectory(),
+            "discrete-gpu",
+            CancellationToken.None);
+
+        Assert.True(result.Captured, string.Join(Environment.NewLine, result.Errors));
+        var report = Assert.IsType<RekallAgeHighFidelityFrameReport>(result.HighFidelityFrame);
+        Assert.Contains(
+            report.Diagnostics,
+            diagnostic => diagnostic.Contains("REKALL_RENDER_POST_PASS_UNSUPPORTED", StringComparison.Ordinal)
+                && diagnostic.Contains("post.pass[0].type", StringComparison.Ordinal)
+                && diagnostic.Contains("requested='vignette'", StringComparison.Ordinal)
+                && diagnostic.Contains("resolved='ignored'", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task HighProfileExecutesAuthoredBloomAndToneMappingInsteadOfReturningLegacyPixels()
     {
         var legacyFrame = EmissiveFrame();
@@ -83,6 +243,21 @@ public sealed class VulkanHighFidelityCaptureTests
         var offset = pixel * 4;
         return Math.Max(rgba[offset], Math.Max(rgba[offset + 1], rgba[offset + 2]));
     }
+
+    private static RekallAgeRuntimeViewportPostProcessStack BloomPostStack(double radius) =>
+        new(
+            "post",
+            "HDR Post",
+            true,
+            [
+                new RekallAgeRuntimeViewportPostProcessPass(
+                    "Bloom",
+                    "bloom",
+                    Threshold: 0.7,
+                    Intensity: 0.85,
+                    Radius: radius),
+                new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")
+            ]);
 
     private static RekallAgeRuntimeViewportFrame EmissiveFrame()
     {

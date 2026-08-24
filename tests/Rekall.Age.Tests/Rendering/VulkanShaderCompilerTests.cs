@@ -1,9 +1,36 @@
 using Rekall.Age.Rendering;
+using Silk.NET.Vulkan;
 
 namespace Rekall.Age.Tests.Rendering;
 
 public sealed class VulkanShaderCompilerTests
 {
+    [Fact]
+    public void HighFidelityHalfFloatSamplingRequiresLinearFilterCapability()
+    {
+        var missingLinear = RekallAgeVulkanHighFidelityFormatValidator.ValidateOptimalTilingFeatures(
+            Format.R16G16B16A16Sfloat,
+            FormatFeatureFlags.ColorAttachmentBit | FormatFeatureFlags.SampledImageBit,
+            FormatFeatureFlags.ColorAttachmentBit
+                | FormatFeatureFlags.SampledImageBit
+                | FormatFeatureFlags.SampledImageFilterLinearBit,
+            "scene-hdr");
+        var supported = RekallAgeVulkanHighFidelityFormatValidator.ValidateOptimalTilingFeatures(
+            Format.R16G16B16A16Sfloat,
+            FormatFeatureFlags.ColorAttachmentBit
+                | FormatFeatureFlags.SampledImageBit
+                | FormatFeatureFlags.SampledImageFilterLinearBit,
+            FormatFeatureFlags.ColorAttachmentBit
+                | FormatFeatureFlags.SampledImageBit
+                | FormatFeatureFlags.SampledImageFilterLinearBit,
+            "scene-hdr");
+
+        Assert.NotNull(missingLinear);
+        Assert.StartsWith("REKALL_RENDER_FORMAT_UNSUPPORTED:", missingLinear, StringComparison.Ordinal);
+        Assert.Contains(nameof(FormatFeatureFlags.SampledImageFilterLinearBit), missingLinear, StringComparison.Ordinal);
+        Assert.Null(supported);
+    }
+
     [Fact]
     public void SceneShadersAreCopiedBesideTestHostForBundledRuntimeUse()
     {

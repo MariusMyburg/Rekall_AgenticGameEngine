@@ -13,9 +13,15 @@ public sealed record RekallAgeVulkanSceneRenderTarget(
     bool UsesArrayLayers = false,
     ImageLayout InitialColorLayout = ImageLayout.Undefined,
     ImageLayout FinalColorLayout = ImageLayout.TransferSrcOptimal,
-    Format OutputColorFormat = Format.Undefined)
+    Format OutputColorFormat = Format.Undefined,
+    uint OutputWidth = 0,
+    uint OutputHeight = 0)
 {
     public Format EffectiveOutputColorFormat => OutputColorFormat == Format.Undefined ? ColorFormat : OutputColorFormat;
+
+    public uint EffectiveOutputWidth => OutputWidth == 0 ? Width : OutputWidth;
+
+    public uint EffectiveOutputHeight => OutputHeight == 0 ? Height : OutputHeight;
 
     public bool IsHighFidelityOffscreenCapture =>
         Kind.Equals(RekallAgeVulkanSceneRenderTargetKinds.HighFidelityOffscreenCapture, StringComparison.Ordinal)
@@ -38,16 +44,22 @@ public sealed record RekallAgeVulkanSceneRenderTarget(
             Format.D32Sfloat);
     }
 
-    public static RekallAgeVulkanSceneRenderTarget HighFidelityOffscreenCapture(uint width, uint height)
+    public static RekallAgeVulkanSceneRenderTarget HighFidelityOffscreenCapture(
+        uint renderWidth,
+        uint renderHeight,
+        uint outputWidth = 0,
+        uint outputHeight = 0)
     {
         return new RekallAgeVulkanSceneRenderTarget(
             RekallAgeVulkanSceneRenderTargetKinds.HighFidelityOffscreenCapture,
-            width,
-            height,
+            renderWidth,
+            renderHeight,
             Format.R16G16B16A16Sfloat,
             Format.D32Sfloat,
             FinalColorLayout: ImageLayout.ShaderReadOnlyOptimal,
-            OutputColorFormat: Format.R8G8B8A8Unorm);
+            OutputColorFormat: Format.R8G8B8A8Unorm,
+            OutputWidth: outputWidth,
+            OutputHeight: outputHeight);
     }
 
     public static RekallAgeVulkanSceneRenderTarget OpenXrStereoSwapchain(
@@ -273,7 +285,7 @@ public static class RekallAgeVulkanSceneRenderBackendPlanner
             [
                 $"Create an owned {target.Width}x{target.Height} R16G16B16A16_SFloat scene image and depth image.",
                 "Execute the validated bloom resource and tone-map passes.",
-                "Copy the R8G8B8A8_UNorm output image into the readback buffer for capture."
+                $"Copy the {target.EffectiveOutputWidth}x{target.EffectiveOutputHeight} R8G8B8A8_UNorm output image into the readback buffer for capture."
             ];
         }
 

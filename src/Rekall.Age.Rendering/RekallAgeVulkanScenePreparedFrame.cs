@@ -31,7 +31,7 @@ public static class RekallAgeVulkanScenePreparedFrameBuilder
         var drawPlan = RekallAgeVulkanSceneDrawPlanBuilder.Build(batch);
         var geometryUpload = RekallAgeVulkanSceneGeometryUploadBuilder.Build(batch);
         var readbackBytes = RekallAgeVulkanSceneRenderBackendPlanner.Plan(target).RequiresReadback
-            ? checked((ulong)target.Width * target.Height * 4)
+            ? checked((ulong)target.EffectiveOutputWidth * target.EffectiveOutputHeight * 4)
             : 0;
         return new RekallAgeVulkanScenePreparedFrame(frame, target, batch, drawPlan, geometryUpload, meshes, readbackBytes);
     }

@@ -14,7 +14,8 @@ layout(push_constant) uniform ToneMapParameters
     float contrast;
     float gradeStrength;
     float bloomIntensity;
-    vec2 outputSize;
+    float bloomRadius;
+    float padding;
 } parameters;
 
 vec3 agxCurve(vec3 value)
@@ -28,7 +29,7 @@ vec3 agxCurve(vec3 value)
 
 vec3 upsampleBloom(vec2 uv)
 {
-    vec2 texel = 1.0 / vec2(textureSize(bloomPyramid, 0));
+    vec2 texel = max(parameters.bloomRadius, 0.05) / vec2(textureSize(bloomPyramid, 0));
     vec3 sum = texture(bloomPyramid, uv).rgb * 4.0;
     sum += texture(bloomPyramid, uv + vec2(texel.x, 0.0)).rgb * 2.0;
     sum += texture(bloomPyramid, uv - vec2(texel.x, 0.0)).rgb * 2.0;

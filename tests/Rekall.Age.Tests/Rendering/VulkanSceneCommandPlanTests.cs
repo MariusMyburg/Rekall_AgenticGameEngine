@@ -87,6 +87,50 @@ public sealed class VulkanSceneCommandPlanTests
         Assert.Equal(Format.R8G8B8A8Unorm, target.EffectiveOutputColorFormat);
     }
 
+    [Fact]
+    public void HighFidelityPlanReportsEveryUnsupportedOrClampedAuthoredPostSetting()
+    {
+        var quality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High", Bloom: true),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+            128,
+            72);
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main", 0, 0, 128, 72, null, [], [], 0,
+            new RekallAgeRuntimeViewportOverlay(false, 0), [])
+        {
+            ResolvedQualityPlan = quality,
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post",
+                "Authored Post",
+                true,
+                [
+                    new RekallAgeRuntimeViewportPostProcessPass(
+                        "Bloom",
+                        "bloom",
+                        Scale: 0.5,
+                        Iterations: 3,
+                        Threshold: -0.25,
+                        Intensity: -2,
+                        Radius: 99,
+                        BlendMode: "screen"),
+                    new RekallAgeRuntimeViewportPostProcessPass("Lens", "vignette"),
+                    new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")
+                ])
+        };
+
+        var plan = Assert.IsType<RekallAgeVulkanHighFidelityFramePlan>(
+            new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame));
+
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_SETTING_UNSUPPORTED", "post.pass[0].scale", "0.5", "0.25");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_SETTING_UNSUPPORTED", "post.pass[0].iterations", "3", "1");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_SETTING_CLAMPED", "post.pass[0].threshold", "-0.25", "0");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_SETTING_CLAMPED", "post.pass[0].intensity", "-2", "0");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_SETTING_CLAMPED", "post.pass[0].radius", "99", "32");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_SETTING_UNSUPPORTED", "post.pass[0].blendMode", "screen", "add");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_PASS_UNSUPPORTED", "post.pass[1].type", "vignette", "ignored");
+    }
+
     private static RekallAgeVulkanScenePreparedFrame CreatePreparedFrame(RekallAgeVulkanSceneRenderTarget target)
     {
         var camera = new RekallAgeRuntimeViewportCamera(
@@ -125,5 +169,20 @@ public sealed class VulkanSceneCommandPlanTests
             []);
         var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
         return RekallAgeVulkanScenePreparedFrameBuilder.Build(frame, meshes, target);
+    }
+
+    private static void AssertPostDiagnostic(
+        RekallAgeVulkanHighFidelityFramePlan plan,
+        string code,
+        string setting,
+        string requested,
+        string resolved)
+    {
+        Assert.Contains(
+            plan.Graph.Diagnostics,
+            diagnostic => diagnostic.Code == code
+                && diagnostic.Target == setting
+                && diagnostic.Message.Contains($"requested='{requested}'", StringComparison.Ordinal)
+                && diagnostic.Message.Contains($"resolved='{resolved}'", StringComparison.Ordinal));
     }
 }

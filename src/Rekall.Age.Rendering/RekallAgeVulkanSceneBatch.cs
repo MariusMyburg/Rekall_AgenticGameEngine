@@ -59,7 +59,7 @@ public sealed record RekallAgeVulkanEffectiveCamera(
         var ndc = uv * 2 - Vector2.One;
         return Position
             + Right * (ndc.X * TangentOrHalfHeight * Aspect)
-            + Up * (ndc.Y * TangentOrHalfHeight);
+            - Up * (ndc.Y * TangentOrHalfHeight);
     }
 
     public Vector3 ViewRay(Vector2 uv)
@@ -73,7 +73,7 @@ public sealed record RekallAgeVulkanEffectiveCamera(
         return Vector3.Normalize(
             Forward
             + Right * (ndc.X * TangentOrHalfHeight * Aspect)
-            + Up * (ndc.Y * TangentOrHalfHeight));
+            - Up * (ndc.Y * TangentOrHalfHeight));
     }
 }
 

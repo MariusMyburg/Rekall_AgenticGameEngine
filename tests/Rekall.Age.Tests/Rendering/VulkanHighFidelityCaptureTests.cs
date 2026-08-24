@@ -421,6 +421,82 @@ public sealed class VulkanHighFidelityCaptureTests
     }
 
     [Fact]
+    public async Task OrthographicElevatedLocalFogAlignsWithItsFramebufferTopOpaqueSurface()
+    {
+        var source = FogFrame("High", density: 0);
+        var camera = source.ActiveCamera! with
+        {
+            X = 0,
+            Y = 0,
+            Z = -5,
+            RotationX = 0,
+            RotationY = 0,
+            RotationZ = 0,
+            ProjectionMode = "orthographic",
+            OrthographicSize = 8
+        };
+        var cube = source.Renderables.Single(renderable => renderable.EntityId == "cube") with
+        {
+            X = 0,
+            Y = 2,
+            Z = 4,
+            MaterialColor = "#101010",
+            EmissiveColor = "#303030",
+            EmissiveStrength = 2
+        };
+        var foggedFrame = source with
+        {
+            ActiveCamera = camera,
+            Cameras = [camera],
+            Renderables = source.Renderables
+                .Where(renderable => renderable.EntityId != "cube")
+                .Append(cube)
+                .ToArray(),
+            FogVolumes =
+            [
+                new RekallAgeRuntimeViewportFogVolume(
+                    "elevated-local-fog",
+                    "Elevated Local Fog",
+                    "box",
+                    0.6,
+                    "#ffffff",
+                    "#ffffff",
+                    0,
+                    0,
+                    0.1,
+                    10,
+                    new RekallAgeRuntimeViewportTransform(0, 2, 1, 0, 0, 0, 1.5, 0.75, 5))
+            ]
+        };
+        var emptyFrame = foggedFrame with
+        {
+            FogVolumes = foggedFrame.FogVolumes.Select(volume => volume with
+            {
+                Density = 0,
+                Emission = "#000000"
+            }).ToArray()
+        };
+        var output = TestPaths.CreateTempDirectory();
+
+        var fogged = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            foggedFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var empty = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            emptyFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(fogged.Captured, string.Join(Environment.NewLine, fogged.Errors));
+        Assert.True(empty.Captured, string.Join(Environment.NewLine, empty.Errors));
+        var foggedImage = await RekallAgePngReader.ReadRgbaAsync(fogged.OutputPath, CancellationToken.None);
+        var emptyImage = await RekallAgePngReader.ReadRgbaAsync(empty.OutputPath, CancellationToken.None);
+        var framebufferTopDelta = RegionDistance(
+            foggedImage.Rgba, emptyImage.Rgba, foggedImage.Width, centerX: 48, centerY: 16);
+        var verticallyMirroredDelta = RegionDistance(
+            foggedImage.Rgba, emptyImage.Rgba, foggedImage.Width, centerX: 48, centerY: 48);
+        Assert.True(framebufferTopDelta > verticallyMirroredDelta + 100,
+            $"Expected elevated local fog to align with the framebuffer-top opaque surface; "
+            + $"top={framebufferTopDelta}, mirrored={verticallyMirroredDelta}.");
+    }
+
+    [Fact]
     public async Task OrthographicAnalyticFogReconstructsPerPixelWorldHeightFromOpaqueDepth()
     {
         var source = FogFrame("Performance", density: 0.1);
@@ -480,8 +556,8 @@ public sealed class VulkanHighFidelityCaptureTests
         Assert.True(empty.Captured, string.Join(Environment.NewLine, empty.Errors));
         var foggedImage = await RekallAgePngReader.ReadRgbaAsync(fogged.OutputPath, CancellationToken.None);
         var emptyImage = await RekallAgePngReader.ReadRgbaAsync(empty.OutputPath, CancellationToken.None);
-        var lowerDelta = RegionDistance(foggedImage.Rgba, emptyImage.Rgba, foggedImage.Width, 30, 16);
-        var upperDelta = RegionDistance(foggedImage.Rgba, emptyImage.Rgba, foggedImage.Width, 66, 48);
+        var lowerDelta = RegionDistance(foggedImage.Rgba, emptyImage.Rgba, foggedImage.Width, 66, 48);
+        var upperDelta = RegionDistance(foggedImage.Rgba, emptyImage.Rgba, foggedImage.Width, 30, 16);
         Assert.True(lowerDelta > upperDelta + 100,
             $"Expected analytic orthographic fog to use per-pixel world height; lower={lowerDelta}, upper={upperDelta}.");
     }
@@ -1088,7 +1164,7 @@ public sealed class VulkanHighFidelityCaptureTests
                     6,
                     0,
                     -100,
-                    Variant: "directional",
+                    Variant: "DirectionalLight",
                     RotationX: 50,
                     RotationY: -25,
                     Intensity: 2.2,
@@ -1229,7 +1305,7 @@ public sealed class VulkanHighFidelityCaptureTests
             8,
             0,
             -100,
-            Variant: "directional",
+            Variant: "DirectionalLight",
             RotationX: 50,
             RotationY: -25,
             Intensity: 2.4,

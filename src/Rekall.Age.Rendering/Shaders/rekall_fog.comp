@@ -70,7 +70,7 @@ vec3 viewRay(vec2 uv)
     return normalize(
         parameters.cameraForwardFar.xyz
         + parameters.cameraRight.xyz * ndc.x * parameters.projection.x * parameters.projection.y
-        + parameters.cameraUp.xyz * ndc.y * parameters.projection.x);
+        - parameters.cameraUp.xyz * ndc.y * parameters.projection.x);
 }
 
 vec3 viewOrigin(vec2 uv)
@@ -83,7 +83,7 @@ vec3 viewOrigin(vec2 uv)
     vec2 ndc = uv * 2.0 - 1.0;
     return parameters.cameraPositionNear.xyz
         + parameters.cameraRight.xyz * ndc.x * parameters.projection.x * parameters.projection.y
-        + parameters.cameraUp.xyz * ndc.y * parameters.projection.x;
+        - parameters.cameraUp.xyz * ndc.y * parameters.projection.x;
 }
 
 float linearViewDepth(float depth)
@@ -189,13 +189,13 @@ vec4 blendTemporalHistory(vec3 worldPosition, vec4 currentValue)
     {
         ndc = vec2(
             dot(delta, history.cameraRight.xyz) / max(history.projection.x * history.projection.y, 0.000001),
-            dot(delta, history.cameraUp.xyz) / max(history.projection.x, 0.000001));
+            -dot(delta, history.cameraUp.xyz) / max(history.projection.x, 0.000001));
     }
     else
     {
         ndc = vec2(
             dot(delta, history.cameraRight.xyz) / max(previousDepth * history.projection.x * history.projection.y, 0.000001),
-            dot(delta, history.cameraUp.xyz) / max(previousDepth * history.projection.x, 0.000001));
+            -dot(delta, history.cameraUp.xyz) / max(previousDepth * history.projection.x, 0.000001));
     }
 
     float normalizedDepth = sqrt(clamp((previousDepth - nearPlane) / (farPlane - nearPlane), 0.0, 1.0));

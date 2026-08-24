@@ -274,6 +274,56 @@ public sealed class VulkanSceneBatchBuilderTests
         Assert.True(leftOrigin.X > rightOrigin.X);
     }
 
+    [Theory]
+    [InlineData("perspective")]
+    [InlineData("orthographic")]
+    public void EffectiveCameraViewReconstructionRoundTripsTopAndBottomFramebufferPixels(string projectionMode)
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera",
+            "Rotated Camera",
+            "Camera3D",
+            true,
+            1,
+            2,
+            -5,
+            RotationX: 12,
+            RotationY: 20,
+            RotationZ: 8,
+            ProjectionMode: projectionMode,
+            OrthographicSize: 8,
+            NearClip: 0.1,
+            FarClip: 80);
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "cube",
+            "Cube",
+            "mesh",
+            "rekall.primitive.cube",
+            4,
+            4,
+            8,
+            1,
+            Variant: "rekall.geometry.cube")) with
+        {
+            ActiveCamera = camera,
+            Cameras = [camera]
+        };
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+        var effective = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes).EffectiveCamera;
+        var topUv = new Vector2(0.37f, 0.18f);
+        var bottomUv = new Vector2(0.37f, 0.82f);
+
+        var topWorld = effective.ViewOrigin(topUv) + effective.ViewRay(topUv) * 12;
+        var bottomWorld = effective.ViewOrigin(bottomUv) + effective.ViewRay(bottomUv) * 12;
+        var projectedTop = ProjectToFramebufferUv(effective.ViewProjection, topWorld);
+        var projectedBottom = ProjectToFramebufferUv(effective.ViewProjection, bottomWorld);
+
+        Assert.InRange(Vector2.Distance(topUv, projectedTop), 0, 0.0001f);
+        Assert.InRange(Vector2.Distance(bottomUv, projectedBottom), 0, 0.0001f);
+        Assert.True(Vector3.Dot(topWorld - bottomWorld, effective.Up) > 0,
+            "Framebuffer-top reconstruction must lie above framebuffer-bottom reconstruction in camera space.");
+    }
+
     [Fact]
     public void BuildUsesPointLightPositionWhenFrameContainsPointLight()
     {
@@ -518,6 +568,64 @@ public sealed class VulkanSceneBatchBuilderTests
         Assert.Equal(Vector4.Zero, prepared.Batch.Frame.LightColor);
         Assert.Equal(Vector4.Zero, prepared.Batch.Frame.LightPosition);
         Assert.Equal(new Vector4(0, 2, 3, 1), prepared.Batch.Frame.AdditionalLightPosition);
+    }
+
+    [Fact]
+    public void HighFidelitySelectionIgnoresSpotAndCustomLightsAheadOfCanonicalDirectional()
+    {
+        var spot = new RekallAgeRuntimeViewportRenderable(
+            "spot-first", "Spot", "light", null, 0, 2, 3, 1,
+            Variant: "SpotLight", Intensity: 4, MaterialColor: "#00ff00")
+        {
+            ShadowPriority = 300
+        };
+        var custom = new RekallAgeRuntimeViewportRenderable(
+            "custom-first", "Custom", "light", null, 0, 2, 3, 2,
+            Variant: "CustomDirectionalLight", Intensity: 4, MaterialColor: "#0000ff")
+        {
+            ShadowPriority = 200
+        };
+        var directional = new RekallAgeRuntimeViewportRenderable(
+            "canonical-directional", "Directional", "light", null, 0, 0, 0, 3,
+            Variant: "rEkAlL.DiReCtIoNaLlIgHt", RotationX: 45, Intensity: 2, MaterialColor: "#ff0000")
+        {
+            ShadowPriority = 10
+        };
+        var frame = CreateHighFidelityLightFrame(spot, custom, directional);
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+
+        var plan = Assert.IsType<RekallAgeVulkanHighFidelityFramePlan>(
+            new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame, meshes));
+
+        Assert.True(plan.DirectionalLight.Available);
+        Assert.Equal("canonical-directional", plan.DirectionalLight.EntityId);
+        Assert.Equal("canonical-directional", plan.ShadowPlan.LightEntityId);
+        Assert.Equal("canonical-directional", plan.FogPlan.DirectLightEntityId);
+    }
+
+    [Theory]
+    [InlineData("SpotLight")]
+    [InlineData("CustomLight")]
+    [InlineData("Agent.DirectionalLight")]
+    public void HighFidelitySelectionReportsNoneWhenCanonicalDirectionalIsAbsent(string variant)
+    {
+        var frame = CreateHighFidelityLightFrame(new RekallAgeRuntimeViewportRenderable(
+            "unsupported-light", "Unsupported", "light", null, 0, 2, 3, 1,
+            Variant: variant, Intensity: 4, MaterialColor: "#ffffff")
+        {
+            ShadowPriority = 300
+        });
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+
+        var plan = Assert.IsType<RekallAgeVulkanHighFidelityFramePlan>(
+            new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame, meshes));
+
+        Assert.False(plan.DirectionalLight.Available);
+        Assert.Null(plan.DirectionalLight.EntityId);
+        Assert.False(plan.ShadowPlan.Enabled);
+        Assert.Null(plan.ShadowPlan.LightEntityId);
+        Assert.False(plan.FogPlan.DirectLightAvailable);
+        Assert.Null(plan.FogPlan.DirectLightEntityId);
     }
 
     [Fact]
@@ -876,6 +984,13 @@ public sealed class VulkanSceneBatchBuilderTests
             [0, 1, 2]);
     }
 
+    private static Vector2 ProjectToFramebufferUv(Matrix4x4 viewProjection, Vector3 worldPosition)
+    {
+        var clip = Vector4.Transform(new Vector4(worldPosition, 1), viewProjection);
+        var inverseW = 1 / clip.W;
+        return new Vector2(clip.X * inverseW, clip.Y * inverseW) * 0.5f + new Vector2(0.5f);
+    }
+
     private static RekallAgeRuntimeViewportFrame CreateFrame(params RekallAgeRuntimeViewportRenderable[] renderables)
     {
         return new RekallAgeRuntimeViewportFrame(
@@ -890,6 +1005,35 @@ public sealed class VulkanSceneBatchBuilderTests
             0,
             new RekallAgeRuntimeViewportOverlay(false, 0),
             []);
+    }
+
+    private static RekallAgeRuntimeViewportFrame CreateHighFidelityLightFrame(
+        params RekallAgeRuntimeViewportRenderable[] lights)
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera", "Camera", "Camera3D", true, 0, 2, -6, NearClip: 0.1, FarClip: 80);
+        return CreateFrame([
+            new RekallAgeRuntimeViewportRenderable(
+                "mesh", "Mesh", "mesh", "rekall.primitive.cube", 0, 0, 5, 1,
+                Variant: "rekall.geometry.cube"),
+            .. lights]) with
+        {
+            ActiveCamera = camera,
+            Cameras = [camera],
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post", "Post", true, [new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")]),
+            ResolvedQualityPlan = new RekallAgeRenderQualityProfileResolver().Resolve(
+                new RekallAgeRenderQualityIntent("High", Bloom: false),
+                RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+                128,
+                72),
+            FogVolumes =
+            [
+                new RekallAgeRuntimeViewportFogVolume(
+                    "fog", "Fog", "global", 0.1, "#ffffff", "#000000", 0, 0, 0, 0,
+                    RekallAgeRuntimeViewportTransform.Identity)
+            ]
+        };
     }
 
     private sealed class CountingRenderableList : IReadOnlyList<RekallAgeRuntimeViewportRenderable>

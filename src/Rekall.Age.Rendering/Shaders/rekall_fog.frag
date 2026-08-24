@@ -38,7 +38,7 @@ vec3 viewRay(vec2 uv)
     return normalize(
         parameters.cameraForwardFar.xyz
         + parameters.cameraRight.xyz * ndc.x * parameters.projection.x * parameters.projection.y
-        + parameters.cameraUp.xyz * ndc.y * parameters.projection.x);
+        - parameters.cameraUp.xyz * ndc.y * parameters.projection.x);
 }
 
 vec3 viewOrigin(vec2 uv)
@@ -47,7 +47,7 @@ vec3 viewOrigin(vec2 uv)
     vec2 ndc = uv * 2.0 - 1.0;
     return frame.cameraPosition.xyz
         + parameters.cameraRight.xyz * ndc.x * parameters.projection.x * parameters.projection.y
-        + parameters.cameraUp.xyz * ndc.y * parameters.projection.x;
+        - parameters.cameraUp.xyz * ndc.y * parameters.projection.x;
 }
 
 float linearViewDepth(float depth)

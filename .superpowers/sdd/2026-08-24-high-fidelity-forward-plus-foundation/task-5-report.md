@@ -311,3 +311,59 @@ Outputs: build succeeded with `0 Warning(s), 0 Error(s)`; formatter and diff che
 ### Residual concerns
 
 No scoped Fix Round 2 finding remains deferred. The high-fidelity path performs an additional bounded transformed-vertex walk during planning to resolve the effective camera before batching; it avoids extra geometry/index allocation and keeps the camera contract exact. If future profiling identifies this as material for very large scenes, the same generic bounds result can be cached by the renderer's scene-residency layer without changing the camera/light/fog contracts.
+
+## Fix Round 3: Vulkan vertical reconstruction and exact directional variants
+
+### Status
+
+`DONE`
+
+Both scoped re-review findings are repaired with isolated RED/GREEN evidence. Perspective and orthographic fog reconstruction now round-trips the exact Vulkan scene projection vertically, including persistent-history reprojection, and high-fidelity light authority now recognizes only the supported canonical directional-light variants.
+
+### Systematic root causes and repairs
+
+1. **Vertical reconstruction:** the scene projection multiplies `M22` by `-1` before upload, while the native viewport and fullscreen fog UV use framebuffer Y. The CPU `ViewRay`/`ViewOrigin` helpers and both fog shaders nevertheless applied framebuffer NDC Y as `+ cameraUp`, reconstructing the vertically opposite world ray/origin from the depth pixel being sampled. The froxel history inverse projection repeated the same sign error. CPU perspective/orthographic reconstruction, analytic fog, froxel injection/composite, and temporal history now consistently apply inverse camera-up for framebuffer Y.
+2. **Directional variants:** selection used a negative rule that accepted every visible light whose variant did not contain `point`. That promoted `SpotLight`, custom lights, and foreign-namespace variants to directional shadow/fog authority. The selector now uses an exact case-insensitive allow-list for `DirectionalLight` and `Rekall.DirectionalLight`; point, spot, custom, foreign-namespace, null, and unknown variants produce explicit no-directional authority unless a canonical directional light is present.
+
+### Isolated RED/GREEN evidence
+
+- **Projection round-trip RED:** direct rotated-camera perspective and orthographic tests reconstructed top/bottom framebuffer samples, projected the resulting world points through the actual Vulkan view-projection matrix, and both failed with UV distance `0.640000045`. GREEN passed 2/2 after correcting the CPU camera-up sign.
+- **Native vertical RED:** with the froxel shader deliberately retaining the old sign, an elevated orthographic local volume and elevated opaque cube produced `top=0, mirrored=11750`. GREEN passed 1/1 after the shader correction; the test now requires fog at the framebuffer-top opaque surface to exceed its vertically mirrored region. The broader native run also exposed an older analytic test whose hard-coded region labels embodied the mirrored mapping (`lower=3001, upper=10185`); correcting those coordinates preserved its intended height-falloff assertion.
+- **Directional selection RED:** the mixed spot/custom/canonical test selected `spot-first` instead of `canonical-directional`, and all three explicit-none cases (`SpotLight`, `CustomLight`, `Agent.DirectionalLight`) incorrectly reported an available directional injection. GREEN passed 4/4 after exact canonical recognition. Existing native fixtures were updated from the unsupported shorthand `directional` to the projected canonical `DirectionalLight` variant.
+
+### Final verification
+
+Required Task 5 focused gate:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~VulkanFogPlannerTests|FullyQualifiedName~ViewportContractTests|FullyQualifiedName~VulkanHighFidelityCaptureTests" --logger "console;verbosity=minimal"
+```
+
+Output: `Passed: 67, Failed: 0, Skipped: 0` in 37 seconds.
+
+Complete Rendering namespace:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~Rekall.Age.Tests.Rendering" --logger "console;verbosity=minimal"
+```
+
+Output: `Passed: 605, Failed: 0, Skipped: 0` in 37 seconds.
+
+Mechanical gates:
+
+```powershell
+dotnet build src\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj --no-restore
+dotnet format Rekall.AGE.sln --no-restore --verify-no-changes --include <all changed C# files>
+git diff --check
+```
+
+Outputs: build succeeded with `0 Warning(s), 0 Error(s)`; formatter and diff checks exited 0.
+
+### Tracked contract updates
+
+- The design and implementation plan now state that the Vulkan `M22` flip makes framebuffer UV Y reconstruct through inverse camera-up in CPU helpers, analytic/froxel shaders, and temporal-history projection.
+- The design and plan now name the exact case-insensitive canonical `DirectionalLight`/`Rekall.DirectionalLight` variants and explicitly exclude point, spot, custom, and foreign-namespace variants from high-fidelity directional authority.
+
+### Residual concerns
+
+No scoped Fix Round 3 finding remains deferred.

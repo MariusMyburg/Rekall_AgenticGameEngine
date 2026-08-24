@@ -138,11 +138,18 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
     private static RekallAgeRuntimeViewportRenderable? SelectDirectionalLight(
         RekallAgeRuntimeViewportFrame frame) => frame.Renderables
         .Where(item => item.Kind.Equals("light", StringComparison.Ordinal)
-            && item.Variant?.Contains("point", StringComparison.OrdinalIgnoreCase) != true
+            && IsDirectionalLightVariant(item.Variant)
             && item.Intensity > 0.0001)
         .OrderByDescending(item => item.ShadowPriority)
         .ThenBy(item => item.EntityId, StringComparer.Ordinal)
         .FirstOrDefault();
+
+    private static bool IsDirectionalLightVariant(string? variant)
+    {
+        var normalized = variant?.Trim();
+        return normalized?.Equals("DirectionalLight", StringComparison.OrdinalIgnoreCase) == true
+            || normalized?.Equals("Rekall.DirectionalLight", StringComparison.OrdinalIgnoreCase) == true;
+    }
 
     private static RekallAgeVulkanDirectionalLightInjection ToDirectionalLightInjection(
         RekallAgeRuntimeViewportRenderable light)

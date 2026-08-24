@@ -12,6 +12,11 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 lightColor;
     vec4 lightPosition;
     vec4 cameraPosition;
+    mat4 shadowViewProjection[4];
+    vec4 shadowSplits;
+    vec4 shadowParameters0;
+    vec4 shadowParameters1;
+    vec4 shadowCameraForward;
 } frame;
 
 layout(set = 1, binding = 0) uniform DrawUniformBuffer
@@ -28,6 +33,7 @@ layout(set = 1, binding = 0) uniform DrawUniformBuffer
     vec4 cloudColor;
     vec4 cloudShadowFactors;
     vec4 surfaceWaterFactors;
+    vec4 shadowFactors;
 } draw;
 
 layout(set = 2, binding = 0) uniform texture2D baseColorTexture;
@@ -44,12 +50,61 @@ layout(set = 2, binding = 10) uniform texture2D cloudShadowTexture;
 layout(set = 2, binding = 11) uniform sampler cloudShadowSampler;
 layout(set = 2, binding = 12) uniform texture2D surfaceWaterTexture;
 layout(set = 2, binding = 13) uniform sampler surfaceWaterSampler;
+#ifdef REKALL_DIRECTIONAL_SHADOWS
+layout(set = 3, binding = 0) uniform sampler2DArrayShadow directionalShadowAtlas;
+#endif
 
 layout(location = 0) out vec4 outColor;
 
 const float PI = 3.14159265359;
 const int MAX_VIEW_SAMPLE_COUNT = 32;
 const int MAX_LIGHT_SAMPLE_COUNT = 16;
+const int MAX_SHADOW_FILTER_TAPS = 24;
+
+float sampleDirectionalShadow(vec3 worldPosition, vec3 normal)
+{
+#ifndef REKALL_DIRECTIONAL_SHADOWS
+    return 1.0;
+#else
+    int cascadeCount = int(frame.shadowParameters0.x + 0.5);
+    if (frame.shadowParameters1.z < 0.5 || draw.shadowFactors.y < 0.5 || cascadeCount <= 0)
+    {
+        return 1.0;
+    }
+
+    float viewDepth = dot(worldPosition - frame.cameraPosition.xyz, normalize(frame.shadowCameraForward.xyz));
+    if (viewDepth <= 0.0 || viewDepth > frame.shadowParameters1.y)
+    {
+        return 1.0;
+    }
+
+    int cascadeIndex = 0;
+    if (cascadeCount > 1 && viewDepth > frame.shadowSplits.x) cascadeIndex = 1;
+    if (cascadeCount > 2 && viewDepth > frame.shadowSplits.y) cascadeIndex = 2;
+    if (cascadeCount > 3 && viewDepth > frame.shadowSplits.z) cascadeIndex = 3;
+    vec3 biasedPosition = worldPosition + normal * frame.shadowParameters0.w;
+    vec4 shadowClip = frame.shadowViewProjection[cascadeIndex] * vec4(biasedPosition, 1.0);
+    vec3 shadowNdc = shadowClip.xyz / max(abs(shadowClip.w), 0.000001);
+    vec2 uv = shadowNdc.xy * 0.5 + 0.5;
+    float referenceDepth = shadowNdc.z - frame.shadowParameters0.z;
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))) || referenceDepth <= 0.0 || referenceDepth >= 1.0)
+    {
+        return 1.0;
+    }
+
+    int tapCount = clamp(int(frame.shadowParameters1.x + 0.5), 1, MAX_SHADOW_FILTER_TAPS);
+    float texel = 1.0 / max(frame.shadowParameters0.y, 1.0);
+    float visibility = 0.0;
+    for (int tap = 0; tap < MAX_SHADOW_FILTER_TAPS; ++tap)
+    {
+        if (tap >= tapCount) break;
+        int x = (tap % 5) - 2;
+        int y = ((tap * 3) % 5) - 2;
+        visibility += texture(directionalShadowAtlas, vec4(uv + vec2(x, y) * texel, float(cascadeIndex), referenceDepth));
+    }
+    return visibility / float(tapCount);
+#endif
+}
 
 vec3 perturbNormal(vec3 normal)
 {
@@ -653,7 +708,8 @@ void main()
     ambient += waterFresnel * frame.lightColor.rgb * directTransmittance * waterCoverage * 0.018;
     vec3 emissive = pow(max(texture(sampler2D(emissiveTexture, emissiveSampler), fragUv).rgb * draw.emissiveFactors.rgb, vec3(0.0)), vec3(2.2)) * draw.emissiveFactors.a;
     float cloudShadow = sampleCloudShadow(fragWorldPosition, light);
-    vec3 color = emissive + ambient + (diffuse + specular) * frame.lightColor.rgb * directTransmittance * cloudShadow * ndotl * 1.8;
+    float directionalShadow = sampleDirectionalShadow(fragWorldPosition, normal);
+    vec3 color = emissive + ambient + (diffuse + specular) * frame.lightColor.rgb * directTransmittance * cloudShadow * directionalShadow * ndotl * 1.8;
     color = applySurfaceAerialPerspective(color, fragWorldPosition, light);
     float surfaceAlpha = hasAtmosphereData() ? fragColor.a : fragColor.a * textureColor.a;
 #ifdef REKALL_HDR_SCENE_OUTPUT

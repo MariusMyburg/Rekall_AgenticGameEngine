@@ -416,7 +416,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         {
             var errors = new List<string>();
             var state = new VulkanState(Vk.GetApi());
-            var highFidelityPlan = new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame);
+            var highFidelityPlan = new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame, meshes);
             if (highFidelityPlan is { Ready: false })
             {
                 errors.AddRange(highFidelityPlan.Graph.Diagnostics.Select(diagnostic =>
@@ -439,7 +439,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             var backendPlan = RekallAgeVulkanSceneRenderBackendPlanner.Plan(target);
             state.Ownership = backendPlan.Ownership;
             var prepared = RekallAgeVulkanScenePreparedFrameBuilder.Build(frame, meshes, target);
-            var commandPlan = RekallAgeVulkanSceneCommandPlanBuilder.BuildOffscreen(prepared, highFidelityPlan?.Graph);
+            var commandPlan = RekallAgeVulkanSceneCommandPlanBuilder.BuildOffscreen(
+                prepared,
+                highFidelityPlan?.Graph,
+                highFidelityPlan?.ShadowPlan);
 
             if (!prepared.HasDrawableGeometry)
             {
@@ -466,7 +469,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 CreateDevice(state);
                 if (highFidelityPlan is not null)
                 {
-                    ValidateHighFidelityFormats(state, commandPlan, errors);
+                    ValidateHighFidelityFormats(state, commandPlan, highFidelityPlan.ShadowPlan, errors);
                     if (errors.Count > 0)
                     {
                         return Unavailable(frame, string.Empty, "Silk.NET Vulkan", state.SelectedDevice, assets, meshes.Count, 0, 0, [], errors) with
@@ -485,16 +488,25 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 if (highFidelityPlan is not null)
                 {
                     CreateHighFidelityImages(state, target, highFidelityPlan, commandPlan);
+                    if (highFidelityPlan.ShadowPlan.Enabled)
+                    {
+                        CreateShadowResources(state, highFidelityPlan.ShadowPlan);
+                    }
                 }
                 CreateBuffers(
                     state,
                     commandPlan.RenderPasses.Select(pass => pass.FrameUniform).ToArray(),
                     commandPlan.RenderPasses[0].Draws.Select(draw => draw.PushConstants).ToArray(),
                     prepared.GeometryUpload,
-                    prepared.ReadbackByteCount);
+                    prepared.ReadbackByteCount,
+                    highFidelityPlan?.ShadowPlan);
                 CreateTextures(state, meshes);
-                CreateDescriptors(state, prepared.DrawPlan.MaterialKeys);
-                if (!TryCompileSceneShaders(errors, out var shaders, highFidelityPlan is not null))
+                CreateDescriptors(state, prepared.DrawPlan.MaterialKeys, highFidelityPlan?.ShadowPlan);
+                if (!TryCompileSceneShaders(
+                    errors,
+                    out var shaders,
+                    highFidelityPlan is not null,
+                    highFidelityPlan?.ShadowPlan.Enabled == true))
                 {
                     return Unavailable(frame, string.Empty, "Silk.NET Vulkan", state.SelectedDevice, assets, meshes.Count, 0, 0, [], errors) with
                     {
@@ -513,6 +525,17 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 }
 
                 CreatePipeline(state, frame, target, shaders);
+                if (highFidelityPlan?.ShadowPlan.Enabled == true)
+                {
+                    CreateShadowPipeline(state, highFidelityPlan.ShadowPlan, errors);
+                    if (errors.Count > 0)
+                    {
+                        return Unavailable(frame, string.Empty, "Silk.NET Vulkan", state.SelectedDevice, assets, meshes.Count, 0, 0, [], errors) with
+                        {
+                            HighFidelityFrame = CreateHighFidelityReport(highFidelityPlan, executed: false, [], errors)
+                        };
+                    }
+                }
                 CreateProjectPipelines(state, frame, target, resolvedPipelines);
                 if (highFidelityPlan is not null)
                 {
@@ -582,7 +605,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         : CreateHighFidelityReport(
                             highFidelityPlan,
                             executed: true,
-                            CreateExecutedHighFidelityPassReports(commandPlan),
+                            CreateExecutedHighFidelityPassReports(commandPlan, highFidelityPlan),
                             [])
                 };
             }
@@ -1048,7 +1071,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             {
                 SType = StructureType.ImageViewCreateInfo,
                 Image = image,
-                ViewType = ImageViewType.Type2D,
+                ViewType = arrayLayers > 1 ? ImageViewType.Type2DArray : ImageViewType.Type2D,
                 Format = format,
                 Components = new ComponentMapping(ComponentSwizzle.Identity, ComponentSwizzle.Identity, ComponentSwizzle.Identity, ComponentSwizzle.Identity),
                 SubresourceRange = new ImageSubresourceRange(aspect, 0, mipLevels, 0, arrayLayers)
@@ -1168,6 +1191,101 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             state.Framebuffers = [state.Framebuffer];
         }
 
+        private static void CreateShadowResources(
+            VulkanState state,
+            RekallAgeVulkanShadowPlan plan)
+        {
+            var layerCount = checked((uint)plan.Cascades.Count);
+            var resolution = checked((uint)plan.Resolution);
+            CreateImage(
+                state,
+                resolution,
+                resolution,
+                Format.D32Sfloat,
+                ImageUsageFlags.DepthStencilAttachmentBit | ImageUsageFlags.SampledBit,
+                ImageAspectFlags.DepthBit,
+                1,
+                layerCount,
+                out state.ShadowImage,
+                out state.ShadowMemory,
+                out state.ShadowView);
+            state.ShadowLayerViews = CreateLayerImageViews(
+                state,
+                state.ShadowImage,
+                Format.D32Sfloat,
+                ImageAspectFlags.DepthBit,
+                layerCount);
+
+            var depthAttachment = new AttachmentDescription
+            {
+                Format = Format.D32Sfloat,
+                Samples = SampleCountFlags.Count1Bit,
+                LoadOp = AttachmentLoadOp.Clear,
+                StoreOp = AttachmentStoreOp.Store,
+                StencilLoadOp = AttachmentLoadOp.DontCare,
+                StencilStoreOp = AttachmentStoreOp.DontCare,
+                InitialLayout = ImageLayout.Undefined,
+                FinalLayout = ImageLayout.ShaderReadOnlyOptimal
+            };
+            var depthReference = new AttachmentReference(0, ImageLayout.DepthStencilAttachmentOptimal);
+            var subpass = new SubpassDescription
+            {
+                PipelineBindPoint = PipelineBindPoint.Graphics,
+                PDepthStencilAttachment = &depthReference
+            };
+            var dependencies = stackalloc SubpassDependency[]
+            {
+                new()
+                {
+                    SrcSubpass = Vk.SubpassExternal,
+                    DstSubpass = 0,
+                    SrcStageMask = PipelineStageFlags.FragmentShaderBit,
+                    DstStageMask = PipelineStageFlags.EarlyFragmentTestsBit,
+                    SrcAccessMask = AccessFlags.ShaderReadBit,
+                    DstAccessMask = AccessFlags.DepthStencilAttachmentWriteBit
+                },
+                new()
+                {
+                    SrcSubpass = 0,
+                    DstSubpass = Vk.SubpassExternal,
+                    SrcStageMask = PipelineStageFlags.LateFragmentTestsBit,
+                    DstStageMask = PipelineStageFlags.FragmentShaderBit,
+                    SrcAccessMask = AccessFlags.DepthStencilAttachmentWriteBit,
+                    DstAccessMask = AccessFlags.ShaderReadBit
+                }
+            };
+            var renderPassInfo = new RenderPassCreateInfo
+            {
+                SType = StructureType.RenderPassCreateInfo,
+                AttachmentCount = 1,
+                PAttachments = &depthAttachment,
+                SubpassCount = 1,
+                PSubpasses = &subpass,
+                DependencyCount = 2,
+                PDependencies = dependencies
+            };
+            ThrowIfFailed(state.Vk.CreateRenderPass(state.Device, &renderPassInfo, null, out state.ShadowRenderPass), "vkCreateRenderPass shadow");
+
+            state.ShadowFramebuffers = new Framebuffer[state.ShadowLayerViews.Length];
+            for (var index = 0; index < state.ShadowLayerViews.Length; index++)
+            {
+                var view = state.ShadowLayerViews[index];
+                var framebufferInfo = new FramebufferCreateInfo
+                {
+                    SType = StructureType.FramebufferCreateInfo,
+                    RenderPass = state.ShadowRenderPass,
+                    AttachmentCount = 1,
+                    PAttachments = &view,
+                    Width = resolution,
+                    Height = resolution,
+                    Layers = 1
+                };
+                ThrowIfFailed(
+                    state.Vk.CreateFramebuffer(state.Device, &framebufferInfo, null, out state.ShadowFramebuffers[index]),
+                    "vkCreateFramebuffer shadow");
+            }
+        }
+
         private static void CreateLayerFramebuffers(VulkanState state, RekallAgeVulkanSceneRenderTarget target)
         {
             var framebufferCount = checked((int)Math.Max(target.EyeCount, 1));
@@ -1200,7 +1318,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             IReadOnlyList<RekallAgeVulkanSceneGpuFrameUniform> frameUniforms,
             IReadOnlyList<RekallAgeVulkanSceneGpuDrawPushConstants> drawUniforms,
             RekallAgeVulkanSceneGeometryUpload geometryUpload,
-            ulong readbackBytes)
+            ulong readbackBytes,
+            RekallAgeVulkanShadowPlan? shadowPlan = null)
         {
             CreateHostBuffer(state, geometryUpload.VertexBytes, BufferUsageFlags.VertexBufferBit, out state.VertexBuffer, out state.VertexMemory);
             CreateHostBuffer(state, geometryUpload.IndexBytes, BufferUsageFlags.IndexBufferBit, out state.IndexBuffer, out state.IndexMemory);
@@ -1223,6 +1342,26 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
             state.UniformBuffer = state.UniformBuffers[0];
             state.UniformMemory = state.UniformMemories[0];
+            if (shadowPlan is { Enabled: true })
+            {
+                state.ShadowUniformBuffers = new Buffer[shadowPlan.Cascades.Count];
+                state.ShadowUniformMemories = new DeviceMemory[shadowPlan.Cascades.Count];
+                for (var index = 0; index < shadowPlan.Cascades.Count; index++)
+                {
+                    var cascadeUniform = new ShadowCascadeGpuUniform(
+                        RekallAgeVulkanSceneUniformUploadBuilder.ToGpuMatrix(shadowPlan.Cascades[index].ViewProjection),
+                        shadowPlan.DepthBias,
+                        shadowPlan.NormalBias,
+                        shadowPlan.Resolution,
+                        index);
+                    CreateHostBuffer(
+                        state,
+                        MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref cascadeUniform, 1)),
+                        BufferUsageFlags.UniformBufferBit,
+                        out state.ShadowUniformBuffers[index],
+                        out state.ShadowUniformMemories[index]);
+                }
+            }
             state.Vk.GetPhysicalDeviceProperties(state.PhysicalDevice, out var physicalDeviceProperties);
             var drawUniformBytes = checked((uint)Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>());
             var minimumAlignment = Math.Max(1UL, physicalDeviceProperties.Limits.MinUniformBufferOffsetAlignment);
@@ -1428,7 +1567,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
         private static void CreateDescriptors(
             VulkanState state,
-            IReadOnlyList<RekallAgeVulkanSceneMaterialKey> materialKeys)
+            IReadOnlyList<RekallAgeVulkanSceneMaterialKey> materialKeys,
+            RekallAgeVulkanShadowPlan? shadowPlan = null)
         {
             var uniformBinding = new DescriptorSetLayoutBinding
             {
@@ -1478,20 +1618,40 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 state.Vk.CreateDescriptorSetLayout(state.Device, &materialLayoutInfo, null, out state.MaterialDescriptorSetLayout),
                 "vkCreateDescriptorSetLayout material");
 
+            if (shadowPlan is { Enabled: true })
+            {
+                var shadowSampleBinding = new DescriptorSetLayoutBinding(
+                    0,
+                    DescriptorType.CombinedImageSampler,
+                    1,
+                    ShaderStageFlags.FragmentBit);
+                var shadowSampleLayoutInfo = new DescriptorSetLayoutCreateInfo
+                {
+                    SType = StructureType.DescriptorSetLayoutCreateInfo,
+                    BindingCount = 1,
+                    PBindings = &shadowSampleBinding
+                };
+                ThrowIfFailed(
+                    state.Vk.CreateDescriptorSetLayout(state.Device, &shadowSampleLayoutInfo, null, out state.ShadowSampleDescriptorSetLayout),
+                    "vkCreateDescriptorSetLayout shadow sample");
+            }
+
             var frameSetCount = checked((uint)state.UniformBuffers.Length);
+            var shadowSetCount = checked((uint)state.ShadowUniformBuffers.Length);
             var materialSetCount = checked((uint)Math.Max(1, materialKeys.Count));
             var poolSizes = stackalloc DescriptorPoolSize[]
             {
-                new(DescriptorType.UniformBuffer, frameSetCount),
+                new(DescriptorType.UniformBuffer, checked(frameSetCount + shadowSetCount)),
                 new(DescriptorType.UniformBufferDynamic, 1),
                 new(DescriptorType.SampledImage, checked(materialSetCount * 7)),
-                new(DescriptorType.Sampler, checked(materialSetCount * 7))
+                new(DescriptorType.Sampler, checked(materialSetCount * 7)),
+                new(DescriptorType.CombinedImageSampler, 1)
             };
             var poolInfo = new DescriptorPoolCreateInfo
             {
                 SType = StructureType.DescriptorPoolCreateInfo,
-                MaxSets = checked(frameSetCount + 1 + materialSetCount),
-                PoolSizeCount = 4,
+                MaxSets = checked(frameSetCount + shadowSetCount + 1 + materialSetCount + (shadowSetCount > 0 ? 1u : 0u)),
+                PoolSizeCount = 5,
                 PPoolSizes = poolSizes
             };
             ThrowIfFailed(state.Vk.CreateDescriptorPool(state.Device, &poolInfo, null, out state.DescriptorPool), "vkCreateDescriptorPool");
@@ -1523,6 +1683,39 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 &drawBufferInfo,
                 DescriptorType.UniformBufferDynamic);
             state.Vk.UpdateDescriptorSets(state.Device, 1, &drawWrite, 0, null);
+
+            if (shadowSetCount > 0)
+            {
+                state.ShadowDescriptorSets = new DescriptorSet[state.ShadowUniformBuffers.Length];
+                for (var index = 0; index < state.ShadowUniformBuffers.Length; index++)
+                {
+                    var descriptorSet = AllocateDescriptorSet(state, state.DescriptorSetLayout);
+                    var shadowBufferInfo = new DescriptorBufferInfo(
+                        state.ShadowUniformBuffers[index],
+                        0,
+                        (ulong)Marshal.SizeOf<ShadowCascadeGpuUniform>());
+                    var shadowWrite = UniformWrite(descriptorSet, &shadowBufferInfo);
+                    state.Vk.UpdateDescriptorSets(state.Device, 1, &shadowWrite, 0, null);
+                    state.ShadowDescriptorSets[index] = descriptorSet;
+                }
+
+                state.ShadowSampler = CreateShadowSampler(state);
+                state.ShadowSampleDescriptorSet = AllocateDescriptorSet(state, state.ShadowSampleDescriptorSetLayout);
+                var shadowImageInfo = new DescriptorImageInfo(
+                    state.ShadowSampler,
+                    state.ShadowView,
+                    ImageLayout.ShaderReadOnlyOptimal);
+                var shadowImageWrite = new WriteDescriptorSet
+                {
+                    SType = StructureType.WriteDescriptorSet,
+                    DstSet = state.ShadowSampleDescriptorSet,
+                    DstBinding = 0,
+                    DescriptorCount = 1,
+                    DescriptorType = DescriptorType.CombinedImageSampler,
+                    PImageInfo = &shadowImageInfo
+                };
+                state.Vk.UpdateDescriptorSets(state.Device, 1, &shadowImageWrite, 0, null);
+            }
 
             foreach (var key in materialKeys)
             {
@@ -1618,11 +1811,13 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         private static bool TryCompileSceneShaders(
             List<string> errors,
             out RekallAgeVulkanSceneShaderCompilationResult shaders,
-            bool highDynamicRangeOutput = false)
+            bool highDynamicRangeOutput = false,
+            bool directionalShadows = false)
         {
             shaders = new RekallAgeVulkanShaderCompiler().CompileScenePipeline(
                 RekallAgeVulkanScenePipelineDescription.Default,
-                highDynamicRangeOutput);
+                highDynamicRangeOutput,
+                directionalShadows);
             if (shaders.Compiled)
             {
                 return true;
@@ -1640,6 +1835,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         private static void ValidateHighFidelityFormats(
             VulkanState state,
             RekallAgeVulkanSceneCommandPlan commandPlan,
+            RekallAgeVulkanShadowPlan shadowPlan,
             ICollection<string> errors)
         {
             if (HasPostPass(commandPlan, "bloom"))
@@ -1683,6 +1879,28 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 FormatFeatureFlags.ColorAttachmentBit | FormatFeatureFlags.TransferSrcBit,
                 "ldr-color",
                 errors);
+
+            if (shadowPlan.Enabled)
+            {
+                state.Vk.GetPhysicalDeviceFormatProperties(state.PhysicalDevice, Format.D32Sfloat, out var properties);
+                var formatDiagnostic = RekallAgeVulkanHighFidelityFormatValidator.ValidateShadowDepthFormat(
+                    properties.OptimalTilingFeatures);
+                if (formatDiagnostic is not null)
+                {
+                    errors.Add($"{formatDiagnostic} Vulkan device: '{state.SelectedDevice?.Name}'.");
+                }
+
+                state.Vk.GetPhysicalDeviceProperties(state.PhysicalDevice, out var physicalDeviceProperties);
+                var limitDiagnostic = RekallAgeVulkanHighFidelityFormatValidator.ValidateShadowAtlasLimits(
+                    checked((uint)shadowPlan.Resolution),
+                    checked((uint)shadowPlan.Cascades.Count),
+                    physicalDeviceProperties.Limits.MaxImageDimension2D,
+                    physicalDeviceProperties.Limits.MaxImageArrayLayers);
+                if (limitDiagnostic is not null)
+                {
+                    errors.Add($"{limitDiagnostic} Vulkan device: '{state.SelectedDevice?.Name}'.");
+                }
+            }
         }
 
         private static void ValidateFormat(
@@ -2183,12 +2401,13 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 {
                     state.DescriptorSetLayout,
                     state.DrawDescriptorSetLayout,
-                    state.MaterialDescriptorSetLayout
+                    state.MaterialDescriptorSetLayout,
+                    state.ShadowSampleDescriptorSetLayout
                 };
                 var layoutInfo = new PipelineLayoutCreateInfo
                 {
                     SType = StructureType.PipelineLayoutCreateInfo,
-                    SetLayoutCount = 3,
+                    SetLayoutCount = state.ShadowSampleDescriptorSetLayout.Handle != 0 ? 4u : 3u,
                     PSetLayouts = setLayouts
                 };
                 ThrowIfFailed(state.Vk.CreatePipelineLayout(state.Device, &layoutInfo, null, out state.PipelineLayout), "vkCreatePipelineLayout");
@@ -2329,6 +2548,166 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             return handle;
         }
 
+        private static void CreateShadowPipeline(
+            VulkanState state,
+            RekallAgeVulkanShadowPlan plan,
+            ICollection<string> errors)
+        {
+            var shaders = new RekallAgeVulkanShaderCompiler().CompileScenePipeline(
+                RekallAgeVulkanScenePipelineDescription.Shadow);
+            if (!shaders.Compiled)
+            {
+                foreach (var error in shaders.Errors)
+                {
+                    errors.Add(error);
+                }
+                return;
+            }
+
+            fixed (byte* vertexCode = shaders.Vertex.Spirv)
+            fixed (byte* fragmentCode = shaders.Fragment.Spirv)
+            {
+                state.ShadowVertexShader = CreateShaderModule(state, vertexCode, shaders.Vertex.Spirv.Length);
+                state.ShadowFragmentShader = CreateShaderModule(state, fragmentCode, shaders.Fragment.Spirv.Length);
+            }
+
+            var entry = "main\0"u8.ToArray();
+            fixed (byte* entryName = entry)
+            {
+                var stages = stackalloc PipelineShaderStageCreateInfo[]
+                {
+                    new()
+                    {
+                        SType = StructureType.PipelineShaderStageCreateInfo,
+                        Stage = ShaderStageFlags.VertexBit,
+                        Module = state.ShadowVertexShader,
+                        PName = entryName
+                    },
+                    new()
+                    {
+                        SType = StructureType.PipelineShaderStageCreateInfo,
+                        Stage = ShaderStageFlags.FragmentBit,
+                        Module = state.ShadowFragmentShader,
+                        PName = entryName
+                    }
+                };
+                var binding = new VertexInputBindingDescription(
+                    0,
+                    (uint)Marshal.SizeOf<RekallAgeVulkanSceneGpuVertex>(),
+                    VertexInputRate.Vertex);
+                var attributes = stackalloc VertexInputAttributeDescription[]
+                {
+                    new(0, 0, Format.R32G32B32Sfloat, 0),
+                    new(1, 0, Format.R32G32B32Sfloat, 12),
+                    new(2, 0, Format.R32G32B32A32Sfloat, 24),
+                    new(3, 0, Format.R32G32Sfloat, 40)
+                };
+                var vertexInput = new PipelineVertexInputStateCreateInfo
+                {
+                    SType = StructureType.PipelineVertexInputStateCreateInfo,
+                    VertexBindingDescriptionCount = 1,
+                    PVertexBindingDescriptions = &binding,
+                    VertexAttributeDescriptionCount = 4,
+                    PVertexAttributeDescriptions = attributes
+                };
+                var inputAssembly = new PipelineInputAssemblyStateCreateInfo
+                {
+                    SType = StructureType.PipelineInputAssemblyStateCreateInfo,
+                    Topology = PrimitiveTopology.TriangleList
+                };
+                var resolution = checked((uint)plan.Resolution);
+                var viewport = new Viewport(0, 0, resolution, resolution, 0, 1);
+                var scissor = new Rect2D(new Offset2D(0, 0), new Extent2D(resolution, resolution));
+                var viewportState = new PipelineViewportStateCreateInfo
+                {
+                    SType = StructureType.PipelineViewportStateCreateInfo,
+                    ViewportCount = 1,
+                    PViewports = &viewport,
+                    ScissorCount = 1,
+                    PScissors = &scissor
+                };
+                var rasterization = new PipelineRasterizationStateCreateInfo
+                {
+                    SType = StructureType.PipelineRasterizationStateCreateInfo,
+                    PolygonMode = PolygonMode.Fill,
+                    CullMode = CullModeFlags.None,
+                    FrontFace = FrontFace.Clockwise,
+                    LineWidth = 1
+                };
+                var multisample = new PipelineMultisampleStateCreateInfo
+                {
+                    SType = StructureType.PipelineMultisampleStateCreateInfo,
+                    RasterizationSamples = SampleCountFlags.Count1Bit
+                };
+                var depth = new PipelineDepthStencilStateCreateInfo
+                {
+                    SType = StructureType.PipelineDepthStencilStateCreateInfo,
+                    DepthTestEnable = true,
+                    DepthWriteEnable = true,
+                    DepthCompareOp = CompareOp.LessOrEqual
+                };
+                var colorBlend = new PipelineColorBlendStateCreateInfo
+                {
+                    SType = StructureType.PipelineColorBlendStateCreateInfo,
+                    AttachmentCount = 0
+                };
+                var setLayouts = stackalloc DescriptorSetLayout[]
+                {
+                    state.DescriptorSetLayout,
+                    state.DrawDescriptorSetLayout,
+                    state.MaterialDescriptorSetLayout
+                };
+                var layoutInfo = new PipelineLayoutCreateInfo
+                {
+                    SType = StructureType.PipelineLayoutCreateInfo,
+                    SetLayoutCount = 3,
+                    PSetLayouts = setLayouts
+                };
+                ThrowIfFailed(
+                    state.Vk.CreatePipelineLayout(state.Device, &layoutInfo, null, out state.ShadowPipelineLayout),
+                    "vkCreatePipelineLayout shadow");
+                var pipelineInfo = new GraphicsPipelineCreateInfo
+                {
+                    SType = StructureType.GraphicsPipelineCreateInfo,
+                    StageCount = 2,
+                    PStages = stages,
+                    PVertexInputState = &vertexInput,
+                    PInputAssemblyState = &inputAssembly,
+                    PViewportState = &viewportState,
+                    PRasterizationState = &rasterization,
+                    PMultisampleState = &multisample,
+                    PDepthStencilState = &depth,
+                    PColorBlendState = &colorBlend,
+                    Layout = state.ShadowPipelineLayout,
+                    RenderPass = state.ShadowRenderPass
+                };
+                ThrowIfFailed(
+                    state.Vk.CreateGraphicsPipelines(state.Device, default, 1, &pipelineInfo, null, out state.ShadowPipeline),
+                    "vkCreateGraphicsPipelines shadow");
+            }
+        }
+
+        private static Sampler CreateShadowSampler(VulkanState state)
+        {
+            var createInfo = new SamplerCreateInfo
+            {
+                SType = StructureType.SamplerCreateInfo,
+                MagFilter = Filter.Linear,
+                MinFilter = Filter.Linear,
+                MipmapMode = SamplerMipmapMode.Nearest,
+                AddressModeU = SamplerAddressMode.ClampToBorder,
+                AddressModeV = SamplerAddressMode.ClampToBorder,
+                AddressModeW = SamplerAddressMode.ClampToBorder,
+                CompareEnable = true,
+                CompareOp = CompareOp.LessOrEqual,
+                MinLod = 0,
+                MaxLod = 0,
+                BorderColor = BorderColor.FloatOpaqueWhite
+            };
+            ThrowIfFailed(state.Vk.CreateSampler(state.Device, &createInfo, null, out var sampler), "vkCreateSampler shadow");
+            return sampler;
+        }
+
         private static Filter ToVkFilter(RekallAgeVulkanSceneFilter filter)
         {
             return filter == RekallAgeVulkanSceneFilter.Nearest ? Filter.Nearest : Filter.Linear;
@@ -2435,6 +2814,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             state.Vk.ResetCommandBuffer(state.CommandBuffer, 0);
             ThrowIfFailed(state.Vk.BeginCommandBuffer(state.CommandBuffer, &beginInfo), "vkBeginCommandBuffer HDR");
             RecordTextureUploads(state);
+            if (highFidelityPlan.ShadowPlan.Enabled)
+            {
+                RecordShadowCommands(state, commandPlan, highFidelityPlan.ShadowPlan);
+            }
 
             var sceneClears = stackalloc ClearValue[2];
             sceneClears[0].Color = new ClearColorValue(0.006f, 0.01f, 0.018f, 1f);
@@ -2602,6 +2985,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 "bloom-pyramid",
                 "ldr-color"
             };
+            if (plan.ShadowPlan.Enabled)
+            {
+                allocated.Add("shadow-directional");
+            }
             return new RekallAgeHighFidelityFrameReport(
                 executed,
                 "R16G16B16A16_SFloat",
@@ -2620,16 +3007,119 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     .Select(diagnostic => $"{diagnostic.Code} [{diagnostic.Target}]: {diagnostic.Message}")
                     .Concat(diagnostics)
                     .Distinct(StringComparer.Ordinal)
-                    .ToArray());
+                    .ToArray())
+            {
+                ShadowCascades = plan.ShadowPlan.Cascades
+                    .Select(cascade => new RekallAgeHighFidelityShadowCascadeReport(
+                        cascade.Index,
+                        cascade.SplitNear,
+                        cascade.SplitFar,
+                        plan.ShadowPlan.Resolution,
+                        cascade.CasterIds.Count,
+                        executed ? cascade.CasterIds.Count : 0,
+                        cascade.CulledCasterCount,
+                        plan.ShadowPlan.FilterTapCount,
+                        cascade.AtlasBytes,
+                        plan.ShadowPlan.DepthBias,
+                        plan.ShadowPlan.NormalBias))
+                    .ToArray()
+            };
+        }
+
+        private static void RecordShadowCommands(
+            VulkanState state,
+            RekallAgeVulkanSceneCommandPlan commandPlan,
+            RekallAgeVulkanShadowPlan shadowPlan)
+        {
+            var draws = commandPlan.RenderPasses[0].Draws;
+            var vertexBuffer = state.VertexBuffer;
+            var vertexOffset = 0UL;
+            var clear = new ClearValue { DepthStencil = new ClearDepthStencilValue(1f, 0) };
+            for (var cascadeIndex = 0; cascadeIndex < shadowPlan.Cascades.Count; cascadeIndex++)
+            {
+                var cascade = shadowPlan.Cascades[cascadeIndex];
+                var renderPassBegin = new RenderPassBeginInfo
+                {
+                    SType = StructureType.RenderPassBeginInfo,
+                    RenderPass = state.ShadowRenderPass,
+                    Framebuffer = state.ShadowFramebuffers[cascadeIndex],
+                    RenderArea = new Rect2D(
+                        new Offset2D(cascade.AtlasViewport.X, cascade.AtlasViewport.Y),
+                        new Extent2D(
+                            checked((uint)cascade.AtlasViewport.Width),
+                            checked((uint)cascade.AtlasViewport.Height))),
+                    ClearValueCount = 1,
+                    PClearValues = &clear
+                };
+                state.Vk.CmdBeginRenderPass(state.CommandBuffer, &renderPassBegin, SubpassContents.Inline);
+                state.Vk.CmdBindPipeline(state.CommandBuffer, PipelineBindPoint.Graphics, state.ShadowPipeline);
+                state.Vk.CmdBindVertexBuffers(state.CommandBuffer, 0, 1, &vertexBuffer, &vertexOffset);
+                state.Vk.CmdBindIndexBuffer(state.CommandBuffer, state.IndexBuffer, 0, IndexType.Uint32);
+                for (var drawIndex = 0; drawIndex < draws.Count; drawIndex++)
+                {
+                    var draw = draws[drawIndex];
+                    if (draw.PushConstants.CastShadows < 0.5f
+                        || draw.Transparent
+                        || !cascade.CasterIds.Contains(draw.EntityId, StringComparer.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    var descriptorSets = new[]
+                    {
+                        state.ShadowDescriptorSets[cascadeIndex],
+                        state.DrawDescriptorSet,
+                        ResolveMaterialDescriptorSet(state, draw.MaterialKey)
+                    };
+                    var dynamicOffset = checked(state.DrawUniformStrideBytes * (uint)drawIndex);
+                    fixed (DescriptorSet* descriptorSetsPtr = descriptorSets)
+                    {
+                        state.Vk.CmdBindDescriptorSets(
+                            state.CommandBuffer,
+                            PipelineBindPoint.Graphics,
+                            state.ShadowPipelineLayout,
+                            0,
+                            3,
+                            descriptorSetsPtr,
+                            1,
+                            &dynamicOffset);
+                    }
+                    state.Vk.CmdDrawIndexed(
+                        state.CommandBuffer,
+                        draw.IndexCount,
+                        1,
+                        draw.FirstIndex,
+                        draw.VertexOffset,
+                        0);
+                }
+                state.Vk.CmdEndRenderPass(state.CommandBuffer);
+            }
         }
 
         private static IReadOnlyList<RekallAgeHighFidelityFramePassReport> CreateExecutedHighFidelityPassReports(
-            RekallAgeVulkanSceneCommandPlan commandPlan)
+            RekallAgeVulkanSceneCommandPlan commandPlan,
+            RekallAgeVulkanHighFidelityFramePlan highFidelityPlan)
         {
-            var reports = new List<RekallAgeHighFidelityFramePassReport>
+            var reports = new List<RekallAgeHighFidelityFramePassReport>();
+            if (highFidelityPlan.ShadowPlan.Enabled)
             {
-                new("opaque-hdr", "graphics", [], ["scene-hdr"], true, 0, commandPlan.DrawCount)
-            };
+                reports.Add(new RekallAgeHighFidelityFramePassReport(
+                    "shadow-directional",
+                    "graphics",
+                    [],
+                    ["shadow-directional"],
+                    true,
+                    0,
+                    highFidelityPlan.ShadowPlan.Cascades.Sum(cascade => cascade.CasterIds.Count)));
+            }
+            reports.Add(new RekallAgeHighFidelityFramePassReport(
+                "opaque-hdr",
+                "graphics",
+                highFidelityPlan.ShadowPlan.Enabled ? ["shadow-directional"] : [],
+                ["scene-hdr"],
+                true,
+                0,
+                commandPlan.DrawCount));
             foreach (var pass in commandPlan.PostPasses)
             {
                 if (pass.Name.Equals("ui", StringComparison.Ordinal))
@@ -2686,8 +3176,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 {
                     state.FrameDescriptorSets[Math.Min(passIndex, state.FrameDescriptorSets.Length - 1)],
                     state.DrawDescriptorSet,
-                    ResolveMaterialDescriptorSet(state, range.MaterialKey)
+                    ResolveMaterialDescriptorSet(state, range.MaterialKey),
+                    state.ShadowSampleDescriptorSet
                 };
+                var descriptorSetCount = state.ShadowSampleDescriptorSet.Handle != 0 ? 4u : 3u;
                 var dynamicOffset = checked(state.DrawUniformStrideBytes * (uint)drawIndex);
                 fixed (DescriptorSet* descriptorSetsPtr = descriptorSets)
                 {
@@ -2696,7 +3188,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         PipelineBindPoint.Graphics,
                         pipeline.Layout,
                         0,
-                        3,
+                        descriptorSetCount,
                         descriptorSetsPtr,
                         1,
                         &dynamicOffset);
@@ -3035,6 +3527,14 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             float BloomRadius,
             float Padding);
 
+        [StructLayout(LayoutKind.Sequential)]
+        private readonly record struct ShadowCascadeGpuUniform(
+            RekallAgeVulkanSceneGpuMatrix4x4 ViewProjection,
+            float DepthBias,
+            float NormalBias,
+            float Resolution,
+            float CascadeIndex);
+
         private readonly record struct DeviceCandidate(PhysicalDevice Device, string Name, PhysicalDeviceType DeviceType, uint ApiVersion, uint? QueueFamily);
 
         private readonly record struct VulkanTextureMipUpload(
@@ -3067,6 +3567,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public DeviceMemory DepthMemory;
             public ImageView DepthView;
             public ImageView[] DepthViews = [];
+            public Image ShadowImage;
+            public DeviceMemory ShadowMemory;
+            public ImageView ShadowView;
+            public ImageView[] ShadowLayerViews = [];
             public Image BloomImage;
             public DeviceMemory BloomMemory;
             public ImageView BloomView;
@@ -3077,9 +3581,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public ImageView OutputView;
             public RenderPass RenderPass;
             public RenderPass OutputRenderPass;
+            public RenderPass ShadowRenderPass;
             public Framebuffer Framebuffer;
             public Framebuffer[] Framebuffers = [];
             public Framebuffer OutputFramebuffer;
+            public Framebuffer[] ShadowFramebuffers = [];
             public Buffer VertexBuffer;
             public DeviceMemory VertexMemory;
             public Buffer IndexBuffer;
@@ -3088,6 +3594,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public DeviceMemory UniformMemory;
             public Buffer[] UniformBuffers = [];
             public DeviceMemory[] UniformMemories = [];
+            public Buffer[] ShadowUniformBuffers = [];
+            public DeviceMemory[] ShadowUniformMemories = [];
             public Buffer DrawUniformBuffer;
             public DeviceMemory DrawUniformMemory;
             public uint DrawUniformStrideBytes;
@@ -3096,11 +3604,14 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public DescriptorSetLayout DescriptorSetLayout;
             public DescriptorSetLayout DrawDescriptorSetLayout;
             public DescriptorSetLayout MaterialDescriptorSetLayout;
+            public DescriptorSetLayout ShadowSampleDescriptorSetLayout;
             public DescriptorPool DescriptorPool;
             public DescriptorPool PostDescriptorPool;
             public DescriptorSet DescriptorSet;
             public DescriptorSet[] FrameDescriptorSets = [];
             public DescriptorSet DrawDescriptorSet;
+            public DescriptorSet[] ShadowDescriptorSets = [];
+            public DescriptorSet ShadowSampleDescriptorSet;
             public DescriptorSetLayout BloomDescriptorSetLayout;
             public DescriptorSetLayout ToneMapDescriptorSetLayout;
             public DescriptorSet BloomDescriptorSet;
@@ -3119,6 +3630,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public Pipeline TransparentPipeline;
             public ShaderModule VertexShader;
             public ShaderModule FragmentShader;
+            public Sampler ShadowSampler;
+            public PipelineLayout ShadowPipelineLayout;
+            public Pipeline ShadowPipeline;
+            public ShaderModule ShadowVertexShader;
+            public ShaderModule ShadowFragmentShader;
             public Sampler PostSampler;
             public PipelineLayout BloomPipelineLayout;
             public PipelineLayout ToneMapPipelineLayout;
@@ -3154,6 +3670,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     {
                         projectPipeline.Dispose(Vk, Device);
                     }
+
+                    if (ShadowPipeline.Handle != 0) Vk.DestroyPipeline(Device, ShadowPipeline, null);
+                    if (ShadowPipelineLayout.Handle != 0) Vk.DestroyPipelineLayout(Device, ShadowPipelineLayout, null);
+                    if (ShadowFragmentShader.Handle != 0) Vk.DestroyShaderModule(Device, ShadowFragmentShader, null);
+                    if (ShadowVertexShader.Handle != 0) Vk.DestroyShaderModule(Device, ShadowVertexShader, null);
 
                     if (ToneMapPipeline.Handle != 0)
                     {
@@ -3198,6 +3719,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     if (PostSampler.Handle != 0)
                     {
                         Vk.DestroySampler(Device, PostSampler, null);
+                    }
+
+                    if (ShadowSampler.Handle != 0)
+                    {
+                        Vk.DestroySampler(Device, ShadowSampler, null);
                     }
 
                     if (ToneMapDescriptorSetLayout.Handle != 0)
@@ -3255,6 +3781,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         Vk.DestroyDescriptorSetLayout(Device, MaterialDescriptorSetLayout, null);
                     }
 
+                    if (ShadowSampleDescriptorSetLayout.Handle != 0)
+                    {
+                        Vk.DestroyDescriptorSetLayout(Device, ShadowSampleDescriptorSetLayout, null);
+                    }
+
                     foreach (var texture in Textures)
                     {
                         texture.Dispose(Vk, Device);
@@ -3276,6 +3807,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     }
 
                     DestroyBuffer(DrawUniformBuffer, DrawUniformMemory);
+
+                    for (var index = 0; index < ShadowUniformBuffers.Length; index++)
+                    {
+                        var memory = index < ShadowUniformMemories.Length ? ShadowUniformMemories[index] : default;
+                        DestroyBuffer(ShadowUniformBuffers[index], memory);
+                    }
 
                     DestroyBuffer(ReadbackBuffer, ReadbackMemory);
 
@@ -3309,10 +3846,24 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         Vk.DestroyRenderPass(Device, OutputRenderPass, null);
                     }
 
+                    foreach (var framebuffer in ShadowFramebuffers)
+                    {
+                        if (framebuffer.Handle != 0)
+                        {
+                            Vk.DestroyFramebuffer(Device, framebuffer, null);
+                        }
+                    }
+
+                    if (ShadowRenderPass.Handle != 0)
+                    {
+                        Vk.DestroyRenderPass(Device, ShadowRenderPass, null);
+                    }
+
                     DestroyImage(ColorImage, ColorView, ColorViews, ColorMemory, Ownership.OwnsImageViews, Ownership.OwnsColorImages);
                     DestroyImage(DepthImage, DepthView, DepthViews, DepthMemory, Ownership.OwnsImageViews, Ownership.OwnsDepthImages);
                     DestroyImage(BloomImage, BloomView, [], BloomMemory, ownsView: true, ownsImageAndMemory: true);
                     DestroyImage(OutputImage, OutputView, [], OutputMemory, ownsView: true, ownsImageAndMemory: true);
+                    DestroyImage(ShadowImage, ShadowView, ShadowLayerViews, ShadowMemory, ownsView: true, ownsImageAndMemory: true);
                     if (Ownership.OwnsVulkanDevice)
                     {
                         Vk.DestroyDevice(Device, null);

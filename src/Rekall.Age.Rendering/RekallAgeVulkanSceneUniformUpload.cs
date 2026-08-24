@@ -5,8 +5,15 @@ namespace Rekall.Age.Rendering;
 
 public static class RekallAgeVulkanSceneUniformUploadBuilder
 {
-    public static RekallAgeVulkanSceneGpuFrameUniform BuildFrameUniform(RekallAgeVulkanSceneFrameUniform frame)
+    public static RekallAgeVulkanSceneGpuFrameUniform BuildFrameUniform(
+        RekallAgeVulkanSceneFrameUniform frame,
+        RekallAgeVulkanShadowPlan? shadowPlan = null)
     {
+        var cascades = shadowPlan?.Cascades ?? [];
+        var split0 = cascades.Count > 0 ? cascades[0].SplitFar : 0;
+        var split1 = cascades.Count > 1 ? cascades[1].SplitFar : split0;
+        var split2 = cascades.Count > 2 ? cascades[2].SplitFar : split1;
+        var split3 = cascades.Count > 3 ? cascades[3].SplitFar : split2;
         return new RekallAgeVulkanSceneGpuFrameUniform(
             ToGpuMatrix(frame.ViewProjection),
             frame.LightDirection.X,
@@ -24,7 +31,27 @@ public static class RekallAgeVulkanSceneUniformUploadBuilder
             frame.CameraPosition.X,
             frame.CameraPosition.Y,
             frame.CameraPosition.Z,
-            frame.CameraPosition.W);
+            frame.CameraPosition.W,
+            ToGpuMatrix(cascades.Count > 0 ? cascades[0].ViewProjection : Matrix4x4.Identity),
+            ToGpuMatrix(cascades.Count > 1 ? cascades[1].ViewProjection : Matrix4x4.Identity),
+            ToGpuMatrix(cascades.Count > 2 ? cascades[2].ViewProjection : Matrix4x4.Identity),
+            ToGpuMatrix(cascades.Count > 3 ? cascades[3].ViewProjection : Matrix4x4.Identity),
+            split0,
+            split1,
+            split2,
+            split3,
+            shadowPlan is { Enabled: true } ? cascades.Count : 0,
+            shadowPlan?.Resolution ?? 1,
+            shadowPlan?.DepthBias ?? 0,
+            shadowPlan?.NormalBias ?? 0,
+            shadowPlan?.FilterTapCount ?? 0,
+            shadowPlan?.MaximumDistance ?? 0,
+            shadowPlan is { Enabled: true } ? 1 : 0,
+            0,
+            shadowPlan?.CameraForward.X ?? 0,
+            shadowPlan?.CameraForward.Y ?? 0,
+            shadowPlan?.CameraForward.Z ?? 1,
+            0);
     }
 
     public static RekallAgeVulkanSceneGpuDrawPushConstants BuildDrawPushConstants(
@@ -39,7 +66,11 @@ public static class RekallAgeVulkanSceneUniformUploadBuilder
         Vector4 cloudFactors = default,
         Vector4 cloudColor = default,
         Vector4 cloudShadowFactors = default,
-        Vector4 surfaceWaterFactors = default)
+        Vector4 surfaceWaterFactors = default,
+        bool castShadows = true,
+        bool receiveShadows = true,
+        string alphaMode = "opaque",
+        float alphaCutoff = 0.5f)
     {
         return new RekallAgeVulkanSceneGpuDrawPushConstants(
             ToGpuMatrix(model),
@@ -86,7 +117,11 @@ public static class RekallAgeVulkanSceneUniformUploadBuilder
             surfaceWaterFactors.X,
             surfaceWaterFactors.Y,
             surfaceWaterFactors.Z,
-            surfaceWaterFactors.W);
+            surfaceWaterFactors.W,
+            castShadows ? 1 : 0,
+            receiveShadows ? 1 : 0,
+            alphaMode.Equals("mask", StringComparison.OrdinalIgnoreCase) ? 1 : 0,
+            Math.Clamp(alphaCutoff, 0, 1));
     }
 
     public static RekallAgeVulkanSceneGpuMatrix4x4 ToGpuMatrix(Matrix4x4 matrix)
@@ -148,7 +183,27 @@ public readonly record struct RekallAgeVulkanSceneGpuFrameUniform(
     float CameraPositionX,
     float CameraPositionY,
     float CameraPositionZ,
-    float CameraPositionW);
+    float CameraPositionW,
+    RekallAgeVulkanSceneGpuMatrix4x4 ShadowViewProjection0,
+    RekallAgeVulkanSceneGpuMatrix4x4 ShadowViewProjection1,
+    RekallAgeVulkanSceneGpuMatrix4x4 ShadowViewProjection2,
+    RekallAgeVulkanSceneGpuMatrix4x4 ShadowViewProjection3,
+    float ShadowSplit0,
+    float ShadowSplit1,
+    float ShadowSplit2,
+    float ShadowSplit3,
+    float ShadowCascadeCount,
+    float ShadowResolution,
+    float ShadowDepthBias,
+    float ShadowNormalBias,
+    float ShadowFilterTapCount,
+    float ShadowMaximumDistance,
+    float ShadowEnabled,
+    float ShadowPad,
+    float ShadowCameraForwardX,
+    float ShadowCameraForwardY,
+    float ShadowCameraForwardZ,
+    float ShadowCameraForwardPad);
 
 [StructLayout(LayoutKind.Sequential)]
 public readonly record struct RekallAgeVulkanSceneGpuDrawPushConstants(
@@ -196,4 +251,8 @@ public readonly record struct RekallAgeVulkanSceneGpuDrawPushConstants(
     float SurfaceWaterEnabled,
     float SurfaceWaterCoverage,
     float SurfaceWaterSpecularStrength,
-    float SurfaceWaterRoughness);
+    float SurfaceWaterRoughness,
+    float CastShadows,
+    float ReceiveShadows,
+    float AlphaMask,
+    float AlphaCutoff);

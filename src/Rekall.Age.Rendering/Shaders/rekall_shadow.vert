@@ -5,19 +5,11 @@ layout(location = 1) in vec3 inNormal;
 layout(location = 2) in vec4 inColor;
 layout(location = 3) in vec2 inUv;
 
-layout(set = 0, binding = 0) uniform FrameUniform
+layout(set = 0, binding = 0) uniform ShadowCascadeUniform
 {
     mat4 viewProjection;
-    vec4 lightDirection;
-    vec4 lightColor;
-    vec4 lightPosition;
-    vec4 cameraPosition;
-    mat4 shadowViewProjection[4];
-    vec4 shadowSplits;
-    vec4 shadowParameters0;
-    vec4 shadowParameters1;
-    vec4 shadowCameraForward;
-} frame;
+    vec4 parameters;
+} shadow;
 
 layout(set = 1, binding = 0) uniform DrawUniformBuffer
 {
@@ -36,17 +28,12 @@ layout(set = 1, binding = 0) uniform DrawUniformBuffer
     vec4 shadowFactors;
 } draw;
 
-layout(location = 0) out vec3 fragNormal;
-layout(location = 1) out vec4 fragColor;
-layout(location = 2) out vec2 fragUv;
-layout(location = 3) out vec3 fragWorldPosition;
+layout(location = 0) out vec2 fragUv;
 
 void main()
 {
     vec4 worldPosition = draw.model * vec4(inPosition, 1.0);
-    gl_Position = frame.viewProjection * worldPosition;
-    fragNormal = mat3(draw.model) * inNormal;
-    fragColor = inColor;
+    gl_Position = shadow.viewProjection * worldPosition;
+    gl_Position.z += shadow.parameters.x * gl_Position.w;
     fragUv = inUv;
-    fragWorldPosition = worldPosition.xyz;
 }

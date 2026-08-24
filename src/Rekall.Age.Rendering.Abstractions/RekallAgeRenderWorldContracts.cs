@@ -264,7 +264,30 @@ public sealed record RekallAgeRuntimeViewportRenderable(
     RekallAgeRuntimeViewportVirtualGeometry? VirtualGeometry = null,
     RekallAgeRuntimeViewportUiVisual? UiVisual = null,
     RekallAgeRuntimeViewportSkin? Skin = null,
-    RekallAgeRuntimeViewportMorph? Morph = null);
+    RekallAgeRuntimeViewportMorph? Morph = null)
+{
+    public bool CastShadows { get; init; } = true;
+
+    public bool ReceiveShadows { get; init; } = true;
+
+    public uint ShadowLayerMask { get; init; } = uint.MaxValue;
+
+    public uint ShadowCasterMask { get; init; } = uint.MaxValue;
+
+    public uint ShadowReceiverMask { get; init; } = uint.MaxValue;
+
+    public double ShadowMaximumDistance { get; init; } = 100;
+
+    public double ShadowBias { get; init; } = 0.0015;
+
+    public double ShadowNormalBias { get; init; } = 0.02;
+
+    public int ShadowPriority { get; init; }
+
+    public string AlphaMode { get; init; } = "opaque";
+
+    public double AlphaCutoff { get; init; } = 0.5;
+}
 
 public sealed record RekallAgeRuntimeViewportMorph(
     IReadOnlyList<double> Weights,

@@ -12,8 +12,10 @@ namespace Rekall.Age.Rendering;
 /// </summary>
 public sealed class RekallAgeRenderingDeviceSceneResources
 {
-    public const uint FrameUniformSizeBytes = 128;
-    public const uint DrawUniformSizeBytes = 96;
+    public static readonly uint FrameUniformSizeBytes =
+        checked((uint)Marshal.SizeOf<RekallAgeVulkanSceneGpuFrameUniform>());
+    public static readonly uint DrawUniformSizeBytes =
+        checked((uint)Marshal.SizeOf<RekallAgeRenderingDeviceSceneGpuDrawUniform>());
     public const int VertexStrideBytes = 48;
 
     /// <summary>

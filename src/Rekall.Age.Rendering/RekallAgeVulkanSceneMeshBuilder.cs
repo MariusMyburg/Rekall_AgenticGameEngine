@@ -321,7 +321,12 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             CloudLayer = ResolveCloudLayer(renderable),
             CloudShadow = ResolveCloudShadow(renderable),
             SurfaceWater = ResolveSurfaceWater(renderable),
-            ShaderPipeline = renderable.ShaderPipeline
+            ShaderPipeline = renderable.ShaderPipeline,
+            CastShadows = renderable.CastShadows,
+            ReceiveShadows = renderable.ReceiveShadows,
+            ShadowLayerMask = renderable.ShadowLayerMask,
+            AlphaMode = renderable.AlphaMode,
+            AlphaCutoff = (float)Math.Clamp(renderable.AlphaCutoff, 0, 1)
         };
     }
 

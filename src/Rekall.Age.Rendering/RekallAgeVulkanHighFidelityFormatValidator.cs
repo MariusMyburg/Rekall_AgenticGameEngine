@@ -4,6 +4,29 @@ namespace Rekall.Age.Rendering;
 
 public static class RekallAgeVulkanHighFidelityFormatValidator
 {
+    private const FormatFeatureFlags ShadowDepthRequiredFeatures =
+        FormatFeatureFlags.DepthStencilAttachmentBit
+        | FormatFeatureFlags.SampledImageBit
+        | FormatFeatureFlags.SampledImageFilterLinearBit;
+
+    public static string? ValidateShadowDepthFormat(FormatFeatureFlags available) =>
+        ValidateOptimalTilingFeatures(
+            Format.D32Sfloat,
+            available,
+            ShadowDepthRequiredFeatures,
+            "shadow-atlas");
+
+    public static string? ValidateShadowAtlasLimits(
+        uint requestedResolution,
+        uint requestedLayers,
+        uint maximumResolution,
+        uint maximumLayers) =>
+        requestedResolution <= maximumResolution && requestedLayers <= maximumLayers
+            ? null
+            : $"REKALL_SHADOW_ATLAS_LIMIT_EXCEEDED: requested {requestedResolution}x{requestedResolution} "
+                + $"with {requestedLayers} layers; device limits are {maximumResolution}x{maximumResolution} "
+                + $"with {maximumLayers} layers.";
+
     public static string? ValidateOptimalTilingFeatures(
         Format format,
         FormatFeatureFlags available,

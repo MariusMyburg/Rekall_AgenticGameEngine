@@ -40,7 +40,13 @@ public sealed record RekallAgeVulkanScenePreparedDraw(
     Vector4 CloudShadowFactors,
     Vector4 SurfaceWaterFactors,
     bool Transparent = false,
-    RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null)
+    RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null,
+    string EntityId = "",
+    bool CastShadows = true,
+    bool ReceiveShadows = true,
+    uint ShadowLayerMask = uint.MaxValue,
+    string AlphaMode = "opaque",
+    float AlphaCutoff = 0.5f)
 {
     public RekallAgeVulkanSceneMaterialKey MaterialKey => new(
         BaseColorTextureId,
@@ -91,7 +97,13 @@ public static class RekallAgeVulkanSceneDrawPlanBuilder
                 draw.CloudShadowFactors,
                 draw.SurfaceWaterFactors,
                 draw.Transparent,
-                draw.ShaderPipeline))
+                draw.ShaderPipeline,
+                draw.EntityId,
+                draw.CastShadows,
+                draw.ReceiveShadows,
+                draw.ShadowLayerMask,
+                draw.AlphaMode,
+                draw.AlphaCutoff))
             .ToArray();
         var materialKeys = draws
             .Select(draw => draw.MaterialKey)

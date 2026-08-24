@@ -6,6 +6,56 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VulkanHighFidelityCaptureTests
 {
     [Fact]
+    public async Task DirectionalShadowsAllocateDrawSampleAndDarkenNativePixels()
+    {
+        var shadowedFrame = ShadowFrame(castShadows: true);
+        var unshadowedFrame = ShadowFrame(castShadows: false);
+        var output = TestPaths.CreateTempDirectory();
+        var capture = new RekallAgeNativeVulkanSceneCapture();
+
+        var shadowed = await capture.CaptureSceneAsync(
+            shadowedFrame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            output,
+            "discrete-gpu",
+            CancellationToken.None);
+        var unshadowed = await capture.CaptureSceneAsync(
+            unshadowedFrame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            output,
+            "discrete-gpu",
+            CancellationToken.None);
+
+        Assert.True(shadowed.Captured, string.Join(Environment.NewLine, shadowed.Errors));
+        Assert.True(unshadowed.Captured, string.Join(Environment.NewLine, unshadowed.Errors));
+        var report = Assert.IsType<RekallAgeHighFidelityFrameReport>(shadowed.HighFidelityFrame);
+        Assert.Contains(report.Resources, resource => resource is
+        { Name: "shadow-directional", Format: "D32_SFloat", Width: 2048, Height: 2048, Allocated: true });
+        Assert.Contains(report.Passes, pass => pass.Name == "shadow-directional"
+            && pass.Executed
+            && pass.DrawCount >= 3);
+        Assert.Contains(report.Passes, pass => pass.Name == "opaque-hdr"
+            && pass.Inputs.Contains("shadow-directional", StringComparer.Ordinal));
+        Assert.Equal(3, report.ShadowCascades.Count);
+        Assert.All(report.ShadowCascades, cascade =>
+        {
+            Assert.Equal(2048, cascade.Resolution);
+            Assert.Equal(12, cascade.FilterTapCount);
+            Assert.True(cascade.AtlasBytes > 0);
+            Assert.True(cascade.DrawCount > 0);
+            Assert.True(cascade.SplitFar > cascade.SplitNear);
+        });
+
+        var shadowedImage = await RekallAgePngReader.ReadRgbaAsync(shadowed.OutputPath, CancellationToken.None);
+        var unshadowedImage = await RekallAgePngReader.ReadRgbaAsync(unshadowed.OutputPath, CancellationToken.None);
+        Assert.NotEqual(shadowed.ByteChecksum, unshadowed.ByteChecksum);
+        Assert.True(
+            Enumerable.Range(0, shadowedImage.Width * shadowedImage.Height).Count(pixel =>
+                PixelBrightness(unshadowedImage.Rgba, pixel) >= PixelBrightness(shadowedImage.Rgba, pixel) + 3) > 48,
+            "Expected the executable shadow sampling path to darken a visible population of receiver pixels.");
+    }
+
+    [Fact]
     public async Task BloomDisabledGraphDoesNotAllocateDispatchOrReportBloom()
     {
         var frame = EmissiveFrame();
@@ -299,5 +349,130 @@ public sealed class VulkanHighFidelityCaptureTests
             0,
             new RekallAgeRuntimeViewportOverlay(false, 0),
             []);
+    }
+
+    private static RekallAgeRuntimeViewportFrame ShadowFrame(bool castShadows)
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera",
+            "Camera",
+            "Camera3D",
+            true,
+            0,
+            3.5,
+            -7,
+            RotationX: 18,
+            FieldOfViewDegrees: 55,
+            NearClip: 0.1,
+            FarClip: 80,
+            ClearColor: "#020306");
+        var light = new RekallAgeRuntimeViewportRenderable(
+            "sun",
+            "Sun",
+            "light",
+            null,
+            0,
+            8,
+            0,
+            -100,
+            Variant: "directional",
+            RotationX: 50,
+            RotationY: -25,
+            Intensity: 2.4,
+            MaterialColor: "#fff1d2")
+        {
+            CastShadows = castShadows,
+            ShadowMaximumDistance = 80,
+            ShadowBias = 0.0015,
+            ShadowNormalBias = 0.02,
+            ShadowPriority = 10
+        };
+        var quality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High", Bloom: false),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("native-test"),
+            256,
+            192);
+        return new RekallAgeRuntimeViewportFrame(
+            "Directional Shadow Test",
+            0,
+            0,
+            256,
+            192,
+            camera,
+            [camera],
+            [
+                light,
+                new RekallAgeRuntimeViewportRenderable(
+                    "ground",
+                    "Ground",
+                    "mesh",
+                    "rekall.primitive.cube",
+                    0,
+                    -1,
+                    6,
+                    0,
+                    Variant: "rekall.geometry.cube",
+                    ScaleX: 7,
+                    ScaleY: 0.2,
+                    ScaleZ: 7,
+                    MaterialColor: "#b8aa8a",
+                    RoughnessFactor: 0.9),
+                new RekallAgeRuntimeViewportRenderable(
+                    "near-caster",
+                    "Near Caster",
+                    "mesh",
+                    "rekall.primitive.cube",
+                    2.2,
+                    0,
+                    0,
+                    1,
+                    Variant: "rekall.geometry.cube",
+                    ScaleX: 0.7,
+                    ScaleY: 1.1,
+                    ScaleZ: 0.7,
+                    MaterialColor: "#79a85b",
+                    RoughnessFactor: 0.7),
+                new RekallAgeRuntimeViewportRenderable(
+                    "caster",
+                    "Caster",
+                    "mesh",
+                    "rekall.primitive.cube",
+                    0,
+                    0.2,
+                    5,
+                    2,
+                    Variant: "rekall.geometry.cube",
+                    ScaleX: 0.85,
+                    ScaleY: 1.4,
+                    ScaleZ: 0.85,
+                    MaterialColor: "#d96b38",
+                    RoughnessFactor: 0.55),
+                new RekallAgeRuntimeViewportRenderable(
+                    "far-caster",
+                    "Far Caster",
+                    "mesh",
+                    "rekall.primitive.cube",
+                    -4,
+                    1,
+                    38,
+                    3,
+                    Variant: "rekall.geometry.cube",
+                    ScaleX: 3,
+                    ScaleY: 4,
+                    ScaleZ: 3,
+                    MaterialColor: "#6b83b8",
+                    RoughnessFactor: 0.65)
+            ],
+            0,
+            new RekallAgeRuntimeViewportOverlay(false, 0),
+            [],
+            PostProcessStack: new RekallAgeRuntimeViewportPostProcessStack(
+                "post",
+                "Tone Map",
+                true,
+                [new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")]))
+        {
+            ResolvedQualityPlan = quality
+        };
     }
 }

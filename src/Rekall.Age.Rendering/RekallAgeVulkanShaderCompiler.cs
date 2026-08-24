@@ -11,7 +11,8 @@ public sealed class RekallAgeVulkanShaderCompiler
 
     public RekallAgeVulkanSceneShaderCompilationResult CompileScenePipeline(
         RekallAgeVulkanScenePipelineDescription pipeline,
-        bool highDynamicRangeOutput)
+        bool highDynamicRangeOutput,
+        bool directionalShadows = false)
     {
         var errors = new List<string>();
         var vertex = CompileShader(pipeline.VertexShaderPath, RekallAgeVulkanShaderStage.Vertex, errors);
@@ -19,7 +20,13 @@ public sealed class RekallAgeVulkanShaderCompiler
             pipeline.FragmentShaderPath,
             RekallAgeVulkanShaderStage.Fragment,
             errors,
-            highDynamicRangeOutput ? ["REKALL_HDR_SCENE_OUTPUT"] : []);
+            (highDynamicRangeOutput, directionalShadows) switch
+            {
+                (true, true) => ["REKALL_HDR_SCENE_OUTPUT", "REKALL_DIRECTIONAL_SHADOWS"],
+                (true, false) => ["REKALL_HDR_SCENE_OUTPUT"],
+                (false, true) => ["REKALL_DIRECTIONAL_SHADOWS"],
+                _ => []
+            });
         return new RekallAgeVulkanSceneShaderCompilationResult(
             errors.Count == 0 && vertex.Spirv.Length > 0 && fragment.Spirv.Length > 0,
             vertex,

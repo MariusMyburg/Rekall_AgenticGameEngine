@@ -6,6 +6,33 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VulkanShaderCompilerTests
 {
     [Fact]
+    public void ShadowDepthAtlasRequiresSamplingAndFitsDeviceArrayLimits()
+    {
+        var missingSampling = RekallAgeVulkanHighFidelityFormatValidator.ValidateShadowDepthFormat(
+            FormatFeatureFlags.DepthStencilAttachmentBit | FormatFeatureFlags.SampledImageBit);
+        var supported = RekallAgeVulkanHighFidelityFormatValidator.ValidateShadowDepthFormat(
+            FormatFeatureFlags.DepthStencilAttachmentBit
+                | FormatFeatureFlags.SampledImageBit
+                | FormatFeatureFlags.SampledImageFilterLinearBit);
+        var exceedsLimits = RekallAgeVulkanHighFidelityFormatValidator.ValidateShadowAtlasLimits(
+            requestedResolution: 4096,
+            requestedLayers: 4,
+            maximumResolution: 2048,
+            maximumLayers: 2);
+
+        Assert.NotNull(missingSampling);
+        Assert.StartsWith("REKALL_RENDER_FORMAT_UNSUPPORTED:", missingSampling, StringComparison.Ordinal);
+        Assert.Contains(nameof(FormatFeatureFlags.SampledImageFilterLinearBit), missingSampling, StringComparison.Ordinal);
+        Assert.Null(supported);
+        Assert.NotNull(exceedsLimits);
+        Assert.StartsWith("REKALL_SHADOW_ATLAS_LIMIT_EXCEEDED:", exceedsLimits, StringComparison.Ordinal);
+        Assert.Contains("4096", exceedsLimits, StringComparison.Ordinal);
+        Assert.Contains("4", exceedsLimits, StringComparison.Ordinal);
+        Assert.Contains("2048", exceedsLimits, StringComparison.Ordinal);
+        Assert.Contains("2", exceedsLimits, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void HighFidelityHalfFloatSamplingRequiresLinearFilterCapability()
     {
         var missingLinear = RekallAgeVulkanHighFidelityFormatValidator.ValidateOptimalTilingFeatures(

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using Rekall.Age.Rendering.Abstractions;
 
 namespace Rekall.Age.Rendering;
@@ -9,6 +10,11 @@ namespace Rekall.Age.Rendering;
 public sealed class RekallAgeVulkanHighFidelityFrameRenderer
 {
     public RekallAgeVulkanHighFidelityFramePlan? Plan(RekallAgeRuntimeViewportFrame frame)
+        => Plan(frame, null);
+
+    public RekallAgeVulkanHighFidelityFramePlan? Plan(
+        RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyList<RekallAgeVulkanSceneMesh>? meshes)
     {
         ArgumentNullException.ThrowIfNull(frame);
         if (frame.ResolvedQualityPlan is not { } resolved
@@ -19,6 +25,12 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
 
         var graph = new RekallAgeHighFidelityRenderGraphBuilder().Build(frame, resolved);
         var diagnostics = new List<RekallAgeHighFidelityRenderGraphDiagnostic>(graph.Diagnostics);
+        var shadowPlan = BuildShadowPlan(frame, meshes, resolved.Shadows);
+        diagnostics.AddRange(shadowPlan.Diagnostics.Select(diagnostic =>
+            new RekallAgeHighFidelityRenderGraphDiagnostic(
+                diagnostic.Code,
+                "shadow-directional",
+                diagnostic.Message)));
         var bloom = frame.PostProcessStack.Passes.FirstOrDefault(pass =>
             pass.Type.Equals("bloom", StringComparison.OrdinalIgnoreCase)
             || pass.Type.Equals("brightExtract", StringComparison.OrdinalIgnoreCase));
@@ -45,8 +57,149 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
                 BloomIntensity: resolved.Post.Bloom
                     ? ResolveNonNegative(composite?.Intensity ?? bloom?.Intensity ?? 0.65)
                     : 0,
-                BloomRadius: ResolveRadius(bloom?.Radius ?? 1)));
+                BloomRadius: ResolveRadius(bloom?.Radius ?? 1)),
+            shadowPlan);
     }
+
+    private static RekallAgeVulkanShadowPlan BuildShadowPlan(
+        RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyList<RekallAgeVulkanSceneMesh>? meshes,
+        RekallAgeResolvedShadowQuality quality)
+    {
+        var camera = frame.ActiveCamera;
+        if (camera is null)
+        {
+            return DisabledShadowPlan(quality, "REKALL_SHADOW_CAMERA_INVALID", "Directional shadows require a finite active camera.");
+        }
+
+        var light = frame.Renderables
+            .Where(item => item.Kind.Equals("light", StringComparison.Ordinal)
+                && item.Variant?.Contains("point", StringComparison.OrdinalIgnoreCase) != true
+                && item.Intensity > 0.0001)
+            .OrderByDescending(item => item.ShadowPriority)
+            .ThenBy(item => item.EntityId, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (light is null)
+        {
+            return DisabledShadowPlan(quality, "REKALL_SHADOW_LIGHT_MISSING", "No visible directional light is available for the shadow pass.");
+        }
+
+        var shadowCamera = new RekallAgeVulkanShadowCamera(
+            new Vector3((float)camera.X, (float)camera.Y, (float)camera.Z),
+            DirectionFromEuler(camera.RotationX, camera.RotationY, camera.RotationZ),
+            RotateDirection(Vector3.UnitY, camera.RotationX, camera.RotationY, camera.RotationZ),
+            MathF.PI / 180f * (float)camera.FieldOfViewDegrees,
+            frame.Height <= 0 ? 1 : frame.Width / (float)frame.Height,
+            (float)camera.NearClip,
+            (float)camera.FarClip,
+            ReceiverMask: uint.MaxValue,
+            ProjectionMode: camera.ProjectionMode,
+            OrthographicSize: (float)camera.OrthographicSize);
+        var shadowLight = new RekallAgeVulkanDirectionalShadowLight(
+            DirectionFromEuler(light.RotationX, light.RotationY, light.RotationZ),
+            light.CastShadows,
+            light.ShadowCasterMask,
+            light.ShadowReceiverMask,
+            (float)light.ShadowMaximumDistance,
+            (float)light.ShadowBias,
+            (float)light.ShadowNormalBias,
+            light.ShadowPriority);
+        return new RekallAgeVulkanShadowCascadePlanner().Plan(
+            shadowCamera,
+            shadowLight,
+            BuildCasters(frame, meshes),
+            quality);
+    }
+
+    private static IReadOnlyList<RekallAgeVulkanShadowCaster> BuildCasters(
+        RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyList<RekallAgeVulkanSceneMesh>? meshes)
+    {
+        var renderables = frame.Renderables.ToDictionary(item => item.EntityId, StringComparer.Ordinal);
+        if (meshes is null)
+        {
+            return frame.Renderables
+                .Where(item => item.Kind.Equals("mesh", StringComparison.Ordinal))
+                .Select(item => new RekallAgeVulkanShadowCaster(
+                    item.EntityId,
+                    new Vector3(
+                        (float)(item.X - Math.Abs(item.ScaleX)),
+                        (float)(item.Y - Math.Abs(item.ScaleY)),
+                        (float)(item.Z - Math.Abs(item.ScaleZ))),
+                    new Vector3(
+                        (float)(item.X + Math.Abs(item.ScaleX)),
+                        (float)(item.Y + Math.Abs(item.ScaleY)),
+                        (float)(item.Z + Math.Abs(item.ScaleZ))),
+                    item.ShadowLayerMask,
+                    item.CastShadows))
+                .ToArray();
+        }
+
+        var casters = new List<RekallAgeVulkanShadowCaster>(meshes.Count);
+        foreach (var mesh in meshes)
+        {
+            if (!renderables.TryGetValue(mesh.EntityId, out var renderable) || mesh.Vertices.Count == 0)
+            {
+                continue;
+            }
+
+            var model = CreateModelMatrix(renderable);
+            var minimum = new Vector3(float.MaxValue);
+            var maximum = new Vector3(float.MinValue);
+            foreach (var vertex in mesh.Vertices)
+            {
+                var world = Vector3.Transform(new Vector3(vertex.X, vertex.Y, vertex.Z), model);
+                minimum = Vector3.Min(minimum, world);
+                maximum = Vector3.Max(maximum, world);
+            }
+            casters.Add(new RekallAgeVulkanShadowCaster(
+                mesh.EntityId,
+                minimum,
+                maximum,
+                mesh.ShadowLayerMask,
+                mesh.CastShadows));
+        }
+        return casters;
+    }
+
+    private static Matrix4x4 CreateModelMatrix(RekallAgeRuntimeViewportRenderable renderable) =>
+        Matrix4x4.CreateScale(
+            (float)Math.Max(0.001, Math.Abs(renderable.ScaleX)),
+            (float)Math.Max(0.001, Math.Abs(renderable.ScaleY)),
+            (float)Math.Max(0.001, Math.Abs(renderable.ScaleZ)))
+        * Matrix4x4.CreateRotationX(MathF.PI / 180f * (float)renderable.RotationX)
+        * Matrix4x4.CreateRotationY(MathF.PI / 180f * (float)renderable.RotationY)
+        * Matrix4x4.CreateRotationZ(MathF.PI / 180f * (float)renderable.RotationZ)
+        * Matrix4x4.CreateTranslation((float)renderable.X, (float)renderable.Y, (float)renderable.Z);
+
+    private static Vector3 DirectionFromEuler(double x, double y, double z) =>
+        Vector3.Normalize(RotateDirection(Vector3.UnitZ, x, y, z));
+
+    private static Vector3 RotateDirection(Vector3 value, double x, double y, double z)
+    {
+        var rotation = Matrix4x4.CreateRotationX(MathF.PI / 180f * (float)x)
+            * Matrix4x4.CreateRotationY(MathF.PI / 180f * (float)y)
+            * Matrix4x4.CreateRotationZ(MathF.PI / 180f * (float)z);
+        return Vector3.TransformNormal(value, rotation);
+    }
+
+    private static RekallAgeVulkanShadowPlan DisabledShadowPlan(
+        RekallAgeResolvedShadowQuality quality,
+        string code,
+        string message) => new(
+            false,
+            quality.Resolution,
+            quality.FilterTapCount,
+            0,
+            0,
+            0,
+            0,
+            Vector3.UnitZ,
+            uint.MaxValue,
+            [],
+            0,
+            0,
+            [new RekallAgeVulkanShadowDiagnostic(code, message)]);
 
     private static void AddPostDiagnostics(
         RekallAgeRuntimeViewportPostProcessPass pass,
@@ -250,7 +403,8 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
 
 public sealed record RekallAgeVulkanHighFidelityFramePlan(
     RekallAgeHighFidelityRenderGraph Graph,
-    RekallAgeHighFidelityPostSettings PostSettings)
+    RekallAgeHighFidelityPostSettings PostSettings,
+    RekallAgeVulkanShadowPlan ShadowPlan)
 {
     public bool Ready => Graph.IsValid;
 }
@@ -271,7 +425,24 @@ public sealed record RekallAgeHighFidelityFrameReport(
     string OutputColorFormat,
     IReadOnlyList<RekallAgeHighFidelityFrameResourceReport> Resources,
     IReadOnlyList<RekallAgeHighFidelityFramePassReport> Passes,
-    IReadOnlyList<string> Diagnostics);
+    IReadOnlyList<string> Diagnostics)
+{
+    public IReadOnlyList<RekallAgeHighFidelityShadowCascadeReport> ShadowCascades { get; init; } =
+        Array.Empty<RekallAgeHighFidelityShadowCascadeReport>();
+}
+
+public sealed record RekallAgeHighFidelityShadowCascadeReport(
+    int Index,
+    float SplitNear,
+    float SplitFar,
+    int Resolution,
+    int CasterCount,
+    int DrawCount,
+    int CulledCount,
+    int FilterTapCount,
+    long AtlasBytes,
+    float DepthBias,
+    float NormalBias);
 
 public sealed record RekallAgeHighFidelityFrameResourceReport(
     string Name,

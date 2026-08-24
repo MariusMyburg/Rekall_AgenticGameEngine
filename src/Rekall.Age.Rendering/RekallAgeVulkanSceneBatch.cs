@@ -35,7 +35,13 @@ public sealed record RekallAgeVulkanSceneDraw(
     Vector4 CloudShadowFactors = default,
     Vector4 SurfaceWaterFactors = default,
     bool Transparent = false,
-    RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null);
+    RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null,
+    string EntityId = "",
+    bool CastShadows = true,
+    bool ReceiveShadows = true,
+    uint ShadowLayerMask = uint.MaxValue,
+    string AlphaMode = "opaque",
+    float AlphaCutoff = 0.5f);
 
 public sealed record RekallAgeVulkanSceneFrameUniform(
     Matrix4x4 ViewProjection,

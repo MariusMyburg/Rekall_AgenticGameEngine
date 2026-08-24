@@ -227,7 +227,7 @@ public sealed class PlayablePackageIntegrityTests
                 output,
                 Path.Combine(root, "Builds", "GenericInputProof"),
                 FrameIndex: 2,
-                Inputs:
+                InputFrames:
                 [
                     new RekallAgeRuntimeInputFrame(SemanticActions: [new("capture.move", 1, true, true)]) { DeltaSeconds = 0.1 },
                     new RekallAgeRuntimeInputFrame(SemanticActions: [new("capture.move", 1, true)]) { DeltaSeconds = 0.2 }

@@ -2203,7 +2203,7 @@ internal static class RekallAgeCli
         var inputs = await ParseRuntimeInputFramesAsync(inputsJson, context.CancellationToken);
         var result = await registry.ExecuteAsync<CapturePlayableFrameRequest, CapturePlayableFrameResult>(
             "rekall.play.capture_frame",
-            new CapturePlayableFrameRequest(root, scene, outputDirectory, parsedFrameIndex, Inputs: inputs),
+            new CapturePlayableFrameRequest(root, scene, outputDirectory, parsedFrameIndex, InputFrames: inputs),
             context);
         Console.WriteLine(result.Summary);
         Console.WriteLine($"{result.Value.OutputPath} ({result.Value.Width}x{result.Value.Height}, nonblank={result.Value.NonBlank})");
@@ -2810,7 +2810,7 @@ internal static class RekallAgeCli
         var inputs = await ParseRuntimeInputFramesAsync(inputsJson, context.CancellationToken);
         var result = await registry.ExecuteAsync<CapturePlayablePackageFrameRequest, CapturePlayablePackageFrameResult>(
             "rekall.workflow.capture_playable_package_frame",
-            new CapturePlayablePackageFrameRequest(packagePath, outputDirectory, frame, Inputs: inputs),
+            new CapturePlayablePackageFrameRequest(packagePath, outputDirectory, frame, InputFrames: inputs),
             context);
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Captured: {result.Value.Captured}");

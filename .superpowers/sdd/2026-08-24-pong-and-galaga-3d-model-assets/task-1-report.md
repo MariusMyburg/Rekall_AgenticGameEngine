@@ -2,7 +2,7 @@
 
 ## Status
 
-DONE_WITH_CONCERNS
+DONE
 
 ## Root cause and data-path comparison
 
@@ -90,9 +90,7 @@ Result: succeeded with 0 warnings and 0 errors.
 Reviewed `git diff --check` and the changed runtime, capture, workflow, CLI, and
 test paths. No genre-specific engine behavior or authored-game files were added.
 
-Concern: The full non-Studio Release test host stalled without emitting a TRX
-result after the Studio Release suite completed. The focused repair selection
-below is green; rerun the branch-wide engine suite in a clean test-host process.
+No remaining concerns.
 
 ## Commit
 
@@ -163,4 +161,49 @@ test project is invoked with `-c Release`.
 after the focused pass. `Rekall.Age.Studio.Tests` completed 55/55 passing and
 its TRX recorded zero failures. `Rekall.Age.Tests` then stalled for several
 minutes with no CPU progress or result file, so the verified stalled test host
-was stopped. This is the remaining concern; no test failure was emitted.
+was stopped. This was subsequently rerun cleanly by the controller on commit
+`cbd7853`: engine 1684/1684 and Studio 55/55 passed.
+
+## Second repair loop — JSON gateway and null compatibility
+
+### Root cause
+
+The first compatibility repair added two request constructors with only the
+last collection type differing. `System.Text.Json`, which powers the dynamic
+registry/MCP command boundary, could not select between those constructors.
+The same overload set made an explicit positional final `null` ambiguous to C#
+callers.
+
+### RED and GREEN evidence
+
+RED:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~CapturePlayablePackageFrameRequestTests"
+```
+
+Observed expected compile failures: `CS0121` for both positional final-null
+constructions and `CS1061` because the canonical `InputFrames` field did not
+yet exist.
+
+GREEN:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~CapturePlayablePackageFrameRequestTests|FullyQualifiedName~CapturePlayableFrameCommandRasterizesModuleDrawCommands|FullyQualifiedName~CapturePlayableFrameProjectsSemanticActionsAndInputEdgesIntoThePlayableModule|FullyQualifiedName~PackageCaptureForwardsGenericInputFramesIntoTheRuntimeViewport|FullyQualifiedName~CaptureRuntimeViewportCommandCanUseVulkanForClearOnlyRuntimeFrames|FullyQualifiedName~CaptureRuntimeViewportCommandRoutesVulkanSceneRenderablesToSceneCapture|FullyQualifiedName~RuntimeSoakPrintsCheckpointsAndPassedChecks|FullyQualifiedName~DefaultRuntimeAppliesDeterministicCelestialRotation|FullyQualifiedName~ExecutionLoopAdvancesFramesDeterministically|FullyQualifiedName~SoakResumesAcrossChunksWithExactDeterministicContinuity"
+dotnet build Rekall.AGE.sln -c Release --no-restore -v:minimal
+```
+
+Result: 13/13 focused tests passed; Release build succeeded with 0 warnings and
+0 errors.
+
+### Repair summary
+
+- Each capture request once again has one unambiguous primary constructor:
+  legacy `Inputs` remains `IReadOnlyList<RekallAgePlaybackInput>?`.
+- `InputFrames` is the distinct canonical generic JSON/CLI field. Direct capture
+  prefers it and falls back to legacy projection; package capture does the same
+  before invoking the runtime viewport.
+- CLI, schemas, and generic test calls use `inputFrames` / `InputFrames`.
+- Dynamic registry JSON probes deserialize semantic actions, physical key edges,
+  and per-frame delta values for both capture request models. A positional-final
+  null test prevents overload ambiguity from returning.

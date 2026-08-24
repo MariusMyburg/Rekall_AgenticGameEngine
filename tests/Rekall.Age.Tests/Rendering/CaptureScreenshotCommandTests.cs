@@ -143,7 +143,7 @@ public sealed class CaptureScreenshotCommandTests
                 "Main",
                 Path.Combine(root, "PlayCaptures"),
                 3,
-                Inputs:
+                InputFrames:
                 [
                     new RekallAgeRuntimeInputFrame(SemanticActions: [new("capture.move", 1, true, true)]),
                     new RekallAgeRuntimeInputFrame(SemanticActions: [new("capture.move", 1, true)]),

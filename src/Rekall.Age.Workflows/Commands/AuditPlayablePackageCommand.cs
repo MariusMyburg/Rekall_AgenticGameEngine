@@ -76,7 +76,7 @@ public sealed class AuditPlayablePackageCommand
             frameIndex,
             request.Width,
             request.Height,
-            request.Inputs);
+            InputFrames: request.Inputs);
         if (CapturePlayablePackageFrameCommand.TryCreateUnsafeOutputError(captureRequest, out var unsafeOutput))
         {
             var safeOutput = unsafeOutput.SuggestedCommands![0].Arguments["outputDirectory"];

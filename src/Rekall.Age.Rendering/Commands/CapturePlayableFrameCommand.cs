@@ -12,27 +12,8 @@ public sealed record CapturePlayableFrameRequest(
     int FrameIndex = 1,
     int Width = 320,
     int Height = 180,
-    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null)
-{
-    public CapturePlayableFrameRequest(
-        string ProjectRoot,
-        string SceneName,
-        string OutputDirectory,
-        int FrameIndex,
-        int Width,
-        int Height,
-        IReadOnlyList<RekallAgePlaybackInput>? Inputs)
-        : this(
-            ProjectRoot,
-            SceneName,
-            OutputDirectory,
-            FrameIndex,
-            Width,
-            Height,
-            Inputs?.Select(input => input.ToRuntimeInputFrame()).ToArray())
-    {
-    }
-}
+    IReadOnlyList<RekallAgePlaybackInput>? Inputs = null,
+    IReadOnlyList<RekallAgeRuntimeInputFrame>? InputFrames = null);
 
 public sealed record CapturePlayableFrameResult(
     bool Captured,
@@ -57,7 +38,7 @@ public sealed class CapturePlayableFrameCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Runs a playable scene frame and captures its structured module draw commands to a deterministic PNG. Inputs use the same generic per-frame shape as rekall.runtime.inspect_scene: semanticActions (for example [{\"name\":\"move.horizontal\",\"value\":1,\"isDown\":true}]), pressedKeys, pressedKeysThisFrame, and releasedKeysThisFrame. Repeat held facts for each supplied frame. deltaSeconds is preserved for playable modules. primaryAction and verticalAxis are legacy compatibility fields only.",
+        "Runs a playable scene frame and captures its structured module draw commands to a deterministic PNG. inputFrames uses the same generic per-frame shape as rekall.runtime.inspect_scene: semanticActions (for example [{\"name\":\"move.horizontal\",\"value\":1,\"isDown\":true}]), pressedKeys, pressedKeysThisFrame, and releasedKeysThisFrame. Repeat held facts for each supplied frame. deltaSeconds is preserved for playable modules. inputs with primaryAction and verticalAxis is a legacy compatibility field only.",
         typeof(CapturePlayableFrameRequest).FullName!,
         typeof(CapturePlayableFrameResult).FullName!);
 
@@ -97,9 +78,7 @@ public sealed class CapturePlayableFrameCommand
         for (var i = 0; i < frameIndex; i++)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            var input = request.Inputs is { Count: > 0 } inputs && i < inputs.Count
-                ? inputs[i]
-                : new RekallAgeRuntimeInputFrame();
+            var input = InputForFrame(request, i);
             game.Tick(input);
             renderFrame = game.RenderFrame(i + 1);
         }
@@ -133,5 +112,19 @@ public sealed class CapturePlayableFrameCommand
         var characters = value.Select(character => invalid.Contains(character) ? '_' : character).ToArray();
         var stem = new string(characters).Trim();
         return string.IsNullOrWhiteSpace(stem) ? "scene" : stem;
+    }
+
+    private static RekallAgeRuntimeInputFrame InputForFrame(
+        CapturePlayableFrameRequest request,
+        int frameIndex)
+    {
+        if (request.InputFrames is { Count: > 0 } inputFrames && frameIndex < inputFrames.Count)
+        {
+            return inputFrames[frameIndex];
+        }
+
+        return request.Inputs is { Count: > 0 } legacyInputs && frameIndex < legacyInputs.Count
+            ? legacyInputs[frameIndex].ToRuntimeInputFrame()
+            : new RekallAgeRuntimeInputFrame();
     }
 }

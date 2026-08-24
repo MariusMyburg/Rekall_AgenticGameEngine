@@ -13,25 +13,8 @@ public sealed record CapturePlayablePackageFrameRequest(
     int FrameIndex = 1,
     int Width = 320,
     int Height = 180,
-    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null)
-{
-    public CapturePlayablePackageFrameRequest(
-        string PackagePath,
-        string OutputDirectory,
-        int FrameIndex,
-        int Width,
-        int Height,
-        IReadOnlyList<RekallAgePlaybackInput>? Inputs)
-        : this(
-            PackagePath,
-            OutputDirectory,
-            FrameIndex,
-            Width,
-            Height,
-            Inputs?.Select(input => input.ToRuntimeInputFrame()).ToArray())
-    {
-    }
-}
+    IReadOnlyList<RekallAgePlaybackInput>? Inputs = null,
+    IReadOnlyList<RekallAgeRuntimeInputFrame>? InputFrames = null);
 
 public sealed record CapturePlayablePackageFrameResult(
     bool Captured,
@@ -66,7 +49,7 @@ public sealed class CapturePlayablePackageFrameCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Verifies a packaged playable launch and captures its packaged authored scene through the deterministic runtime viewport. OutputDirectory must be outside a directory package. Inputs use generic runtime input frames such as {\"semanticActions\":[{\"name\":\"move.horizontal\",\"value\":1,\"isDown\":true}]}; repeat held facts for every frame. deltaSeconds, primaryAction, and verticalAxis are legacy playable-module compatibility fields, not canonical examples.",
+        "Verifies a packaged playable launch and captures its packaged authored scene through the deterministic runtime viewport. OutputDirectory must be outside a directory package. inputFrames uses generic runtime input frames such as {\"semanticActions\":[{\"name\":\"move.horizontal\",\"value\":1,\"isDown\":true}]}; repeat held facts for every frame. inputs with deltaSeconds, primaryAction, and verticalAxis is a legacy playable-module compatibility field only.",
         typeof(CapturePlayablePackageFrameRequest).FullName!,
         typeof(CapturePlayablePackageFrameResult).FullName!);
 
@@ -124,7 +107,9 @@ public sealed class CapturePlayablePackageFrameCommand
                 request.OutputDirectory,
                 width,
                 height,
-                Inputs: request.Inputs),
+                Inputs: request.InputFrames ?? request.Inputs?
+                    .Select(input => input.ToRuntimeInputFrame())
+                    .ToArray()),
             context);
         if (!capture.Ok || !capture.Value.Captured)
         {

@@ -161,8 +161,11 @@ public sealed class PackagePlayableGameCommand
             request.ProjectRoot,
             bundledGameRoot,
             context.CancellationToken);
+        var packagedLaunchPath = request.Graphics
+            ? CreateWindowsLaunchers(outputDirectory, player.Value.LaunchPath)
+            : player.Value.LaunchPath;
         var manifestGameRoot = "Game";
-        var manifestLaunchPath = NormalizePath(Path.GetRelativePath(outputDirectory, player.Value.LaunchPath));
+        var manifestLaunchPath = NormalizePath(Path.GetRelativePath(outputDirectory, packagedLaunchPath));
         var manifestProofLaunchPath = proofPlayer is null
             ? null
             : NormalizePath(Path.GetRelativePath(outputDirectory, proofPlayer.Value.LaunchPath));
@@ -185,8 +188,27 @@ public sealed class PackagePlayableGameCommand
         context.Transaction.RecordChangedResource(archivePath);
 
         return RekallAgeCommandResult<PackagePlayableGameResult>.Success(
-            result with { ProofLaunchPath = manifestProofLaunchPath },
+            result with
+            {
+                LaunchPath = packagedLaunchPath,
+                ProofLaunchPath = manifestProofLaunchPath
+            },
             $"Packaged playable game '{request.SceneName}' at '{player.Value.OutputDirectory}'.");
+    }
+
+    private static string CreateWindowsLaunchers(string outputDirectory, string playerLaunchPath)
+    {
+        if (!Path.GetExtension(playerLaunchPath).Equals(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("A graphical Windows package requires a Windows player executable.");
+        }
+
+        var playExecutable = Path.Combine(outputDirectory, "Play.exe");
+        File.Copy(playerLaunchPath, playExecutable, overwrite: true);
+        File.WriteAllText(
+            Path.Combine(outputDirectory, "Play.bat"),
+            "@echo off\r\n\"%~dp0Play.exe\"\r\nexit /b %ERRORLEVEL%\r\n");
+        return playExecutable;
     }
 
     private static IReadOnlyList<string> CreateLaunchArguments(string bundledGameRoot, string sceneName, bool graphics)

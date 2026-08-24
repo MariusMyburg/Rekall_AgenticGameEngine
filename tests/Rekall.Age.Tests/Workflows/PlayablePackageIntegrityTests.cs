@@ -97,11 +97,20 @@ public sealed class PlayablePackageIntegrityTests
             new InspectPlayablePackageRequest(output),
             context);
         Assert.True(inspection.Ok, inspection.Summary);
-        Assert.EndsWith("Rekall.Age.Player.Windows.exe", inspection.Value.Manifest.LaunchPath, StringComparison.Ordinal);
+        Assert.Equal("Play.exe", inspection.Value.Manifest.LaunchPath);
         Assert.EndsWith("Rekall.Age.Player.exe", inspection.Value.Manifest.ProofLaunchPath, StringComparison.Ordinal);
+        Assert.Equal(Path.Combine(output, "Play.exe"), packaged.Value.LaunchPath);
+        Assert.True(File.Exists(packaged.Value.LaunchPath));
+        var batchPath = Path.Combine(output, "Play.bat");
+        Assert.True(File.Exists(batchPath));
+        var batch = await File.ReadAllTextAsync(batchPath);
+        Assert.Contains("\"%~dp0Play.exe\"", batch, StringComparison.Ordinal);
+        Assert.Contains("exit /b %ERRORLEVEL%", batch, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("--playable", packaged.Value.Arguments);
         Assert.DoesNotContain("--playable", inspection.Value.Manifest.Arguments);
         Assert.True(File.Exists(Path.Combine(output, inspection.Value.Manifest.ProofLaunchPath!.Replace('/', Path.DirectorySeparatorChar))));
+        Assert.Contains(inspection.Value.Manifest.Files!, file => file.Path == "Play.exe");
+        Assert.Contains(inspection.Value.Manifest.Files!, file => file.Path == "Play.bat");
 
         var capture = await new CapturePlayablePackageFrameCommand().ExecuteAsync(
             new CapturePlayablePackageFrameRequest(
@@ -139,6 +148,8 @@ public sealed class PlayablePackageIntegrityTests
                 Path.Combine(TestPaths.CreateTempDirectory(), "RelocatedGraphicsPackage")),
             context);
         Assert.True(relocated.Ok, relocated.Summary);
+        Assert.True(File.Exists(Path.Combine(relocated.Value.PackagePath, "Play.exe")));
+        Assert.True(File.Exists(Path.Combine(relocated.Value.PackagePath, "Play.bat")));
         var relocatedAudit = await new AuditPlayablePackageCommand().ExecuteAsync(
             new AuditPlayablePackageRequest(
                 relocated.Value.PackagePath,

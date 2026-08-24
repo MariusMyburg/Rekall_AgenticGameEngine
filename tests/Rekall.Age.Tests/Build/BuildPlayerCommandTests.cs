@@ -66,6 +66,9 @@ public sealed class BuildPlayerCommandTests
         Assert.Contains("--backend", result.Value.Arguments);
         Assert.Contains("vulkan", result.Value.Arguments);
         Assert.DoesNotContain("--playable", result.Value.Arguments);
+        Assert.True(
+            File.Exists(Path.Combine(result.Value.OutputDirectory, "hostfxr.dll")),
+            "The graphical Windows player must be published self-contained.");
     }
 
     private static string FailureDetails(RekallAgeCommandResult<BuildPlayerResult> result)

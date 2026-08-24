@@ -62,6 +62,14 @@ public sealed class BuildPlayerCommand : IRekallAgeCommand<BuildPlayerRequest, B
         startInfo.ArgumentList.Add("-p:RestoreLockedMode=true");
         startInfo.ArgumentList.Add("-c");
         startInfo.ArgumentList.Add("Debug");
+        if (request.Graphics)
+        {
+            startInfo.ArgumentList.Add("-r");
+            startInfo.ArgumentList.Add("win-x64");
+            startInfo.ArgumentList.Add("--self-contained");
+            startInfo.ArgumentList.Add("true");
+            startInfo.ArgumentList.Add("-p:PublishSingleFile=false");
+        }
         startInfo.ArgumentList.Add("-o");
         startInfo.ArgumentList.Add(outputDirectory);
         startInfo.ArgumentList.Add("--artifacts-path");

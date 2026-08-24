@@ -258,6 +258,7 @@
         "type": "Project",
         "dependencies": {
           "BepuPhysics": "[2.4.0, )",
+          "Rekall.Age.AssetPipeline": "[0.1.0-preview.1, )",
           "Rekall.Age.Assets": "[0.1.0-preview.1, )",
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
           "Rekall.Age.Modeling": "[0.1.0-preview.1, )",

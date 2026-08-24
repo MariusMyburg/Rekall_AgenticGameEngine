@@ -317,6 +317,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 component.Type.Equals("Rekall.GeometryMesh", StringComparison.Ordinal));
             var meshAssetReferenceComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.MeshAssetReference", StringComparison.Ordinal));
+            var modelAssetReferenceComponent = entity?.Components.FirstOrDefault(component =>
+                component.Type.Equals("Rekall.ModelAssetReference", StringComparison.Ordinal));
             var lineSegmentsComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.LineSegments", StringComparison.Ordinal));
             var orbitComponent = entity?.Components.FirstOrDefault(component =>
@@ -396,7 +398,9 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 continue;
             }
 
-            var compiledMeshResolution = _compiledMeshResolver.Resolve(world.ProjectRoot, meshAssetReferenceComponent);
+            var compiledMeshResolution = meshAssetReferenceComponent is not null
+                ? _compiledMeshResolver.Resolve(world.ProjectRoot, meshAssetReferenceComponent)
+                : _compiledMeshResolver.ResolveModelAsset(world.ProjectRoot, modelAssetReferenceComponent);
             if (compiledMeshResolution.IssueCode is not null)
             {
                 meshObservations.Add(new RekallAgeRuntimeViewportObservation(
@@ -404,7 +408,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     "error",
                     "rendering",
                     mesh.EntityName,
-                    compiledMeshResolution.IssueMessage ?? "Editable mesh asset could not be resolved."));
+                    compiledMeshResolution.IssueMessage ?? "Editable mesh or Model Asset could not be resolved."));
             }
             var compiledMesh = compiledMeshResolution.Mesh;
             var geometryMesh = orbitPathMesh ?? ringMesh ?? starfieldMesh ?? markerMesh ?? haloMesh

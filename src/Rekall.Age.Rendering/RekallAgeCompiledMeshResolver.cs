@@ -18,6 +18,7 @@ public sealed record RekallAgeCompiledMeshResolution(
 public sealed class RekallAgeCompiledMeshResolver
 {
     private readonly RekallAgeCompiledMeshAssetResolver _resolver = new();
+    private readonly Rekall.Age.Runtime.RekallAgeCompiledModelAssetResolver _modelAssetResolver = new();
 
     public RekallAgeCompiledMeshResolution Resolve(
         string? projectRoot,
@@ -32,6 +33,30 @@ public sealed class RekallAgeCompiledMeshResolver
         return resolved.Snapshot is null
             ? new(null, resolved.IssueCode, resolved.IssueMessage)
             : new(new(resolved.FileRevision!, resolved.Snapshot, ToGeometry(resolved.Snapshot)));
+    }
+
+    /// <summary>
+    /// Resolves a <c>Rekall.ModelAssetReference</c> (the published Model Asset placement shape
+    /// <c>rekall.scene.instantiate_asset</c> produces) the same way <see cref="Resolve"/> resolves the
+    /// older <c>Rekall.MeshAssetReference</c>. Before this existed, a placed Model Asset's bare
+    /// <c>Rekall.MeshRenderer</c> component had no way to reach the compiled geometry its own sibling
+    /// <c>Rekall.ModelAssetReference</c> named, and rendered as an unresolved fallback shape --
+    /// confirmed by capturing an actual placed Model Asset before this fix (Asset-backed: 0,
+    /// Fallback: 1).
+    /// </summary>
+    public RekallAgeCompiledMeshResolution ResolveModelAsset(
+        string? projectRoot,
+        RekallAgeRuntimeComponent? reference)
+    {
+        if (reference is null)
+        {
+            return new(null);
+        }
+        var assetId = ReadString(reference, "assetId");
+        var resolved = _modelAssetResolver.Resolve(projectRoot, assetId);
+        return resolved.Snapshot is null
+            ? new(null, resolved.IssueCode, resolved.IssueMessage)
+            : new(new(resolved.Revision!, resolved.Snapshot, ToGeometry(resolved.Snapshot)));
     }
 
     private static RekallAgeRuntimeViewportGeometryMesh ToGeometry(RekallAgeCompiledMeshSnapshot snapshot) =>

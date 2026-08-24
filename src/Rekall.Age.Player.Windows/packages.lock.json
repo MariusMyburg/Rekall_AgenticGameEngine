@@ -245,6 +245,15 @@
         "resolved": "0.8.8",
         "contentHash": "UIDFkA5DC3en3tOJ3Mof11yBx9kUQLsaeo/oFdvN6Bbkr9E9+VCqfIadHci8cu+I51K2Sl7XYWVl2R/mA75NBQ=="
       },
+      "rekall.age.assetpipeline": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modeling": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )"
+        }
+      },
       "rekall.age.assets": {
         "type": "Project",
         "dependencies": {
@@ -318,6 +327,7 @@
         "type": "Project",
         "dependencies": {
           "BepuPhysics": "[2.4.0, )",
+          "Rekall.Age.AssetPipeline": "[0.1.0-preview.1, )",
           "Rekall.Age.Assets": "[0.1.0-preview.1, )",
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
           "Rekall.Age.Modeling": "[0.1.0-preview.1, )",

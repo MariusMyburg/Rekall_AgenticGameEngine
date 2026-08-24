@@ -18,6 +18,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
     private const float DefaultGravityY = -9.81f;
     private PersistentPhysicsWorld? _physicsWorld;
     private readonly RekallAgeCompiledMeshAssetResolver _meshResolver = new();
+    private readonly RekallAgeCompiledModelAssetResolver _modelAssetResolver = new();
 
     public string Id => "runtime.physics.bepu";
 
@@ -183,13 +184,16 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
         ICollection<RekallAgeRuntimeObservation> observations)
     {
         var reference = FindComponent(entity, "Rekall.MeshAssetReference");
-        RekallAgeCompiledMeshAssetResolution? resolved = null;
+        RekallAgeCompiledMeshSnapshot? compiledMesh = null;
+        string? compiledMeshRevision = null;
         if (reference is not null)
         {
-            resolved = _meshResolver.Resolve(
+            var resolved = _meshResolver.Resolve(
                 projectRoot,
                 ReadString(reference, "assetId", string.Empty),
                 ReadString(reference, "expectedRevision", string.Empty));
+            compiledMesh = resolved.Snapshot;
+            compiledMeshRevision = resolved.FileRevision;
             if (resolved.IssueCode is not null)
             {
                 observations.Add(new RekallAgeRuntimeObservation(
@@ -204,13 +208,42 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                     ["rekall.mesh.inspect", "rekall.mesh.validate"]));
             }
         }
+        else
+        {
+            // Rekall.ModelAssetReference is the newer published Model Asset placement shape
+            // (rekall.scene.instantiate_asset); a same-entity Rekall.MeshCollider must resolve its
+            // compiled geometry the same way an older Rekall.MeshAssetReference entity's collider
+            // does, or a placed Model Asset silently has no physical shape at all.
+            var modelReference = FindComponent(entity, "Rekall.ModelAssetReference");
+            if (modelReference is not null)
+            {
+                var resolved = _modelAssetResolver.Resolve(
+                    projectRoot,
+                    ReadString(modelReference, "assetId", string.Empty));
+                compiledMesh = resolved.Snapshot;
+                compiledMeshRevision = resolved.Revision;
+                if (resolved.IssueCode is not null)
+                {
+                    observations.Add(new RekallAgeRuntimeObservation(
+                        frame,
+                        resolved.IssueCode,
+                        "error",
+                        "physics",
+                        entity.Id,
+                        entity.Name,
+                        Id,
+                        resolved.IssueMessage ?? "Model Asset collider could not be resolved.",
+                        ["rekall.asset.model.inspect", "rekall.asset.model.rebuild"]));
+                }
+            }
+        }
         return new PhysicsEntity(
             entity,
             FindComponent(entity, "Rekall.Rigidbody3D") ?? FindComponent(entity, "Rekall.Rigidbody2D"),
             FindCollider(entity),
             FindComponent(entity, "Rekall.GeometryMesh"),
-            resolved?.Snapshot,
-            resolved?.FileRevision,
+            compiledMesh,
+            compiledMeshRevision,
             ReadPhysicsMaterial(entity),
             FindComponent(entity, "Rekall.Rigidbody2D") is not null
                 || FindComponent(entity, "Rekall.BoxCollider2D") is not null

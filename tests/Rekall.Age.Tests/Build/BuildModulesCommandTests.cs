@@ -8,6 +8,40 @@ namespace Rekall.Age.Tests.Build;
 
 public sealed class BuildModulesCommandTests
 {
+    // Portable stand-in for a hung external compiler process, not a dependency of the production
+    // build path. Prefer pwsh (PowerShell 7, cross-platform) since that's what a non-Windows CI
+    // runner for this net10.0 (not net10.0-windows) test project would have; fall back to the
+    // Windows-only powershell.exe, which ships with every Windows install but isn't guaranteed
+    // present elsewhere, only when pwsh itself isn't on PATH (as on this dev machine).
+    private static readonly string HangShellExecutable = ResolveHangShellExecutable();
+
+    private static string ResolveHangShellExecutable()
+    {
+        foreach (var candidate in new[] { "pwsh", "powershell" })
+        {
+            try
+            {
+                using var probe = Process.Start(new ProcessStartInfo(candidate, "-NoProfile -Command exit")
+                {
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                });
+                probe?.WaitForExit(5000);
+                if (probe is { HasExited: true })
+                {
+                    return candidate;
+                }
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                // Not on PATH; try the next candidate.
+            }
+        }
+
+        throw new InvalidOperationException("Neither pwsh nor powershell is available to run this test.");
+    }
+
     [Fact]
     public async Task WedgedCompilerTimesOutAndIsTerminatedWithoutReceipt()
     {
@@ -22,11 +56,7 @@ public sealed class BuildModulesCommandTests
         int? compilerProcessId = null;
         Process? StartWedgedCompiler(ProcessStartInfo _)
         {
-            // Windows PowerShell (powershell.exe) ships with every Windows install; PowerShell 7
-            // (pwsh) is an optional separate install and is not guaranteed present. This is only a
-            // portable stand-in for a hung external compiler process, not a dependency of the
-            // production build path, so either shell works -- prefer the one always available.
-            var helper = new ProcessStartInfo("powershell")
+            var helper = new ProcessStartInfo(HangShellExecutable)
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -87,9 +117,7 @@ public sealed class BuildModulesCommandTests
         int? compilerProcessId = null;
         Process? StartWedgedCompiler(ProcessStartInfo _)
         {
-            // See the comment in WedgedCompilerTimesOutAndIsTerminatedWithoutReceipt above: powershell.exe
-            // is guaranteed present on Windows, unlike the optional pwsh install.
-            var helper = new ProcessStartInfo("powershell")
+            var helper = new ProcessStartInfo(HangShellExecutable)
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,

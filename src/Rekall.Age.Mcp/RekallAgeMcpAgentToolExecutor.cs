@@ -17,6 +17,7 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
     private const string ExecuteToolName = "rekall.tools.execute";
     private const int MaximumDirectlyExposedTools = 24;
     private const int MaximumEncodedGatewayArgumentsCharacters = 1_000_000;
+    private const int ResponseBudgetCharacters = 12_000;
 
     public RekallAgeMcpAgentToolExecutor(
         RekallAgeCommandRegistry registry,
@@ -221,9 +222,20 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
         var node = JsonSerializer.SerializeToNode(result, JsonOptions)
             ?? new JsonObject { ["ok"] = false, ["summary"] = "Tool result serialization failed." };
         var serialized = node.ToJsonString();
-        if (serialized.Length <= 12_000)
+        if (serialized.Length <= ResponseBudgetCharacters)
         {
             return node;
+        }
+
+        // Most agent tool results that grow past budget are a list (search/list commands) rather
+        // than one huge scalar payload -- shrink the largest list to fit instead of discarding the
+        // structured value outright. A search command's own schema can tell agents to raise a
+        // result limit "if needed" (e.g. rekall.module.search_component_schemas); silently
+        // replacing `value` with an opaque string preview when they do exactly that turns following
+        // the tool's own advice into a worse result, not a bounded one.
+        if (node is JsonObject root && TryTruncateLargestArray(root, ResponseBudgetCharacters))
+        {
+            return root;
         }
 
         return new JsonObject
@@ -235,6 +247,92 @@ public sealed class RekallAgeMcpAgentToolExecutor : IRekallAgeAgentToolExecutor
             ["valueTruncated"] = true,
             ["originalCharacters"] = serialized.Length
         };
+    }
+
+    /// <summary>
+    /// Finds the largest JSON array reachable under <paramref name="root"/>'s "value" property and
+    /// drops trailing elements until the whole document fits within <paramref name="budget"/>
+    /// characters, recording how many were returned versus how many existed as a sibling
+    /// "&lt;propertyName&gt;Truncated" property. Returns false (leaving <paramref name="root"/>
+    /// unmodified) if there is no array to shrink, or shrinking it to a single element still
+    /// doesn't fit -- callers fall back to the opaque preview in that case.
+    /// </summary>
+    private static bool TryTruncateLargestArray(JsonObject root, int budget)
+    {
+        if (root["value"] is not { } valueNode)
+        {
+            return false;
+        }
+
+        var (parent, propertyName, array) = FindLargestArray(valueNode);
+        if (parent is null || propertyName is null || array is null || array.Count == 0)
+        {
+            return false;
+        }
+
+        var originalCount = array.Count;
+        while (array.Count > 1 && root.ToJsonString().Length > budget)
+        {
+            array.RemoveAt(array.Count - 1);
+        }
+
+        if (root.ToJsonString().Length > budget)
+        {
+            return false;
+        }
+
+        parent[$"{propertyName}Truncated"] = new JsonObject
+        {
+            ["returned"] = array.Count,
+            ["total"] = originalCount
+        };
+        return true;
+    }
+
+    private static (JsonObject? Parent, string? PropertyName, JsonArray? Array) FindLargestArray(JsonNode node)
+    {
+        JsonObject? bestParent = null;
+        string? bestProperty = null;
+        JsonArray? bestArray = null;
+        var bestLength = -1;
+
+        void Visit(JsonNode? current)
+        {
+            switch (current)
+            {
+                case JsonObject obj:
+                    foreach (var (key, child) in obj)
+                    {
+                        if (child is JsonArray array)
+                        {
+                            var length = array.ToJsonString().Length;
+                            if (length > bestLength)
+                            {
+                                bestLength = length;
+                                bestParent = obj;
+                                bestProperty = key;
+                                bestArray = array;
+                            }
+                        }
+                        else if (child is not null)
+                        {
+                            Visit(child);
+                        }
+                    }
+
+                    break;
+                case JsonArray arr:
+                    foreach (var item in arr)
+                    {
+                        Visit(item);
+                    }
+
+                    break;
+            }
+        }
+
+        Visit(node);
+        return (bestParent, bestProperty, bestArray);
     }
 
     private JsonNode SearchTools(JsonObject arguments)

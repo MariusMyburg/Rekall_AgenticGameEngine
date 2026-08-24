@@ -110,12 +110,14 @@ public sealed class ProjectRuntimeSystemTests
         Assert.True(result.Ok, result.Summary);
         Assert.Equal(0, result.Value.FallbackRenderableCount);
         // The orbiting cube ends at world X=2 (see RuntimeSnapshotRunsCompiledProjectRuntimeSystems
-        // above); measured against the camera set up in SaveOrbitSceneAsync, positive world X
-        // projects to the left half of the frame here, not the right -- confirmed by rendering and
-        // reading back the actual pixels (547 matching pixels averaging x=76 of 220 wide) rather than
-        // assumed. The point of this assertion is only that the captured frame reflects the project
-        // runtime system's actual output (the cube visibly off-center, not centered/absent), so assert
-        // the measured side.
+        // above). With the camera set up in SaveOrbitSceneAsync (unrotated-forward +Z, no yaw),
+        // positive world X projects to the left half of the frame, not the right. This is a real,
+        // consistent AGE camera convention, not a bug or a backend quirk: captured this exact scene
+        // through both `render viewport capture ... software` and `... vulkan` independently and both
+        // backends agree the cube lands left-of-center (native Vulkan: NVIDIA GeForce RTX 5090; see
+        // docs/production/PROGRESS.md for the comparison). The point of this assertion is only that
+        // the captured frame reflects the project runtime system's actual output (the cube visibly
+        // off-center, not centered/absent), so assert the side both backends actually produce.
         Assert.True(cubePixelXs.Average() < output.Width / 2.0 - 18);
     }
 

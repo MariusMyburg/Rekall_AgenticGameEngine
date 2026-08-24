@@ -52,7 +52,21 @@ AGE will study and adapt architectural principles from the local Godot source wi
 
 Godot is a reference for subsystem boundaries and proven rendering trade-offs. AGE retains its own immutable runtime world, command system, rendering-device abstractions, diagnostics, and agent-first authoring model.
 
-Blender remains the reference for editable mesh/material/animation authoring vocabulary and stable data-block-style asset ownership. Agents author content through AGE's modeling graphs, mesh tools, material graphs, animation assets, and scene components; the engine does not author the content for them.
+### Blender EEVEE reference principles
+
+Blender remains the reference for editable mesh/material/animation authoring vocabulary and stable data-block-style asset ownership. Its EEVEE renderer is also a reference for producing cinematic output from scalable real-time approximations:
+
+- EEVEE's engine/instance boundary keeps viewport and final-frame execution behind the same renderer instance lifecycle.
+- Its virtual shadow-map design separates directional clipmaps/cascades and punctual cubemaps from a shared physical page atlas, with GPU-driven usage tagging and allocation. AGE begins with conventional stabilized cascades, then adopts virtualized/cached shadow allocation only after ordinary shadow quality and diagnostics are playable.
+- Its sphere and volume light-probe systems separate specular environment filtering, diffuse irradiance storage, validity/leak prevention, and authored influence volumes. AGE uses the same conceptual separation for reflection and irradiance probes.
+- Its unified volume path treats world and bounded volumes as participating media that receive light and shadow rather than as a screen-color overlay.
+- Its real-time approximations explicitly account for screen-space limitations, transparency, temporal sampling, and history invalidation. AGE exposes those limitations through the resolved feature plan and capture diagnostics.
+- Its film/compositor split reinforces that scene HDR rendering, exposure/tone mapping, and creative image effects are separate authored stages. AGE keeps its standard game post stack executable while allowing later compositor-style graphs to feed the same render graph.
+- Its Principled material compatibility demonstrates the value of one portable material vocabulary across asset authoring and real-time presentation. AGE continues converging imported glTF materials and AGE material graphs on one runtime PBR description.
+
+Relevant official references include Blender's EEVEE engine sources under `source/blender/draw/engines/eevee`, the [EEVEE 4.2 architecture changes](https://developer.blender.org/docs/release_notes/4.2/eevee/), [virtual shadow-map design](https://developer.blender.org/docs/features/eevee/modules/shadow/), and [sphere light-probe design](https://developer.blender.org/docs/features/eevee/modules/lightprobe_sphere/).
+
+Agents author content through AGE's modeling graphs, mesh tools, material graphs, animation assets, compositor/post-process descriptions, and scene components; the engine does not author the content for them.
 
 ## Architectural Boundaries
 

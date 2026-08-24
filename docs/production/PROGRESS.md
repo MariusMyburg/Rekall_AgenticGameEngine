@@ -4346,6 +4346,24 @@ browser) is next, now with a browser-execution path already proven to
 carry a real physics3d scene through a full publish/serve/render/tick
 cycle.
 
+**Known, deliberately deferred cost from fix (3) above, not yet fixed:**
+flushing every tick is correct but expensive as written. `FlushAsync`
+awaits `device.queue.onSubmittedWorkDone()`, so a per-tick call serializes
+CPU and GPU every frame instead of letting the browser pipeline ahead; and
+because `capture.texture` is still set on every canvas submit (not only
+the one-shot proof workload's), every tick also allocates a full-canvas
+readback buffer, copies the whole canvas into it, and destroys it unread
+(~650KB/frame at 640x480, ~8MB/frame at 1080p). Both are consequences of
+reusing machinery built for a single proof frame inside a real per-tick
+loop. The real fix has two parts: a separate per-tick drain that awaits
+only the queued error-scope promises (no `onSubmittedWorkDone`), leaving
+the full `flush()` semantics for the proof workload; and staging the
+readback copy only when a caller actually intends to read pixels, not on
+every canvas submit. Correctness is not at stake -- the current build
+genuinely renders and sustains real ticks -- but this must be fixed before
+any playable-acceptance claim, since it directly affects frame smoothness
+and canvas resolution scales linearly with the wasted per-frame copy.
+
 ## Next after the current item
 
 The first Godot-reference graphics milestone is verified. A shallow,

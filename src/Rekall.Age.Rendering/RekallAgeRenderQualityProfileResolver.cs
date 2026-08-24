@@ -58,8 +58,35 @@ public sealed class RekallAgeRenderQualityProfileResolver
 
         var safeOutputWidth = Math.Max(1, outputWidth);
         var safeOutputHeight = Math.Max(1, outputHeight);
+        if (safeOutputWidth != outputWidth || safeOutputHeight != outputHeight)
+        {
+            AddDeviceClamp(
+                degradations,
+                "outputResolution",
+                $"{outputWidth}x{outputHeight}",
+                $"{safeOutputWidth}x{safeOutputHeight}");
+        }
+
         var renderWidth = Math.Max(1, (int)Math.Round(safeOutputWidth * resolutionScale, MidpointRounding.AwayFromZero));
         var renderHeight = Math.Max(1, (int)Math.Round(safeOutputHeight * resolutionScale, MidpointRounding.AwayFromZero));
+        var requestedRenderWidth = renderWidth;
+        var requestedRenderHeight = renderHeight;
+        var maximumRenderDimension = Math.Max(1, capabilities.MaximumTextureDimension2D);
+        if (renderWidth > maximumRenderDimension || renderHeight > maximumRenderDimension)
+        {
+            var clampScale = Math.Min(
+                (double)maximumRenderDimension / renderWidth,
+                (double)maximumRenderDimension / renderHeight);
+            renderWidth = Math.Min(maximumRenderDimension, Math.Max(1, (int)Math.Round(renderWidth * clampScale, MidpointRounding.AwayFromZero)));
+            renderHeight = Math.Min(maximumRenderDimension, Math.Max(1, (int)Math.Round(renderHeight * clampScale, MidpointRounding.AwayFromZero)));
+            resolutionScale *= clampScale;
+            AddDeviceClamp(
+                degradations,
+                "renderResolution",
+                $"{requestedRenderWidth}x{requestedRenderHeight}",
+                $"{renderWidth}x{renderHeight}");
+        }
+
         var fog = ResolveFogQuality(fogMode, renderWidth, renderHeight);
         var shadow = new RekallAgeResolvedShadowQuality(cascadeCount, shadowResolution, preset.FilterTapCount);
         var post = new RekallAgeResolvedPostQuality(bloom, ssao, timestamps);

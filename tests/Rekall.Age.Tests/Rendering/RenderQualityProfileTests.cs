@@ -80,7 +80,7 @@ public sealed class RenderQualityProfileTests
             1440);
 
         Assert.Equal("High", plan.ResolvedPreset);
-        Assert.Equal(1, plan.ResolutionScale);
+        Assert.Equal(0.4, plan.ResolutionScale, 3);
         Assert.Equal(1024, plan.Shadows.Resolution);
         Assert.False(plan.Post.GpuTimestamps);
         Assert.Contains(plan.Degradations, item => item.Code == "REKALL_RENDER_QUALITY_OVERRIDE_INVALID"
@@ -89,5 +89,38 @@ public sealed class RenderQualityProfileTests
             && item.Feature == "shadowResolution" && item.RequestedValue == "2048" && item.ResolvedValue == "1024");
         Assert.Contains(plan.Degradations, item => item.Code == "REKALL_RENDER_FEATURE_DEVICE_CLAMPED"
             && item.Feature == "gpuTimestamps" && item.RequestedValue == "true" && item.ResolvedValue == "false");
+    }
+
+    [Fact]
+    public void ResolverClampsRenderResolutionToTheDeviceTextureLimit()
+    {
+        var plan = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High"),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test") with { MaximumTextureDimension2D = 2048 },
+            2560,
+            1440);
+
+        Assert.Equal(2048, plan.RenderWidth);
+        Assert.Equal(1152, plan.RenderHeight);
+        Assert.Equal(0.8, plan.ResolutionScale, 3);
+        Assert.Contains(plan.Degradations, item => item.Code == "REKALL_RENDER_FEATURE_DEVICE_CLAMPED"
+            && item.Feature == "renderResolution" && item.RequestedValue == "2560x1440"
+            && item.ResolvedValue == "2048x1152");
+    }
+
+    [Fact]
+    public void ResolverReportsInvalidOutputDimensionsInsteadOfSilentlySubstitutingThem()
+    {
+        var plan = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High"),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+            0,
+            -4);
+
+        Assert.Equal(1, plan.OutputWidth);
+        Assert.Equal(1, plan.OutputHeight);
+        Assert.Contains(plan.Degradations, item => item.Code == "REKALL_RENDER_FEATURE_DEVICE_CLAMPED"
+            && item.Feature == "outputResolution" && item.RequestedValue == "0x-4"
+            && item.ResolvedValue == "1x1");
     }
 }

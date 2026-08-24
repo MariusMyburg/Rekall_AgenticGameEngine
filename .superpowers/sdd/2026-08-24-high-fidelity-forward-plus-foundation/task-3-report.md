@@ -167,3 +167,165 @@ Also committed the 20 causally affected lock files described above. The approved
 - The eight repository-wide Windows AppContainer isolation failures are an environment/module-host concern outside Task 3. They do not prevent trustworthy native Vulkan evidence, but they keep the overall repository test command from being fully green.
 - Task 3 intentionally implements the minimum executable bloom resource represented by the current validated graph (one quarter-resolution `bloom-pyramid` image with thresholded downsample and normalized reconstruction). Expanding this into a multi-level chain can occur when the backend-neutral graph exposes per-level resources; no contract was invented in this executor.
 - GPU timestamp timing remains deferred to its planned instrumentation task; Task 3 reports executed work and counts, not fabricated timings.
+
+## Fix Round 1: Important review findings
+
+Implementation commit: `1b746e3` (`fix: make HDR post execution graph authoritative`).
+
+All four Important findings were addressed through isolated RED/GREEN cycles before the final combined verification. The approved spec and plan were not changed: the approved render graph already specifies conditional bloom, resolved scene extents, output extents, authored degradation visibility, and pre-allocation capability validation. This round makes the Vulkan executor obey those existing contracts; it does not introduce a new contract, pass order, or acceptance gate.
+
+### Finding 1: bloom must derive from the validated graph
+
+Added native capture test `BloomDisabledGraphDoesNotAllocateDispatchOrReportBloom` with a Performance/Bloom-disabled resolved plan and tone-map-only authored stack.
+
+RED command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~BloomDisabledGraphDoesNotAllocateDispatchOrReportBloom"
+```
+
+RED result: `Failed: 1, Passed: 0`. `Assert.DoesNotContain` found a reported executed bloom pass with `DispatchCount = 1` even though the graph omitted bloom.
+
+GREEN result for the same command: `Passed: 1, Failed: 0` in 536 ms.
+
+Implementation:
+
+- Bloom image allocation now requires both the `bloom` command in `commandPlan.PostPasses` and its graph resource; the fallback allocation was removed.
+- Compute-queue/storage-format validation, descriptor layout/set creation, shader module/pipeline creation, image transitions, and dispatch are all conditional on that authoritative command.
+- Tone mapping binds the valid HDR scene view with zero bloom intensity when bloom is absent, avoiding a dummy bloom allocation.
+- Executed pass reports are generated from `commandPlan.PostPasses`; bloom-disabled captures neither execute nor report bloom. UI remains deferred to the one real CPU composition.
+
+### Finding 2: execute at resolved render extent, output at requested LDR extent
+
+Added native test `ResolvedRenderScaleControlsHdrSceneExtentWhileOutputStaysViewportSized`. It compares otherwise identical High plans at resolution scales 1.0 and 0.5, with bloom disabled so bloom extent cannot create a false positive.
+
+RED command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ResolvedRenderScaleControlsHdrSceneExtentWhileOutputStaysViewportSized"
+```
+
+RED result: `Failed: 1, Passed: 0`. Full and scaled captures had the same checksum, `10204647218010715168`, proving scene rendering still used the viewport extent.
+
+GREEN result for the same command: `Passed: 1, Failed: 0` in 940 ms.
+
+Implementation:
+
+- High-fidelity target creation now takes `scene-hdr` dimensions from the validated graph and independently carries the `ldr-color` output extent.
+- Scene color/depth images, framebuffer, command viewport, camera rectangle, and custom project pipelines use the resolved render extent.
+- Tone-map output image, framebuffer, viewport/scissor, render area, readback buffer/copy, capture dimensions, PNG dimensions, and result dimensions use the resolved output extent.
+- The report dimensions and allocation claims now match the Vulkan objects actually created for Performance, Low, Medium, High, Epic, and custom scales.
+
+Native image evidence from the final renderer suite:
+
+- scale 1.0: `C:\Users\Marius\AppData\Local\Temp\rekall-age-tests\0dbb131cb2754cc2ac0f574b9fe9ffe5\vulkan-scene-96x64-20260824174904763.png`
+- scale 0.5 (48x32 HDR upsampled to 96x64 LDR): `C:\Users\Marius\AppData\Local\Temp\rekall-age-tests\0dbb131cb2754cc2ac0f574b9fe9ffe5\vulkan-scene-96x64-20260824174905026.png`
+
+Both were opened at original resolution. Independent pixel comparison: output size `96x64`, `96` pixels differ, mean RGB changes from `4.317` to `3.972`, while both bounded maxima are `231`. The scaled result retains the requested 96x64 PNG but visibly exhibits the lower-resolution edge reconstruction.
+
+### Finding 3: authored post semantics must be implemented or explicitly degraded
+
+Bloom radius is now a supported Task 3 semantic. Added native test `AuthoredBloomRadiusChangesNativeBloomReconstruction`.
+
+RED command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~AuthoredBloomRadiusChangesNativeBloomReconstruction"
+```
+
+RED result: `Failed: 1, Passed: 0`; radius 0.5 and radius 3.0 produced the same checksum, `16476533142349731723`.
+
+GREEN result for the same command: `Passed: 1, Failed: 0` in 945 ms. Radius is clamped to `[0.05, 32]`, pushed to the tone-map shader, and scales the normalized tent reconstruction footprint.
+
+Native radius evidence:
+
+- radius 0.5: `C:\Users\Marius\AppData\Local\Temp\rekall-age-tests\8c7135fe04f34ccbb3fcefa04c420bec\vulkan-scene-96x64-20260824174905885.png`
+- radius 3.0: `C:\Users\Marius\AppData\Local\Temp\rekall-age-tests\8c7135fe04f34ccbb3fcefa04c420bec\vulkan-scene-96x64-20260824174906268.png`
+
+Both were opened at original resolution. Independent comparison: `1857` of `6144` pixels differ; mean RGB changes from `9.004` to `21.191`; maxima remain bounded at `242` and `236`. The wider authored radius produces the expected visibly larger emissive reconstruction.
+
+Added command-plan test `HighFidelityPlanReportsEveryUnsupportedOrClampedAuthoredPostSetting`.
+
+RED command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~HighFidelityPlanReportsEveryUnsupportedOrClampedAuthoredPostSetting"
+```
+
+RED result: after correcting the test to use the existing diagnostic `Target` field, `Failed: 1, Passed: 0`; the diagnostic collection was empty. GREEN: `Passed: 1, Failed: 0` in 22 ms.
+
+The plan now emits deterministic non-structural graph diagnostics with code, exact pass/setting target, requested value, and resolved value:
+
+- `REKALL_RENDER_POST_PASS_UNSUPPORTED` for unknown pass types;
+- `REKALL_RENDER_POST_PASS_DISABLED_BY_RESOLVED_QUALITY` when authored bloom is removed by the resolved quality plan;
+- `REKALL_RENDER_POST_SETTING_UNSUPPORTED` for non-quarter bloom scale, iterations other than one, and non-additive bloom/composite blend mode;
+- `REKALL_RENDER_POST_SETTING_CLAMPED` for invalid/negative threshold and intensity and out-of-range/non-finite radius.
+
+Threshold, bloom/composite intensity, radius, the `brightExtract` alias, additive composite, and tone-map aliases are resolved explicitly. Unknown passes remain ignored but never silent.
+
+Added native test `NativeFrameReportSurfacesAuthoredPostDegradationFacts` so diagnostics are not stranded in planning metadata. RED: `Assert.Contains` found the successful report diagnostic collection empty. GREEN for the same single-test command: `Passed: 1, Failed: 0` in 536 ms. Successful and failed native reports now include stable formatted graph degradation facts alongside runtime diagnostics.
+
+### Finding 4: half-float sampling requires linear-filter support
+
+Added `HighFidelityHalfFloatSamplingRequiresLinearFilterCapability` in the shader/compiler-focused tests.
+
+RED command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~HighFidelityHalfFloatSamplingRequiresLinearFilterCapability"
+```
+
+RED result: `Failed: 1, Passed: 0`; the high-fidelity format-validation boundary did not exist (`Assert.NotNull` received null). After GREEN, the test was refactored to call the real validator directly. GREEN: `Passed: 1, Failed: 0` in 9 ms.
+
+`RekallAgeVulkanHighFidelityFormatValidator` now computes missing optimal-tiling features and returns stable `REKALL_RENDER_FORMAT_UNSUPPORTED` diagnostics. Native pre-allocation validation requires `SampledImageFilterLinearBit` for both sampled `R16G16B16A16_SFloat` scene HDR and bloom resources, in addition to their attachment/storage and sampled-image features. The validation runs before either image is allocated.
+
+### Fix Round 1 combined verification
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~VulkanHighFidelityCaptureTests|FullyQualifiedName~VulkanSceneCaptureTests|FullyQualifiedName~VulkanSceneCommandPlanTests|FullyQualifiedName~VulkanShaderCompilerTests"
+```
+
+Result: `Passed: 26, Failed: 0, Skipped: 0` in 2 seconds.
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~Rekall.Age.Tests.Rendering"
+```
+
+Result: `Passed: 545, Failed: 0, Skipped: 0` in 3 seconds.
+
+```powershell
+dotnet restore Rekall.AGE.sln --locked-mode
+dotnet build src\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj --no-restore
+dotnet format Rekall.AGE.sln --no-restore --verify-no-changes --include <Fix Round 1 changed C# files>
+git diff --check
+```
+
+Results: locked restore up to date; build succeeded with `0 Warning(s), 0 Error(s)`; format and diff checks exited 0 (Git emitted only CRLF conversion notices).
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore
+```
+
+Result: `Passed: 1744, Failed: 8, Skipped: 0, Total: 1752` in 3 minutes 47 seconds. The same eight unrelated `ModuleHostWindowsIsolationTests` fail during AppContainer worker startup/transport EOF. There are no rendering, Vulkan, shader, format-validation, restore, lock, build, or publish failures.
+
+### Fix Round 1 changed files
+
+- `src/Rekall.Age.Rendering/RekallAgeNativeVulkanSceneCapture.cs`
+- `src/Rekall.Age.Rendering/RekallAgeVulkanHighFidelityFrameRenderer.cs`
+- `src/Rekall.Age.Rendering/RekallAgeVulkanHighFidelityFormatValidator.cs` (new)
+- `src/Rekall.Age.Rendering/RekallAgeVulkanScenePreparedFrame.cs`
+- `src/Rekall.Age.Rendering/RekallAgeVulkanSceneRenderTarget.cs`
+- `src/Rekall.Age.Rendering/Shaders/rekall_tonemap.frag`
+- `tests/Rekall.Age.Tests/Rendering/VulkanHighFidelityCaptureTests.cs`
+- `tests/Rekall.Age.Tests/Rendering/VulkanSceneCommandPlanTests.cs`
+- `tests/Rekall.Age.Tests/Rendering/VulkanShaderCompilerTests.cs`
+
+### Fix Round 1 self-review
+
+- Graph authority: every optional bloom GPU resource and operation is gated by the validated command plan; no fallback bloom image or fabricated report remains.
+- Extent truthfulness: render and output extents are distinct all the way from graph resources through Vulkan allocation, pipeline viewport, output readback, PNG, and report.
+- Semantic visibility: supported settings affect pixels; unsupported/clamped settings have stable requested/resolved facts in both plan and native result.
+- Capability safety: every half-float image sampled through the linear post sampler is checked for linear-filter support before allocation.
+- Compatibility: legacy capture activation and target/readback behavior are unchanged; OpenXR call sites pass their existing same-size target through the generalized scene-pipeline viewport path.
+- Mutation check: unconditional bloom, viewport-sized HDR, ignored radius, empty degradation diagnostics, and omitted linear-filter validation each make at least one new test fail.
+- Remaining concern is unchanged: eight environment-specific Windows AppContainer module-host tests prevent a completely green repository-wide command but do not affect native Vulkan trustworthiness.

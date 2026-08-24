@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 10:35 Africa/Johannesburg
+Last verified: 2026-08-24 11:40 Africa/Johannesburg
 
 Branch: `codex/model-asset-games` (based exactly on `1c269fe`, which merged
 `codex/web-scene-bootstrap` into `master`)
@@ -5031,6 +5031,128 @@ Release fallback -- the same class of brittleness
 `WindowsPlayerRecoveryTests` had earlier this session (fixed there with a
 Release-then-Debug search), but not yet applied to this larger CLI test
 cluster. Worth a follow-up pass, not blocking.
+
+### Pong 3D: promotion, HUD, lighting, and two more real CLI/MCP gaps
+
+Promoted the sandbox Pong 3D project into `Examples/Pong3D/` (matching the
+`Examples/ClockworkCanopy` and `Examples/GlbStationTest` precedent),
+carrying every real asset artifact the Model Asset path needs to resolve
+after relocation: both modeling graphs, both meshes, both `.age.model.json`
+documents, both compiled-mesh outputs, and `Assets/assets.age.catalog.json`
+-- not just the scene/module source. Excluded `bin/`, `obj/`, `.rekall/`,
+`packages.lock.json`, `Transactions/`, matching the established exclusion
+set.
+
+Relocating the raw catalog file by copying it verbatim (rather than through
+a CLI command) left its `sourcePath`/`importedPath` fields pointing at the
+old `.age-sandbox/Pong3D` location -- own mistake, not an engine defect
+(`GlbStationTest`'s catalog uses the same absolute-path convention and was
+never relocated after authoring, so it never surfaced this). Fixed the
+correct way, through the CLI: `rekall.asset.model.rebuild` on both assets
+regenerated the catalog entries with paths correct for the new location.
+The rendering/physics resolver path was unaffected throughout (it resolves
+relative to `projectRoot`, not the catalog's absolute fields) -- confirmed
+by `render viewport capture` from the promoted path showing real geometry
+(`Asset-backed`/`Fallback` both read `0`, meaning the metric itself doesn't
+track `Rekall.ModelAssetReference` yet, a minor observability gap noted but
+not chased further) both before and after the catalog rebuild.
+
+Discovered via a real `rekall.build.player` + native launch attempt (not
+source-reading) that a project built only through
+`rekall.module.scaffold_runtime_system` cannot launch natively:
+`Rekall.Age.Playback.RekallAgePlayableModuleMissingException`. Found the
+fix by searching the actual MCP tool list rather than guessing --
+`rekall.module.scaffold_playable` exists precisely for this, and
+`Examples/ClockworkCanopy` already carries both a `*Playable` and a
+`*Rules` module for exactly this reason, which a first read of either
+scaffold tool's own description would not have surfaced (neither
+cross-referenced the other). Scaffolded `PongPlayable`, confirmed the
+native player now gets past that exception (a leftover
+`set_CursorVisible`/`IOException` in the same run is a non-interactive
+console-redirection artifact of this shell environment, not a game or
+engine defect), then fixed the documentation gap at the source -- see the
+"engine fix" commit below. Per the session's established convention (real
+3D visual proof lives in the web publish/audit/browser path, not the
+native player's text loop, exactly as documented in the `web-scene-bootstrap`
+README rewrite), did not chase native-player visuals further.
+
+Following that same web publish/audit path surfaced a second, more
+consequential real gap: `rekall.game.publish_web` staged a Model Asset's
+*compiled mesh* (`asset.ImportedPath`) but never its own
+`.age.model.json` *definition document*
+(`ModelAssetMetadata.ModelDocumentPath`) -- confirmed by serving the
+published bundle and finding `Assets/Models/pong-ball-model.age.model.json`
+404s while `Assets/Models/Compiled/.../<hash>.age.compiled-mesh.json`
+serves fine. Any web-published game using `Rekall.ModelAssetReference`
+would silently fall back to the player's boot placeholder rather than
+rendering. Fixed in `RekallAgeWebGameExporter.StageAsync`
+(`src/Rekall.Age.Workflows/Web/RekallAgeWebGameExporter.cs`), verified the
+fix by republishing and confirming both files now serve `200`, and added
+`StagesTheModelAssetDefinitionDocumentAlongsideItsCompiledMeshOutput`
+(`WebGameExporterTests`, 14/14 passing). Committed separately from Pong's
+game content, together with the scaffold-description fix above, as
+`f30f36c` on `codex/model-asset-games`; full engine suite re-verified green
+at 1669/1669 (`Rekall.Age.Tests`) + 55/55 (`Rekall.Age.Studio.Tests`),
+Release, after both fixes.
+
+Attempted the remaining tier-4/5 evidence step (real browser session
+against the served, fixed web build) via the same Playwright setup used
+earlier this session for `ClockworkCanopy`. Both games show the identical
+static "WEB PLAYER / CONTRACT PROOF 001 ... NOT YET A PLAYABLE EXPORT"
+boot placeholder in a headless Chromium capture, with no console output
+beyond the browser's own benign `favicon.ico` 404 -- a pre-existing
+limitation of this specific Playwright/WebGPU-headless configuration in
+this sandbox (already present for `ClockworkCanopy` before any Pong work
+started), not a Pong-specific regression and not evidence the fix above is
+incomplete. Recorded honestly rather than claimed: tier 1-3 automated
+`rekall.game.audit_web` checks all pass (manifest-integrity,
+module-registry-coverage, content-relocation, runtime-identity,
+static-server-boot); tier 4-5 real-browser visual proof was not obtained in
+this environment for either game.
+
+Game-quality/content fixes made directly through
+`rekall.component.set_property`/`rekall.component.add`/`rekall.entity.create`
+(no hand-edited scene JSON): raised `KeyLight` intensity and added a second,
+cooler-toned `FillLight` after finding the unlit back wall rendered fully
+black regardless of its authored color (no ambient term -- a real, if minor,
+lighting-model characteristic worth remembering for future scenes, not
+treated as a bug to fix in the renderer); brightened the arena panel
+colors; added a native `Rekall.UiCanvas` + two `Rekall.Label` score
+readouts (confirmed the native text-rendering path actually paints through
+both the Vulkan and software `render viewport capture` backends before
+wiring gameplay to it) and extended `PongRulesSystem` to write the live
+score into both labels every frame -- verified end-to-end via `runtime
+inspect` (HUD read "0"/"5" after 3000 idle frames exactly matching the
+simulated score) and via a captured frame mid-rally; fixed a game-design
+bug where every serve launched with `velocityY = 0`, making the AI's
+perfect Y-tracking degenerate every rally into an unbreakable straight
+line -- serves now alternate a small deterministic vertical component with
+`serveDirection`.
+
+Verified `scoreRight` (left/player-side miss) increments correctly via a
+fully passive 3000-frame idle run (score ended 0-5, matching an immobile
+player paddle). Did not obtain equivalent direct evidence for `scoreLeft`
+(right/AI-side miss, which requires the AI's speed cap to be outrun during
+an extended rally that a static or simply-scripted player can't sustain);
+the code path is the same `StartServe` call mirrored across
+`newX < -ArenaHalfWidth` / `newX > ArenaHalfWidth`, not a separately
+implemented, untested branch, so this is a coverage gap in the evidence
+gathered, not a known-unverified code path. Also confirmed, at a real
+paddle-contact frame (ball at `x=6.3`, about to bounce), that
+`Events: 0` -- `PongRulesSystem`'s own AABB math drives the bounce, and the
+Model-Asset-derived `Rekall.MeshCollider` on the ball, while genuinely
+resolved (per the priority #3 fix above), does not participate in the
+physics-engine collision-event stream during actual gameplay. Recorded
+plainly rather than implied otherwise: the collider is present and
+resolves through the real Model Asset path, but gameplay does not consume
+physics collision events for it.
+
+Not yet done for Pong: package/relocate/audit via
+`rekall.workflow.package_playable_game` /
+`rekall.workflow.relocate_playable_package` /
+`rekall.workflow.audit_playable_package` (only the web publish/audit path
+was exercised); a dedicated evidence archive under `Artifacts/`; direct
+evidence for the `scoreLeft` path noted above.
 
 ## Evidence index
 

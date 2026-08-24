@@ -220,8 +220,13 @@ public static class RekallAgeSceneWgslShaderSource
         fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
             let lightDir = normalize(-frame.lightDirection.xyz);
             let ndotl = max(dot(input.worldNormal, lightDir), 0.0);
-            let ambient = 0.15;
-            let lit = ambient + ndotl * (1.0 - ambient);
+            // Matches RekallAgePerspectiveSoftwareSceneRenderer's shading exactly (same 0.35/0.75/[0.22,1.15]
+            // constants) so the same scene looks the same across backends. The previous 0.15 ambient floor with
+            // no clamp made any surface with a low-diffuse light angle render far darker here than through the
+            // software or native Vulkan capture paths for the identical scene and light -- caught by comparing a
+            // real published build's canvas pixels against those other backends' output for the same authored
+            // colors, not by any build or unit test (nothing here diffs rendered brightness across backends).
+            let lit = clamp(0.35 + ndotl * 0.75, 0.22, 1.15);
             let emissive = draw.emissiveFactors.rgb * draw.emissiveFactors.a;
             let baseColor = input.color.rgb * frame.lightColor.rgb * lit + emissive;
             return vec4<f32>(baseColor, input.color.a);

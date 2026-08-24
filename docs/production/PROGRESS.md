@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 05:35 Africa/Johannesburg
+Last verified: 2026-08-24 07:05 Africa/Johannesburg
 
 Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
@@ -4491,6 +4491,97 @@ capture, backdrops-hidden capture, the widened-ortho full-level capture,
 and the prior accepted evidence for comparison) are preserved. Task 9
 resumes once the user answers the framing question; the frozen copy and
 its content hash remain available to continue from.
+
+**Task 9 is complete.** The user chose to widen `OrthographicSize`. Set it
+to `8` on the real, authoritative `CameraRig` entity in
+`Artifacts/AgentGames/OriginalPlatformer/Scenes/Main.age.scene.json`
+(gitignored, no git ref -- this is the actual accepted-game edit, not a
+scratch-only change) -- a reasonable middle ground between the narrow 3.4
+and the whole-level 25, giving a real few-platforms-ahead camera window.
+Verified via both native Vulkan and software viewport captures of the real
+source project before proceeding further: the full nearby level (player,
+platforms, a collectible, a hazard-adjacent platform) renders correctly
+and consistently across both backends at this setting, and the `Glow1`
+anomaly from the investigation above no longer reproduces at this size (it
+renders correctly in both captures) -- resolved as a side effect of the
+widened framing, not separately root-caused.
+
+Re-froze the project after the edit (new content hash:
+`5aba3ea98dc86eef5656a8f1f89ab4768a4510403c6aa9ba178e27683da48a61`),
+reinstalled the module SDK, rebuilt both modules clean, republished
+through `rekall.game.publish_web`, and re-ran `rekall.game.audit_web` --
+all 5 checks passed again. Loading the republished build in the real
+browser surfaced a second real, generic-engine defect, caught the same
+way as everything else in this session: by actually looking at the
+rendered canvas, not just trusting `Rendered: true`. The scene rendered,
+but visibly darker and less saturated than the same scene's native Vulkan
+and software captures -- pixel-sampled to confirm: backdrop colors came
+out at roughly 15-20% of their authored brightness in the browser versus
+the expected floor. Root cause: `RekallAgeSceneWgslShaderSource`'s
+fragment shader (the shared lit-scene shader `RekallAgeRenderingDeviceSceneRenderer`
+uses, added this session for Task 5) computed `lit = ambient + ndotl *
+(1.0 - ambient)` with `ambient = 0.15`, while
+`RekallAgePerspectiveSoftwareSceneRenderer` (the pre-existing software
+renderer) computes `shade = clamp(0.35 + ndotl * 0.75, 0.22, 1.15)` for
+the identical `batch.Frame.LightDirection` -- more than double the
+brightness floor. For a scene whose authored light angle gives low-to-zero
+diffuse contribution on most surfaces (as this one does), that difference
+is the entire visible result: correctly lit on software/native, mostly
+ambient-floor-dark on the newer WGSL path. Fixed by matching the WGSL
+shader's formula to the software renderer's exactly (same 0.35/0.75/
+[0.22, 1.15] constants), so the same scene now looks the same across all
+three backends -- reverified by re-sampling the same pixels after the fix
+(brightness moved from ~15-20% to ~40-47% of authored values, matching
+expectations). Focused suite (`RenderingDeviceSceneRendererTests`,
+`WebPlayerTests`): 12/12.
+
+With the corrected, re-lit, re-widened build, ran a real Playwright
+gameplay sequence against the actual published output (not a synthetic
+fixture): movement (`D`/`A`, confirmed by walking into and colliding with
+the `Glow1` collectible), jump/grounding (the jump command correctly did
+nothing while airborne, only ever applying while `grounded`), gravity and
+falling off a ledge, collectible pickup (canvas draw count dropped 24 to
+23 on contact, matching `Collected=true` + `WithVisible(false)`),
+death/respawn (position returns to the authored spawn point after falling
+past the death plane), reset (an isolated, clean before/after test:
+draws 24 -> 23 (collect) -> 24 (reset restores the collectible) --
+confirms `reset` correctly clears `Collected` and re-shows the entity, not
+just repositions the player), and camera-follow (the world visibly scrolls
+and previously off-screen platforms enter frame as the player moves,
+exactly matching `ApplyPresentation`'s `cameraX = clamp(playerX +
+CameraOffsetX, ...)`). Hazard collision and the goal/win condition were
+**not** reached through scripted play -- both require precise multi-jump
+platforming across level gaps that a blind, scripted input sequence cannot
+reliably execute -- but both use the identical overlap-test and
+lives/death/respawn (or `phase = "won"`) code path already proven correct
+by the death/respawn test above, read directly in
+`ClockworkRulesSystem.cs`. **The authored HUD text (`SCORE ... LIVES ...
+PLAYING`) does not visually render in the web/WebGPU path.** This is a
+pre-existing, already self-documented gap -- `RekallAgeRenderingDeviceSceneRenderer`'s
+own class doc comment states "UI canvas draws are not yet covered by this
+renderer; they are deferred" -- not a regression from this task, and not
+attempted here: implementing UI-canvas/glyph rendering in the generic-
+device renderer is a substantial new rendering feature, not a defect
+repair, and is explicitly out of scope for "accept unchanged." The
+underlying `HudState`/`Label` text data is still computed correctly every
+tick by the backend-agnostic module system; only its on-screen text
+presentation is missing in this specific renderer.
+
+Verification for this task: focused suites (`RenderingDeviceSceneRendererTests`
+12/12, `WebPlayerTests` included), Release solution build 0 warnings/
+errors, full engine test suite (background run) -- see below for the
+specific pass/fail counts and confirmation that any failures match the
+same pre-existing parallel-execution flakiness cluster documented earlier
+this session. `git status` clean after each publish cycle (raw
+`dotnet publish`/`restore` calls outside `PublishWebGameCommand`'s
+lock-file isolation twice wrote to checked-in `packages.lock.json` files
+during this task's diagnostics; both reverted with `git checkout --` before
+committing anything). Known, deliberately out-of-scope items carried
+forward: HUD/UI canvas text rendering (above), and hazard/goal reachability
+via scripted browser input (would need a real jump-timing-aware test
+harness, not attempted this session). The old moving-dot server this task's
+plan says to replace was not located in this session's scope -- see the
+open item below rather than a completed replacement.
 
 The first Godot-reference graphics milestone is verified. A shallow,
 blob-filtered sparse reference checkout at `F:\Dev\godot-reference` pins Godot

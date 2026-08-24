@@ -1077,24 +1077,43 @@ dotnet run --project src/Rekall.Age.Cli -- render vulkan render-pass capture-cle
 
 ## Web Player Proof
 
-`src/Rekall.Age.Player.Web` is the first .NET 10 browser-WASM portability
-proof. It compiles real AGE Core, World, and Rendering.Abstractions assemblies,
-uses generated `[JSImport]` bindings to inspect browser graphics support, and
-reports the selected RenderingDevice profile in a live canvas shell.
+`src/Rekall.Age.Player.Web` is the .NET 10 browser-WASM portability layer. It
+compiles real AGE Core, World, and Rendering.Abstractions assemblies, bridges
+browser input/graphics through generated `[JSImport]` bindings, and renders an
+ordinary AGE project's scene directly through AGE's WebGPU backend -- the same
+project manifest, scene, assets, and agent-authored C# modules that run on
+Windows, unchanged.
+
+`Examples/ClockworkCanopy` is the first accepted, substantial original
+platformer published this way: movement, jumping, collision/grounding, a
+hazard, a collectible, score/lives, a goal, death/respawn, reset/replay,
+camera-follow, and HUD state all run through the shared deterministic C#
+runtime. Publish and serve it through the ordinary commands:
 
 ```powershell
 dotnet workload install wasm-tools wasm-experimental
-dotnet publish src/Rekall.Age.Player.Web/Rekall.Age.Player.Web.csproj -c Release
-python -m http.server 9327 --bind 127.0.0.1 --directory src/Rekall.Age.Player.Web/bin/Release/net10.0/publish/wwwroot
+dotnet run --project src/Rekall.Age.Cli -- module install-sdk Examples/ClockworkCanopy
+dotnet run --project src/Rekall.Age.Cli -- build modules Examples/ClockworkCanopy
+dotnet run --project src/Rekall.Age.Cli -- game publish-web Examples/ClockworkCanopy Main
+dotnet run --project src/Rekall.Age.Cli -- game audit-web Examples/ClockworkCanopy Main
+python -m http.server 9327 --bind 127.0.0.1 --directory Examples/ClockworkCanopy.web-publish/publish/wwwroot
 ```
 
-The WebGPU adapter now executes a real compiler-authored WGSL indirect-draw
-workload in Chromium and passes same-frame pixel readback acceptance. The
-committed physical proof is
-`docs/production/evidence/webgpu-physical-proof-2026-08-23.png`. This is not yet
-a playable game export: completion still requires the scene/module package
-loader, browser input/audio/storage/network bridges, package audit, and
-deterministic playable acceptance. WebGL 2 is a later compatibility tier.
+`game publish-web` bundles the project's manifest, scene, assets, and
+agent-authored modules with integrity metadata; `game audit-web` verifies
+manifest integrity, module-registry coverage, byte-identical content
+relocation, WASM runtime identity, and that the published output actually
+boots over a real loopback HTTP listener. Neither substitutes for a real
+browser session: load the served `index.html` in an actual browser and play
+it before trusting the build.
+
+The raw `Rekall.Age.Player.Web` project (with no `Examples/` project supplied)
+falls back to a bare WebGPU RenderingDevice proof -- a moving shape on an
+otherwise empty canvas -- useful for isolating renderer/browser-bridge defects,
+but it is not itself a playable game export and should not be presented as
+one. The committed physical WebGPU proof from that bare path is
+`docs/production/evidence/webgpu-physical-proof-2026-08-23.png`. WebGL 2 is a
+later compatibility tier.
 
 Vulkan scene rendering handles:
 

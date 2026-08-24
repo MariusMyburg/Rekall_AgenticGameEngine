@@ -26,6 +26,8 @@ Artifacts/
 .agecache/
 *.agecache
 .rekall/
+.rekall-web-publish/
+*.web-publish/
 .worktrees/
 worktrees/
 

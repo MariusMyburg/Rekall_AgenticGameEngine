@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 07:05 Africa/Johannesburg
+Last verified: 2026-08-24 08:10 Africa/Johannesburg
 
 Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
@@ -4818,6 +4818,34 @@ portable authoring path, followed by a Galaga-class game in Studio. The queued
 Rain Glass shader acceptance follows those playable proofs
 and still requires the licensed remote image, full-window asset-backed
 composition, two temporally distinct frames, package relocation, and audit.
+
+Task 9's plan item 7 ("replace the old moving-dot server with the accepted
+relocated game") was previously logged as not located in this session's
+scope. It is now done: it referred to this README's own "Web Player Proof"
+section, which documented serving `Rekall.Age.Player.Web`'s bare
+RenderingDevice proof build (a moving shape on an otherwise empty canvas,
+via `python -m http.server` directly against that project's own publish
+output) as if it were the web-publishing story. Promoted the accepted,
+camera-fixed, correctly-lit Clockwork Canopy project into
+`Examples/ClockworkCanopy/` (`rekall.project.json`, `Scenes/Main.age.scene.json`,
+both modules' source and `.csproj` files -- no `bin/`, `obj/`, `.rekall/`, or
+generated lock/transaction files, matching the existing `Examples/TumblingCubes`
+pattern exactly) and re-verified the promoted copy through the ordinary
+commands from a clean checkout: `module install-sdk`, `build modules`,
+`game publish-web`, `game audit-web` -- all 5 audit checks passed
+(manifest-integrity, module-registry-coverage, content-relocation,
+runtime-identity, static-server-boot). `git status` was clean after each
+step (no stray `packages.lock.json` writes this time). Rewrote the README's
+"Web Player Proof" section to document publishing/auditing/serving
+`Examples/ClockworkCanopy` as the primary path, and demoted the bare
+`Rekall.Age.Player.Web` proof to what it actually is: a renderer/bridge
+diagnostic fallback, explicitly not a playable game export. Added
+`.rekall-web-publish/` and `*.web-publish/` to `.gitignore` so the CLI's
+per-project web-publish staging/output directories (e.g.
+`Examples/ClockworkCanopy.web-publish/`) don't show up as untracked cruft.
+This closes the last open item from Task 9; the full plan
+(`docs/superpowers/plans/2026-08-23-genuine-web-game-publishing.md`) is now
+complete end to end.
 
 ## Evidence index
 

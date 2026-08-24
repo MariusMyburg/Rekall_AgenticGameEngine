@@ -91,6 +91,37 @@ public sealed class RekallAgeRuntimeSnapshotService
             }
         }
 
+        // Each inputs[i] applies to exactly simulation frame i (documented on
+        // rekall.runtime.inspect_scene's own schema); frames beyond the supplied array
+        // length receive RekallAgeRuntimeInputState.Empty, not the last-held state. A
+        // client that supplies fewer input entries than requested frames -- e.g. one
+        // "held key" entry meant to persist across a long run -- gets a plausible-looking
+        // but silently wrong result with no error. Surface it as a structured observation
+        // so that failure mode is visible in the result instead of requiring the client to
+        // notice on its own.
+        if (inputs is { Count: > 0 } suppliedInputs && suppliedInputs.Count < frames)
+        {
+            world = world with
+            {
+                Observations = world.Observations
+                    .Append(new RekallAgeRuntimeObservation(
+                        frames,
+                        "REKALL_RUNTIME_INPUT_FRAMES_EXHAUSTED",
+                        "warning",
+                        "input",
+                        string.Empty,
+                        string.Empty,
+                        "runtime.input",
+                        $"Only {suppliedInputs.Count} of {frames} requested frame(s) had a supplied input entry. "
+                            + $"Frame(s) {suppliedInputs.Count} through {frames - 1} received no input at all "
+                            + "(not the prior frame's held state) -- each inputs[i] applies to exactly frame i. "
+                            + "To hold a key/action across N frames, repeat that same input entry N times in the "
+                            + "inputs array.",
+                        []))
+                    .ToArray()
+            };
+        }
+
         return world;
     }
 }

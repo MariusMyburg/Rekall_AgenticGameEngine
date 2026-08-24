@@ -56,6 +56,67 @@ public sealed class RuntimeInputInspectionTests
     }
 
     [Fact]
+    public async Task RuntimeInspectionWarnsWhenFewerInputFramesAreSuppliedThanRequestedFrames()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"])
+            .AddEntity(RekallAgeEntityDocument.Create("Input", ["input"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.InputActionMap",
+                    new JsonObject
+                    {
+                        ["actions"] = new JsonArray { new JsonObject { ["name"] = "thrust", ["key"] = "W" } }
+                    })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("runtime-input-exhausted"), CancellationToken.None);
+
+        // One input entry ("held W") but ten requested frames: only frame 0 actually
+        // receives it -- frames 1-9 silently get no input at all. This is documented
+        // command behavior (inputs[i] applies to frame i), but was previously a silent,
+        // plausible-looking-but-wrong result. It should now be a structured observation.
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(
+                root,
+                "Main",
+                10,
+                [new RekallAgeRuntimeInputFrame(PressedKeys: ["W"])]),
+            context);
+
+        Assert.True(result.Ok);
+        var observation = Assert.Single(
+            result.Value.Observations,
+            item => item.Code == "REKALL_RUNTIME_INPUT_FRAMES_EXHAUSTED");
+        Assert.Equal("warning", observation.Severity);
+        Assert.Contains("1 of 10", observation.Message);
+    }
+
+    [Fact]
+    public async Task RuntimeInspectionDoesNotWarnWhenSuppliedInputFramesCoverEveryRequestedFrame()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world"]);
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("runtime-input-covered"), CancellationToken.None);
+
+        var result = await new InspectSceneRuntimeCommand().ExecuteAsync(
+            new InspectSceneRuntimeRequest(
+                root,
+                "Main",
+                3,
+                [
+                    new RekallAgeRuntimeInputFrame(),
+                    new RekallAgeRuntimeInputFrame(),
+                    new RekallAgeRuntimeInputFrame()
+                ]),
+            context);
+
+        Assert.True(result.Ok);
+        Assert.DoesNotContain(
+            result.Value.Observations,
+            item => item.Code == "REKALL_RUNTIME_INPUT_FRAMES_EXHAUSTED");
+    }
+
+    [Fact]
     public async Task RuntimeInspectionProjectsInjectedSemanticActionsThroughDeclaredActionMap()
     {
         var root = TestPaths.CreateTempDirectory();

@@ -31,25 +31,25 @@
 - Consumes: `rekall.package.json` with `kind`, `gameRoot`, `sceneName`, and `arguments`.
 - Produces: `RekallAgePackagedLaunchResolver.Resolve(string executablePath, IReadOnlyList<string> suppliedArguments) : string[]`.
 
-- [ ] **Step 1: Write failing resolver tests**
+- [x] **Step 1: Write failing resolver tests**
 
 Cover explicit arguments, a relocated package path containing spaces, missing manifest, invalid kind, rooted game paths, and traversal outside the package.
 
-- [ ] **Step 2: Run tests and confirm RED**
+- [x] **Step 2: Run tests and confirm RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~PackagedLaunchResolverTests`
 
 Expected: compilation fails because `RekallAgePackagedLaunchResolver` does not exist.
 
-- [ ] **Step 3: Implement the minimal resolver and player hookup**
+- [x] **Step 3: Implement the minimal resolver and player hookup**
 
 If arguments were supplied, return them unchanged. Otherwise read the adjacent manifest, validate its kind and bounded relative game root, create `[absoluteGameRoot, sceneName, ...remainingOptions]`, and call the resolver at the start of the Windows player's `RunAsync` method.
 
-- [ ] **Step 4: Run focused tests and confirm GREEN**
+- [x] **Step 4: Run focused tests and confirm GREEN**
 
 Run the command from Step 2. Expected: all resolver tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `feat(player): bootstrap packaged game from manifest`
 
@@ -65,25 +65,25 @@ Commit message: `feat(player): bootstrap packaged game from manifest`
 - Consumes: the graphical Windows player app host from `BuildPlayerCommand`.
 - Produces: package-root `Play.exe`, package-root `Play.bat`, and manifest `launchPath: "Play.exe"`.
 
-- [ ] **Step 1: Write failing packaging and publish tests**
+- [x] **Step 1: Write failing packaging and publish tests**
 
 Assert graphical publishing requests `win-x64` self-contained output, graphical packaging returns and records `Play.exe`, `Play.bat` invokes only the adjacent executable, and both files appear in the integrity inventory after relocation.
 
-- [ ] **Step 2: Run tests and confirm RED**
+- [x] **Step 2: Run tests and confirm RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~BuildPlayerCommandTests|FullyQualifiedName~GraphicsPackageIncludesDeterministicProofPlayerForCaptureAndAudit"`
 
 Expected: launcher assertions fail because packages still expose `Rekall.Age.Player.Windows.exe` and have no batch fallback.
 
-- [ ] **Step 3: Implement self-contained publishing and launcher creation**
+- [x] **Step 3: Implement self-contained publishing and launcher creation**
 
 For graphical Windows publish add `-r win-x64 --self-contained true`. During graphical package assembly copy the app host to `Play.exe`, write a fixed `Play.bat` that calls `"%~dp0Play.exe"` and returns `%ERRORLEVEL%`, then create the manifest inventory and archive. Return `Play.exe` from `PackagePlayableGameResult.LaunchPath`.
 
-- [ ] **Step 4: Run focused tests and confirm GREEN**
+- [x] **Step 4: Run focused tests and confirm GREEN**
 
 Run the command from Step 2. Expected: all selected tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `feat(packaging): add runnable Windows launchers`
 
@@ -96,23 +96,32 @@ Commit message: `feat(packaging): add runnable Windows launchers`
 - Consumes: completed manifest bootstrap and launcher package behavior.
 - Produces: recorded verification evidence and a reviewed commit series.
 
-- [ ] **Step 1: Run package workflow tests**
+- [x] **Step 1: Run package workflow tests**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~PlayablePackageIntegrityTests`
 
 Expected: all package integrity, relocation, capture, and audit tests pass.
 
-- [ ] **Step 2: Run Release solution verification**
+- [x] **Step 2: Run Release solution verification**
 
 Run: `dotnet test Rekall.AGE.sln -c Release --no-restore`
 
 Expected: build succeeds with zero warnings and all tests pass.
 
-- [ ] **Step 3: Review the complete diff**
+- [x] **Step 3: Review the complete diff**
 
 Confirm the executable is package-relative, batch content is constant and safely quoted, manifest traversal is rejected, self-contained publishing applies only to the Windows graphical player, and unrelated package behavior is unchanged.
 
-- [ ] **Step 4: Record completion**
+- [x] **Step 4: Record completion**
 
 Mark every completed checkbox in this plan and commit the evidence update with message `docs: record Windows launcher verification`.
 
+## Verification evidence
+
+- Resolver RED/GREEN: 8/8 focused tests pass, including relocation with spaces, dot-segment traversal, rooted paths, and a junction escaping the package.
+- Packaging RED/GREEN: graphical publish includes `hostfxr.dll`; `Play.exe` and `Play.bat` are integrity-inventoried and survive relocation.
+- Package workflow suite: 9/9 `PlayablePackageIntegrityTests` pass.
+- Real launcher smoke: relocated `Play.exe` and `Play.bat`, started without arguments from a different working directory, each rendered two bounded graphical frames and exited `0`.
+- Full solution: 1,688/1,688 engine tests and 55/55 Studio tests pass in Release with no build warnings or errors.
+- Independent review: launcher and generic capture-input changes are approved with no remaining Critical or Important findings.
+- Authored-game acceptance: Pong3D and Galaga3D graphical Windows packages each inspect and relocate successfully with 311 integrity-inventoried files; both audits pass every readiness, run, capture, layout, and informative-frame check.

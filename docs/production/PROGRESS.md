@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 12:20 Africa/Johannesburg
+Last verified: 2026-08-24 13:54 Africa/Johannesburg
 
 Branch: `codex/model-asset-games` (based exactly on `1c269fe`, which merged
 `codex/web-scene-bootstrap` into `master`)
@@ -5292,6 +5292,52 @@ projectile-vs-enemy visual capture (blocked by the finding above); native
 Windows player launch attempt (expected to hit the same console-
 redirection artifact already documented for Pong, given the same
 environment); a dedicated evidence archive under `Artifacts/`.
+
+## 2026-08-24 Pong3D Windows package accepted
+
+Pong3D now completes the package, archive, relocation, audit, semantic-input
+capture, and native-launch portion of its acceptance path. The graphical
+package at `artifacts/acceptance/Pong3D-Windows` exposes a self-contained
+`Play.exe` plus quoted `Play.bat`; its 48.2 MiB archive inspected ready with
+311 integrity-inventoried files and `Play.exe` as the manifest launch path.
+Relocation from the archive to
+`artifacts/acceptance/Relocated/Pong3D-Windows` passed integrity verification.
+
+The relocated audit passed manifest readiness, key artifacts, packaged scene
+validation, deterministic run, capture, non-blank frame, layout integrity, and
+informative-frame checks (93 distinct colors). A canonical `inputFrames`
+capture drove three repeated `paddle.move` semantic-action frames and produced
+`artifacts/acceptance/Evidence/Pong3D/package_play_frame_003.png` with 13 draw
+commands. Starting the relocated `Play.exe` with no arguments from an unrelated
+working directory reached and remained in graphical play startup until the
+bounded acceptance process ended it.
+
+## 2026-08-24 Galaga3D Windows package accepted
+
+Galaga3D now completes the same delivery path independently. The graphical
+package at `artifacts/acceptance/Galaga3D-Windows` exposes the same generic,
+manifest-driven `Play.exe`/`Play.bat` contract; its 48.1 MiB archive inspected
+ready with 311 integrity-inventoried files and relocated successfully to
+`artifacts/acceptance/Relocated/Galaga3D-Windows`.
+
+The relocated audit passed every readiness, validation, run, capture, layout,
+and informative-frame check (44 distinct colors). A canonical `inputFrames`
+capture drove repeated `player.move` plus pressed/held `fire` semantic actions
+and produced
+`artifacts/acceptance/Evidence/Galaga3D/package_play_frame_003.png` with 18 draw
+commands. Its relocated no-argument `Play.exe` also reached and remained in
+graphical play startup from an unrelated working directory.
+
+The generic engine work required to close both packages is verified, not just
+source-inspected: package capture now accepts semantic actions, physical key
+facts, edges, and per-frame deltas while preserving the legacy playback input
+field; Vulkan capture reports the same action/timing diagnostics; fixed-step
+elapsed time remains exact; dynamic command JSON and recovery suggestions retain
+canonical frames. The Windows player resolves its adjacent bounded manifest,
+rejects traversal and reparse-point game roots, and publishes self-contained.
+Final Release verification passed 1,688/1,688 engine tests and 55/55 Studio
+tests, and independent reviews report no remaining Critical or Important
+findings.
 
 ## Evidence index
 

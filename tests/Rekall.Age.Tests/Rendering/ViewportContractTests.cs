@@ -11,6 +11,82 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class ViewportContractTests
 {
     [Fact]
+    public void RuntimeProjectionPreservesGenericQualityAndEnvironmentAuthoring()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Render Settings", ["rendering"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RenderQualityProfile", new JsonObject
+                {
+                    ["preset"] = "Ultra",
+                    ["resolutionScale"] = 0.9,
+                    ["shadowCascadeCount"] = 3,
+                    ["shadowResolution"] = 1024,
+                    ["fogMode"] = "froxel",
+                    ["bloom"] = false,
+                    ["ssao"] = true,
+                    ["maximumActiveParticles"] = 12_000,
+                    ["automaticScaling"] = true,
+                    ["targetFramesPerSecond"] = 72
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Environment", ["rendering"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Environment3D", new JsonObject
+                {
+                    ["skyAsset"] = "asset_sky",
+                    ["ambientEnergy"] = 1.5,
+                    ["exposure"] = 0.25,
+                    ["toneMapper"] = "agx",
+                    ["whitePoint"] = 11.2,
+                    ["colorGrade"] = "asset_grade",
+                    ["backgroundPolicy"] = "skybox"
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Shadows", ["rendering"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.ShadowSettings", new JsonObject
+                {
+                    ["cascadeCount"] = 4,
+                    ["atlasResolution"] = 4096,
+                    ["maximumDistance"] = 250,
+                    ["splitPolicy"] = "practical",
+                    ["bias"] = 0.001,
+                    ["normalBias"] = 0.01,
+                    ["filter"] = "pcf",
+                    ["stabilization"] = true
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Mist", ["rendering"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.FogVolume", new JsonObject
+                {
+                    ["shape"] = "global",
+                    ["density"] = 0.02,
+                    ["albedo"] = "#d0e0ff",
+                    ["emission"] = "#000000",
+                    ["anisotropy"] = 0.15,
+                    ["heightFalloff"] = 0.4,
+                    ["blendDistance"] = 30,
+                    ["priority"] = 2
+                })));
+
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var quality = Assert.Single(world.Subsystems.Rendering.QualityProfiles);
+        Assert.Equal("Ultra", quality.Intent.Preset);
+        Assert.Equal(0.9, quality.Intent.ResolutionScale);
+        Assert.Equal(12_000, quality.Intent.MaximumActiveParticles);
+        Assert.True(quality.Intent.AutomaticScaling);
+        Assert.Equal(72, quality.Intent.TargetFramesPerSecond);
+        var environment = Assert.Single(world.Subsystems.Rendering.Environments);
+        Assert.Equal("asset_sky", environment.SkyAssetId);
+        Assert.Equal("agx", environment.ToneMapper);
+        Assert.Equal("skybox", environment.BackgroundPolicy);
+        var shadows = Assert.Single(world.Subsystems.Rendering.ShadowSettings);
+        Assert.Equal(4, shadows.CascadeCount);
+        Assert.Equal(4096, shadows.AtlasResolution);
+        Assert.True(shadows.Stabilization);
+        var fog = Assert.Single(world.Subsystems.Rendering.FogVolumes);
+        Assert.Equal("global", fog.Shape);
+        Assert.Equal(0.02, fog.Density);
+        Assert.Equal(2, fog.Priority);
+    }
+
+    [Fact]
     public async Task ViewportModelExtractsCameraAndRenderableSprites()
     {
         var root = TestPaths.CreateTempDirectory();

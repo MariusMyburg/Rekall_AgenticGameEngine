@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.World;
 
 namespace Rekall.Age.Runtime.Abstractions;
@@ -322,6 +323,18 @@ public sealed record RekallAgeRuntimeRenderView(
     public IReadOnlyList<RekallAgeRuntimeGpuWorkload> GpuWorkloads { get; init; } =
         Array.Empty<RekallAgeRuntimeGpuWorkload>();
 
+    public IReadOnlyList<RekallAgeRuntimeRenderQualityProfile> QualityProfiles { get; init; } =
+        Array.Empty<RekallAgeRuntimeRenderQualityProfile>();
+
+    public IReadOnlyList<RekallAgeRuntimeEnvironment3D> Environments { get; init; } =
+        Array.Empty<RekallAgeRuntimeEnvironment3D>();
+
+    public IReadOnlyList<RekallAgeRuntimeShadowSettings> ShadowSettings { get; init; } =
+        Array.Empty<RekallAgeRuntimeShadowSettings>();
+
+    public IReadOnlyList<RekallAgeRuntimeFogVolume> FogVolumes { get; init; } =
+        Array.Empty<RekallAgeRuntimeFogVolume>();
+
     public static RekallAgeRuntimeRenderView Empty { get; } = new(
         Array.Empty<RekallAgeRuntimeRenderCamera>(),
         Array.Empty<RekallAgeRuntimeRenderSprite>(),
@@ -414,6 +427,58 @@ public sealed record RekallAgeRuntimeRenderPostProcessPass(
     double Intensity = 1,
     double Radius = 1,
     string BlendMode = "add");
+
+public sealed record RekallAgeRuntimeRenderQualityProfile(
+    string EntityId,
+    string EntityName,
+    RekallAgeRenderQualityIntent Intent)
+{
+    public string ProjectionSource { get; init; } = RekallAgeRuntimeProjectionSources.Authored;
+}
+
+public sealed record RekallAgeRuntimeEnvironment3D(
+    string EntityId,
+    string EntityName,
+    string? SkyAssetId,
+    double AmbientEnergy,
+    double Exposure,
+    string ToneMapper,
+    double WhitePoint,
+    string? ColorGradeAssetId,
+    string BackgroundPolicy)
+{
+    public string ProjectionSource { get; init; } = RekallAgeRuntimeProjectionSources.Authored;
+}
+
+public sealed record RekallAgeRuntimeShadowSettings(
+    string EntityId,
+    string EntityName,
+    int CascadeCount,
+    int AtlasResolution,
+    double MaximumDistance,
+    string SplitPolicy,
+    double Bias,
+    double NormalBias,
+    string Filter,
+    bool Stabilization)
+{
+    public string ProjectionSource { get; init; } = RekallAgeRuntimeProjectionSources.Authored;
+}
+
+public sealed record RekallAgeRuntimeFogVolume(
+    string EntityId,
+    string EntityName,
+    string Shape,
+    double Density,
+    string Albedo,
+    string Emission,
+    double Anisotropy,
+    double HeightFalloff,
+    double BlendDistance,
+    int Priority)
+{
+    public string ProjectionSource { get; init; } = RekallAgeRuntimeProjectionSources.Authored;
+}
 
 [Flags]
 public enum RekallAgeRuntimeGpuBufferUsage

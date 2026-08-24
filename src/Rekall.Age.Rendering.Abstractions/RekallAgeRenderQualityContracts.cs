@@ -1,0 +1,63 @@
+namespace Rekall.Age.Rendering.Abstractions;
+
+/// <summary>
+/// Backend-neutral authored quality intent. Resolution is performed against explicit device facts.
+/// </summary>
+public sealed record RekallAgeRenderQualityIntent(
+    string Preset = "High",
+    double? ResolutionScale = null,
+    int? ShadowCascadeCount = null,
+    int? ShadowResolution = null,
+    string? FogMode = null,
+    bool? Bloom = null,
+    bool? Ssao = null,
+    int? MaximumActiveParticles = null,
+    bool AutomaticScaling = false,
+    double TargetFramesPerSecond = 60)
+{
+    public bool EnableGpuTimestamps { get; init; }
+}
+
+public sealed record RekallAgeResolvedRenderFeaturePlan(
+    string RequestedPreset,
+    string ResolvedPreset,
+    int OutputWidth,
+    int OutputHeight,
+    int RenderWidth,
+    int RenderHeight,
+    double ResolutionScale,
+    RekallAgeResolvedShadowQuality Shadows,
+    RekallAgeResolvedFogQuality Fog,
+    RekallAgeResolvedPostQuality Post,
+    RekallAgeResolvedParticleQuality Particles,
+    long EstimatedTransientBytes,
+    long EstimatedPersistentBytes,
+    IReadOnlyList<RekallAgeRenderFeatureDegradation> Degradations);
+
+public sealed record RekallAgeResolvedShadowQuality(
+    int CascadeCount,
+    int Resolution,
+    int FilterTapCount);
+
+public sealed record RekallAgeResolvedFogQuality(
+    string Mode,
+    int FroxelWidth = 0,
+    int FroxelHeight = 0,
+    int FroxelDepth = 0);
+
+public sealed record RekallAgeResolvedPostQuality(
+    bool Bloom,
+    bool Ssao,
+    bool GpuTimestamps);
+
+public sealed record RekallAgeResolvedParticleQuality(int MaximumActiveParticles);
+
+/// <summary>
+/// A stable, inspectable explanation for any resolver fallback or device-enforced reduction.
+/// </summary>
+public sealed record RekallAgeRenderFeatureDegradation(
+    string Code,
+    string Feature,
+    string RequestedValue,
+    string ResolvedValue,
+    string Message);

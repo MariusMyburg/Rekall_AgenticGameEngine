@@ -54,6 +54,8 @@ public sealed record RekallAgeRuntimeViewportFrame(
 
     public RekallAgeRuntimeViewportCamera? HeadsetCamera { get; init; }
 
+    public RekallAgeResolvedRenderFeaturePlan? ResolvedQualityPlan { get; init; }
+
     public RekallAgeRuntimeViewportFrame ForHeadsetOutput()
     {
         return HeadsetCamera is null ? this : ForCameraView(HeadsetCamera);

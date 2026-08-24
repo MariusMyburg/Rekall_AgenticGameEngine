@@ -39,13 +39,64 @@ internal static class WardenSimulation
             AetherfallConstants.ArrivalMinimumZ,
             AetherfallConstants.ArrivalMaximumZ);
         var hasDirection = Math.Abs(moveX) > 0.0001 || Math.Abs(moveZ) > 0.0001;
+        var aether = warden.ComponentNumber(AetherfallConstants.WardenStateType, "aether", 100);
+        var dashCooldown = Math.Max(
+            0,
+            warden.ComponentNumber(AetherfallConstants.WardenStateType, "dashCooldown") - seconds);
+        var invulnerability = Math.Max(
+            0,
+            warden.ComponentNumber(AetherfallConstants.WardenStateType, "invulnerability") - seconds);
+        if (world.WasInputActionPressed(AetherfallConstants.DashAction)
+            && hasDirection
+            && dashCooldown <= 0
+            && aether >= AetherfallConstants.DashCost)
+        {
+            nextX = Math.Clamp(
+                nextX + moveX * AetherfallConstants.DashDistance,
+                AetherfallConstants.ArrivalMinimumX,
+                AetherfallConstants.ArrivalMaximumX);
+            nextZ = Math.Clamp(
+                nextZ + moveZ * AetherfallConstants.DashDistance,
+                AetherfallConstants.ArrivalMinimumZ,
+                AetherfallConstants.ArrivalMaximumZ);
+            aether -= AetherfallConstants.DashCost;
+            dashCooldown = AetherfallConstants.DashCooldownSeconds;
+            invulnerability = AetherfallConstants.DashInvulnerabilitySeconds;
+            world = world.AddEntity(AetherfallEntityFactory.CreateDashEffect(
+                world.FrameIndex,
+                new RekallAgeRuntimeVector3(nextX, position.Y, nextZ)));
+            world = world.EmitEvent(warden, "warden.dashed", nameof(WardenSimulation));
+        }
+
+        var pulseCooldown = Math.Max(
+            0,
+            warden.ComponentNumber(AetherfallConstants.WardenStateType, "pulseCooldown") - seconds);
+        var pulsePressed = world.WasInputActionPressed(AetherfallConstants.PulseAction);
+        if (pulsePressed && pulseCooldown <= 0 && aether >= AetherfallConstants.PulseCost)
+        {
+            var facingX = warden.ComponentNumber(AetherfallConstants.WardenStateType, "facingX");
+            var facingZ = warden.ComponentNumber(AetherfallConstants.WardenStateType, "facingZ", 1);
+            var (pulseX, pulseZ) = AetherfallMath.NormalizePlanar(facingX, facingZ);
+            var pulse = AetherfallEntityFactory.CreateWardenPulse(
+                world.FrameIndex,
+                new RekallAgeRuntimeVector3(nextX + pulseX, position.Y, nextZ + pulseZ),
+                pulseX,
+                pulseZ);
+            world = world.AddEntity(pulse);
+            pulseCooldown = AetherfallConstants.PulseCooldownSeconds;
+            aether -= AetherfallConstants.PulseCost;
+        }
 
         return world.UpdateEntity(warden.Id, entity =>
         {
             var updated = entity
                 .WithPosition3D(new RekallAgeRuntimeVector3(nextX, position.Y, nextZ))
                 .WithComponentNumber(AetherfallConstants.WardenStateType, "velocityX", velocityX)
-                .WithComponentNumber(AetherfallConstants.WardenStateType, "velocityZ", velocityZ);
+                .WithComponentNumber(AetherfallConstants.WardenStateType, "velocityZ", velocityZ)
+                .WithComponentNumber(AetherfallConstants.WardenStateType, "pulseCooldown", pulseCooldown)
+                .WithComponentNumber(AetherfallConstants.WardenStateType, "dashCooldown", dashCooldown)
+                .WithComponentNumber(AetherfallConstants.WardenStateType, "invulnerability", invulnerability)
+                .WithComponentNumber(AetherfallConstants.WardenStateType, "aether", aether);
             return hasDirection
                 ? updated
                     .WithComponentNumber(AetherfallConstants.WardenStateType, "facingX", moveX)

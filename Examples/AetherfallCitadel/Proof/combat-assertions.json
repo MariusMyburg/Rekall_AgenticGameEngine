@@ -1,0 +1,5 @@
+[
+  {"entityName":"AetherWarden","subject":"component","operator":"exists","componentType":"Game.Modules.AetherfallRules.WardenState"},
+  {"entityName":"TrainingSentinel","subject":"changed.component.property","operator":"equals","componentType":"Game.Modules.AetherfallRules.EnemyState","propertyName":"health","expected":true},
+  {"entityName":"AetherWarden","subject":"changed.component.property","operator":"equals","componentType":"Game.Modules.AetherfallRules.WardenState","propertyName":"shardCount","expected":true}
+]

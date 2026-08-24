@@ -13,6 +13,8 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
         RekallAgeRuntimeWorld world,
         RekallAgeRuntimeModuleFrameContext context)
     {
-        return ValueTask.FromResult(WardenSimulation.Update(world, context));
+        world = WardenSimulation.Update(world, context);
+        world = WorldInteractionSimulation.Update(world, context);
+        return ValueTask.FromResult(world);
     }
 }

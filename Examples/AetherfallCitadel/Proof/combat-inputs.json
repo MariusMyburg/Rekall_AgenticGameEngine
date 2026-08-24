@@ -1,0 +1,12 @@
+[
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"ability.pulse","value":1,"isDown":true,"wasPressed":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[]},
+  {"deltaSeconds":0.1,"semanticActions":[]},
+  {"deltaSeconds":0.1,"semanticActions":[]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[]}
+]

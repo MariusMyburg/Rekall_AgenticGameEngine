@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "assetId": "galaga-player-graph",
+  "name": "Galaga Player Ship Graph",
+  "revision": 1,
+  "nodes": [
+    {
+      "nodeId": "body",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "radiusBottom": 0.32,
+        "radiusTop": 0.6,
+        "depth": 1.5,
+        "segments": 6,
+        "capBottom": true,
+        "capTop": true
+      }
+    },
+    {
+      "nodeId": "wing",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 2.6,
+        "sizeY": 0.12,
+        "sizeZ": 0.6
+      }
+    },
+    {
+      "nodeId": "wingXform",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          -0.02,
+          0.05
+        ]
+      }
+    },
+    {
+      "nodeId": "finL",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "radiusBottom": 0.05,
+        "radiusTop": 0.2,
+        "depth": 0.45,
+        "segments": 4,
+        "capBottom": true,
+        "capTop": true
+      }
+    },
+    {
+      "nodeId": "finLXform",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -1.15,
+          0,
+          0.35
+        ],
+        "rotation": [
+          0,
+          0,
+          15
+        ]
+      }
+    },
+    {
+      "nodeId": "finR",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "radiusBottom": 0.05,
+        "radiusTop": 0.2,
+        "depth": 0.45,
+        "segments": 4,
+        "capBottom": true,
+        "capTop": true
+      }
+    },
+    {
+      "nodeId": "finRXform",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          1.15,
+          0,
+          0.35
+        ],
+        "rotation": [
+          0,
+          0,
+          -15
+        ]
+      }
+    },
+    {
+      "nodeId": "joinAll",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "uv",
+      "typeId": "rekall.modeling.project_uv",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "xz"
+      }
+    },
+    {
+      "nodeId": "out",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "l1",
+      "fromNodeId": "body",
+      "fromPortId": "geometry",
+      "toNodeId": "joinAll",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l2",
+      "fromNodeId": "wing",
+      "fromPortId": "geometry",
+      "toNodeId": "wingXform",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l3",
+      "fromNodeId": "wingXform",
+      "fromPortId": "geometry",
+      "toNodeId": "joinAll",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l4",
+      "fromNodeId": "finL",
+      "fromPortId": "geometry",
+      "toNodeId": "finLXform",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l5",
+      "fromNodeId": "finLXform",
+      "fromPortId": "geometry",
+      "toNodeId": "joinAll",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l6",
+      "fromNodeId": "finR",
+      "fromPortId": "geometry",
+      "toNodeId": "finRXform",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l7",
+      "fromNodeId": "finRXform",
+      "fromPortId": "geometry",
+      "toNodeId": "joinAll",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l8",
+      "fromNodeId": "joinAll",
+      "fromPortId": "geometry",
+      "toNodeId": "uv",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l9",
+      "fromNodeId": "uv",
+      "fromPortId": "geometry",
+      "toNodeId": "out",
+      "toPortId": "input"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "out",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

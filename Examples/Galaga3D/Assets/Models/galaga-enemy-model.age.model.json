@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "galaga-enemy-model",
+  "displayName": "Galaga Enemy Ship",
+  "revision": 1,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "galaga-enemy-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "f63f8c4d2e1eabb406111e52f7826b507ff82625d93d207184fa82f028bcec41",
+    "sourceLogicalRevision": 2,
+    "compiledMeshPath": "Assets/Models/Compiled/galaga-enemy-model/579e033c7fd424c43d665156dce04248a8291ce187f183fc75e0b63bdc6acf6f.age.compiled-mesh.json",
+    "compiledContentHash": "579e033c7fd424c43d665156dce04248a8291ce187f183fc75e0b63bdc6acf6f",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-24T09:56:45.7522923+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

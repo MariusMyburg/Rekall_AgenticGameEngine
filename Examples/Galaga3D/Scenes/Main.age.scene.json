@@ -1,0 +1,775 @@
+{
+  "schemaVersion": 1,
+  "id": "scene_5045db050c6541aca9fef7939c37ac20",
+  "name": "Main",
+  "capabilities": [
+    "audio",
+    "input",
+    "physics",
+    "rendering3d",
+    "ui",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "ent_f4884291bc1547cf9224d9c3e72146ad",
+      "name": "Backdrop",
+      "tags": [
+        "geometry"
+      ],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#12182b"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 3,
+            "z": 9,
+            "scaleX": 16,
+            "scaleY": 10,
+            "scaleZ": 0.2
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_33ccd3310e384737b4776fe587d1c97e",
+      "name": "Enemy_0",
+      "tags": [
+        "model-asset"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.GalagaRules.Enemy",
+          "properties": {
+            "alive": true,
+            "baseX": -4.5,
+            "baseZ": 3,
+            "divePhase": "formation",
+            "diveTimer": 3
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "galaga-enemy-model"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -4.5,
+            "y": 0,
+            "z": 3,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_8133e8bfb5cd40f0ae869c22ba0c98a8",
+      "name": "Enemy_1",
+      "tags": [
+        "model-asset"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.GalagaRules.Enemy",
+          "properties": {
+            "alive": true,
+            "baseX": -1.5,
+            "baseZ": 3,
+            "divePhase": "formation",
+            "diveTimer": 4.3
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "galaga-enemy-model"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -1.5,
+            "y": 0,
+            "z": 3,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_bfd8483f6a9544899d9c2481e20621af",
+      "name": "Enemy_2",
+      "tags": [
+        "model-asset"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.GalagaRules.Enemy",
+          "properties": {
+            "alive": true,
+            "baseX": 1.5,
+            "baseZ": 3,
+            "divePhase": "formation",
+            "diveTimer": 5.6
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "galaga-enemy-model"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 1.5,
+            "y": 0,
+            "z": 3,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_2281f458bcd14e038529ed0a432e5da7",
+      "name": "Enemy_3",
+      "tags": [
+        "model-asset"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.GalagaRules.Enemy",
+          "properties": {
+            "alive": true,
+            "baseX": 4.5,
+            "baseZ": 3,
+            "divePhase": "formation",
+            "diveTimer": 6.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "galaga-enemy-model"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 4.5,
+            "y": 0,
+            "z": 3,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_1dfa40d933b146aa815716bea482d908",
+      "name": "Enemy_4",
+      "tags": [
+        "model-asset"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.GalagaRules.Enemy",
+          "properties": {
+            "alive": true,
+            "baseX": -4.5,
+            "baseZ": 4.5,
+            "divePhase": "formation",
+            "diveTimer": 3.6
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "galaga-enemy-model"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -4.5,
+            "y": 0,
+            "z": 4.5,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e3b10a7fd36f45f7b9010fc897758e51",
+      "name": "Enemy_5",
+      "tags": [
+        "model-asset"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.GalagaRules.Enemy",
+          "properties": {
+            "alive": true,
+            "baseX": -1.5,
+            "baseZ": 4.5,
+            "divePhase": "formation",
+            "diveTimer": 4.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "galaga-enemy-model"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -1.5,
+            "y": 0,
+            "z": 4.5,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_c86374fbc3d848e6b82c9b10219780bb",
+      "name": "Enemy_6",
+      "tags": [
+        "model-asset"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.GalagaRules.Enemy",
+          "properties": {
+            "alive": true,
+            "baseX": 1.5,
+            "baseZ": 4.5,
+            "divePhase": "formation",
+            "diveTimer": 6.2
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "galaga-enemy-model"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 1.5,
+            "y": 0,
+            "z": 4.5,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_bb5a33ebd1464e2c8673d5200adc4607",
+      "name": "Enemy_7",
+      "tags": [
+        "model-asset"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.GalagaRules.Enemy",
+          "properties": {
+            "alive": true,
+            "baseX": 4.5,
+            "baseZ": 4.5,
+            "divePhase": "formation",
+            "diveTimer": 7.5
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "galaga-enemy-model"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 4.5,
+            "y": 0,
+            "z": 4.5,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_a6aeb66a511046b7a5f47070c60f8caa",
+      "name": "FillLight",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": {
+            "intensity": 0.75,
+            "color": "#ff7ad9"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "pitch": 20,
+            "yaw": 150
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_6f26ef701e3a4429a8d18b4bbe717373",
+      "name": "Floor",
+      "tags": [
+        "geometry"
+      ],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#1c2440"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": -1.5,
+            "z": 0,
+            "scaleX": 16,
+            "scaleY": 0.2,
+            "scaleZ": 18
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_2d66ce8732274db19b5a45509986681e",
+      "name": "HudCanvas",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.UiCanvas",
+          "properties": {
+            "ReferenceWidth": 960,
+            "ReferenceHeight": 540,
+            "Layer": 10
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_84866d1e41b34cdd911719987394a1d0",
+      "name": "InputRoot",
+      "tags": [
+        "input"
+      ],
+      "components": [
+        {
+          "type": "Rekall.InputActionMap",
+          "properties": {
+            "actions": [
+              {
+                "name": "player.move",
+                "negativeKey": "A",
+                "positiveKey": "D"
+              },
+              {
+                "name": "fire",
+                "key": "Space"
+              },
+              {
+                "name": "reset",
+                "key": "R"
+              }
+            ]
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_0cd5365df6fb40dbb01e560f8bff1cd9",
+      "name": "KeyLight",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": {
+            "intensity": 1.5,
+            "color": "#d9e8ff"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "pitch": -40,
+            "yaw": -35
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_eb45ff9c407a4115b3169f15b58bbee8",
+      "name": "LeftWall",
+      "tags": [
+        "geometry"
+      ],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#2a3560"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -6.8,
+            "y": 0.5,
+            "z": 0,
+            "scaleX": 0.2,
+            "scaleY": 3,
+            "scaleZ": 18
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_9ebe1b5dae3a4ec39719e12ddc73a291",
+      "name": "LivesLabel",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Label",
+          "properties": {
+            "Text": "LIVES 3",
+            "X": 680,
+            "Y": 16,
+            "Width": 260,
+            "Height": 44,
+            "FontSize": 32,
+            "ForegroundColor": "#eaf6ff",
+            "HorizontalAlignment": "end"
+          }
+        }
+      ],
+      "parentId": "ent_2d66ce8732274db19b5a45509986681e",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_bb12d1a9650749f8aafbba2f608e0002",
+      "name": "MainCamera",
+      "tags": [
+        "camera"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "active": true,
+            "fieldOfView": 60,
+            "clearColor": "#050812"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 10,
+            "z": -13,
+            "pitch": 40
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_343173d57b2242c6b342c6e02baf69ea",
+      "name": "PlayerShip",
+      "tags": [
+        "model-asset"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.GalagaRules.GalagaState",
+          "properties": {
+            "score": 0,
+            "lives": 3,
+            "phase": "playing",
+            "fireCooldown": 0
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "galaga-player-model"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "z": -6,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ebf2c874489b4bddbeddec4259119b05",
+      "name": "RightWall",
+      "tags": [
+        "geometry"
+      ],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#2a3560"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 6.8,
+            "y": 0.5,
+            "z": 0,
+            "scaleX": 0.2,
+            "scaleY": 3,
+            "scaleZ": 18
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_c9ece7f806c242898522d86b7739c287",
+      "name": "ScoreLabel",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Label",
+          "properties": {
+            "Text": "SCORE 0",
+            "X": 20,
+            "Y": 16,
+            "Width": 260,
+            "Height": 44,
+            "FontSize": 32,
+            "ForegroundColor": "#eaf6ff",
+            "HorizontalAlignment": "start"
+          }
+        }
+      ],
+      "parentId": "ent_2d66ce8732274db19b5a45509986681e",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

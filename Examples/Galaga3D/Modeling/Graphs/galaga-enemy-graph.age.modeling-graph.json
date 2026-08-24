@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 1,
+  "assetId": "galaga-enemy-graph",
+  "name": "Galaga Enemy Ship Graph",
+  "revision": 1,
+  "nodes": [
+    {
+      "nodeId": "body",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.42,
+        "segments": 10,
+        "rings": 6
+      }
+    },
+    {
+      "nodeId": "ring",
+      "typeId": "rekall.modeling.primitive.torus",
+      "typeVersion": 1,
+      "parameters": {
+        "majorRadius": 0.55,
+        "minorRadius": 0.08,
+        "majorSegments": 16,
+        "minorSegments": 6
+      }
+    },
+    {
+      "nodeId": "ringXform",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "rotation": [
+          90,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "legL",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "radiusBottom": 0.03,
+        "radiusTop": 0.1,
+        "depth": 0.3,
+        "segments": 4,
+        "capBottom": true,
+        "capTop": true
+      }
+    },
+    {
+      "nodeId": "legLXform",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -0.25,
+          -0.35,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          20
+        ]
+      }
+    },
+    {
+      "nodeId": "legR",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "radiusBottom": 0.03,
+        "radiusTop": 0.1,
+        "depth": 0.3,
+        "segments": 4,
+        "capBottom": true,
+        "capTop": true
+      }
+    },
+    {
+      "nodeId": "legRXform",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0.25,
+          -0.35,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          -20
+        ]
+      }
+    },
+    {
+      "nodeId": "joinAll",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "uv",
+      "typeId": "rekall.modeling.project_uv",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "xz"
+      }
+    },
+    {
+      "nodeId": "out",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "l1",
+      "fromNodeId": "body",
+      "fromPortId": "geometry",
+      "toNodeId": "joinAll",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l2",
+      "fromNodeId": "ring",
+      "fromPortId": "geometry",
+      "toNodeId": "ringXform",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l3",
+      "fromNodeId": "ringXform",
+      "fromPortId": "geometry",
+      "toNodeId": "joinAll",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l4",
+      "fromNodeId": "legL",
+      "fromPortId": "geometry",
+      "toNodeId": "legLXform",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l5",
+      "fromNodeId": "legLXform",
+      "fromPortId": "geometry",
+      "toNodeId": "joinAll",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l6",
+      "fromNodeId": "legR",
+      "fromPortId": "geometry",
+      "toNodeId": "legRXform",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l7",
+      "fromNodeId": "legRXform",
+      "fromPortId": "geometry",
+      "toNodeId": "joinAll",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l8",
+      "fromNodeId": "joinAll",
+      "fromPortId": "geometry",
+      "toNodeId": "uv",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "l9",
+      "fromNodeId": "uv",
+      "fromPortId": "geometry",
+      "toNodeId": "out",
+      "toPortId": "input"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "out",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

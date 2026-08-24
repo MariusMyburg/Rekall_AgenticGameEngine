@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "galaga-player-model",
+  "displayName": "Galaga Player Ship",
+  "revision": 1,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "galaga-player-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "2f3c280b08b64d6fdbf31ab09d8ef43cc766c1e3a2d21ca2f5c815fe3f0f68fc",
+    "sourceLogicalRevision": 2,
+    "compiledMeshPath": "Assets/Models/Compiled/galaga-player-model/d11042d2e658e5f81f2b22f6e5ebc4fc339606b4a74e27a920c1ffc49209d6b4.age.compiled-mesh.json",
+    "compiledContentHash": "d11042d2e658e5f81f2b22f6e5ebc4fc339606b4a74e27a920c1ffc49209d6b4",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-24T09:56:45.6795282+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

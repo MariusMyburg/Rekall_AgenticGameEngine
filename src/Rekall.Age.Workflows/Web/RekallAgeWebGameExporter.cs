@@ -90,6 +90,24 @@ public sealed class RekallAgeWebGameExporter
                     RekallAgeDocumentSchemaProbe.MaximumDocumentBytes,
                     cancellationToken);
                 staged.TryAdd(logicalPath, assetEntry.Bytes.ToArray());
+
+                // A Model Asset's ImportedPath is only its compiled mesh snapshot. The web
+                // client also needs the Model Asset's own definition document (the file that
+                // records which compiled output/hash is current) to resolve
+                // Rekall.ModelAssetReference at runtime, so stage it alongside the compiled
+                // mesh -- otherwise the published bundle 404s on it and the web player falls
+                // back to its boot placeholder instead of rendering the game.
+                if (asset.ModelAssetMetadata is { } modelMetadata
+                    && !string.IsNullOrWhiteSpace(modelMetadata.ModelDocumentPath))
+                {
+                    var modelDocumentPath = ResolveAssetPath(projectRoot, modelMetadata.ModelDocumentPath);
+                    var modelDocumentEntry = await content.ReadAsync(
+                        modelDocumentPath,
+                        RekallAgeDocumentSchemaProbe.MaximumDocumentBytes,
+                        cancellationToken);
+                    staged.TryAdd(modelDocumentPath, modelDocumentEntry.Bytes.ToArray());
+                }
+
                 packagedAssets.Add(asset with
                 {
                     SourcePath = string.Empty,

@@ -23,7 +23,7 @@ public sealed class ScaffoldPlayableModuleCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Scaffolds an agent-editable C# playable module shell without engine-authored game behavior and refuses to overwrite an existing module. If the module exists, read and edit it; never scaffold it again.",
+        "Scaffolds an agent-editable C# playable module shell without engine-authored game behavior and refuses to overwrite an existing module. If the module exists, read and edit it; never scaffold it again. This is the module type rekall.build.player's native player entrypoint requires (IRekallAgePlayableModule) -- a project with only a rekall.module.scaffold_runtime_system module cannot be launched natively without also scaffolding one of these. It is a minimal Tick/Render state-and-text loop, separate from the full 3D world/physics/rendering simulation driven by IRekallAgeRuntimeModuleSystem; real visual/gameplay proof of a 3D scene comes from rekall.game.publish_web + rekall.game.audit_web plus a real browser session, not from this native entrypoint.",
         typeof(ScaffoldPlayableModuleRequest).FullName!,
         typeof(ScaffoldPlayableModuleResult).FullName!);
 

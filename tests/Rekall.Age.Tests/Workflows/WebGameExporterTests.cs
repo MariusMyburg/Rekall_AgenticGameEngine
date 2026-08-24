@@ -306,6 +306,71 @@ public sealed class WebGameExporterTests
     }
 
     [Fact]
+    public async Task StagesTheModelAssetDefinitionDocumentAlongsideItsCompiledMeshOutput()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var output = TestPaths.CreateTempDirectory();
+        Directory.Delete(output);
+        Directory.CreateDirectory(Path.Combine(root, "Scenes"));
+        Directory.CreateDirectory(Path.Combine(root, "Assets", "Models", "Compiled", "ball-model"));
+        await File.WriteAllTextAsync(
+            Path.Combine(root, "rekall.project.json"),
+            """
+            {"name":"Model Asset Web Game","schemaVersion":1,"capabilities":["world","rendering3d","ui"]}
+            """);
+        await File.WriteAllTextAsync(
+            Path.Combine(root, "Scenes", "Main.age.scene.json"),
+            """
+            {"id":"scene_main","name":"Main","schemaVersion":1,"capabilities":["world","rendering3d","ui"],"entities":[{"id":"ball","name":"Ball","tags":[],"components":[{"type":"Rekall.ModelAssetReference","properties":{"assetId":"ball-model"}}],"parentId":null,"prefabSourceId":null,"visible":true,"locked":false}]}
+            """);
+        var compiledMeshHash = new string('c', 64);
+        var catalog = new
+        {
+            assets = new object[]
+            {
+                new
+                {
+                    id = "ball-model",
+                    name = "ball-model",
+                    displayName = "Ball",
+                    kind = "model",
+                    sourcePath = "Modeling/Meshes/ball-mesh.age.mesh.json",
+                    importedPath = $"Assets/Models/Compiled/ball-model/{compiledMeshHash}.age.compiled-mesh.json",
+                    contentHash = compiledMeshHash,
+                    modelAssetMetadata = new
+                    {
+                        modelDocumentPath = "Assets/Models/ball-model.age.model.json",
+                        sourceKind = "Mesh",
+                        sourceAssetId = "ball-mesh",
+                        compiledOutputPath = $"Assets/Models/Compiled/ball-model/{compiledMeshHash}.age.compiled-mesh.json",
+                        compiledContentHash = compiledMeshHash
+                    }
+                }
+            }
+        };
+        await File.WriteAllTextAsync(
+            Path.Combine(root, "Assets", "assets.age.catalog.json"),
+            JsonSerializer.Serialize(catalog));
+        await File.WriteAllTextAsync(
+            Path.Combine(root, "Assets", "Models", "ball-model.age.model.json"),
+            """{"schemaVersion":1,"assetId":"ball-model","displayName":"Ball","revision":1}""");
+        await File.WriteAllBytesAsync(
+            Path.Combine(root, "Assets", "Models", "Compiled", "ball-model", $"{compiledMeshHash}.age.compiled-mesh.json"),
+            Encoding.UTF8.GetBytes("compiled-mesh-bytes"));
+
+        var result = await new RekallAgeWebGameExporter().StageAsync(
+            new RekallAgeWebGameStageRequest(root, "Main", output),
+            CancellationToken.None);
+
+        Assert.Contains(
+            "Assets/Models/ball-model.age.model.json",
+            result.Manifest.Content.Select(entry => entry.Path));
+        Assert.True(File.Exists(Path.Combine(output, "Assets", "Models", "ball-model.age.model.json")));
+        Assert.True(File.Exists(Path.Combine(
+            output, "Assets", "Models", "Compiled", "ball-model", $"{compiledMeshHash}.age.compiled-mesh.json")));
+    }
+
+    [Fact]
     public async Task RejectsAnAssetCatalogPathThatEscapesTheProject()
     {
         var root = TestPaths.CreateTempDirectory();

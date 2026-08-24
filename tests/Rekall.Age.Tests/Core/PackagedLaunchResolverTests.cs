@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using Rekall.Age.Core.Product;
 
 namespace Rekall.Age.Tests.Core;
@@ -43,6 +44,7 @@ public sealed class PackagedLaunchResolverTests
     [Theory]
     [InlineData("wrong.package.kind", "Game")]
     [InlineData("rekall.age.playable.package", "../Outside")]
+    [InlineData("rekall.age.playable.package", "Game/../Game")]
     public async Task InvalidOrEscapingManifestIsRejected(string kind, string gameRoot)
     {
         var packageRoot = TestPaths.CreateTempDirectory();
@@ -63,6 +65,44 @@ public sealed class PackagedLaunchResolverTests
 
         Assert.Throws<InvalidDataException>(
             () => RekallAgePackagedLaunchResolver.Resolve(executable, []));
+    }
+
+    [Fact]
+    public async Task LinkedGameRootOutsidePackageIsRejected()
+    {
+        var packageRoot = TestPaths.CreateTempDirectory();
+        var outside = TestPaths.CreateTempDirectory();
+        var gameRoot = Path.Combine(packageRoot, "Game");
+        if (OperatingSystem.IsWindows())
+        {
+            var startInfo = new ProcessStartInfo("cmd.exe")
+            {
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            startInfo.ArgumentList.Add("/d");
+            startInfo.ArgumentList.Add("/c");
+            startInfo.ArgumentList.Add("mklink");
+            startInfo.ArgumentList.Add("/J");
+            startInfo.ArgumentList.Add(gameRoot);
+            startInfo.ArgumentList.Add(outside);
+            using var process = Process.Start(startInfo)!;
+            process.WaitForExit();
+            Assert.Equal(0, process.ExitCode);
+        }
+        else
+        {
+            Directory.CreateSymbolicLink(gameRoot, outside);
+        }
+
+        var executable = Path.Combine(packageRoot, "Play.exe");
+        await WriteManifestAsync(packageRoot, "Game", "Main", ["Game", "Main", "--graphics"]);
+
+        var exception = Assert.Throws<InvalidDataException>(
+            () => RekallAgePackagedLaunchResolver.Resolve(executable, []));
+
+        Assert.Contains("reparse", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task WriteManifestAsync(

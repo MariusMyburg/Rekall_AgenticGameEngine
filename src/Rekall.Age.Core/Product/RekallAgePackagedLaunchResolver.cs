@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Rekall.Age.Core.Persistence;
 
 namespace Rekall.Age.Core.Product;
 
@@ -52,6 +53,12 @@ public static class RekallAgePackagedLaunchResolver
             throw new InvalidDataException("The packaged game root must be a relative path.");
         }
 
+        if (manifest.GameRoot.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries)
+            .Any(segment => segment is "." or ".."))
+        {
+            throw new InvalidDataException("The packaged game root must not contain traversal segments.");
+        }
+
         if (string.IsNullOrWhiteSpace(manifest.SceneName))
         {
             throw new InvalidDataException("The packaged scene name is missing.");
@@ -72,6 +79,18 @@ public static class RekallAgePackagedLaunchResolver
                 PathComparison))
         {
             throw new InvalidDataException("The packaged game root escapes the package directory.");
+        }
+
+        try
+        {
+            resolvedGameRoot = RekallAgeConfinedPath.Resolve(
+                normalizedPackageRoot,
+                resolvedGameRoot,
+                "Packaged game root");
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidDataException("The packaged game root escapes the package directory.", exception);
         }
 
         return [resolvedGameRoot, manifest.SceneName, .. manifest.Arguments.Skip(2)];

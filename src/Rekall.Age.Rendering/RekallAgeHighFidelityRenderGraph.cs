@@ -150,7 +150,9 @@ public sealed record RekallAgeHighFidelityRenderGraph(
                     continue;
                 }
 
-                if (!writers.Any(writer => writer.Order < pass.Order))
+                var persistentFeedback = resourceLifetimes[resource].Equals("persistent", StringComparison.OrdinalIgnoreCase)
+                    && writers.Any(writer => writer.Name.Equals(pass.Name, StringComparison.Ordinal));
+                if (!writers.Any(writer => writer.Order < pass.Order) && !persistentFeedback)
                 {
                     Add(diagnostics, "REKALL_RENDER_GRAPH_READ_BEFORE_WRITE", resource,
                         $"Render pass '{pass.Name}' reads '{resource}' before an earlier pass writes it.");

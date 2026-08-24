@@ -129,8 +129,10 @@ Following the useful Godot separation, CPU scene documents and runtime facts do 
 - particle simulations and instance buffers
 - animation skin/morph buffers
 - environment and post-process resources
+- temporal histories whose lifetime spans frames in one renderer session
 
 Stores use stable asset/content identities and bounded invalidation. Hot reload replaces only affected resources and retains the last valid representation on compilation/import failure.
+The native renderer session owns its Vulkan instance/device and persistent temporal images until that session is disposed. The render graph declares those images as persistent resources, includes them in persistent memory estimates, and treats their prior-frame contents as valid inputs only after the owning execution path has initialized them.
 
 ## Physically Based Shading
 
@@ -160,7 +162,7 @@ Later milestones add spot/point shadow atlases, cached static shadows, contact s
 
 ## Atmosphere, Fog, and Post-Processing
 
-The foundation supports inexpensive analytic height/distance fog on lower tiers and froxel volumetric fog on higher tiers. Volumetric fog includes bounded grid dimensions, light injection, density volumes, anisotropic scattering, temporal reprojection, camera-cut reset, and optional filtering.
+The foundation supports inexpensive analytic height/distance fog on lower tiers and froxel volumetric fog on higher tiers. Both paths sample stored opaque depth and reconstruct view rays from the active camera basis and projection so integration stops at visible opaque surfaces, including for rotated cameras. Volumetric fog includes bounded grid dimensions, oriented local density volumes, selected directional-light injection, anisotropic phase scattering, per-froxel cascade shadow lookup, persistent GPU history sampling and reprojection, truthful camera-cut/grid reset, and optional filtering. Unsupported volume shapes degrade deterministically with stable observation facts and dropped entity IDs. Fog debug slices come from an explicit readback of the executed GPU froxel image.
 
 The HDR post stack executes authored standard passes rather than treating their names as metadata only:
 

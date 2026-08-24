@@ -34,13 +34,15 @@ public sealed class RekallAgeVulkanShaderCompiler
             errors);
     }
 
-    public RekallAgeVulkanHighFidelityShaderCompilationResult CompileHighFidelityPostPipeline()
+    public RekallAgeVulkanHighFidelityShaderCompilationResult CompileHighFidelityPostPipeline(
+        bool directionalShadows = false)
     {
         var errors = new List<string>();
         var fog = CompileShader(
             Path.Combine("Shaders", "rekall_fog.comp"),
             RekallAgeVulkanShaderStage.Compute,
-            errors);
+            errors,
+            directionalShadows ? ["REKALL_FOG_DIRECTIONAL_SHADOWS"] : []);
         var analyticFog = CompileShader(
             Path.Combine("Shaders", "rekall_fog.frag"),
             RekallAgeVulkanShaderStage.Fragment,

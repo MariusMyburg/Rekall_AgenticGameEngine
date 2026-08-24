@@ -10,11 +10,17 @@ namespace Rekall.Age.Rendering;
 public sealed class RekallAgeVulkanHighFidelityFrameRenderer
 {
     public RekallAgeVulkanHighFidelityFramePlan? Plan(RekallAgeRuntimeViewportFrame frame)
-        => Plan(frame, null);
+        => Plan(frame, null, null);
 
     public RekallAgeVulkanHighFidelityFramePlan? Plan(
         RekallAgeRuntimeViewportFrame frame,
-        IReadOnlyList<RekallAgeVulkanSceneMesh>? meshes)
+        IReadOnlyList<RekallAgeVulkanSceneMesh>? meshes) =>
+        Plan(frame, meshes, null);
+
+    public RekallAgeVulkanHighFidelityFramePlan? Plan(
+        RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyList<RekallAgeVulkanSceneMesh>? meshes,
+        RekallAgeVulkanFogHistory? previousFogHistory)
     {
         ArgumentNullException.ThrowIfNull(frame);
         if (frame.ResolvedQualityPlan is not { } resolved
@@ -31,11 +37,13 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
                 diagnostic.Code,
                 "shadow-directional",
                 diagnostic.Message)));
-        var fogPlan = new RekallAgeVulkanFogPlanner().Plan(frame, resolved.Fog) with
+        var fogPlan = new RekallAgeVulkanFogPlanner().Plan(frame, resolved.Fog, previousFogHistory) with
         {
             DirectLightAvailable = frame.Renderables.Any(item =>
                 item.Kind.Equals("light", StringComparison.Ordinal) && item.Intensity > 0.0001),
-            ShadowAvailable = shadowPlan.Enabled
+            ShadowAvailable = shadowPlan.Enabled,
+            DirectLightEntityId = shadowPlan.LightEntityId ?? frame.Renderables.FirstOrDefault(item =>
+                item.Kind.Equals("light", StringComparison.Ordinal) && item.Intensity > 0.0001)?.EntityId
         };
         diagnostics.AddRange(fogPlan.Diagnostics.Select(diagnostic =>
             new RekallAgeHighFidelityRenderGraphDiagnostic(
@@ -470,14 +478,32 @@ public sealed record RekallAgeHighFidelityFogReport(
     bool DirectLightInjected,
     bool ShadowAttenuationApplied,
     bool HistoryReset,
-    bool TemporalReprojection);
+    bool TemporalReprojection)
+{
+    public bool SceneDepthSampled { get; init; }
+
+    public bool HistoryDescriptorBound { get; init; }
+
+    public bool HistorySampled { get; init; }
+
+    public int HistoryResourceGeneration { get; init; }
+
+    public IReadOnlyList<string> Diagnostics { get; init; } = Array.Empty<string>();
+
+    public string? DirectionalLightEntityId { get; init; }
+
+    public bool CascadeShadowSampled { get; init; }
+}
 
 public sealed record RekallAgeHighFidelityFogDebugCapture(
     string Kind,
     int SliceIndex,
     string OutputPath,
     bool NonBlank,
-    ulong ByteChecksum);
+    ulong ByteChecksum)
+{
+    public string Source { get; init; } = string.Empty;
+}
 
 public sealed record RekallAgeHighFidelityShadowDebugCapture(
     int CascadeIndex,

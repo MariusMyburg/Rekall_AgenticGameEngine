@@ -41,6 +41,7 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
         if (!plan.Fog.Mode.Equals("analytic", StringComparison.OrdinalIgnoreCase))
         {
             resources.Add(Resource("fog-froxel", "R16G16B16A16_SFloat", plan.Fog.FroxelWidth, plan.Fog.FroxelHeight, plan.Fog.FroxelDepth, "transient", ["storage", "sampled"]));
+            resources.Add(Resource("fog-history", "R16G16B16A16_SFloat", plan.Fog.FroxelWidth, plan.Fog.FroxelHeight, plan.Fog.FroxelDepth, "persistent", ["sampled", "transfer-destination"]));
         }
 
         if (plan.Post.Bloom)
@@ -61,8 +62,8 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
 
         var nextOrder = 4;
         passes.Add(plan.Fog.Mode.Equals("analytic", StringComparison.OrdinalIgnoreCase)
-            ? Pass("fog-integrate", "graphics", ["scene-hdr"], ["scene-hdr"], nextOrder++)
-            : Pass("fog-integrate", "compute", ["scene-hdr"], ["fog-froxel", "scene-hdr"], nextOrder++));
+            ? Pass("fog-integrate", "graphics", ["scene-hdr", "depth-buffer"], ["scene-hdr"], nextOrder++)
+            : Pass("fog-integrate", "compute", ["scene-hdr", "depth-buffer", "fog-history"], ["fog-froxel", "fog-history", "scene-hdr"], nextOrder++));
 
         passes.Add(Pass("transparent-particles", "graphics", ["depth-buffer", "scene-hdr"], ["scene-hdr"], nextOrder++));
         if (plan.Post.Bloom)

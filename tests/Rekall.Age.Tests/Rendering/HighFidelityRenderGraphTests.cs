@@ -20,6 +20,26 @@ public sealed class HighFidelityRenderGraphTests
     }
 
     [Fact]
+    public void FroxelGraphDeclaresDepthAndPersistentHistoryAuthority()
+    {
+        var graph = Build("High");
+
+        Assert.Contains(graph.Resources, resource => resource is
+        {
+            Name: "fog-history",
+            Format: "R16G16B16A16_SFloat",
+            Width: 160,
+            Height: 90,
+            Layers: 48,
+            Lifetime: "persistent"
+        });
+        var fog = Assert.Single(graph.Passes, pass => pass.Name == "fog-integrate");
+        Assert.Contains("depth-buffer", fog.Reads);
+        Assert.Contains("fog-history", fog.Reads);
+        Assert.Contains("fog-history", fog.Writes);
+    }
+
+    [Fact]
     public void BuilderOmitsPerformanceOnlyVolumetricBloomAndSsaoResources()
     {
         var graph = Build("Performance");
@@ -80,11 +100,25 @@ public sealed class HighFidelityRenderGraphTests
     }
 
     [Fact]
+    public void PersistentFeedbackAllowsPriorFrameReadButStillRequiresAWriter()
+    {
+        var feedback = RekallAgeHighFidelityRenderGraph.Create(
+            [new RekallAgeHighFidelityRenderResource("history", "R8_UNorm", 1, 1, 1, "persistent", ["sampled", "storage"])],
+            [new RekallAgeHighFidelityRenderPass("temporal", "compute", ["history"], ["history"], 0, true)]);
+        var orphan = RekallAgeHighFidelityRenderGraph.Create(
+            [new RekallAgeHighFidelityRenderResource("history", "R8_UNorm", 1, 1, 1, "persistent", ["sampled"])],
+            [new RekallAgeHighFidelityRenderPass("temporal", "compute", ["history"], [], 0, true)]);
+
+        Assert.True(feedback.IsValid);
+        Assert.Contains(orphan.Diagnostics, item => item.Code == "REKALL_RENDER_GRAPH_MISSING_PRODUCER");
+    }
+
+    [Fact]
     public void GraphEstimatesHighResourceBytesAndStaysWithinTheResolvedBudget()
     {
         var graph = Build("High");
 
-        Assert.Equal(133_736_448, graph.EstimatedBytes);
+        Assert.Equal(139_266_048, graph.EstimatedBytes);
         Assert.Equal(
             graph.Resources
                 .Where(resource => resource.Lifetime != "external")

@@ -2,7 +2,7 @@
 
 ## Status
 
-`DONE_WITH_CONCERNS`
+`DONE`
 
 Task 5 adds generic projected fog-volume transforms, deterministic bounded fog planning, lower-tier analytic fog, and higher-tier native Vulkan froxel fog. The graph-authoritative native path now executes fog after opaque HDR and before transparent rendering, uses resolved quality grids and device limits, records truthful workload/allocation facts, and emits inspectable density, lighting, and integrated-transmittance slices.
 
@@ -165,3 +165,82 @@ The approved design and implementation plan were not changed because executable 
 - The initial light-aware implementation injects the selected direct-light color and applies a conservative shadow-availability attenuation scalar; it does not sample cascade depth inside the compute shader. The report names this accurately. Per-froxel cascade lookup is a later fidelity improvement.
 - Box and sphere bounds currently use position and absolute scale. Authored fog-volume rotation is preserved in the viewport transform contract but is not yet applied to the local signed-distance evaluation.
 - Debug slices reconstruct the exact sanitized plan on CPU after native success rather than reading the 3D image back. They prove inspectable density/light/transmittance inputs and native-pass success, but a future diagnostic mode should expose GPU froxel readback for shader-level comparison.
+
+## Fix Round 1: High-fidelity fog execution truthfulness
+
+### Status and review findings
+
+`DONE`
+
+All seven review findings are repaired in production code and covered by native or planner tests. The four concerns recorded above describe the pre-fix implementation and are superseded by this section: native fog now consumes stored opaque depth and real camera projection/basis data, the renderer session owns and samples persistent GPU history, froxel injection samples the selected directional light and cascade shadow atlas, local volumes use their inverse orientation, debug slices derive from the GPU image readback, workload reports match recorded commands, and unsupported shapes degrade with stable affected IDs.
+
+The renderer lifecycle and graph contracts changed, so the tracked design specification and implementation plan were updated. `fog-history` is now a graph-declared and budgeted persistent `R16G16B16A16_SFloat` 3D resource. `RekallAgeNativeVulkanSceneCapture` owns the resident Vulkan instance/device and history image for its session and releases them through `IDisposable` (with a finalizer fallback).
+
+### Systematic root causes
+
+1. **Depth and camera:** the depth image lacked sampled usage and, critically, the opaque render pass declared `AttachmentStoreOp.DontCare`. The fog pass therefore sampled discarded depth. Both shaders also reconstructed positions from fixed axis-aligned screen heuristics. The fix stores/transitions/binds D32 scene depth, linearizes it from the actual near/far projection, constructs rays from the active camera forward/right/up basis, and stops analytic/froxel integration at the sampled opaque surface.
+2. **Temporal reprojection:** history reset/reuse existed only in the CPU planner while each native capture destroyed every Vulkan object. The fix gives a capture/renderer session a serialized persistent context, keeps one grid-sized 3D history image and Vulkan device alive across frames, binds the history sampler and previous-camera uniform, reprojects world positions, samples/blends history, copies the executed current grid into history, and clears/recreates it truthfully for cuts and grid changes.
+3. **Light and shadows:** froxel injection used a fixed phase cosine plus color/scalar availability flags. The fix binds the same selected primary directional-light direction/color used by the shadow plan, evaluates the Henyey-Greenstein phase with the actual ray/light angle, selects cascades by view depth, transforms the froxel position by the cascade matrix, and samples the real comparison shadow array.
+4. **Rotated volumes:** the GPU payload carried only position and axis-aligned extents. It now carries a sanitized inverse rigid transform and evaluates box/sphere signed distance in local space.
+5. **Debug evidence:** slices were CPU reconstructions of the plan. The froxel image now has transfer-source usage, is copied to a host-visible buffer after compute, and density/lighting/integrated-transmittance PNGs are derived from the returned `RGBA16F` cells with source `gpu-image-readback`.
+6. **Workload reports:** one report dispatch represented two recorded `vkCmdDispatch` calls and analytic draws were reported independent of recording. Froxel reports now expose injection plus composite as two dispatches; analytic execution/draw facts require an enabled, recorded analytic pass.
+7. **Unsupported shapes:** sanitizer rejection was silent. Unsupported shapes are now sorted deterministically, reported with `REKALL_FOG_VOLUME_SHAPE_UNSUPPORTED`, and included in stable dropped entity IDs independently of volume-limit drops.
+
+### Isolated RED/GREEN evidence
+
+- Rotated local-volume RED failed to compile because the fog-volume plan had no inverse transform. The new orientation assertion then passed with the planner test group after `LocalToWorld`/`WorldToLocal` packing and shader local-space evaluation.
+- Unsupported-shape RED observed an empty dropped-ID list and no degradation. The stable diagnostic/ID test passed after explicit shape classification.
+- Workload RED reported `Expected: 2, Actual: 1` for the froxel pass. The native test passed after the injection and composite dispatches were reported separately, including an empty analytic case that records zero draws.
+- GPU-evidence RED failed to compile because debug captures had no source fact. The native test passed after transfer readback and asserts `Source == "gpu-image-readback"` for all three slices.
+- Depth RED first exposed the absent `SceneDepthSampled` execution fact, then the behavioral surface comparison showed near/far fog deltas that did not track opaque depth. Retained probe images isolated the decisive `StoreOp.DontCare` cause. `FogSamplesOpaqueDepthAndStopsAtNearerSurfaces` and `RotatedCameraFogReconstructionStopsAtCenteredOpaqueSurface` now pass for both Performance analytic and High froxel modes (4/4 cases).
+- Temporal RED failed to compile for absent history descriptor/sample/generation facts and the non-disposable renderer session. `FroxelHistoryPersistsSamplesAndResetsForCameraCutsAndGridChanges` now proves first-frame reset, second-frame descriptor sample/blend with the same generation, camera-cut reset, and grid-change reallocation/reset (1/1).
+- Directional/shadow RED failed to compile for absent selected-light and cascade-sampling facts. `FroxelFogSamplesSelectedDirectionalLightAndCascadeOcclusion` now proves the selected entity ID, real cascade-enabled execution, a GPU-lighting checksum change when occlusion is removed, and a second change when light direction/color changes (1/1).
+- Graph lifecycle RED failed at `HighFidelityRenderGraphTests.FroxelGraphDeclaresDepthAndPersistentHistoryAuthority`: no `fog-history` resource matched. A final validator audit added a second RED proving that blanket persistent-resource exemption incorrectly accepted an orphaned history input. The graph now allows prior-frame reads only for a declared persistent feedback read/write edge and still diagnoses missing producers; the full graph group passes (11/11).
+
+### Final verification
+
+Native capture class:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~VulkanHighFidelityCaptureTests" --logger "console;verbosity=minimal"
+```
+
+Output: `Passed: 16, Failed: 0, Skipped: 0` in 27 seconds.
+
+Required Task 5 focused gate:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~VulkanFogPlannerTests|FullyQualifiedName~ViewportContractTests|FullyQualifiedName~VulkanHighFidelityCaptureTests" --logger "console;verbosity=minimal"
+```
+
+Output: `Passed: 62, Failed: 0, Skipped: 0` in 27 seconds.
+
+Complete Rendering namespace:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~Rekall.Age.Tests.Rendering" --logger "console;verbosity=minimal"
+```
+
+Output: `Passed: 588, Failed: 0, Skipped: 0` in 28 seconds.
+
+Repository-wide test project:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --logger "console;verbosity=minimal"
+```
+
+Output: `Failed: 8, Passed: 1787, Skipped: 0, Total: 1795` in 3 minutes 57 seconds. The eight failures are the same pre-existing `ModuleHostWindowsIsolationTests` AppContainer worker initialization/truncated-frame/transport failures documented before this fix round. No rendering test failed.
+
+Mechanical gates:
+
+```powershell
+dotnet build src\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj --no-restore
+dotnet format Rekall.AGE.sln --no-restore --verify-no-changes --include <all changed C# files>
+git diff --check
+```
+
+Outputs: build succeeded with `0 Warning(s), 0 Error(s)`; formatter and diff checks exited 0. Git emitted only the repository's existing LF-to-CRLF notices.
+
+### Residual concerns
+
+No Task 5 review finding remains deferred. The repository-wide AppContainer failures are unrelated pre-existing environment/worker transport failures; the complete Rendering namespace is green.

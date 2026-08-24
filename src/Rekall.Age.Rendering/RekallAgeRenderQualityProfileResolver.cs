@@ -121,7 +121,10 @@ public sealed class RekallAgeRenderQualityProfileResolver
         var renderPixels = (long)renderWidth * renderHeight;
         var transient = renderPixels * (bloom ? 20L : 12L) + (ssao ? renderPixels * 2L : 0L);
         var persistent = (long)shadowResolution * shadowResolution * cascadeCount * 4L
-            + (long)particles * 64L;
+            + (long)particles * 64L
+            + (fog.Mode.Equals("analytic", StringComparison.Ordinal)
+                ? 0L
+                : (long)fog.FroxelWidth * fog.FroxelHeight * fog.FroxelDepth * 8L);
 
         return new RekallAgeResolvedRenderFeaturePlan(
             requestedPreset,

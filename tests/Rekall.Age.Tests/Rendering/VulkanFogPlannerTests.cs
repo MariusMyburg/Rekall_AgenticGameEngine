@@ -146,6 +146,61 @@ public sealed class VulkanFogPlannerTests
             && item.EntityIds.SequenceEqual(["global-08", "global-09"]));
     }
 
+    [Fact]
+    public void RotatedLocalVolumeCarriesWorldToLocalOrientation()
+    {
+        var frame = Frame() with
+        {
+            FogVolumes =
+            [
+                Volume("rotated-box", "box", density: 0.2, priority: 1) with
+                {
+                    Transform = new RekallAgeRuntimeViewportTransform(
+                        4, 2, 8,
+                        0, 90, 0,
+                        2, 1, 0.5)
+                }
+            ]
+        };
+
+        var volume = Assert.Single(new RekallAgeVulkanFogPlanner().Plan(
+            frame,
+            new RekallAgeResolvedFogQuality("froxel", 160, 90, 48)).Volumes);
+
+        Assert.Equal(new Vector3(4, 2, 8), Vector3.Transform(Vector3.Zero, volume.LocalToWorld));
+        Assert.True(Matrix4x4.Invert(volume.LocalToWorld, out var expectedInverse));
+        AssertMatrixEqual(expectedInverse, volume.WorldToLocal);
+        var localPoint = Vector3.Transform(new Vector3(5, 2, 8), volume.WorldToLocal);
+        Assert.Equal(0f, localPoint.X, 5);
+        Assert.Equal(0f, localPoint.Y, 5);
+        Assert.Equal(1f, localPoint.Z, 5);
+    }
+
+    [Fact]
+    public void UnsupportedShapesDegradeWithStableFactsAndDroppedIds()
+    {
+        var frame = Frame() with
+        {
+            FogVolumes =
+            [
+                Volume("z-cone", "cone", density: 0.2, priority: 8),
+                Volume("valid", "box", density: 0.1, priority: 4),
+                Volume("a-capsule", "capsule", density: 0.3, priority: 2)
+            ]
+        };
+
+        var plan = new RekallAgeVulkanFogPlanner().Plan(
+            frame,
+            new RekallAgeResolvedFogQuality("froxel", 160, 90, 48));
+
+        Assert.Equal(["valid"], plan.Volumes.Select(item => item.EntityId));
+        Assert.Equal(["a-capsule", "z-cone"], plan.DroppedEntityIds);
+        var diagnostic = Assert.Single(plan.Diagnostics, item => item.Code == "REKALL_FOG_VOLUME_SHAPE_UNSUPPORTED");
+        Assert.Equal(["a-capsule", "z-cone"], diagnostic.EntityIds);
+        Assert.Contains("capsule", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("cone", diagnostic.Message, StringComparison.Ordinal);
+    }
+
     private static RekallAgeRuntimeViewportFrame Frame(int frameIndex = 0)
     {
         var camera = new RekallAgeRuntimeViewportCamera(
@@ -200,4 +255,24 @@ public sealed class VulkanFogPlannerTests
 
     private static bool IsFinite(Vector3 value) =>
         float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
+
+    private static void AssertMatrixEqual(Matrix4x4 expected, Matrix4x4 actual)
+    {
+        Assert.Equal(expected.M11, actual.M11, 5);
+        Assert.Equal(expected.M12, actual.M12, 5);
+        Assert.Equal(expected.M13, actual.M13, 5);
+        Assert.Equal(expected.M14, actual.M14, 5);
+        Assert.Equal(expected.M21, actual.M21, 5);
+        Assert.Equal(expected.M22, actual.M22, 5);
+        Assert.Equal(expected.M23, actual.M23, 5);
+        Assert.Equal(expected.M24, actual.M24, 5);
+        Assert.Equal(expected.M31, actual.M31, 5);
+        Assert.Equal(expected.M32, actual.M32, 5);
+        Assert.Equal(expected.M33, actual.M33, 5);
+        Assert.Equal(expected.M34, actual.M34, 5);
+        Assert.Equal(expected.M41, actual.M41, 5);
+        Assert.Equal(expected.M42, actual.M42, 5);
+        Assert.Equal(expected.M43, actual.M43, 5);
+        Assert.Equal(expected.M44, actual.M44, 5);
+    }
 }

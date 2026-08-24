@@ -25,6 +25,21 @@ public sealed class RekallAgeVulkanFogPlanner
         var diagnostics = new List<RekallAgeVulkanFogDiagnostic>();
         var mode = NormalizeMode(quality.Mode);
         var grid = ResolveGrid(mode, quality, diagnostics);
+        var unsupported = frame.FogVolumes
+            .Where(volume => !IsSupportedShape(volume.Shape))
+            .OrderBy(volume => volume.EntityId, StringComparer.Ordinal)
+            .ToArray();
+        if (unsupported.Length > 0)
+        {
+            var shapes = unsupported
+                .Select(volume => NormalizeShape(volume.Shape))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(shape => shape, StringComparer.Ordinal);
+            diagnostics.Add(new RekallAgeVulkanFogDiagnostic(
+                "REKALL_FOG_VOLUME_SHAPE_UNSUPPORTED",
+                $"Unsupported fog volume shapes were dropped: {string.Join(", ", shapes)}. Supported shapes are global, box, and sphere.",
+                unsupported.Select(volume => volume.EntityId).ToArray()));
+        }
         var ordered = frame.FogVolumes
             .Select(Sanitize)
             .Where(item => item is not null)
@@ -35,14 +50,14 @@ public sealed class RekallAgeVulkanFogPlanner
         var selectedLocals = 0;
         var selectedGlobals = 0;
         var selected = new List<RekallAgeVulkanFogVolume>(ordered.Length);
-        var dropped = new List<string>();
+        var limitDropped = new List<string>();
         foreach (var volume in ordered)
         {
             if (volume.Shape.Equals("global", StringComparison.Ordinal))
             {
                 if (selectedGlobals >= DefaultMaximumGlobalVolumes)
                 {
-                    dropped.Add(volume.EntityId);
+                    limitDropped.Add(volume.EntityId);
                     continue;
                 }
 
@@ -52,7 +67,7 @@ public sealed class RekallAgeVulkanFogPlanner
             {
                 if (selectedLocals >= maximumLocalVolumes)
                 {
-                    dropped.Add(volume.EntityId);
+                    limitDropped.Add(volume.EntityId);
                     continue;
                 }
 
@@ -62,13 +77,18 @@ public sealed class RekallAgeVulkanFogPlanner
             selected.Add(volume);
         }
 
-        if (dropped.Count > 0)
+        if (limitDropped.Count > 0)
         {
             diagnostics.Add(new RekallAgeVulkanFogDiagnostic(
                 "REKALL_FOG_VOLUME_LIMIT_CLAMPED",
-                $"Fog volume packing retained at most {maximumLocalVolumes.ToString(CultureInfo.InvariantCulture)} local and {DefaultMaximumGlobalVolumes.ToString(CultureInfo.InvariantCulture)} global volumes, and dropped {dropped.Count.ToString(CultureInfo.InvariantCulture)}.",
-                dropped));
+                $"Fog volume packing retained at most {maximumLocalVolumes.ToString(CultureInfo.InvariantCulture)} local and {DefaultMaximumGlobalVolumes.ToString(CultureInfo.InvariantCulture)} global volumes, and dropped {limitDropped.Count.ToString(CultureInfo.InvariantCulture)}.",
+                limitDropped));
         }
+
+        var dropped = unsupported.Select(volume => volume.EntityId)
+            .Concat(limitDropped)
+            .OrderBy(entityId => entityId, StringComparer.Ordinal)
+            .ToArray();
 
         var history = BuildHistory(frame, mode, grid);
         var historyReset = ShouldResetHistory(previousHistory, history, diagnostics);
@@ -134,8 +154,8 @@ public sealed class RekallAgeVulkanFogPlanner
 
     private static RekallAgeVulkanFogVolume? Sanitize(RekallAgeRuntimeViewportFogVolume source)
     {
-        var shape = source.Shape.Trim().ToLowerInvariant();
-        if (shape is not ("global" or "box" or "sphere"))
+        var shape = NormalizeShape(source.Shape);
+        if (!IsSupportedShape(shape))
         {
             return null;
         }
@@ -155,6 +175,15 @@ public sealed class RekallAgeVulkanFogPlanner
         var anisotropy = Math.Clamp(FiniteFloat(source.Anisotropy), -0.95f, 0.95f);
         var heightFalloff = Math.Clamp(FiniteFloat(source.HeightFalloff), 0, 64);
         var blendDistance = Math.Clamp(FiniteFloat(source.BlendDistance), 0, halfExtents.MaxComponent());
+        var localToWorld = Matrix4x4.CreateRotationX(DegreesToRadians(transform.RotationX))
+            * Matrix4x4.CreateRotationY(DegreesToRadians(transform.RotationY))
+            * Matrix4x4.CreateRotationZ(DegreesToRadians(transform.RotationZ))
+            * Matrix4x4.CreateTranslation(position);
+        if (!Matrix4x4.Invert(localToWorld, out var worldToLocal))
+        {
+            localToWorld = Matrix4x4.CreateTranslation(position);
+            worldToLocal = Matrix4x4.CreateTranslation(-position);
+        }
         return new RekallAgeVulkanFogVolume(
             source.EntityId,
             source.EntityName,
@@ -168,7 +197,9 @@ public sealed class RekallAgeVulkanFogPlanner
             source.Priority,
             position,
             halfExtents,
-            albedo * density);
+            albedo * density,
+            localToWorld,
+            worldToLocal);
     }
 
     private static RekallAgeVulkanFogHistory BuildHistory(
@@ -263,12 +294,18 @@ public sealed class RekallAgeVulkanFogPlanner
         _ => "analytic"
     };
 
+    private static string NormalizeShape(string shape) => shape.Trim().ToLowerInvariant();
+
+    private static bool IsSupportedShape(string shape) => NormalizeShape(shape) is "global" or "box" or "sphere";
+
     private static bool UsesFroxel(string mode) => !mode.Equals("analytic", StringComparison.Ordinal);
 
     private static float FiniteFloat(double value) =>
         double.IsFinite(value) && value >= -float.MaxValue && value <= float.MaxValue ? (float)value : 0;
 
     private static float PositiveExtent(double value) => Math.Max(0.001f, Math.Abs(FiniteFloat(value)));
+
+    private static float DegreesToRadians(double value) => MathF.PI / 180f * FiniteFloat(value);
 
     private static int DivideRoundUp(int value, int divisor) => (value + divisor - 1) / divisor;
 }
@@ -293,7 +330,9 @@ public sealed record RekallAgeVulkanFogVolume(
     int Priority,
     Vector3 Position,
     Vector3 HalfExtents,
-    Vector3 Scattering);
+    Vector3 Scattering,
+    Matrix4x4 LocalToWorld,
+    Matrix4x4 WorldToLocal);
 
 public sealed record RekallAgeVulkanFogHistory(
     int FrameIndex,
@@ -320,6 +359,8 @@ public sealed record RekallAgeVulkanFogPlan(
     public bool DirectLightAvailable { get; init; }
 
     public bool ShadowAvailable { get; init; }
+
+    public string? DirectLightEntityId { get; init; }
 }
 
 public sealed record RekallAgeVulkanFogDiagnostic(

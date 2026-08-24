@@ -10,9 +10,12 @@ using System.Text.Json.Nodes;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using Rekall.Age.Agent.LanguageModels;
+using Rekall.Age.Assets;
+using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Persistence;
 using Rekall.Age.Editor;
 using Rekall.Age.Editor.Contracts;
+using Rekall.Age.LevelDesign.Commands;
 using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Rendering;
@@ -74,12 +77,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeMeshPrimitiveFactory _meshPrimitiveFactory = new();
     private readonly RekallAgeStudioModelingGraphSession _modelingGraph = new();
     private readonly RekallAgeStudioMeshViewportRenderer _meshViewportRenderer = new();
+    private readonly RekallAgeModelAssetStore _modelAssetStore = new();
     private readonly Action<string> _openPackageFolder;
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
     private readonly RekallAgeAsyncCommand _refreshMeshAssetsCommand;
     private readonly RekallAgeAsyncCommand _createMeshPrimitiveCommand;
     private readonly RekallAgeAsyncCommand _openMeshAssetCommand;
+    private readonly RekallAgeAsyncCommand _publishModelCommand;
+    private readonly RekallAgeAsyncCommand _placeModelCommand;
+    private readonly RekallAgeAsyncCommand _publishAndPlaceModelCommand;
     private readonly RekallAgeAsyncCommand _selectMeshElementCommand;
     private readonly RekallAgeAsyncCommand _clearMeshSelectionCommand;
     private readonly RekallAgeAsyncCommand _previewMeshOperationCommand;
@@ -111,6 +118,21 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _selectedOllamaModel = "qwen3.5:35b";
     private string _agentTaskInput = string.Empty;
     private string? _selectedMeshAssetId;
+    private string _modelAssetIdInput = string.Empty;
+    private string _modelAssetDisplayNameInput = string.Empty;
+    private string _modelEntityNameInput = string.Empty;
+    private string _modelPlacementParentEntityIdInput = string.Empty;
+    private double _modelPositionX;
+    private double _modelPositionY;
+    private double _modelPositionZ;
+    private double _modelRotationX;
+    private double _modelRotationY;
+    private double _modelRotationZ;
+    private double _modelScaleX = 1;
+    private double _modelScaleY = 1;
+    private double _modelScaleZ = 1;
+    private string? _lastPublishedModelAssetId;
+    private string? _lastPlacedModelEntityId;
     private string _selectedMeshPrimitive = "box";
     private string _meshPrimitiveAssetIdInput = "mesh-box";
     private ulong? _selectedMeshElementId;
@@ -231,6 +253,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _refreshMeshAssetsCommand = CreateAsyncCommand(RefreshMeshAssetsAsync, HasOpenProject);
         _createMeshPrimitiveCommand = CreateAsyncCommand(CreateMeshPrimitiveAsync, CanCreateMeshPrimitive);
         _openMeshAssetCommand = CreateAsyncCommand(OpenMeshAssetAsync, CanOpenMeshAsset);
+        _publishModelCommand = CreateAsyncCommand(PublishModelAsync, CanPublishModel);
+        _placeModelCommand = CreateAsyncCommand(PlaceModelAsync, CanPlaceModel);
+        _publishAndPlaceModelCommand = CreateAsyncCommand(PublishAndPlaceModelAsync, CanPublishModel);
         _selectMeshElementCommand = CreateAsyncCommand(SelectMeshElementAsync, CanSelectMeshElement);
         _clearMeshSelectionCommand = CreateAsyncCommand(ClearMeshSelectionAsync, HasOpenMesh);
         _previewMeshOperationCommand = CreateAsyncCommand(PreviewMeshOperationAsync, CanRunMeshOperation);
@@ -311,6 +336,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand RefreshMeshAssetsCommand => _refreshMeshAssetsCommand;
     public ICommand CreateMeshPrimitiveCommand => _createMeshPrimitiveCommand;
     public ICommand OpenMeshAssetCommand => _openMeshAssetCommand;
+    public ICommand PublishModelCommand => _publishModelCommand;
+    public ICommand PlaceModelCommand => _placeModelCommand;
+    public ICommand PublishAndPlaceModelCommand => _publishAndPlaceModelCommand;
     public ICommand SelectMeshElementCommand => _selectMeshElementCommand;
     public ICommand ClearMeshSelectionCommand => _clearMeshSelectionCommand;
     public ICommand PreviewMeshOperationCommand => _previewMeshOperationCommand;
@@ -425,8 +453,40 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public string? SelectedMeshAssetId
     {
         get => _selectedMeshAssetId;
-        set { if (Set(ref _selectedMeshAssetId, value)) RefreshCommands(); }
+        set
+        {
+            if (!Set(ref _selectedMeshAssetId, value)) return;
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                var displayName = HumanizeAssetId(value);
+                ModelAssetIdInput = value;
+                ModelAssetDisplayNameInput = displayName;
+                ModelEntityNameInput = displayName;
+            }
+            RefreshCommands();
+        }
     }
+
+    public string ModelAssetIdInput { get => _modelAssetIdInput; set { if (Set(ref _modelAssetIdInput, value)) RefreshCommands(); } }
+    public string ModelAssetDisplayNameInput { get => _modelAssetDisplayNameInput; set { if (Set(ref _modelAssetDisplayNameInput, value)) RefreshCommands(); } }
+    public string ModelEntityNameInput { get => _modelEntityNameInput; set => Set(ref _modelEntityNameInput, value); }
+    public string ModelPlacementParentEntityIdInput { get => _modelPlacementParentEntityIdInput; set => Set(ref _modelPlacementParentEntityIdInput, value); }
+    public double ModelPositionX { get => _modelPositionX; set => Set(ref _modelPositionX, value); }
+    public double ModelPositionY { get => _modelPositionY; set => Set(ref _modelPositionY, value); }
+    public double ModelPositionZ { get => _modelPositionZ; set => Set(ref _modelPositionZ, value); }
+    public double ModelRotationX { get => _modelRotationX; set => Set(ref _modelRotationX, value); }
+    public double ModelRotationY { get => _modelRotationY; set => Set(ref _modelRotationY, value); }
+    public double ModelRotationZ { get => _modelRotationZ; set => Set(ref _modelRotationZ, value); }
+    public double ModelScaleX { get => _modelScaleX; set => Set(ref _modelScaleX, value); }
+    public double ModelScaleY { get => _modelScaleY; set => Set(ref _modelScaleY, value); }
+    public double ModelScaleZ { get => _modelScaleZ; set => Set(ref _modelScaleZ, value); }
+    public string? LastPublishedModelAssetId { get => _lastPublishedModelAssetId; private set => Set(ref _lastPublishedModelAssetId, value); }
+    public string? LastPlacedModelEntityId { get => _lastPlacedModelEntityId; private set => Set(ref _lastPlacedModelEntityId, value); }
+
+    private static string HumanizeAssetId(string assetId) => string.Join(
+        ' ',
+        assetId.Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
 
     public IReadOnlyList<string> MeshPrimitiveTypes => _meshPrimitiveFactory.SupportedPrimitives;
 
@@ -972,6 +1032,24 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private bool CanAuditWeb() => HasOpenProject();
     private bool HasOpenMesh() => !IsBusy && Mode == RekallAgeStudioMode.Edit && _modeling.Mesh is not null;
     private bool CanOpenMeshAsset() => HasEditableProject() && !string.IsNullOrWhiteSpace(SelectedMeshAssetId);
+    private bool CanPublishModel() => CanOpenMeshAsset()
+        && !string.IsNullOrWhiteSpace(ModelAssetIdInput)
+        && !string.IsNullOrWhiteSpace(ModelAssetDisplayNameInput)
+        && IsModelAssetIdValid();
+    private bool CanPlaceModel() => CanPublishModel()
+        && File.Exists(_modelAssetStore.GetModelPath(_session.ProjectRoot!, ModelAssetIdInput.Trim()));
+    private bool IsModelAssetIdValid()
+    {
+        try
+        {
+            _ = _modelAssetStore.GetModelPath(_session.ProjectRoot!, ModelAssetIdInput.Trim());
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
     private bool CanCreateMeshPrimitive() => HasEditableProject()
         && !string.IsNullOrWhiteSpace(SelectedMeshPrimitive)
         && !string.IsNullOrWhiteSpace(MeshPrimitiveAssetIdInput);
@@ -1034,6 +1112,121 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _modeling.SetDomain(MeshEditDomain);
         RefreshMeshEditingState();
     });
+
+    private Task PublishModelAsync() => RunAsync(PublishModelOperationAsync);
+
+    private Task PlaceModelAsync() => RunAsync(PlaceModelOperationAsync, refreshPreviewAfter: true);
+
+    private Task PublishAndPlaceModelAsync() => RunAsync(async () =>
+    {
+        var published = await PublishModelOperationAsync();
+        return published.Ok ? await PlaceModelOperationAsync() : published;
+    }, refreshPreviewAfter: true);
+
+    private async Task<RekallAgeWorkbenchOperationResult> PublishModelOperationAsync()
+    {
+        var modelAssetId = ModelAssetIdInput.Trim();
+        var modelPath = _modelAssetStore.GetModelPath(_session.ProjectRoot!, modelAssetId);
+        RekallAgeWorkbenchOperationResult published;
+        if (File.Exists(modelPath))
+        {
+            var current = await _modelAssetStore.LoadVersionedAsync(
+                _session.ProjectRoot!,
+                modelAssetId,
+                CancellationToken.None);
+            if (current.Value.Source.Kind != RekallAgeModelSourceKind.Mesh
+                || !current.Value.Source.AssetId.Equals(SelectedMeshAssetId, StringComparison.Ordinal))
+            {
+                const string code = "REKALL_STUDIO_MODEL_SOURCE_MISMATCH";
+                var message = $"Model Asset '{modelAssetId}' is linked to mesh '{current.Value.Source.AssetId}', not selected mesh '{SelectedMeshAssetId}'. Choose a new Model Asset ID or select the linked mesh.";
+                return new RekallAgeWorkbenchOperationResult(
+                    false,
+                    message,
+                    null,
+                    [new RekallAgeCommandError(code, message, modelAssetId)]);
+            }
+            published = await _session.ExecuteAsync(
+                "rekall.asset.model.rebuild",
+                JsonSerializer.Serialize(new
+                {
+                    projectRoot = _session.ProjectRoot,
+                    assetId = modelAssetId,
+                    expectedModelFileRevision = current.Revision
+                }),
+                $"Rebuild Model Asset {modelAssetId}",
+                "studio",
+                CancellationToken.None);
+        }
+        else
+        {
+            published = await _session.ExecuteAsync(
+                "rekall.asset.model.publish",
+                JsonSerializer.Serialize(new
+                {
+                    projectRoot = _session.ProjectRoot,
+                    assetId = modelAssetId,
+                    displayName = ModelAssetDisplayNameInput.Trim(),
+                    source = new
+                    {
+                        kind = "Mesh",
+                        assetId = SelectedMeshAssetId,
+                        outputName = (string?)null
+                    },
+                    expectedModelFileRevision = RekallAgeDocumentRevision.Missing
+                }),
+                $"Publish Model Asset {modelAssetId}",
+                "studio",
+                CancellationToken.None);
+        }
+
+        if (!published.Ok)
+        {
+            return published;
+        }
+
+        LastPublishedModelAssetId = modelAssetId;
+        return published;
+    }
+
+    private async Task<RekallAgeWorkbenchOperationResult> PlaceModelOperationAsync()
+    {
+        var modelAssetId = ModelAssetIdInput.Trim();
+        var placed = await _session.ExecuteAsync(
+            "rekall.scene.instantiate_asset",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                modelAssetId,
+                name = string.IsNullOrWhiteSpace(ModelEntityNameInput) ? null : ModelEntityNameInput.Trim(),
+                position = new { x = ModelPositionX, y = ModelPositionY, z = ModelPositionZ },
+                rotationDegrees = new { x = ModelRotationX, y = ModelRotationY, z = ModelRotationZ },
+                scale = new { x = ModelScaleX, y = ModelScaleY, z = ModelScaleZ },
+                parentEntityId = string.IsNullOrWhiteSpace(ModelPlacementParentEntityIdInput)
+                    ? null
+                    : ModelPlacementParentEntityIdInput.Trim()
+            }),
+            $"Place Model Asset {modelAssetId}",
+            "studio",
+            CancellationToken.None);
+        if (!placed.Ok || placed.Value is not InstantiateModelAssetResult placement)
+        {
+            return placed;
+        }
+
+        LastPlacedModelEntityId = placement.EntityId;
+        var selected = await _session.SelectEntityAsync(placement.EntityId, CancellationToken.None);
+        return selected.Ok
+            ? new RekallAgeWorkbenchOperationResult(
+                true,
+                placed.Summary,
+                placement,
+                placement.Warnings.Select(warning => new RekallAgeCommandError(
+                    warning.Code,
+                    warning.Message,
+                    warning.Target)).ToArray())
+            : selected;
+    }
 
     private Task SelectMeshElementAsync() => RunModelingAsync(() =>
     {
@@ -2208,6 +2401,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _refreshMeshAssetsCommand.RaiseCanExecuteChanged();
         _createMeshPrimitiveCommand.RaiseCanExecuteChanged();
         _openMeshAssetCommand.RaiseCanExecuteChanged();
+        _publishModelCommand.RaiseCanExecuteChanged();
+        _placeModelCommand.RaiseCanExecuteChanged();
+        _publishAndPlaceModelCommand.RaiseCanExecuteChanged();
         _selectMeshElementCommand.RaiseCanExecuteChanged();
         _clearMeshSelectionCommand.RaiseCanExecuteChanged();
         _previewMeshOperationCommand.RaiseCanExecuteChanged();

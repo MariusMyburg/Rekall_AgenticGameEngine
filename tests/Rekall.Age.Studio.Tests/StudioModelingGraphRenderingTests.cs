@@ -59,6 +59,19 @@ public sealed class StudioModelingGraphRenderingTests
                 Assert.True(host.ActualWidth > 1400);
                 Assert.True(host.ActualHeight > 700);
 
+                var publish = Assert.IsType<Button>(host.FindName("PublishModelButton"));
+                var place = Assert.IsType<Button>(host.FindName("PlaceModelButton"));
+                var publishAndPlace = Assert.IsType<Button>(host.FindName("PublishAndPlaceModelButton"));
+                var modelAssetId = Assert.IsType<TextBox>(host.FindName("ModelAssetIdInput"));
+                var positionX = Assert.IsType<TextBox>(host.FindName("ModelPositionXInput"));
+                Assert.Same(viewModel.PublishModelCommand, publish.Command);
+                Assert.Same(viewModel.PlaceModelCommand, place.Command);
+                Assert.Same(viewModel.PublishAndPlaceModelCommand, publishAndPlace.Command);
+                Assert.NotNull(modelAssetId.GetBindingExpression(TextBox.TextProperty));
+                Assert.NotNull(positionX.GetBindingExpression(TextBox.TextProperty));
+                Assert.Contains("Publish", publish.Content?.ToString(), StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("Place", place.Content?.ToString(), StringComparison.OrdinalIgnoreCase);
+
                 var bitmap = new RenderTargetBitmap(1480, 820, 96, 96, PixelFormats.Pbgra32);
                 bitmap.Render(window);
                 var output = Path.Combine(repositoryRoot, "artifacts", "studio-acceptance", "modeling-workspace.png");

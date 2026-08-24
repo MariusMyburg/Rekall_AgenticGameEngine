@@ -1,11 +1,15 @@
 using System.IO;
+using System.IO.Compression;
 using System.Text.Json.Nodes;
 using Rekall.Age.Agent.LanguageModels;
+using Rekall.Age.Assets;
+using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor;
 using Rekall.Age.Modeling;
 using Rekall.Age.Rendering;
 using Rekall.Age.Studio;
 using Rekall.Age.Workflows;
+using Rekall.Age.Workflows.Commands;
 using Rekall.Age.World;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -14,6 +18,292 @@ namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioViewModelTests
 {
+    [Fact]
+    public async Task PublishedAndPlacedStudioModelSurvivesWindowsPackagingAndPlayableAudit()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-model-package-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var gauntlet = await new RunAgentAuthoringGauntletCommand().ExecuteAsync(
+                new RunAgentAuthoringGauntletRequest(
+                    root,
+                    "Packaged Model Test",
+                    "Main",
+                    Path.Combine(root, "Builds", "InitialPackage")),
+                new Rekall.Age.Core.Commands.RekallAgeCommandContext(
+                    "studio-model-package-test",
+                    RekallAgeTransaction.Begin("create playable Studio model fixture"),
+                    CancellationToken.None));
+            Assert.True(gauntlet.Ok, gauntlet.Summary);
+
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Packaged Model Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.OpenCommand);
+            viewModel.MeshPrimitiveAssetIdInput = "package-mesh";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            viewModel.ModelAssetIdInput = "package-model";
+            viewModel.ModelAssetDisplayNameInput = "Package Model";
+            viewModel.ModelEntityNameInput = "Packaged Instance";
+            viewModel.ModelPositionZ = 5;
+            await ExecuteAsync(viewModel.PublishAndPlaceModelCommand);
+
+            var model = await new RekallAgeModelAssetStore().LoadAsync(root, "package-model", CancellationToken.None);
+            await ExecuteAsync(viewModel.PackageCommand);
+
+            Assert.Equal(RekallAgePlayablePackageTargets.Windows, viewModel.SelectedPackageTarget);
+            Assert.True(viewModel.LastPackageOutputDirectory is not null,
+                viewModel.StatusText + Environment.NewLine + string.Join(Environment.NewLine, viewModel.ValidationLines));
+            Assert.NotNull(viewModel.LastPackagePath);
+            Assert.True(File.Exists(Path.Combine(viewModel.LastPackageOutputDirectory!, "Play.exe")));
+            Assert.True(File.Exists(Path.Combine(viewModel.LastPackageOutputDirectory!, "Play.bat")));
+            Assert.True(File.Exists(viewModel.LastPackagePath));
+
+            using var archive = ZipFile.OpenRead(viewModel.LastPackagePath!);
+            var entryPaths = archive.Entries.Select(entry => entry.FullName.Replace('\\', '/')).ToHashSet(StringComparer.Ordinal);
+            Assert.Contains("Play.exe", entryPaths);
+            Assert.Contains("Play.bat", entryPaths);
+            Assert.Contains("Game/Scenes/Main.age.scene.json", entryPaths);
+            Assert.Contains("Game/Assets/Models/package-model.age.model.json", entryPaths);
+            Assert.Contains("Game/" + model.LastSuccessfulBuild!.CompiledMeshPath, entryPaths);
+            using (var sceneReader = new StreamReader(archive.GetEntry("Game/Scenes/Main.age.scene.json")!.Open()))
+            {
+                var sceneJson = await sceneReader.ReadToEndAsync();
+                Assert.Contains("package-model", sceneJson, StringComparison.Ordinal);
+                Assert.Contains("Rekall.ModelAssetReference", sceneJson, StringComparison.Ordinal);
+            }
+
+            Assert.True(viewModel.AuditPackageCommand.CanExecute(null));
+            await ExecuteAsync(viewModel.AuditPackageCommand);
+            Assert.DoesNotContain(viewModel.ValidationLines, line => line.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task PublishAndPlaceTurnsTheSelectedEditableMeshIntoASelectedSceneEntity()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-place-model-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Place Model Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.SelectedMeshPrimitive = "box";
+            viewModel.MeshPrimitiveAssetIdInput = "hero-box";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            viewModel.ModelAssetIdInput = "hero-model";
+            viewModel.ModelAssetDisplayNameInput = "Hero Model";
+            viewModel.ModelEntityNameInput = "Hero Instance";
+            viewModel.ModelPositionX = 1.25;
+            viewModel.ModelPositionY = -2.5;
+            viewModel.ModelPositionZ = 3.75;
+            viewModel.ModelRotationY = 45;
+            viewModel.ModelScaleX = 0.5;
+            viewModel.ModelScaleY = 2;
+            viewModel.ModelScaleZ = 3;
+
+            Assert.True(viewModel.PublishAndPlaceModelCommand.CanExecute(null));
+            var previewResetsBeforePlacement = preview.ResetCount;
+            await ExecuteAsync(viewModel.PublishAndPlaceModelCommand);
+
+            var published = await new RekallAgeModelAssetStore().LoadAsync(root, "hero-model", CancellationToken.None);
+            Assert.Equal("Hero Model", published.DisplayName);
+            Assert.Equal(RekallAgeModelSourceKind.Mesh, published.Source.Kind);
+            Assert.Equal("hero-box", published.Source.AssetId);
+            Assert.NotNull(published.LastSuccessfulBuild);
+            Assert.True(File.Exists(Path.Combine(root, published.LastSuccessfulBuild!.CompiledMeshPath)));
+
+            var entity = Assert.Single((await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None)).Entities);
+            Assert.Equal("Hero Instance", entity.Name);
+            var reference = Assert.Single(entity.Components, component => component.Type == "Rekall.ModelAssetReference");
+            Assert.Equal("hero-model", reference.Properties["assetId"]!.GetValue<string>());
+            var transform = Assert.Single(entity.Components, component => component.Type == "Rekall.Transform3D");
+            Assert.Equal(1.25, transform.Properties["x"]!.GetValue<double>());
+            Assert.Equal(-2.5, transform.Properties["y"]!.GetValue<double>());
+            Assert.Equal(3.75, transform.Properties["z"]!.GetValue<double>());
+            Assert.Equal(45, transform.Properties["yaw"]!.GetValue<double>());
+            Assert.Equal(0.5, transform.Properties["scaleX"]!.GetValue<double>());
+            Assert.Equal(2, transform.Properties["scaleY"]!.GetValue<double>());
+            Assert.Equal(3, transform.Properties["scaleZ"]!.GetValue<double>());
+            Assert.Equal(entity.Id, viewModel.SelectedEntityId);
+            Assert.Equal("hero-model", viewModel.LastPublishedModelAssetId);
+            Assert.Equal(entity.Id, viewModel.LastPlacedModelEntityId);
+            Assert.True(preview.ResetCount > previewResetsBeforePlacement);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SeparatePublishRebuildAndPlaceActionsPreserveTheLiveLinkedModelWorkflow()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-model-actions-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Model Actions Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.MeshPrimitiveAssetIdInput = "display-mesh";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+
+            Assert.True(viewModel.PublishModelCommand.CanExecute(null));
+            Assert.False(viewModel.PlaceModelCommand.CanExecute(null));
+            await ExecuteAsync(viewModel.PublishModelCommand);
+
+            var store = new RekallAgeModelAssetStore();
+            var first = await store.LoadAsync(root, "display-mesh", CancellationToken.None);
+            Assert.Equal(1, first.Revision);
+            Assert.Empty((await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None)).Entities);
+            Assert.True(viewModel.PlaceModelCommand.CanExecute(null));
+
+            await ExecuteAsync(viewModel.PublishModelCommand);
+            var rebuilt = await store.LoadAsync(root, "display-mesh", CancellationToken.None);
+            Assert.Equal(2, rebuilt.Revision);
+            Assert.Equal("display-mesh", rebuilt.Source.AssetId);
+
+            viewModel.ModelEntityNameInput = "Display Instance";
+            await ExecuteAsync(viewModel.PlaceModelCommand);
+            var entity = Assert.Single((await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None)).Entities);
+            Assert.Equal("Display Instance", entity.Name);
+            Assert.Equal(entity.Id, viewModel.SelectedEntityId);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ExistingModelAssetRejectsASelectedMeshSourceMismatchWithoutPlacingTheWrongGeometry()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-model-source-mismatch-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Model Source Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.MeshPrimitiveAssetIdInput = "first-mesh";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            await ExecuteAsync(viewModel.PublishModelCommand);
+
+            viewModel.MeshPrimitiveAssetIdInput = "second-mesh";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            viewModel.ModelAssetIdInput = "first-mesh";
+            viewModel.ModelAssetDisplayNameInput = "First Mesh";
+            await ExecuteAsync(viewModel.PublishAndPlaceModelCommand);
+
+            Assert.Empty((await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None)).Entities);
+            Assert.Null(viewModel.LastPlacedModelEntityId);
+            Assert.Contains(
+                viewModel.ValidationLines,
+                line => line.Contains("REKALL_STUDIO_MODEL_SOURCE_MISMATCH", StringComparison.Ordinal));
+            var published = await new RekallAgeModelAssetStore().LoadAsync(root, "first-mesh", CancellationToken.None);
+            Assert.Equal("first-mesh", published.Source.AssetId);
+            Assert.Equal(1, published.Revision);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task InvalidPlacementScaleSurfacesTheCanonicalDiagnosticWithoutMutatingTheScene()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-invalid-model-placement-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Invalid Placement Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.MeshPrimitiveAssetIdInput = "invalid-scale-mesh";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            viewModel.ModelScaleX = 0;
+
+            await ExecuteAsync(viewModel.PublishAndPlaceModelCommand);
+
+            Assert.Empty((await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None)).Entities);
+            Assert.Contains(
+                viewModel.ValidationLines,
+                line => line.Contains("REKALL_MODEL_PLACEMENT_TRANSFORM_INVALID", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task InvalidModelAssetIdDisablesPlacementWithoutThrowingFromCommandEvaluation()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-invalid-model-id-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Invalid Model ID Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            viewModel.ModelAssetIdInput = "bad/id";
+
+            var exception = Record.Exception(() => viewModel.PlaceModelCommand.CanExecute(null));
+
+            Assert.Null(exception);
+            Assert.False(viewModel.PlaceModelCommand.CanExecute(null));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task ViewportPickSelectsTheMappedSceneEntityAndRejectsLetterboxSpace()
     {
@@ -163,6 +453,10 @@ public sealed class StudioViewModelTests
             Assert.Equal("hero-box", viewModel.SelectedMeshAssetId);
             Assert.Contains("hero-box", viewModel.MeshAssetIds);
             Assert.NotNull(viewModel.MeshViewportImage);
+            Assert.Equal("hero-box", viewModel.ModelAssetIdInput);
+            Assert.Equal("Hero Box", viewModel.ModelAssetDisplayNameInput);
+            Assert.Equal("Hero Box", viewModel.ModelEntityNameInput);
+            Assert.True(viewModel.PublishAndPlaceModelCommand.CanExecute(null));
             var mesh = await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None);
             Assert.Equal("hero-box", mesh.AssetId);
             Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);

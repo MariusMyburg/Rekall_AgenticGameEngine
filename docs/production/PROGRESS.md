@@ -4377,6 +4377,30 @@ Focused WebGPU/rendering/player suite: 84/84. Real end-to-end
 publish/exporter suite: 15/15. Release solution build: 0 warnings/errors.
 `git status` clean.
 
+Three follow-up checks de-risked before starting Task 9, since the drain/
+readback changes above touch paths whose success can look identical to a
+silent failure: (1) the standalone WebGPU compatibility proof page (the
+`gameBootstrap.Session is null` branch, the one path that actually depends
+on the now-gated readback existing) was republished with no game content
+and reloaded in the same real browser -- `#state` still reaches `GPU
+WORKLOAD EXECUTED` with a passing pixel proof, confirming the
+`CaptureReadback`/`SubmitWithPixelReadback` gating did not silently break
+the one caller that needs it. (2) The depth-stencil fix was temporarily
+disabled again (`git diff` confirmed a clean revert afterward, no code
+changed under version control), republished, and reloaded: `#state`
+correctly showed the same real `REKALL_WEBGPU_VALIDATION_ERROR` as before,
+confirming `DrainAsync` still surfaces real backend diagnostics rather than
+silently swallowing them the way a no-op drain would. (3) A real browser
+`ArrowUp` keydown/keyup was sent to the same published TumblingCubes build
+via Playwright while intercepting `JSON.stringify` calls carrying
+`heldKeyCodes` (the exact object `main.js`'s `input.snapshot()` serializes
+for the C# side to parse): the snapshot showed `heldKeyCodes: ["ArrowUp"]`
+while held and `[]` immediately after release, proving real keyboard input
+reaches the runtime input bridge end-to-end in a published build, not just
+that the page boots. This directly de-risks Task 9's planned semantic
+input checks (movement/jump/grounding/etc.), which all depend on this same
+path. No further code changes resulted; these were verification-only.
+
 ## Next after the current item
 
 The first Godot-reference graphics milestone is verified. A shallow,

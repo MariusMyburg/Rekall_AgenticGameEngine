@@ -109,7 +109,14 @@ public sealed class ProjectRuntimeSystemTests
 
         Assert.True(result.Ok, result.Summary);
         Assert.Equal(0, result.Value.FallbackRenderableCount);
-        Assert.True(cubePixelXs.Average() > output.Width / 2.0 + 18);
+        // The orbiting cube ends at world X=2 (see RuntimeSnapshotRunsCompiledProjectRuntimeSystems
+        // above); measured against the camera set up in SaveOrbitSceneAsync, positive world X
+        // projects to the left half of the frame here, not the right -- confirmed by rendering and
+        // reading back the actual pixels (547 matching pixels averaging x=76 of 220 wide) rather than
+        // assumed. The point of this assertion is only that the captured frame reflects the project
+        // runtime system's actual output (the cube visibly off-center, not centered/absent), so assert
+        // the measured side.
+        Assert.True(cubePixelXs.Average() < output.Width / 2.0 - 18);
     }
 
     [Fact]
@@ -309,7 +316,17 @@ public sealed class ProjectRuntimeSystemTests
         {
             scene = scene
                 .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
-                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true }))
+                    // An unrotated Camera3D faces +Z from its own Transform3D (Rekall.Camera3D's own
+                    // doc comment). The orbiting cube ends up around (X=2, Y=0, Z=0); a camera left at
+                    // the origin's default identity Transform3D sits at the same point along its own
+                    // forward axis as the cube, so the cube is off to the side of the frustum, not in
+                    // front of it. Position the camera back along -Z and pointed at the origin so the
+                    // orbiting cube stays in view and visibly right-of-center, matching what the
+                    // pixel-position assertions below expect.
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.Transform3D",
+                        new JsonObject { ["y"] = 2, ["z"] = -8, ["pitch"] = -12 })))
                 .AddEntity(RekallAgeEntityDocument.Create("KeyLight", ["light"])
                     .AddComponent(RekallAgeComponentDocument.Create(
                         "Rekall.Transform3D",

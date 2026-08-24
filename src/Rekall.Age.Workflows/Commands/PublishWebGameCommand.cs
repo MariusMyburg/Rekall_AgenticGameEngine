@@ -187,6 +187,35 @@ public sealed class PublishWebGameCommand : IRekallAgeCommand<PublishWebGameRequ
         CancellationToken cancellationToken,
         params string[] arguments)
     {
+        // rekall.game.audit_web republishes through this same command against the same
+        // workingRoot/lockFilePath a preceding rekall.game.publish_web call already used (see
+        // AuditWebGameCommand). On Windows, the just-exited dotnet.exe process's handle on
+        // packages.lock.json is not always released the instant WaitForExitAsync returns --
+        // observed directly both interactively (had to `dotnet build-server shutdown` to unstick
+        // it) and as a transient full-suite failure under parallel test load. Retry a handful of
+        // times with a short backoff specifically for that one transient NuGet.targets "file...
+        // is being used by another process" error; any other failure (a real compile/publish
+        // error) surfaces immediately on the first attempt.
+        const int maxAttempts = 4;
+        for (var attempt = 1; ; attempt++)
+        {
+            var result = await RunDotNetOnceAsync(cancellationToken, arguments);
+            var isTransientLockFailure = result.ExitCode != 0
+                && result.Output.Contains("being used by another process", StringComparison.OrdinalIgnoreCase)
+                && result.Output.Contains("packages.lock.json", StringComparison.OrdinalIgnoreCase);
+            if (!isTransientLockFailure || attempt >= maxAttempts)
+            {
+                return result;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250 * attempt), cancellationToken);
+        }
+    }
+
+    private static async ValueTask<(int ExitCode, string Output)> RunDotNetOnceAsync(
+        CancellationToken cancellationToken,
+        string[] arguments)
+    {
         var startInfo = new ProcessStartInfo("dotnet")
         {
             RedirectStandardOutput = true,

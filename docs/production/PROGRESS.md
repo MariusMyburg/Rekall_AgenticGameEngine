@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 08:10 Africa/Johannesburg
+Last verified: 2026-08-24 09:35 Africa/Johannesburg
 
 Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
@@ -4846,6 +4846,80 @@ per-project web-publish staging/output directories (e.g.
 This closes the last open item from Task 9; the full plan
 (`docs/superpowers/plans/2026-08-23-genuine-web-game-publishing.md`) is now
 complete end to end.
+
+The previously-documented "pre-existing parallel-execution flakiness
+cluster" (`BuildModulesCommandTests` wedged-compiler tests,
+`McpAgentToolExecutorTests`, `ProjectRuntimeSystemTests`,
+`ScaffoldRuntimeSystemModuleCommandTests`, `WindowsPlayerRecoveryTests`) is
+fixed. All 6 failures turned out to be real, individually diagnosable
+causes, not vague nondeterminism -- confirmed by running each in isolation
+first (5 of 6 failed deterministically alone, only
+`ScaffoldRuntimeSystemModuleCommandTests` needed the full parallel suite to
+reproduce):
+- `BuildModulesCommandTests` (2 tests): spawned `pwsh` (PowerShell 7) as a
+  portable stand-in for a hung external compiler process; `pwsh` is an
+  optional separate install and was not present on this machine.
+  Switched to `powershell` (Windows PowerShell 5.1), which ships with every
+  Windows install and is not a production-path dependency either way.
+- `WindowsPlayerRecoveryTests`: hardcoded the `bin/Debug/net10.0-windows`
+  output path for `Rekall.Age.Player.Windows.exe`, so a Release-only
+  build/test pass (this session's convention) made it fail even though the
+  player was built and fine. Now tries Release first, then Debug, mirroring
+  `WebGameCliTests.FindCliAssemblyPath`'s existing pattern for the CLI
+  assembly.
+- `McpAgentToolExecutorTests.BroadComponentSearchFitsTheAgentToolBudget...`:
+  the built-in component catalog has grown enough since this test was
+  written that a `limit=12` response for its broad multi-topic query now
+  serializes to 13,955 characters, over the 12,000-character agent tool
+  budget (`RekallAgeMcpAgentToolExecutor.ExecuteRegisteredToolAsync`), so
+  the executor correctly truncated it -- exactly the behavior the test's own
+  name says it's proving works. Measured (not guessed) that `limit=9` keeps
+  the same realistic broad query comfortably under budget (~10.4k chars)
+  while every explicitly required contract type still ranks in the top 9.
+- `ProjectRuntimeSystemTests.RuntimeViewportCaptureUsesProjectRuntimeSystem
+  Output`: the test's orbit-scene camera had no explicit `Transform3D`, so
+  it defaulted to the world origin facing +Z. The orbiting cube ends at
+  world X=2, Z=0 -- off to the side of the camera's frustum, not in front of
+  it, once the software renderer honors the real authored camera instead of
+  the legacy oblique-projection fallback (the same class of gap Task 9
+  found in Clockwork Canopy). Gave the camera an explicit position/pitch so
+  the cube stays in frame; measured the actual rendered pixel distribution
+  rather than assuming a screen-side convention, and corrected the
+  assertion to match what real rendering produces (the cube lands
+  left-of-center at this camera setup, not right).
+- `ScaffoldRuntimeSystemModuleCommandTests`: a real engine bug, not test
+  brittleness. `RekallAgeModuleIndexer.IndexAssembly` filtered candidate
+  module types by `!type.IsAbstract` only, which does not exclude open
+  generic types (`Type.ContainsGenericParameters`). Whenever an unbound
+  generic `RekallAgeModule` subclass from another test's dynamically
+  compiled module assembly (`Game.Modules.WebRules.WebRulesModule<T>`) was
+  already loaded into the shared parallel-test-run AppDomain, the indexer's
+  `Activator.CreateInstance` call on it threw
+  `ArgumentException: Cannot create an instance of ... because
+  Type.ContainsGenericParameters is true`, which is exactly why this one
+  only reproduced under full-suite parallel load and never in isolation.
+  Added the missing `!type.ContainsGenericParameters` filter.
+- A sixth, previously-unseen failure surfaced once the above were fixed:
+  `WebGamePublishingTests.PublishesAndAuditsARealWebGameEndToEnd` hit
+  `NuGet.targets error: The process cannot access the file '...
+  packages.lock.json' because it is being used by another process.`
+  `rekall.game.audit_web` republishes through the same
+  `PublishWebGameCommand` path a preceding `rekall.game.publish_web` call
+  in the same test already used, against the same isolated
+  `workingRoot`/lock-file path. On Windows the just-exited `dotnet.exe`
+  process's handle on that file is not always released the instant
+  `WaitForExitAsync` returns -- hit this same error interactively earlier
+  this session too, only fixed then by `dotnet build-server shutdown`.
+  Added a bounded retry (4 attempts, linear backoff) in
+  `PublishWebGameCommand.RunDotNetAsync`, matching only that specific
+  transient NuGet lock-file error string so any real compile/publish
+  failure still surfaces on the first attempt.
+
+Verification: 3 full sequential runs of the complete engine suite as each
+fix landed (1659/1665 -> 1664/1665 after the first 5 fixes -> 1665/1665
+after the `ModuleIndexer` and `PublishWebGameCommand` fixes), 55/55 Studio
+tests, a zero-warning zero-error Release solution build, `git status` clean
+(only the 6 intended files touched, no stray `packages.lock.json` writes).
 
 ## Evidence index
 

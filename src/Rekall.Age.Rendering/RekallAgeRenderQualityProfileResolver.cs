@@ -88,6 +88,32 @@ public sealed class RekallAgeRenderQualityProfileResolver
         }
 
         var fog = ResolveFogQuality(fogMode, renderWidth, renderHeight);
+        if (!fog.Mode.Equals("analytic", StringComparison.Ordinal))
+        {
+            var computeDimensionLimit = capabilities.MaximumComputeWorkgroupsPerDimension > int.MaxValue / 4u
+                ? int.MaxValue
+                : checked((int)capabilities.MaximumComputeWorkgroupsPerDimension * 4);
+            var maximumFogDimension = Math.Max(
+                1,
+                Math.Min(capabilities.MaximumTextureDimension3D, computeDimensionLimit));
+            var largestFogDimension = Math.Max(fog.FroxelWidth, Math.Max(fog.FroxelHeight, fog.FroxelDepth));
+            if (largestFogDimension > maximumFogDimension)
+            {
+                var requestedFog = fog;
+                var fogScale = (double)maximumFogDimension / largestFogDimension;
+                fog = fog with
+                {
+                    FroxelWidth = Math.Max(1, (int)Math.Round(fog.FroxelWidth * fogScale, MidpointRounding.AwayFromZero)),
+                    FroxelHeight = Math.Max(1, (int)Math.Round(fog.FroxelHeight * fogScale, MidpointRounding.AwayFromZero)),
+                    FroxelDepth = Math.Max(1, (int)Math.Round(fog.FroxelDepth * fogScale, MidpointRounding.AwayFromZero))
+                };
+                AddDeviceClamp(
+                    degradations,
+                    "fogGrid",
+                    $"{requestedFog.FroxelWidth}x{requestedFog.FroxelHeight}x{requestedFog.FroxelDepth}",
+                    $"{fog.FroxelWidth}x{fog.FroxelHeight}x{fog.FroxelDepth}");
+            }
+        }
         var shadow = new RekallAgeResolvedShadowQuality(cascadeCount, shadowResolution, preset.FilterTapCount);
         var post = new RekallAgeResolvedPostQuality(bloom, ssao, timestamps);
         var particleQuality = new RekallAgeResolvedParticleQuality(particles);
@@ -192,9 +218,9 @@ public sealed class RekallAgeRenderQualityProfileResolver
         return mode switch
         {
             "froxel-low" => new RekallAgeResolvedFogQuality(mode, Math.Max(1, width / 16), Math.Max(1, height / 16), 32),
-            "froxel" => new RekallAgeResolvedFogQuality(mode, Math.Max(1, width / 16), Math.Max(1, height / 16), 48),
-            "froxel-high" => new RekallAgeResolvedFogQuality(mode, Math.Max(1, width / 12), Math.Max(1, height / 12), 64),
-            "froxel-epic" => new RekallAgeResolvedFogQuality(mode, Math.Max(1, width / 8), Math.Max(1, height / 8), 96),
+            "froxel" => new RekallAgeResolvedFogQuality(mode, 160, 90, 48),
+            "froxel-high" => new RekallAgeResolvedFogQuality(mode, 240, 135, 64),
+            "froxel-epic" => new RekallAgeResolvedFogQuality(mode, 320, 180, 96),
             _ => new RekallAgeResolvedFogQuality("analytic")
         };
     }

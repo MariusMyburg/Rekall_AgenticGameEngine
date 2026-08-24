@@ -81,7 +81,9 @@ public sealed class VulkanSceneCommandPlanTests
         var plan = RekallAgeVulkanSceneCommandPlanBuilder.BuildOffscreen(prepared, graph);
 
         Assert.True(plan.Ready, string.Join(" ", plan.Blockers));
-        Assert.Equal(["bloom", "tone-map", "ui", "present"], plan.PostPasses.Select(pass => pass.Name));
+        Assert.Equal(
+            ["fog-integrate", "transparent-particles", "bloom", "tone-map", "ui", "present"],
+            plan.PostPasses.Select(pass => pass.Name));
         Assert.True(plan.CopiesColorToReadback);
         Assert.Equal(Format.R16G16B16A16Sfloat, target.ColorFormat);
         Assert.Equal(Format.R8G8B8A8Unorm, target.EffectiveOutputColorFormat);

@@ -87,6 +87,47 @@ public sealed class ViewportContractTests
     }
 
     [Fact]
+    public void RuntimeFrameProjectsFogVolumeTransformAndMaterialFacts()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Mist Sphere", ["rendering"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = 4,
+                    ["y"] = 2,
+                    ["z"] = 9,
+                    ["scaleX"] = 3,
+                    ["scaleY"] = 2,
+                    ["scaleZ"] = 1
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.FogVolume", new JsonObject
+                {
+                    ["shape"] = "sphere",
+                    ["density"] = 0.12,
+                    ["albedo"] = "#a0c0ff",
+                    ["emission"] = "#100800",
+                    ["anisotropy"] = 0.4,
+                    ["heightFalloff"] = 0.25,
+                    ["blendDistance"] = 0.75,
+                    ["priority"] = 7
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var fog = Assert.Single(frame.FogVolumes);
+        Assert.Equal("Mist Sphere", fog.EntityName);
+        Assert.Equal("sphere", fog.Shape);
+        Assert.Equal(0.12, fog.Density);
+        Assert.Equal(4, fog.Transform.X);
+        Assert.Equal(2, fog.Transform.Y);
+        Assert.Equal(9, fog.Transform.Z);
+        Assert.Equal(3, fog.Transform.ScaleX);
+        Assert.Equal(2, fog.Transform.ScaleY);
+        Assert.Equal(1, fog.Transform.ScaleZ);
+    }
+
+    [Fact]
     public async Task ViewportModelExtractsCameraAndRenderableSprites()
     {
         var root = TestPaths.CreateTempDirectory();

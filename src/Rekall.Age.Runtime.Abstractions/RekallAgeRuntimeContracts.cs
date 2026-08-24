@@ -478,6 +478,8 @@ public sealed record RekallAgeRuntimeFogVolume(
     int Priority)
 {
     public string ProjectionSource { get; init; } = RekallAgeRuntimeProjectionSources.Authored;
+
+    public RekallAgeRuntimeTransform Transform { get; init; } = RekallAgeRuntimeTransform.Identity;
 }
 
 [Flags]

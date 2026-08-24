@@ -5,6 +5,31 @@ namespace Rekall.Age.Tests.Rendering;
 
 public sealed class RenderQualityProfileTests
 {
+    [Fact]
+    public void FroxelGridIsProportionallyClampedToDevice3DAndComputeLimitsWithStableDegradation()
+    {
+        var capabilities = RekallAgeRenderingDeviceCapabilities.DesktopBaseline("limited") with
+        {
+            MaximumTextureDimension3D = 64,
+            MaximumComputeWorkgroupsPerDimension = 12
+        };
+
+        var plan = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("Epic"),
+            capabilities,
+            2560,
+            1440);
+
+        Assert.Equal(new RekallAgeResolvedFogQuality("froxel-epic", 48, 27, 14), plan.Fog);
+        Assert.Contains(plan.Degradations, item => item is
+        {
+            Code: "REKALL_RENDER_FEATURE_DEVICE_CLAMPED",
+            Feature: "fogGrid",
+            RequestedValue: "320x180x96",
+            ResolvedValue: "48x27x14"
+        });
+    }
+
     public static TheoryData<string, double, int, int, string, int> Presets => new()
     {
         { "Performance", 0.50, 1, 512, "analytic", 2_000 },

@@ -56,6 +56,9 @@ public sealed record RekallAgeRuntimeViewportFrame(
 
     public RekallAgeResolvedRenderFeaturePlan? ResolvedQualityPlan { get; init; }
 
+    public IReadOnlyList<RekallAgeRuntimeViewportFogVolume> FogVolumes { get; init; } =
+        Array.Empty<RekallAgeRuntimeViewportFogVolume>();
+
     public RekallAgeRuntimeViewportFrame ForHeadsetOutput()
     {
         return HeadsetCamera is null ? this : ForCameraView(HeadsetCamera);
@@ -208,6 +211,33 @@ public sealed record RekallAgeRuntimeViewportPostProcessPass(
     double Intensity = 1,
     double Radius = 1,
     string BlendMode = "add");
+
+public sealed record RekallAgeRuntimeViewportFogVolume(
+    string EntityId,
+    string EntityName,
+    string Shape,
+    double Density,
+    string Albedo,
+    string Emission,
+    double Anisotropy,
+    double HeightFalloff,
+    double BlendDistance,
+    int Priority,
+    RekallAgeRuntimeViewportTransform Transform);
+
+public sealed record RekallAgeRuntimeViewportTransform(
+    double X,
+    double Y,
+    double Z,
+    double RotationX,
+    double RotationY,
+    double RotationZ,
+    double ScaleX,
+    double ScaleY,
+    double ScaleZ)
+{
+    public static RekallAgeRuntimeViewportTransform Identity { get; } = new(0, 0, 0, 0, 0, 0, 1, 1, 1);
+}
 
 public sealed record RekallAgeRuntimeViewportEye(
     string Name,

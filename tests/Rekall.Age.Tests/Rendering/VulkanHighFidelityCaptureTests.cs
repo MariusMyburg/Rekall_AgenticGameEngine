@@ -7,6 +7,104 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VulkanHighFidelityCaptureTests
 {
     [Fact]
+    public async Task AnalyticFogExecutesAndProducesDeterministicVisibleAttenuation()
+    {
+        var foggedFrame = FogFrame("Performance", density: 0.09);
+        var emptyFrame = FogFrame("Performance", density: 0);
+        var output = TestPaths.CreateTempDirectory();
+        var capture = new RekallAgeNativeVulkanSceneCapture();
+
+        var fogged = await capture.CaptureSceneAsync(
+            foggedFrame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            output,
+            "discrete-gpu",
+            CancellationToken.None);
+        var empty = await capture.CaptureSceneAsync(
+            emptyFrame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            output,
+            "discrete-gpu",
+            CancellationToken.None);
+
+        Assert.True(fogged.Captured, string.Join(Environment.NewLine, fogged.Errors));
+        Assert.True(empty.Captured, string.Join(Environment.NewLine, empty.Errors));
+        Assert.NotEqual(empty.ByteChecksum, fogged.ByteChecksum);
+        var report = Assert.IsType<RekallAgeHighFidelityFrameReport>(fogged.HighFidelityFrame);
+        var fog = Assert.IsType<RekallAgeHighFidelityFogReport>(report.Fog);
+        Assert.Equal("analytic", fog.Mode);
+        Assert.True(fog.Enabled);
+        Assert.Equal(1, fog.PackedVolumeCount);
+        Assert.Equal(0, fog.DispatchCount);
+        Assert.Contains(report.Passes, pass => pass.Name == "fog-integrate"
+            && pass.Kind == "graphics"
+            && pass.Executed
+            && pass.DrawCount == 1);
+        Assert.DoesNotContain(report.Resources, resource => resource.Name == "fog-froxel");
+    }
+
+    [Fact]
+    public async Task FroxelFogAllocatesDispatchesLightsAndWritesInspectableDebugSlices()
+    {
+        var foggedFrame = FogFrame("High", density: 0.12);
+        var emptyFroxelFrame = FogFrame("High", density: 0);
+        var emptyAnalyticFrame = FogFrame("High", density: 0, fogMode: "analytic");
+        var output = TestPaths.CreateTempDirectory();
+        var capture = new RekallAgeNativeVulkanSceneCapture();
+
+        var fogged = await capture.CaptureSceneAsync(
+            foggedFrame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            output,
+            "discrete-gpu",
+            CancellationToken.None);
+        var emptyFroxel = await capture.CaptureSceneAsync(
+            emptyFroxelFrame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            output,
+            "discrete-gpu",
+            CancellationToken.None);
+        var emptyAnalytic = await capture.CaptureSceneAsync(
+            emptyAnalyticFrame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            output,
+            "discrete-gpu",
+            CancellationToken.None);
+
+        Assert.True(fogged.Captured, string.Join(Environment.NewLine, fogged.Errors));
+        Assert.True(emptyFroxel.Captured, string.Join(Environment.NewLine, emptyFroxel.Errors));
+        Assert.True(emptyAnalytic.Captured, string.Join(Environment.NewLine, emptyAnalytic.Errors));
+        Assert.NotEqual(emptyFroxel.ByteChecksum, fogged.ByteChecksum);
+        Assert.Equal(emptyAnalytic.ByteChecksum, emptyFroxel.ByteChecksum);
+        var report = Assert.IsType<RekallAgeHighFidelityFrameReport>(fogged.HighFidelityFrame);
+        var fog = Assert.IsType<RekallAgeHighFidelityFogReport>(report.Fog);
+        Assert.Equal("froxel", fog.Mode);
+        Assert.True(fog.Enabled);
+        Assert.Equal(new RekallAgeVulkanFogGrid(160, 90, 48), fog.Grid);
+        Assert.Equal(new RekallAgeVulkanFogDispatch(40, 23, 12), fog.Dispatch);
+        Assert.Equal(1, fog.DispatchCount);
+        Assert.True(fog.DirectLightInjected);
+        Assert.True(fog.HistoryReset);
+        Assert.False(fog.TemporalReprojection);
+        Assert.Contains(report.Resources, resource => resource is
+        { Name: "fog-froxel", Format: "R16G16B16A16_SFloat", Width: 160, Height: 90, Allocated: true });
+        var fogPass = Assert.Single(report.Passes, pass => pass.Name == "fog-integrate");
+        var transparentPass = Assert.Single(report.Passes, pass => pass.Name == "transparent-particles");
+        Assert.True(fogPass.Executed);
+        Assert.True(fogPass.DispatchCount > 0);
+        Assert.True(report.Passes.ToList().IndexOf(fogPass) < report.Passes.ToList().IndexOf(transparentPass));
+        Assert.Equal(["density", "lighting", "integrated-transmittance"], report.FogDebugCaptures.Select(item => item.Kind));
+        foreach (var debug in report.FogDebugCaptures)
+        {
+            Assert.True(File.Exists(debug.OutputPath), debug.OutputPath);
+            Assert.True(debug.NonBlank, debug.Kind);
+            var image = await RekallAgePngReader.ReadRgbaAsync(debug.OutputPath, CancellationToken.None);
+            Assert.Equal(160, image.Width);
+            Assert.Equal(90, image.Height);
+        }
+    }
+
+    [Fact]
     public async Task DirectionalShadowsAllocateDrawSampleAndDarkenNativePixels()
     {
         var shadowedFrame = ShadowFrame(castShadows: true);
@@ -378,6 +476,96 @@ public sealed class VulkanHighFidelityCaptureTests
                     Radius: radius),
                 new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")
             ]);
+
+    private static RekallAgeRuntimeViewportFrame FogFrame(
+        string preset,
+        double density,
+        string? fogMode = null)
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera",
+            "Camera",
+            "Camera3D",
+            true,
+            0,
+            1.5,
+            -5,
+            RotationX: 8,
+            FieldOfViewDegrees: 62,
+            NearClip: 0.1,
+            FarClip: 80,
+            ClearColor: "#03050a");
+        var quality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent(preset, FogMode: fogMode, Bloom: false),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("native-test"),
+            96,
+            64);
+        return new RekallAgeRuntimeViewportFrame(
+            "Fog Native Test",
+            4,
+            4.0 / 60.0,
+            96,
+            64,
+            camera,
+            [camera],
+            [
+                new RekallAgeRuntimeViewportRenderable(
+                    "sun",
+                    "Sun",
+                    "light",
+                    null,
+                    0,
+                    6,
+                    0,
+                    -100,
+                    Variant: "directional",
+                    RotationX: 50,
+                    RotationY: -25,
+                    Intensity: 2.2,
+                    MaterialColor: "#ffe0b0"),
+                new RekallAgeRuntimeViewportRenderable(
+                    "cube",
+                    "Cube",
+                    "mesh",
+                    "rekall.primitive.cube",
+                    0,
+                    0,
+                    2,
+                    0,
+                    Variant: "rekall.geometry.cube",
+                    ScaleX: 1.5,
+                    ScaleY: 1.5,
+                    ScaleZ: 1.5,
+                    MaterialColor: "#305090",
+                    RoughnessFactor: 0.55)
+            ],
+            0,
+            new RekallAgeRuntimeViewportOverlay(false, 0),
+            [],
+            PostProcessStack: new RekallAgeRuntimeViewportPostProcessStack(
+                "post",
+                "Tone Map",
+                true,
+                [new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")]))
+        {
+            ResolvedQualityPlan = quality,
+            FogVolumes =
+            [
+                new RekallAgeRuntimeViewportFogVolume(
+                    "fog",
+                    "Fog",
+                    "global",
+                    density,
+                    "#8fb8e8",
+                    "#020408",
+                    0.35,
+                    0.12,
+                    0,
+                    10,
+                    RekallAgeRuntimeViewportTransform.Identity)
+            ]
+        };
+    }
 
     private static RekallAgeRuntimeViewportFrame EmissiveFrame()
     {

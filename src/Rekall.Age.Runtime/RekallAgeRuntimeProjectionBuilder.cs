@@ -182,7 +182,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             ReadNumber(component.Properties, "blendDistance", 0),
                             ReadInt32(component.Properties, "priority", 0))
                         {
-                            ProjectionSource = RekallAgeRuntimeProjectionSources.BuiltIn
+                            ProjectionSource = RekallAgeRuntimeProjectionSources.BuiltIn,
+                            Transform = entity.Transform
                         });
                         break;
                     case "Rekall.GeometryMesh":
@@ -751,13 +752,13 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                     Sort(canvases),
                     Sort(elements),
                     elements.Count(element => element.Interactive)))
-                {
-                    Input = world.Subsystems.Input,
-                    Events = world.Subsystems.Events,
-                    Multiplayer = new RekallAgeRuntimeMultiplayerView(
+            {
+                Input = world.Subsystems.Input,
+                Events = world.Subsystems.Events,
+                Multiplayer = new RekallAgeRuntimeMultiplayerView(
                         Sort(networkSessions),
                         Sort(networkEntities)),
-                    Xr = new RekallAgeRuntimeXrView(
+                Xr = new RekallAgeRuntimeXrView(
                         Sort(xrRigs),
                         Sort(xrControllers),
                         world.Subsystems.Xr.Poses
@@ -768,7 +769,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             .OrderBy(action => action.Hand, StringComparer.OrdinalIgnoreCase)
                             .ThenBy(action => action.Name, StringComparer.OrdinalIgnoreCase)
                             .ToArray())
-                },
+            },
             Observations = observations
                 .OrderBy(observation => observation.Severity, StringComparer.Ordinal)
                 .ThenBy(observation => observation.Subsystem, StringComparer.Ordinal)

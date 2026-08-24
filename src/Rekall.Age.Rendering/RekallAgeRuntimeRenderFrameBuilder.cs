@@ -108,9 +108,37 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         {
             Culling = culling,
             CameraViews = cameraViews,
-            HeadsetCamera = headsetCamera
+            HeadsetCamera = headsetCamera,
+            FogVolumes = BuildFogVolumes(world)
         };
     }
+
+    private static IReadOnlyList<RekallAgeRuntimeViewportFogVolume> BuildFogVolumes(RekallAgeRuntimeWorld world) =>
+        world.Subsystems.Rendering.FogVolumes
+            .Select(volume => new RekallAgeRuntimeViewportFogVolume(
+                volume.EntityId,
+                volume.EntityName,
+                volume.Shape,
+                volume.Density,
+                volume.Albedo,
+                volume.Emission,
+                volume.Anisotropy,
+                volume.HeightFalloff,
+                volume.BlendDistance,
+                volume.Priority,
+                new RekallAgeRuntimeViewportTransform(
+                    volume.Transform.Position3D.X,
+                    volume.Transform.Position3D.Y,
+                    volume.Transform.Position3D.Z,
+                    volume.Transform.Rotation3D.X,
+                    volume.Transform.Rotation3D.Y,
+                    volume.Transform.Rotation3D.Z,
+                    volume.Transform.Scale3D.X,
+                    volume.Transform.Scale3D.Y,
+                    volume.Transform.Scale3D.Z)))
+            .OrderByDescending(volume => volume.Priority)
+            .ThenBy(volume => volume.EntityId, StringComparer.Ordinal)
+            .ToArray();
 
     private static RekallAgeRuntimeViewportPostProcessStack? BuildPostProcessStack(RekallAgeRuntimeWorld world)
     {

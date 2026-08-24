@@ -27,7 +27,16 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
             resources.Add(Resource("ssao-occlusion", "R8_UNorm", DivideRoundUp(plan.RenderWidth, 2), DivideRoundUp(plan.RenderHeight, 2), 1, "transient", ["storage", "sampled"]));
         }
 
-        resources.Add(Resource("scene-hdr", "R16G16B16A16_SFloat", plan.RenderWidth, plan.RenderHeight, 1, "transient", ["color-attachment", "sampled"]));
+        resources.Add(Resource(
+            "scene-hdr",
+            "R16G16B16A16_SFloat",
+            plan.RenderWidth,
+            plan.RenderHeight,
+            1,
+            "transient",
+            plan.Fog.Mode.Equals("analytic", StringComparison.OrdinalIgnoreCase)
+                ? ["color-attachment", "sampled"]
+                : ["color-attachment", "storage", "sampled"]));
 
         if (!plan.Fog.Mode.Equals("analytic", StringComparison.OrdinalIgnoreCase))
         {
@@ -51,10 +60,9 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
         };
 
         var nextOrder = 4;
-        if (!plan.Fog.Mode.Equals("analytic", StringComparison.OrdinalIgnoreCase))
-        {
-            passes.Add(Pass("fog-integrate", "compute", ["scene-hdr"], ["fog-froxel", "scene-hdr"], nextOrder++));
-        }
+        passes.Add(plan.Fog.Mode.Equals("analytic", StringComparison.OrdinalIgnoreCase)
+            ? Pass("fog-integrate", "graphics", ["scene-hdr"], ["scene-hdr"], nextOrder++)
+            : Pass("fog-integrate", "compute", ["scene-hdr"], ["fog-froxel", "scene-hdr"], nextOrder++));
 
         passes.Add(Pass("transparent-particles", "graphics", ["depth-buffer", "scene-hdr"], ["scene-hdr"], nextOrder++));
         if (plan.Post.Bloom)

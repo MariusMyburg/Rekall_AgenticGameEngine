@@ -31,6 +31,17 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
                 diagnostic.Code,
                 "shadow-directional",
                 diagnostic.Message)));
+        var fogPlan = new RekallAgeVulkanFogPlanner().Plan(frame, resolved.Fog) with
+        {
+            DirectLightAvailable = frame.Renderables.Any(item =>
+                item.Kind.Equals("light", StringComparison.Ordinal) && item.Intensity > 0.0001),
+            ShadowAvailable = shadowPlan.Enabled
+        };
+        diagnostics.AddRange(fogPlan.Diagnostics.Select(diagnostic =>
+            new RekallAgeHighFidelityRenderGraphDiagnostic(
+                diagnostic.Code,
+                "fog-integrate",
+                diagnostic.Message)));
         var bloom = frame.PostProcessStack.Passes.FirstOrDefault(pass =>
             pass.Type.Equals("bloom", StringComparison.OrdinalIgnoreCase)
             || pass.Type.Equals("brightExtract", StringComparison.OrdinalIgnoreCase));
@@ -58,7 +69,8 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
                     ? ResolveNonNegative(composite?.Intensity ?? bloom?.Intensity ?? 0.65)
                     : 0,
                 BloomRadius: ResolveRadius(bloom?.Radius ?? 1)),
-            shadowPlan);
+            shadowPlan,
+            fogPlan);
     }
 
     private static RekallAgeVulkanShadowPlan BuildShadowPlan(
@@ -411,7 +423,8 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
 public sealed record RekallAgeVulkanHighFidelityFramePlan(
     RekallAgeHighFidelityRenderGraph Graph,
     RekallAgeHighFidelityPostSettings PostSettings,
-    RekallAgeVulkanShadowPlan ShadowPlan)
+    RekallAgeVulkanShadowPlan ShadowPlan,
+    RekallAgeVulkanFogPlan FogPlan)
 {
     public bool Ready => Graph.IsValid;
 }
@@ -439,7 +452,32 @@ public sealed record RekallAgeHighFidelityFrameReport(
 
     public IReadOnlyList<RekallAgeHighFidelityShadowDebugCapture> ShadowDebugCaptures { get; init; } =
         Array.Empty<RekallAgeHighFidelityShadowDebugCapture>();
+
+    public RekallAgeHighFidelityFogReport? Fog { get; init; }
+
+    public IReadOnlyList<RekallAgeHighFidelityFogDebugCapture> FogDebugCaptures { get; init; } =
+        Array.Empty<RekallAgeHighFidelityFogDebugCapture>();
 }
+
+public sealed record RekallAgeHighFidelityFogReport(
+    string Mode,
+    bool Enabled,
+    RekallAgeVulkanFogGrid Grid,
+    RekallAgeVulkanFogDispatch Dispatch,
+    int DispatchCount,
+    int PackedVolumeCount,
+    IReadOnlyList<string> DroppedEntityIds,
+    bool DirectLightInjected,
+    bool ShadowAttenuationApplied,
+    bool HistoryReset,
+    bool TemporalReprojection);
+
+public sealed record RekallAgeHighFidelityFogDebugCapture(
+    string Kind,
+    int SliceIndex,
+    string OutputPath,
+    bool NonBlank,
+    ulong ByteChecksum);
 
 public sealed record RekallAgeHighFidelityShadowDebugCapture(
     int CascadeIndex,

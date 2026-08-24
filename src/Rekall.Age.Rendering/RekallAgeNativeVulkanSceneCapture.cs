@@ -474,7 +474,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 CreateDevice(state);
                 if (highFidelityPlan is not null)
                 {
-                    ValidateHighFidelityFormats(state, commandPlan, highFidelityPlan.ShadowPlan, errors);
+                    ValidateHighFidelityFormats(state, commandPlan, highFidelityPlan.ShadowPlan, highFidelityPlan.FogPlan, errors);
                     if (errors.Count > 0)
                     {
                         return Unavailable(frame, string.Empty, "Silk.NET Vulkan", state.SelectedDevice, assets, meshes.Count, 0, 0, [], errors) with
@@ -485,7 +485,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 }
 
                 var colorUsage = ImageUsageFlags.ColorAttachmentBit
-                    | (highFidelityPlan is null ? ImageUsageFlags.TransferSrcBit : ImageUsageFlags.SampledBit);
+                    | (highFidelityPlan is null ? ImageUsageFlags.TransferSrcBit : ImageUsageFlags.SampledBit)
+                    | (highFidelityPlan?.FogPlan.UsesFroxelGrid == true ? ImageUsageFlags.StorageBit : 0);
                 CreateImage(state, target.Width, target.Height, target.ColorFormat, colorUsage, ImageAspectFlags.ColorBit, 1, out state.ColorImage, out state.ColorMemory, out state.ColorView);
                 CreateImage(state, target.Width, target.Height, target.DepthFormat, ImageUsageFlags.DepthStencilAttachmentBit, ImageAspectFlags.DepthBit, 1, out state.DepthImage, out state.DepthMemory, out state.DepthView);
                 CreateRenderPass(state, target);
@@ -568,6 +569,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 var shadowDebugCaptures = highFidelityPlan?.ShadowPlan.Enabled == true
                     ? WriteShadowDebugCaptures(state, highFidelityPlan.ShadowPlan, outputDirectory, cancellationToken)
                     : [];
+                var fogDebugCaptures = highFidelityPlan?.FogPlan is { UsesFroxelGrid: true, Enabled: true }
+                    ? WriteFogDebugCaptures(highFidelityPlan.FogPlan, outputDirectory, cancellationToken)
+                    : [];
                 var rgba = ReadBack(state, checked((ulong)target.EffectiveOutputWidth * target.EffectiveOutputHeight * 4));
                 var outputPath = Path.Combine(outputDirectory, $"vulkan-scene-{target.EffectiveOutputWidth}x{target.EffectiveOutputHeight}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}.png");
                 RekallAgePngWriter.WriteRgbaAsync(
@@ -616,7 +620,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                             CreateExecutedHighFidelityPassReports(commandPlan, highFidelityPlan),
                             [],
                             commandPlan,
-                            shadowDebugCaptures)
+                            shadowDebugCaptures,
+                            fogDebugCaptures)
                 };
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -1102,6 +1107,46 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             out ImageView view)
         {
             CreateImage(state, width, height, format, usage, aspect, mipLevels, 1, out image, out memory, out view);
+        }
+
+        private static void CreateImage3D(
+            VulkanState state,
+            uint width,
+            uint height,
+            uint depth,
+            Format format,
+            ImageUsageFlags usage,
+            out Image image,
+            out DeviceMemory memory,
+            out ImageView view)
+        {
+            var imageInfo = new ImageCreateInfo
+            {
+                SType = StructureType.ImageCreateInfo,
+                ImageType = ImageType.Type3D,
+                Format = format,
+                Extent = new Extent3D(width, height, depth),
+                MipLevels = 1,
+                ArrayLayers = 1,
+                Samples = SampleCountFlags.Count1Bit,
+                Tiling = ImageTiling.Optimal,
+                Usage = usage,
+                SharingMode = SharingMode.Exclusive,
+                InitialLayout = ImageLayout.Undefined
+            };
+            ThrowIfFailed(state.Vk.CreateImage(state.Device, &imageInfo, null, out image), "vkCreateImage fog 3D");
+            state.Vk.GetImageMemoryRequirements(state.Device, image, out var requirements);
+            AllocateAndBindImage(state, image, requirements, MemoryPropertyFlags.DeviceLocalBit, out memory);
+            var viewInfo = new ImageViewCreateInfo
+            {
+                SType = StructureType.ImageViewCreateInfo,
+                Image = image,
+                ViewType = ImageViewType.Type3D,
+                Format = format,
+                Components = new ComponentMapping(ComponentSwizzle.Identity, ComponentSwizzle.Identity, ComponentSwizzle.Identity, ComponentSwizzle.Identity),
+                SubresourceRange = new ImageSubresourceRange(ImageAspectFlags.ColorBit, 0, 1, 0, 1)
+            };
+            ThrowIfFailed(state.Vk.CreateImageView(state.Device, &viewInfo, null, out view), "vkCreateImageView fog 3D");
         }
 
         private static ImageView[] CreateLayerImageViews(
@@ -1858,9 +1903,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             VulkanState state,
             RekallAgeVulkanSceneCommandPlan commandPlan,
             RekallAgeVulkanShadowPlan shadowPlan,
+            RekallAgeVulkanFogPlan fogPlan,
             ICollection<string> errors)
         {
-            if (HasPostPass(commandPlan, "bloom"))
+            if (HasPostPass(commandPlan, "bloom") || fogPlan.UsesFroxelGrid)
             {
                 uint queueFamilyCount = 0;
                 state.Vk.GetPhysicalDeviceQueueFamilyProperties(state.PhysicalDevice, &queueFamilyCount, null);
@@ -1871,7 +1917,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 {
                     errors.Add(
                         $"REKALL_RENDER_COMPUTE_QUEUE_UNSUPPORTED: Vulkan graphics queue family {state.GraphicsQueueFamily} "
-                        + $"on device '{state.SelectedDevice?.Name}' cannot execute the bloom compute pass.");
+                        + $"on device '{state.SelectedDevice?.Name}' cannot execute the resolved compute passes.");
                 }
             }
 
@@ -1880,9 +1926,29 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 Format.R16G16B16A16Sfloat,
                 FormatFeatureFlags.ColorAttachmentBit
                     | FormatFeatureFlags.SampledImageBit
-                    | FormatFeatureFlags.SampledImageFilterLinearBit,
+                    | FormatFeatureFlags.SampledImageFilterLinearBit
+                    | (fogPlan.UsesFroxelGrid ? FormatFeatureFlags.StorageImageBit : 0),
                 "scene-hdr",
                 errors);
+            if (fogPlan.UsesFroxelGrid)
+            {
+                ValidateFormat(
+                    state,
+                    Format.R16G16B16A16Sfloat,
+                    FormatFeatureFlags.StorageImageBit | FormatFeatureFlags.SampledImageBit,
+                    "fog-froxel",
+                    errors);
+                state.Vk.GetPhysicalDeviceProperties(state.PhysicalDevice, out var fogDeviceProperties);
+                var maximumDimension = fogDeviceProperties.Limits.MaxImageDimension3D;
+                if ((uint)fogPlan.Grid.Width > maximumDimension
+                    || (uint)fogPlan.Grid.Height > maximumDimension
+                    || (uint)fogPlan.Grid.Depth > maximumDimension)
+                {
+                    errors.Add(
+                        $"REKALL_FOG_GRID_DEVICE_LIMIT_EXCEEDED: Resolved fog grid {fogPlan.Grid.Width}x{fogPlan.Grid.Height}x{fogPlan.Grid.Depth} "
+                        + $"exceeds Vulkan maxImageDimension3D {maximumDimension} on device '{state.SelectedDevice?.Name}'.");
+                }
+            }
             if (HasPostPass(commandPlan, "bloom"))
             {
                 ValidateFormat(
@@ -1950,6 +2016,30 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             RekallAgeVulkanHighFidelityFramePlan plan,
             RekallAgeVulkanSceneCommandPlan commandPlan)
         {
+            if (plan.FogPlan.UsesFroxelGrid)
+            {
+                state.FogWidth = checked((uint)plan.FogPlan.Grid.Width);
+                state.FogHeight = checked((uint)plan.FogPlan.Grid.Height);
+                state.FogDepth = checked((uint)plan.FogPlan.Grid.Depth);
+                CreateImage3D(
+                    state,
+                    state.FogWidth,
+                    state.FogHeight,
+                    state.FogDepth,
+                    Format.R16G16B16A16Sfloat,
+                    ImageUsageFlags.StorageBit | ImageUsageFlags.SampledBit,
+                    out state.FogImage,
+                    out state.FogMemory,
+                    out state.FogView);
+                var fogBytes = PackFogVolumes(plan.FogPlan.Volumes);
+                CreateHostBuffer(
+                    state,
+                    fogBytes,
+                    BufferUsageFlags.StorageBufferBit,
+                    out state.FogVolumeBuffer,
+                    out state.FogVolumeMemory);
+            }
+
             if (HasPostPass(commandPlan, "bloom"))
             {
                 var bloom = plan.Graph.Resources.Single(resource => resource.Name == "bloom-pyramid");
@@ -1967,6 +2057,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     out state.BloomMemory,
                     out state.BloomView);
             }
+            CreateFogAndTransparentRenderPasses(state, target);
             CreateImage(
                 state,
                 target.EffectiveOutputWidth,
@@ -2032,6 +2123,108 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             ThrowIfFailed(state.Vk.CreateFramebuffer(state.Device, &framebufferInfo, null, out state.OutputFramebuffer), "vkCreateFramebuffer tone-map");
         }
 
+        private static void CreateFogAndTransparentRenderPasses(
+            VulkanState state,
+            RekallAgeVulkanSceneRenderTarget target)
+        {
+            var fogColor = new AttachmentDescription
+            {
+                Format = target.ColorFormat,
+                Samples = SampleCountFlags.Count1Bit,
+                LoadOp = AttachmentLoadOp.Load,
+                StoreOp = AttachmentStoreOp.Store,
+                StencilLoadOp = AttachmentLoadOp.DontCare,
+                StencilStoreOp = AttachmentStoreOp.DontCare,
+                InitialLayout = ImageLayout.ShaderReadOnlyOptimal,
+                FinalLayout = ImageLayout.ShaderReadOnlyOptimal
+            };
+            var fogColorReference = new AttachmentReference(0, ImageLayout.ColorAttachmentOptimal);
+            var fogSubpass = new SubpassDescription
+            {
+                PipelineBindPoint = PipelineBindPoint.Graphics,
+                ColorAttachmentCount = 1,
+                PColorAttachments = &fogColorReference
+            };
+            var fogDependency = new SubpassDependency
+            {
+                SrcSubpass = Vk.SubpassExternal,
+                DstSubpass = 0,
+                SrcStageMask = PipelineStageFlags.ComputeShaderBit | PipelineStageFlags.FragmentShaderBit,
+                DstStageMask = PipelineStageFlags.ColorAttachmentOutputBit,
+                SrcAccessMask = AccessFlags.ShaderReadBit | AccessFlags.ShaderWriteBit,
+                DstAccessMask = AccessFlags.ColorAttachmentReadBit | AccessFlags.ColorAttachmentWriteBit
+            };
+            var fogPassInfo = new RenderPassCreateInfo
+            {
+                SType = StructureType.RenderPassCreateInfo,
+                AttachmentCount = 1,
+                PAttachments = &fogColor,
+                SubpassCount = 1,
+                PSubpasses = &fogSubpass,
+                DependencyCount = 1,
+                PDependencies = &fogDependency
+            };
+            ThrowIfFailed(state.Vk.CreateRenderPass(state.Device, &fogPassInfo, null, out state.FogCompositeRenderPass), "vkCreateRenderPass analytic fog");
+            var colorView = state.ColorView;
+            var fogFramebufferInfo = new FramebufferCreateInfo
+            {
+                SType = StructureType.FramebufferCreateInfo,
+                RenderPass = state.FogCompositeRenderPass,
+                AttachmentCount = 1,
+                PAttachments = &colorView,
+                Width = target.Width,
+                Height = target.Height,
+                Layers = 1
+            };
+            ThrowIfFailed(state.Vk.CreateFramebuffer(state.Device, &fogFramebufferInfo, null, out state.FogCompositeFramebuffer), "vkCreateFramebuffer analytic fog");
+
+            var transparentColor = fogColor;
+            var transparentDepth = new AttachmentDescription
+            {
+                Format = target.DepthFormat,
+                Samples = SampleCountFlags.Count1Bit,
+                LoadOp = AttachmentLoadOp.Load,
+                StoreOp = AttachmentStoreOp.Store,
+                StencilLoadOp = AttachmentLoadOp.DontCare,
+                StencilStoreOp = AttachmentStoreOp.DontCare,
+                InitialLayout = ImageLayout.DepthStencilAttachmentOptimal,
+                FinalLayout = ImageLayout.DepthStencilAttachmentOptimal
+            };
+            var transparentAttachments = stackalloc AttachmentDescription[] { transparentColor, transparentDepth };
+            var transparentColorReference = new AttachmentReference(0, ImageLayout.ColorAttachmentOptimal);
+            var transparentDepthReference = new AttachmentReference(1, ImageLayout.DepthStencilAttachmentOptimal);
+            var transparentSubpass = new SubpassDescription
+            {
+                PipelineBindPoint = PipelineBindPoint.Graphics,
+                ColorAttachmentCount = 1,
+                PColorAttachments = &transparentColorReference,
+                PDepthStencilAttachment = &transparentDepthReference
+            };
+            var transparentPassInfo = new RenderPassCreateInfo
+            {
+                SType = StructureType.RenderPassCreateInfo,
+                AttachmentCount = 2,
+                PAttachments = transparentAttachments,
+                SubpassCount = 1,
+                PSubpasses = &transparentSubpass,
+                DependencyCount = 1,
+                PDependencies = &fogDependency
+            };
+            ThrowIfFailed(state.Vk.CreateRenderPass(state.Device, &transparentPassInfo, null, out state.TransparentRenderPass), "vkCreateRenderPass transparent");
+            var transparentViews = stackalloc ImageView[] { state.ColorView, state.DepthView };
+            var transparentFramebufferInfo = new FramebufferCreateInfo
+            {
+                SType = StructureType.FramebufferCreateInfo,
+                RenderPass = state.TransparentRenderPass,
+                AttachmentCount = 2,
+                PAttachments = transparentViews,
+                Width = target.Width,
+                Height = target.Height,
+                Layers = 1
+            };
+            ThrowIfFailed(state.Vk.CreateFramebuffer(state.Device, &transparentFramebufferInfo, null, out state.TransparentFramebuffer), "vkCreateFramebuffer transparent");
+        }
+
         private static void CreateHighFidelityPostPipeline(
             VulkanState state,
             RekallAgeVulkanSceneRenderTarget target,
@@ -2040,6 +2233,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             ICollection<string> errors)
         {
             var hasBloom = HasPostPass(commandPlan, "bloom");
+            var hasFog = plan.FogPlan.UsesFroxelGrid;
             var compiled = new RekallAgeVulkanShaderCompiler().CompileHighFidelityPostPipeline();
             if (!compiled.Compiled)
             {
@@ -2050,16 +2244,24 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 return;
             }
 
+            fixed (byte* fogCode = compiled.Fog.Spirv)
+            fixed (byte* analyticFogCode = compiled.AnalyticFog.Spirv)
             fixed (byte* bloomCode = compiled.Bloom.Spirv)
             fixed (byte* vertexCode = compiled.FullscreenVertex.Spirv)
             fixed (byte* toneCode = compiled.ToneMap.Spirv)
             {
+                if (hasFog)
+                {
+                    state.FogShader = CreateShaderModule(state, fogCode, compiled.Fog.Spirv.Length);
+                }
+
                 if (hasBloom)
                 {
                     state.BloomShader = CreateShaderModule(state, bloomCode, compiled.Bloom.Spirv.Length);
                 }
 
                 state.FullscreenVertexShader = CreateShaderModule(state, vertexCode, compiled.FullscreenVertex.Spirv.Length);
+                state.AnalyticFogShader = CreateShaderModule(state, analyticFogCode, compiled.AnalyticFog.Spirv.Length);
                 state.ToneMapShader = CreateShaderModule(state, toneCode, compiled.ToneMap.Spirv.Length);
             }
 
@@ -2075,6 +2277,23 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 MaxLod = 0
             };
             ThrowIfFailed(state.Vk.CreateSampler(state.Device, &samplerInfo, null, out state.PostSampler), "vkCreateSampler post");
+
+            if (hasFog)
+            {
+                var fogBindings = stackalloc DescriptorSetLayoutBinding[]
+                {
+                    new(0, DescriptorType.StorageImage, 1, ShaderStageFlags.ComputeBit),
+                    new(1, DescriptorType.StorageBuffer, 1, ShaderStageFlags.ComputeBit),
+                    new(2, DescriptorType.StorageImage, 1, ShaderStageFlags.ComputeBit)
+                };
+                var fogLayoutInfo = new DescriptorSetLayoutCreateInfo
+                {
+                    SType = StructureType.DescriptorSetLayoutCreateInfo,
+                    BindingCount = 3,
+                    PBindings = fogBindings
+                };
+                ThrowIfFailed(state.Vk.CreateDescriptorSetLayout(state.Device, &fogLayoutInfo, null, out state.FogDescriptorSetLayout), "vkCreateDescriptorSetLayout fog");
+            }
 
             if (hasBloom)
             {
@@ -2108,22 +2327,52 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             var poolSizes = stackalloc DescriptorPoolSize[]
             {
                 new(DescriptorType.CombinedImageSampler, 3),
-                new(DescriptorType.StorageImage, 1)
+                new(DescriptorType.StorageImage, 3),
+                new(DescriptorType.StorageBuffer, 1)
             };
             var poolInfo = new DescriptorPoolCreateInfo
             {
                 SType = StructureType.DescriptorPoolCreateInfo,
-                MaxSets = 2,
-                PoolSizeCount = 2,
+                MaxSets = 3,
+                PoolSizeCount = 3,
                 PPoolSizes = poolSizes
             };
             ThrowIfFailed(state.Vk.CreateDescriptorPool(state.Device, &poolInfo, null, out state.PostDescriptorPool), "vkCreateDescriptorPool post");
+            if (hasFog)
+            {
+                state.FogDescriptorSet = AllocateDescriptorSet(state, state.PostDescriptorPool, state.FogDescriptorSetLayout);
+            }
             if (hasBloom)
             {
                 state.BloomDescriptorSet = AllocateDescriptorSet(state, state.PostDescriptorPool, state.BloomDescriptorSetLayout);
             }
 
             state.ToneMapDescriptorSet = AllocateDescriptorSet(state, state.PostDescriptorPool, state.ToneMapDescriptorSetLayout);
+
+            if (hasFog)
+            {
+                var fogImages = stackalloc DescriptorImageInfo[]
+                {
+                    new(default, state.FogView, ImageLayout.General),
+                    new(default, state.ColorView, ImageLayout.General)
+                };
+                var fogBuffer = new DescriptorBufferInfo(state.FogVolumeBuffer, 0, Vk.WholeSize);
+                var fogWrites = stackalloc WriteDescriptorSet[]
+                {
+                    ImageWrite(state.FogDescriptorSet, 0, DescriptorType.StorageImage, &fogImages[0]),
+                    new()
+                    {
+                        SType = StructureType.WriteDescriptorSet,
+                        DstSet = state.FogDescriptorSet,
+                        DstBinding = 1,
+                        DescriptorCount = 1,
+                        DescriptorType = DescriptorType.StorageBuffer,
+                        PBufferInfo = &fogBuffer
+                    },
+                    ImageWrite(state.FogDescriptorSet, 2, DescriptorType.StorageImage, &fogImages[1])
+                };
+                state.Vk.UpdateDescriptorSets(state.Device, 3, fogWrites, 0, null);
+            }
 
             if (hasBloom)
             {
@@ -2167,9 +2416,44 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 ThrowIfFailed(state.Vk.CreatePipelineLayout(state.Device, &bloomPipelineLayoutInfo, null, out state.BloomPipelineLayout), "vkCreatePipelineLayout bloom");
             }
 
+            if (hasFog)
+            {
+                var fogPushRange = new PushConstantRange(ShaderStageFlags.ComputeBit, 0, (uint)Marshal.SizeOf<FogPushConstants>());
+                var fogSetLayout = state.FogDescriptorSetLayout;
+                var fogPipelineLayoutInfo = new PipelineLayoutCreateInfo
+                {
+                    SType = StructureType.PipelineLayoutCreateInfo,
+                    SetLayoutCount = 1,
+                    PSetLayouts = &fogSetLayout,
+                    PushConstantRangeCount = 1,
+                    PPushConstantRanges = &fogPushRange
+                };
+                ThrowIfFailed(state.Vk.CreatePipelineLayout(state.Device, &fogPipelineLayoutInfo, null, out state.FogPipelineLayout), "vkCreatePipelineLayout fog");
+            }
+
             var entry = "main\0"u8.ToArray();
             fixed (byte* entryName = entry)
             {
+                CreateAnalyticFogPipeline(state, target, entryName);
+
+                if (hasFog)
+                {
+                    var fogStage = new PipelineShaderStageCreateInfo
+                    {
+                        SType = StructureType.PipelineShaderStageCreateInfo,
+                        Stage = ShaderStageFlags.ComputeBit,
+                        Module = state.FogShader,
+                        PName = entryName
+                    };
+                    var fogInfo = new ComputePipelineCreateInfo
+                    {
+                        SType = StructureType.ComputePipelineCreateInfo,
+                        Stage = fogStage,
+                        Layout = state.FogPipelineLayout
+                    };
+                    ThrowIfFailed(state.Vk.CreateComputePipelines(state.Device, default, 1, &fogInfo, null, out state.FogPipeline), "vkCreateComputePipelines fog");
+                }
+
                 if (hasBloom)
                 {
                     var computeStage = new PipelineShaderStageCreateInfo
@@ -2274,6 +2558,106 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 };
                 ThrowIfFailed(state.Vk.CreateGraphicsPipelines(state.Device, default, 1, &pipelineInfo, null, out state.ToneMapPipeline), "vkCreateGraphicsPipelines tone-map");
             }
+        }
+
+        private static void CreateAnalyticFogPipeline(
+            VulkanState state,
+            RekallAgeVulkanSceneRenderTarget target,
+            byte* entryName)
+        {
+            var pushRange = new PushConstantRange(
+                ShaderStageFlags.FragmentBit,
+                0,
+                (uint)Marshal.SizeOf<AnalyticFogPushConstants>());
+            var layoutInfo = new PipelineLayoutCreateInfo
+            {
+                SType = StructureType.PipelineLayoutCreateInfo,
+                PushConstantRangeCount = 1,
+                PPushConstantRanges = &pushRange
+            };
+            ThrowIfFailed(
+                state.Vk.CreatePipelineLayout(state.Device, &layoutInfo, null, out state.AnalyticFogPipelineLayout),
+                "vkCreatePipelineLayout analytic fog");
+            var stages = stackalloc PipelineShaderStageCreateInfo[]
+            {
+                new()
+                {
+                    SType = StructureType.PipelineShaderStageCreateInfo,
+                    Stage = ShaderStageFlags.VertexBit,
+                    Module = state.FullscreenVertexShader,
+                    PName = entryName
+                },
+                new()
+                {
+                    SType = StructureType.PipelineShaderStageCreateInfo,
+                    Stage = ShaderStageFlags.FragmentBit,
+                    Module = state.AnalyticFogShader,
+                    PName = entryName
+                }
+            };
+            var vertexInput = new PipelineVertexInputStateCreateInfo { SType = StructureType.PipelineVertexInputStateCreateInfo };
+            var inputAssembly = new PipelineInputAssemblyStateCreateInfo
+            {
+                SType = StructureType.PipelineInputAssemblyStateCreateInfo,
+                Topology = PrimitiveTopology.TriangleList
+            };
+            var viewport = new Viewport(0, 0, target.Width, target.Height, 0, 1);
+            var scissor = new Rect2D(new Offset2D(0, 0), new Extent2D(target.Width, target.Height));
+            var viewportState = new PipelineViewportStateCreateInfo
+            {
+                SType = StructureType.PipelineViewportStateCreateInfo,
+                ViewportCount = 1,
+                PViewports = &viewport,
+                ScissorCount = 1,
+                PScissors = &scissor
+            };
+            var rasterization = new PipelineRasterizationStateCreateInfo
+            {
+                SType = StructureType.PipelineRasterizationStateCreateInfo,
+                PolygonMode = PolygonMode.Fill,
+                CullMode = CullModeFlags.None,
+                FrontFace = FrontFace.Clockwise,
+                LineWidth = 1
+            };
+            var multisample = new PipelineMultisampleStateCreateInfo
+            {
+                SType = StructureType.PipelineMultisampleStateCreateInfo,
+                RasterizationSamples = SampleCountFlags.Count1Bit
+            };
+            var blendAttachment = new PipelineColorBlendAttachmentState
+            {
+                BlendEnable = true,
+                SrcColorBlendFactor = BlendFactor.SrcAlpha,
+                DstColorBlendFactor = BlendFactor.OneMinusSrcAlpha,
+                ColorBlendOp = BlendOp.Add,
+                SrcAlphaBlendFactor = BlendFactor.One,
+                DstAlphaBlendFactor = BlendFactor.OneMinusSrcAlpha,
+                AlphaBlendOp = BlendOp.Add,
+                ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit | ColorComponentFlags.ABit
+            };
+            var blend = new PipelineColorBlendStateCreateInfo
+            {
+                SType = StructureType.PipelineColorBlendStateCreateInfo,
+                AttachmentCount = 1,
+                PAttachments = &blendAttachment
+            };
+            var pipelineInfo = new GraphicsPipelineCreateInfo
+            {
+                SType = StructureType.GraphicsPipelineCreateInfo,
+                StageCount = 2,
+                PStages = stages,
+                PVertexInputState = &vertexInput,
+                PInputAssemblyState = &inputAssembly,
+                PViewportState = &viewportState,
+                PRasterizationState = &rasterization,
+                PMultisampleState = &multisample,
+                PColorBlendState = &blend,
+                Layout = state.AnalyticFogPipelineLayout,
+                RenderPass = state.FogCompositeRenderPass
+            };
+            ThrowIfFailed(
+                state.Vk.CreateGraphicsPipelines(state.Device, default, 1, &pipelineInfo, null, out state.AnalyticFogPipeline),
+                "vkCreateGraphicsPipelines analytic fog");
         }
 
         private static DescriptorSet AllocateDescriptorSet(
@@ -2860,7 +3244,6 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             state.Vk.CmdBindVertexBuffers(state.CommandBuffer, 0, 1, &vertexBuffer, &vertexOffset);
             state.Vk.CmdBindIndexBuffer(state.CommandBuffer, state.IndexBuffer, 0, IndexType.Uint32);
             DrawPassRanges(state, 0, pass.Draws, transparent: false);
-            DrawPassRanges(state, 0, pass.Draws, transparent: true);
             state.Vk.CmdEndRenderPass(state.CommandBuffer);
 
             if (highFidelityPlan.ShadowPlan.Enabled && state.ShadowReadbackBuffer.Handle != 0)
@@ -2868,15 +3251,28 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 RecordShadowDebugCopies(state, highFidelityPlan.ShadowPlan);
             }
 
-            TransitionImage(
-                state,
-                state.ColorImage,
-                ImageLayout.ShaderReadOnlyOptimal,
-                ImageLayout.ShaderReadOnlyOptimal,
-                AccessFlags.ColorAttachmentWriteBit,
-                AccessFlags.ShaderReadBit,
-                PipelineStageFlags.ColorAttachmentOutputBit,
-                PipelineStageFlags.ComputeShaderBit | PipelineStageFlags.FragmentShaderBit);
+            if (highFidelityPlan.FogPlan.UsesFroxelGrid)
+            {
+                RecordFroxelFogCommands(state, commandPlan, highFidelityPlan.FogPlan);
+            }
+            else if (highFidelityPlan.FogPlan.Enabled)
+            {
+                RecordAnalyticFogCommands(state, target, highFidelityPlan.FogPlan);
+            }
+            else
+            {
+                TransitionImage(
+                    state,
+                    state.ColorImage,
+                    ImageLayout.ShaderReadOnlyOptimal,
+                    ImageLayout.ShaderReadOnlyOptimal,
+                    AccessFlags.ColorAttachmentWriteBit,
+                    AccessFlags.ShaderReadBit,
+                    PipelineStageFlags.ColorAttachmentOutputBit,
+                    PipelineStageFlags.ComputeShaderBit | PipelineStageFlags.FragmentShaderBit);
+            }
+
+            RecordTransparentCommands(state, commandPlan);
 
             if (HasPostPass(commandPlan, "bloom"))
             {
@@ -3000,6 +3396,182 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             ThrowIfFailed(state.Vk.EndCommandBuffer(state.CommandBuffer), "vkEndCommandBuffer HDR");
         }
 
+        private static void RecordAnalyticFogCommands(
+            VulkanState state,
+            RekallAgeVulkanSceneRenderTarget target,
+            RekallAgeVulkanFogPlan fogPlan)
+        {
+            var begin = new RenderPassBeginInfo
+            {
+                SType = StructureType.RenderPassBeginInfo,
+                RenderPass = state.FogCompositeRenderPass,
+                Framebuffer = state.FogCompositeFramebuffer,
+                RenderArea = new Rect2D(new Offset2D(0, 0), new Extent2D(target.Width, target.Height))
+            };
+            state.Vk.CmdBeginRenderPass(state.CommandBuffer, &begin, SubpassContents.Inline);
+            state.Vk.CmdBindPipeline(state.CommandBuffer, PipelineBindPoint.Graphics, state.AnalyticFogPipeline);
+            var resolved = ResolveAnalyticFogParameters(fogPlan);
+            var parameters = new AnalyticFogPushConstants(resolved.Color, resolved.Parameters);
+            state.Vk.CmdPushConstants(
+                state.CommandBuffer,
+                state.AnalyticFogPipelineLayout,
+                ShaderStageFlags.FragmentBit,
+                0,
+                (uint)Marshal.SizeOf<AnalyticFogPushConstants>(),
+                &parameters);
+            state.Vk.CmdDraw(state.CommandBuffer, 3, 1, 0, 0);
+            state.Vk.CmdEndRenderPass(state.CommandBuffer);
+        }
+
+        private static void RecordTransparentCommands(
+            VulkanState state,
+            RekallAgeVulkanSceneCommandPlan commandPlan)
+        {
+            var draws = commandPlan.RenderPasses[0].Draws;
+            if (!draws.Any(draw => draw.Transparent))
+            {
+                return;
+            }
+
+            var target = commandPlan.PreparedFrame.Target;
+            var begin = new RenderPassBeginInfo
+            {
+                SType = StructureType.RenderPassBeginInfo,
+                RenderPass = state.TransparentRenderPass,
+                Framebuffer = state.TransparentFramebuffer,
+                RenderArea = new Rect2D(new Offset2D(0, 0), new Extent2D(target.Width, target.Height))
+            };
+            state.Vk.CmdBeginRenderPass(state.CommandBuffer, &begin, SubpassContents.Inline);
+            var vertexBuffer = state.VertexBuffer;
+            var vertexOffset = 0UL;
+            state.Vk.CmdBindVertexBuffers(state.CommandBuffer, 0, 1, &vertexBuffer, &vertexOffset);
+            state.Vk.CmdBindIndexBuffer(state.CommandBuffer, state.IndexBuffer, 0, IndexType.Uint32);
+            DrawPassRanges(state, 0, draws, transparent: true);
+            state.Vk.CmdEndRenderPass(state.CommandBuffer);
+        }
+
+        private static (Vector4 Color, Vector4 Parameters) ResolveAnalyticFogParameters(
+            RekallAgeVulkanFogPlan fogPlan)
+        {
+            if (fogPlan.UsesFroxelGrid || !fogPlan.Enabled)
+            {
+                return (Vector4.Zero, Vector4.Zero);
+            }
+
+            var volumes = fogPlan.Volumes
+                .Where(volume => volume.Shape.Equals("global", StringComparison.Ordinal))
+                .DefaultIfEmpty(fogPlan.Volumes.First())
+                .ToArray();
+            var density = Math.Clamp(volumes.Sum(volume => volume.Density), 0, 64);
+            var totalWeight = Math.Max(0.000001f, volumes.Sum(volume => Math.Max(volume.Density, 0.000001f)));
+            var color = volumes.Aggregate(Vector3.Zero, (sum, volume) =>
+                sum + (volume.Albedo + volume.Emission) * Math.Max(volume.Density, 0.000001f)) / totalWeight;
+            var heightFalloff = volumes.Sum(volume => volume.HeightFalloff * Math.Max(volume.Density, 0.000001f)) / totalWeight;
+            return (
+                new Vector4(color, 1),
+                new Vector4(density, heightFalloff, 12, 1));
+        }
+
+        private static void RecordFroxelFogCommands(
+            VulkanState state,
+            RekallAgeVulkanSceneCommandPlan commandPlan,
+            RekallAgeVulkanFogPlan fogPlan)
+        {
+            TransitionImage(
+                state,
+                state.FogImage,
+                ImageLayout.Undefined,
+                ImageLayout.General,
+                0,
+                AccessFlags.ShaderWriteBit,
+                PipelineStageFlags.TopOfPipeBit,
+                PipelineStageFlags.ComputeShaderBit);
+            TransitionImage(
+                state,
+                state.ColorImage,
+                ImageLayout.ShaderReadOnlyOptimal,
+                ImageLayout.General,
+                AccessFlags.ColorAttachmentWriteBit,
+                AccessFlags.ShaderReadBit | AccessFlags.ShaderWriteBit,
+                PipelineStageFlags.ColorAttachmentOutputBit,
+                PipelineStageFlags.ComputeShaderBit);
+            state.Vk.CmdBindPipeline(state.CommandBuffer, PipelineBindPoint.Compute, state.FogPipeline);
+            var fogSet = state.FogDescriptorSet;
+            state.Vk.CmdBindDescriptorSets(
+                state.CommandBuffer,
+                PipelineBindPoint.Compute,
+                state.FogPipelineLayout,
+                0,
+                1,
+                &fogSet,
+                0,
+                null);
+            var frame = commandPlan.PreparedFrame.Frame;
+            var camera = frame.ActiveCamera;
+            var lightColor = commandPlan.PreparedFrame.Batch.Frame.LightColor;
+            var lightScale = fogPlan.DirectLightAvailable ? Math.Max(0.1f, lightColor.W) : 0f;
+            if (fogPlan.ShadowAvailable)
+            {
+                lightScale *= 0.72f;
+            }
+
+            var inject = new FogPushConstants(
+                new Vector4(
+                    checked((float)(camera?.X ?? 0)),
+                    checked((float)(camera?.Y ?? 0)),
+                    checked((float)(camera?.Z ?? 0)),
+                    checked((float)Math.Max(0.001, camera?.NearClip ?? 0.05))),
+                new Vector4(lightColor.X, lightColor.Y, lightColor.Z, lightScale),
+                new Vector4(
+                    fogPlan.Volumes.Count,
+                    0,
+                    checked((float)Math.Min(camera?.FarClip ?? 100, 500)),
+                    fogPlan.TemporalReprojection ? 0.9f : 0));
+            state.Vk.CmdPushConstants(
+                state.CommandBuffer,
+                state.FogPipelineLayout,
+                ShaderStageFlags.ComputeBit,
+                0,
+                (uint)Marshal.SizeOf<FogPushConstants>(),
+                &inject);
+            state.Vk.CmdDispatch(
+                state.CommandBuffer,
+                checked((uint)fogPlan.Dispatch.GroupCountX),
+                checked((uint)fogPlan.Dispatch.GroupCountY),
+                checked((uint)fogPlan.Dispatch.GroupCountZ));
+            TransitionImage(
+                state,
+                state.FogImage,
+                ImageLayout.General,
+                ImageLayout.General,
+                AccessFlags.ShaderWriteBit,
+                AccessFlags.ShaderReadBit,
+                PipelineStageFlags.ComputeShaderBit,
+                PipelineStageFlags.ComputeShaderBit);
+            var composite = inject with { Execution = inject.Execution with { Y = 1 } };
+            state.Vk.CmdPushConstants(
+                state.CommandBuffer,
+                state.FogPipelineLayout,
+                ShaderStageFlags.ComputeBit,
+                0,
+                (uint)Marshal.SizeOf<FogPushConstants>(),
+                &composite);
+            state.Vk.CmdDispatch(
+                state.CommandBuffer,
+                (commandPlan.PreparedFrame.Target.Width + 3) / 4,
+                (commandPlan.PreparedFrame.Target.Height + 3) / 4,
+                1);
+            TransitionImage(
+                state,
+                state.ColorImage,
+                ImageLayout.General,
+                ImageLayout.ShaderReadOnlyOptimal,
+                AccessFlags.ShaderWriteBit,
+                AccessFlags.ShaderReadBit,
+                PipelineStageFlags.ComputeShaderBit,
+                PipelineStageFlags.ComputeShaderBit | PipelineStageFlags.FragmentShaderBit);
+        }
+
         private static void RecordShadowDebugCopies(
             VulkanState state,
             RekallAgeVulkanShadowPlan shadowPlan)
@@ -3052,7 +3624,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             IReadOnlyList<RekallAgeHighFidelityFramePassReport> passes,
             IReadOnlyList<string> diagnostics,
             RekallAgeVulkanSceneCommandPlan? commandPlan = null,
-            IReadOnlyList<RekallAgeHighFidelityShadowDebugCapture>? shadowDebugCaptures = null)
+            IReadOnlyList<RekallAgeHighFidelityShadowDebugCapture>? shadowDebugCaptures = null,
+            IReadOnlyList<RekallAgeHighFidelityFogDebugCapture>? fogDebugCaptures = null)
         {
             var allocated = new HashSet<string>(StringComparer.Ordinal)
             {
@@ -3063,6 +3636,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             if (plan.ShadowPlan.Enabled)
             {
                 allocated.Add("shadow-directional");
+            }
+            if (plan.FogPlan.UsesFroxelGrid)
+            {
+                allocated.Add("fog-froxel");
             }
             return new RekallAgeHighFidelityFrameReport(
                 executed,
@@ -3098,7 +3675,20 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         plan.ShadowPlan.DepthBias,
                         plan.ShadowPlan.NormalBias))
                     .ToArray(),
-                ShadowDebugCaptures = shadowDebugCaptures ?? []
+                ShadowDebugCaptures = shadowDebugCaptures ?? [],
+                Fog = new RekallAgeHighFidelityFogReport(
+                    plan.FogPlan.Mode,
+                    plan.FogPlan.Enabled,
+                    plan.FogPlan.Grid,
+                    plan.FogPlan.Dispatch,
+                    executed && plan.FogPlan.UsesFroxelGrid ? 1 : 0,
+                    plan.FogPlan.Volumes.Count,
+                    plan.FogPlan.DroppedEntityIds,
+                    executed && plan.FogPlan.Enabled && plan.FogPlan.DirectLightAvailable,
+                    executed && plan.FogPlan.Enabled && plan.FogPlan.ShadowAvailable,
+                    plan.FogPlan.HistoryReset,
+                    plan.FogPlan.TemporalReprojection),
+                FogDebugCaptures = fogDebugCaptures ?? []
             };
         }
 
@@ -3193,7 +3783,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 ["scene-hdr"],
                 true,
                 0,
-                commandPlan.DrawCount));
+                commandPlan.RenderPasses[0].Draws.Count(draw => !draw.Transparent)));
             foreach (var pass in commandPlan.PostPasses)
             {
                 if (pass.Name.Equals("ui", StringComparison.Ordinal))
@@ -3203,6 +3793,22 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
                 reports.Add(pass.Name switch
                 {
+                    "fog-integrate" => new(
+                        pass.Name,
+                        pass.Kind,
+                        pass.Reads,
+                        pass.Writes,
+                        true,
+                        highFidelityPlan.FogPlan.UsesFroxelGrid ? 1 : 0,
+                        !highFidelityPlan.FogPlan.UsesFroxelGrid && highFidelityPlan.FogPlan.Enabled ? 1 : 0),
+                    "transparent-particles" => new(
+                        pass.Name,
+                        pass.Kind,
+                        pass.Reads,
+                        pass.Writes,
+                        true,
+                        0,
+                        commandPlan.RenderPasses[0].Draws.Count(draw => draw.Transparent)),
                     "bloom" => new(pass.Name, "compute", pass.Reads, pass.Writes, true, 1, 0),
                     "tone-map" => new(pass.Name, "graphics", pass.Reads, pass.Writes, true, 0, 1),
                     "present" => new(pass.Name, "copy-readback", pass.Reads, pass.Writes, true, 0, 0),
@@ -3668,6 +4274,142 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             return captures;
         }
 
+        private static IReadOnlyList<RekallAgeHighFidelityFogDebugCapture> WriteFogDebugCaptures(
+            RekallAgeVulkanFogPlan fogPlan,
+            string outputDirectory,
+            CancellationToken cancellationToken)
+        {
+            var width = fogPlan.Grid.Width;
+            var height = fogPlan.Grid.Height;
+            var slice = Math.Clamp(fogPlan.Grid.Depth / 2, 0, Math.Max(0, fogPlan.Grid.Depth - 1));
+            var densityRgba = new byte[checked(width * height * 4)];
+            var lightingRgba = new byte[densityRgba.Length];
+            var transmittanceRgba = new byte[densityRgba.Length];
+            for (var y = 0; y < height; y++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                for (var x = 0; x < width; x++)
+                {
+                    var uvw = new Vector3(
+                        (x + 0.5f) / width,
+                        (y + 0.5f) / height,
+                        (slice + 0.5f) / fogPlan.Grid.Depth);
+                    var viewDepth = 100f * uvw.Z * uvw.Z;
+                    var position = fogPlan.NextHistory.CameraPosition
+                        + new Vector3((uvw.X - 0.5f) * viewDepth * 2, (uvw.Y - 0.5f) * viewDepth * 1.2f, viewDepth);
+                    var density = 0f;
+                    var lighting = Vector3.Zero;
+                    foreach (var volume in fogPlan.Volumes)
+                    {
+                        var influence = FogVolumeInfluence(volume, position);
+                        var heightAttenuation = MathF.Exp(-volume.HeightFalloff * Math.Max(position.Y, 0));
+                        var localDensity = volume.Density * influence * heightAttenuation;
+                        density += localDensity;
+                        lighting += (volume.Scattering * (fogPlan.DirectLightAvailable ? 1f : 0f) + volume.Emission) * influence;
+                    }
+
+                    var transmittance = MathF.Exp(-density * 2f);
+                    var densityValue = ToDebugByte(1f - MathF.Exp(-density));
+                    var lightingValue = ToDebugByte(Math.Max(lighting.X, Math.Max(lighting.Y, lighting.Z)) * (1f - transmittance));
+                    var transmittanceValue = ToDebugByte(1f - transmittance);
+                    var offset = checked((y * width + x) * 4);
+                    WriteDebugPixel(densityRgba, offset, densityValue, densityValue, densityValue);
+                    WriteDebugPixel(lightingRgba, offset, lightingValue, checked((byte)(lightingValue * 3 / 4)), checked((byte)(lightingValue / 2)));
+                    WriteDebugPixel(transmittanceRgba, offset, transmittanceValue, transmittanceValue, transmittanceValue);
+                }
+            }
+
+            var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture);
+            var captures = new List<RekallAgeHighFidelityFogDebugCapture>(3);
+            foreach (var (kind, rgba) in new[]
+            {
+                ("density", densityRgba),
+                ("lighting", lightingRgba),
+                ("integrated-transmittance", transmittanceRgba)
+            })
+            {
+                var path = Path.Combine(outputDirectory, $"vulkan-fog-{kind}-slice-{slice}-{timestamp}.png");
+                RekallAgePngWriter.WriteRgbaAsync(path, width, height, rgba, cancellationToken)
+                    .AsTask().GetAwaiter().GetResult();
+                var analysis = Analyze(rgba);
+                captures.Add(new RekallAgeHighFidelityFogDebugCapture(
+                    kind,
+                    slice,
+                    path,
+                    rgba.Where((_, index) => index % 4 != 3).Any(value => value > 0),
+                    analysis.Checksum));
+            }
+
+            return captures;
+        }
+
+        private static float FogVolumeInfluence(RekallAgeVulkanFogVolume volume, Vector3 position)
+        {
+            if (volume.Shape.Equals("global", StringComparison.Ordinal))
+            {
+                return 1;
+            }
+
+            var local = position - volume.Position;
+            float signedDistance;
+            if (volume.Shape.Equals("sphere", StringComparison.Ordinal))
+            {
+                signedDistance = (local / volume.HalfExtents).Length() - 1;
+                signedDistance *= volume.HalfExtents.MaxComponent();
+            }
+            else
+            {
+                var q = Vector3.Abs(local) - volume.HalfExtents;
+                signedDistance = Vector3.Max(q, Vector3.Zero).Length() + Math.Min(Math.Max(q.X, Math.Max(q.Y, q.Z)), 0);
+            }
+
+            if (signedDistance <= -volume.BlendDistance || signedDistance <= 0 && volume.BlendDistance <= 0.0001f)
+            {
+                return 1;
+            }
+
+            if (signedDistance >= 0)
+            {
+                return 0;
+            }
+
+            return Math.Clamp(-signedDistance / Math.Max(volume.BlendDistance, 0.0001f), 0, 1);
+        }
+
+        private static byte ToDebugByte(float value) =>
+            checked((byte)Math.Clamp(Math.Round(Math.Clamp(value, 0, 1) * 255), 0, 255));
+
+        private static void WriteDebugPixel(byte[] rgba, int offset, byte red, byte green, byte blue)
+        {
+            rgba[offset] = red;
+            rgba[offset + 1] = green;
+            rgba[offset + 2] = blue;
+            rgba[offset + 3] = byte.MaxValue;
+        }
+
+        private static byte[] PackFogVolumes(IReadOnlyList<RekallAgeVulkanFogVolume> volumes)
+        {
+            var packed = volumes
+                .Select(volume => new FogVolumeGpu(
+                    new Vector4(volume.Position, volume.Shape switch
+                    {
+                        "box" => 1,
+                        "sphere" => 2,
+                        _ => 0
+                    }),
+                    new Vector4(volume.HalfExtents, volume.Density),
+                    new Vector4(volume.Albedo, volume.Anisotropy),
+                    new Vector4(volume.Emission, volume.HeightFalloff),
+                    new Vector4(volume.BlendDistance, volume.Priority, 0, 0)))
+                .ToArray();
+            if (packed.Length == 0)
+            {
+                packed = [default];
+            }
+
+            return MemoryMarshal.AsBytes(packed.AsSpan()).ToArray();
+        }
+
         private static byte[] ReadBackMemory(VulkanState state, DeviceMemory memory, ulong byteCount)
         {
             void* mapped;
@@ -3701,6 +4443,25 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             float BloomIntensity,
             float BloomRadius,
             float Padding);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private readonly record struct AnalyticFogPushConstants(
+            Vector4 Color,
+            Vector4 Optical);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private readonly record struct FogPushConstants(
+            Vector4 CameraNearFar,
+            Vector4 LightColorIntensity,
+            Vector4 Execution);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private readonly record struct FogVolumeGpu(
+            Vector4 PositionShape,
+            Vector4 ExtentsDensity,
+            Vector4 AlbedoAnisotropy,
+            Vector4 EmissionHeightFalloff,
+            Vector4 BlendPriorityPadding);
 
         [StructLayout(LayoutKind.Sequential)]
         private readonly record struct ShadowCascadeGpuUniform(
@@ -3751,15 +4512,25 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public ImageView BloomView;
             public uint BloomWidth;
             public uint BloomHeight;
+            public Image FogImage;
+            public DeviceMemory FogMemory;
+            public ImageView FogView;
+            public uint FogWidth;
+            public uint FogHeight;
+            public uint FogDepth;
             public Image OutputImage;
             public DeviceMemory OutputMemory;
             public ImageView OutputView;
             public RenderPass RenderPass;
             public RenderPass OutputRenderPass;
+            public RenderPass FogCompositeRenderPass;
+            public RenderPass TransparentRenderPass;
             public RenderPass ShadowRenderPass;
             public Framebuffer Framebuffer;
             public Framebuffer[] Framebuffers = [];
             public Framebuffer OutputFramebuffer;
+            public Framebuffer FogCompositeFramebuffer;
+            public Framebuffer TransparentFramebuffer;
             public Framebuffer[] ShadowFramebuffers = [];
             public Buffer VertexBuffer;
             public DeviceMemory VertexMemory;
@@ -3779,6 +4550,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public Buffer ShadowReadbackBuffer;
             public DeviceMemory ShadowReadbackMemory;
             public ulong ShadowReadbackByteCount;
+            public Buffer FogVolumeBuffer;
+            public DeviceMemory FogVolumeMemory;
             public DescriptorSetLayout DescriptorSetLayout;
             public DescriptorSetLayout DrawDescriptorSetLayout;
             public DescriptorSetLayout MaterialDescriptorSetLayout;
@@ -3791,8 +4564,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public DescriptorSet[] ShadowDescriptorSets = [];
             public DescriptorSet ShadowSampleDescriptorSet;
             public DescriptorSetLayout BloomDescriptorSetLayout;
+            public DescriptorSetLayout FogDescriptorSetLayout;
             public DescriptorSetLayout ToneMapDescriptorSetLayout;
             public DescriptorSet BloomDescriptorSet;
+            public DescriptorSet FogDescriptorSet;
             public DescriptorSet ToneMapDescriptorSet;
             public readonly List<VulkanTextureResource> Textures = [];
             public readonly Dictionary<string, VulkanTextureResource> TextureById = new(StringComparer.Ordinal);
@@ -3815,10 +4590,16 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public ShaderModule ShadowFragmentShader;
             public Sampler PostSampler;
             public PipelineLayout BloomPipelineLayout;
+            public PipelineLayout FogPipelineLayout;
+            public PipelineLayout AnalyticFogPipelineLayout;
             public PipelineLayout ToneMapPipelineLayout;
             public Pipeline BloomPipeline;
+            public Pipeline FogPipeline;
+            public Pipeline AnalyticFogPipeline;
             public Pipeline ToneMapPipeline;
             public ShaderModule BloomShader;
+            public ShaderModule FogShader;
+            public ShaderModule AnalyticFogShader;
             public ShaderModule FullscreenVertexShader;
             public ShaderModule ToneMapShader;
             public CommandPool CommandPool;
@@ -3864,6 +4645,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         Vk.DestroyPipeline(Device, BloomPipeline, null);
                     }
 
+                    if (FogPipeline.Handle != 0) Vk.DestroyPipeline(Device, FogPipeline, null);
+                    if (AnalyticFogPipeline.Handle != 0) Vk.DestroyPipeline(Device, AnalyticFogPipeline, null);
+
                     if (ToneMapPipelineLayout.Handle != 0)
                     {
                         Vk.DestroyPipelineLayout(Device, ToneMapPipelineLayout, null);
@@ -3873,6 +4657,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     {
                         Vk.DestroyPipelineLayout(Device, BloomPipelineLayout, null);
                     }
+
+                    if (FogPipelineLayout.Handle != 0) Vk.DestroyPipelineLayout(Device, FogPipelineLayout, null);
+                    if (AnalyticFogPipelineLayout.Handle != 0) Vk.DestroyPipelineLayout(Device, AnalyticFogPipelineLayout, null);
 
                     if (ToneMapShader.Handle != 0)
                     {
@@ -3888,6 +4675,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     {
                         Vk.DestroyShaderModule(Device, BloomShader, null);
                     }
+
+                    if (FogShader.Handle != 0) Vk.DestroyShaderModule(Device, FogShader, null);
+                    if (AnalyticFogShader.Handle != 0) Vk.DestroyShaderModule(Device, AnalyticFogShader, null);
 
                     if (PostDescriptorPool.Handle != 0)
                     {
@@ -3913,6 +4703,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     {
                         Vk.DestroyDescriptorSetLayout(Device, BloomDescriptorSetLayout, null);
                     }
+
+                    if (FogDescriptorSetLayout.Handle != 0) Vk.DestroyDescriptorSetLayout(Device, FogDescriptorSetLayout, null);
 
                     if (Pipeline.Handle != 0)
                     {
@@ -3994,6 +4786,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
                     DestroyBuffer(ReadbackBuffer, ReadbackMemory);
                     DestroyBuffer(ShadowReadbackBuffer, ShadowReadbackMemory);
+                    DestroyBuffer(FogVolumeBuffer, FogVolumeMemory);
 
                     if (Framebuffers.Length > 0)
                     {
@@ -4025,6 +4818,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         Vk.DestroyRenderPass(Device, OutputRenderPass, null);
                     }
 
+                    if (FogCompositeFramebuffer.Handle != 0) Vk.DestroyFramebuffer(Device, FogCompositeFramebuffer, null);
+                    if (FogCompositeRenderPass.Handle != 0) Vk.DestroyRenderPass(Device, FogCompositeRenderPass, null);
+                    if (TransparentFramebuffer.Handle != 0) Vk.DestroyFramebuffer(Device, TransparentFramebuffer, null);
+                    if (TransparentRenderPass.Handle != 0) Vk.DestroyRenderPass(Device, TransparentRenderPass, null);
+
                     foreach (var framebuffer in ShadowFramebuffers)
                     {
                         if (framebuffer.Handle != 0)
@@ -4041,6 +4839,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     DestroyImage(ColorImage, ColorView, ColorViews, ColorMemory, Ownership.OwnsImageViews, Ownership.OwnsColorImages);
                     DestroyImage(DepthImage, DepthView, DepthViews, DepthMemory, Ownership.OwnsImageViews, Ownership.OwnsDepthImages);
                     DestroyImage(BloomImage, BloomView, [], BloomMemory, ownsView: true, ownsImageAndMemory: true);
+                    DestroyImage(FogImage, FogView, [], FogMemory, ownsView: true, ownsImageAndMemory: true);
                     DestroyImage(OutputImage, OutputView, [], OutputMemory, ownsView: true, ownsImageAndMemory: true);
                     DestroyImage(ShadowImage, ShadowView, ShadowLayerViews, ShadowMemory, ownsView: true, ownsImageAndMemory: true);
                     if (Ownership.OwnsVulkanDevice)

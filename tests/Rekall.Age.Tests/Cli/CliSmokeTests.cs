@@ -11,6 +11,45 @@ namespace Rekall.Age.Tests.Cli;
 public sealed class CliSmokeTests
 {
     [Fact]
+    public async Task CliCapturesRuntimeViewportAfterScriptedGenericInputs()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Camera3D",
+                    new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.MeshRenderer",
+                    new JsonObject { ["mesh"] = "rekall.primitive.cube" })))
+            .AddEntity(RekallAgeEntityDocument.Create("Input", ["input"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.InputActionMap",
+                    new JsonObject
+                    {
+                        ["actions"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = "capture.move", ["positiveKey"] = "D" }
+                        }
+                    })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+        var inputsPath = Path.Combine(root, "capture-inputs.json");
+        await File.WriteAllTextAsync(
+            inputsPath,
+            """[{"deltaSeconds":0.1,"semanticActions":[{"name":"capture.move","value":1,"isDown":true,"wasPressed":true}]}]""");
+
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            "render", "viewport", "capture", root, "Main", "1", Path.Combine(root, "Viewport"),
+            "64", "48", "software", inputsPath);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Input actions: capture.move=1", result.Output);
+        Assert.Contains("Elapsed simulation: 0.100s", result.Output);
+    }
+
+    [Fact]
     public async Task CliAssemblesVerifiedDistribution()
     {
         var root = TestPaths.CreateTempDirectory();

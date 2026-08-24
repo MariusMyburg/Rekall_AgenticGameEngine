@@ -1,0 +1,7 @@
+[
+  {"entityName":"AetherWarden","subject":"component","operator":"exists","componentType":"Game.Modules.AetherfallRules.WardenState"},
+  {"entityName":"AetherWarden","subject":"transform.position3d.x","operator":"equals","expected":0},
+  {"entityName":"AetherWarden","subject":"transform.position3d.z","operator":"equals","expected":-12},
+  {"entityName":"AetherWarden","subject":"component.property","operator":"equals","componentType":"Game.Modules.AetherfallRules.WardenState","propertyName":"aether","expected":100},
+  {"entityName":"AetherWarden","subject":"component.property","operator":"equals","componentType":"Game.Modules.AetherfallRules.WardenState","propertyName":"phase","expected":"playing"}
+]

@@ -203,7 +203,9 @@ internal static class RekallAgeCli
                 ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory, var width, var height] =>
                     await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height, "software"),
                 ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory, var width, var height, var backend] =>
-                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height, backend),
+                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height, backend, null),
+                ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory, var width, var height, var backend, var inputsJson] =>
+                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height, backend, inputsJson),
                 ["render", "glb", "export", var root, var scene, var outputPath] =>
                     await ExportSceneGlbAsync(registry, context, root, scene, outputPath, "0"),
                 ["render", "glb", "export", var root, var scene, var outputPath, var frames] =>
@@ -4029,14 +4031,25 @@ internal static class RekallAgeCli
         string outputDirectory,
         string width,
         string height,
-        string backend)
+        string backend,
+        string? inputsJson = null)
     {
         var frameCount = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
         var viewportWidth = int.Parse(width, System.Globalization.CultureInfo.InvariantCulture);
         var viewportHeight = int.Parse(height, System.Globalization.CultureInfo.InvariantCulture);
+        var inputs = await ParseRuntimeInputFramesAsync(inputsJson, context.CancellationToken);
         var result = await registry.ExecuteAsync<CaptureRuntimeViewportRequest, CaptureRuntimeViewportResult>(
             "rekall.render.capture_runtime_viewport",
-            new CaptureRuntimeViewportRequest(root, scene, frameCount, outputDirectory, viewportWidth, viewportHeight, true, backend),
+            new CaptureRuntimeViewportRequest(
+                root,
+                scene,
+                frameCount,
+                outputDirectory,
+                viewportWidth,
+                viewportHeight,
+                true,
+                backend,
+                Inputs: inputs),
             context);
 
         Console.WriteLine($"Runtime viewport {scene} frame {result.Value.FrameIndex}: {result.Value.Width}x{result.Value.Height}");
@@ -4045,6 +4058,9 @@ internal static class RekallAgeCli
         Console.WriteLine($"Hardware accelerated: {result.Value.HardwareAccelerated}");
         Console.WriteLine($"Acceleration: {result.Value.AccelerationStatus}");
         Console.WriteLine($"Selected device: {result.Value.SelectedDeviceName ?? "(none)"}");
+        Console.WriteLine(
+            $"Input actions: {(result.Value.InputActions.Count == 0 ? "(none)" : string.Join(", ", result.Value.InputActions.Select(action => $"{action.Name}={action.Value:G}")))}");
+        Console.WriteLine($"Elapsed simulation: {result.Value.ElapsedSeconds:F3}s");
         Console.WriteLine($"Active camera: {result.Value.ActiveCamera ?? "(none)"}");
         if (result.Value.LayoutDiagnostics.ActiveCamera is { } camera)
         {

@@ -1,0 +1,6 @@
+[
+  {"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":0.5,"isDown":true}]},
+  {"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":0.5,"isDown":true}]},
+  {"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":0.5,"isDown":true}]},
+  {"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":0.5,"isDown":true}]}
+]

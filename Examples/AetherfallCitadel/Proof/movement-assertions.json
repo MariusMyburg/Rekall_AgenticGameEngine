@@ -1,0 +1,4 @@
+[
+  {"entityName":"AetherWarden","subject":"component","operator":"exists","componentType":"Game.Modules.AetherfallRules.WardenState"},
+  {"entityName":"AetherWarden","subject":"delta.position3d.x","operator":"greater-than","expected":0}
+]

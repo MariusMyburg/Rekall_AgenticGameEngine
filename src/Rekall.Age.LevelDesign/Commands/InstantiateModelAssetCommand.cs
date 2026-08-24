@@ -18,7 +18,8 @@ public sealed record InstantiateModelAssetRequest(
     RekallAgePlacementVector3 RotationDegrees,
     RekallAgePlacementVector3 Scale,
     string? ParentEntityId = null,
-    string? ExpectedSceneRevision = null);
+    string? ExpectedSceneRevision = null,
+    string? EntityId = null);
 
 public sealed record InstantiateModelAssetResult(
     string EntityId,
@@ -51,7 +52,7 @@ public sealed class InstantiateModelAssetCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Places one published Model Asset as a generic visible entity. Requires finite bounded position/rotation and finite nonzero scale components with absolute magnitude from 0.000001 through 1000000. Current and Frozen outputs are placeable; Stale uses the last successful output and returns bounded warnings. The scene stores only the stable Model Asset ID, never copied geometry. Optional expectedSceneRevision provides optimistic concurrency.",
+        "Places one published Model Asset as a generic visible entity. Requires finite bounded position/rotation and finite nonzero scale components with absolute magnitude from 0.000001 through 1000000. Optional entityId accepts a portable stable identifier and rejects collisions. Current and Frozen outputs are placeable; Stale uses the last successful output and returns bounded warnings. The scene stores only the stable Model Asset ID, never copied geometry. Optional expectedSceneRevision provides optimistic concurrency.",
         typeof(InstantiateModelAssetRequest).FullName!,
         typeof(InstantiateModelAssetResult).FullName!);
 
@@ -73,6 +74,15 @@ public sealed class InstantiateModelAssetCommand
                 context.CancellationToken).ConfigureAwait(false);
             var scene = loadedScene.Value;
             var parentId = NormalizeOptional(request.ParentEntityId);
+            var entityId = NormalizeOptional(request.EntityId);
+            if (entityId is not null
+                && scene.Entities.Any(entity => entity.Id.Equals(entityId, StringComparison.Ordinal)))
+            {
+                return Failure(new(
+                    "REKALL_MODEL_ENTITY_ID_DUPLICATE",
+                    $"Entity ID '{entityId}' already exists in scene '{scene.Name}'.",
+                    entityId));
+            }
             if (parentId is not null
                 && !scene.Entities.Any(entity => entity.Id.Equals(parentId, StringComparison.Ordinal)))
             {
@@ -145,7 +155,7 @@ public sealed class InstantiateModelAssetCommand
                     .Take(MaximumWarnings)
                     .ToArray()
                 : [];
-            var entity = CreateEntity(request, asset, parentId);
+            var entity = CreateEntity(request, asset, parentId, entityId);
             var updated = scene.AddEntity(entity);
             var scenePath = _sceneStore.GetScenePath(request.ProjectRoot, request.SceneName);
             var scenePreimage = await RekallAgeBoundedFileSnapshot.ReadAsync(
@@ -189,8 +199,10 @@ public sealed class InstantiateModelAssetCommand
     private static RekallAgeEntityDocument CreateEntity(
         InstantiateModelAssetRequest request,
         RekallAgeModelAssetDocument asset,
-        string? parentId) =>
-        RekallAgeEntityDocument.Create(
+        string? parentId,
+        string? entityId)
+    {
+        var entity = RekallAgeEntityDocument.Create(
                 string.IsNullOrWhiteSpace(request.Name) ? asset.DisplayName : request.Name.Trim(),
                 ["model-asset"])
             .AddComponent(RekallAgeComponentDocument.Create(
@@ -210,11 +222,14 @@ public sealed class InstantiateModelAssetCommand
             .AddComponent(RekallAgeComponentDocument.Create(
                 "Rekall.ModelAssetReference",
                 new JsonObject { ["assetId"] = asset.AssetId }))
-            .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer")) with
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer"));
+        return entity with
         {
+            Id = entityId ?? entity.Id,
             ParentId = parentId,
             Visible = true
         };
+    }
 
     private static RekallAgeCommandError? ValidateRequest(InstantiateModelAssetRequest? request)
     {
@@ -246,6 +261,15 @@ public sealed class InstantiateModelAssetCommand
                 request.ModelAssetId);
         }
 
+        var entityId = NormalizeOptional(request.EntityId);
+        if (entityId is not null && !IsValidEntityId(entityId))
+        {
+            return new(
+                "REKALL_MODEL_ENTITY_ID_INVALID",
+                "Entity ID must be 1 to 128 characters, begin with a letter, digit, or underscore, and contain only letters, digits, underscore, hyphen, period, or colon.",
+                "entityId");
+        }
+
         if (request.ExpectedSceneRevision is not null
             && !RekallAgeDocumentRevision.IsValid(request.ExpectedSceneRevision))
         {
@@ -269,6 +293,13 @@ public sealed class InstantiateModelAssetCommand
 
     private static bool IsScale(double value) =>
         IsBounded(value) && Math.Abs(value) >= MinimumScaleMagnitude;
+
+    public static bool IsValidEntityId(string value) =>
+        !string.IsNullOrEmpty(value)
+        && value.Length <= 128
+        && (char.IsAsciiLetterOrDigit(value[0]) || value[0] == '_')
+        && value.All(character => char.IsAsciiLetterOrDigit(character)
+            || character is '_' or '-' or '.' or ':');
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -42,13 +42,15 @@ public sealed class ModelAssetPlacementTests
                 new(1.25, -2.5, 3.75),
                 new(-15, 45, 90),
                 new(0.5, 2, -3),
-                parent.Id),
+                parent.Id,
+                EntityId: "hero-instance"),
             context);
 
         Assert.True(result.Ok, result.Summary);
         Assert.Empty(result.Errors);
         Assert.Empty(result.Value.Warnings);
         Assert.Equal(RekallAgeModelBuildState.Current, result.Value.BuildState);
+        Assert.Equal("hero-instance", result.Value.EntityId);
         Assert.Equal(fixture.Publication.Asset.LastSuccessfulBuild!.CompiledMeshPath, result.Value.CompiledMeshPath);
         var scene = Assert.IsType<RekallAgeSceneDocument>(result.Value.Scene);
         var entity = scene.GetRequiredEntity(result.Value.EntityId);
@@ -77,6 +79,36 @@ public sealed class ModelAssetPlacementTests
         Assert.DoesNotContain(entity.Components, component => component.Type == "Rekall.GeometryMesh");
         Assert.DoesNotContain("positions", fixture.SceneStore.Serialize(scene), StringComparison.OrdinalIgnoreCase);
         Assert.True(RekallAgeBuiltInComponentTypeCatalog.IsKnown("Rekall.ModelAssetReference"));
+    }
+
+    [Fact]
+    public async Task ExplicitEntityIdRejectsDuplicatesWithoutMutatingScene()
+    {
+        var fixture = await CreatePublishedFixtureAsync();
+        var existing = RekallAgeEntityDocument.Create("Existing", []) with { Id = "stable-instance" };
+        await fixture.SceneStore.SaveAsync(
+            fixture.Root,
+            (await fixture.SceneStore.LoadAsync(fixture.Root, "Main", default)).AddEntity(existing),
+            default);
+
+        await AssertFailureWithoutMutationAsync(
+            fixture,
+            Request(fixture.Root) with { EntityId = "stable-instance" },
+            "REKALL_MODEL_ENTITY_ID_DUPLICATE");
+    }
+
+    [Theory]
+    [InlineData("contains spaces")]
+    [InlineData("../traversal")]
+    [InlineData("-starts-with-punctuation")]
+    public async Task ExplicitEntityIdRejectsNonPortableIdentifiers(string entityId)
+    {
+        var fixture = await CreatePublishedFixtureAsync();
+
+        await AssertFailureWithoutMutationAsync(
+            fixture,
+            Request(fixture.Root) with { EntityId = entityId },
+            "REKALL_MODEL_ENTITY_ID_INVALID");
     }
 
     [Fact]

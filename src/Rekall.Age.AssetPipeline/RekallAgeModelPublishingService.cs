@@ -216,6 +216,21 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
         string assetId,
         string expectedModelFileRevision,
         RekallAgeTransaction transaction,
+        CancellationToken cancellationToken) =>
+        await RebuildAsync(
+            projectRoot,
+            assetId,
+            null,
+            expectedModelFileRevision,
+            transaction,
+            cancellationToken).ConfigureAwait(false);
+
+    public async ValueTask<RekallAgePublishModelResult> RebuildAsync(
+        string projectRoot,
+        string assetId,
+        string? displayName,
+        string expectedModelFileRevision,
+        RekallAgeTransaction transaction,
         CancellationToken cancellationToken)
     {
         RekallAgeVersionedDocument<RekallAgeModelAssetDocument> current;
@@ -234,7 +249,11 @@ public sealed class RekallAgeModelPublishingService : IRekallAgeModelAssetHealth
         RejectFrozen(current.Value);
         return await PublishAsync(
             projectRoot,
-            new(current.Value.AssetId, current.Value.DisplayName, current.Value.Source, expectedModelFileRevision),
+            new(
+                current.Value.AssetId,
+                displayName ?? current.Value.DisplayName,
+                current.Value.Source,
+                expectedModelFileRevision),
             transaction,
             cancellationToken).ConfigureAwait(false);
     }

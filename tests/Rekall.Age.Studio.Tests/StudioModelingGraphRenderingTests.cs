@@ -71,6 +71,10 @@ public sealed class StudioModelingGraphRenderingTests
                 Assert.NotNull(positionX.GetBindingExpression(TextBox.TextProperty));
                 Assert.Contains("Publish", publish.Content?.ToString(), StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("Place", place.Content?.ToString(), StringComparison.OrdinalIgnoreCase);
+                Assert.True(viewModel.PublishAndPlaceModelCommand.CanExecute(null));
+                positionX.Text = "not-a-number";
+                positionX.GetBindingExpression(TextBox.TextProperty)!.UpdateSource();
+                Assert.False(viewModel.PublishAndPlaceModelCommand.CanExecute(null));
 
                 var bitmap = new RenderTargetBitmap(1480, 820, 96, 96, PixelFormats.Pbgra32);
                 bitmap.Render(window);

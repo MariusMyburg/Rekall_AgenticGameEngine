@@ -101,27 +101,29 @@
                                                 <TextBox x:Name="ModelAssetIdInput" Text="{Binding ModelAssetIdInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,5" />
                                                 <TextBlock Text="Display name" Style="{StaticResource SectionLabel}" />
                                                 <TextBox Text="{Binding ModelAssetDisplayNameInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,5" />
+                                                <TextBlock Text="Scene entity ID (optional)" Style="{StaticResource SectionLabel}" />
+                                                <TextBox Text="{Binding ModelEntityIdInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,5" />
                                                 <TextBlock Text="Scene entity name" Style="{StaticResource SectionLabel}" />
                                                 <TextBox Text="{Binding ModelEntityNameInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,5" />
                                                 <TextBlock Text="Optional parent entity ID" Style="{StaticResource SectionLabel}" />
                                                 <TextBox Text="{Binding ModelPlacementParentEntityIdInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,7" />
                                                 <TextBlock Text="Position X / Y / Z" Style="{StaticResource SectionLabel}" />
                                                 <UniformGrid Columns="3" Margin="0,3,0,5">
-                                                    <TextBox x:Name="ModelPositionXInput" Text="{Binding ModelPositionX, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,3,0" />
-                                                    <TextBox Text="{Binding ModelPositionY, UpdateSourceTrigger=PropertyChanged}" Margin="2,0" />
-                                                    <TextBox Text="{Binding ModelPositionZ, UpdateSourceTrigger=PropertyChanged}" Margin="3,0,0,0" />
+                                                    <TextBox x:Name="ModelPositionXInput" Text="{Binding ModelPositionXInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,3,0" />
+                                                    <TextBox Text="{Binding ModelPositionYInput, UpdateSourceTrigger=PropertyChanged}" Margin="2,0" />
+                                                    <TextBox Text="{Binding ModelPositionZInput, UpdateSourceTrigger=PropertyChanged}" Margin="3,0,0,0" />
                                                 </UniformGrid>
                                                 <TextBlock Text="Rotation X / Y / Z (degrees)" Style="{StaticResource SectionLabel}" />
                                                 <UniformGrid Columns="3" Margin="0,3,0,5">
-                                                    <TextBox Text="{Binding ModelRotationX, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,3,0" />
-                                                    <TextBox Text="{Binding ModelRotationY, UpdateSourceTrigger=PropertyChanged}" Margin="2,0" />
-                                                    <TextBox Text="{Binding ModelRotationZ, UpdateSourceTrigger=PropertyChanged}" Margin="3,0,0,0" />
+                                                    <TextBox Text="{Binding ModelRotationXInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,3,0" />
+                                                    <TextBox Text="{Binding ModelRotationYInput, UpdateSourceTrigger=PropertyChanged}" Margin="2,0" />
+                                                    <TextBox Text="{Binding ModelRotationZInput, UpdateSourceTrigger=PropertyChanged}" Margin="3,0,0,0" />
                                                 </UniformGrid>
                                                 <TextBlock Text="Scale X / Y / Z" Style="{StaticResource SectionLabel}" />
                                                 <UniformGrid Columns="3" Margin="0,3,0,7">
-                                                    <TextBox Text="{Binding ModelScaleX, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,3,0" />
-                                                    <TextBox Text="{Binding ModelScaleY, UpdateSourceTrigger=PropertyChanged}" Margin="2,0" />
-                                                    <TextBox Text="{Binding ModelScaleZ, UpdateSourceTrigger=PropertyChanged}" Margin="3,0,0,0" />
+                                                    <TextBox Text="{Binding ModelScaleXInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,3,0" />
+                                                    <TextBox Text="{Binding ModelScaleYInput, UpdateSourceTrigger=PropertyChanged}" Margin="2,0" />
+                                                    <TextBox Text="{Binding ModelScaleZInput, UpdateSourceTrigger=PropertyChanged}" Margin="3,0,0,0" />
                                                 </UniformGrid>
                                                 <Button x:Name="PublishAndPlaceModelButton" Content="Publish &amp; Place" Command="{Binding PublishAndPlaceModelCommand}"
                                                         Style="{StaticResource AccentButton}" Padding="7,4" />

@@ -120,6 +120,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string? _selectedMeshAssetId;
     private string _modelAssetIdInput = string.Empty;
     private string _modelAssetDisplayNameInput = string.Empty;
+    private string _modelEntityIdInput = string.Empty;
     private string _modelEntityNameInput = string.Empty;
     private string _modelPlacementParentEntityIdInput = string.Empty;
     private double _modelPositionX;
@@ -131,6 +132,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private double _modelScaleX = 1;
     private double _modelScaleY = 1;
     private double _modelScaleZ = 1;
+    private string _modelPositionXInput = "0";
+    private string _modelPositionYInput = "0";
+    private string _modelPositionZInput = "0";
+    private string _modelRotationXInput = "0";
+    private string _modelRotationYInput = "0";
+    private string _modelRotationZInput = "0";
+    private string _modelScaleXInput = "1";
+    private string _modelScaleYInput = "1";
+    private string _modelScaleZInput = "1";
     private string? _lastPublishedModelAssetId;
     private string? _lastPlacedModelEntityId;
     private string _selectedMeshPrimitive = "box";
@@ -255,7 +265,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _openMeshAssetCommand = CreateAsyncCommand(OpenMeshAssetAsync, CanOpenMeshAsset);
         _publishModelCommand = CreateAsyncCommand(PublishModelAsync, CanPublishModel);
         _placeModelCommand = CreateAsyncCommand(PlaceModelAsync, CanPlaceModel);
-        _publishAndPlaceModelCommand = CreateAsyncCommand(PublishAndPlaceModelAsync, CanPublishModel);
+        _publishAndPlaceModelCommand = CreateAsyncCommand(PublishAndPlaceModelAsync, CanPublishAndPlaceModel);
         _selectMeshElementCommand = CreateAsyncCommand(SelectMeshElementAsync, CanSelectMeshElement);
         _clearMeshSelectionCommand = CreateAsyncCommand(ClearMeshSelectionAsync, HasOpenMesh);
         _previewMeshOperationCommand = CreateAsyncCommand(PreviewMeshOperationAsync, CanRunMeshOperation);
@@ -461,6 +471,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 var displayName = HumanizeAssetId(value);
                 ModelAssetIdInput = value;
                 ModelAssetDisplayNameInput = displayName;
+                ModelEntityIdInput = value + "-instance";
                 ModelEntityNameInput = displayName;
             }
             RefreshCommands();
@@ -469,17 +480,27 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public string ModelAssetIdInput { get => _modelAssetIdInput; set { if (Set(ref _modelAssetIdInput, value)) RefreshCommands(); } }
     public string ModelAssetDisplayNameInput { get => _modelAssetDisplayNameInput; set { if (Set(ref _modelAssetDisplayNameInput, value)) RefreshCommands(); } }
+    public string ModelEntityIdInput { get => _modelEntityIdInput; set { if (Set(ref _modelEntityIdInput, value)) RefreshCommands(); } }
     public string ModelEntityNameInput { get => _modelEntityNameInput; set => Set(ref _modelEntityNameInput, value); }
     public string ModelPlacementParentEntityIdInput { get => _modelPlacementParentEntityIdInput; set => Set(ref _modelPlacementParentEntityIdInput, value); }
-    public double ModelPositionX { get => _modelPositionX; set => Set(ref _modelPositionX, value); }
-    public double ModelPositionY { get => _modelPositionY; set => Set(ref _modelPositionY, value); }
-    public double ModelPositionZ { get => _modelPositionZ; set => Set(ref _modelPositionZ, value); }
-    public double ModelRotationX { get => _modelRotationX; set => Set(ref _modelRotationX, value); }
-    public double ModelRotationY { get => _modelRotationY; set => Set(ref _modelRotationY, value); }
-    public double ModelRotationZ { get => _modelRotationZ; set => Set(ref _modelRotationZ, value); }
-    public double ModelScaleX { get => _modelScaleX; set => Set(ref _modelScaleX, value); }
-    public double ModelScaleY { get => _modelScaleY; set => Set(ref _modelScaleY, value); }
-    public double ModelScaleZ { get => _modelScaleZ; set => Set(ref _modelScaleZ, value); }
+    public double ModelPositionX { get => _modelPositionX; set => SetModelNumber(ref _modelPositionX, ref _modelPositionXInput, value, nameof(ModelPositionX), nameof(ModelPositionXInput)); }
+    public double ModelPositionY { get => _modelPositionY; set => SetModelNumber(ref _modelPositionY, ref _modelPositionYInput, value, nameof(ModelPositionY), nameof(ModelPositionYInput)); }
+    public double ModelPositionZ { get => _modelPositionZ; set => SetModelNumber(ref _modelPositionZ, ref _modelPositionZInput, value, nameof(ModelPositionZ), nameof(ModelPositionZInput)); }
+    public double ModelRotationX { get => _modelRotationX; set => SetModelNumber(ref _modelRotationX, ref _modelRotationXInput, value, nameof(ModelRotationX), nameof(ModelRotationXInput)); }
+    public double ModelRotationY { get => _modelRotationY; set => SetModelNumber(ref _modelRotationY, ref _modelRotationYInput, value, nameof(ModelRotationY), nameof(ModelRotationYInput)); }
+    public double ModelRotationZ { get => _modelRotationZ; set => SetModelNumber(ref _modelRotationZ, ref _modelRotationZInput, value, nameof(ModelRotationZ), nameof(ModelRotationZInput)); }
+    public double ModelScaleX { get => _modelScaleX; set => SetModelNumber(ref _modelScaleX, ref _modelScaleXInput, value, nameof(ModelScaleX), nameof(ModelScaleXInput)); }
+    public double ModelScaleY { get => _modelScaleY; set => SetModelNumber(ref _modelScaleY, ref _modelScaleYInput, value, nameof(ModelScaleY), nameof(ModelScaleYInput)); }
+    public double ModelScaleZ { get => _modelScaleZ; set => SetModelNumber(ref _modelScaleZ, ref _modelScaleZInput, value, nameof(ModelScaleZ), nameof(ModelScaleZInput)); }
+    public string ModelPositionXInput { get => _modelPositionXInput; set => SetModelNumberInput(ref _modelPositionXInput, ref _modelPositionX, value, nameof(ModelPositionXInput), nameof(ModelPositionX)); }
+    public string ModelPositionYInput { get => _modelPositionYInput; set => SetModelNumberInput(ref _modelPositionYInput, ref _modelPositionY, value, nameof(ModelPositionYInput), nameof(ModelPositionY)); }
+    public string ModelPositionZInput { get => _modelPositionZInput; set => SetModelNumberInput(ref _modelPositionZInput, ref _modelPositionZ, value, nameof(ModelPositionZInput), nameof(ModelPositionZ)); }
+    public string ModelRotationXInput { get => _modelRotationXInput; set => SetModelNumberInput(ref _modelRotationXInput, ref _modelRotationX, value, nameof(ModelRotationXInput), nameof(ModelRotationX)); }
+    public string ModelRotationYInput { get => _modelRotationYInput; set => SetModelNumberInput(ref _modelRotationYInput, ref _modelRotationY, value, nameof(ModelRotationYInput), nameof(ModelRotationY)); }
+    public string ModelRotationZInput { get => _modelRotationZInput; set => SetModelNumberInput(ref _modelRotationZInput, ref _modelRotationZ, value, nameof(ModelRotationZInput), nameof(ModelRotationZ)); }
+    public string ModelScaleXInput { get => _modelScaleXInput; set => SetModelNumberInput(ref _modelScaleXInput, ref _modelScaleX, value, nameof(ModelScaleXInput), nameof(ModelScaleX)); }
+    public string ModelScaleYInput { get => _modelScaleYInput; set => SetModelNumberInput(ref _modelScaleYInput, ref _modelScaleY, value, nameof(ModelScaleYInput), nameof(ModelScaleY)); }
+    public string ModelScaleZInput { get => _modelScaleZInput; set => SetModelNumberInput(ref _modelScaleZInput, ref _modelScaleZ, value, nameof(ModelScaleZInput), nameof(ModelScaleZ)); }
     public string? LastPublishedModelAssetId { get => _lastPublishedModelAssetId; private set => Set(ref _lastPublishedModelAssetId, value); }
     public string? LastPlacedModelEntityId { get => _lastPlacedModelEntityId; private set => Set(ref _lastPlacedModelEntityId, value); }
 
@@ -487,6 +508,54 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         ' ',
         assetId.Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries)
             .Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
+
+    private void SetModelNumber(
+        ref double numberField,
+        ref string inputField,
+        double value,
+        string numberProperty,
+        string inputProperty)
+    {
+        Set(ref numberField, value, numberProperty);
+        Set(ref inputField, value.ToString("R", CultureInfo.InvariantCulture), inputProperty);
+        RefreshCommands();
+    }
+
+    private void SetModelNumberInput(
+        ref string inputField,
+        ref double numberField,
+        string value,
+        string inputProperty,
+        string numberProperty)
+    {
+        if (!Set(ref inputField, value, inputProperty)) return;
+        if (TryParseModelNumber(value, out var parsed)) Set(ref numberField, parsed, numberProperty);
+        RefreshCommands();
+    }
+
+    private bool TryGetModelPlacement(
+        out RekallAgePlacementVector3 position,
+        out RekallAgePlacementVector3 rotation,
+        out RekallAgePlacementVector3 scale)
+    {
+        var valid = TryParseModelNumber(ModelPositionXInput, out var positionX)
+            & TryParseModelNumber(ModelPositionYInput, out var positionY)
+            & TryParseModelNumber(ModelPositionZInput, out var positionZ)
+            & TryParseModelNumber(ModelRotationXInput, out var rotationX)
+            & TryParseModelNumber(ModelRotationYInput, out var rotationY)
+            & TryParseModelNumber(ModelRotationZInput, out var rotationZ)
+            & TryParseModelNumber(ModelScaleXInput, out var scaleX)
+            & TryParseModelNumber(ModelScaleYInput, out var scaleY)
+            & TryParseModelNumber(ModelScaleZInput, out var scaleZ);
+        position = new(positionX, positionY, positionZ);
+        rotation = new(rotationX, rotationY, rotationZ);
+        scale = new(scaleX, scaleY, scaleZ);
+        return valid;
+    }
+
+    private static bool TryParseModelNumber(string value, out double parsed) =>
+        double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out parsed)
+        || double.TryParse(value, NumberStyles.Float, CultureInfo.CurrentCulture, out parsed);
 
     public IReadOnlyList<string> MeshPrimitiveTypes => _meshPrimitiveFactory.SupportedPrimitives;
 
@@ -1037,7 +1106,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         && !string.IsNullOrWhiteSpace(ModelAssetDisplayNameInput)
         && IsModelAssetIdValid();
     private bool CanPlaceModel() => CanPublishModel()
+        && CanUseModelPlacementInputs()
         && File.Exists(_modelAssetStore.GetModelPath(_session.ProjectRoot!, ModelAssetIdInput.Trim()));
+    private bool CanPublishAndPlaceModel() => CanPublishModel() && CanUseModelPlacementInputs();
+    private bool CanUseModelPlacementInputs() =>
+        (string.IsNullOrWhiteSpace(ModelEntityIdInput)
+            || InstantiateModelAssetCommand.IsValidEntityId(ModelEntityIdInput.Trim()))
+        && TryGetModelPlacement(out _, out _, out _);
     private bool IsModelAssetIdValid()
     {
         try
@@ -1151,6 +1226,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 {
                     projectRoot = _session.ProjectRoot,
                     assetId = modelAssetId,
+                    displayName = ModelAssetDisplayNameInput.Trim(),
                     expectedModelFileRevision = current.Revision
                 }),
                 $"Rebuild Model Asset {modelAssetId}",
@@ -1191,6 +1267,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private async Task<RekallAgeWorkbenchOperationResult> PlaceModelOperationAsync()
     {
         var modelAssetId = ModelAssetIdInput.Trim();
+        if (!TryGetModelPlacement(out var position, out var rotation, out var scale))
+        {
+            const string code = "REKALL_STUDIO_MODEL_TRANSFORM_INVALID";
+            const string message = "Position, rotation, and scale must contain valid numbers before placing a Model Asset.";
+            return new(false, message, null, [new(code, message, "transform")]);
+        }
         var placed = await _session.ExecuteAsync(
             "rekall.scene.instantiate_asset",
             JsonSerializer.Serialize(new
@@ -1198,10 +1280,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 projectRoot = _session.ProjectRoot,
                 sceneName = _session.SceneName,
                 modelAssetId,
+                entityId = string.IsNullOrWhiteSpace(ModelEntityIdInput) ? null : ModelEntityIdInput.Trim(),
                 name = string.IsNullOrWhiteSpace(ModelEntityNameInput) ? null : ModelEntityNameInput.Trim(),
-                position = new { x = ModelPositionX, y = ModelPositionY, z = ModelPositionZ },
-                rotationDegrees = new { x = ModelRotationX, y = ModelRotationY, z = ModelRotationZ },
-                scale = new { x = ModelScaleX, y = ModelScaleY, z = ModelScaleZ },
+                position = new { x = position.X, y = position.Y, z = position.Z },
+                rotationDegrees = new { x = rotation.X, y = rotation.Y, z = rotation.Z },
+                scale = new { x = scale.X, y = scale.Y, z = scale.Z },
                 parentEntityId = string.IsNullOrWhiteSpace(ModelPlacementParentEntityIdInput)
                     ? null
                     : ModelPlacementParentEntityIdInput.Trim()
@@ -1216,6 +1299,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
         LastPlacedModelEntityId = placement.EntityId;
         var selected = await _session.SelectEntityAsync(placement.EntityId, CancellationToken.None);
+        if (selected.Ok) ModelEntityIdInput = string.Empty;
         return selected.Ok
             ? new RekallAgeWorkbenchOperationResult(
                 true,
@@ -2094,6 +2178,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             if (result.Ok && _session.Model is not null)
             {
                 ApplyModel(_session.Model);
+                foreach (var warning in result.Errors)
+                {
+                    ValidationLines.Add($"warning: {warning.Code} - {warning.Message}");
+                }
                 if (refreshPreviewAfter && IsLiveViewportEnabled && Mode == RekallAgeStudioMode.Edit)
                 {
                     await RefreshEditPreviewAsync(result.Summary);

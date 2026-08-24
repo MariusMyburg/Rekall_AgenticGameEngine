@@ -111,6 +111,7 @@ public sealed class StudioViewModelTests
             await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
             viewModel.ModelAssetIdInput = "hero-model";
             viewModel.ModelAssetDisplayNameInput = "Hero Model";
+            viewModel.ModelEntityIdInput = "hero-instance";
             viewModel.ModelEntityNameInput = "Hero Instance";
             viewModel.ModelPositionX = 1.25;
             viewModel.ModelPositionY = -2.5;
@@ -132,6 +133,7 @@ public sealed class StudioViewModelTests
             Assert.True(File.Exists(Path.Combine(root, published.LastSuccessfulBuild!.CompiledMeshPath)));
 
             var entity = Assert.Single((await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None)).Entities);
+            Assert.Equal("hero-instance", entity.Id);
             Assert.Equal("Hero Instance", entity.Name);
             var reference = Assert.Single(entity.Components, component => component.Type == "Rekall.ModelAssetReference");
             Assert.Equal("hero-model", reference.Properties["assetId"]!.GetValue<string>());
@@ -183,9 +185,11 @@ public sealed class StudioViewModelTests
             Assert.Empty((await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None)).Entities);
             Assert.True(viewModel.PlaceModelCommand.CanExecute(null));
 
+            viewModel.ModelAssetDisplayNameInput = "Renamed Display Model";
             await ExecuteAsync(viewModel.PublishModelCommand);
             var rebuilt = await store.LoadAsync(root, "display-mesh", CancellationToken.None);
             Assert.Equal(2, rebuilt.Revision);
+            Assert.Equal("Renamed Display Model", rebuilt.DisplayName);
             Assert.Equal("display-mesh", rebuilt.Source.AssetId);
 
             viewModel.ModelEntityNameInput = "Display Instance";
@@ -193,6 +197,52 @@ public sealed class StudioViewModelTests
             var entity = Assert.Single((await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None)).Entities);
             Assert.Equal("Display Instance", entity.Name);
             Assert.Equal(entity.Id, viewModel.SelectedEntityId);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task StaleModelPlacementSurfacesSuccessfulWarningsInStudioDiagnostics()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-stale-model-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Stale Model Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.MeshPrimitiveAssetIdInput = "stale-mesh";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            await ExecuteAsync(viewModel.PublishModelCommand);
+
+            var meshStore = new RekallAgeMeshAssetStore();
+            var loaded = await meshStore.LoadVersionedAsync(root, "stale-mesh", CancellationToken.None);
+            var replacement = await new RekallAgeMeshPrimitiveFactory().CreateAsync(
+                "sphere",
+                "stale-mesh",
+                "Stale Mesh",
+                CancellationToken.None);
+            await meshStore.SaveIfRevisionAsync(
+                root,
+                replacement with { Revision = loaded.Value.Revision + 1 },
+                loaded.Revision,
+                CancellationToken.None);
+
+            await ExecuteAsync(viewModel.PlaceModelCommand);
+
+            Assert.Contains(
+                viewModel.ValidationLines,
+                line => line.Contains("warning: REKALL_MODEL_SOURCE_STALE", StringComparison.OrdinalIgnoreCase));
+            Assert.Single((await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None)).Entities);
         }
         finally
         {

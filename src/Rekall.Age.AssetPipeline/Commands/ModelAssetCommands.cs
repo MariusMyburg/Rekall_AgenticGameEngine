@@ -16,7 +16,8 @@ public sealed record PublishModelAssetRequest(
 public sealed record RebuildModelAssetRequest(
     string ProjectRoot,
     string AssetId,
-    string ExpectedModelFileRevision);
+    string ExpectedModelFileRevision,
+    string? DisplayName = null);
 
 public sealed record InspectModelAssetRequest(string ProjectRoot, string AssetId);
 
@@ -124,7 +125,7 @@ public sealed class RebuildModelAssetCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Rebuilds a live-linked editable-mesh Model Asset using the required expected Model Asset file revision. Source shape remains { kind: Mesh, assetId, outputName? }; compilation and staged validation precede replacement, frozen assets reject rebuild, and every failure retains the last successful compiled output and Model Asset revision.",
+        "Rebuilds a live-linked editable-mesh Model Asset using the required expected Model Asset file revision. Optional displayName atomically updates generic asset metadata with the rebuild. Source shape remains { kind: Mesh, assetId, outputName? }; compilation and staged validation precede replacement, frozen assets reject rebuild, and every failure retains the last successful compiled output and Model Asset revision.",
         typeof(RebuildModelAssetRequest).FullName!,
         typeof(ModelAssetMutationCommandResult).FullName!);
 
@@ -145,6 +146,7 @@ public sealed class RebuildModelAssetCommand
             var publication = await _service.RebuildAsync(
                 request.ProjectRoot,
                 request.AssetId,
+                request.DisplayName,
                 request.ExpectedModelFileRevision,
                 context.Transaction,
                 context.CancellationToken).ConfigureAwait(false);

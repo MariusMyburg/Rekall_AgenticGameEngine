@@ -42,6 +42,7 @@ Logs/
 crashdumps/
 
 # Local assets and large ad-hoc captures
+Examples/AetherfallCitadel/Builds/
 *.tmp
 *.temp
 *.bak

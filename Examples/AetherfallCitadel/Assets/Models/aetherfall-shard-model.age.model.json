@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-shard-model",
+  "displayName": "Echo Shard",
+  "revision": 1,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-shard-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "bbe8953c42ac05feeaacf988e2cd3f711848a1c683d465be8e539d55c087ba00",
+    "sourceLogicalRevision": 1,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-shard-model/3c842af70e115362b256d7e5e450104fd001fd1d323644e123427a30a6e7b9aa.age.compiled-mesh.json",
+    "compiledContentHash": "3c842af70e115362b256d7e5e450104fd001fd1d323644e123427a30a6e7b9aa",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-24T14:45:12.1282189+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-warden-model",
+  "displayName": "Aether Warden",
+  "revision": 1,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-warden-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "1f82392c83bea47772c0eb408748b7af0a28b4a2201f035396dfd76e283bc9b6",
+    "sourceLogicalRevision": 1,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-warden-model/77652c52ce47be1c60dae13cd66a20657d1d9086eaec382a5968d94ba51c455f.age.compiled-mesh.json",
+    "compiledContentHash": "77652c52ce47be1c60dae13cd66a20657d1d9086eaec382a5968d94ba51c455f",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-24T14:44:55.5087866+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

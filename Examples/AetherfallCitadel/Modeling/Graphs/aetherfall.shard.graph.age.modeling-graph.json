@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.shard.graph",
+  "name": "Aetherfall Echo Shard Graph",
+  "revision": 1,
+  "nodes": [
+    {
+      "nodeId": "shape",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.65,
+        "segments": 6,
+        "rings": 3
+      }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "shape-output",
+      "fromNodeId": "shape",
+      "fromPortId": "geometry",
+      "toNodeId": "output",
+      "toPortId": "input"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "output",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

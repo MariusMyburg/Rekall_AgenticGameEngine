@@ -64,6 +64,50 @@ public sealed class AetherfallCitadelAcceptanceTests
     }
 
     [Fact]
+    public void PublishedModelsAndPresentationResolveAsAnInspectableContract()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var catalogPath = Path.Combine(projectRoot, "Assets", "assets.age.catalog.json");
+        Assert.True(File.Exists(catalogPath), $"Missing model-asset catalog: {catalogPath}");
+
+        var catalog = JsonNode.Parse(File.ReadAllText(catalogPath))!.AsObject();
+        var assetIds = catalog["assets"]!.AsArray()
+            .Where(asset => ReadString(asset, "kind") == "model")
+            .Select(asset => ReadString(asset, "id"))
+            .Where(id => id is not null)
+            .ToHashSet(StringComparer.Ordinal);
+        var scene = LoadMainScene();
+        var entities = scene["entities"]!.AsArray();
+        var components = entities.SelectMany(entity => entity!["components"]!.AsArray()).ToArray();
+        var modelReferences = components
+            .Where(component => ReadString(component, "type") == "Rekall.ModelAssetReference")
+            .Select(component => ReadString(component?["properties"], "assetId"))
+            .Where(id => id is not null)
+            .ToArray();
+        var hudText = components
+            .Where(component => ReadString(component, "type") == "Rekall.Label")
+            .Select(component => ReadString(component?["properties"], "text") ?? string.Empty)
+            .ToArray();
+
+        Assert.True(assetIds.Count >= 10, $"Expected at least 10 published models, found {assetIds.Count}.");
+        Assert.NotEmpty(modelReferences);
+        Assert.True(modelReferences.Distinct(StringComparer.Ordinal).Count() >= 10);
+        Assert.All(modelReferences, assetId => Assert.Contains(assetId, assetIds));
+        Assert.Single(components, component =>
+            ReadString(component, "type") == "Rekall.Camera3D"
+            && ReadBoolean(component, "active")
+            && ReadString(component?["properties"], "projectionMode") == "perspective");
+        Assert.True(entities.Count(entity => entity?["visible"]?.GetValue<bool>() == true) >= 60);
+        Assert.Contains(hudText, text => text.Contains("OBJECTIVE", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(hudText, text => text.Contains("INTEGRITY", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(hudText, text => text.Contains("AETHER", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(hudText, text => text.Contains("SHARDS", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(hudText, text => text.Contains("SCORE", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(hudText, text => text.Contains("COMBO", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(hudText, text => text.Contains("GUARDIAN", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task RulesModuleBuildsAndMovesWardenFromSemanticInput()
     {
         var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
@@ -79,6 +123,9 @@ public sealed class AetherfallCitadelAcceptanceTests
         Assert.Single(
             build.Value.Modules,
             module => module.ModuleName == "AetherfallRules" && module.Succeeded);
+        Assert.Contains(
+            build.Value.Modules,
+            module => module.ModuleName == "AetherfallPlayable" && module.Succeeded);
 
         var inputs = Enumerable.Range(0, 4)
             .Select(_ => new RekallAgeRuntimeInputFrame(
@@ -208,6 +255,34 @@ public sealed class AetherfallCitadelAcceptanceTests
 
         Assert.NotEqual(7, hazard.Transform.Position3D.X, precision: 3);
         Assert.NotEqual(13, hazard.Transform.Position3D.Z, precision: 3);
+    }
+
+    [Fact]
+    public async Task PresentationTracksWardenAndSynchronizesHudState()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        await BuildRulesAsync(projectRoot);
+        var inputs = MovementFrames(30, -1, 1).ToArray();
+
+        var world = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(
+            projectRoot,
+            "Main",
+            inputs.Length,
+            inputs,
+            CancellationToken.None);
+        var camera = world.Entities.Single(entity => entity.Name == "CitadelCamera");
+        var status = world.Entities.Single(entity => entity.Name == "HudStatus");
+        var guardianHud = world.Entities.Single(entity => entity.Name == "HudGuardian");
+        var dormantEnemy = world.Entities.Single(entity => entity.Name == "CourtLancer");
+
+        Assert.True(camera.Transform.Position3D.Z > -27);
+        Assert.Contains(
+            "SHARDS 1",
+            status.Components.Single(c => c.Type == "Rekall.Label").Properties["text"]!.GetValue<string>());
+        Assert.Contains(
+            "GUARDIAN: SEALED",
+            guardianHud.Components.Single(c => c.Type == "Rekall.Label").Properties["text"]!.GetValue<string>());
+        Assert.False(dormantEnemy.Visible);
     }
 
     [Fact]

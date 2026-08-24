@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-guardian-model",
+  "displayName": "Guardian Core",
+  "revision": 1,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-guardian-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "06aa7810e5d93e4b15c19be2f4420482839555b2cbbba3f280ece6ffa85e8b39",
+    "sourceLogicalRevision": 1,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-guardian-model/a719691ace6649f87320f67a2d4358671bf1dc785ad1afb68ef7a4984a6d8d99.age.compiled-mesh.json",
+    "compiledContentHash": "a719691ace6649f87320f67a2d4358671bf1dc785ad1afb68ef7a4984a6d8d99",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-24T14:45:03.8349149+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

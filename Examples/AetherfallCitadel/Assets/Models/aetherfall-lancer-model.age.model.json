@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-lancer-model",
+  "displayName": "Court Lancer",
+  "revision": 1,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-lancer-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "ede522e677493b13230bfb5504210bcf6172b46b26a50db8ac91e75377422daa",
+    "sourceLogicalRevision": 1,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-lancer-model/30c6bdcc899673761c3cc8bc6ead5640101a4ee7ade9510a2937a18fbf5132fb.age.compiled-mesh.json",
+    "compiledContentHash": "30c6bdcc899673761c3cc8bc6ead5640101a4ee7ade9510a2937a18fbf5132fb",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-24T14:45:01.7598883+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

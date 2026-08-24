@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.conduit.graph",
+  "name": "Aetherfall Conduit Graph",
+  "revision": 1,
+  "nodes": [
+    {
+      "nodeId": "shape",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "radiusBottom": 0.8,
+        "radiusTop": 0.55,
+        "depth": 3.2,
+        "segments": 12
+      }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "shape-output",
+      "fromNodeId": "shape",
+      "fromPortId": "geometry",
+      "toNodeId": "output",
+      "toPortId": "input"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "output",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

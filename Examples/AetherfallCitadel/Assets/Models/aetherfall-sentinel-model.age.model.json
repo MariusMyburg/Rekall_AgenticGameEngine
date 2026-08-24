@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-sentinel-model",
+  "displayName": "Citadel Sentinel",
+  "revision": 1,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-sentinel-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "cb9fa4fdbd6c441f0521484fd6fb5b0be79869a8f7464a47566d35c92a4122b1",
+    "sourceLogicalRevision": 1,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-sentinel-model/dc37cb894fbee7f42c9a8e98d94c734cc30c7a8688de76ce08465f044bee1a77.age.compiled-mesh.json",
+    "compiledContentHash": "dc37cb894fbee7f42c9a8e98d94c734cc30c7a8688de76ce08465f044bee1a77",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-24T14:44:57.6012972+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

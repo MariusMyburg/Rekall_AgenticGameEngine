@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.bridge.graph",
+  "name": "Aetherfall Bridge Segment Graph",
+  "revision": 1,
+  "nodes": [
+    {
+      "nodeId": "shape",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 5,
+        "sizeY": 0.6,
+        "sizeZ": 8
+      }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "shape-output",
+      "fromNodeId": "shape",
+      "fromPortId": "geometry",
+      "toNodeId": "output",
+      "toPortId": "input"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "output",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

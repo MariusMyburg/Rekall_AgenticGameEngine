@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-bridge-model",
+  "displayName": "Citadel Bridge Segment",
+  "revision": 1,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-bridge-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "98b6bf1f8d0c9f4b41b2134910a5cbaa6fab184ade18fd29068db225bbd755b7",
+    "sourceLogicalRevision": 1,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-bridge-model/674e74727c0e2fcd5c63309b711b3d7220bf28d3d47585e38c239e0353a1a1db.age.compiled-mesh.json",
+    "compiledContentHash": "674e74727c0e2fcd5c63309b711b3d7220bf28d3d47585e38c239e0353a1a1db",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-24T14:45:10.0875084+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

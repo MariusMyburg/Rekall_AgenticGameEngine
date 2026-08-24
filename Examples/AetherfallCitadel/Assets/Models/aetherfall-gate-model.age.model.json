@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-gate-model",
+  "displayName": "Resonance Gate",
+  "revision": 1,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-gate-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "4bf070daf023d3d6581086fe3e58edd6f5308aa2642abe9f2075e85b8693e354",
+    "sourceLogicalRevision": 1,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-gate-model/77125d4911306932bd1e9fcefb03bd560fa359821e50cf68efc6fab8d9e8691e.age.compiled-mesh.json",
+    "compiledContentHash": "77125d4911306932bd1e9fcefb03bd560fa359821e50cf68efc6fab8d9e8691e",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-24T14:45:08.0833475+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

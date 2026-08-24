@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.spire.graph",
+  "name": "Aetherfall Citadel Spire Graph",
+  "revision": 1,
+  "nodes": [
+    {
+      "nodeId": "shape",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "radiusBottom": 1.8,
+        "radiusTop": 0,
+        "depth": 8,
+        "segments": 10
+      }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "shape-output",
+      "fromNodeId": "shape",
+      "fromPortId": "geometry",
+      "toNodeId": "output",
+      "toPortId": "input"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "output",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

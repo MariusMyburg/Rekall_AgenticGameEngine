@@ -1,0 +1,194 @@
+{
+  "assets": [
+    {
+      "id": "aetherfall-bridge-model",
+      "name": "aetherfall-bridge-model",
+      "displayName": "Citadel Bridge Segment",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-bridge-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-bridge-model\\674e74727c0e2fcd5c63309b711b3d7220bf28d3d47585e38c239e0353a1a1db.age.compiled-mesh.json",
+      "contentHash": "674e74727c0e2fcd5c63309b711b3d7220bf28d3d47585e38c239e0353a1a1db",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-bridge-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-bridge-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-bridge-model/674e74727c0e2fcd5c63309b711b3d7220bf28d3d47585e38c239e0353a1a1db.age.compiled-mesh.json",
+        "compiledContentHash": "674e74727c0e2fcd5c63309b711b3d7220bf28d3d47585e38c239e0353a1a1db"
+      }
+    },
+    {
+      "id": "aetherfall-conduit-model",
+      "name": "aetherfall-conduit-model",
+      "displayName": "Aether Conduit",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-conduit-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-conduit-model\\56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497.age.compiled-mesh.json",
+      "contentHash": "56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-conduit-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-conduit-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-conduit-model/56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497.age.compiled-mesh.json",
+        "compiledContentHash": "56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497"
+      }
+    },
+    {
+      "id": "aetherfall-gate-model",
+      "name": "aetherfall-gate-model",
+      "displayName": "Resonance Gate",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-gate-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-gate-model\\77125d4911306932bd1e9fcefb03bd560fa359821e50cf68efc6fab8d9e8691e.age.compiled-mesh.json",
+      "contentHash": "77125d4911306932bd1e9fcefb03bd560fa359821e50cf68efc6fab8d9e8691e",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-gate-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-gate-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-gate-model/77125d4911306932bd1e9fcefb03bd560fa359821e50cf68efc6fab8d9e8691e.age.compiled-mesh.json",
+        "compiledContentHash": "77125d4911306932bd1e9fcefb03bd560fa359821e50cf68efc6fab8d9e8691e"
+      }
+    },
+    {
+      "id": "aetherfall-guardian-model",
+      "name": "aetherfall-guardian-model",
+      "displayName": "Guardian Core",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-guardian-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-guardian-model\\a719691ace6649f87320f67a2d4358671bf1dc785ad1afb68ef7a4984a6d8d99.age.compiled-mesh.json",
+      "contentHash": "a719691ace6649f87320f67a2d4358671bf1dc785ad1afb68ef7a4984a6d8d99",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-guardian-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-guardian-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-guardian-model/a719691ace6649f87320f67a2d4358671bf1dc785ad1afb68ef7a4984a6d8d99.age.compiled-mesh.json",
+        "compiledContentHash": "a719691ace6649f87320f67a2d4358671bf1dc785ad1afb68ef7a4984a6d8d99"
+      }
+    },
+    {
+      "id": "aetherfall-lancer-model",
+      "name": "aetherfall-lancer-model",
+      "displayName": "Court Lancer",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-lancer-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-lancer-model\\30c6bdcc899673761c3cc8bc6ead5640101a4ee7ade9510a2937a18fbf5132fb.age.compiled-mesh.json",
+      "contentHash": "30c6bdcc899673761c3cc8bc6ead5640101a4ee7ade9510a2937a18fbf5132fb",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-lancer-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-lancer-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-lancer-model/30c6bdcc899673761c3cc8bc6ead5640101a4ee7ade9510a2937a18fbf5132fb.age.compiled-mesh.json",
+        "compiledContentHash": "30c6bdcc899673761c3cc8bc6ead5640101a4ee7ade9510a2937a18fbf5132fb"
+      }
+    },
+    {
+      "id": "aetherfall-orbiter-model",
+      "name": "aetherfall-orbiter-model",
+      "displayName": "Resonance Orbiter",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-orbiter-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-orbiter-model\\28deb57b6496d0f397ff9eb53fa958d89f06dd927571b29809faae4d771dc6e2.age.compiled-mesh.json",
+      "contentHash": "28deb57b6496d0f397ff9eb53fa958d89f06dd927571b29809faae4d771dc6e2",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-orbiter-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-orbiter-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-orbiter-model/28deb57b6496d0f397ff9eb53fa958d89f06dd927571b29809faae4d771dc6e2.age.compiled-mesh.json",
+        "compiledContentHash": "28deb57b6496d0f397ff9eb53fa958d89f06dd927571b29809faae4d771dc6e2"
+      }
+    },
+    {
+      "id": "aetherfall-sentinel-model",
+      "name": "aetherfall-sentinel-model",
+      "displayName": "Citadel Sentinel",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-sentinel-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-sentinel-model\\dc37cb894fbee7f42c9a8e98d94c734cc30c7a8688de76ce08465f044bee1a77.age.compiled-mesh.json",
+      "contentHash": "dc37cb894fbee7f42c9a8e98d94c734cc30c7a8688de76ce08465f044bee1a77",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-sentinel-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-sentinel-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-sentinel-model/dc37cb894fbee7f42c9a8e98d94c734cc30c7a8688de76ce08465f044bee1a77.age.compiled-mesh.json",
+        "compiledContentHash": "dc37cb894fbee7f42c9a8e98d94c734cc30c7a8688de76ce08465f044bee1a77"
+      }
+    },
+    {
+      "id": "aetherfall-shard-model",
+      "name": "aetherfall-shard-model",
+      "displayName": "Echo Shard",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-shard-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-shard-model\\3c842af70e115362b256d7e5e450104fd001fd1d323644e123427a30a6e7b9aa.age.compiled-mesh.json",
+      "contentHash": "3c842af70e115362b256d7e5e450104fd001fd1d323644e123427a30a6e7b9aa",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-shard-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-shard-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-shard-model/3c842af70e115362b256d7e5e450104fd001fd1d323644e123427a30a6e7b9aa.age.compiled-mesh.json",
+        "compiledContentHash": "3c842af70e115362b256d7e5e450104fd001fd1d323644e123427a30a6e7b9aa"
+      }
+    },
+    {
+      "id": "aetherfall-spire-model",
+      "name": "aetherfall-spire-model",
+      "displayName": "Citadel Spire",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-spire-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-spire-model\\e0f5bf11f364b5114da05c049b40ff24d2751a47f8f9c1e48895c29e1ec856a1.age.compiled-mesh.json",
+      "contentHash": "e0f5bf11f364b5114da05c049b40ff24d2751a47f8f9c1e48895c29e1ec856a1",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-spire-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-spire-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-spire-model/e0f5bf11f364b5114da05c049b40ff24d2751a47f8f9c1e48895c29e1ec856a1.age.compiled-mesh.json",
+        "compiledContentHash": "e0f5bf11f364b5114da05c049b40ff24d2751a47f8f9c1e48895c29e1ec856a1"
+      }
+    },
+    {
+      "id": "aetherfall-warden-model",
+      "name": "aetherfall-warden-model",
+      "displayName": "Aether Warden",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-warden-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-model\\77652c52ce47be1c60dae13cd66a20657d1d9086eaec382a5968d94ba51c455f.age.compiled-mesh.json",
+      "contentHash": "77652c52ce47be1c60dae13cd66a20657d1d9086eaec382a5968d94ba51c455f",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-warden-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-warden-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-model/77652c52ce47be1c60dae13cd66a20657d1d9086eaec382a5968d94ba51c455f.age.compiled-mesh.json",
+        "compiledContentHash": "77652c52ce47be1c60dae13cd66a20657d1d9086eaec382a5968d94ba51c455f"
+      }
+    }
+  ]
+}

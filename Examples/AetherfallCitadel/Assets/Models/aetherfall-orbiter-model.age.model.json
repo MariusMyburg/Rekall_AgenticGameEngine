@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-orbiter-model",
+  "displayName": "Resonance Orbiter",
+  "revision": 1,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-orbiter-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "7af64244d1800114d0e7eaa8dfda37ec10977461199ea8999f0168c00c73092e",
+    "sourceLogicalRevision": 1,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-orbiter-model/28deb57b6496d0f397ff9eb53fa958d89f06dd927571b29809faae4d771dc6e2.age.compiled-mesh.json",
+    "compiledContentHash": "28deb57b6496d0f397ff9eb53fa958d89f06dd927571b29809faae4d771dc6e2",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-24T14:44:59.7222627+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

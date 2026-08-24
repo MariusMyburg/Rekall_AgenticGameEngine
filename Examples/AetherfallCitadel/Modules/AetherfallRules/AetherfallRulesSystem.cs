@@ -15,7 +15,8 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
     {
         if (world.WasInputActionPressed("reset"))
         {
-            return ValueTask.FromResult(AetherfallReset.Apply(world));
+            world = AetherfallReset.Apply(world);
+            return ValueTask.FromResult(PresentationSimulation.Update(world, context));
         }
 
         var warden = world.FindEntity(AetherfallConstants.WardenName);
@@ -26,12 +27,12 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
                 AetherfallConstants.WardenStateType,
                 "phase",
                 phase == "paused" ? "playing" : "paused"));
-            return ValueTask.FromResult(world);
+            return ValueTask.FromResult(PresentationSimulation.Update(world, context));
         }
 
         if (warden?.ComponentString(AetherfallConstants.WardenStateType, "phase", "playing") != "playing")
         {
-            return ValueTask.FromResult(world);
+            return ValueTask.FromResult(PresentationSimulation.Update(world, context));
         }
 
         world = WardenSimulation.Update(world, context);
@@ -48,6 +49,6 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
                 "defeat"));
         }
 
-        return ValueTask.FromResult(world);
+        return ValueTask.FromResult(PresentationSimulation.Update(world, context));
     }
 }

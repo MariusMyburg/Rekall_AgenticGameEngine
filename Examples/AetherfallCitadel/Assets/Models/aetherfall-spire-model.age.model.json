@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-spire-model",
+  "displayName": "Citadel Spire",
+  "revision": 1,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-spire-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "f3a20e64f1871156ebbd7d97c2f234c8fd7f8dc322d7890e8d923654a9fefec3",
+    "sourceLogicalRevision": 1,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-spire-model/e0f5bf11f364b5114da05c049b40ff24d2751a47f8f9c1e48895c29e1ec856a1.age.compiled-mesh.json",
+    "compiledContentHash": "e0f5bf11f364b5114da05c049b40ff24d2751a47f8f9c1e48895c29e1ec856a1",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-24T14:45:14.1935465+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

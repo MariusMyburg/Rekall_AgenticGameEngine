@@ -2,7 +2,7 @@
 
 ## Status
 
-DONE
+DONE_WITH_CONCERNS
 
 ## Root cause and data-path comparison
 
@@ -90,10 +90,77 @@ Result: succeeded with 0 warnings and 0 errors.
 Reviewed `git diff --check` and the changed runtime, capture, workflow, CLI, and
 test paths. No genre-specific engine behavior or authored-game files were added.
 
-Concern: Vulkan viewport captures retain elapsed timing but currently return an
-empty projected-action list; the software deterministic path used by package
-proof exposes the final projected actions and is covered by the focused test.
+Concern: The full non-Studio Release test host stalled without emitting a TRX
+result after the Studio Release suite completed. The focused repair selection
+below is green; rerun the branch-wide engine suite in a clean test-host process.
 
 ## Commit
 
 Implementation commit: `bffe85b7778e997e89a761c4f5be1adfb2546f3e`
+
+## Repair loop — compatibility, Vulkan diagnostics, and deterministic timing
+
+### Root cause
+
+The generic request-type replacement removed collection-level source
+compatibility: an `IReadOnlyList<RekallAgePlaybackInput>` cannot implicitly
+convert to an `IReadOnlyList<RekallAgeRuntimeInputFrame>`, even though its
+elements can convert. Vulkan scene capture then discarded the already-projected
+input actions, while its clear-only path built a result without carrying either
+actions or elapsed time. Finally, the snapshot service passes the fixed tick as
+`TimeSpan.FromSeconds(1.0 / 60.0)` per frame; repeatedly adding that rounded
+value changed the engine's established fixed-step timeline semantics and caused
+deterministic elapsed-time drift.
+
+### RED and GREEN evidence
+
+RED compatibility command:
+
+```powershell
+dotnet test Rekall.AGE.sln -c Release --no-restore --filter "FullyQualifiedName~CapturePlayableFrameCommandRasterizesModuleDrawCommands|FullyQualifiedName~CapturePlayablePackageFrameRequestTests|FullyQualifiedName~CaptureRuntimeViewportCommandCanUseVulkanForClearOnlyRuntimeFrames|FullyQualifiedName~CaptureRuntimeViewportCommandRoutesVulkanSceneRenderablesToSceneCapture"
+```
+
+Before the adapter, compilation failed with `CS1503`: a variable typed
+`IReadOnlyList<RekallAgePlaybackInput>` could not bind to either capture
+request's runtime-frame collection parameter.
+
+RED timing command:
+
+```powershell
+dotnet test Rekall.AGE.sln -c Release --no-restore --filter "FullyQualifiedName~RuntimeSoakPrintsCheckpointsAndPassedChecks|FullyQualifiedName~DefaultRuntimeAppliesDeterministicCelestialRotation|FullyQualifiedName~ExecutionLoopAdvancesFramesDeterministically|FullyQualifiedName~SoakResumesAcrossChunksWithExactDeterministicContinuity"
+```
+
+Observed four failures, including `194.99928` versus `195` celestial rotation
+and `0.0499998` versus `0.05` elapsed time.
+
+GREEN focused repair command:
+
+```powershell
+dotnet build src\Rekall.Age.Cli\Rekall.Age.Cli.csproj -c Debug --no-restore
+dotnet test Rekall.AGE.sln -c Release --no-restore --filter "FullyQualifiedName~CapturePlayableFrameCommandRasterizesModuleDrawCommands|FullyQualifiedName~CapturePlayablePackageFrameRequestTests|FullyQualifiedName~CaptureRuntimeViewportCommandCanUseVulkanForClearOnlyRuntimeFrames|FullyQualifiedName~CaptureRuntimeViewportCommandRoutesVulkanSceneRenderablesToSceneCapture|FullyQualifiedName~RuntimeSoakPrintsCheckpointsAndPassedChecks|FullyQualifiedName~DefaultRuntimeAppliesDeterministicCelestialRotation|FullyQualifiedName~ExecutionLoopAdvancesFramesDeterministically|FullyQualifiedName~SoakResumesAcrossChunksWithExactDeterministicContinuity"
+```
+
+Result: 8/8 passed. The Debug CLI build is necessary because the CLI test
+intentionally launches `src/Rekall.Age.Cli/bin/Debug/net10.0` even when the
+test project is invoked with `-c Release`.
+
+### Repair summary
+
+- Both capture request records now provide a legacy-list constructor adapter;
+  direct capture executes an old-list variable successfully, while package
+  request conversion is checked at runtime.
+- Vulkan scene and clear-pass results both forward the projected `InputActions`
+  and the inspected `ElapsedSeconds`.
+- The runtime execution loop uses the original frame-indexed fixed-step timeline
+  for the fixed tick, while non-fixed supplied deltas retain explicit per-frame
+  accumulation.
+- New/extended tests prove source compatibility, Vulkan clear diagnostics,
+  Vulkan scene diagnostics, and the repaired timing failures.
+
+### Full Release suite attempt
+
+`dotnet test Rekall.AGE.sln -c Release --no-build --no-restore` was started
+after the focused pass. `Rekall.Age.Studio.Tests` completed 55/55 passing and
+its TRX recorded zero failures. `Rekall.Age.Tests` then stalled for several
+minutes with no CPU progress or result file, so the verified stalled test host
+was stopped. This is the remaining concern; no test failure was emitted.

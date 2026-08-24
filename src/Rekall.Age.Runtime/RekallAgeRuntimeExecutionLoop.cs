@@ -101,14 +101,21 @@ public sealed class RekallAgeRuntimeExecutionLoop : IDisposable
         }
 
         var world = initialWorld;
-        var stepDelta = deltaTime is { } requestedDelta && requestedDelta > TimeSpan.Zero
-            ? requestedDelta
+        var usesCustomDelta = deltaTime is { } requestedDelta
+            && requestedDelta > TimeSpan.Zero
+            && requestedDelta != _fixedDeltaTime;
+        var stepDelta = usesCustomDelta
+            ? deltaTime!.Value
             : _fixedDeltaTime;
+        var timelineOrigin = initialWorld.ElapsedTime - TimeSpan.FromSeconds(
+            initialWorld.FrameIndex * _fixedDeltaSeconds);
         for (var frame = 0; frame < frames; frame++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var nextFrameIndex = world.FrameIndex + 1;
-            var nextElapsed = world.ElapsedTime + stepDelta;
+            var nextElapsed = usesCustomDelta
+                ? world.ElapsedTime + stepDelta
+                : timelineOrigin + TimeSpan.FromSeconds(nextFrameIndex * _fixedDeltaSeconds);
             var context = new RekallAgeRuntimeWorldFrameContext(
                 nextFrameIndex,
                 stepDelta,

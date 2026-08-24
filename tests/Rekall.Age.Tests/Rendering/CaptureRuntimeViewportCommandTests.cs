@@ -4,6 +4,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
+using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.World;
 
 namespace Rekall.Age.Tests.Rendering;
@@ -668,7 +669,17 @@ public sealed class CaptureRuntimeViewportCommandTests
                 {
                     ["active"] = true,
                     ["clearColor"] = "#336699"
-                })));
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Input", ["input"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.InputActionMap",
+                    new JsonObject
+                    {
+                        ["actions"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = "capture.move", ["positiveKey"] = "D" }
+                        }
+                    })));
         await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
         var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("vulkan viewport"), CancellationToken.None);
         var vulkan = new FakeVulkanViewportCapture();
@@ -683,7 +694,12 @@ public sealed class CaptureRuntimeViewportCommandTests
                 48,
                 DebugOverlay: false,
                 BackendId: "vulkan",
-                PreferredDeviceType: "integrated-gpu"),
+                PreferredDeviceType: "integrated-gpu",
+                Inputs:
+                [
+                    new RekallAgeRuntimeInputFrame(SemanticActions: [new("capture.move", 1, true, true)]) { DeltaSeconds = 0.1 },
+                    new RekallAgeRuntimeInputFrame(SemanticActions: [new("capture.move", 1, true)]) { DeltaSeconds = 0.2 }
+                ]),
             context);
 
         Assert.True(result.Ok, result.Summary);
@@ -697,6 +713,10 @@ public sealed class CaptureRuntimeViewportCommandTests
         Assert.Equal("integrated-gpu", vulkan.PreferredDeviceType);
         Assert.Equal(96u, vulkan.Width);
         Assert.Equal(48u, vulkan.Height);
+        var action = Assert.Single(result.Value.InputActions);
+        Assert.Equal("capture.move", action.Name);
+        Assert.True(action.IsDown);
+        Assert.Equal(0.3, result.Value.ElapsedSeconds, precision: 6);
         Assert.Contains(result.Value.ScreenshotPath, context.Transaction.ChangedResources);
     }
 
@@ -708,7 +728,17 @@ public sealed class CaptureRuntimeViewportCommandTests
             .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
                 .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
             .AddEntity(RekallAgeEntityDocument.Create("Cube", ["prop"])
-                .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer", new JsonObject { ["mesh"] = "rekall.primitive.cube" })));
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer", new JsonObject { ["mesh"] = "rekall.primitive.cube" })))
+            .AddEntity(RekallAgeEntityDocument.Create("Input", ["input"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.InputActionMap",
+                    new JsonObject
+                    {
+                        ["actions"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = "capture.move", ["positiveKey"] = "D" }
+                        }
+                    })));
         await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
 
         var sceneCapture = new FakeVulkanSceneCapture();
@@ -716,9 +746,13 @@ public sealed class CaptureRuntimeViewportCommandTests
             new CaptureRuntimeViewportRequest(
                 root,
                 "Main",
-                0,
+                1,
                 Path.Combine(root, "Viewport"),
-                BackendId: "vulkan"),
+                BackendId: "vulkan",
+                Inputs:
+                [
+                    new RekallAgeRuntimeInputFrame(SemanticActions: [new("capture.move", 1, true, true)]) { DeltaSeconds = 0.1 }
+                ]),
             new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("vulkan scene viewport"), CancellationToken.None));
 
         Assert.True(result.Ok, result.Summary);
@@ -729,6 +763,9 @@ public sealed class CaptureRuntimeViewportCommandTests
         Assert.Equal("Fake Scene GPU", result.Value.SelectedDeviceName);
         Assert.Equal(1, sceneCapture.MeshRenderableCount);
         Assert.Equal(["mesh"], result.Value.RenderableKinds);
+        var action = Assert.Single(result.Value.InputActions);
+        Assert.Equal("capture.move", action.Name);
+        Assert.True(action.IsDown);
     }
 
     [Fact]

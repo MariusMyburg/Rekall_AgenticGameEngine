@@ -12,7 +12,27 @@ public sealed record CapturePlayableFrameRequest(
     int FrameIndex = 1,
     int Width = 320,
     int Height = 180,
-    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null);
+    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null)
+{
+    public CapturePlayableFrameRequest(
+        string ProjectRoot,
+        string SceneName,
+        string OutputDirectory,
+        int FrameIndex,
+        int Width,
+        int Height,
+        IReadOnlyList<RekallAgePlaybackInput>? Inputs)
+        : this(
+            ProjectRoot,
+            SceneName,
+            OutputDirectory,
+            FrameIndex,
+            Width,
+            Height,
+            Inputs?.Select(input => input.ToRuntimeInputFrame()).ToArray())
+    {
+    }
+}
 
 public sealed record CapturePlayableFrameResult(
     bool Captured,

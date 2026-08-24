@@ -77,6 +77,10 @@ public sealed class CaptureScreenshotCommandTests
         var build = await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
         Assert.True(build.Ok, build.Summary);
         var command = new CapturePlayableFrameCommand();
+        IReadOnlyList<RekallAgePlaybackInput> legacyInputs =
+        [
+            new RekallAgePlaybackInput(1, PrimaryAction: true)
+        ];
 
         var result = await command.ExecuteAsync(
             new CapturePlayableFrameRequest(
@@ -86,9 +90,7 @@ public sealed class CaptureScreenshotCommandTests
                 1,
                 320,
                 180,
-                [
-                    new RekallAgePlaybackInput(1, PrimaryAction: true)
-                ]),
+                legacyInputs),
             context);
 
         Assert.True(result.Ok, result.Summary);

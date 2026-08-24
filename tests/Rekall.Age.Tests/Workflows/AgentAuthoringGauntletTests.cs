@@ -1,10 +1,57 @@
+using System.Text.Json.Nodes;
+using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
+using Rekall.Age.Modules.Commands;
+using Rekall.Age.Project;
 using Rekall.Age.Workflows.Commands;
+using Rekall.Age.World;
 
 namespace Rekall.Age.Tests.Workflows;
 
 public sealed class AgentAuthoringGauntletTests
 {
+    [Fact]
+    public async Task GauntletPackagesExistingThreeDimensionalGameWithoutReplacingAuthoredScene()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Existing 3D Game", ["world", "rendering3d"]),
+            CancellationToken.None);
+        var authoredScene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("AuthoredCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Camera3D",
+                    new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("AuthoredCitadel", ["authored"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.MeshRenderer",
+                    new JsonObject { ["mesh"] = "rekall.primitive.cube" })));
+        await new RekallAgeSceneStore().SaveAsync(root, authoredScene, CancellationToken.None);
+        var output = Path.Combine(root, "Package");
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("existing 3d authoring gauntlet"),
+            CancellationToken.None);
+        var scaffold = await new ScaffoldPlayableModuleCommand().ExecuteAsync(
+            new ScaffoldPlayableModuleRequest(root, "existing.game", "Existing Game", "ExistingGame"),
+            context);
+        Assert.True(scaffold.Ok, scaffold.Summary);
+
+        var result = await new RunAgentAuthoringGauntletCommand().ExecuteAsync(
+            new RunAgentAuthoringGauntletRequest(root, "Existing 3D Game", "Main", output),
+            context);
+
+        Assert.True(result.Ok, result.Summary + Environment.NewLine + string.Join(
+            Environment.NewLine,
+            result.Errors.Select(error => $"{error.Code}: {error.Message}")));
+        Assert.True(result.Value.Ready);
+        Assert.Contains(result.Value.Checks, check => check is { Name: "scene-preserved", Passed: true });
+        var preserved = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        Assert.Contains(preserved.Entities, entity => entity.Name == "AuthoredCitadel");
+        Assert.DoesNotContain(preserved.Entities, entity => entity.Name == "Agent Authored Marker");
+    }
+
     [Fact]
     public async Task GauntletAuthorsPackagesAuditsAndCapturesGenericPlayableProject()
     {

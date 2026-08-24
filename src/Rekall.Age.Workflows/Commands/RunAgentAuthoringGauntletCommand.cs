@@ -81,6 +81,7 @@ public sealed class RunAgentAuthoringGauntletCommand
             string.IsNullOrWhiteSpace(request.OutputDirectory)
                 ? Path.Combine(projectRoot, "Builds", "AgentAuthoringGauntlet")
                 : request.OutputDirectory);
+        var sceneAlreadyExists = File.Exists(_sceneStore.GetScenePath(projectRoot, sceneName));
 
         var project = await EnsureProjectAsync(projectRoot, projectName, context);
         checks.Add(ToCheck("project-created", project));
@@ -96,31 +97,41 @@ public sealed class RunAgentAuthoringGauntletCommand
             return Failure(request with { ProjectRoot = projectRoot, SceneName = sceneName }, checks, null, null, scene.Summary, scene.Errors);
         }
 
-        var blueprint = await _applyBlueprint.ExecuteAsync(
-            new ApplySceneBlueprintRequest(projectRoot, sceneName, CreateGauntletBlueprint(), ClearExisting: true),
-            context);
-        checks.Add(ToCheck("scene-blueprint-authored", blueprint));
-        if (!blueprint.Ok)
+        if (sceneAlreadyExists)
         {
-            return Failure(request with { ProjectRoot = projectRoot, SceneName = sceneName }, checks, null, null, blueprint.Summary, blueprint.Errors);
+            checks.Add(new RekallAgeAgentAuthoringGauntletCheck(
+                "scene-preserved",
+                true,
+                $"Using existing authored scene '{sceneName}' without replacing its entities."));
         }
-
-        var scaffold = await _scaffoldPlayableModule.ExecuteAsync(
-            new ScaffoldPlayableModuleRequest(projectRoot, "agent.gauntlet", "Agent Gauntlet", "AgentGauntlet"),
-            context);
-        checks.Add(ToCheck("module-scaffolded", scaffold));
-        if (!scaffold.Ok)
+        else
         {
-            return Failure(request with { ProjectRoot = projectRoot, SceneName = sceneName }, checks, null, null, scaffold.Summary, scaffold.Errors);
-        }
+            var blueprint = await _applyBlueprint.ExecuteAsync(
+                new ApplySceneBlueprintRequest(projectRoot, sceneName, CreateGauntletBlueprint(), ClearExisting: true),
+                context);
+            checks.Add(ToCheck("scene-blueprint-authored", blueprint));
+            if (!blueprint.Ok)
+            {
+                return Failure(request with { ProjectRoot = projectRoot, SceneName = sceneName }, checks, null, null, blueprint.Summary, blueprint.Errors);
+            }
 
-        var source = await _writeModuleSource.ExecuteAsync(
-            new WriteModuleSourceRequest(projectRoot, "AgentGauntlet", "AgentGauntletModule.cs", CreatePlayableModuleSource()),
-            context);
-        checks.Add(ToCheck("module-source-authored", source));
-        if (!source.Ok)
-        {
-            return Failure(request with { ProjectRoot = projectRoot, SceneName = sceneName }, checks, null, null, source.Summary, source.Errors);
+            var scaffold = await _scaffoldPlayableModule.ExecuteAsync(
+                new ScaffoldPlayableModuleRequest(projectRoot, "agent.gauntlet", "Agent Gauntlet", "AgentGauntlet"),
+                context);
+            checks.Add(ToCheck("module-scaffolded", scaffold));
+            if (!scaffold.Ok)
+            {
+                return Failure(request with { ProjectRoot = projectRoot, SceneName = sceneName }, checks, null, null, scaffold.Summary, scaffold.Errors);
+            }
+
+            var source = await _writeModuleSource.ExecuteAsync(
+                new WriteModuleSourceRequest(projectRoot, "AgentGauntlet", "AgentGauntletModule.cs", CreatePlayableModuleSource()),
+                context);
+            checks.Add(ToCheck("module-source-authored", source));
+            if (!source.Ok)
+            {
+                return Failure(request with { ProjectRoot = projectRoot, SceneName = sceneName }, checks, null, null, source.Summary, source.Errors);
+            }
         }
 
         var package = await _packagePlayableGame.ExecuteAsync(
@@ -129,12 +140,14 @@ public sealed class RunAgentAuthoringGauntletCommand
                 sceneName,
                 outputDirectory,
                 Frames: 2,
-                Inputs: [new RekallAgePlaybackInput(1, PrimaryAction: true)],
-                Assertions:
-                [
-                    new RekallAgeFrameAssertion(0, "AGENT GAUNTLET"),
-                    new RekallAgeFrameAssertion(0, "Score 10")
-                ]),
+                Inputs: sceneAlreadyExists ? null : [new RekallAgePlaybackInput(1, PrimaryAction: true)],
+                Assertions: sceneAlreadyExists
+                    ? null
+                    :
+                    [
+                        new RekallAgeFrameAssertion(0, "AGENT GAUNTLET"),
+                        new RekallAgeFrameAssertion(0, "Score 10")
+                    ]),
             context);
         checks.Add(ToCheck("package-created", package));
         if (!package.Ok)
@@ -184,10 +197,17 @@ public sealed class RunAgentAuthoringGauntletCommand
         }
 
         var manifest = await _projectStore.LoadAsync(projectRoot, context.CancellationToken);
-        var missingCapabilities = new[] { "world", "rendering2d" }
-            .Where(required => !manifest.Capabilities.Contains(required, StringComparer.OrdinalIgnoreCase))
-            .ToArray();
-        if (missingCapabilities.Length > 0)
+        var missingCapabilities = new List<string>();
+        if (!manifest.Capabilities.Contains("world", StringComparer.OrdinalIgnoreCase))
+        {
+            missingCapabilities.Add("world");
+        }
+        if (!manifest.Capabilities.Contains("rendering2d", StringComparer.OrdinalIgnoreCase)
+            && !manifest.Capabilities.Contains("rendering3d", StringComparer.OrdinalIgnoreCase))
+        {
+            missingCapabilities.Add("rendering2d or rendering3d");
+        }
+        if (missingCapabilities.Count > 0)
         {
             return RekallAgeCommandResult<CreateProjectResult>.Failure(
                 new CreateProjectResult(manifestPath, manifest),

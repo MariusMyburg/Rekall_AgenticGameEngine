@@ -11,6 +11,7 @@ using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Recovery;
 using Rekall.Age.Core.Diagnostics;
+using Rekall.Age.Core.Product;
 using Rekall.Age.Playback;
 using Rekall.Age.Runtime;
 using Rekall.Age.Runtime.Abstractions;
@@ -74,6 +75,9 @@ internal static class Program
     private static async Task<int> RunAsync(string[] args)
     {
         PlayerLog.Write("Player process starting.");
+        args = RekallAgePackagedLaunchResolver.Resolve(
+            Environment.ProcessPath ?? typeof(Program).Assembly.Location,
+            args);
         if (args.Length < 2)
         {
             PlayerLog.Write("Player process exiting: missing arguments.");

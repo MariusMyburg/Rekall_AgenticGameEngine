@@ -1,3 +1,5 @@
+using Rekall.Age.Runtime.Abstractions;
+
 namespace Rekall.Age.Playback;
 
 public sealed record RekallAgePlaybackRenderFrame(
@@ -49,7 +51,7 @@ public interface IRekallAgePlayableGame : IDisposable
 
     IReadOnlyList<string> EntityNames { get; }
 
-    void Tick(RekallAgePlaybackInput input);
+    void Tick(RekallAgeRuntimeInputFrame input);
 
     string RenderAscii();
 

@@ -5,6 +5,7 @@ using Rekall.Age.Playback;
 using Rekall.Age.Playback.Commands;
 using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
+using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
 
@@ -147,7 +148,7 @@ public sealed class RunAgentAuthoringGauntletCommand
                 Path.Combine(projectRoot, "Builds", "AgentAuthoringGauntletAudit"),
                 Frames: 1,
                 FrameIndex: 1,
-                Inputs: [new RekallAgePlaybackInput(1, PrimaryAction: true)]),
+                Inputs: [new RekallAgeRuntimeInputFrame { VerticalAxis = 1, PrimaryAction = true }]),
             context);
         checks.Add(ToCheck("package-audited", audit));
         if (!audit.Ok)

@@ -75,10 +75,17 @@ public sealed class RekallAgeRuntimeSnapshotService
         {
             for (var frame = 0; frame < frames; frame++)
             {
-                var input = inputs is { Count: > 0 } && frame < inputs.Count
-                    ? inputs[frame].ToState()
+                var inputFrame = inputs is { Count: > 0 } && frame < inputs.Count
+                    ? inputs[frame]
+                    : null;
+                var input = inputFrame is not null
+                    ? inputFrame.ToState()
                     : RekallAgeRuntimeInputState.Empty;
-                var result = await executionLoop.RunAsync(world, 1, cancellationToken, input);
+                var deltaSeconds = inputFrame?.DeltaSeconds ?? (1.0 / 60.0);
+                TimeSpan? deltaTime = double.IsFinite(deltaSeconds) && deltaSeconds > 0
+                    ? TimeSpan.FromSeconds(deltaSeconds)
+                    : null;
+                var result = await executionLoop.RunAsync(world, 1, cancellationToken, input, deltaTime);
                 world = result.World;
                 observeFrame?.Invoke(world);
             }

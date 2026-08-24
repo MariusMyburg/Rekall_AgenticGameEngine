@@ -2,6 +2,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Commands;
+using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.Workflows;
 
 namespace Rekall.Age.Workflows.Commands;
@@ -12,7 +13,7 @@ public sealed record CapturePlayablePackageFrameRequest(
     int FrameIndex = 1,
     int Width = 320,
     int Height = 180,
-    IReadOnlyList<RekallAgePlaybackInput>? Inputs = null);
+    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null);
 
 public sealed record CapturePlayablePackageFrameResult(
     bool Captured,
@@ -29,6 +30,11 @@ public sealed record CapturePlayablePackageFrameResult(
     string Text)
 {
     public CaptureRuntimeViewportLayoutDiagnostics? LayoutDiagnostics { get; init; }
+
+    public IReadOnlyList<RekallAgeRuntimeInputAction> InputActions { get; init; } =
+        Array.Empty<RekallAgeRuntimeInputAction>();
+
+    public double ElapsedSeconds { get; init; }
 }
 
 public sealed class CapturePlayablePackageFrameCommand
@@ -42,7 +48,7 @@ public sealed class CapturePlayablePackageFrameCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Verifies a packaged playable launch and captures its packaged authored scene through the deterministic runtime viewport. OutputDirectory must be outside a directory package.",
+        "Verifies a packaged playable launch and captures its packaged authored scene through the deterministic runtime viewport. OutputDirectory must be outside a directory package. Inputs use generic runtime input frames such as {\"semanticActions\":[{\"name\":\"move.horizontal\",\"value\":1,\"isDown\":true}]}; repeat held facts for every frame. deltaSeconds, primaryAction, and verticalAxis are legacy playable-module compatibility fields, not canonical examples.",
         typeof(CapturePlayablePackageFrameRequest).FullName!,
         typeof(CapturePlayablePackageFrameResult).FullName!);
 
@@ -76,7 +82,7 @@ public sealed class CapturePlayablePackageFrameCommand
             new RunPlayablePackageRequest(
                 request.PackagePath,
                 frameIndex,
-                request.Inputs),
+                null),
             context);
         if (!run.Ok)
         {
@@ -99,7 +105,8 @@ public sealed class CapturePlayablePackageFrameCommand
                 frameIndex,
                 request.OutputDirectory,
                 width,
-                height),
+                height,
+                Inputs: request.Inputs),
             context);
         if (!capture.Ok || !capture.Value.Captured)
         {
@@ -140,7 +147,9 @@ public sealed class CapturePlayablePackageFrameCommand
             viewport.FrameAnalysis,
             $"Captured packaged authored scene '{inspection.Value.Manifest.SceneName}' using {viewport.BackendId}.")
         {
-            LayoutDiagnostics = viewport.LayoutDiagnostics
+            LayoutDiagnostics = viewport.LayoutDiagnostics,
+            InputActions = viewport.InputActions,
+            ElapsedSeconds = viewport.ElapsedSeconds
         };
         return RekallAgeCommandResult<CapturePlayablePackageFrameResult>.Success(
             resultValue,

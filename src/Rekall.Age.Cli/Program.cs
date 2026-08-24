@@ -290,7 +290,9 @@ internal static class RekallAgeCli
                 ["game", "capture-package-frame", var packagePath, var outputDirectory] =>
                     await CapturePlayablePackageFrameAsync(registry, context, packagePath, outputDirectory, "1"),
                 ["game", "capture-package-frame", var packagePath, var outputDirectory, var frameIndex] =>
-                    await CapturePlayablePackageFrameAsync(registry, context, packagePath, outputDirectory, frameIndex),
+                    await CapturePlayablePackageFrameAsync(registry, context, packagePath, outputDirectory, frameIndex, null),
+                ["game", "capture-package-frame", var packagePath, var outputDirectory, var frameIndex, var inputsJson] =>
+                    await CapturePlayablePackageFrameAsync(registry, context, packagePath, outputDirectory, frameIndex, inputsJson),
                 ["game", "publish-web", var root] => await PublishWebGameAsync(registry, context, root, "Main", null),
                 ["game", "publish-web", var root, var scene] => await PublishWebGameAsync(registry, context, root, scene, null),
                 ["game", "publish-web", var root, var scene, var outputDirectory] =>
@@ -2198,7 +2200,7 @@ internal static class RekallAgeCli
         string? inputsJson)
     {
         var parsedFrameIndex = int.Parse(frameIndex, System.Globalization.CultureInfo.InvariantCulture);
-        var inputs = await ParsePlaybackInputsAsync(inputsJson, context.CancellationToken);
+        var inputs = await ParseRuntimeInputFramesAsync(inputsJson, context.CancellationToken);
         var result = await registry.ExecuteAsync<CapturePlayableFrameRequest, CapturePlayableFrameResult>(
             "rekall.play.capture_frame",
             new CapturePlayableFrameRequest(root, scene, outputDirectory, parsedFrameIndex, Inputs: inputs),
@@ -2801,12 +2803,14 @@ internal static class RekallAgeCli
         RekallAgeCommandContext context,
         string packagePath,
         string outputDirectory,
-        string frameIndex)
+        string frameIndex,
+        string? inputsJson = null)
     {
         var frame = int.Parse(frameIndex, System.Globalization.CultureInfo.InvariantCulture);
+        var inputs = await ParseRuntimeInputFramesAsync(inputsJson, context.CancellationToken);
         var result = await registry.ExecuteAsync<CapturePlayablePackageFrameRequest, CapturePlayablePackageFrameResult>(
             "rekall.workflow.capture_playable_package_frame",
-            new CapturePlayablePackageFrameRequest(packagePath, outputDirectory, frame),
+            new CapturePlayablePackageFrameRequest(packagePath, outputDirectory, frame, Inputs: inputs),
             context);
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Captured: {result.Value.Captured}");

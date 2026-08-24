@@ -1820,7 +1820,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _lastPlayableTickSeconds = now;
         var playableInput = BuildPlayableInput(deltaSeconds);
         AdvanceSimulationToWallClock();
-        game.Tick(playableInput);
+        game.Tick(playableInput.ToRuntimeInputFrame());
         var renderFrame = game.RenderFrame(frameNumber);
         EnsurePlayableRenderTarget();
         var raster = _playableRasterizer.Rasterize(renderFrame, _sceneTarget.Width, _sceneTarget.Height);

@@ -1,5 +1,6 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
+using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.Validation;
 using Rekall.Age.World;
 
@@ -12,7 +13,7 @@ public sealed record AuditPlayablePackageRequest(
     int FrameIndex = 1,
     int Width = 320,
     int Height = 180,
-    IReadOnlyList<RekallAgePlaybackInput>? Inputs = null);
+    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null);
 
 public sealed record RekallAgePlayablePackageAuditCheck(
     string Name,
@@ -112,7 +113,7 @@ public sealed class AuditPlayablePackageCommand
             : new RekallAgeValidationReport([]);
 
         var run = await _runPackage.ExecuteAsync(
-            new RunPlayablePackageRequest(request.PackagePath, frameCount, request.Inputs),
+            new RunPlayablePackageRequest(request.PackagePath, frameCount, null),
             context);
         var capture = await _captureFrame.ExecuteAsync(
             captureRequest,

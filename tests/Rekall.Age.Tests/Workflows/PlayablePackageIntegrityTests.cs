@@ -7,6 +7,7 @@ using Rekall.Age.Core.Transactions;
 using Rekall.Age.Modules;
 using Rekall.Age.Workflows.Commands;
 using Rekall.Age.Modules.Security;
+using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.World;
 
 namespace Rekall.Age.Tests.Workflows;
@@ -177,6 +178,58 @@ public sealed class PlayablePackageIntegrityTests
             new InspectPlayablePackageRequest(output),
             context);
         Assert.True(inspectionAfterRejectedAudit.Ok, inspectionAfterRejectedAudit.Summary);
+    }
+
+    [Fact]
+    public async Task PackageCaptureForwardsGenericInputFramesIntoTheRuntimeViewport()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var output = Path.Combine(TestPaths.CreateTempDirectory(), "GenericInputPackage");
+        var context = new RekallAgeCommandContext(
+            "generic-input-package-capture",
+            RekallAgeTransaction.Begin("capture packaged generic input"),
+            CancellationToken.None);
+        var authored = await new RunAgentAuthoringGauntletCommand().ExecuteAsync(
+            new RunAgentAuthoringGauntletRequest(root, "Generic Input Package", "Main", Path.Combine(TestPaths.CreateTempDirectory(), "InitialPackage")),
+            context);
+        Assert.True(authored.Ok, authored.Summary);
+        var store = new RekallAgeSceneStore();
+        var scene = await store.LoadAsync(root, "Main", CancellationToken.None);
+        await store.SaveAsync(root, scene.AddEntity(
+            RekallAgeEntityDocument.Create("CaptureInput", ["input"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.InputActionMap",
+                    new JsonObject
+                    {
+                        ["actions"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = "capture.move", ["positiveKey"] = "D" }
+                        }
+                    }))), CancellationToken.None);
+        var packaged = await new PackagePlayableGameCommand().ExecuteAsync(
+            new PackagePlayableGameRequest(root, "Main", output),
+            context);
+        Assert.True(packaged.Ok, packaged.Summary);
+
+        var capture = await new CapturePlayablePackageFrameCommand().ExecuteAsync(
+            new CapturePlayablePackageFrameRequest(
+                output,
+                Path.Combine(root, "Builds", "GenericInputProof"),
+                FrameIndex: 2,
+                Inputs:
+                [
+                    new RekallAgeRuntimeInputFrame(SemanticActions: [new("capture.move", 1, true, true)]) { DeltaSeconds = 0.1 },
+                    new RekallAgeRuntimeInputFrame(SemanticActions: [new("capture.move", 1, true)]) { DeltaSeconds = 0.2 }
+                ]),
+            context);
+
+        Assert.True(capture.Ok, capture.Summary);
+        var action = Assert.Single(capture.Value.InputActions);
+        Assert.Equal("capture.move", action.Name);
+        Assert.Equal(1, action.Value);
+        Assert.True(action.IsDown);
+        Assert.False(action.WasPressed);
+        Assert.Equal(0.3, capture.Value.ElapsedSeconds, precision: 6);
     }
 
     [Fact]

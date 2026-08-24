@@ -92,6 +92,15 @@ public sealed record RekallAgeRuntimeInputFrame(
     IReadOnlyList<RekallAgeRuntimeSemanticActionSample>? SemanticActions = null,
     IReadOnlyList<RekallAgeRuntimeControllerState>? Controllers = null)
 {
+    // Capture and inspection clients use this explicit per-frame duration when a
+    // playable module consumes DeltaSeconds. Runtime simulation itself remains
+    // fixed-step; authored realtime systems receive that fixed engine timestep.
+    public double DeltaSeconds { get; init; } = 1.0 / 60.0;
+
+    public int VerticalAxis { get; init; }
+
+    public bool PrimaryAction { get; init; }
+
     public RekallAgeRuntimeInputState ToState()
     {
         return new RekallAgeRuntimeInputState(

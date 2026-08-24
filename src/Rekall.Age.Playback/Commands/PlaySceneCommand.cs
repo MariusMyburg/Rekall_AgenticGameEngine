@@ -69,7 +69,7 @@ public sealed class PlaySceneCommand : IRekallAgeCommand<PlaySceneRequest, PlayS
             var input = request.Inputs is { Count: > 0 } inputs && i < inputs.Count
                 ? inputs[i]
                 : RekallAgePlaybackInput.None;
-            game.Tick(input);
+            game.Tick(input.ToRuntimeInputFrame());
             var renderFrame = game.RenderFrame(i + 1);
             renderFrames.Add(renderFrame);
             frames.Add(renderFrame.Text);

@@ -6,6 +6,7 @@ using Rekall.Age.Modules.Commands;
 using Rekall.Age.Playback;
 using Rekall.Age.Rendering;
 using Rekall.Age.Runtime;
+using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.World;
 
@@ -106,6 +107,65 @@ public sealed class CaptureScreenshotCommandTests
         Assert.Contains(result.Value.OutputPath, context.Transaction.ChangedResources);
     }
 
+    [Fact]
+    public async Task CapturePlayableFrameProjectsSemanticActionsAndInputEdgesIntoThePlayableModule()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("semantic play capture"), CancellationToken.None);
+        await TestProjectAuthoring.CreateProjectWithSceneAsync(root, context, "Semantic Captured Playable");
+        var store = new RekallAgeSceneStore();
+        var scene = await store.LoadAsync(root, "Main", CancellationToken.None);
+        await store.SaveAsync(root, scene.AddEntity(
+            RekallAgeEntityDocument.Create("Input", ["input"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.InputActionMap",
+                    new JsonObject
+                    {
+                        ["actions"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = "capture.move", ["positiveKey"] = "D" }
+                        }
+                    }))), CancellationToken.None);
+        await new ScaffoldPlayableModuleCommand().ExecuteAsync(
+            new ScaffoldPlayableModuleRequest(root, "agent.semantic.capture", "Agent Semantic Capture", "AgentSemanticCapture"),
+            context);
+        await new WriteModuleSourceCommand().ExecuteAsync(
+            new WriteModuleSourceRequest(root, "AgentSemanticCapture", "AgentSemanticCaptureModule.cs", CreateSemanticCaptureModuleSource()),
+            context);
+        var build = await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
+        Assert.True(build.Ok, build.Summary);
+
+        var result = await new CapturePlayableFrameCommand().ExecuteAsync(
+            new CapturePlayableFrameRequest(
+                root,
+                "Main",
+                Path.Combine(root, "PlayCaptures"),
+                3,
+                Inputs:
+                [
+                    new RekallAgeRuntimeInputFrame(SemanticActions: [new("capture.move", 1, true, true)]),
+                    new RekallAgeRuntimeInputFrame(SemanticActions: [new("capture.move", 1, true)]),
+                    new RekallAgeRuntimeInputFrame(SemanticActions: [new("capture.move", 0, false, false, true)])
+                ]),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains("held=2", result.Value.Text, StringComparison.Ordinal);
+        Assert.Contains("pressed=1", result.Value.Text, StringComparison.Ordinal);
+        Assert.Contains("released=1", result.Value.Text, StringComparison.Ordinal);
+        Assert.Contains("value=0", result.Value.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CapturePlayableFrameSchemaDocumentsGenericInputFrames()
+    {
+        var description = new CapturePlayableFrameCommand().Schema.Description;
+
+        Assert.Contains("semanticActions", description, StringComparison.Ordinal);
+        Assert.Contains("pressedKeys", description, StringComparison.Ordinal);
+        Assert.Contains("legacy", description, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string CreateCaptureModuleSource()
     {
         return """
@@ -149,6 +209,44 @@ public sealed class AgentCaptureModule : RekallAgeModule, IRekallAgePlayableModu
             new RekallAgePlayableDrawCommand("text", "agent-hud", 8, 8, 0, 0, "#ffffff", $"Score {score}")
         };
         return new RekallAgePlayableModuleFrame($"AGENT CAPTURE\nScore {score}", drawCommands);
+    }
+}
+""";
+    }
+
+    private static string CreateSemanticCaptureModuleSource()
+    {
+        return """
+using Rekall.Age.Modules;
+
+namespace Game.Modules.AgentSemanticCapture;
+
+[RekallAgeModule("agent.semantic.capture", "Agent Semantic Capture")]
+[RekallAgeRequiresCapability("world")]
+public sealed class AgentSemanticCaptureModule : RekallAgeModule, IRekallAgePlayableModule
+{
+    public string Kind => "agent-authored";
+
+    public override void Configure(RekallAgeModuleBuilder builder)
+    {
+    }
+
+    public RekallAgePlayableModuleState CreateInitialState(RekallAgePlayableModuleContext context)
+    {
+        return new RekallAgePlayableModuleState();
+    }
+
+    public void Tick(RekallAgePlayableModuleState state, RekallAgePlayableModuleInput input)
+    {
+        state.Numbers["held"] = state.Numbers.GetValueOrDefault("held") + (input.IsInputActionDown("capture.move") ? 1 : 0);
+        state.Numbers["pressed"] = state.Numbers.GetValueOrDefault("pressed") + (input.WasInputActionPressed("capture.move") ? 1 : 0);
+        state.Numbers["released"] = state.Numbers.GetValueOrDefault("released") + (input.WasInputActionReleased("capture.move") ? 1 : 0);
+        state.Numbers["value"] = input.InputActionValue("capture.move");
+    }
+
+    public RekallAgePlayableModuleFrame Render(RekallAgePlayableModuleState state)
+    {
+        return new RekallAgePlayableModuleFrame($"held={(int)state.Numbers["held"]} pressed={(int)state.Numbers["pressed"]} released={(int)state.Numbers["released"]} value={state.Numbers["value"]:0}");
     }
 }
 """;

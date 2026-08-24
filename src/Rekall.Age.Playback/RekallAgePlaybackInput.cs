@@ -1,3 +1,5 @@
+using Rekall.Age.Runtime.Abstractions;
+
 namespace Rekall.Age.Playback;
 
 public readonly record struct RekallAgePlaybackInput(
@@ -10,4 +12,14 @@ public readonly record struct RekallAgePlaybackInput(
     public static RekallAgePlaybackInput Up { get; } = new(-1);
 
     public static RekallAgePlaybackInput Down { get; } = new(1);
+
+    public RekallAgeRuntimeInputFrame ToRuntimeInputFrame() => new()
+    {
+        DeltaSeconds = DeltaSeconds,
+        VerticalAxis = VerticalAxis,
+        PrimaryAction = PrimaryAction
+    };
+
+    public static implicit operator RekallAgeRuntimeInputFrame(RekallAgePlaybackInput input) =>
+        input.ToRuntimeInputFrame();
 }

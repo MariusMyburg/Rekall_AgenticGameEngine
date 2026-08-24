@@ -1,5 +1,6 @@
 using Rekall.Age.World;
 using Rekall.Age.Runtime;
+using Rekall.Age.Runtime.Abstractions;
 
 namespace Rekall.Age.Playback;
 
@@ -33,7 +34,7 @@ internal sealed class RekallAgeRuntimeObservedPlayableGame(
 
     public IReadOnlyList<string> EntityNames => inner.EntityNames;
 
-    public void Tick(RekallAgePlaybackInput input)
+    public void Tick(RekallAgeRuntimeInputFrame input)
     {
         inner.Tick(input);
         _runtimeAccumulatorSeconds = Math.Min(
@@ -46,7 +47,7 @@ internal sealed class RekallAgeRuntimeObservedPlayableGame(
         }
 
         _runtimeAccumulatorSeconds -= fixedSteps * FixedDeltaSeconds;
-        _runtimeWorld = runtimeLoop.RunAsync(_runtimeWorld, fixedSteps, CancellationToken.None)
+        _runtimeWorld = runtimeLoop.RunAsync(_runtimeWorld, fixedSteps, CancellationToken.None, input.ToState())
             .AsTask()
             .GetAwaiter()
             .GetResult()

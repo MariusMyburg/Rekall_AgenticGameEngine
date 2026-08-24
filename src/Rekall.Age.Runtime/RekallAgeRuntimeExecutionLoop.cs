@@ -92,7 +92,8 @@ public sealed class RekallAgeRuntimeExecutionLoop : IDisposable
         RekallAgeRuntimeWorld initialWorld,
         int frames,
         CancellationToken cancellationToken,
-        RekallAgeRuntimeInputState? input = null)
+        RekallAgeRuntimeInputState? input = null,
+        TimeSpan? deltaTime = null)
     {
         if (frames < 0)
         {
@@ -100,17 +101,17 @@ public sealed class RekallAgeRuntimeExecutionLoop : IDisposable
         }
 
         var world = initialWorld;
-        var timelineOrigin = initialWorld.ElapsedTime
-            - TimeSpan.FromSeconds(initialWorld.FrameIndex * _fixedDeltaSeconds);
+        var stepDelta = deltaTime is { } requestedDelta && requestedDelta > TimeSpan.Zero
+            ? requestedDelta
+            : _fixedDeltaTime;
         for (var frame = 0; frame < frames; frame++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var nextFrameIndex = world.FrameIndex + 1;
-            var nextElapsed = timelineOrigin
-                + TimeSpan.FromSeconds(nextFrameIndex * _fixedDeltaSeconds);
+            var nextElapsed = world.ElapsedTime + stepDelta;
             var context = new RekallAgeRuntimeWorldFrameContext(
                 nextFrameIndex,
-                _fixedDeltaTime,
+                stepDelta,
                 nextElapsed,
                 cancellationToken)
             {
@@ -144,7 +145,7 @@ public sealed class RekallAgeRuntimeExecutionLoop : IDisposable
         return new RekallAgeRuntimeRunResult(
             world,
             frames,
-            _fixedDeltaTime,
+            stepDelta,
             _systems.Select(system => system.Id).ToArray());
     }
 

@@ -24,7 +24,7 @@ if (frames is not null)
         var input = inputs is { Count: > 0 } && i < inputs.Count
             ? inputs[i]
             : RekallAgePlaybackInput.None;
-        game.Tick(input);
+        game.Tick(input.ToRuntimeInputFrame());
         var renderFrame = game.RenderFrame(i + 1);
         renderFrames.Add(renderFrame);
         Console.WriteLine($"FRAME {i + 1}");
@@ -70,7 +70,7 @@ try
             break;
         }
 
-        game.Tick(input.Value);
+        game.Tick(input.Value.ToRuntimeInputFrame());
         Console.SetCursorPosition(0, 0);
         Console.Write(game.RenderAscii());
         Console.WriteLine("W/S move left paddle. Q quits.");

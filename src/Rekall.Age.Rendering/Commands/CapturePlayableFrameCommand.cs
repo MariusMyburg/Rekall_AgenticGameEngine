@@ -1,5 +1,6 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Playback;
+using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.World;
 
 namespace Rekall.Age.Rendering.Commands;
@@ -11,7 +12,7 @@ public sealed record CapturePlayableFrameRequest(
     int FrameIndex = 1,
     int Width = 320,
     int Height = 180,
-    IReadOnlyList<RekallAgePlaybackInput>? Inputs = null);
+    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null);
 
 public sealed record CapturePlayableFrameResult(
     bool Captured,
@@ -36,7 +37,7 @@ public sealed class CapturePlayableFrameCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Runs a playable scene frame and captures its structured module draw commands to a deterministic PNG.",
+        "Runs a playable scene frame and captures its structured module draw commands to a deterministic PNG. Inputs use the same generic per-frame shape as rekall.runtime.inspect_scene: semanticActions (for example [{\"name\":\"move.horizontal\",\"value\":1,\"isDown\":true}]), pressedKeys, pressedKeysThisFrame, and releasedKeysThisFrame. Repeat held facts for each supplied frame. deltaSeconds is preserved for playable modules. primaryAction and verticalAxis are legacy compatibility fields only.",
         typeof(CapturePlayableFrameRequest).FullName!,
         typeof(CapturePlayableFrameResult).FullName!);
 
@@ -78,7 +79,7 @@ public sealed class CapturePlayableFrameCommand
             context.CancellationToken.ThrowIfCancellationRequested();
             var input = request.Inputs is { Count: > 0 } inputs && i < inputs.Count
                 ? inputs[i]
-                : RekallAgePlaybackInput.None;
+                : new RekallAgeRuntimeInputFrame();
             game.Tick(input);
             renderFrame = game.RenderFrame(i + 1);
         }

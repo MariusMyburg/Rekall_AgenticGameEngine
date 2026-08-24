@@ -1,6 +1,7 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime;
+using Rekall.Age.Runtime.Abstractions;
 using System.Globalization;
 using System.Numerics;
 
@@ -15,7 +16,8 @@ public sealed record CaptureRuntimeViewportRequest(
     int Height = 180,
     bool DebugOverlay = true,
     string BackendId = "software",
-    string? PreferredDeviceType = "discrete-gpu");
+    string? PreferredDeviceType = "discrete-gpu",
+    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null);
 
 public sealed record CaptureRuntimeViewportResult(
     bool Captured,
@@ -41,7 +43,13 @@ public sealed record CaptureRuntimeViewportResult(
     string AccelerationStatus,
     string? SelectedDeviceName,
     RekallAgeViewportFrameAnalysis FrameAnalysis,
-    CaptureRuntimeViewportLayoutDiagnostics LayoutDiagnostics);
+    CaptureRuntimeViewportLayoutDiagnostics LayoutDiagnostics)
+{
+    public IReadOnlyList<RekallAgeRuntimeInputAction> InputActions { get; init; } =
+        Array.Empty<RekallAgeRuntimeInputAction>();
+
+    public double ElapsedSeconds { get; init; }
+}
 
 public sealed record CaptureRuntimeViewportCulledRenderable(
     string EntityId,
@@ -145,6 +153,7 @@ public sealed class CaptureRuntimeViewportCommand
             request.ProjectRoot,
             request.SceneName,
             request.Frames,
+            request.Inputs,
             context.CancellationToken);
         var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(
             world,
@@ -158,7 +167,7 @@ public sealed class CaptureRuntimeViewportCommand
         var backendId = NormalizeBackendId(request.BackendId);
         if (backendId.Equals("vulkan", StringComparison.Ordinal))
         {
-            return await CaptureVulkanViewportAsync(request, context, frame, assets);
+            return await CaptureVulkanViewportAsync(request, context, frame, assets, world.ElapsedTime.TotalSeconds);
         }
 
         var capture = await new RekallAgeRuntimeSoftwareRenderer().CaptureAsync(
@@ -200,7 +209,11 @@ public sealed class CaptureRuntimeViewportCommand
             "software-rasterized",
             null,
             frameAnalysis,
-            BuildLayoutDiagnostics(frame, assets));
+            BuildLayoutDiagnostics(frame, assets))
+        {
+            InputActions = world.Subsystems.Input.Actions,
+            ElapsedSeconds = world.ElapsedTime.TotalSeconds
+        };
 
         context.Transaction.RecordChangedResource(capture.ScreenshotPath);
         return RekallAgeCommandResult<CaptureRuntimeViewportResult>.Success(
@@ -212,11 +225,12 @@ public sealed class CaptureRuntimeViewportCommand
         CaptureRuntimeViewportRequest request,
         RekallAgeCommandContext context,
         Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame,
-        RekallAgeRuntimeViewportAssetSet assets)
+        RekallAgeRuntimeViewportAssetSet assets,
+        double elapsedSeconds)
     {
         if (frame.Renderables.Count == 0)
         {
-            return await CaptureVulkanClearViewportAsync(request, context, frame);
+            return await CaptureVulkanClearViewportAsync(request, context, frame, elapsedSeconds);
         }
 
         var capture = await _vulkanSceneCapture.CaptureProjectSceneAsync(
@@ -267,7 +281,11 @@ public sealed class CaptureRuntimeViewportCommand
             capture.Captured ? "vulkan-scene-rendered" : "vulkan-scene-failed",
             capture.SelectedDevice?.Name,
             frameAnalysis,
-            BuildLayoutDiagnostics(frame, assets));
+            BuildLayoutDiagnostics(frame, assets))
+        {
+            InputActions = Array.Empty<RekallAgeRuntimeInputAction>(),
+            ElapsedSeconds = elapsedSeconds
+        };
 
         if (capture.Captured)
         {
@@ -290,7 +308,8 @@ public sealed class CaptureRuntimeViewportCommand
     private async ValueTask<RekallAgeCommandResult<CaptureRuntimeViewportResult>> CaptureVulkanClearViewportAsync(
         CaptureRuntimeViewportRequest request,
         RekallAgeCommandContext context,
-        Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame)
+        Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame,
+        double elapsedSeconds)
     {
 
         var capture = await _vulkanCapture.CaptureClearRenderPassAsync(
@@ -963,6 +982,9 @@ public sealed class CaptureRuntimeViewportCommand
             "not-captured",
             null,
             RekallAgeViewportFrameAnalysis.NotAnalyzed,
-            EmptyLayoutDiagnostics());
+            EmptyLayoutDiagnostics())
+        {
+            ElapsedSeconds = 0
+        };
     }
 }

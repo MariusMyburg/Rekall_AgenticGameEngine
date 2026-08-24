@@ -207,3 +207,32 @@ Result: 13/13 focused tests passed; Release build succeeded with 0 warnings and
 - Dynamic registry JSON probes deserialize semantic actions, physical key edges,
   and per-frame delta values for both capture request models. A positional-final
   null test prevents overload ambiguity from returning.
+
+## Third repair loop — unsafe-output recovery input retention
+
+### Root cause and evidence
+
+The safe-output suggestion for `rekall.workflow.capture_playable_package_frame`
+always serialized only the legacy `inputs` argument. A canonical caller has
+`InputFrames` and no legacy input, so retrying the suggested command silently
+lost semantic actions, physical edges, and per-frame delta values.
+
+RED:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~UnsafeOutputRecoveryPreservesCanonicalInputFrames"
+```
+
+Expected failure: `KeyNotFoundException` for the missing `inputFrames`
+suggested-command argument.
+
+GREEN:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~CapturePlayablePackageFrameRequestTests|FullyQualifiedName~PackageCaptureForwardsGenericInputFramesIntoTheRuntimeViewport|FullyQualifiedName~CapturePlayableFrameCommandRasterizesModuleDrawCommands|FullyQualifiedName~CapturePlayableFrameProjectsSemanticActionsAndInputEdgesIntoThePlayableModule"
+dotnet build Rekall.AGE.sln -c Release --no-restore -v:minimal
+```
+
+Result: 8/8 focused tests passed; Release build succeeded with 0 warnings and
+0 errors. Unsafe-output recovery now emits non-null legacy `inputs` and
+canonical `inputFrames` independently, so either supplied form is retained.

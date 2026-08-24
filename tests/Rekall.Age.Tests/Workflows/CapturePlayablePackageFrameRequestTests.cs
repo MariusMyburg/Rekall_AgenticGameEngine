@@ -105,6 +105,27 @@ public sealed class CapturePlayablePackageFrameRequestTests
         Assert.Contains("inputFrames", new CapturePlayablePackageFrameCommand().Schema.Description, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void UnsafeOutputRecoveryPreservesCanonicalInputFrames()
+    {
+        var packagePath = TestPaths.CreateTempDirectory();
+        var inputFrames = new RekallAgeRuntimeInputFrame[]
+        {
+            new(SemanticActions: [new("fire", 1, true, true)]) { DeltaSeconds = 0.25 }
+        };
+        var request = new CapturePlayablePackageFrameRequest(
+            packagePath,
+            Path.Combine(packagePath, "Proof"),
+            InputFrames: inputFrames);
+
+        var unsafeOutput = CapturePlayablePackageFrameCommand.TryCreateUnsafeOutputError(request, out var error);
+
+        Assert.True(unsafeOutput);
+        var retry = Assert.Single(error.SuggestedCommands!);
+        Assert.Equal(inputFrames, retry.Arguments["inputFrames"]);
+        Assert.DoesNotContain("inputs", retry.Arguments.Keys);
+    }
+
     private static RekallAgeCommandContext Context(string name) => new(
         "mcp",
         RekallAgeTransaction.Begin(name),

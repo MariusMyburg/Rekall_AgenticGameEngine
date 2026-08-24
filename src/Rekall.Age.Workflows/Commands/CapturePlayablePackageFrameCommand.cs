@@ -185,6 +185,24 @@ public sealed class CapturePlayablePackageFrameCommand
         var safeOutput = Path.Combine(
             Path.GetDirectoryName(packageRoot) ?? Directory.GetCurrentDirectory(),
             $"{Path.GetFileName(packageRoot)}.proof_frames");
+        var retryArguments = new Dictionary<string, object?>
+        {
+            ["packagePath"] = request.PackagePath,
+            ["outputDirectory"] = safeOutput,
+            ["frameIndex"] = request.FrameIndex,
+            ["width"] = request.Width,
+            ["height"] = request.Height
+        };
+        if (request.Inputs is not null)
+        {
+            retryArguments["inputs"] = request.Inputs;
+        }
+
+        if (request.InputFrames is not null)
+        {
+            retryArguments["inputFrames"] = request.InputFrames;
+        }
+
         error = new RekallAgeCommandError(
             "REKALL_PACKAGE_PROOF_OUTPUT_UNSAFE",
             "Package proof output must be outside the immutable package directory.",
@@ -192,15 +210,7 @@ public sealed class CapturePlayablePackageFrameCommand
             [
                 new RekallAgeSuggestedCommand(
                     "rekall.workflow.capture_playable_package_frame",
-                    new Dictionary<string, object?>
-                    {
-                        ["packagePath"] = request.PackagePath,
-                        ["outputDirectory"] = safeOutput,
-                        ["frameIndex"] = request.FrameIndex,
-                        ["width"] = request.Width,
-                        ["height"] = request.Height,
-                        ["inputs"] = request.Inputs
-                    })
+                    retryArguments)
             ]);
         return true;
     }

@@ -1,0 +1,113 @@
+using Rekall.Age.Rendering.Abstractions;
+
+namespace Rekall.Age.Rendering;
+
+/// <summary>
+/// Compiles immutable resolved-quality and viewport facts into the first inspectable Forward+ frame graph.
+/// </summary>
+public sealed class RekallAgeHighFidelityRenderGraphBuilder
+{
+    public RekallAgeHighFidelityRenderGraph Build(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeResolvedRenderFeaturePlan plan)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        ArgumentNullException.ThrowIfNull(plan);
+
+        var resources = new List<RekallAgeHighFidelityRenderResource>
+        {
+            Resource("depth-buffer", "D32_SFloat", plan.RenderWidth, plan.RenderHeight, 1, "transient", ["depth-attachment", "sampled"]),
+            Resource("normal-buffer", "R16G16_SFloat", plan.RenderWidth, plan.RenderHeight, 1, "transient", ["color-attachment", "sampled"]),
+            Resource("shadow-directional", "D32_SFloat", plan.Shadows.Resolution, plan.Shadows.Resolution, plan.Shadows.CascadeCount, "persistent", ["depth-attachment", "sampled", $"filter-taps:{plan.Shadows.FilterTapCount}"]),
+            Resource("cluster-indices", "R32_UInt", DivideRoundUp(plan.RenderWidth, 16), DivideRoundUp(plan.RenderHeight, 16), 24, "transient", ["storage", "sampled"])
+        };
+
+        if (plan.Post.Ssao)
+        {
+            resources.Add(Resource("ssao-occlusion", "R8_UNorm", DivideRoundUp(plan.RenderWidth, 2), DivideRoundUp(plan.RenderHeight, 2), 1, "transient", ["storage", "sampled"]));
+        }
+
+        resources.Add(Resource("scene-hdr", "R16G16B16A16_SFloat", plan.RenderWidth, plan.RenderHeight, 1, "transient", ["color-attachment", "sampled"]));
+
+        if (!plan.Fog.Mode.Equals("analytic", StringComparison.OrdinalIgnoreCase))
+        {
+            resources.Add(Resource("fog-froxel", "R16G16B16A16_SFloat", plan.Fog.FroxelWidth, plan.Fog.FroxelHeight, plan.Fog.FroxelDepth, "transient", ["storage", "sampled"]));
+        }
+
+        if (plan.Post.Bloom)
+        {
+            resources.Add(Resource("bloom-pyramid", "R16G16B16A16_SFloat", DivideRoundUp(plan.RenderWidth, 4), DivideRoundUp(plan.RenderHeight, 4), 1, "transient", ["storage", "sampled"]));
+        }
+
+        resources.Add(Resource("ldr-color", "R8G8B8A8_UNorm", plan.OutputWidth, plan.OutputHeight, 1, "transient", ["color-attachment", "sampled"]));
+        resources.Add(Resource("present-output", "R8G8B8A8_UNorm", plan.OutputWidth, plan.OutputHeight, 1, "external", ["color-attachment", "present"]));
+
+        var passes = new List<RekallAgeHighFidelityRenderPass>
+        {
+            Pass("depth-normal", "graphics", [], ["depth-buffer", "normal-buffer"], 0),
+            Pass("shadow-directional", "graphics", [], ["shadow-directional"], 1),
+            Pass("cluster-build", "compute", ["depth-buffer", "normal-buffer"], ClusterWrites(plan), 2),
+            Pass("opaque-hdr", "graphics", OpaqueReads(plan), ["scene-hdr"], 3)
+        };
+
+        var nextOrder = 4;
+        if (!plan.Fog.Mode.Equals("analytic", StringComparison.OrdinalIgnoreCase))
+        {
+            passes.Add(Pass("fog-integrate", "compute", ["scene-hdr"], ["fog-froxel", "scene-hdr"], nextOrder++));
+        }
+
+        passes.Add(Pass("transparent-particles", "graphics", ["depth-buffer", "scene-hdr"], ["scene-hdr"], nextOrder++));
+        if (plan.Post.Bloom)
+        {
+            passes.Add(Pass("bloom", "compute", ["scene-hdr"], ["bloom-pyramid"], nextOrder++));
+        }
+
+        var toneMapReads = new List<string> { "scene-hdr" };
+        if (plan.Post.Bloom)
+        {
+            toneMapReads.Add("bloom-pyramid");
+        }
+
+        passes.Add(Pass("tone-map", "graphics", toneMapReads, ["ldr-color"], nextOrder++));
+        passes.Add(Pass("ui", "graphics", ["ldr-color"], ["ldr-color"], nextOrder++));
+        passes.Add(Pass("present", "present", ["ldr-color"], ["present-output"], nextOrder));
+
+        return RekallAgeHighFidelityRenderGraph.Create(
+            resources,
+            passes,
+            transientBudgetBytes: plan.EstimatedTransientBytes,
+            persistentBudgetBytes: plan.EstimatedPersistentBytes);
+    }
+
+    private static IReadOnlyList<string> ClusterWrites(RekallAgeResolvedRenderFeaturePlan plan) =>
+        plan.Post.Ssao ? ["cluster-indices", "ssao-occlusion"] : ["cluster-indices"];
+
+    private static IReadOnlyList<string> OpaqueReads(RekallAgeResolvedRenderFeaturePlan plan)
+    {
+        var reads = new List<string> { "depth-buffer", "normal-buffer", "shadow-directional", "cluster-indices" };
+        if (plan.Post.Ssao)
+        {
+            reads.Add("ssao-occlusion");
+        }
+
+        return reads;
+    }
+
+    private static RekallAgeHighFidelityRenderResource Resource(
+        string name,
+        string format,
+        int width,
+        int height,
+        int layers,
+        string lifetime,
+        IReadOnlyList<string> usage) => new(name, format, width, height, layers, lifetime, usage);
+
+    private static RekallAgeHighFidelityRenderPass Pass(
+        string name,
+        string kind,
+        IReadOnlyList<string> reads,
+        IReadOnlyList<string> writes,
+        int order) => new(name, kind, reads, writes, order, Enabled: true);
+
+    private static int DivideRoundUp(int value, int divisor) => Math.Max(1, (value + divisor - 1) / divisor);
+}

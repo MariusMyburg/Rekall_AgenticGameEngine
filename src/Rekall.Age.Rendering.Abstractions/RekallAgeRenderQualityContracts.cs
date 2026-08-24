@@ -61,3 +61,36 @@ public sealed record RekallAgeRenderFeatureDegradation(
     string RequestedValue,
     string ResolvedValue,
     string Message);
+
+/// <summary>
+/// A backend-neutral render resource planned from resolved quality and viewport facts.
+/// </summary>
+public sealed record RekallAgeHighFidelityRenderResource(
+    string Name,
+    string Format,
+    int Width,
+    int Height,
+    int Layers,
+    string Lifetime,
+    IReadOnlyList<string> Usage);
+
+/// <summary>
+/// A backend-neutral render pass whose declared resource accesses can be inspected before execution.
+/// </summary>
+public sealed record RekallAgeHighFidelityRenderPass(
+    string Name,
+    string Kind,
+    IReadOnlyList<string> Reads,
+    IReadOnlyList<string> Writes,
+    int Order,
+    bool Enabled);
+
+public sealed record RekallAgeHighFidelityRenderDependency(
+    string ProducerPass,
+    string ConsumerPass,
+    string Resource);
+
+public sealed record RekallAgeHighFidelityRenderGraphDiagnostic(
+    string Code,
+    string Target,
+    string Message);

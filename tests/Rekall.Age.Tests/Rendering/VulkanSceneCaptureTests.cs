@@ -43,7 +43,7 @@ public sealed class VulkanSceneCaptureTests
                         64,
                         32,
                         "HUD",
-                        "#203040ff",
+                        "#20304080",
                         "#ffffffff",
                         "#00000000",
                         0,
@@ -81,7 +81,16 @@ public sealed class VulkanSceneCaptureTests
             false,
             false,
             false,
-            []);
+            [])
+        {
+            HighFidelityFrame = new RekallAgeHighFidelityFrameReport(
+                true,
+                "R16G16B16A16_SFloat",
+                "R8G8B8A8_UNorm",
+                [],
+                [new RekallAgeHighFidelityFramePassReport("tone-map", "graphics", [], ["ldr-color"], true, 0, 1)],
+                [])
+        };
 
         var composited = await RekallAgeNativeVulkanSceneCapture.CompositeUiOverlayAsync(
             capture,
@@ -91,6 +100,16 @@ public sealed class VulkanSceneCaptureTests
         var image = await RekallAgePngReader.ReadRgbaAsync(outputPath, CancellationToken.None);
 
         Assert.NotEqual((ulong)1, composited.ByteChecksum);
+        var overlay = new RekallAgeRuntimeSoftwareRenderer().RenderUiOverlayRgba(
+            frame,
+            RekallAgeRuntimeViewportAssetSet.Empty);
+        var uiPixel = Enumerable.Range(0, overlay.Length / 4)
+            .First(pixel => overlay[pixel * 4 + 3] > 0);
+        var offset = uiPixel * 4;
+        Assert.Equal(overlay[offset], image.Rgba[offset]);
+        Assert.Equal(overlay[offset + 1], image.Rgba[offset + 1]);
+        Assert.Equal(overlay[offset + 2], image.Rgba[offset + 2]);
+        Assert.Single(Assert.IsType<RekallAgeHighFidelityFrameReport>(composited.HighFidelityFrame).Passes, pass => pass.Name == "ui");
         Assert.Contains(Enumerable.Range(0, image.Rgba.Length / 4), pixel =>
         {
             var index = pixel * 4;

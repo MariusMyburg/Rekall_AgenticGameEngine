@@ -514,7 +514,11 @@ vec4 renderAtmosphere()
     color += draw.atmosphereColor0.rgb * atmosphereLightColor() * limb * sunlitRim * rayleighStrength * sunIntensity * 0.18;
     vec3 mapped = vec3(1.0) - exp(-color * max(draw.emissiveFactors.a, 0.0));
     float alpha = clamp(max(max(mapped.r, mapped.g), mapped.b) * 1.8, 0.0, 0.9);
+#ifdef REKALL_HDR_SCENE_OUTPUT
+    return vec4(max(color, vec3(0.0)), alpha);
+#else
     return vec4(pow(mapped, vec3(1.0 / 2.2)), alpha);
+#endif
 }
 
 bool isCloudLayer()
@@ -576,7 +580,11 @@ vec4 renderCloudLayer()
         * (frame.lightColor.rgb * directTransmittance * lightTerm * skyVisibility * 2.65 + vec3(ambientTerm));
     color += frame.lightColor.rgb * directTransmittance * silverLining * 0.75;
     color = applySurfaceAerialPerspective(color, fragWorldPosition, light);
+#ifdef REKALL_HDR_SCENE_OUTPUT
+    return vec4(max(color, vec3(0.0)), alpha);
+#else
     return vec4(pow(max(color, vec3(0.0)), vec3(1.0 / 2.2)), alpha);
+#endif
 }
 
 void main()
@@ -647,8 +655,12 @@ void main()
     float cloudShadow = sampleCloudShadow(fragWorldPosition, light);
     vec3 color = emissive + ambient + (diffuse + specular) * frame.lightColor.rgb * directTransmittance * cloudShadow * ndotl * 1.8;
     color = applySurfaceAerialPerspective(color, fragWorldPosition, light);
+    float surfaceAlpha = hasAtmosphereData() ? fragColor.a : fragColor.a * textureColor.a;
+#ifdef REKALL_HDR_SCENE_OUTPUT
+    outColor = vec4(max(color, vec3(0.0)), surfaceAlpha);
+#else
     vec3 mapped = vec3(1.0) - exp(-max(color, vec3(0.0)) * 1.15);
     vec3 lit = pow(mapped, vec3(1.0 / 2.2));
-    float surfaceAlpha = hasAtmosphereData() ? fragColor.a : fragColor.a * textureColor.a;
     outColor = vec4(lit, surfaceAlpha);
+#endif
 }

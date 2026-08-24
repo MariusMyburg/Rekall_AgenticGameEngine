@@ -60,6 +60,33 @@ public sealed class VulkanSceneCommandPlanTests
         Assert.Equal(prepared.DrawCount * 2, plan.DrawCount);
     }
 
+    [Fact]
+    public void HighFidelityOffscreenPlanCarriesOnlyExecutablePostCommandsFromValidatedGraph()
+    {
+        var target = RekallAgeVulkanSceneRenderTarget.HighFidelityOffscreenCapture(128, 72);
+        var prepared = CreatePreparedFrame(target);
+        var quality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High"),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+            128,
+            72);
+        var runtimeFrame = new RekallAgeRuntimeViewportFrame(
+            "Main", 0, 0, 128, 72, null, [], [], 0,
+            new RekallAgeRuntimeViewportOverlay(false, 0), [])
+        {
+            ResolvedQualityPlan = quality
+        };
+        var graph = new RekallAgeHighFidelityRenderGraphBuilder().Build(runtimeFrame, quality);
+
+        var plan = RekallAgeVulkanSceneCommandPlanBuilder.BuildOffscreen(prepared, graph);
+
+        Assert.True(plan.Ready, string.Join(" ", plan.Blockers));
+        Assert.Equal(["bloom", "tone-map", "ui", "present"], plan.PostPasses.Select(pass => pass.Name));
+        Assert.True(plan.CopiesColorToReadback);
+        Assert.Equal(Format.R16G16B16A16Sfloat, target.ColorFormat);
+        Assert.Equal(Format.R8G8B8A8Unorm, target.EffectiveOutputColorFormat);
+    }
+
     private static RekallAgeVulkanScenePreparedFrame CreatePreparedFrame(RekallAgeVulkanSceneRenderTarget target)
     {
         var camera = new RekallAgeRuntimeViewportCamera(

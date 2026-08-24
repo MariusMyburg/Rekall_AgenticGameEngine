@@ -12,8 +12,16 @@ public sealed record RekallAgeVulkanSceneRenderTarget(
     bool ExternallyOwnedColorImages = false,
     bool UsesArrayLayers = false,
     ImageLayout InitialColorLayout = ImageLayout.Undefined,
-    ImageLayout FinalColorLayout = ImageLayout.TransferSrcOptimal)
+    ImageLayout FinalColorLayout = ImageLayout.TransferSrcOptimal,
+    Format OutputColorFormat = Format.Undefined)
 {
+    public Format EffectiveOutputColorFormat => OutputColorFormat == Format.Undefined ? ColorFormat : OutputColorFormat;
+
+    public bool IsHighFidelityOffscreenCapture =>
+        Kind.Equals(RekallAgeVulkanSceneRenderTargetKinds.HighFidelityOffscreenCapture, StringComparison.Ordinal)
+        && ColorFormat == Format.R16G16B16A16Sfloat
+        && EffectiveOutputColorFormat == Format.R8G8B8A8Unorm;
+
     public bool IsOpenXrStereoSwapchain =>
         Kind.Equals(RekallAgeVulkanSceneRenderTargetKinds.OpenXrStereoSwapchain, StringComparison.Ordinal)
         && ExternallyOwnedColorImages
@@ -28,6 +36,18 @@ public sealed record RekallAgeVulkanSceneRenderTarget(
             height,
             Format.R8G8B8A8Unorm,
             Format.D32Sfloat);
+    }
+
+    public static RekallAgeVulkanSceneRenderTarget HighFidelityOffscreenCapture(uint width, uint height)
+    {
+        return new RekallAgeVulkanSceneRenderTarget(
+            RekallAgeVulkanSceneRenderTargetKinds.HighFidelityOffscreenCapture,
+            width,
+            height,
+            Format.R16G16B16A16Sfloat,
+            Format.D32Sfloat,
+            FinalColorLayout: ImageLayout.ShaderReadOnlyOptimal,
+            OutputColorFormat: Format.R8G8B8A8Unorm);
     }
 
     public static RekallAgeVulkanSceneRenderTarget OpenXrStereoSwapchain(
@@ -54,6 +74,7 @@ public sealed record RekallAgeVulkanSceneRenderTarget(
 public static class RekallAgeVulkanSceneRenderTargetKinds
 {
     public const string OffscreenCapture = "offscreen-capture";
+    public const string HighFidelityOffscreenCapture = "high-fidelity-offscreen-capture";
     public const string DesktopSwapchain = "desktop-swapchain";
     public const string OpenXrStereoSwapchain = "openxr-stereo-swapchain";
 }
@@ -225,7 +246,8 @@ public static class RekallAgeVulkanSceneRenderBackendPlanner
             isOpenXr,
             isOpenXr,
             isOpenXr,
-            target.Kind.Equals(RekallAgeVulkanSceneRenderTargetKinds.OffscreenCapture, StringComparison.Ordinal),
+            target.Kind.Equals(RekallAgeVulkanSceneRenderTargetKinds.OffscreenCapture, StringComparison.Ordinal)
+                || target.IsHighFidelityOffscreenCapture,
             BuildSteps(target, isOpenXr),
             blockers);
     }
@@ -242,6 +264,16 @@ public static class RekallAgeVulkanSceneRenderBackendPlanner
                 "Update the scene frame uniform from xrLocateViews FOV and pose for each eye.",
                 "Record the shared Rekall scene pipeline against the acquired OpenXR swapchain image.",
                 "Leave the color image in VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL for xrEndFrame."
+            ];
+        }
+
+        if (target.IsHighFidelityOffscreenCapture)
+        {
+            return
+            [
+                $"Create an owned {target.Width}x{target.Height} R16G16B16A16_SFloat scene image and depth image.",
+                "Execute the validated bloom resource and tone-map passes.",
+                "Copy the R8G8B8A8_UNorm output image into the readback buffer for capture."
             ];
         }
 

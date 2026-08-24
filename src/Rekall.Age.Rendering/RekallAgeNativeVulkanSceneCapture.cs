@@ -191,7 +191,22 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             BytesRead = checked((ulong)image.Rgba.Length),
             NonZeroBytes = nonZero,
             FirstPixel = firstPixel,
-            ByteChecksum = checksum
+            ByteChecksum = checksum,
+            HighFidelityFrame = capture.HighFidelityFrame is not { } report
+                ? null
+                : report with
+                {
+                    Passes = report.Passes
+                        .Append(new RekallAgeHighFidelityFramePassReport(
+                            "ui",
+                            "cpu-composite",
+                            ["ldr-color"],
+                            ["ldr-color"],
+                            true,
+                            0,
+                            1))
+                        .ToArray()
+                }
         };
     }
 
@@ -401,13 +416,28 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         {
             var errors = new List<string>();
             var state = new VulkanState(Vk.GetApi());
-            var target = RekallAgeVulkanSceneRenderTarget.OffscreenCapture(
-                checked((uint)frame.Width),
-                checked((uint)frame.Height));
+            var highFidelityPlan = new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame);
+            if (highFidelityPlan is { Ready: false })
+            {
+                errors.AddRange(highFidelityPlan.Graph.Diagnostics.Select(diagnostic =>
+                    $"{diagnostic.Code}: {diagnostic.Message}"));
+                return Unavailable(frame, string.Empty, null, null, assets, meshes.Count, 0, 0, [], errors) with
+                {
+                    HighFidelityFrame = CreateHighFidelityReport(highFidelityPlan, executed: false, [], errors)
+                };
+            }
+
+            var target = highFidelityPlan is null
+                ? RekallAgeVulkanSceneRenderTarget.OffscreenCapture(
+                    checked((uint)frame.Width),
+                    checked((uint)frame.Height))
+                : RekallAgeVulkanSceneRenderTarget.HighFidelityOffscreenCapture(
+                    checked((uint)frame.Width),
+                    checked((uint)frame.Height));
             var backendPlan = RekallAgeVulkanSceneRenderBackendPlanner.Plan(target);
             state.Ownership = backendPlan.Ownership;
             var prepared = RekallAgeVulkanScenePreparedFrameBuilder.Build(frame, meshes, target);
-            var commandPlan = RekallAgeVulkanSceneCommandPlanBuilder.BuildOffscreen(prepared);
+            var commandPlan = RekallAgeVulkanSceneCommandPlanBuilder.BuildOffscreen(prepared, highFidelityPlan?.Graph);
 
             if (!prepared.HasDrawableGeometry)
             {
@@ -432,10 +462,28 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 }
 
                 CreateDevice(state);
-                CreateImage(state, target.Width, target.Height, target.ColorFormat, ImageUsageFlags.ColorAttachmentBit | ImageUsageFlags.TransferSrcBit, ImageAspectFlags.ColorBit, 1, out state.ColorImage, out state.ColorMemory, out state.ColorView);
+                if (highFidelityPlan is not null)
+                {
+                    ValidateHighFidelityFormats(state, errors);
+                    if (errors.Count > 0)
+                    {
+                        return Unavailable(frame, string.Empty, "Silk.NET Vulkan", state.SelectedDevice, assets, meshes.Count, 0, 0, [], errors) with
+                        {
+                            HighFidelityFrame = CreateHighFidelityReport(highFidelityPlan, executed: false, [], errors)
+                        };
+                    }
+                }
+
+                var colorUsage = ImageUsageFlags.ColorAttachmentBit
+                    | (highFidelityPlan is null ? ImageUsageFlags.TransferSrcBit : ImageUsageFlags.SampledBit);
+                CreateImage(state, target.Width, target.Height, target.ColorFormat, colorUsage, ImageAspectFlags.ColorBit, 1, out state.ColorImage, out state.ColorMemory, out state.ColorView);
                 CreateImage(state, target.Width, target.Height, target.DepthFormat, ImageUsageFlags.DepthStencilAttachmentBit, ImageAspectFlags.DepthBit, 1, out state.DepthImage, out state.DepthMemory, out state.DepthView);
                 CreateRenderPass(state, target);
                 CreateFramebuffer(state, target);
+                if (highFidelityPlan is not null)
+                {
+                    CreateHighFidelityImages(state, target, highFidelityPlan);
+                }
                 CreateBuffers(
                     state,
                     commandPlan.RenderPasses.Select(pass => pass.FrameUniform).ToArray(),
@@ -444,7 +492,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     prepared.ReadbackByteCount);
                 CreateTextures(state, meshes);
                 CreateDescriptors(state, prepared.DrawPlan.MaterialKeys);
-                if (!TryCompileSceneShaders(errors, out var shaders))
+                if (!TryCompileSceneShaders(errors, out var shaders, highFidelityPlan is not null))
                 {
                     return Unavailable(frame, string.Empty, "Silk.NET Vulkan", state.SelectedDevice, assets, meshes.Count, 0, 0, [], errors) with
                     {
@@ -455,14 +503,35 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         VertexBufferCreated = state.VertexBuffer.Handle != 0,
                         IndexBufferCreated = state.IndexBuffer.Handle != 0,
                         UniformBufferCreated = state.UniformBuffer.Handle != 0,
-                        DescriptorSetLayoutCreated = state.DescriptorSetLayout.Handle != 0
+                        DescriptorSetLayoutCreated = state.DescriptorSetLayout.Handle != 0,
+                        HighFidelityFrame = highFidelityPlan is null
+                            ? null
+                            : CreateHighFidelityReport(highFidelityPlan, executed: false, [], errors)
                     };
                 }
 
                 CreatePipeline(state, frame, shaders);
                 CreateProjectPipelines(state, frame, resolvedPipelines);
+                if (highFidelityPlan is not null)
+                {
+                    CreateHighFidelityPostPipeline(state, target, highFidelityPlan, errors);
+                    if (errors.Count > 0)
+                    {
+                        return Unavailable(frame, string.Empty, "Silk.NET Vulkan", state.SelectedDevice, assets, meshes.Count, 0, 0, [], errors) with
+                        {
+                            HighFidelityFrame = CreateHighFidelityReport(highFidelityPlan, executed: false, [], errors)
+                        };
+                    }
+                }
                 CreateCommandPoolAndBuffer(state);
-                RecordCommands(state, commandPlan);
+                if (highFidelityPlan is null)
+                {
+                    RecordCommands(state, commandPlan);
+                }
+                else
+                {
+                    RecordHighFidelityCommands(state, commandPlan, highFidelityPlan);
+                }
                 SubmitAndWait(state);
 
                 var rgba = ReadBack(state, checked((ulong)frame.Width * (ulong)frame.Height * 4));
@@ -478,7 +547,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     state.SelectedDevice,
                     checked((uint)frame.Width),
                     checked((uint)frame.Height),
-                    ToFormatName(target.ColorFormat),
+                    ToFormatName(target.EffectiveOutputColorFormat),
                     checked((ulong)rgba.Length),
                     nonZero,
                     firstPixel,
@@ -499,7 +568,21 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     PipelineLayoutCreated: true,
                     GraphicsPipelineCreated: true,
                     TextureResourcesCreated: state.TextureById.Count > 0,
-                    Errors: []);
+                    Errors: []) with
+                {
+                    HighFidelityFrame = highFidelityPlan is null
+                        ? null
+                        : CreateHighFidelityReport(
+                            highFidelityPlan,
+                            executed: true,
+                            [
+                                new RekallAgeHighFidelityFramePassReport("opaque-hdr", "graphics", [], ["scene-hdr"], true, 0, commandPlan.DrawCount),
+                                new RekallAgeHighFidelityFramePassReport("bloom", "compute", ["scene-hdr"], ["bloom-pyramid"], true, 1, 0),
+                                new RekallAgeHighFidelityFramePassReport("tone-map", "graphics", ["scene-hdr", "bloom-pyramid"], ["ldr-color"], true, 0, 1),
+                                new RekallAgeHighFidelityFramePassReport("present", "copy-readback", ["ldr-color"], ["present-output"], true, 0, 0)
+                            ],
+                            [])
+                };
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -515,7 +598,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     UniformBufferCreated = state.UniformBuffer.Handle != 0,
                     DescriptorSetLayoutCreated = state.DescriptorSetLayout.Handle != 0,
                     PipelineLayoutCreated = state.PipelineLayout.Handle != 0,
-                    GraphicsPipelineCreated = state.Pipeline.Handle != 0
+                    GraphicsPipelineCreated = state.Pipeline.Handle != 0,
+                    HighFidelityFrame = highFidelityPlan is null
+                        ? null
+                        : CreateHighFidelityReport(highFidelityPlan, executed: false, [], errors)
                 };
             }
             finally
@@ -1529,9 +1615,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
         private static bool TryCompileSceneShaders(
             List<string> errors,
-            out RekallAgeVulkanSceneShaderCompilationResult shaders)
+            out RekallAgeVulkanSceneShaderCompilationResult shaders,
+            bool highDynamicRangeOutput = false)
         {
-            shaders = new RekallAgeVulkanShaderCompiler().CompileScenePipeline(RekallAgeVulkanScenePipelineDescription.Default);
+            shaders = new RekallAgeVulkanShaderCompiler().CompileScenePipeline(
+                RekallAgeVulkanScenePipelineDescription.Default,
+                highDynamicRangeOutput);
             if (shaders.Compiled)
             {
                 return true;
@@ -1545,6 +1634,391 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
             return false;
         }
+
+        private static void ValidateHighFidelityFormats(VulkanState state, ICollection<string> errors)
+        {
+            uint queueFamilyCount = 0;
+            state.Vk.GetPhysicalDeviceQueueFamilyProperties(state.PhysicalDevice, &queueFamilyCount, null);
+            var queueFamilies = stackalloc QueueFamilyProperties[checked((int)queueFamilyCount)];
+            state.Vk.GetPhysicalDeviceQueueFamilyProperties(state.PhysicalDevice, &queueFamilyCount, queueFamilies);
+            if (state.GraphicsQueueFamily >= queueFamilyCount
+                || (queueFamilies[state.GraphicsQueueFamily].QueueFlags & QueueFlags.ComputeBit) == 0)
+            {
+                errors.Add(
+                    $"REKALL_RENDER_COMPUTE_QUEUE_UNSUPPORTED: Vulkan graphics queue family {state.GraphicsQueueFamily} "
+                    + $"on device '{state.SelectedDevice?.Name}' cannot execute the bloom compute pass.");
+            }
+
+            ValidateFormat(
+                state,
+                Format.R16G16B16A16Sfloat,
+                FormatFeatureFlags.ColorAttachmentBit | FormatFeatureFlags.SampledImageBit,
+                "scene-hdr",
+                errors);
+            ValidateFormat(
+                state,
+                Format.R16G16B16A16Sfloat,
+                FormatFeatureFlags.StorageImageBit | FormatFeatureFlags.SampledImageBit,
+                "bloom-pyramid",
+                errors);
+            ValidateFormat(
+                state,
+                Format.R8G8B8A8Unorm,
+                FormatFeatureFlags.ColorAttachmentBit | FormatFeatureFlags.TransferSrcBit,
+                "ldr-color",
+                errors);
+        }
+
+        private static void ValidateFormat(
+            VulkanState state,
+            Format format,
+            FormatFeatureFlags required,
+            string resource,
+            ICollection<string> errors)
+        {
+            state.Vk.GetPhysicalDeviceFormatProperties(state.PhysicalDevice, format, out var properties);
+            if ((properties.OptimalTilingFeatures & required) != required)
+            {
+                errors.Add(
+                    $"REKALL_RENDER_FORMAT_UNSUPPORTED: Vulkan device '{state.SelectedDevice?.Name}' cannot allocate '{resource}' "
+                    + $"as {ToFormatName(format)} with required features '{required}'.");
+            }
+        }
+
+        private static void CreateHighFidelityImages(
+            VulkanState state,
+            RekallAgeVulkanSceneRenderTarget target,
+            RekallAgeVulkanHighFidelityFramePlan plan)
+        {
+            var bloom = plan.Graph.Resources.SingleOrDefault(resource => resource.Name == "bloom-pyramid");
+            state.BloomWidth = checked((uint)Math.Max(1, bloom?.Width ?? (int)Math.Max(1, target.Width / 4)));
+            state.BloomHeight = checked((uint)Math.Max(1, bloom?.Height ?? (int)Math.Max(1, target.Height / 4)));
+            CreateImage(
+                state,
+                state.BloomWidth,
+                state.BloomHeight,
+                Format.R16G16B16A16Sfloat,
+                ImageUsageFlags.StorageBit | ImageUsageFlags.SampledBit,
+                ImageAspectFlags.ColorBit,
+                1,
+                out state.BloomImage,
+                out state.BloomMemory,
+                out state.BloomView);
+            CreateImage(
+                state,
+                target.Width,
+                target.Height,
+                target.EffectiveOutputColorFormat,
+                ImageUsageFlags.ColorAttachmentBit | ImageUsageFlags.TransferSrcBit,
+                ImageAspectFlags.ColorBit,
+                1,
+                out state.OutputImage,
+                out state.OutputMemory,
+                out state.OutputView);
+
+            var outputAttachment = new AttachmentDescription
+            {
+                Format = target.EffectiveOutputColorFormat,
+                Samples = SampleCountFlags.Count1Bit,
+                LoadOp = AttachmentLoadOp.Clear,
+                StoreOp = AttachmentStoreOp.Store,
+                StencilLoadOp = AttachmentLoadOp.DontCare,
+                StencilStoreOp = AttachmentStoreOp.DontCare,
+                InitialLayout = ImageLayout.Undefined,
+                FinalLayout = ImageLayout.TransferSrcOptimal
+            };
+            var outputReference = new AttachmentReference(0, ImageLayout.ColorAttachmentOptimal);
+            var subpass = new SubpassDescription
+            {
+                PipelineBindPoint = PipelineBindPoint.Graphics,
+                ColorAttachmentCount = 1,
+                PColorAttachments = &outputReference
+            };
+            var dependency = new SubpassDependency
+            {
+                SrcSubpass = Vk.SubpassExternal,
+                DstSubpass = 0,
+                SrcStageMask = PipelineStageFlags.FragmentShaderBit,
+                DstStageMask = PipelineStageFlags.ColorAttachmentOutputBit,
+                SrcAccessMask = AccessFlags.ShaderReadBit,
+                DstAccessMask = AccessFlags.ColorAttachmentWriteBit
+            };
+            var renderPassInfo = new RenderPassCreateInfo
+            {
+                SType = StructureType.RenderPassCreateInfo,
+                AttachmentCount = 1,
+                PAttachments = &outputAttachment,
+                SubpassCount = 1,
+                PSubpasses = &subpass,
+                DependencyCount = 1,
+                PDependencies = &dependency
+            };
+            ThrowIfFailed(state.Vk.CreateRenderPass(state.Device, &renderPassInfo, null, out state.OutputRenderPass), "vkCreateRenderPass tone-map");
+
+            var outputView = state.OutputView;
+            var framebufferInfo = new FramebufferCreateInfo
+            {
+                SType = StructureType.FramebufferCreateInfo,
+                RenderPass = state.OutputRenderPass,
+                AttachmentCount = 1,
+                PAttachments = &outputView,
+                Width = target.Width,
+                Height = target.Height,
+                Layers = 1
+            };
+            ThrowIfFailed(state.Vk.CreateFramebuffer(state.Device, &framebufferInfo, null, out state.OutputFramebuffer), "vkCreateFramebuffer tone-map");
+        }
+
+        private static void CreateHighFidelityPostPipeline(
+            VulkanState state,
+            RekallAgeVulkanSceneRenderTarget target,
+            RekallAgeVulkanHighFidelityFramePlan plan,
+            ICollection<string> errors)
+        {
+            var compiled = new RekallAgeVulkanShaderCompiler().CompileHighFidelityPostPipeline();
+            if (!compiled.Compiled)
+            {
+                foreach (var error in compiled.Errors)
+                {
+                    errors.Add(error);
+                }
+                return;
+            }
+
+            fixed (byte* bloomCode = compiled.Bloom.Spirv)
+            fixed (byte* vertexCode = compiled.FullscreenVertex.Spirv)
+            fixed (byte* toneCode = compiled.ToneMap.Spirv)
+            {
+                state.BloomShader = CreateShaderModule(state, bloomCode, compiled.Bloom.Spirv.Length);
+                state.FullscreenVertexShader = CreateShaderModule(state, vertexCode, compiled.FullscreenVertex.Spirv.Length);
+                state.ToneMapShader = CreateShaderModule(state, toneCode, compiled.ToneMap.Spirv.Length);
+            }
+
+            var samplerInfo = new SamplerCreateInfo
+            {
+                SType = StructureType.SamplerCreateInfo,
+                MagFilter = Filter.Linear,
+                MinFilter = Filter.Linear,
+                MipmapMode = SamplerMipmapMode.Linear,
+                AddressModeU = SamplerAddressMode.ClampToEdge,
+                AddressModeV = SamplerAddressMode.ClampToEdge,
+                AddressModeW = SamplerAddressMode.ClampToEdge,
+                MaxLod = 0
+            };
+            ThrowIfFailed(state.Vk.CreateSampler(state.Device, &samplerInfo, null, out state.PostSampler), "vkCreateSampler post");
+
+            var bloomBindings = stackalloc DescriptorSetLayoutBinding[]
+            {
+                new(0, DescriptorType.CombinedImageSampler, 1, ShaderStageFlags.ComputeBit),
+                new(1, DescriptorType.StorageImage, 1, ShaderStageFlags.ComputeBit)
+            };
+            var bloomLayoutInfo = new DescriptorSetLayoutCreateInfo
+            {
+                SType = StructureType.DescriptorSetLayoutCreateInfo,
+                BindingCount = 2,
+                PBindings = bloomBindings
+            };
+            ThrowIfFailed(state.Vk.CreateDescriptorSetLayout(state.Device, &bloomLayoutInfo, null, out state.BloomDescriptorSetLayout), "vkCreateDescriptorSetLayout bloom");
+
+            var toneBindings = stackalloc DescriptorSetLayoutBinding[]
+            {
+                new(0, DescriptorType.CombinedImageSampler, 1, ShaderStageFlags.FragmentBit),
+                new(1, DescriptorType.CombinedImageSampler, 1, ShaderStageFlags.FragmentBit)
+            };
+            var toneLayoutInfo = new DescriptorSetLayoutCreateInfo
+            {
+                SType = StructureType.DescriptorSetLayoutCreateInfo,
+                BindingCount = 2,
+                PBindings = toneBindings
+            };
+            ThrowIfFailed(state.Vk.CreateDescriptorSetLayout(state.Device, &toneLayoutInfo, null, out state.ToneMapDescriptorSetLayout), "vkCreateDescriptorSetLayout tone-map");
+
+            var poolSizes = stackalloc DescriptorPoolSize[]
+            {
+                new(DescriptorType.CombinedImageSampler, 3),
+                new(DescriptorType.StorageImage, 1)
+            };
+            var poolInfo = new DescriptorPoolCreateInfo
+            {
+                SType = StructureType.DescriptorPoolCreateInfo,
+                MaxSets = 2,
+                PoolSizeCount = 2,
+                PPoolSizes = poolSizes
+            };
+            ThrowIfFailed(state.Vk.CreateDescriptorPool(state.Device, &poolInfo, null, out state.PostDescriptorPool), "vkCreateDescriptorPool post");
+            state.BloomDescriptorSet = AllocateDescriptorSet(state, state.PostDescriptorPool, state.BloomDescriptorSetLayout);
+            state.ToneMapDescriptorSet = AllocateDescriptorSet(state, state.PostDescriptorPool, state.ToneMapDescriptorSetLayout);
+
+            var bloomImages = stackalloc DescriptorImageInfo[]
+            {
+                new(state.PostSampler, state.ColorView, ImageLayout.ShaderReadOnlyOptimal),
+                new(default, state.BloomView, ImageLayout.General)
+            };
+            var bloomWrites = stackalloc WriteDescriptorSet[]
+            {
+                ImageWrite(state.BloomDescriptorSet, 0, DescriptorType.CombinedImageSampler, &bloomImages[0]),
+                ImageWrite(state.BloomDescriptorSet, 1, DescriptorType.StorageImage, &bloomImages[1])
+            };
+            state.Vk.UpdateDescriptorSets(state.Device, 2, bloomWrites, 0, null);
+
+            var toneImages = stackalloc DescriptorImageInfo[]
+            {
+                new(state.PostSampler, state.ColorView, ImageLayout.ShaderReadOnlyOptimal),
+                new(state.PostSampler, state.BloomView, ImageLayout.ShaderReadOnlyOptimal)
+            };
+            var toneWrites = stackalloc WriteDescriptorSet[]
+            {
+                ImageWrite(state.ToneMapDescriptorSet, 0, DescriptorType.CombinedImageSampler, &toneImages[0]),
+                ImageWrite(state.ToneMapDescriptorSet, 1, DescriptorType.CombinedImageSampler, &toneImages[1])
+            };
+            state.Vk.UpdateDescriptorSets(state.Device, 2, toneWrites, 0, null);
+
+            var bloomPushRange = new PushConstantRange(ShaderStageFlags.ComputeBit, 0, (uint)Marshal.SizeOf<BloomPushConstants>());
+            var bloomSetLayout = state.BloomDescriptorSetLayout;
+            var bloomPipelineLayoutInfo = new PipelineLayoutCreateInfo
+            {
+                SType = StructureType.PipelineLayoutCreateInfo,
+                SetLayoutCount = 1,
+                PSetLayouts = &bloomSetLayout,
+                PushConstantRangeCount = 1,
+                PPushConstantRanges = &bloomPushRange
+            };
+            ThrowIfFailed(state.Vk.CreatePipelineLayout(state.Device, &bloomPipelineLayoutInfo, null, out state.BloomPipelineLayout), "vkCreatePipelineLayout bloom");
+
+            var entry = "main\0"u8.ToArray();
+            fixed (byte* entryName = entry)
+            {
+                var computeStage = new PipelineShaderStageCreateInfo
+                {
+                    SType = StructureType.PipelineShaderStageCreateInfo,
+                    Stage = ShaderStageFlags.ComputeBit,
+                    Module = state.BloomShader,
+                    PName = entryName
+                };
+                var computeInfo = new ComputePipelineCreateInfo
+                {
+                    SType = StructureType.ComputePipelineCreateInfo,
+                    Stage = computeStage,
+                    Layout = state.BloomPipelineLayout
+                };
+                ThrowIfFailed(state.Vk.CreateComputePipelines(state.Device, default, 1, &computeInfo, null, out state.BloomPipeline), "vkCreateComputePipelines bloom");
+
+                var tonePushRange = new PushConstantRange(ShaderStageFlags.FragmentBit, 0, (uint)Marshal.SizeOf<ToneMapPushConstants>());
+                var toneSetLayout = state.ToneMapDescriptorSetLayout;
+                var tonePipelineLayoutInfo = new PipelineLayoutCreateInfo
+                {
+                    SType = StructureType.PipelineLayoutCreateInfo,
+                    SetLayoutCount = 1,
+                    PSetLayouts = &toneSetLayout,
+                    PushConstantRangeCount = 1,
+                    PPushConstantRanges = &tonePushRange
+                };
+                ThrowIfFailed(state.Vk.CreatePipelineLayout(state.Device, &tonePipelineLayoutInfo, null, out state.ToneMapPipelineLayout), "vkCreatePipelineLayout tone-map");
+
+                var stages = stackalloc PipelineShaderStageCreateInfo[]
+                {
+                    new()
+                    {
+                        SType = StructureType.PipelineShaderStageCreateInfo,
+                        Stage = ShaderStageFlags.VertexBit,
+                        Module = state.FullscreenVertexShader,
+                        PName = entryName
+                    },
+                    new()
+                    {
+                        SType = StructureType.PipelineShaderStageCreateInfo,
+                        Stage = ShaderStageFlags.FragmentBit,
+                        Module = state.ToneMapShader,
+                        PName = entryName
+                    }
+                };
+                var vertexInput = new PipelineVertexInputStateCreateInfo { SType = StructureType.PipelineVertexInputStateCreateInfo };
+                var inputAssembly = new PipelineInputAssemblyStateCreateInfo
+                {
+                    SType = StructureType.PipelineInputAssemblyStateCreateInfo,
+                    Topology = PrimitiveTopology.TriangleList
+                };
+                var viewport = new Viewport(0, 0, target.Width, target.Height, 0, 1);
+                var scissor = new Rect2D(new Offset2D(0, 0), new Extent2D(target.Width, target.Height));
+                var viewportState = new PipelineViewportStateCreateInfo
+                {
+                    SType = StructureType.PipelineViewportStateCreateInfo,
+                    ViewportCount = 1,
+                    PViewports = &viewport,
+                    ScissorCount = 1,
+                    PScissors = &scissor
+                };
+                var rasterization = new PipelineRasterizationStateCreateInfo
+                {
+                    SType = StructureType.PipelineRasterizationStateCreateInfo,
+                    PolygonMode = PolygonMode.Fill,
+                    CullMode = CullModeFlags.None,
+                    FrontFace = FrontFace.Clockwise,
+                    LineWidth = 1
+                };
+                var multisample = new PipelineMultisampleStateCreateInfo
+                {
+                    SType = StructureType.PipelineMultisampleStateCreateInfo,
+                    RasterizationSamples = SampleCountFlags.Count1Bit
+                };
+                var blendAttachment = new PipelineColorBlendAttachmentState
+                {
+                    ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit | ColorComponentFlags.ABit
+                };
+                var blend = new PipelineColorBlendStateCreateInfo
+                {
+                    SType = StructureType.PipelineColorBlendStateCreateInfo,
+                    AttachmentCount = 1,
+                    PAttachments = &blendAttachment
+                };
+                var pipelineInfo = new GraphicsPipelineCreateInfo
+                {
+                    SType = StructureType.GraphicsPipelineCreateInfo,
+                    StageCount = 2,
+                    PStages = stages,
+                    PVertexInputState = &vertexInput,
+                    PInputAssemblyState = &inputAssembly,
+                    PViewportState = &viewportState,
+                    PRasterizationState = &rasterization,
+                    PMultisampleState = &multisample,
+                    PColorBlendState = &blend,
+                    Layout = state.ToneMapPipelineLayout,
+                    RenderPass = state.OutputRenderPass
+                };
+                ThrowIfFailed(state.Vk.CreateGraphicsPipelines(state.Device, default, 1, &pipelineInfo, null, out state.ToneMapPipeline), "vkCreateGraphicsPipelines tone-map");
+            }
+        }
+
+        private static DescriptorSet AllocateDescriptorSet(
+            VulkanState state,
+            DescriptorPool pool,
+            DescriptorSetLayout layout)
+        {
+            var allocateInfo = new DescriptorSetAllocateInfo
+            {
+                SType = StructureType.DescriptorSetAllocateInfo,
+                DescriptorPool = pool,
+                DescriptorSetCount = 1,
+                PSetLayouts = &layout
+            };
+            ThrowIfFailed(state.Vk.AllocateDescriptorSets(state.Device, &allocateInfo, out var descriptorSet), "vkAllocateDescriptorSets post");
+            return descriptorSet;
+        }
+
+        private static WriteDescriptorSet ImageWrite(
+            DescriptorSet descriptorSet,
+            uint binding,
+            DescriptorType type,
+            DescriptorImageInfo* imageInfo) =>
+            new()
+            {
+                SType = StructureType.WriteDescriptorSet,
+                DstSet = descriptorSet,
+                DstBinding = binding,
+                DescriptorCount = 1,
+                DescriptorType = type,
+                PImageInfo = imageInfo
+            };
 
         private static void CreatePipeline(
             VulkanState state,
@@ -1893,6 +2367,195 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             }
 
             ThrowIfFailed(state.Vk.EndCommandBuffer(state.CommandBuffer), "vkEndCommandBuffer");
+        }
+
+        private static void RecordHighFidelityCommands(
+            VulkanState state,
+            RekallAgeVulkanSceneCommandPlan commandPlan,
+            RekallAgeVulkanHighFidelityFramePlan highFidelityPlan)
+        {
+            var target = commandPlan.PreparedFrame.Target;
+            var beginInfo = new CommandBufferBeginInfo { SType = StructureType.CommandBufferBeginInfo };
+            state.Vk.ResetCommandBuffer(state.CommandBuffer, 0);
+            ThrowIfFailed(state.Vk.BeginCommandBuffer(state.CommandBuffer, &beginInfo), "vkBeginCommandBuffer HDR");
+            RecordTextureUploads(state);
+
+            var sceneClears = stackalloc ClearValue[2];
+            sceneClears[0].Color = new ClearColorValue(0.006f, 0.01f, 0.018f, 1f);
+            sceneClears[1].DepthStencil = new ClearDepthStencilValue(1f, 0);
+            var pass = commandPlan.RenderPasses[0];
+            var scenePass = new RenderPassBeginInfo
+            {
+                SType = StructureType.RenderPassBeginInfo,
+                RenderPass = state.RenderPass,
+                Framebuffer = state.Framebuffer,
+                RenderArea = new Rect2D(new Offset2D(0, 0), new Extent2D(target.Width, target.Height)),
+                ClearValueCount = 2,
+                PClearValues = sceneClears
+            };
+            state.Vk.CmdBeginRenderPass(state.CommandBuffer, &scenePass, SubpassContents.Inline);
+            var vertexBuffer = state.VertexBuffer;
+            var vertexOffset = 0UL;
+            state.Vk.CmdBindVertexBuffers(state.CommandBuffer, 0, 1, &vertexBuffer, &vertexOffset);
+            state.Vk.CmdBindIndexBuffer(state.CommandBuffer, state.IndexBuffer, 0, IndexType.Uint32);
+            DrawPassRanges(state, 0, pass.Draws, transparent: false);
+            DrawPassRanges(state, 0, pass.Draws, transparent: true);
+            state.Vk.CmdEndRenderPass(state.CommandBuffer);
+
+            TransitionImage(
+                state,
+                state.ColorImage,
+                ImageLayout.ShaderReadOnlyOptimal,
+                ImageLayout.ShaderReadOnlyOptimal,
+                AccessFlags.ColorAttachmentWriteBit,
+                AccessFlags.ShaderReadBit,
+                PipelineStageFlags.ColorAttachmentOutputBit,
+                PipelineStageFlags.ComputeShaderBit | PipelineStageFlags.FragmentShaderBit);
+
+            TransitionImage(
+                state,
+                state.BloomImage,
+                ImageLayout.Undefined,
+                ImageLayout.General,
+                0,
+                AccessFlags.ShaderWriteBit,
+                PipelineStageFlags.TopOfPipeBit,
+                PipelineStageFlags.ComputeShaderBit);
+            state.Vk.CmdBindPipeline(state.CommandBuffer, PipelineBindPoint.Compute, state.BloomPipeline);
+            var bloomSet = state.BloomDescriptorSet;
+            state.Vk.CmdBindDescriptorSets(
+                state.CommandBuffer,
+                PipelineBindPoint.Compute,
+                state.BloomPipelineLayout,
+                0,
+                1,
+                &bloomSet,
+                0,
+                null);
+            var bloomParameters = new BloomPushConstants(
+                checked((float)highFidelityPlan.PostSettings.BloomThreshold),
+                checked((float)highFidelityPlan.PostSettings.BloomIntensity),
+                target.Width,
+                target.Height);
+            state.Vk.CmdPushConstants(
+                state.CommandBuffer,
+                state.BloomPipelineLayout,
+                ShaderStageFlags.ComputeBit,
+                0,
+                (uint)Marshal.SizeOf<BloomPushConstants>(),
+                &bloomParameters);
+            state.Vk.CmdDispatch(
+                state.CommandBuffer,
+                (state.BloomWidth + 7) / 8,
+                (state.BloomHeight + 7) / 8,
+                1);
+            TransitionImage(
+                state,
+                state.BloomImage,
+                ImageLayout.General,
+                ImageLayout.ShaderReadOnlyOptimal,
+                AccessFlags.ShaderWriteBit,
+                AccessFlags.ShaderReadBit,
+                PipelineStageFlags.ComputeShaderBit,
+                PipelineStageFlags.FragmentShaderBit);
+
+            var outputClear = new ClearValue { Color = new ClearColorValue(0, 0, 0, 1) };
+            var outputPass = new RenderPassBeginInfo
+            {
+                SType = StructureType.RenderPassBeginInfo,
+                RenderPass = state.OutputRenderPass,
+                Framebuffer = state.OutputFramebuffer,
+                RenderArea = new Rect2D(new Offset2D(0, 0), new Extent2D(target.Width, target.Height)),
+                ClearValueCount = 1,
+                PClearValues = &outputClear
+            };
+            state.Vk.CmdBeginRenderPass(state.CommandBuffer, &outputPass, SubpassContents.Inline);
+            state.Vk.CmdBindPipeline(state.CommandBuffer, PipelineBindPoint.Graphics, state.ToneMapPipeline);
+            var toneSet = state.ToneMapDescriptorSet;
+            state.Vk.CmdBindDescriptorSets(
+                state.CommandBuffer,
+                PipelineBindPoint.Graphics,
+                state.ToneMapPipelineLayout,
+                0,
+                1,
+                &toneSet,
+                0,
+                null);
+            var toneParameters = new ToneMapPushConstants(
+                checked((float)highFidelityPlan.PostSettings.Exposure),
+                checked((float)highFidelityPlan.PostSettings.WhitePoint),
+                checked((float)highFidelityPlan.PostSettings.Saturation),
+                checked((float)highFidelityPlan.PostSettings.Contrast),
+                checked((float)highFidelityPlan.PostSettings.GradeStrength),
+                checked((float)highFidelityPlan.PostSettings.BloomIntensity),
+                target.Width,
+                target.Height);
+            state.Vk.CmdPushConstants(
+                state.CommandBuffer,
+                state.ToneMapPipelineLayout,
+                ShaderStageFlags.FragmentBit,
+                0,
+                (uint)Marshal.SizeOf<ToneMapPushConstants>(),
+                &toneParameters);
+            state.Vk.CmdDraw(state.CommandBuffer, 3, 1, 0, 0);
+            state.Vk.CmdEndRenderPass(state.CommandBuffer);
+
+            TransitionImage(
+                state,
+                state.OutputImage,
+                ImageLayout.TransferSrcOptimal,
+                ImageLayout.TransferSrcOptimal,
+                AccessFlags.ColorAttachmentWriteBit,
+                AccessFlags.TransferReadBit,
+                PipelineStageFlags.ColorAttachmentOutputBit,
+                PipelineStageFlags.TransferBit);
+
+            var copy = new BufferImageCopy
+            {
+                BufferOffset = 0,
+                BufferRowLength = 0,
+                BufferImageHeight = 0,
+                ImageSubresource = new ImageSubresourceLayers(ImageAspectFlags.ColorBit, 0, 0, 1),
+                ImageOffset = new Offset3D(0, 0, 0),
+                ImageExtent = new Extent3D(target.Width, target.Height, 1)
+            };
+            state.Vk.CmdCopyImageToBuffer(
+                state.CommandBuffer,
+                state.OutputImage,
+                ImageLayout.TransferSrcOptimal,
+                state.ReadbackBuffer,
+                1,
+                &copy);
+            ThrowIfFailed(state.Vk.EndCommandBuffer(state.CommandBuffer), "vkEndCommandBuffer HDR");
+        }
+
+        private static RekallAgeHighFidelityFrameReport CreateHighFidelityReport(
+            RekallAgeVulkanHighFidelityFramePlan plan,
+            bool executed,
+            IReadOnlyList<RekallAgeHighFidelityFramePassReport> passes,
+            IReadOnlyList<string> diagnostics)
+        {
+            var allocated = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "scene-hdr",
+                "bloom-pyramid",
+                "ldr-color"
+            };
+            return new RekallAgeHighFidelityFrameReport(
+                executed,
+                "R16G16B16A16_SFloat",
+                "R8G8B8A8_UNorm",
+                plan.Graph.Resources
+                    .Where(resource => allocated.Contains(resource.Name))
+                    .Select(resource => new RekallAgeHighFidelityFrameResourceReport(
+                        resource.Name,
+                        resource.Format,
+                        resource.Width,
+                        resource.Height,
+                        executed))
+                    .ToArray(),
+                passes,
+                diagnostics);
         }
 
         private static void DrawPassRanges(
@@ -2260,6 +2923,24 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             }
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private readonly record struct BloomPushConstants(
+            float Threshold,
+            float Intensity,
+            float SourceWidth,
+            float SourceHeight);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private readonly record struct ToneMapPushConstants(
+            float Exposure,
+            float WhitePoint,
+            float Saturation,
+            float Contrast,
+            float GradeStrength,
+            float BloomIntensity,
+            float OutputWidth,
+            float OutputHeight);
+
         private readonly record struct DeviceCandidate(PhysicalDevice Device, string Name, PhysicalDeviceType DeviceType, uint ApiVersion, uint? QueueFamily);
 
         private readonly record struct VulkanTextureMipUpload(
@@ -2292,9 +2973,19 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public DeviceMemory DepthMemory;
             public ImageView DepthView;
             public ImageView[] DepthViews = [];
+            public Image BloomImage;
+            public DeviceMemory BloomMemory;
+            public ImageView BloomView;
+            public uint BloomWidth;
+            public uint BloomHeight;
+            public Image OutputImage;
+            public DeviceMemory OutputMemory;
+            public ImageView OutputView;
             public RenderPass RenderPass;
+            public RenderPass OutputRenderPass;
             public Framebuffer Framebuffer;
             public Framebuffer[] Framebuffers = [];
+            public Framebuffer OutputFramebuffer;
             public Buffer VertexBuffer;
             public DeviceMemory VertexMemory;
             public Buffer IndexBuffer;
@@ -2312,9 +3003,14 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public DescriptorSetLayout DrawDescriptorSetLayout;
             public DescriptorSetLayout MaterialDescriptorSetLayout;
             public DescriptorPool DescriptorPool;
+            public DescriptorPool PostDescriptorPool;
             public DescriptorSet DescriptorSet;
             public DescriptorSet[] FrameDescriptorSets = [];
             public DescriptorSet DrawDescriptorSet;
+            public DescriptorSetLayout BloomDescriptorSetLayout;
+            public DescriptorSetLayout ToneMapDescriptorSetLayout;
+            public DescriptorSet BloomDescriptorSet;
+            public DescriptorSet ToneMapDescriptorSet;
             public readonly List<VulkanTextureResource> Textures = [];
             public readonly Dictionary<string, VulkanTextureResource> TextureById = new(StringComparer.Ordinal);
             public readonly Dictionary<RekallAgeVulkanSceneMaterialKey, DescriptorSet> MaterialDescriptorSets = [];
@@ -2329,6 +3025,14 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public Pipeline TransparentPipeline;
             public ShaderModule VertexShader;
             public ShaderModule FragmentShader;
+            public Sampler PostSampler;
+            public PipelineLayout BloomPipelineLayout;
+            public PipelineLayout ToneMapPipelineLayout;
+            public Pipeline BloomPipeline;
+            public Pipeline ToneMapPipeline;
+            public ShaderModule BloomShader;
+            public ShaderModule FullscreenVertexShader;
+            public ShaderModule ToneMapShader;
             public CommandPool CommandPool;
             public CommandBuffer CommandBuffer;
             public Fence Fence;
@@ -2355,6 +3059,61 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     foreach (var projectPipeline in ProjectPipelineResources.AsEnumerable().Reverse())
                     {
                         projectPipeline.Dispose(Vk, Device);
+                    }
+
+                    if (ToneMapPipeline.Handle != 0)
+                    {
+                        Vk.DestroyPipeline(Device, ToneMapPipeline, null);
+                    }
+
+                    if (BloomPipeline.Handle != 0)
+                    {
+                        Vk.DestroyPipeline(Device, BloomPipeline, null);
+                    }
+
+                    if (ToneMapPipelineLayout.Handle != 0)
+                    {
+                        Vk.DestroyPipelineLayout(Device, ToneMapPipelineLayout, null);
+                    }
+
+                    if (BloomPipelineLayout.Handle != 0)
+                    {
+                        Vk.DestroyPipelineLayout(Device, BloomPipelineLayout, null);
+                    }
+
+                    if (ToneMapShader.Handle != 0)
+                    {
+                        Vk.DestroyShaderModule(Device, ToneMapShader, null);
+                    }
+
+                    if (FullscreenVertexShader.Handle != 0)
+                    {
+                        Vk.DestroyShaderModule(Device, FullscreenVertexShader, null);
+                    }
+
+                    if (BloomShader.Handle != 0)
+                    {
+                        Vk.DestroyShaderModule(Device, BloomShader, null);
+                    }
+
+                    if (PostDescriptorPool.Handle != 0)
+                    {
+                        Vk.DestroyDescriptorPool(Device, PostDescriptorPool, null);
+                    }
+
+                    if (PostSampler.Handle != 0)
+                    {
+                        Vk.DestroySampler(Device, PostSampler, null);
+                    }
+
+                    if (ToneMapDescriptorSetLayout.Handle != 0)
+                    {
+                        Vk.DestroyDescriptorSetLayout(Device, ToneMapDescriptorSetLayout, null);
+                    }
+
+                    if (BloomDescriptorSetLayout.Handle != 0)
+                    {
+                        Vk.DestroyDescriptorSetLayout(Device, BloomDescriptorSetLayout, null);
                     }
 
                     if (Pipeline.Handle != 0)
@@ -2446,8 +3205,20 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         Vk.DestroyRenderPass(Device, RenderPass, null);
                     }
 
+                    if (OutputFramebuffer.Handle != 0)
+                    {
+                        Vk.DestroyFramebuffer(Device, OutputFramebuffer, null);
+                    }
+
+                    if (OutputRenderPass.Handle != 0)
+                    {
+                        Vk.DestroyRenderPass(Device, OutputRenderPass, null);
+                    }
+
                     DestroyImage(ColorImage, ColorView, ColorViews, ColorMemory, Ownership.OwnsImageViews, Ownership.OwnsColorImages);
                     DestroyImage(DepthImage, DepthView, DepthViews, DepthMemory, Ownership.OwnsImageViews, Ownership.OwnsDepthImages);
+                    DestroyImage(BloomImage, BloomView, [], BloomMemory, ownsView: true, ownsImageAndMemory: true);
+                    DestroyImage(OutputImage, OutputView, [], OutputMemory, ownsView: true, ownsImageAndMemory: true);
                     if (Ownership.OwnsVulkanDevice)
                     {
                         Vk.DestroyDevice(Device, null);

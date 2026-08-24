@@ -30,11 +30,16 @@ public sealed record RekallAgeVulkanSceneCommandPlan(
     IReadOnlyList<string> Blockers)
 {
     public int DrawCount => RenderPasses.Sum(pass => pass.Draws.Count);
+
+    public IReadOnlyList<RekallAgeHighFidelityRenderPass> PostPasses { get; init; } =
+        Array.Empty<RekallAgeHighFidelityRenderPass>();
 }
 
 public static class RekallAgeVulkanSceneCommandPlanBuilder
 {
-    public static RekallAgeVulkanSceneCommandPlan BuildOffscreen(RekallAgeVulkanScenePreparedFrame preparedFrame)
+    public static RekallAgeVulkanSceneCommandPlan BuildOffscreen(
+        RekallAgeVulkanScenePreparedFrame preparedFrame,
+        RekallAgeHighFidelityRenderGraph? highFidelityGraph = null)
     {
         var backend = RekallAgeVulkanSceneRenderBackendPlanner.Plan(preparedFrame.Target);
         var blockers = new List<string>(backend.Blockers);
@@ -53,7 +58,7 @@ public static class RekallAgeVulkanSceneCommandPlanBuilder
             return Blocked(preparedFrame, backend, blockers);
         }
 
-        return new RekallAgeVulkanSceneCommandPlan(
+        var plan = new RekallAgeVulkanSceneCommandPlan(
             preparedFrame,
             [
                 new RekallAgeVulkanSceneRenderPassCommand(
@@ -69,6 +74,17 @@ public static class RekallAgeVulkanSceneCommandPlanBuilder
             backend.CommandSubmission.RequiresExternalAcquireRelease,
             true,
             Array.Empty<string>());
+        if (preparedFrame.Target.IsHighFidelityOffscreenCapture && highFidelityGraph is not null)
+        {
+            plan = plan with
+            {
+                PostPasses = highFidelityGraph.Passes
+                    .Where(pass => pass.Name is "bloom" or "tone-map" or "ui" or "present")
+                    .ToArray()
+            };
+        }
+
+        return plan;
     }
 
     public static RekallAgeVulkanSceneCommandPlan BuildOpenXr(RekallAgeOpenXrNativeSceneRenderPlan nativePlan)

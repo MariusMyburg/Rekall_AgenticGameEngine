@@ -4,7 +4,14 @@ const MAX_DIAGNOSTICS = 64;
 const MAX_DIAGNOSTIC_CODE_BYTES = 128;
 const MAX_DIAGNOSTIC_MESSAGE_BYTES = 2048;
 const MAX_DIAGNOSTIC_TARGET_BYTES = 1024;
-const MAX_PENDING = 64;
+// Bounds pendingScopes/pendingCompilations -- purely a safety limit against runaway unbounded growth from a
+// broken caller, not a WebGPU or hardware constraint, so raising it costs nothing but array size. A real
+// multi-entity scene's first tick creates many resources (buffers, textures, pipelines) before the tick loop's
+// own per-tick drain gets a chance to run once (see Program.cs): a 28-entity published scene tripped the
+// original 64 on its very first frame, self-healing by the next tick but dropping that frame's render, observed
+// directly in a real browser, not caught by any unit test (the in-memory test device has no such queue). Raised
+// with real headroom for a substantial scene rather than tuned to exactly one observed case.
+const MAX_PENDING = 512;
 const MAX_READBACK_BYTES = 64 * 1024 * 1024;
 const deviceLimitNames = ['maxBufferSize', 'maxTextureDimension1D', 'maxTextureDimension2D', 'maxTextureDimension3D', 'maxTextureArrayLayers', 'maxColorAttachments', 'maxBindingsPerBindGroup', 'maxVertexBuffers', 'maxVertexAttributes', 'maxVertexBufferArrayStride', 'maxComputeWorkgroupsPerDimension'];
 

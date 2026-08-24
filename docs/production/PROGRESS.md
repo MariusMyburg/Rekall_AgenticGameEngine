@@ -4858,9 +4858,15 @@ first (5 of 6 failed deterministically alone, only
 reproduce):
 - `BuildModulesCommandTests` (2 tests): spawned `pwsh` (PowerShell 7) as a
   portable stand-in for a hung external compiler process; `pwsh` is an
-  optional separate install and was not present on this machine.
-  Switched to `powershell` (Windows PowerShell 5.1), which ships with every
-  Windows install and is not a production-path dependency either way.
+  optional separate install and was not present on this machine. The first
+  pass here just switched to `powershell` (Windows PowerShell 5.1) --
+  caught in review before landing: `tests/Rekall.Age.Tests` targets
+  `net10.0`, not `net10.0-windows`, and `powershell.exe` doesn't exist off
+  Windows, so that traded "fails on this dev machine" for "fails on any
+  non-Windows runner." Resolves `pwsh` first (cross-platform, and matches
+  what a non-Windows CI runner for this project would actually have),
+  falling back to `powershell` only when `pwsh` isn't on `PATH`, preserving
+  the original intent while fixing this environment.
 - `WindowsPlayerRecoveryTests`: hardcoded the `bin/Debug/net10.0-windows`
   output path for `Rekall.Age.Player.Windows.exe`, so a Release-only
   build/test pass (this session's convention) made it fail even though the
@@ -4868,14 +4874,29 @@ reproduce):
   `WebGameCliTests.FindCliAssemblyPath`'s existing pattern for the CLI
   assembly.
 - `McpAgentToolExecutorTests.BroadComponentSearchFitsTheAgentToolBudget...`:
-  the built-in component catalog has grown enough since this test was
-  written that a `limit=12` response for its broad multi-topic query now
-  serializes to 13,955 characters, over the 12,000-character agent tool
-  budget (`RekallAgeMcpAgentToolExecutor.ExecuteRegisteredToolAsync`), so
-  the executor correctly truncated it -- exactly the behavior the test's own
-  name says it's proving works. Measured (not guessed) that `limit=9` keeps
-  the same realistic broad query comfortably under budget (~10.4k chars)
-  while every explicitly required contract type still ranks in the top 9.
+  the built-in component catalog has grown enough that a `limit=12` response
+  for its broad multi-topic query now serializes to 13,955 characters, over
+  the 12,000-character agent tool budget
+  (`RekallAgeMcpAgentToolExecutor.ExecuteRegisteredToolAsync`). The first
+  pass here just lowered the test's `limit` to 9 to dodge the budget -- caught
+  in review before landing: the production default really is 12, the
+  `rekall.module.search_component_schemas` schema's own description tells
+  agents to "raise Limit if needed" for broad queries, and the executor's
+  prior behavior on overflow discarded the entire structured `value` in
+  favor of an opaque 8,000-character string preview. An agent following the
+  tool's own advice at its own default was silently losing the structured
+  component list it asked for -- on the exact primary-authoring-discovery
+  surface this session was about to lean on for Pong/Galaga modeling work.
+  Fixed for real in `RekallAgeMcpAgentToolExecutor`: when a tool result
+  exceeds budget, find the largest JSON array reachable under its `value`
+  and drop trailing (lowest-ranked, since search results are already
+  ordered by match score) elements until the whole document fits, recording
+  `"<property>Truncated": {returned, total}` next to it, instead of
+  replacing `value` outright. Falls back to the old opaque-preview behavior
+  only if there's no array to shrink or shrinking it to one element still
+  doesn't fit. Test restored to the real `limit=12` default; passes because
+  the array now degrades gracefully instead of the whole response being
+  discarded.
 - `ProjectRuntimeSystemTests.RuntimeViewportCaptureUsesProjectRuntimeSystem
   Output`: the test's orbit-scene camera had no explicit `Transform3D`, so
   it defaulted to the world origin facing +Z. The orbiting cube ends at
@@ -4883,10 +4904,16 @@ reproduce):
   it, once the software renderer honors the real authored camera instead of
   the legacy oblique-projection fallback (the same class of gap Task 9
   found in Clockwork Canopy). Gave the camera an explicit position/pitch so
-  the cube stays in frame; measured the actual rendered pixel distribution
-  rather than assuming a screen-side convention, and corrected the
-  assertion to match what real rendering produces (the cube lands
-  left-of-center at this camera setup, not right).
+  the cube stays in frame. The rendered cube then landed left-of-center
+  instead of the right-of-center the original assertion expected; rather
+  than trust that and flip the assertion on one backend's word, captured
+  the identical scene through both `render viewport capture ... software`
+  and `... vulkan` (NVIDIA GeForce RTX 5090) independently -- both backends
+  agree the cube lands left-of-center, so this is a real, consistent AGE
+  camera convention (unrotated camera facing +Z, no yaw: +world-X projects
+  screen-left), not a backend divergence like the WGSL lighting bug was.
+  Corrected the assertion to match, with the cross-backend check recorded
+  in the test's own comment.
 - `ScaffoldRuntimeSystemModuleCommandTests`: a real engine bug, not test
   brittleness. `RekallAgeModuleIndexer.IndexAssembly` filtered candidate
   module types by `!type.IsAbstract` only, which does not exclude open

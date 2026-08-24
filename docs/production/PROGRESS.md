@@ -4978,18 +4978,33 @@ by this actual CLI entrypoint. All of `rekall.modeling.graph.*`,
 `rekall.asset.model.*`, and `rekall.scene.instantiate_asset` were
 genuinely discoverable this way (contrary to an earlier, wrong shortcut of
 grepping `Program.cs` for CLI verbs and concluding they had no discovery
-path -- corrected before it caused any real damage). Two real
-schema/UX findings from driving the actual protocol: (1)
+path -- corrected before it caused any real damage). Two schema/UX
+findings from driving the actual protocol, both since resolved: (1)
 `rekall.asset.model.publish`'s own tool description says
 `source has exact shape { kind: Mesh, assetId, outputName? }`, literally
 implying the JSON string `"Mesh"` for `kind`, but the actual required
-shape is the enum's underlying integer (`0`) -- the string value throws
-`REKALL_COMMAND_ARGUMENTS_INVALID`; (2) `rekall.scene.instantiate_asset`
-requires an existing scene and fails with a raw
-`Could not find a part of the path ...` filesystem exception rather than a
-structured `REKALL_*` error when the named scene doesn't exist yet.
-Neither blocks authoring once known, but both are genuine friction a real
-client would hit on the very first attempt.
+shape was the enum's underlying integer (`0`) -- the string value threw
+`REKALL_COMMAND_ARGUMENTS_INVALID`. Fixed by making the behavior match
+the description (accepting the string, the friendlier direction) rather
+than the reverse: added
+`[JsonConverter(typeof(JsonStringEnumConverter<RekallAgeModelSourceKind>))]`
+to `RekallAgeModelSourceKind`, matching the existing convention already
+used for every enum in `Rekall.Age.Modeling.Contracts`. Verified through
+the exact raw-JSON path a real client uses
+(`RekallAgeCommandRegistry.ExecuteJsonAsync`, not a typed C# request
+construction) with a new test,
+`PublishAcceptsTheSourceKindEnumNameAsRawJsonMatchingItsOwnToolDescription`.
+(2) Re-checked `rekall.scene.instantiate_asset` for a missing scene
+directly over the real MCP protocol before touching anything -- it
+already returns a structured `REKALL_MODEL_PLACEMENT_FAILED` error (the
+underlying `DirectoryNotFoundException` is caught by the command's
+existing `IOException`-family catch clause), not a raw unstructured
+exception. The earlier note above was wrong/stale; corrected here rather
+than left standing. The error message itself is a bare `Could not find
+file '<full path>'`, which is arguably terser than ideal, but it is the
+same generic catch-all shape every scene-loading command in this codebase
+uses (no sibling command has a bespoke `REKALL_SCENE_NOT_FOUND`), so left
+as-is rather than inventing a one-off convention.
 
 While driving that same discovery-then-publish-then-place sequence to
 build the first real Model Asset test fixture, found and fixed the actual
@@ -5146,6 +5161,26 @@ physics-engine collision-event stream during actual gameplay. Recorded
 plainly rather than implied otherwise: the collider is present and
 resolves through the real Model Asset path, but gameplay does not consume
 physics collision events for it.
+
+Clarification on the `render viewport capture` "Asset-backed"/"Fallback"
+counters used as the priority #3 before/after evidence earlier: checked
+`RekallAgeRuntimeSoftwareRenderer.DrawRenderables` directly rather than
+assume. `AssetBackedRenderableCount` only ever increments for `"sprite"`-
+kind renderables (2D image-backed UI/sprites); any `"mesh"`-kind
+renderable that resolves -- whether via `Rekall.MeshAssetReference` or
+`Rekall.ModelAssetReference` -- takes the separate
+`TryDrawEngineRenderable` branch and increments neither counter. This is
+why Pong's captures consistently read `Asset-backed: 0`: it isn't blind to
+3D Model Assets, it was never counting them in the first place, by design.
+`FallbackRenderableCount` is the metric that actually tracks resolution
+health for meshes (it's the one that went `1 -> 0` across the priority #3
+fix's before/after repro), and it continues to work as a self-verifying
+regression signal for both `Examples/Pong3D`'s Model Assets specifically
+(confirmed `Fallback: 0` throughout this session's captures) and for any
+future mesh/Model Asset that fails to resolve. No engine change made here
+-- documenting the naming precisely so a future reader doesn't misread
+`Asset-backed: 0` as "nothing resolved" when 3D meshes are working
+correctly and simply aren't what that specific counter measures.
 
 Not yet done for Pong: package/relocate/audit via
 `rekall.workflow.package_playable_game` /

@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace Rekall.Age.Assets;
 
+[JsonConverter(typeof(JsonStringEnumConverter<RekallAgeModelSourceKind>))]
 public enum RekallAgeModelSourceKind
 {
     Mesh

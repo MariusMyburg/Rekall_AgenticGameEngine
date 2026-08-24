@@ -176,6 +176,44 @@ public sealed class ModelAssetCommandContractTests
         AssertStableReferenceAndGameplayData(afterRebuild.Value.Entity);
     }
 
+    [Fact]
+    public async Task PublishAcceptsTheSourceKindEnumNameAsRawJsonMatchingItsOwnToolDescription()
+    {
+        // rekall.asset.model.publish's own schema description says source has
+        // shape "{ kind: Mesh, assetId, outputName? }", which a real MCP/CLI
+        // client reads as the JSON string "Mesh" -- not the enum's underlying
+        // int. Exercises the exact raw-JSON path a real client uses
+        // (registry.ExecuteJsonAsync), not a typed C# request construction,
+        // so it actually covers what a client sends.
+        var root = TestPaths.CreateTempDirectory();
+        var registry = RekallAgeDefaultCommandRegistry.Create();
+        var mesh = await Execute<CreateMeshAssetRequest, CreateMeshAssetResult>(
+            registry,
+            "rekall.mesh.create_asset",
+            new(root, "hero-mesh", "Hero Mesh", Triangle()),
+            "create editable mesh");
+        Assert.True(mesh.Ok, mesh.Summary);
+
+        var argumentsJson = $$"""
+            {
+                "projectRoot": {{System.Text.Json.JsonSerializer.Serialize(root)}},
+                "assetId": "hero-model",
+                "displayName": "Hero Model",
+                "source": { "kind": "Mesh", "assetId": "hero-mesh" },
+                "expectedModelFileRevision": "missing"
+            }
+            """;
+        var result = await registry.ExecuteJsonAsync(
+            "rekall.asset.model.publish",
+            argumentsJson,
+            new RekallAgeCommandContext(
+                "model-asset-contract",
+                RekallAgeTransaction.Begin("publish with string source kind"),
+                CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+    }
+
     private static async ValueTask<RekallAgeCommandResult<TResult>> Execute<TRequest, TResult>(
         RekallAgeCommandRegistry registry,
         string command,

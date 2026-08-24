@@ -8,7 +8,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
 {
     public RekallAgeVulkanSceneBatch Build(
         RekallAgeRuntimeViewportFrame frame,
-        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
+        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes,
+        string? primaryLightEntityId = null)
     {
         var renderablesByEntityId = BuildRenderableLookup(frame);
         var vertices = BuildLocalVertices(meshes);
@@ -17,7 +18,7 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             vertices,
             indices,
             draws,
-            BuildFrameUniform(frame, bounds),
+            BuildFrameUniform(frame, bounds, primaryLightEntityId),
             BuildStereoFrame(frame, bounds));
     }
 
@@ -64,7 +65,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
                 && mesh.Primitive.Equals("atmosphere", StringComparison.Ordinal);
             var isTransparent = isAtmosphereShell
                 || mesh.CloudLayer is not null
-                || mesh.Primitive.Equals("halo", StringComparison.Ordinal);
+                || mesh.Primitive.Equals("halo", StringComparison.Ordinal)
+                || mesh.AlphaMode.Equals("blend", StringComparison.OrdinalIgnoreCase);
             ranges.Add(new RekallAgeVulkanSceneDraw(
                 (uint)indices.Count,
                 (uint)mesh.Indices.Count,
@@ -141,7 +143,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
 
     private static RekallAgeVulkanSceneFrameUniform BuildFrameUniform(
         RekallAgeRuntimeViewportFrame frame,
-        SceneBounds bounds)
+        SceneBounds bounds,
+        string? primaryLightEntityId)
     {
         bounds = bounds.OrDefault();
         var center = new Vector3(
@@ -157,14 +160,24 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         var softwareViewProjection = view * projection;
         projection.M22 *= -1f;
 
-        var light = ResolvePrimaryLight(frame);
+        var light = ResolvePrimaryLight(frame, primaryLightEntityId);
+        var additionalLight = string.IsNullOrWhiteSpace(primaryLightEntityId)
+            ? SceneLight.Disabled
+            : ResolvePrimaryLight(frame, primaryLightEntityId: null);
+        if (string.Equals(light.EntityId, additionalLight.EntityId, StringComparison.Ordinal))
+        {
+            additionalLight = SceneLight.Disabled;
+        }
         return new RekallAgeVulkanSceneFrameUniform(
             view * projection,
             light.Direction,
             light.Color,
             light.Position,
             new Vector4(pose.Eye, 1),
-            softwareViewProjection);
+            softwareViewProjection,
+            additionalLight.Direction,
+            additionalLight.Color,
+            additionalLight.Position);
     }
 
     private static RekallAgeVulkanSceneStereoFrame? BuildStereoFrame(
@@ -352,8 +365,22 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             1);
     }
 
-    private static SceneLight ResolvePrimaryLight(RekallAgeRuntimeViewportFrame frame)
+    private static SceneLight ResolvePrimaryLight(
+        RekallAgeRuntimeViewportFrame frame,
+        string? primaryLightEntityId)
     {
+        if (!string.IsNullOrWhiteSpace(primaryLightEntityId))
+        {
+            var selected = frame.Renderables.FirstOrDefault(renderable =>
+                renderable.EntityId.Equals(primaryLightEntityId, StringComparison.Ordinal)
+                && renderable.Kind.Equals("light", StringComparison.Ordinal)
+                && renderable.Intensity > 0.0001);
+            if (selected is not null)
+            {
+                return ToSceneLight(selected);
+            }
+        }
+
         RekallAgeRuntimeViewportRenderable? firstLight = null;
         RekallAgeRuntimeViewportRenderable? firstPointLight = null;
         foreach (var renderable in frame.Renderables)
@@ -379,18 +406,23 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         if (light is null)
         {
             return new SceneLight(
+                null,
                 Vector3.Normalize(new Vector3(-0.45f, -0.65f, -0.6f)),
                 new Vector4(0, 0, 0, 0),
                 Vector4.One);
         }
 
-        return new SceneLight(
+        return ToSceneLight(light);
+    }
+
+    private static SceneLight ToSceneLight(RekallAgeRuntimeViewportRenderable light) =>
+        new(
+            light.EntityId,
             DirectionFromEuler(light.RotationX, light.RotationY, light.RotationZ),
             IsPointLight(light)
                 ? new Vector4((float)light.X, (float)light.Y, (float)light.Z, 1)
                 : new Vector4((float)light.X, (float)light.Y, (float)light.Z, 0),
             ResolveLightColor(light));
-    }
 
     private static Vector4 ResolveLightColor(RekallAgeRuntimeViewportRenderable light)
     {
@@ -478,7 +510,10 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         }
     }
 
-    private readonly record struct SceneLight(Vector3 Direction, Vector4 Position, Vector4 Color);
+    private readonly record struct SceneLight(string? EntityId, Vector3 Direction, Vector4 Position, Vector4 Color)
+    {
+        public static SceneLight Disabled { get; } = new(null, Vector3.Zero, Vector4.Zero, Vector4.Zero);
+    }
 
     private readonly record struct CameraPose(Vector3 Eye, Vector3 Forward, Vector3 Right, Vector3 Up);
 }

@@ -7,7 +7,8 @@ public static class RekallAgeVulkanHighFidelityFormatValidator
     private const FormatFeatureFlags ShadowDepthRequiredFeatures =
         FormatFeatureFlags.DepthStencilAttachmentBit
         | FormatFeatureFlags.SampledImageBit
-        | FormatFeatureFlags.SampledImageFilterLinearBit;
+        | FormatFeatureFlags.SampledImageFilterLinearBit
+        | FormatFeatureFlags.TransferSrcBit;
 
     public static string? ValidateShadowDepthFormat(FormatFeatureFlags available) =>
         ValidateOptimalTilingFeatures(

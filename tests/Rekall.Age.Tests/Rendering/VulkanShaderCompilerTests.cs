@@ -13,7 +13,8 @@ public sealed class VulkanShaderCompilerTests
         var supported = RekallAgeVulkanHighFidelityFormatValidator.ValidateShadowDepthFormat(
             FormatFeatureFlags.DepthStencilAttachmentBit
                 | FormatFeatureFlags.SampledImageBit
-                | FormatFeatureFlags.SampledImageFilterLinearBit);
+                | FormatFeatureFlags.SampledImageFilterLinearBit
+                | FormatFeatureFlags.TransferSrcBit);
         var exceedsLimits = RekallAgeVulkanHighFidelityFormatValidator.ValidateShadowAtlasLimits(
             requestedResolution: 4096,
             requestedLayers: 4,

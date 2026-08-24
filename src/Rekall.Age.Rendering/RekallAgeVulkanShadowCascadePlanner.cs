@@ -76,10 +76,9 @@ public sealed class RekallAgeVulkanShadowCascadePlanner
         {
             var splitFar = splits[index];
             var corners = BuildFrustumCorners(camera, splitNear, splitFar);
-            var matrix = BuildStableLightMatrix(corners, light.Direction, resolution);
+            var matrix = BuildStableLightMatrix(corners, light.Direction, light.MaximumDistance, resolution);
             var casterIds = selectedCasters
-                .Where(caster => IntersectsCameraDepth(camera, caster, splitNear, splitFar)
-                    && IntersectsCascadeBounds(caster, matrix))
+                .Where(caster => IntersectsCascadeBounds(caster, matrix))
                 .Select(caster => caster.EntityId)
                 .ToArray();
             cascades.Add(new RekallAgeVulkanShadowCascade(
@@ -160,6 +159,7 @@ public sealed class RekallAgeVulkanShadowCascadePlanner
     private static Matrix4x4 BuildStableLightMatrix(
         IReadOnlyList<Vector3> corners,
         Vector3 authoredLightDirection,
+        float casterExtrusionDistance,
         int resolution)
     {
         var center = Vector3.Zero;
@@ -183,7 +183,8 @@ public sealed class RekallAgeVulkanShadowCascadePlanner
         centerLight.Z = MathF.Floor(centerLight.Z / worldUnitsPerTexel) * worldUnitsPerTexel;
         Matrix4x4.Invert(orientation, out var inverseOrientation);
         var snappedCenter = Vector3.Transform(centerLight, inverseOrientation);
-        var eye = snappedCenter - lightDirection * (radius * 2f + 10f);
+        var depthPadding = radius + 10f;
+        var eye = snappedCenter - lightDirection * (casterExtrusionDistance + depthPadding);
         var view = Matrix4x4.CreateLookAt(eye, snappedCenter, up);
 
         var projection = Matrix4x4.CreateOrthographicOffCenter(
@@ -192,20 +193,8 @@ public sealed class RekallAgeVulkanShadowCascadePlanner
             -radius,
             radius,
             0.01f,
-            radius * 6f + 20f);
+            casterExtrusionDistance + radius * 2f + 20f);
         return view * projection;
-    }
-
-    private static bool IntersectsCameraDepth(
-        RekallAgeVulkanShadowCamera camera,
-        RekallAgeVulkanShadowCaster caster,
-        float splitNear,
-        float splitFar)
-    {
-        var center = (caster.BoundsMinimum + caster.BoundsMaximum) * 0.5f;
-        var radius = Vector3.Distance(caster.BoundsMinimum, caster.BoundsMaximum) * 0.5f;
-        var depth = Vector3.Dot(center - camera.Position, Vector3.Normalize(camera.Forward));
-        return depth + radius >= splitNear && depth - radius <= splitFar;
     }
 
     private static bool IntersectsCascadeBounds(
@@ -310,7 +299,10 @@ public sealed record RekallAgeVulkanShadowPlan(
     IReadOnlyList<RekallAgeVulkanShadowCascade> Cascades,
     int SelectedCasterCount,
     int CulledCasterCount,
-    IReadOnlyList<RekallAgeVulkanShadowDiagnostic> Diagnostics);
+    IReadOnlyList<RekallAgeVulkanShadowDiagnostic> Diagnostics)
+{
+    public string? LightEntityId { get; init; }
+}
 
 public sealed record RekallAgeVulkanShadowCascade(
     int Index,

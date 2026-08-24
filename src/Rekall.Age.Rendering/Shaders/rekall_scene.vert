@@ -17,6 +17,9 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 shadowParameters0;
     vec4 shadowParameters1;
     vec4 shadowCameraForward;
+    vec4 additionalLightDirection;
+    vec4 additionalLightColor;
+    vec4 additionalLightPosition;
 } frame;
 
 layout(set = 1, binding = 0) uniform DrawUniformBuffer

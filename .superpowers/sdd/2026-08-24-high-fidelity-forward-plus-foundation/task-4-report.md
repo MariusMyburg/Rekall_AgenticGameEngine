@@ -169,3 +169,139 @@ The approved design and implementation plan were not changed because the executa
 - The repository-wide test command remains red only in the existing Windows AppContainer isolation fixture. It is unrelated to rendering but prevents a fully green repository-level status.
 - The foundation implements the approved single directional shadow light and conventional depth-array cascades. Punctual-light atlases, cached/static shadow reuse, virtual shadow allocation, contact shadows, and GPU timing remain later milestones.
 - Current per-renderable shadow intent is present in the backend-neutral runtime renderable contract and honored through mesh/batch/native execution. Projecting a richer authoring-schema surface for custom numeric layer masks and per-light softness can be expanded with the planned material/light authoring work without changing this execution contract.
+
+## Fix Round 1: Important review findings
+
+All four Important review findings were repaired with isolated RED/GREEN tests. The approved design and implementation plan remain unchanged: these fixes make the already-approved eligibility, selected-light, conservative-culling, and debug-capture contracts executable and truthful without changing graph pass order or acceptance gates.
+
+### 1. Transparent eligibility and recorded workload
+
+RED command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~BlendedRenderableDoesNotCastOrInflateRecordedShadowDrawReports"
+```
+
+RED output: `Failed: 1, Passed: 0`; the baseline shadow pass reported 5 draws while the otherwise-identical frame containing one `AlphaMode="blend"` mesh reported 6.
+
+The batch now classifies authored blend materials as transparent, shadow planning excludes them, and command recording plus pass/cascade workload reports share one `IsShadowDrawEligible` predicate. Reports count actual recordable command draws rather than planned caster IDs.
+
+GREEN output for the same command: `Passed: 1, Failed: 0`.
+
+### 2. Shadow-selected light and direct shading
+
+RED command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ShadowSelectedDirectionalLightIsTheDirectLightAttenuatedBySceneShading"
+```
+
+Initial RED output: compilation failed with `CS1061` because `RekallAgeVulkanShadowPlan` did not identify its selected light. A strengthened preservation assertion produced a second genuine RED with `CS1061` for absent `AdditionalLightPosition` and `AdditionalLightColor` frame facts.
+
+The deterministic priority-selected directional light entity ID now travels from high-fidelity planning through prepared-frame construction into primary direct-light resolution. A fixture with a point light first, two directional lights, distinct colors, and priorities 10/20 proves that the priority-20 red directional light is both the planned shadow light and the directional direct-light slot (`LightPosition.W == 0`, color `(2,0,0,1)`). The previously supported green point light remains in a separate additional direct-light UBO/shader slot (`position (0,2,3,1)`, color `(0,4,0,1)`), whose BRDF contribution is not multiplied by the directional cascade factor. If the selected directional light was already the legacy primary, the additional slot is disabled to avoid double contribution.
+
+GREEN output for the same command: `Passed: 1, Failed: 0`.
+
+### 3. Conservative low-angle/boundary caster selection
+
+RED command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~LowAngleCasterBeforeCascadeBoundaryIsConservativelyIncludedForDownstreamReceivers"
+```
+
+Initial RED output: `Failed: 1, Passed: 0`; cascade 1 omitted `boundary-upstream` because camera-forward same-slice depth gating rejected a caster that can shadow downstream receivers along a low-angle directional light. The strengthened 80-unit extrusion fixture then produced a second genuine RED: cascade 0 contained only `boundary-upstream` and omitted `distant-upstream` at z=-70.
+
+Camera-forward depth gating was removed. Each cascade now culls against its fitted light-space receiver bounds extruded upstream by the authored directional shadow maximum distance, with bounded XY fitting and deterministic texel snapping retained.
+
+GREEN command/output:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~VulkanShadowCascadePlannerTests"
+```
+
+Output: `Passed: 12, Failed: 0, Skipped: 0` in 41 ms, including conservative boundary coverage, outside-frustum culling, and exact stabilization.
+
+### 4. Executable cascade split/depth debug captures
+
+RED command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~DirectionalShadowsAllocateDrawSampleAndDarkenNativePixels"
+```
+
+RED output: compilation failed with `CS1061` because the high-fidelity report had no `ShadowDebugCaptures` evidence.
+
+The native path now creates a host-visible readback buffer, copies every actual `D32_SFLOAT` array layer after HDR scene sampling, normalizes occupied depth to a grayscale PNG, and reports each file with its planned cascade index/split range, nonblank fact, and checksum. `D32_SFLOAT` capability validation now truthfully includes `TransferSrcBit`; unsupported devices degrade before allocation under the existing stable format diagnostic.
+
+GREEN output for the same command: `Passed: 1, Failed: 0`. The test requires one output per planned cascade, exact split correspondence, planned resolution, an occupied pixel, and more than one distinct SHA-256 image hash.
+
+### Fix-round native and visual evidence
+
+Combined regression command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~DirectionalShadowsAllocateDrawSampleAndDarkenNativePixels|FullyQualifiedName~BlendedRenderableDoesNotCastOrInflateRecordedShadowDrawReports|FullyQualifiedName~ShadowSelectedDirectionalLightIsTheDirectLightAttenuatedBySceneShading|FullyQualifiedName~LowAngleCasterBeforeCascadeBoundaryIsConservativelyIncludedForDownstreamReceivers" --logger "console;verbosity=normal"
+```
+
+Final output after the strengthened light-preservation change: `Passed: 4, Failed: 0, Skipped: 0, Total: 4` in 4 seconds. Both native Vulkan tests executed on the local device.
+
+A final retained native evidence run used `REKALL_AGE_TEST_TEMP_ROOT=C:\Users\Marius\AppData\Local\Temp\rekall-age-task4-fix-evidence` and passed `1/1` in 2 seconds. The three actual 2048x2048 layer visualizations are:
+
+- cascade 0: `C:\Users\Marius\AppData\Local\Temp\rekall-age-task4-fix-evidence\16783f72d3024ccc8c410e71911798fa\vulkan-shadow-cascade-0-20260824193300255.png`, 32,396 bytes, SHA-256 `D20031CC4F6A14B4FA4C4419A22C52DBB52CD68D050693B245747808B8D0B887`;
+- cascade 1: `C:\Users\Marius\AppData\Local\Temp\rekall-age-task4-fix-evidence\16783f72d3024ccc8c410e71911798fa\vulkan-shadow-cascade-1-20260824193300255.png`, 25,916 bytes, SHA-256 `CA67378C176AE4963B42F51818C96A85482C7F8DD3CAFA564E3067DD11D3B06A`;
+- cascade 2: `C:\Users\Marius\AppData\Local\Temp\rekall-age-task4-fix-evidence\16783f72d3024ccc8c410e71911798fa\vulkan-shadow-cascade-2-20260824193300255.png`, 22,500 bytes, SHA-256 `759590EBED1BD64B772E29E6E074DA088A8E8BCF13BCF78A38476DDD0E85131F`.
+
+All three were opened and inspected. They are nonblank and visibly distinguishable: the same ground and caster silhouettes occupy successively smaller near, middle, and far cascade footprints, with readable intra-surface depth gradients rather than synthetic placeholders.
+
+### Fix-round final verification
+
+Required brief gate:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~VulkanShadowCascadePlannerTests|FullyQualifiedName~VulkanScene" --logger "console;verbosity=normal"
+```
+
+Output: `Total tests: 102, Passed: 102, Failed: 0` in 2.6292 seconds.
+
+Broader Rendering gate:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~Rekall.Age.Tests.Rendering" --logger "console;verbosity=minimal"
+```
+
+Output: `Passed: 564, Failed: 0, Skipped: 0, Total: 564` in 6 seconds.
+
+Build/format/diff gates:
+
+```powershell
+dotnet build src\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj --no-restore
+dotnet format Rekall.AGE.sln --no-restore --verify-no-changes --include <all fix-round changed C# files>
+git diff --check
+```
+
+Outputs: build succeeded with `0 Warning(s), 0 Error(s)`; format and diff checks exited 0. Git emitted only the repository's LF-to-CRLF working-copy notices.
+
+### Fix-round files and self-review
+
+Production:
+
+- `src/Rekall.Age.Rendering/RekallAgeVulkanShadowCascadePlanner.cs`
+- `src/Rekall.Age.Rendering/RekallAgeVulkanHighFidelityFrameRenderer.cs`
+- `src/Rekall.Age.Rendering/RekallAgeVulkanSceneBatch.cs`
+- `src/Rekall.Age.Rendering/RekallAgeVulkanSceneBatchBuilder.cs`
+- `src/Rekall.Age.Rendering/RekallAgeVulkanScenePreparedFrame.cs`
+- `src/Rekall.Age.Rendering/RekallAgeVulkanSceneUniformUpload.cs`
+- `src/Rekall.Age.Rendering/RekallAgeNativeVulkanSceneCapture.cs`
+- `src/Rekall.Age.Rendering/RekallAgeVulkanHighFidelityFormatValidator.cs`
+- `src/Rekall.Age.Rendering/Shaders/rekall_scene.vert`
+- `src/Rekall.Age.Rendering/Shaders/rekall_scene.frag`
+
+Tests:
+
+- `tests/Rekall.Age.Tests/Rendering/VulkanHighFidelityCaptureTests.cs`
+- `tests/Rekall.Age.Tests/Rendering/VulkanSceneBatchBuilderTests.cs`
+- `tests/Rekall.Age.Tests/Rendering/VulkanShadowCascadePlannerTests.cs`
+- `tests/Rekall.Age.Tests/Rendering/VulkanShaderCompilerTests.cs`
+
+Self-review found no remaining Important-round blocker: graph authority and compatibility fallback are unchanged; blend/mask/opaque distinctions remain generic; light selection uses only priority and stable entity-ID tie-breaking; conservative extrusion remains bounded by authored shadow distance and fitted XY receiver coverage; workload evidence derives from the same predicate as recording; readback resources are state-owned and destroyed; and debug evidence is copied from the sampled native depth allocation. The review-led minor repeated PCF-offset concern remains deliberately out of this round as instructed.

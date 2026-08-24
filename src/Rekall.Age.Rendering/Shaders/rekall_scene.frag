@@ -17,6 +17,9 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 shadowParameters0;
     vec4 shadowParameters1;
     vec4 shadowCameraForward;
+    vec4 additionalLightDirection;
+    vec4 additionalLightColor;
+    vec4 additionalLightPosition;
 } frame;
 
 layout(set = 1, binding = 0) uniform DrawUniformBuffer
@@ -709,7 +712,32 @@ void main()
     vec3 emissive = pow(max(texture(sampler2D(emissiveTexture, emissiveSampler), fragUv).rgb * draw.emissiveFactors.rgb, vec3(0.0)), vec3(2.2)) * draw.emissiveFactors.a;
     float cloudShadow = sampleCloudShadow(fragWorldPosition, light);
     float directionalShadow = sampleDirectionalShadow(fragWorldPosition, normal);
-    vec3 color = emissive + ambient + (diffuse + specular) * frame.lightColor.rgb * directTransmittance * cloudShadow * directionalShadow * ndotl * 1.8;
+    vec3 additionalDirect = vec3(0.0);
+    if (any(greaterThan(frame.additionalLightColor.rgb, vec3(0.0001))))
+    {
+        vec3 additionalLight = frame.additionalLightPosition.w > 0.5
+            ? normalize(frame.additionalLightPosition.xyz - fragWorldPosition)
+            : normalize(-frame.additionalLightDirection.xyz);
+        vec3 additionalHalfVector = normalize(view + additionalLight);
+        float additionalNdotl = max(dot(normal, additionalLight), 0.0);
+        float additionalD = distributionGgx(normal, additionalHalfVector, roughness);
+        float additionalG = geometrySchlickGgx(ndotv, roughness) * geometrySchlickGgx(additionalNdotl, roughness);
+        vec3 additionalF = fresnelSchlick(max(dot(additionalHalfVector, view), 0.0), f0);
+        vec3 additionalSpecular = additionalD * additionalG * additionalF / max(4.0 * ndotv * additionalNdotl, 0.0001);
+        additionalSpecular *= mix(1.0, surfaceWaterSpecularStrength(), waterCoverage);
+        vec3 additionalDiffuse = (1.0 - additionalF) * (1.0 - metallic) * albedo / PI;
+        additionalDiffuse *= mix(1.0, 0.42, waterCoverage);
+        vec3 additionalTransmittance = surfaceAtmosphereTransmittance(fragWorldPosition, additionalLight);
+        additionalDirect = (additionalDiffuse + additionalSpecular)
+            * frame.additionalLightColor.rgb
+            * additionalTransmittance
+            * additionalNdotl
+            * 1.8;
+    }
+    vec3 color = emissive
+        + ambient
+        + (diffuse + specular) * frame.lightColor.rgb * directTransmittance * cloudShadow * directionalShadow * ndotl * 1.8
+        + additionalDirect;
     color = applySurfaceAerialPerspective(color, fragWorldPosition, light);
     float surfaceAlpha = hasAtmosphereData() ? fragColor.a : fragColor.a * textureColor.a;
 #ifdef REKALL_HDR_SCENE_OUTPUT

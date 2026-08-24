@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Rekall.Age.Rendering.Abstractions;
@@ -438,7 +439,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     checked((uint)highFidelityPlan.Graph.Resources.Single(resource => resource.Name == "ldr-color").Height));
             var backendPlan = RekallAgeVulkanSceneRenderBackendPlanner.Plan(target);
             state.Ownership = backendPlan.Ownership;
-            var prepared = RekallAgeVulkanScenePreparedFrameBuilder.Build(frame, meshes, target);
+            var prepared = RekallAgeVulkanScenePreparedFrameBuilder.Build(
+                frame,
+                meshes,
+                target,
+                highFidelityPlan?.ShadowPlan.LightEntityId);
             var commandPlan = RekallAgeVulkanSceneCommandPlanBuilder.BuildOffscreen(
                 prepared,
                 highFidelityPlan?.Graph,
@@ -559,8 +564,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 }
                 SubmitAndWait(state);
 
-                var rgba = ReadBack(state, checked((ulong)target.EffectiveOutputWidth * target.EffectiveOutputHeight * 4));
                 Directory.CreateDirectory(outputDirectory);
+                var shadowDebugCaptures = highFidelityPlan?.ShadowPlan.Enabled == true
+                    ? WriteShadowDebugCaptures(state, highFidelityPlan.ShadowPlan, outputDirectory, cancellationToken)
+                    : [];
+                var rgba = ReadBack(state, checked((ulong)target.EffectiveOutputWidth * target.EffectiveOutputHeight * 4));
                 var outputPath = Path.Combine(outputDirectory, $"vulkan-scene-{target.EffectiveOutputWidth}x{target.EffectiveOutputHeight}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}.png");
                 RekallAgePngWriter.WriteRgbaAsync(
                     outputPath,
@@ -606,7 +614,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                             highFidelityPlan,
                             executed: true,
                             CreateExecutedHighFidelityPassReports(commandPlan, highFidelityPlan),
-                            [])
+                            [],
+                            commandPlan,
+                            shadowDebugCaptures)
                 };
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -1202,7 +1212,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 resolution,
                 resolution,
                 Format.D32Sfloat,
-                ImageUsageFlags.DepthStencilAttachmentBit | ImageUsageFlags.SampledBit,
+                ImageUsageFlags.DepthStencilAttachmentBit | ImageUsageFlags.SampledBit | ImageUsageFlags.TransferSrcBit,
                 ImageAspectFlags.DepthBit,
                 1,
                 layerCount,
@@ -1361,6 +1371,18 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         out state.ShadowUniformBuffers[index],
                         out state.ShadowUniformMemories[index]);
                 }
+
+                state.ShadowReadbackByteCount = checked(
+                    (ulong)shadowPlan.Resolution
+                    * (ulong)shadowPlan.Resolution
+                    * sizeof(float)
+                    * (ulong)shadowPlan.Cascades.Count);
+                CreateHostBuffer(
+                    state,
+                    new byte[checked((int)state.ShadowReadbackByteCount)],
+                    BufferUsageFlags.TransferDstBit,
+                    out state.ShadowReadbackBuffer,
+                    out state.ShadowReadbackMemory);
             }
             state.Vk.GetPhysicalDeviceProperties(state.PhysicalDevice, out var physicalDeviceProperties);
             var drawUniformBytes = checked((uint)Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>());
@@ -2841,6 +2863,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             DrawPassRanges(state, 0, pass.Draws, transparent: true);
             state.Vk.CmdEndRenderPass(state.CommandBuffer);
 
+            if (highFidelityPlan.ShadowPlan.Enabled && state.ShadowReadbackBuffer.Handle != 0)
+            {
+                RecordShadowDebugCopies(state, highFidelityPlan.ShadowPlan);
+            }
+
             TransitionImage(
                 state,
                 state.ColorImage,
@@ -2973,11 +3000,59 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             ThrowIfFailed(state.Vk.EndCommandBuffer(state.CommandBuffer), "vkEndCommandBuffer HDR");
         }
 
+        private static void RecordShadowDebugCopies(
+            VulkanState state,
+            RekallAgeVulkanShadowPlan shadowPlan)
+        {
+            var layerCount = checked((uint)shadowPlan.Cascades.Count);
+            TransitionImage(
+                state,
+                state.ShadowImage,
+                ImageLayout.ShaderReadOnlyOptimal,
+                ImageLayout.TransferSrcOptimal,
+                AccessFlags.ShaderReadBit,
+                AccessFlags.TransferReadBit,
+                PipelineStageFlags.FragmentShaderBit,
+                PipelineStageFlags.TransferBit,
+                aspectMask: ImageAspectFlags.DepthBit,
+                layerCount: layerCount);
+
+            var resolution = checked((uint)shadowPlan.Resolution);
+            var layerBytes = checked((ulong)resolution * resolution * sizeof(float));
+            var copies = shadowPlan.Cascades
+                .Select(cascade => new BufferImageCopy
+                {
+                    BufferOffset = checked(layerBytes * (ulong)cascade.Index),
+                    BufferRowLength = 0,
+                    BufferImageHeight = 0,
+                    ImageSubresource = new ImageSubresourceLayers(
+                        ImageAspectFlags.DepthBit,
+                        0,
+                        checked((uint)cascade.Index),
+                        1),
+                    ImageOffset = new Offset3D(0, 0, 0),
+                    ImageExtent = new Extent3D(resolution, resolution, 1)
+                })
+                .ToArray();
+            fixed (BufferImageCopy* copy = copies)
+            {
+                state.Vk.CmdCopyImageToBuffer(
+                    state.CommandBuffer,
+                    state.ShadowImage,
+                    ImageLayout.TransferSrcOptimal,
+                    state.ShadowReadbackBuffer,
+                    checked((uint)copies.Length),
+                    copy);
+            }
+        }
+
         private static RekallAgeHighFidelityFrameReport CreateHighFidelityReport(
             RekallAgeVulkanHighFidelityFramePlan plan,
             bool executed,
             IReadOnlyList<RekallAgeHighFidelityFramePassReport> passes,
-            IReadOnlyList<string> diagnostics)
+            IReadOnlyList<string> diagnostics,
+            RekallAgeVulkanSceneCommandPlan? commandPlan = null,
+            IReadOnlyList<RekallAgeHighFidelityShadowDebugCapture>? shadowDebugCaptures = null)
         {
             var allocated = new HashSet<string>(StringComparer.Ordinal)
             {
@@ -3016,13 +3091,14 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         cascade.SplitFar,
                         plan.ShadowPlan.Resolution,
                         cascade.CasterIds.Count,
-                        executed ? cascade.CasterIds.Count : 0,
+                        executed && commandPlan is not null ? CountShadowDraws(commandPlan, cascade) : 0,
                         cascade.CulledCasterCount,
                         plan.ShadowPlan.FilterTapCount,
                         cascade.AtlasBytes,
                         plan.ShadowPlan.DepthBias,
                         plan.ShadowPlan.NormalBias))
-                    .ToArray()
+                    .ToArray(),
+                ShadowDebugCaptures = shadowDebugCaptures ?? []
             };
         }
 
@@ -3058,9 +3134,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 for (var drawIndex = 0; drawIndex < draws.Count; drawIndex++)
                 {
                     var draw = draws[drawIndex];
-                    if (draw.PushConstants.CastShadows < 0.5f
-                        || draw.Transparent
-                        || !cascade.CasterIds.Contains(draw.EntityId, StringComparer.Ordinal))
+                    if (!IsShadowDrawEligible(draw, cascade))
                     {
                         continue;
                     }
@@ -3110,7 +3184,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     ["shadow-directional"],
                     true,
                     0,
-                    highFidelityPlan.ShadowPlan.Cascades.Sum(cascade => cascade.CasterIds.Count)));
+                    highFidelityPlan.ShadowPlan.Cascades.Sum(cascade => CountShadowDraws(commandPlan, cascade))));
             }
             reports.Add(new RekallAgeHighFidelityFramePassReport(
                 "opaque-hdr",
@@ -3138,6 +3212,18 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
             return reports;
         }
+
+        private static int CountShadowDraws(
+            RekallAgeVulkanSceneCommandPlan commandPlan,
+            RekallAgeVulkanShadowCascade cascade) =>
+            commandPlan.RenderPasses[0].Draws.Count(draw => IsShadowDrawEligible(draw, cascade));
+
+        private static bool IsShadowDrawEligible(
+            RekallAgeVulkanSceneCommandDraw draw,
+            RekallAgeVulkanShadowCascade cascade) =>
+            draw.PushConstants.CastShadows >= 0.5f
+            && !draw.Transparent
+            && cascade.CasterIds.Contains(draw.EntityId, StringComparer.Ordinal);
 
         private static bool HasPostPass(RekallAgeVulkanSceneCommandPlan commandPlan, string name) =>
             commandPlan.PostPasses.Any(pass => pass.Enabled && pass.Name.Equals(name, StringComparison.Ordinal));
@@ -3268,7 +3354,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             AccessFlags dstAccess,
             PipelineStageFlags srcStage,
             PipelineStageFlags dstStage,
-            uint mipLevels = 1)
+            uint mipLevels = 1,
+            ImageAspectFlags aspectMask = ImageAspectFlags.ColorBit,
+            uint layerCount = 1)
         {
             var barrier = new ImageMemoryBarrier
             {
@@ -3280,7 +3368,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
                 DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
                 Image = image,
-                SubresourceRange = new ImageSubresourceRange(ImageAspectFlags.ColorBit, 0, mipLevels, 0, 1)
+                SubresourceRange = new ImageSubresourceRange(aspectMask, 0, mipLevels, 0, layerCount)
             };
             state.Vk.CmdPipelineBarrier(
                 state.CommandBuffer,
@@ -3509,6 +3597,93 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             }
         }
 
+        private static IReadOnlyList<RekallAgeHighFidelityShadowDebugCapture> WriteShadowDebugCaptures(
+            VulkanState state,
+            RekallAgeVulkanShadowPlan shadowPlan,
+            string outputDirectory,
+            CancellationToken cancellationToken)
+        {
+            var bytes = ReadBackMemory(state, state.ShadowReadbackMemory, state.ShadowReadbackByteCount);
+            var depth = MemoryMarshal.Cast<byte, float>(bytes);
+            var resolution = shadowPlan.Resolution;
+            var pixelsPerLayer = checked(resolution * resolution);
+            var captures = new List<RekallAgeHighFidelityShadowDebugCapture>(shadowPlan.Cascades.Count);
+            var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture);
+            foreach (var cascade in shadowPlan.Cascades)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var layer = depth.Slice(checked(cascade.Index * pixelsPerLayer), pixelsPerLayer);
+                var occupiedCount = 0;
+                var minimum = float.MaxValue;
+                var maximum = float.MinValue;
+                foreach (var value in layer)
+                {
+                    if (!float.IsFinite(value) || value < 0 || value >= 0.999999f)
+                    {
+                        continue;
+                    }
+
+                    occupiedCount++;
+                    minimum = MathF.Min(minimum, value);
+                    maximum = MathF.Max(maximum, value);
+                }
+                var range = maximum - minimum;
+                var rgba = new byte[checked(pixelsPerLayer * 4)];
+                for (var pixel = 0; pixel < pixelsPerLayer; pixel++)
+                {
+                    var value = layer[pixel];
+                    byte intensity = 0;
+                    if (float.IsFinite(value) && value >= 0 && value < 0.999999f)
+                    {
+                        intensity = range < 0.000001f
+                            ? byte.MaxValue
+                            : checked((byte)Math.Clamp(
+                                Math.Round(32 + (1 - (value - minimum) / range) * 223),
+                                0,
+                                255));
+                    }
+
+                    var offset = checked(pixel * 4);
+                    rgba[offset] = intensity;
+                    rgba[offset + 1] = intensity;
+                    rgba[offset + 2] = intensity;
+                    rgba[offset + 3] = byte.MaxValue;
+                }
+
+                var path = Path.Combine(
+                    outputDirectory,
+                    $"vulkan-shadow-cascade-{cascade.Index}-{timestamp}.png");
+                RekallAgePngWriter.WriteRgbaAsync(path, resolution, resolution, rgba, cancellationToken)
+                    .AsTask().GetAwaiter().GetResult();
+                var analysis = Analyze(rgba);
+                captures.Add(new RekallAgeHighFidelityShadowDebugCapture(
+                    cascade.Index,
+                    cascade.SplitNear,
+                    cascade.SplitFar,
+                    path,
+                    occupiedCount > 0,
+                    analysis.Checksum));
+            }
+
+            return captures;
+        }
+
+        private static byte[] ReadBackMemory(VulkanState state, DeviceMemory memory, ulong byteCount)
+        {
+            void* mapped;
+            ThrowIfFailed(state.Vk.MapMemory(state.Device, memory, 0, byteCount, 0, &mapped), "vkMapMemory debug readback");
+            try
+            {
+                var bytes = new byte[checked((int)byteCount)];
+                Marshal.Copy((nint)mapped, bytes, 0, bytes.Length);
+                return bytes;
+            }
+            finally
+            {
+                state.Vk.UnmapMemory(state.Device, memory);
+            }
+        }
+
         [StructLayout(LayoutKind.Sequential)]
         private readonly record struct BloomPushConstants(
             float Threshold,
@@ -3601,6 +3776,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public uint DrawUniformStrideBytes;
             public Buffer ReadbackBuffer;
             public DeviceMemory ReadbackMemory;
+            public Buffer ShadowReadbackBuffer;
+            public DeviceMemory ShadowReadbackMemory;
+            public ulong ShadowReadbackByteCount;
             public DescriptorSetLayout DescriptorSetLayout;
             public DescriptorSetLayout DrawDescriptorSetLayout;
             public DescriptorSetLayout MaterialDescriptorSetLayout;
@@ -3815,6 +3993,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     }
 
                     DestroyBuffer(ReadbackBuffer, ReadbackMemory);
+                    DestroyBuffer(ShadowReadbackBuffer, ShadowReadbackMemory);
 
                     if (Framebuffers.Length > 0)
                     {

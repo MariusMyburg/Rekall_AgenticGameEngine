@@ -95,6 +95,27 @@ public sealed class VulkanShadowCascadePlannerTests
     }
 
     [Fact]
+    public void LowAngleCasterBeforeCascadeBoundaryIsConservativelyIncludedForDownstreamReceivers()
+    {
+        var plan = new RekallAgeVulkanShadowCascadePlanner().Plan(
+            Camera(),
+            Light(maximumDistance: 80) with
+            {
+                Direction = Vector3.Normalize(new Vector3(0, -0.1f, 1))
+            },
+            [
+                Caster("boundary-upstream", new Vector3(0, 1, 14), layerMask: uint.MaxValue),
+                Caster("distant-upstream", new Vector3(0, 1, -70), layerMask: uint.MaxValue)
+            ],
+            new RekallAgeResolvedShadowQuality(2, 1024, 8));
+
+        Assert.Equal(2, plan.Cascades.Count);
+        Assert.True(plan.Cascades[1].SplitNear > 14.5f);
+        Assert.Contains("boundary-upstream", plan.Cascades[1].CasterIds);
+        Assert.Contains("distant-upstream", plan.Cascades[0].CasterIds);
+    }
+
+    [Fact]
     public void TexelStabilizationKeepsSubTexelCameraMotionBitStable()
     {
         var planner = new RekallAgeVulkanShadowCascadePlanner();

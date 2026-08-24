@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 
@@ -45,6 +46,25 @@ public sealed class VulkanHighFidelityCaptureTests
             Assert.True(cascade.DrawCount > 0);
             Assert.True(cascade.SplitFar > cascade.SplitNear);
         });
+        Assert.Equal(report.ShadowCascades.Count, report.ShadowDebugCaptures.Count);
+        var debugImages = new List<RekallAgeRgbaImage>();
+        foreach (var debugCapture in report.ShadowDebugCaptures.OrderBy(item => item.CascadeIndex))
+        {
+            var cascade = report.ShadowCascades[debugCapture.CascadeIndex];
+            Assert.Equal(cascade.SplitNear, debugCapture.SplitNear);
+            Assert.Equal(cascade.SplitFar, debugCapture.SplitFar);
+            Assert.True(File.Exists(debugCapture.OutputPath), debugCapture.OutputPath);
+            Assert.True(debugCapture.NonBlank);
+            var debugImage = await RekallAgePngReader.ReadRgbaAsync(debugCapture.OutputPath, CancellationToken.None);
+            Assert.Equal(cascade.Resolution, debugImage.Width);
+            Assert.Equal(cascade.Resolution, debugImage.Height);
+            Assert.Contains(Enumerable.Range(0, debugImage.Width * debugImage.Height), pixel =>
+                PixelBrightness(debugImage.Rgba, pixel) > 0);
+            debugImages.Add(debugImage);
+        }
+        Assert.True(
+            debugImages.Select(image => Convert.ToHexString(SHA256.HashData(image.Rgba))).Distinct(StringComparer.Ordinal).Count() > 1,
+            "Expected cascade depth visualizations to be distinguishable across planned layers.");
 
         var shadowedImage = await RekallAgePngReader.ReadRgbaAsync(shadowed.OutputPath, CancellationToken.None);
         var unshadowedImage = await RekallAgePngReader.ReadRgbaAsync(unshadowed.OutputPath, CancellationToken.None);
@@ -53,6 +73,56 @@ public sealed class VulkanHighFidelityCaptureTests
             Enumerable.Range(0, shadowedImage.Width * shadowedImage.Height).Count(pixel =>
                 PixelBrightness(unshadowedImage.Rgba, pixel) >= PixelBrightness(shadowedImage.Rgba, pixel) + 3) > 48,
             "Expected the executable shadow sampling path to darken a visible population of receiver pixels.");
+    }
+
+    [Fact]
+    public async Task BlendedRenderableDoesNotCastOrInflateRecordedShadowDrawReports()
+    {
+        var baselineFrame = ShadowFrame(castShadows: true);
+        var blendedFrame = baselineFrame with
+        {
+            Renderables = baselineFrame.Renderables.Append(new RekallAgeRuntimeViewportRenderable(
+                "blend",
+                "Blended Surface",
+                "mesh",
+                "rekall.primitive.cube",
+                -2.5,
+                0,
+                5,
+                4,
+                Variant: "rekall.geometry.cube",
+                MaterialColor: "#80d0ffff")
+            {
+                AlphaMode = "blend",
+                CastShadows = true
+            }).ToArray()
+        };
+        var output = TestPaths.CreateTempDirectory();
+        var capture = new RekallAgeNativeVulkanSceneCapture();
+
+        var baseline = await capture.CaptureSceneAsync(
+            baselineFrame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            output,
+            "discrete-gpu",
+            CancellationToken.None);
+        var blended = await capture.CaptureSceneAsync(
+            blendedFrame,
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            output,
+            "discrete-gpu",
+            CancellationToken.None);
+
+        Assert.True(baseline.Captured, string.Join(Environment.NewLine, baseline.Errors));
+        Assert.True(blended.Captured, string.Join(Environment.NewLine, blended.Errors));
+        var baselineReport = Assert.IsType<RekallAgeHighFidelityFrameReport>(baseline.HighFidelityFrame);
+        var blendedReport = Assert.IsType<RekallAgeHighFidelityFrameReport>(blended.HighFidelityFrame);
+        Assert.Equal(
+            Assert.Single(baselineReport.Passes, pass => pass.Name == "shadow-directional").DrawCount,
+            Assert.Single(blendedReport.Passes, pass => pass.Name == "shadow-directional").DrawCount);
+        Assert.Equal(
+            baselineReport.ShadowCascades.Select(cascade => cascade.DrawCount),
+            blendedReport.ShadowCascades.Select(cascade => cascade.DrawCount));
     }
 
     [Fact]

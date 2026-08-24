@@ -222,6 +222,105 @@ public sealed class VulkanSceneBatchBuilderTests
     }
 
     [Fact]
+    public void ShadowSelectedDirectionalLightIsTheDirectLightAttenuatedBySceneShading()
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera",
+            "Camera",
+            "Camera3D",
+            true,
+            0,
+            2,
+            -6,
+            NearClip: 0.1,
+            FarClip: 80);
+        var frame = CreateFrame(
+            new RekallAgeRuntimeViewportRenderable(
+                "mesh",
+                "Mesh",
+                "mesh",
+                "rekall.primitive.cube",
+                0,
+                0,
+                5,
+                1,
+                Variant: "rekall.geometry.cube"),
+            new RekallAgeRuntimeViewportRenderable(
+                "point",
+                "Point",
+                "light",
+                null,
+                0,
+                2,
+                3,
+                2,
+                Variant: "PointLight",
+                Intensity: 4,
+                MaterialColor: "#00ff00"),
+            new RekallAgeRuntimeViewportRenderable(
+                "lower-directional",
+                "Lower Directional",
+                "light",
+                null,
+                0,
+                0,
+                0,
+                3,
+                Variant: "DirectionalLight",
+                RotationY: 30,
+                Intensity: 3,
+                MaterialColor: "#0000ff")
+            {
+                ShadowPriority = 10
+            },
+            new RekallAgeRuntimeViewportRenderable(
+                "shadow-directional",
+                "Shadow Directional",
+                "light",
+                null,
+                0,
+                0,
+                0,
+                4,
+                Variant: "DirectionalLight",
+                RotationX: 55,
+                RotationY: -20,
+                Intensity: 2,
+                MaterialColor: "#ff0000")
+            {
+                ShadowPriority = 20
+            }) with
+        {
+            ActiveCamera = camera,
+            Cameras = [camera],
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post",
+                "Post",
+                true,
+                [new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")]),
+            ResolvedQualityPlan = new RekallAgeRenderQualityProfileResolver().Resolve(
+                new RekallAgeRenderQualityIntent("High", Bloom: false),
+                RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+                128,
+                72)
+        };
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+
+        var highFidelity = Assert.IsType<RekallAgeVulkanHighFidelityFramePlan>(
+            new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame, meshes));
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(
+            frame,
+            meshes,
+            highFidelity.ShadowPlan.LightEntityId);
+
+        Assert.Equal("shadow-directional", highFidelity.ShadowPlan.LightEntityId);
+        Assert.Equal(0, batch.Frame.LightPosition.W);
+        Assert.Equal(new Vector4(2, 0, 0, 1), batch.Frame.LightColor);
+        Assert.Equal(new Vector4(0, 2, 3, 1), batch.Frame.AdditionalLightPosition);
+        Assert.Equal(new Vector4(0, 4, 0, 1), batch.Frame.AdditionalLightColor);
+    }
+
+    [Fact]
     public void BuildTintsLightColorFromAuthoredLightMaterialColor()
     {
         var frame = CreateFrame(

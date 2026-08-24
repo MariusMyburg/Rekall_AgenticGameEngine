@@ -104,11 +104,15 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
             (float)light.ShadowBias,
             (float)light.ShadowNormalBias,
             light.ShadowPriority);
-        return new RekallAgeVulkanShadowCascadePlanner().Plan(
+        var plan = new RekallAgeVulkanShadowCascadePlanner().Plan(
             shadowCamera,
             shadowLight,
             BuildCasters(frame, meshes),
             quality);
+        return plan with
+        {
+            LightEntityId = plan.Enabled ? light.EntityId : null
+        };
     }
 
     private static IReadOnlyList<RekallAgeVulkanShadowCaster> BuildCasters(
@@ -119,7 +123,8 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
         if (meshes is null)
         {
             return frame.Renderables
-                .Where(item => item.Kind.Equals("mesh", StringComparison.Ordinal))
+                .Where(item => item.Kind.Equals("mesh", StringComparison.Ordinal)
+                    && !item.AlphaMode.Equals("blend", StringComparison.OrdinalIgnoreCase))
                 .Select(item => new RekallAgeVulkanShadowCaster(
                     item.EntityId,
                     new Vector3(
@@ -138,7 +143,9 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
         var casters = new List<RekallAgeVulkanShadowCaster>(meshes.Count);
         foreach (var mesh in meshes)
         {
-            if (!renderables.TryGetValue(mesh.EntityId, out var renderable) || mesh.Vertices.Count == 0)
+            if (!renderables.TryGetValue(mesh.EntityId, out var renderable)
+                || mesh.Vertices.Count == 0
+                || mesh.AlphaMode.Equals("blend", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -429,7 +436,18 @@ public sealed record RekallAgeHighFidelityFrameReport(
 {
     public IReadOnlyList<RekallAgeHighFidelityShadowCascadeReport> ShadowCascades { get; init; } =
         Array.Empty<RekallAgeHighFidelityShadowCascadeReport>();
+
+    public IReadOnlyList<RekallAgeHighFidelityShadowDebugCapture> ShadowDebugCaptures { get; init; } =
+        Array.Empty<RekallAgeHighFidelityShadowDebugCapture>();
 }
+
+public sealed record RekallAgeHighFidelityShadowDebugCapture(
+    int CascadeIndex,
+    float SplitNear,
+    float SplitFar,
+    string OutputPath,
+    bool NonBlank,
+    ulong ByteChecksum);
 
 public sealed record RekallAgeHighFidelityShadowCascadeReport(
     int Index,

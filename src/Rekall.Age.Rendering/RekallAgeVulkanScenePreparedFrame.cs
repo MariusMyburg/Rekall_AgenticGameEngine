@@ -26,9 +26,16 @@ public static class RekallAgeVulkanScenePreparedFrameBuilder
         RekallAgeRuntimeViewportFrame frame,
         IReadOnlyList<RekallAgeVulkanSceneMesh> meshes,
         RekallAgeVulkanSceneRenderTarget target,
-        string? primaryLightEntityId = null)
+        string? primaryLightEntityId = null,
+        RekallAgeVulkanDirectionalLightInjection? directionalLight = null,
+        RekallAgeVulkanEffectiveCamera? effectiveCamera = null)
     {
-        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes, primaryLightEntityId);
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(
+            frame,
+            meshes,
+            primaryLightEntityId,
+            directionalLight,
+            effectiveCamera);
         var drawPlan = RekallAgeVulkanSceneDrawPlanBuilder.Build(batch);
         var geometryUpload = RekallAgeVulkanSceneGeometryUploadBuilder.Build(batch);
         var readbackBytes = RekallAgeVulkanSceneRenderBackendPlanner.Plan(target).RequiresReadback

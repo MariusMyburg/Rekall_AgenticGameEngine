@@ -119,7 +119,12 @@ public sealed class RekallAgeRenderQualityProfileResolver
         var particleQuality = new RekallAgeResolvedParticleQuality(particles);
 
         var renderPixels = (long)renderWidth * renderHeight;
-        var transient = renderPixels * (bloom ? 20L : 12L) + (ssao ? renderPixels * 2L : 0L);
+        var fogDebugReadbackBytes = fog.Mode.Equals("analytic", StringComparison.Ordinal)
+            ? 0L
+            : (long)fog.FroxelWidth * fog.FroxelHeight * fog.FroxelDepth * 8L;
+        var transient = renderPixels * (bloom ? 20L : 12L)
+            + (ssao ? renderPixels * 2L : 0L)
+            + fogDebugReadbackBytes;
         var persistent = (long)shadowResolution * shadowResolution * cascadeCount * 4L
             + (long)particles * 64L
             + (fog.Mode.Equals("analytic", StringComparison.Ordinal)

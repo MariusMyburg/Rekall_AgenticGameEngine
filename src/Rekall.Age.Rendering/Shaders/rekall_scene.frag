@@ -220,6 +220,27 @@ vec3 atmosphereLightColor()
     return max(frame.lightColor.rgb, vec3(0.0));
 }
 
+vec3 primaryLightVector(vec3 worldPosition)
+{
+    return frame.lightPosition.w > 0.5
+        ? frame.lightPosition.xyz - worldPosition
+        : -frame.lightDirection.xyz;
+}
+
+bool hasPrimaryLight(vec3 worldPosition)
+{
+    vec3 lightVector = primaryLightVector(worldPosition);
+    return dot(frame.lightColor.rgb, frame.lightColor.rgb) > 0.000001
+        && dot(lightVector, lightVector) > 0.000001;
+}
+
+vec3 primaryLightDirection(vec3 worldPosition)
+{
+    vec3 lightVector = primaryLightVector(worldPosition);
+    float lightLength = length(lightVector);
+    return lightLength > 0.000001 ? lightVector / lightLength : vec3(0.0);
+}
+
 float ozoneAbsorption()
 {
     return max(draw.atmosphereColor2.w, 0.0);
@@ -274,7 +295,7 @@ float aerialPerspectiveStrength()
 
 vec3 surfaceAtmosphereTransmittance(vec3 surfacePosition, vec3 lightDirection)
 {
-    if (!hasAtmosphereData())
+    if (!hasAtmosphereData() || dot(lightDirection, lightDirection) <= 0.000001)
     {
         return vec3(1.0);
     }
@@ -324,7 +345,7 @@ vec2 sphericalUv(vec3 direction)
 
 float sampleCloudShadow(vec3 surfacePosition, vec3 lightDirection)
 {
-    if (draw.cloudShadowFactors.x <= 0.5)
+    if (draw.cloudShadowFactors.x <= 0.5 || dot(lightDirection, lightDirection) <= 0.000001)
     {
         return 1.0;
     }
@@ -473,9 +494,15 @@ vec3 applySurfaceAerialPerspective(vec3 surfaceColor, vec3 surfacePosition, vec3
     float lowAltitudeView = 1.0 - smoothstep(1.0, 1.35, cameraAtmosphereRatio);
     float effectiveStrength = strength * mix(1.0, 0.32, lowAltitudeView);
     vec3 transmittance = exp(-opticalDepth * surfaceAtmosphereExtinction() * effectiveStrength);
-    vec3 scattering = surfaceAerialPerspectiveScattering(rayOrigin, rayDirection, rayStart, rayEnd, normalize(lightDirection));
+    bool directLightAvailable = dot(frame.lightColor.rgb, frame.lightColor.rgb) > 0.000001
+        && dot(lightDirection, lightDirection) > 0.000001;
+    vec3 scattering = directLightAvailable
+        ? surfaceAerialPerspectiveScattering(rayOrigin, rayDirection, rayStart, rayEnd, normalize(lightDirection))
+        : vec3(0.0);
     vec3 surfaceNormal = normalize(surfacePosition - planetCenter);
-    float surfaceSun = smoothstep(-0.08, 0.18, dot(surfaceNormal, normalize(lightDirection)));
+    float surfaceSun = directLightAvailable
+        ? smoothstep(-0.08, 0.18, dot(surfaceNormal, normalize(lightDirection)))
+        : 0.0;
     vec3 scatteringTint = mix(vec3(1.0), vec3(0.55, 0.78, 1.35), lowAltitudeView);
     return surfaceColor * transmittance + scattering * scatteringTint * effectiveStrength * surfaceSun;
 }
@@ -495,9 +522,11 @@ vec4 renderAtmosphere()
     vec3 planetCenter = draw.model[3].xyz;
     vec3 rayOrigin = frame.cameraPosition.xyz;
     vec3 rayDirection = normalize(fragWorldPosition - rayOrigin);
-    vec3 sunDirection = frame.lightPosition.w > 0.5
-        ? normalize(frame.lightPosition.xyz - fragWorldPosition)
-        : normalize(-frame.lightDirection.xyz);
+    if (!hasPrimaryLight(fragWorldPosition))
+    {
+        return vec4(0.0);
+    }
+    vec3 sunDirection = primaryLightDirection(fragWorldPosition);
     if (shouldDiscardAtmosphereBackHemisphere(rayOrigin, rayDirection, planetCenter, atmosphereRadius))
     {
         discard;
@@ -607,9 +636,7 @@ vec4 renderCloudLayer()
 
     vec3 normal = normalize(fragWorldPosition - planetCenter);
     vec3 view = normalize(rayOrigin - fragWorldPosition);
-    vec3 light = frame.lightPosition.w > 0.5
-        ? normalize(frame.lightPosition.xyz - fragWorldPosition)
-        : normalize(-frame.lightDirection.xyz);
+    vec3 light = primaryLightDirection(fragWorldPosition);
     float lambertian = max(dot(normal, light), 0.0);
     float skyVisibility = cloudSkyVisibility(fragWorldPosition, light, planetCenter);
 
@@ -677,9 +704,7 @@ void main()
     {
         occlusion = mix(1.0, texture(sampler2D(occlusionTexture, occlusionSampler), fragUv).r, draw.materialFactors.w);
     }
-    vec3 light = frame.lightPosition.w > 0.5
-        ? normalize(frame.lightPosition.xyz - fragWorldPosition)
-        : normalize(-frame.lightDirection.xyz);
+    vec3 light = primaryLightDirection(fragWorldPosition);
     vec3 view = normalize(frame.cameraPosition.xyz - fragWorldPosition);
     vec3 normal = hasAtmosphereData()
         ? normalize(fragWorldPosition - draw.model[3].xyz)

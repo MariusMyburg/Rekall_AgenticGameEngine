@@ -116,7 +116,7 @@ The first production frame graph is:
 11. exposure, bloom, tone mapping, color grading, sharpening, and upscale
 12. screen-space UI composition and presentation
 
-The graph declares reads, writes, formats, extents, lifetimes, queue intent, and dependencies. Vulkan execution owns synchronization and resource transitions; authored content never manipulates barriers or native handles.
+The graph declares reads, writes, formats, extents, lifetimes, queue intent, and dependencies. Diagnostic GPU readback is graph-visible too: the froxel image declares transfer-source usage, a bounded host-readback destination declares transfer-destination usage, and an ordered transfer pass depends on completed fog integration. Vulkan execution owns synchronization and resource transitions; authored content never manipulates barriers or native handles.
 
 ### Renderer storage
 
@@ -162,7 +162,7 @@ Later milestones add spot/point shadow atlases, cached static shadows, contact s
 
 ## Atmosphere, Fog, and Post-Processing
 
-The foundation supports inexpensive analytic height/distance fog on lower tiers and froxel volumetric fog on higher tiers. Both paths sample stored opaque depth and reconstruct view rays from the active camera basis and projection so integration stops at visible opaque surfaces, including for rotated cameras. Volumetric fog includes bounded grid dimensions, oriented local density volumes, selected directional-light injection, anisotropic phase scattering, per-froxel cascade shadow lookup, persistent GPU history sampling and reprojection, truthful camera-cut/grid reset, and optional filtering. Unsupported volume shapes degrade deterministically with stable observation facts and dropped entity IDs. Fog debug slices come from an explicit readback of the executed GPU froxel image.
+The foundation supports inexpensive analytic height/distance fog on lower tiers and froxel volumetric fog on higher tiers. Scene rendering, shadows, fog, and fog history consume one resolved effective-camera fact: an authored non-default pose remains authoritative, while a null/zero default camera is auto-framed once from actual scene bounds. That fact carries the exact view/projection matrices, orientation basis, near/far range, perspective tangent or orthographic half-height/aspect extents, and orthographic per-pixel origins, so both fog paths sample stored opaque depth and stop at the same visible surfaces the scene rendered. Volumetric fog includes bounded grid dimensions, oriented local density volumes, one deterministically selected visible directional light (priority then entity ID), explicit no-directional-light injection with zero energy, anisotropic phase scattering, per-froxel cascade shadow lookup, persistent GPU history sampling and reprojection, truthful camera-cut/grid reset, and optional filtering. Point lights remain punctual/additional lights and never masquerade as the directional fog/shadow source; there is no synthetic directional fallback in the high-fidelity path. Unsupported volume shapes degrade deterministically with stable observation facts and dropped entity IDs. Fog debug slices come from a graph-declared transfer readback of the executed GPU froxel image.
 
 The HDR post stack executes authored standard passes rather than treating their names as metadata only:
 

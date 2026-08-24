@@ -10,12 +10,24 @@ public static class RekallAgeVulkanHighFidelityFormatValidator
         | FormatFeatureFlags.SampledImageFilterLinearBit
         | FormatFeatureFlags.TransferSrcBit;
 
+    private const FormatFeatureFlags FogFroxelRequiredFeatures =
+        FormatFeatureFlags.StorageImageBit
+        | FormatFeatureFlags.SampledImageBit
+        | FormatFeatureFlags.TransferSrcBit;
+
     public static string? ValidateShadowDepthFormat(FormatFeatureFlags available) =>
         ValidateOptimalTilingFeatures(
             Format.D32Sfloat,
             available,
             ShadowDepthRequiredFeatures,
             "shadow-atlas");
+
+    public static string? ValidateFogFroxelFormat(FormatFeatureFlags available) =>
+        ValidateOptimalTilingFeatures(
+            Format.R16G16B16A16Sfloat,
+            available,
+            FogFroxelRequiredFeatures,
+            "fog-froxel");
 
     public static string? ValidateShadowAtlasLimits(
         uint requestedResolution,

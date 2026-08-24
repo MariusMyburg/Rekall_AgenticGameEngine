@@ -17,7 +17,8 @@ public sealed class RekallAgeVulkanFogPlanner
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeResolvedFogQuality quality,
         RekallAgeVulkanFogHistory? previousHistory = null,
-        int maximumLocalVolumes = DefaultMaximumLocalVolumes)
+        int maximumLocalVolumes = DefaultMaximumLocalVolumes,
+        RekallAgeVulkanEffectiveCamera? effectiveCamera = null)
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(quality);
@@ -90,7 +91,7 @@ public sealed class RekallAgeVulkanFogPlanner
             .OrderBy(entityId => entityId, StringComparer.Ordinal)
             .ToArray();
 
-        var history = BuildHistory(frame, mode, grid);
+        var history = BuildHistory(frame, mode, grid, effectiveCamera);
         var historyReset = ShouldResetHistory(previousHistory, history, diagnostics);
         var enabled = selected.Any(volume => volume.Density > 0.000001f || volume.Emission.LengthSquared() > 0.000001f);
         return new RekallAgeVulkanFogPlan(
@@ -205,17 +206,18 @@ public sealed class RekallAgeVulkanFogPlanner
     private static RekallAgeVulkanFogHistory BuildHistory(
         RekallAgeRuntimeViewportFrame frame,
         string mode,
-        RekallAgeVulkanFogGrid grid)
+        RekallAgeVulkanFogGrid grid,
+        RekallAgeVulkanEffectiveCamera? effectiveCamera)
     {
         var camera = frame.ActiveCamera;
         return new RekallAgeVulkanFogHistory(
             frame.FrameIndex,
-            camera?.EntityId,
-            new Vector3(
+            effectiveCamera?.EntityId ?? camera?.EntityId,
+            effectiveCamera?.Position ?? new Vector3(
                 FiniteFloat(camera?.X ?? 0),
                 FiniteFloat(camera?.Y ?? 0),
                 FiniteFloat(camera?.Z ?? 0)),
-            new Vector3(
+            effectiveCamera?.RotationDegrees ?? new Vector3(
                 FiniteFloat(camera?.RotationX ?? 0),
                 FiniteFloat(camera?.RotationY ?? 0),
                 FiniteFloat(camera?.RotationZ ?? 0)),

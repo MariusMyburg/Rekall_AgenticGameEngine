@@ -60,6 +60,21 @@ public sealed class VulkanShaderCompilerTests
     }
 
     [Fact]
+    public void FroxelFormatPreflightRequiresStorageSamplingAndDebugTransferSource()
+    {
+        var missingTransferSource = RekallAgeVulkanHighFidelityFormatValidator.ValidateFogFroxelFormat(
+            FormatFeatureFlags.StorageImageBit | FormatFeatureFlags.SampledImageBit);
+        var supported = RekallAgeVulkanHighFidelityFormatValidator.ValidateFogFroxelFormat(
+            FormatFeatureFlags.StorageImageBit
+                | FormatFeatureFlags.SampledImageBit
+                | FormatFeatureFlags.TransferSrcBit);
+
+        Assert.NotNull(missingTransferSource);
+        Assert.Contains(nameof(FormatFeatureFlags.TransferSrcBit), missingTransferSource, StringComparison.Ordinal);
+        Assert.Null(supported);
+    }
+
+    [Fact]
     public void SceneShadersAreCopiedBesideTestHostForBundledRuntimeUse()
     {
         var shaderDirectory = Path.Combine(AppContext.BaseDirectory, "Shaders");

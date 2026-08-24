@@ -286,6 +286,265 @@ public sealed class VulkanHighFidelityCaptureTests
     }
 
     [Fact]
+    public async Task DefaultAuthoredCameraUsesTheSceneAutoFrameForNativeLocalFogAndDepth()
+    {
+        var source = FogFrame("High", density: 0);
+        var camera = source.ActiveCamera! with
+        {
+            X = 0,
+            Y = 0,
+            Z = 0,
+            RotationX = 0,
+            RotationY = 0,
+            RotationZ = 0
+        };
+        var cube = source.Renderables.Single(renderable => renderable.EntityId == "cube") with
+        {
+            X = 0,
+            Y = 0,
+            Z = 10,
+            MaterialColor = "#101010",
+            EmissiveColor = "#303030",
+            EmissiveStrength = 2
+        };
+        var foggedFrame = source with
+        {
+            ActiveCamera = camera,
+            Cameras = [camera],
+            Renderables = source.Renderables
+                .Where(renderable => renderable.EntityId != "cube")
+                .Append(cube)
+                .ToArray(),
+            FogVolumes =
+            [
+                new RekallAgeRuntimeViewportFogVolume(
+                    "auto-frame-fog",
+                    "Auto-frame Fog",
+                    "box",
+                    0.45,
+                    "#ffffff",
+                    "#ffffff",
+                    0,
+                    0,
+                    0.1,
+                    10,
+                    new RekallAgeRuntimeViewportTransform(0, 0, 12, 0, 0, 0, 3, 3, 1))
+            ]
+        };
+        var emptyFrame = foggedFrame with
+        {
+            FogVolumes = foggedFrame.FogVolumes.Select(volume => volume with { Density = 0, Emission = "#000000" }).ToArray()
+        };
+        var output = TestPaths.CreateTempDirectory();
+
+        var fogged = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            foggedFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var empty = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            emptyFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(fogged.Captured, string.Join(Environment.NewLine, fogged.Errors));
+        Assert.True(empty.Captured, string.Join(Environment.NewLine, empty.Errors));
+        var foggedImage = await RekallAgePngReader.ReadRgbaAsync(fogged.OutputPath, CancellationToken.None);
+        var emptyImage = await RekallAgePngReader.ReadRgbaAsync(empty.OutputPath, CancellationToken.None);
+        Assert.True(
+            RegionDistance(foggedImage.Rgba, emptyImage.Rgba, foggedImage.Width, 48, 32) > 100,
+            "Expected auto-framed camera local fog to contribute before the centered opaque surface.");
+    }
+
+    [Fact]
+    public async Task OrthographicNativeFogUsesPerPixelOriginsForLocalVolumeAndOpaqueDepth()
+    {
+        var source = FogFrame("High", density: 0);
+        var camera = source.ActiveCamera! with
+        {
+            X = 0,
+            Y = 0,
+            Z = -5,
+            RotationX = 0,
+            RotationY = 0,
+            RotationZ = 0,
+            ProjectionMode = "orthographic",
+            OrthographicSize = 8
+        };
+        var cube = source.Renderables.Single(renderable => renderable.EntityId == "cube") with
+        {
+            X = -2.5,
+            Y = 0,
+            Z = 4,
+            MaterialColor = "#101010",
+            EmissiveColor = "#303030",
+            EmissiveStrength = 2
+        };
+        var foggedFrame = source with
+        {
+            ActiveCamera = camera,
+            Cameras = [camera],
+            Renderables = source.Renderables
+                .Where(renderable => renderable.EntityId != "cube")
+                .Append(cube)
+                .ToArray(),
+            FogVolumes =
+            [
+                new RekallAgeRuntimeViewportFogVolume(
+                    "ortho-local-fog",
+                    "Orthographic Local Fog",
+                    "box",
+                    0.45,
+                    "#ffffff",
+                    "#ffffff",
+                    0,
+                    0,
+                    0.1,
+                    10,
+                    new RekallAgeRuntimeViewportTransform(-2.5, 0, 1.5, 0, 0, 0, 1.2, 3, 4))
+            ]
+        };
+        var emptyFrame = foggedFrame with
+        {
+            FogVolumes = foggedFrame.FogVolumes.Select(volume => volume with { Density = 0, Emission = "#000000" }).ToArray()
+        };
+        var output = TestPaths.CreateTempDirectory();
+
+        var fogged = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            foggedFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var empty = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            emptyFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(fogged.Captured, string.Join(Environment.NewLine, fogged.Errors));
+        Assert.True(empty.Captured, string.Join(Environment.NewLine, empty.Errors));
+        var foggedImage = await RekallAgePngReader.ReadRgbaAsync(fogged.OutputPath, CancellationToken.None);
+        var emptyImage = await RekallAgePngReader.ReadRgbaAsync(empty.OutputPath, CancellationToken.None);
+        var localDelta = RegionDistance(foggedImage.Rgba, emptyImage.Rgba, foggedImage.Width, 72, 32);
+        var oppositeDelta = RegionDistance(foggedImage.Rgba, emptyImage.Rgba, foggedImage.Width, 25, 32);
+        Assert.True(localDelta > oppositeDelta + 100,
+            $"Expected orthographic per-pixel origin to intersect only the authored local fog; local={localDelta}, opposite={oppositeDelta}.");
+    }
+
+    [Fact]
+    public async Task OrthographicAnalyticFogReconstructsPerPixelWorldHeightFromOpaqueDepth()
+    {
+        var source = FogFrame("Performance", density: 0.1);
+        var camera = source.ActiveCamera! with
+        {
+            X = 0,
+            Y = 0,
+            Z = -5,
+            RotationX = 0,
+            RotationY = 0,
+            RotationZ = 0,
+            ProjectionMode = "orthographic",
+            OrthographicSize = 8
+        };
+        var original = source.Renderables.Single(renderable => renderable.EntityId == "cube");
+        var lower = original with
+        {
+            EntityId = "lower-cube",
+            X = -2,
+            Y = -2,
+            Z = 4,
+            ScaleX = 1.2,
+            ScaleY = 1.2,
+            ScaleZ = 1.2,
+            MaterialColor = "#101010",
+            EmissiveColor = "#303030",
+            EmissiveStrength = 2
+        };
+        var upper = lower with { EntityId = "upper-cube", X = 2, Y = 2 };
+        var foggedFrame = source with
+        {
+            ActiveCamera = camera,
+            Cameras = [camera],
+            Renderables = source.Renderables
+                .Where(renderable => renderable.EntityId != "cube")
+                .Concat([lower, upper])
+                .ToArray(),
+            FogVolumes = source.FogVolumes.Select(volume => volume with
+            {
+                Albedo = "#ffffff",
+                Emission = "#000000",
+                HeightFalloff = 1.5
+            }).ToArray()
+        };
+        var emptyFrame = foggedFrame with
+        {
+            FogVolumes = foggedFrame.FogVolumes.Select(volume => volume with { Density = 0 }).ToArray()
+        };
+        var output = TestPaths.CreateTempDirectory();
+
+        var fogged = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            foggedFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var empty = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            emptyFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(fogged.Captured, string.Join(Environment.NewLine, fogged.Errors));
+        Assert.True(empty.Captured, string.Join(Environment.NewLine, empty.Errors));
+        var foggedImage = await RekallAgePngReader.ReadRgbaAsync(fogged.OutputPath, CancellationToken.None);
+        var emptyImage = await RekallAgePngReader.ReadRgbaAsync(empty.OutputPath, CancellationToken.None);
+        var lowerDelta = RegionDistance(foggedImage.Rgba, emptyImage.Rgba, foggedImage.Width, 30, 16);
+        var upperDelta = RegionDistance(foggedImage.Rgba, emptyImage.Rgba, foggedImage.Width, 66, 48);
+        Assert.True(lowerDelta > upperDelta + 100,
+            $"Expected analytic orthographic fog to use per-pixel world height; lower={lowerDelta}, upper={upperDelta}.");
+    }
+
+    [Fact]
+    public async Task NativeFogReportsOneSelectedDirectionalAndNeverPromotesPointOrFallbackLights()
+    {
+        var source = FogFrame("High", density: 0.08);
+        var point = source.Renderables.Single(renderable => renderable.EntityId == "sun") with
+        {
+            EntityId = "point-first",
+            EntityName = "Point First",
+            Variant = "PointLight",
+            X = 0,
+            Y = 1.5,
+            Z = -3,
+            MaterialColor = "#ffffff",
+            ShadowPriority = 100
+        };
+        var lower = source.Renderables.Single(renderable => renderable.EntityId == "sun") with
+        {
+            EntityId = "directional-lower",
+            ShadowPriority = 10,
+            MaterialColor = "#ff0000"
+        };
+        var selected = lower with
+        {
+            EntityId = "directional-selected",
+            ShadowPriority = 20,
+            MaterialColor = "#4080ff"
+        };
+        var meshes = source.Renderables.Where(renderable => renderable.Kind == "mesh").ToArray();
+        var pointFirstFrame = source with { Renderables = [point, lower, selected, .. meshes] };
+        var pointOnlyFrame = source with { Renderables = [point, .. meshes] };
+        var noLightFrame = source with { Renderables = meshes };
+        var output = TestPaths.CreateTempDirectory();
+
+        var pointFirst = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            pointFirstFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var pointOnly = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            pointOnlyFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var noLight = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            noLightFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.All([pointFirst, pointOnly, noLight], result =>
+            Assert.True(result.Captured, string.Join(Environment.NewLine, result.Errors)));
+        var selectedReport = Assert.IsType<RekallAgeHighFidelityFogReport>(
+            Assert.IsType<RekallAgeHighFidelityFrameReport>(pointFirst.HighFidelityFrame).Fog);
+        var pointReport = Assert.IsType<RekallAgeHighFidelityFogReport>(
+            Assert.IsType<RekallAgeHighFidelityFrameReport>(pointOnly.HighFidelityFrame).Fog);
+        var noLightReport = Assert.IsType<RekallAgeHighFidelityFogReport>(
+            Assert.IsType<RekallAgeHighFidelityFrameReport>(noLight.HighFidelityFrame).Fog);
+
+        Assert.True(selectedReport.DirectLightInjected);
+        Assert.Equal("directional-selected", selectedReport.DirectionalLightEntityId);
+        Assert.False(pointReport.DirectLightInjected);
+        Assert.Null(pointReport.DirectionalLightEntityId);
+        Assert.False(noLightReport.DirectLightInjected);
+        Assert.Null(noLightReport.DirectionalLightEntityId);
+        Assert.NotEqual(noLight.ByteChecksum, pointOnly.ByteChecksum);
+    }
+
+    [Fact]
     public async Task FroxelHistoryPersistsSamplesAndResetsForCameraCutsAndGridChanges()
     {
         var firstFrame = FogFrame("High", density: 0.16) with { FrameIndex = 40, ElapsedSeconds = 40.0 / 60.0 };

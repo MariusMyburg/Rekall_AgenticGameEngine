@@ -41,6 +41,15 @@ vec3 viewRay(vec2 uv)
         + parameters.cameraUp.xyz * ndc.y * parameters.projection.x);
 }
 
+vec3 viewOrigin(vec2 uv)
+{
+    if (parameters.projection.z <= 0.5) return frame.cameraPosition.xyz;
+    vec2 ndc = uv * 2.0 - 1.0;
+    return frame.cameraPosition.xyz
+        + parameters.cameraRight.xyz * ndc.x * parameters.projection.x * parameters.projection.y
+        + parameters.cameraUp.xyz * ndc.y * parameters.projection.x;
+}
+
 float linearViewDepth(float depth)
 {
     float nearPlane = max(parameters.optical.w, 0.001);
@@ -53,15 +62,15 @@ void main()
 {
     float depth = texture(sceneDepth, fragUv).r;
     float distanceToSurface = parameters.optical.z;
-    float worldHeight = frame.cameraPosition.y;
+    vec3 ray = viewRay(fragUv);
+    vec3 origin = viewOrigin(fragUv);
+    float worldHeight;
     if (depth < 0.999999)
     {
-        vec3 ray = viewRay(fragUv);
         distanceToSurface = linearViewDepth(depth)
             / max(dot(ray, normalize(parameters.cameraForwardFar.xyz)), 0.000001);
-        vec3 worldPosition = frame.cameraPosition.xyz + ray * distanceToSurface;
-        worldHeight = worldPosition.y;
     }
+    worldHeight = (origin + ray * distanceToSurface).y;
 
     float heightFactor = exp(-max(parameters.optical.y, 0.0) * max(worldHeight, 0.0));
     float opacity = 1.0 - exp(-max(parameters.optical.x, 0.0) * max(distanceToSurface, 0.0) * heightFactor);

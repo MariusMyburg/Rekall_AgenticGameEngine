@@ -244,3 +244,70 @@ Outputs: build succeeded with `0 Warning(s), 0 Error(s)`; formatter and diff che
 ### Residual concerns
 
 No Task 5 review finding remains deferred. The repository-wide AppContainer failures are unrelated pre-existing environment/worker transport failures; the complete Rendering namespace is green.
+
+## Fix Round 2: Effective camera, directional-light authority, and graph-declared froxel readback
+
+### Status
+
+`DONE`
+
+All three scoped re-review findings are repaired in production code, exercised through native Vulkan captures or graph/format validation, and reflected exactly in the tracked design specification and implementation plan.
+
+### Systematic root causes and repairs
+
+1. **Effective camera/projection:** scene batching privately auto-framed a null/zero camera from mesh bounds, while fog independently reconstructed the authored zero pose. Orthographic fog also emitted one forward ray from one camera origin for every pixel even though the scene projection spans authored width/height extents. `RekallAgeVulkanEffectiveCamera` now publishes the one resolved pose, basis, exact scene view/projection matrices, clip range, perspective tangent or orthographic half-height/aspect, and auto-frame fact. Its horizontal reconstruction basis is derived from the actual right-handed view (`cross(forward, up)`), rather than assuming authored local +X maps to screen right. High-fidelity planning resolves it from the same transformed mesh bounds, then injects that exact object into scene batching, shadow planning, fog/history planning, analytic/froxel push constants, and persistent-history commits. Perspective reconstruction uses per-pixel rays; orthographic reconstruction uses parallel rays plus per-pixel origins. Both native fog shaders continue to sample stored D32 depth and stop at the rendered opaque surface.
+2. **Directional-light truth:** the fog plan previously reported any visible light, the shadow plan separately chose a directional light, and frame batching could prefer a point light or synthesize a white directional fallback. The high-fidelity plan now owns one `RekallAgeVulkanDirectionalLightInjection`, selected only from visible non-point lights by descending shadow priority then stable entity ID. Its entity/direction/color drives the shadow plan, primary frame UBO, fog plan, shader, and report. Point lights remain optional additional punctual lights. When no directional light exists, the primary UBO contains zero direction/color/position, fog reports no direct injection and a null entity ID, and the shader skips directional phase/shadow work without a synthetic fallback or zero-vector normalization.
+3. **Graph/native readback authority:** native Vulkan allocated the froxel image with `TransferSrc`, copied it to a host buffer, and generated debug PNGs, but the graph declared only storage/sampled usage and device preflight omitted transfer-source capability. The graph now declares `fog-froxel` transfer-source usage, a budgeted `fog-debug-readback` transfer-destination/host-readback resource, and a dependency-ordered transfer pass between fog integration and transparent rendering. Command planning and executed pass reports carry that pass. The resolved transient budget includes the readback bytes, the native resource report exposes its allocation, and `ValidateFogFroxelFormat` requires storage, sampled, and transfer-source support before allocation.
+
+### Isolated RED/GREEN evidence
+
+- **Graph/preflight RED:** the focused test initially failed compilation with `CS0117` because `ValidateFogFroxelFormat` did not exist; the graph assertion also lacked `transfer-source`. The stronger dependency test then failed because no `fog-debug-readback` resource/pass existed. GREEN is the complete `HighFidelityRenderGraphTests` group at 12/12 plus the format-validator test, with the graph estimate updated from `139,266,048` to `144,795,648` bytes for High.
+- **Effective-camera RED:** the isolated camera tests failed compilation with `CS1061` because `RekallAgeVulkanSceneBatch` exposed no `EffectiveCamera`. A later matrix-handedness assertion then failed because the authored rotated +X axis was incorrectly treated as screen right for a +Z-looking right-handed view. GREEN proves the auto-framed camera is the frame uniform camera/VP, the reconstructed horizontal basis agrees with the real view matrix, and orthographic screen positions have distinct origins but parallel rays. Native GREEN proves a local volume between an auto-framed camera and opaque cube contributes, a bounded orthographic local volume affects its matrix-correct screen region before opaque depth, and analytic orthographic height fog reconstructs different per-pixel world heights from opaque depth.
+- **Directional selection RED:** isolated tests failed compilation with `CS1061` because `RekallAgeVulkanHighFidelityFramePlan` exposed neither `DirectionalLight` nor `EffectiveCamera`, and prepared batching had no explicit injection input. GREEN proves a point-first list cannot displace the highest-priority directional light, multiple directional lights select deterministically, and point-only/no-light frames keep the primary directional UBO and report disabled. A native three-case capture verifies selected entity `directional-selected`, null IDs for point-only/no-light, and truthful `DirectLightInjected` values. A stronger native assertion initially found point-only and no-light pixel checksums equal because the scene shader normalized the disabled zero primary direction and contaminated additional-light shading. The shader now branches on actual primary-light energy/vector length, performs no synthetic directional work when disabled, preserves additional point-light shading, and the native checksums differ.
+- **Aggregate compatibility RED/GREEN:** the first broad focused run found one intentional graph-contract mismatch in `VulkanSceneCommandPlanTests`: the expected post list omitted the new readback pass. Its isolated rerun passed after the test was updated to the authoritative order. No production defect was hidden or deferred.
+
+### Final verification
+
+Required Task 5 focused gate:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~VulkanFogPlannerTests|FullyQualifiedName~ViewportContractTests|FullyQualifiedName~VulkanHighFidelityCaptureTests" --logger "console;verbosity=minimal"
+```
+
+Output: `Passed: 66, Failed: 0, Skipped: 0`.
+
+Broader changed-contract gate:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~VulkanFogPlannerTests|FullyQualifiedName~ViewportContractTests|FullyQualifiedName~VulkanHighFidelityCaptureTests|FullyQualifiedName~VulkanSceneBatchBuilderTests|FullyQualifiedName~HighFidelityRenderGraphTests|FullyQualifiedName~VulkanShaderCompilerTests|FullyQualifiedName~VulkanSceneCommandPlanTests" --logger "console;verbosity=minimal"
+```
+
+Output: `Passed: 112, Failed: 0, Skipped: 0`.
+
+Complete Rendering namespace:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~Rekall.Age.Tests.Rendering" --logger "console;verbosity=minimal"
+```
+
+Output: `Passed: 598, Failed: 0, Skipped: 0` in 34 seconds.
+
+Mechanical gates:
+
+```powershell
+dotnet build src\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj --no-restore
+dotnet format Rekall.AGE.sln --no-restore --verify-no-changes --include <all changed C# files>
+git diff --check
+```
+
+Outputs: build succeeded with `0 Warning(s), 0 Error(s)`; formatter and diff checks exited 0.
+
+### Tracked contract updates
+
+- The design now defines one effective camera shared by scene/shadow/fog/history, including default auto-frame and orthographic per-pixel origins.
+- The design and plan now define one deterministic directional-light injection fact or explicit none; point lights and synthetic fallback are excluded from that role.
+- The graph contract and documented pass order now include the budgeted `fog-debug-readback` transfer resource/pass/dependency after `fog-integrate` and before transparent rendering.
+
+### Residual concerns
+
+No scoped Fix Round 2 finding remains deferred. The high-fidelity path performs an additional bounded transformed-vertex walk during planning to resolve the effective camera before batching; it avoids extra geometry/index allocation and keeps the camera contract exact. If future profiling identifies this as material for very large scenes, the same generic bounds result can be cached by the renderer's scene-residency layer without changing the camera/light/fog contracts.

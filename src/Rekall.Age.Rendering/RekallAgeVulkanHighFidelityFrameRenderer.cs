@@ -31,19 +31,26 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
 
         var graph = new RekallAgeHighFidelityRenderGraphBuilder().Build(frame, resolved);
         var diagnostics = new List<RekallAgeHighFidelityRenderGraphDiagnostic>(graph.Diagnostics);
-        var shadowPlan = BuildShadowPlan(frame, meshes, resolved.Shadows);
+        var effectiveCamera = new RekallAgeVulkanSceneBatchBuilder().ResolveEffectiveCamera(frame, meshes ?? []);
+        var selectedDirectionalRenderable = SelectDirectionalLight(frame);
+        var directionalLight = selectedDirectionalRenderable is null
+            ? RekallAgeVulkanDirectionalLightInjection.Disabled
+            : ToDirectionalLightInjection(selectedDirectionalRenderable);
+        var shadowPlan = BuildShadowPlan(frame, meshes, resolved.Shadows, effectiveCamera, selectedDirectionalRenderable);
         diagnostics.AddRange(shadowPlan.Diagnostics.Select(diagnostic =>
             new RekallAgeHighFidelityRenderGraphDiagnostic(
                 diagnostic.Code,
                 "shadow-directional",
                 diagnostic.Message)));
-        var fogPlan = new RekallAgeVulkanFogPlanner().Plan(frame, resolved.Fog, previousFogHistory) with
+        var fogPlan = new RekallAgeVulkanFogPlanner().Plan(
+            frame,
+            resolved.Fog,
+            previousFogHistory,
+            effectiveCamera: effectiveCamera) with
         {
-            DirectLightAvailable = frame.Renderables.Any(item =>
-                item.Kind.Equals("light", StringComparison.Ordinal) && item.Intensity > 0.0001),
+            DirectLightAvailable = directionalLight.Available,
             ShadowAvailable = shadowPlan.Enabled,
-            DirectLightEntityId = shadowPlan.LightEntityId ?? frame.Renderables.FirstOrDefault(item =>
-                item.Kind.Equals("light", StringComparison.Ordinal) && item.Intensity > 0.0001)?.EntityId
+            DirectLightEntityId = directionalLight.EntityId
         };
         diagnostics.AddRange(fogPlan.Diagnostics.Select(diagnostic =>
             new RekallAgeHighFidelityRenderGraphDiagnostic(
@@ -78,43 +85,36 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
                     : 0,
                 BloomRadius: ResolveRadius(bloom?.Radius ?? 1)),
             shadowPlan,
-            fogPlan);
+            fogPlan)
+        {
+            DirectionalLight = directionalLight,
+            EffectiveCamera = effectiveCamera
+        };
     }
 
     private static RekallAgeVulkanShadowPlan BuildShadowPlan(
         RekallAgeRuntimeViewportFrame frame,
         IReadOnlyList<RekallAgeVulkanSceneMesh>? meshes,
-        RekallAgeResolvedShadowQuality quality)
+        RekallAgeResolvedShadowQuality quality,
+        RekallAgeVulkanEffectiveCamera camera,
+        RekallAgeRuntimeViewportRenderable? light)
     {
-        var camera = frame.ActiveCamera;
-        if (camera is null)
-        {
-            return DisabledShadowPlan(quality, "REKALL_SHADOW_CAMERA_INVALID", "Directional shadows require a finite active camera.");
-        }
-
-        var light = frame.Renderables
-            .Where(item => item.Kind.Equals("light", StringComparison.Ordinal)
-                && item.Variant?.Contains("point", StringComparison.OrdinalIgnoreCase) != true
-                && item.Intensity > 0.0001)
-            .OrderByDescending(item => item.ShadowPriority)
-            .ThenBy(item => item.EntityId, StringComparer.Ordinal)
-            .FirstOrDefault();
         if (light is null)
         {
             return DisabledShadowPlan(quality, "REKALL_SHADOW_LIGHT_MISSING", "No visible directional light is available for the shadow pass.");
         }
 
         var shadowCamera = new RekallAgeVulkanShadowCamera(
-            new Vector3((float)camera.X, (float)camera.Y, (float)camera.Z),
-            DirectionFromEuler(camera.RotationX, camera.RotationY, camera.RotationZ),
-            RotateDirection(Vector3.UnitY, camera.RotationX, camera.RotationY, camera.RotationZ),
-            MathF.PI / 180f * (float)camera.FieldOfViewDegrees,
-            frame.Height <= 0 ? 1 : frame.Width / (float)frame.Height,
-            (float)camera.NearClip,
-            (float)camera.FarClip,
+            camera.Position,
+            camera.Forward,
+            camera.Up,
+            camera.Orthographic ? MathF.PI / 3 : 2 * MathF.Atan(camera.TangentOrHalfHeight),
+            camera.Aspect,
+            camera.NearClip,
+            camera.FarClip,
             ReceiverMask: uint.MaxValue,
-            ProjectionMode: camera.ProjectionMode,
-            OrthographicSize: (float)camera.OrthographicSize);
+            ProjectionMode: camera.Orthographic ? "orthographic" : "perspective",
+            OrthographicSize: camera.TangentOrHalfHeight * 2);
         var shadowLight = new RekallAgeVulkanDirectionalShadowLight(
             DirectionFromEuler(light.RotationX, light.RotationY, light.RotationZ),
             light.CastShadows,
@@ -131,8 +131,42 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
             quality);
         return plan with
         {
-            LightEntityId = plan.Enabled ? light.EntityId : null
+            LightEntityId = light.EntityId
         };
+    }
+
+    private static RekallAgeRuntimeViewportRenderable? SelectDirectionalLight(
+        RekallAgeRuntimeViewportFrame frame) => frame.Renderables
+        .Where(item => item.Kind.Equals("light", StringComparison.Ordinal)
+            && item.Variant?.Contains("point", StringComparison.OrdinalIgnoreCase) != true
+            && item.Intensity > 0.0001)
+        .OrderByDescending(item => item.ShadowPriority)
+        .ThenBy(item => item.EntityId, StringComparer.Ordinal)
+        .FirstOrDefault();
+
+    private static RekallAgeVulkanDirectionalLightInjection ToDirectionalLightInjection(
+        RekallAgeRuntimeViewportRenderable light)
+    {
+        var color = ParseLightColor(light.MaterialColor);
+        var intensity = (float)Math.Clamp(light.Intensity, 0.05, 4.0);
+        return new RekallAgeVulkanDirectionalLightInjection(
+            true,
+            light.EntityId,
+            DirectionFromEuler(light.RotationX, light.RotationY, light.RotationZ),
+            new Vector4(color * intensity, 1));
+    }
+
+    private static Vector3 ParseLightColor(string? color)
+    {
+        if (color is { Length: 7 or 9 } && color[0] == '#'
+            && byte.TryParse(color.AsSpan(1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var red)
+            && byte.TryParse(color.AsSpan(3, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var green)
+            && byte.TryParse(color.AsSpan(5, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var blue))
+        {
+            return new Vector3(red / 255f, green / 255f, blue / 255f);
+        }
+
+        return Vector3.One;
     }
 
     private static IReadOnlyList<RekallAgeVulkanShadowCaster> BuildCasters(
@@ -435,6 +469,12 @@ public sealed record RekallAgeVulkanHighFidelityFramePlan(
     RekallAgeVulkanFogPlan FogPlan)
 {
     public bool Ready => Graph.IsValid;
+
+    public RekallAgeVulkanDirectionalLightInjection DirectionalLight { get; init; } =
+        RekallAgeVulkanDirectionalLightInjection.Disabled;
+
+    public RekallAgeVulkanEffectiveCamera EffectiveCamera { get; init; } =
+        RekallAgeVulkanEffectiveCamera.Default;
 }
 
 public sealed record RekallAgeHighFidelityPostSettings(

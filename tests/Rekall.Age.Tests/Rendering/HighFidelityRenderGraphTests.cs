@@ -11,7 +11,7 @@ public sealed class HighFidelityRenderGraphTests
         var graph = Build("High");
 
         Assert.Equal(
-            ["depth-normal", "shadow-directional", "cluster-build", "opaque-hdr", "fog-integrate", "transparent-particles", "bloom", "tone-map", "ui", "present"],
+            ["depth-normal", "shadow-directional", "cluster-build", "opaque-hdr", "fog-integrate", "fog-debug-readback", "transparent-particles", "bloom", "tone-map", "ui", "present"],
             graph.Passes.Select(pass => pass.Name));
         Assert.All(graph.Passes, pass => Assert.All(
             pass.Reads,
@@ -37,6 +37,30 @@ public sealed class HighFidelityRenderGraphTests
         Assert.Contains("depth-buffer", fog.Reads);
         Assert.Contains("fog-history", fog.Reads);
         Assert.Contains("fog-history", fog.Writes);
+    }
+
+    [Fact]
+    public void FroxelGraphDeclaresNativeDebugReadbackTransferSourceUsage()
+    {
+        var graph = Build("High");
+
+        var froxel = Assert.Single(graph.Resources, resource => resource.Name == "fog-froxel");
+        Assert.Contains("storage", froxel.Usage);
+        Assert.Contains("sampled", froxel.Usage);
+        Assert.Contains("transfer-source", froxel.Usage);
+        Assert.Contains(graph.Resources, resource => resource.Name == "fog-debug-readback"
+            && resource.Usage.Contains("transfer-destination", StringComparer.Ordinal)
+            && resource.Usage.Contains("host-readback", StringComparer.Ordinal));
+        var readback = Assert.Single(graph.Passes, pass => pass.Name == "fog-debug-readback");
+        Assert.Equal("transfer", readback.Kind);
+        Assert.Contains("fog-froxel", readback.Reads);
+        Assert.Contains("fog-debug-readback", readback.Writes);
+        Assert.Contains(graph.Dependencies, dependency => dependency is
+        {
+            ProducerPass: "fog-integrate",
+            ConsumerPass: "fog-debug-readback",
+            Resource: "fog-froxel"
+        });
     }
 
     [Fact]
@@ -118,7 +142,7 @@ public sealed class HighFidelityRenderGraphTests
     {
         var graph = Build("High");
 
-        Assert.Equal(139_266_048, graph.EstimatedBytes);
+        Assert.Equal(144_795_648, graph.EstimatedBytes);
         Assert.Equal(
             graph.Resources
                 .Where(resource => resource.Lifetime != "external")

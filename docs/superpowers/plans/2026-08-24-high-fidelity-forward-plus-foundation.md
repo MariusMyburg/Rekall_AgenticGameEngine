@@ -174,7 +174,7 @@ Cover `Performance`, `High`, and `Epic`. High must order these named passes:
 
 ```csharp
 Assert.Equal(
-    ["depth-normal", "shadow-directional", "cluster-build", "opaque-hdr", "fog-integrate", "transparent-particles", "bloom", "tone-map", "ui", "present"],
+    ["depth-normal", "shadow-directional", "cluster-build", "opaque-hdr", "fog-integrate", "fog-debug-readback", "transparent-particles", "bloom", "tone-map", "ui", "present"],
     graph.Passes.Select(pass => pass.Name));
 Assert.All(graph.Passes, pass => Assert.All(pass.Reads, resource => Assert.Contains(graph.Resources, item => item.Name == resource)));
 ```
@@ -347,8 +347,8 @@ git commit -m "feat: add scalable cascaded scene shadows"
 - Test: `tests/Rekall.Age.Tests/Rendering/VulkanHighFidelityCaptureTests.cs`
 
 **Interfaces:**
-- Consumes: projected `Rekall.FogVolume` values, camera, light/shadow resources, depth, previous fog history, and resolved fog quality.
-- Produces: ordered bounded fog volumes plus analytic or froxel dispatch plans, a persistent GPU-history resource, reset/reuse facts, and GPU-readback debug evidence.
+- Consumes: projected `Rekall.FogVolume` values, the scene renderer's resolved effective camera, one selected directional-light injection fact or explicit none, cascade shadow resources, opaque depth, previous fog history, and resolved fog quality.
+- Produces: ordered bounded fog volumes plus analytic or froxel dispatch plans, a persistent GPU-history resource, reset/reuse facts, and graph-declared GPU-readback debug evidence.
 
 - [ ] **Step 1: Write failing projection/planner tests**
 
@@ -370,7 +370,7 @@ Performance/Low resolve to analytic distance/height fog. Medium and above resolv
 
 - [ ] **Step 3: Implement light/shadow-aware froxel integration**
 
-Store and sample opaque depth in analytic and froxel shaders; reconstruct rays from the active camera orientation/projection and stop integration at opaque surfaces. Inject the selected directional-light color/direction into the 3D grid, evaluate the anisotropic phase angle, and sample its cascade shadow atlas by view depth. Evaluate local volumes through packed world-to-local transforms. Keep one initialized 3D history image per native renderer session, bind/sample/reproject it on reusable frames, and clear/reset it on camera cuts or grid changes. Declare and budget that persistent resource in the render graph, read back the executed froxel image for debug slices, record injection and composite as two dispatches, and composite before transparent particles. Clamp supported volume counts and return affected entity IDs on overflow; reject unsupported shapes with a stable degradation code and dropped IDs.
+Resolve one effective camera from authored pose plus actual scene bounds and use it unchanged for scene/shadow uniforms, fog push constants, and history continuity; default/null cameras auto-frame once, perspective rays use its projection tangent/aspect, and orthographic rays use parallel direction plus per-pixel origins from its half extents. Store/sample opaque depth in both shaders and stop integration at opaque surfaces. Select one visible directional light by shadow priority then stable entity ID and use that exact direction/color/entity for shadow planning, frame UBOs, fog planning, shader injection, and reports; point lights remain additional punctual lights, while no directional light injects zero energy with no synthetic fallback. Evaluate anisotropic phase and cascade shadow lookup from that selection, and local volumes through packed world-to-local transforms. Keep one initialized 3D history image per native renderer session, bind/sample/reproject it on reusable frames, and clear/reset it on camera cuts or grid changes. Declare and budget the history plus `fog-froxel` transfer-source and `fog-debug-readback` transfer-destination resources in the render graph, execute their dependency-ordered readback pass, derive debug slices from the returned GPU cells, record injection and composite as two dispatches, and composite before transparent particles. Clamp supported volume counts and return affected entity IDs on overflow; reject unsupported shapes with a stable degradation code and dropped IDs.
 
 - [ ] **Step 4: Add fog debug slices and tests**
 

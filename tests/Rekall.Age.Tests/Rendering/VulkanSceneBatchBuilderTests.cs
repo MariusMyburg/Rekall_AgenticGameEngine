@@ -189,6 +189,92 @@ public sealed class VulkanSceneBatchBuilderTests
     }
 
     [Fact]
+    public void BuildPublishesTheAutoFramedCameraUsedBySceneAndFogConsumers()
+    {
+        var authored = new RekallAgeRuntimeViewportCamera(
+            "camera",
+            "Default Camera",
+            "Camera3D",
+            true,
+            0,
+            0,
+            0);
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "cube",
+            "Offset Cube",
+            "mesh",
+            "rekall.primitive.cube",
+            10,
+            4,
+            20,
+            1,
+            Variant: "rekall.geometry.cube",
+            ScaleX: 2,
+            ScaleY: 2,
+            ScaleZ: 2)) with
+        {
+            ActiveCamera = authored,
+            Cameras = [authored]
+        };
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
+
+        Assert.NotEqual(Vector3.Zero, batch.EffectiveCamera.Position);
+        var toCenter = new Vector3(10, 4, 20) - batch.EffectiveCamera.Position;
+        Assert.InRange(Vector3.Cross(Vector3.Normalize(toCenter), batch.EffectiveCamera.Forward).Length(), 0, 0.01f);
+        Assert.True(Vector3.Dot(toCenter, batch.EffectiveCamera.Forward) > 0);
+        Assert.Equal(batch.EffectiveCamera.Position, new Vector3(
+            batch.Frame.CameraPosition.X,
+            batch.Frame.CameraPosition.Y,
+            batch.Frame.CameraPosition.Z));
+        Assert.Equal(batch.EffectiveCamera.ViewProjection, batch.Frame.ViewProjection);
+        Assert.True(batch.EffectiveCamera.AutoFramed);
+    }
+
+    [Fact]
+    public void BuildPublishesOrthographicPerPixelOriginsAndParallelRays()
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera",
+            "Orthographic Camera",
+            "Camera3D",
+            true,
+            4,
+            3,
+            -5,
+            ProjectionMode: "orthographic",
+            OrthographicSize: 8,
+            NearClip: 0.1,
+            FarClip: 80);
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "cube",
+            "Cube",
+            "mesh",
+            "rekall.primitive.cube",
+            4,
+            3,
+            5,
+            1,
+            Variant: "rekall.geometry.cube")) with
+        {
+            ActiveCamera = camera,
+            Cameras = [camera]
+        };
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+
+        var effective = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes).EffectiveCamera;
+        var leftOrigin = effective.ViewOrigin(new Vector2(0, 0.5f));
+        var rightOrigin = effective.ViewOrigin(new Vector2(1, 0.5f));
+
+        Assert.True(effective.Orthographic);
+        Assert.InRange(Vector3.Distance(effective.Forward, effective.ViewRay(new Vector2(0, 0.5f))), 0, 0.0001f);
+        Assert.InRange(Vector3.Distance(effective.Forward, effective.ViewRay(new Vector2(1, 0.5f))), 0, 0.0001f);
+        Assert.InRange(Vector3.Distance(leftOrigin, rightOrigin), 14.21f, 14.23f);
+        Assert.True(leftOrigin.X > rightOrigin.X);
+    }
+
+    [Fact]
     public void BuildUsesPointLightPositionWhenFrameContainsPointLight()
     {
         var frame = CreateFrame(
@@ -318,6 +404,120 @@ public sealed class VulkanSceneBatchBuilderTests
         Assert.Equal(new Vector4(2, 0, 0, 1), batch.Frame.LightColor);
         Assert.Equal(new Vector4(0, 2, 3, 1), batch.Frame.AdditionalLightPosition);
         Assert.Equal(new Vector4(0, 4, 0, 1), batch.Frame.AdditionalLightColor);
+    }
+
+    [Fact]
+    public void HighFidelitySelectionIgnoresPointFirstAndUsesHighestPriorityDirectionalEverywhere()
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera", "Camera", "Camera3D", true, 0, 2, -6, NearClip: 0.1, FarClip: 80);
+        var frame = CreateFrame(
+            new RekallAgeRuntimeViewportRenderable(
+                "mesh", "Mesh", "mesh", "rekall.primitive.cube", 0, 0, 5, 1,
+                Variant: "rekall.geometry.cube"),
+            new RekallAgeRuntimeViewportRenderable(
+                "point-first", "Point", "light", null, 0, 2, 3, 2,
+                Variant: "PointLight", Intensity: 4, MaterialColor: "#00ff00"),
+            new RekallAgeRuntimeViewportRenderable(
+                "directional-low", "Low", "light", null, 0, 0, 0, 3,
+                Variant: "DirectionalLight", RotationY: 30, Intensity: 3, MaterialColor: "#0000ff")
+            {
+                ShadowPriority = 10
+            },
+            new RekallAgeRuntimeViewportRenderable(
+                "directional-selected", "Selected", "light", null, 0, 0, 0, 4,
+                Variant: "DirectionalLight", RotationX: 55, Intensity: 2, MaterialColor: "#ff0000")
+            {
+                ShadowPriority = 20
+            }) with
+        {
+            ActiveCamera = camera,
+            Cameras = [camera],
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post", "Post", true, [new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")]),
+            ResolvedQualityPlan = new RekallAgeRenderQualityProfileResolver().Resolve(
+                new RekallAgeRenderQualityIntent("High", Bloom: false),
+                RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+                128,
+                72),
+            FogVolumes =
+            [
+                new RekallAgeRuntimeViewportFogVolume(
+                    "fog", "Fog", "global", 0.1, "#ffffff", "#000000", 0, 0, 0, 0,
+                    RekallAgeRuntimeViewportTransform.Identity)
+            ]
+        };
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+
+        var plan = Assert.IsType<RekallAgeVulkanHighFidelityFramePlan>(
+            new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame, meshes));
+        var prepared = RekallAgeVulkanScenePreparedFrameBuilder.Build(
+            frame,
+            meshes,
+            RekallAgeVulkanSceneRenderTarget.OffscreenCapture(128, 72),
+            directionalLight: plan.DirectionalLight,
+            effectiveCamera: plan.EffectiveCamera);
+
+        Assert.True(plan.DirectionalLight.Available);
+        Assert.Equal("directional-selected", plan.DirectionalLight.EntityId);
+        Assert.Equal(plan.DirectionalLight.EntityId, plan.ShadowPlan.LightEntityId);
+        Assert.Equal(plan.DirectionalLight.EntityId, plan.FogPlan.DirectLightEntityId);
+        Assert.True(plan.FogPlan.DirectLightAvailable);
+        Assert.Equal(plan.DirectionalLight.Direction, prepared.Batch.Frame.LightDirection);
+        Assert.Equal(plan.DirectionalLight.Color, prepared.Batch.Frame.LightColor);
+        Assert.Equal(0, prepared.Batch.Frame.LightPosition.W);
+        Assert.Equal(new Vector4(0, 2, 3, 1), prepared.Batch.Frame.AdditionalLightPosition);
+    }
+
+    [Fact]
+    public void HighFidelitySelectionReportsNoDirectionalWithoutSyntheticOrPointMasquerade()
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera", "Camera", "Camera3D", true, 0, 2, -6, NearClip: 0.1, FarClip: 80);
+        var frame = CreateFrame(
+            new RekallAgeRuntimeViewportRenderable(
+                "mesh", "Mesh", "mesh", "rekall.primitive.cube", 0, 0, 5, 1,
+                Variant: "rekall.geometry.cube"),
+            new RekallAgeRuntimeViewportRenderable(
+                "point-only", "Point", "light", null, 0, 2, 3, 2,
+                Variant: "PointLight", Intensity: 4, MaterialColor: "#00ff00")) with
+        {
+            ActiveCamera = camera,
+            Cameras = [camera],
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post", "Post", true, [new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")]),
+            ResolvedQualityPlan = new RekallAgeRenderQualityProfileResolver().Resolve(
+                new RekallAgeRenderQualityIntent("High", Bloom: false),
+                RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+                128,
+                72),
+            FogVolumes =
+            [
+                new RekallAgeRuntimeViewportFogVolume(
+                    "fog", "Fog", "global", 0.1, "#ffffff", "#000000", 0, 0, 0, 0,
+                    RekallAgeRuntimeViewportTransform.Identity)
+            ]
+        };
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+
+        var plan = Assert.IsType<RekallAgeVulkanHighFidelityFramePlan>(
+            new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame, meshes));
+        var prepared = RekallAgeVulkanScenePreparedFrameBuilder.Build(
+            frame,
+            meshes,
+            RekallAgeVulkanSceneRenderTarget.OffscreenCapture(128, 72),
+            directionalLight: plan.DirectionalLight,
+            effectiveCamera: plan.EffectiveCamera);
+
+        Assert.False(plan.DirectionalLight.Available);
+        Assert.Null(plan.DirectionalLight.EntityId);
+        Assert.Null(plan.FogPlan.DirectLightEntityId);
+        Assert.False(plan.FogPlan.DirectLightAvailable);
+        Assert.False(plan.ShadowPlan.Enabled);
+        Assert.Equal(Vector3.Zero, prepared.Batch.Frame.LightDirection);
+        Assert.Equal(Vector4.Zero, prepared.Batch.Frame.LightColor);
+        Assert.Equal(Vector4.Zero, prepared.Batch.Frame.LightPosition);
+        Assert.Equal(new Vector4(0, 2, 3, 1), prepared.Batch.Frame.AdditionalLightPosition);
     }
 
     [Fact]

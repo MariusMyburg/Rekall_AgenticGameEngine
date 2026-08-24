@@ -504,7 +504,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 frame,
                 meshes,
                 target,
-                highFidelityPlan?.ShadowPlan.LightEntityId);
+                highFidelityPlan?.ShadowPlan.LightEntityId,
+                highFidelityPlan?.DirectionalLight,
+                highFidelityPlan?.EffectiveCamera);
             var commandPlan = RekallAgeVulkanSceneCommandPlanBuilder.BuildOffscreen(
                 prepared,
                 highFidelityPlan?.Graph,
@@ -570,7 +572,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     if (highFidelityPlan.FogPlan.UsesFroxelGrid
                         && persistentContext is not null)
                     {
-                        PreparePersistentFogHistory(state, persistentContext, highFidelityPlan.FogPlan, frame);
+                        PreparePersistentFogHistory(
+                            state,
+                            persistentContext,
+                            highFidelityPlan.FogPlan,
+                            highFidelityPlan.EffectiveCamera);
                     }
                     if (highFidelityPlan.ShadowPlan.Enabled)
                     {
@@ -648,7 +654,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 {
                     persistentContext.CommitFogHistory(
                         highFidelityPlan.FogPlan.NextHistory,
-                        ResolveFogCamera(frame));
+                        ResolveFogCamera(highFidelityPlan.EffectiveCamera));
                 }
 
                 Directory.CreateDirectory(outputDirectory);
@@ -2025,12 +2031,13 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 errors);
             if (fogPlan.UsesFroxelGrid)
             {
-                ValidateFormat(
-                    state,
-                    Format.R16G16B16A16Sfloat,
-                    FormatFeatureFlags.StorageImageBit | FormatFeatureFlags.SampledImageBit,
-                    "fog-froxel",
-                    errors);
+                state.Vk.GetPhysicalDeviceFormatProperties(state.PhysicalDevice, Format.R16G16B16A16Sfloat, out var fogFormatProperties);
+                var fogFormatDiagnostic = RekallAgeVulkanHighFidelityFormatValidator.ValidateFogFroxelFormat(
+                    fogFormatProperties.OptimalTilingFeatures);
+                if (fogFormatDiagnostic is not null)
+                {
+                    errors.Add($"{fogFormatDiagnostic} Vulkan device: '{state.SelectedDevice?.Name}'.");
+                }
                 state.Vk.GetPhysicalDeviceProperties(state.PhysicalDevice, out var fogDeviceProperties);
                 var maximumDimension = fogDeviceProperties.Limits.MaxImageDimension3D;
                 if ((uint)fogPlan.Grid.Width > maximumDimension
@@ -3607,11 +3614,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 &analyticSet,
                 0,
                 null);
-            var resolved = ResolveAnalyticFogParameters(
-                fogPlan,
-                checked((float)Math.Max(0.001, commandPlan.PreparedFrame.Frame.ActiveCamera?.NearClip ?? 0.05)),
-                checked((float)Math.Max(0.001, commandPlan.PreparedFrame.Frame.ActiveCamera?.FarClip ?? 100)));
-            var camera = ResolveFogCamera(commandPlan.PreparedFrame.Frame);
+            var camera = ResolveFogCamera(commandPlan.PreparedFrame.Batch.EffectiveCamera);
+            var resolved = ResolveAnalyticFogParameters(fogPlan, camera.NearClip, camera.FarClip);
             var parameters = new AnalyticFogPushConstants(
                 resolved.Color,
                 resolved.Parameters,
@@ -3747,8 +3751,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 &fogSet,
                 0,
                 null);
-            var frame = commandPlan.PreparedFrame.Frame;
-            var camera = ResolveFogCamera(frame);
+            var camera = ResolveFogCamera(commandPlan.PreparedFrame.Batch.EffectiveCamera);
             var inject = new FogPushConstants(
                 new Vector4(camera.Position, camera.NearClip),
                 new Vector4(camera.Forward, camera.FarClip),
@@ -3952,6 +3955,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             if (plan.FogPlan.UsesFroxelGrid)
             {
                 allocated.Add("fog-froxel");
+                allocated.Add("fog-debug-readback");
                 allocated.Add("fog-history");
             }
             return new RekallAgeHighFidelityFrameReport(
@@ -4128,6 +4132,14 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         highFidelityPlan.FogPlan.UsesFroxelGrid || highFidelityPlan.FogPlan.Enabled,
                         highFidelityPlan.FogPlan.UsesFroxelGrid ? 2 : 0,
                         !highFidelityPlan.FogPlan.UsesFroxelGrid && highFidelityPlan.FogPlan.Enabled ? 1 : 0),
+                    "fog-debug-readback" => new(
+                        pass.Name,
+                        pass.Kind,
+                        pass.Reads,
+                        pass.Writes,
+                        highFidelityPlan.FogPlan.UsesFroxelGrid,
+                        0,
+                        0),
                     "transparent-particles" => new(
                         pass.Name,
                         pass.Kind,
@@ -4709,7 +4721,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             VulkanState state,
             PersistentContext context,
             RekallAgeVulkanFogPlan fogPlan,
-            RekallAgeRuntimeViewportFrame frame)
+            RekallAgeVulkanEffectiveCamera effectiveCamera)
         {
             var grid = fogPlan.Grid;
             var historyLayoutInitialized = context.FogHistoryValid;
@@ -4750,7 +4762,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             state.FogHistorySampled = sampleHistory;
             state.FogHistoryGeneration = context.FogHistoryGeneration;
 
-            var previous = context.PreviousFogCamera ?? ResolveFogCamera(frame);
+            var previous = context.PreviousFogCamera ?? ResolveFogCamera(effectiveCamera);
             var historyUniform = new FogHistoryGpuUniform(
                 new Vector4(previous.Position, previous.NearClip),
                 new Vector4(previous.Forward, previous.FarClip),
@@ -4766,36 +4778,16 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 out state.FogHistoryUniformMemory);
         }
 
-        private static FogCameraParameters ResolveFogCamera(RekallAgeRuntimeViewportFrame frame)
-        {
-            var camera = frame.ActiveCamera;
-            var rotation = Matrix4x4.CreateRotationX(MathF.PI / 180f * checked((float)(camera?.RotationX ?? 0)))
-                * Matrix4x4.CreateRotationY(MathF.PI / 180f * checked((float)(camera?.RotationY ?? 0)))
-                * Matrix4x4.CreateRotationZ(MathF.PI / 180f * checked((float)(camera?.RotationZ ?? 0)));
-            var forward = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitZ, rotation));
-            var right = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitX, rotation));
-            var up = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitY, rotation));
-            var nearClip = checked((float)Math.Max(0.001, camera?.NearClip ?? 0.05));
-            var farClip = checked((float)Math.Max(nearClip + 0.001, camera?.FarClip ?? 100));
-            var aspect = frame.Height <= 0 ? 1 : frame.Width / (float)frame.Height;
-            var orthographic = camera?.ProjectionMode.Equals("orthographic", StringComparison.OrdinalIgnoreCase) == true;
-            var tangentOrHalfHeight = orthographic
-                ? checked((float)Math.Max(0.001, camera?.OrthographicSize ?? 10)) * 0.5f
-                : MathF.Tan(MathF.PI / 360f * checked((float)Math.Clamp(camera?.FieldOfViewDegrees ?? 65, 1, 179)));
-            return new FogCameraParameters(
-                new Vector3(
-                    checked((float)(camera?.X ?? 0)),
-                    checked((float)(camera?.Y ?? 0)),
-                    checked((float)(camera?.Z ?? 0))),
-                forward,
-                right,
-                up,
-                nearClip,
-                farClip,
-                aspect,
-                tangentOrHalfHeight,
-                orthographic);
-        }
+        private static FogCameraParameters ResolveFogCamera(RekallAgeVulkanEffectiveCamera camera) => new(
+            camera.Position,
+            camera.Forward,
+            camera.Right,
+            camera.Up,
+            camera.NearClip,
+            camera.FarClip,
+            camera.Aspect,
+            camera.TangentOrHalfHeight,
+            camera.Orthographic);
 
         private static byte[] ReadBackMemory(VulkanState state, DeviceMemory memory, ulong byteCount)
         {

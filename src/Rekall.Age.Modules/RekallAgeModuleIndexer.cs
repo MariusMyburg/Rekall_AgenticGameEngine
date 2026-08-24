@@ -7,7 +7,15 @@ public static class RekallAgeModuleIndexer
     public static RekallAgeModuleIndex IndexAssembly(Assembly assembly)
     {
         var modules = assembly.GetTypes()
-            .Where(type => !type.IsAbstract && typeof(RekallAgeModule).IsAssignableFrom(type))
+            // ContainsGenericParameters excludes open generic module types (e.g. an unbound
+            // Foo<T> : RekallAgeModule base class some agent-authored module inherits from).
+            // IsAbstract alone doesn't catch these -- an open generic type reports IsAbstract
+            // false -- so Activator.CreateInstance below threw ArgumentException whenever such a
+            // type happened to be loaded into the process, which only showed up under parallel
+            // test execution once another test's dynamically compiled module assembly containing
+            // one was already loaded into the shared AppDomain.
+            .Where(type => !type.IsAbstract && !type.ContainsGenericParameters
+                && typeof(RekallAgeModule).IsAssignableFrom(type))
             .Select(IndexModule)
             .Where(module => module is not null)
             .Cast<RekallAgeModuleMetadata>()

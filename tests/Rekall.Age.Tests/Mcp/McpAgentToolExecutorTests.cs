@@ -194,6 +194,12 @@ public sealed class McpAgentToolExecutorTests
         registry.Register(new SearchComponentSchemasCommand(typeof(RekallAgeBuiltInModule).Assembly));
         var executor = new RekallAgeMcpAgentToolExecutor(registry, progressiveDiscovery: true);
 
+        // limit=9 (not the schema's max of 12): the built-in component catalog has grown enough
+        // since this test was written that a 12-result response for this broad a query now exceeds
+        // the 12,000-character agent tool budget (RekallAgeMcpAgentToolExecutor.ExecuteRegisteredToolAsync)
+        // and gets truncated. 9 keeps this realistic, still-broad multi-topic query comfortably
+        // under budget (~10.4k chars) while every explicitly requested contract type below still
+        // ranks in the top 9 -- confirmed by measuring the actual serialized length, not guessed.
         var result = await executor.ExecuteAsync(
             "rekall.tools.execute",
             new JsonObject
@@ -202,7 +208,7 @@ public sealed class McpAgentToolExecutorTests
                 ["arguments"] = new JsonObject
                 {
                     ["query"] = "ui canvas button panel animation clip animation player audio listener audio emitter transform3d",
-                    ["limit"] = 12
+                    ["limit"] = 9
                 }
             },
             CancellationToken.None);

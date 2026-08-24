@@ -148,6 +148,7 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         var pose = ResolveCameraPose(frame.ActiveCamera, center, extent);
         var view = Matrix4x4.CreateLookAt(pose.Eye, pose.Eye + pose.Forward, pose.Up);
         var projection = CreateProjection(frame.ActiveCamera, frame, extent);
+        var softwareViewProjection = view * projection;
         projection.M22 *= -1f;
 
         var light = ResolvePrimaryLight(frame);
@@ -156,7 +157,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             light.Direction,
             light.Color,
             light.Position,
-            new Vector4(pose.Eye, 1));
+            new Vector4(pose.Eye, 1),
+            softwareViewProjection);
     }
 
     private static RekallAgeVulkanSceneStereoFrame? BuildStereoFrame(

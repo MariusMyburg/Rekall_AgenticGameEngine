@@ -22,7 +22,11 @@ public sealed class BuildModulesCommandTests
         int? compilerProcessId = null;
         Process? StartWedgedCompiler(ProcessStartInfo _)
         {
-            var helper = new ProcessStartInfo("pwsh")
+            // Windows PowerShell (powershell.exe) ships with every Windows install; PowerShell 7
+            // (pwsh) is an optional separate install and is not guaranteed present. This is only a
+            // portable stand-in for a hung external compiler process, not a dependency of the
+            // production build path, so either shell works -- prefer the one always available.
+            var helper = new ProcessStartInfo("powershell")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -83,7 +87,9 @@ public sealed class BuildModulesCommandTests
         int? compilerProcessId = null;
         Process? StartWedgedCompiler(ProcessStartInfo _)
         {
-            var helper = new ProcessStartInfo("pwsh")
+            // See the comment in WedgedCompilerTimesOutAndIsTerminatedWithoutReceipt above: powershell.exe
+            // is guaranteed present on Windows, unlike the optional pwsh install.
+            var helper = new ProcessStartInfo("powershell")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,

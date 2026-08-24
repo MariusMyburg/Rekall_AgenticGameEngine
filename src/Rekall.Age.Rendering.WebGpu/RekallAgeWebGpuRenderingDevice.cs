@@ -115,7 +115,17 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
             ? new RekallAgeWebGpuCommandEncoder(this, _conformance.BeginCommandEncoder(label), label)
             : new RekallAgeWebGpuCommandEncoder(this, null, label);
 
-    public RekallAgeGraphicsValidationResult Submit(RekallAgeGraphicsCommandBuffer commandBuffer)
+    public RekallAgeGraphicsValidationResult Submit(RekallAgeGraphicsCommandBuffer commandBuffer) =>
+        SubmitCore(commandBuffer, captureReadback: false);
+
+    // Distinct from Submit: also stages a CPU pixel-readback copy of the canvas output this submission draws
+    // into, for the caller (the one-shot compatibility proof workload) that is about to read it back. Deliberately
+    // not exposed on IRekallAgeRenderingDevice -- pixel readback is a WebGPU-bridge concern, not part of the
+    // generic cross-backend rendering contract every ordinary scene submission goes through.
+    public RekallAgeGraphicsValidationResult SubmitWithPixelReadback(RekallAgeGraphicsCommandBuffer commandBuffer) =>
+        SubmitCore(commandBuffer, captureReadback: true);
+
+    private RekallAgeGraphicsValidationResult SubmitCore(RekallAgeGraphicsCommandBuffer commandBuffer, bool captureReadback)
     {
         if (!IsAvailable(out var diagnostics)) return new(diagnostics);
         if (!TryValidateLabel(commandBuffer.Label, out diagnostics)) return new(diagnostics);
@@ -134,7 +144,8 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
             ? Execute(new RekallAgeWebGpuSubmitPacket(
                 RekallAgeWebGpuProtocol.Version,
                 commandBuffer.Label,
-                commandBuffer.Commands.Select(ToPacket).ToArray()))
+                commandBuffer.Commands.Select(ToPacket).ToArray(),
+                CaptureReadback: captureReadback))
             : validation;
     }
 
@@ -186,6 +197,31 @@ public sealed class RekallAgeWebGpuRenderingDevice : IRekallAgeRenderingDevice
         catch (Exception exception)
         {
             Fault([new("REKALL_WEBGPU_BRIDGE_FLUSH_FAILED", "The WebGPU bridge failed while flushing device work.", exception.GetType().Name)]);
+            return new(_faultDiagnostics!);
+        }
+    }
+
+    // Lighter-weight counterpart to FlushAsync for a real per-tick call: drains queued validation/compilation work
+    // (still detects and reports the same errors, and still bounds the same pending-work queues) without also
+    // blocking on GPU completion, which FlushAsync's onSubmittedWorkDone wait does. Calling FlushAsync every tick
+    // of an ordinarily-running game would serialize CPU and GPU for no correctness benefit.
+    public async ValueTask<RekallAgeGraphicsValidationResult> DrainAsync(CancellationToken cancellationToken = default)
+    {
+        if (!IsAvailable(out var diagnostics)) return new(diagnostics);
+        try
+        {
+            var result = await _bridge.DrainAsync(cancellationToken).ConfigureAwait(false);
+            if (result.Succeeded) return new([]);
+            Fault(result.Diagnostics);
+            return new(_faultDiagnostics!);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Fault([new("REKALL_WEBGPU_BRIDGE_DRAIN_FAILED", "The WebGPU bridge failed while draining pending validation work.", exception.GetType().Name)]);
             return new(_faultDiagnostics!);
         }
     }

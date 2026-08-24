@@ -4,9 +4,9 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-23 17:50 Africa/Johannesburg
+Last verified: 2026-08-24 09:35 Africa/Johannesburg
 
-Branch: `master`
+Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
 Current execution order is governed by
 [`STRATEGIC-PRIORITIES.md`](STRATEGIC-PRIORITIES.md). The immediate acceptance
@@ -16,6 +16,95 @@ project through a genuine browser-WASM runtime and direct WebGPU scene renderer.
 The current moving-dot and triangle pages remain RenderingDevice proofs only;
 CPU-frame upload, JavaScript gameplay rewrites, remote desktop streaming, and
 other visually convincing substitutes are explicitly not web game publication.
+
+The genuine web-publishing work now has a bounded static module build-input
+slice in addition to its first staging exporter and shared-runtime seams.
+Agent-authored modules and their configured runtime systems can be registered
+through explicit constructor factories for browser trimming/AOT without
+weakening the ordinary desktop module loader. A desktop build-time generator
+reuses the canonical module build policy and verified build receipts, rejects
+non-public, open-generic, unstable, or multi-module export layouts, emits
+deterministic escaped direct C# type/factory references, and emits MSBuild
+inputs that reference the original authored module projects. Those inputs bind
+the generated registry to per-file source hashes before compilation and after
+publication, while the staging request can consume that same immutable discovery
+plan for its canonical manifest identity. The WebAssembly project conditionally
+imports those inputs, binds each generated registration to its canonical module
+ID/name/assembly/source fingerprint, and exposes the loaded module identities in
+structured bootstrap evidence.
+Canonical web manifests now include the verified module ID, assembly identity,
+and source fingerprint.
+A real trimmed `browser-wasm` publish test retains the authored fixture module
+and now includes the unchanged staged `game.manifest.json`, project, entry scene,
+asset catalog, and referenced asset bytes in the static web package;
+the test suppresses the repository's pre-existing Core trim-analysis warnings
+because those warnings are still treated as errors outside this slice. This
+proves static compile/link inclusion and package composition, not rendering,
+input, continuous simulation, or game playability.
+
+Shipped game content can be read through one bounded logical-path contract from
+either the filesystem or browser-style memory, and one byte-based scene codec
+supplies identical schema/shape validation to the desktop scene store and future
+browser bootstrap. An ordinary project and entry scene can be staged into a
+path-confined deterministic inventory containing the project document, scene,
+referenced-only sanitized asset catalog, and referenced asset bytes. The
+exporter preserves the 64 MiB per-read and depth-128 document limits, adds a
+4,096-entry/512 MiB aggregate closure bound, hashes actual staged bytes, and
+emits the canonical `game.manifest.json`. Equivalent projects with relative or
+root-dependent absolute imported asset paths produce the same logical manifest
+and build identity. The browser-WASM host now performs bounded browser HTTP
+reads, validates canonical manifest identity plus declared size/SHA-256 for the
+project and entry scene, decodes both through trimming-safe shared codecs,
+requires the generated static module IDs to match the manifest, constructs the
+canonical `RekallAgeRuntimeWorld`, and runs one fixed runtime frame through the
+generated authored-module/runtime-system factories. Structured evidence exposes
+build/project/scene/module identities, frame/system facts, bounded entity and
+component facts, and stable failure diagnostics. An executable staged-project
+test proves an authored system changes `Game.BootstrapState.ticks` from 0 to 1
+in that C# runtime world; tampered bytes, project-identity mismatch, oversized
+HTTP content, and excessive registrations fail closed. Browser input, the
+animation/simulation loop, direct WebGPU scene rendering, audio, and playability
+remain unimplemented. The current Web page still renders only the WebGPU
+contract proof and must not be described as a playable game export.
+The consolidated manifest/export/bootstrap/codec/static-loader selection passes
+55/55, including the real trimmed `browser-wasm` publish; Web Player Release
+builds with zero warnings/errors, and the browser-platform JavaScript contract
+selection passes 23/23. Independent review found no blockers. A legacy runtime
+viewport color-threshold test remains red on the unchanged base commit because
+the shared camera-correct software renderer produces a darker valid cube than
+that stale threshold expects; it is not caused by this web-bootstrap slice.
+
+Windows graphics packages now launch the authored runtime scene directly and
+no longer append the misleading legacy `--playable` flag. For compatibility,
+that obsolete flag also selects the canonical runtime; the CPU-raster proof
+adapter is available only through the explicit `--legacy-playable-adapter`
+diagnostic option. Held keyboard, mouse, controller, and semantic-action state
+now persists across fixed-step catch-up ticks while transient press/release
+edges and deltas are cleared, so gameplay input is not render-rate dependent
+after a hitch. The focused player/package/input selection passes 19/19, the
+Windows player Release build has zero warnings/errors, and a real three-frame
+Clockwork Canopy launch through the obsolete flag loaded 25 runtime renderables,
+loaded no legacy adapter, and exited normally.
+
+The runtime UI projection now respects entity visibility for Label, Button,
+Panel, Image, UiElement, and UiCanvas visuals. A single entity may intentionally
+carry both UiCanvas and one visual without expanding that visual to the full
+canvas; its authored bounds are retained. Fixed anchors (equal minimum and
+maximum anchors) now retain authored size and apply position/pivot at the anchor,
+while differing anchors retain stretch semantics and apply the newly
+agent-visible left/top/right/bottom offsets. The combined Runtime, Rendering,
+and Modules verification for these UI contracts passes 849/849. A fresh
+Clockwork Canopy capture reports zero UI observations; its remaining invisible
+HUD is an authored positive bottom-edge offset, not a missing-canvas or
+zero-sized-layout engine defect. Software viewport capture now
+routes 3D meshes through the same mesh, model-matrix, authored-camera, and depth
+pipeline used to prepare Vulkan scenes, then composites remaining 2D/UI content.
+This removes the legacy fixed-oblique cube projection that drew rear faces and
+made ordinary cubes appear hollow or inside-out. It also rasterizes the visible
+portion of large triangles whose vertices lie outside the viewport and preserves
+near-surface depth independent of entity order. The complete Rendering namespace
+selection passes 501/501, and a fresh software capture of Clockwork Canopy now
+matches the Vulkan camera geometry instead of inventing side/bottom cube faces.
 
 The first stable Model Asset metadata and publishing foundation is now available through the default
 CLI/Studio command registry and its derived MCP catalog. The canonical surface
@@ -3916,7 +4005,583 @@ output directory. The unchanged installed product matrix passed. Soak completed
 all nine checks. The 1,149-payload-file archive is 195,083,188 bytes with
 SHA-256 `5744CCEEE831BC9C80ABE7F8A2668AA1BE4C570E70106097EE26052368E88B60`.
 
-## Next after the current item
+Genuine web publishing Task 5 (the direct RenderingDevice scene renderer) has
+started with its first verified slice: `RekallAgeRenderingDeviceSceneRenderer`
+and `RekallAgeRenderingDeviceSceneResources` execute an ordinary
+`RekallAgeRuntimeViewportFrame` entirely through the generic
+`IRekallAgeRenderingDevice` contract instead of native Vulkan calls. Rather
+than duplicating the existing native scene pipeline, it reuses the same
+backend-neutral frame/draw projection already used by the Vulkan path --
+`RekallAgeVulkanSceneBatchBuilder`, `RekallAgeVulkanSceneDrawPlanBuilder`, and
+`RekallAgeVulkanSceneGeometryUploadBuilder` are all pure data transforms with
+no native Vulkan dependency -- so both backends share one camera/model/light
+projection instead of diverging. The new renderer creates a persistent,
+content-hash-cached vertex/index buffer pair, a shared WGSL scene pipeline
+(`RekallAgeSceneWgslShaderSource`), a frame uniform buffer, and one
+reusable uniform buffer plus binding set per draw slot, then records a real
+begin-pass/set-pipeline/set-buffers/draw-indexed/end-pass/submit sequence.
+Four focused tests against `RekallAgeInMemoryRenderingDevice` cover a single
+draw, two draws with distinct model matrices and separate binding sets,
+resource reuse across two identical frames (no growth in
+`InspectResources()` between frames), and a rejected empty frame. This slice
+covers camera projection, geometry primitives (explicit vertex/index meshes),
+transforms, per-draw material/emissive factors, and directional lighting
+through vertex color; it does not yet cover texture sampling, depth testing,
+skinning/morphing, atmosphere/cloud/water shading, or UI canvas draws, which
+remain the next parts of this same task. The focused rendering selection
+passed 510/510, the zero-warning/zero-error Release solution built cleanly,
+and the complete engine suite passed 1,624/1,629 with the same five
+pre-existing failures present on an unmodified tree (a wedged-compiler-timeout
+pair in `BuildModulesCommandTests`, one `McpAgentToolExecutorTests` assertion,
+one `ProjectRuntimeSystemTests` average-of-empty-sequence failure, and one
+`WindowsPlayerRecoveryTests` failure caused by a missing Debug player
+executable from a Release-only build); the change set is strictly additive
+(three new files, nothing existing modified), so none of the five are
+attributable to this slice. Studio passed 53/53. Task 6 (browser input
+bridge) is next.
+
+Task 6 (the browser input bridge) is now complete. `RekallAgeWebInputBridge`
+converts successive raw `RekallAgeWebInputSnapshot` polls into the same
+`RekallAgeRuntimeInputState` the Windows SDL2 player produces: it owns
+held/pressed/released edge detection for keys, pointer buttons, and
+per-gamepad buttons, releases every held key/button on a focus-loss fact
+(matching the Windows player's mouse-capture release), and normalizes browser
+`KeyboardEvent.code` values against the same canonical key names the
+`Silk.NET.Input.Key` enum produces on Windows (`KeyW` -> `W`, `ArrowUp` ->
+`Up`, `Digit1` -> `Number1`, `ShiftLeft` -> `ShiftLeft`, and so on), so one
+authored `Rekall.InputActionMap` binds identically in both environments.
+`RekallAgeWebInputSnapshotJson` parses the bounded JSON payload the browser
+side produces without throwing on missing optional fields. On the JavaScript
+side, `web-input.js` (`createWebInputBridge`) captures only raw, unmapped
+device facts -- held key codes, pointer position scaled from CSS to canvas
+pixels, accumulated pointer/wheel deltas reset after each poll, held pointer
+buttons with capture, touch points, and polled Gamepad API state -- plus
+stable resize/visibility/fullscreen/device-loss lifecycle event constructors;
+it makes no gameplay decisions. `main.js` wires the bridge in, queues
+lifecycle facts from `resize`/`visibilitychange`/`fullscreenchange`, and
+exposes `input.snapshot`/`input.pullLifecycleEvents` through the existing
+`setModuleImports` seam. `Program.cs` calls the real round trip once during
+bootstrap (JS snapshot -> `RekallAgeWebInputSnapshotJson.Parse` ->
+`RekallAgeWebInputBridge.Capture`) and folds the confirmed viewport size into
+the existing runtime status text, so this is exercised on every load rather
+than being dead code awaiting Task 7's continuous loop. Verification: the
+focused selection passed 20/20 C# tests (11 bridge/edge-detection tests plus
+9 JSON-parsing/round-trip tests) and 10/10 new Node tests (33/33 including the
+existing WebGPU suite); the zero-warning/zero-error Release solution built
+cleanly for both the desktop and `browser-wasm` targets; and the complete
+engine suite passed 1,644/1,649 with the same five pre-existing,
+environment-caused failures (the two `BuildModulesCommandTests` cases now
+fail because `pwsh` is not on this shell's `PATH` rather than the earlier
+timeout symptom, confirming they are environment-dependent, not regressions).
+Studio passed 53/53. Continuous simulation/presentation (Task 7) is next.
+
+Task 7 (the browser simulation/presentation loop) is now wired end to end at
+the build/test evidence tier; it has not yet been exercised in a real
+browser. `RekallAgeWebPlayer` owns one bootstrapped session's play loop: each
+tick captures the browser input snapshot through the Task 6 bridge (so a
+held key's edge is never lost or double-fired across a pause boundary),
+advances `RekallAgeRuntimeSimulationClock` only while unpaused and only when
+elapsed time is positive, then always builds the current viewport frame
+(`RekallAgeRuntimeRenderFrameBuilder`), projects it into backend-neutral
+scene meshes (`RekallAgeVulkanSceneMeshBuilder`), and presents through the
+Task 5 `RekallAgeRenderingDeviceSceneRenderer` -- once per visual tick,
+regardless of whether that tick simulated zero, one, or several fixed steps,
+so a paused or sub-frame-rate tick still redraws the current world instead of
+a stale or blank canvas. On the JavaScript side, `web-player-loop.js`
+(`createFrameLoop`) is a thin `requestAnimationFrame` driver owning only
+timing, pause/resume, and one clamp on an oversized frame gap (a backgrounded
+tab); it delegates all fixed-step/catch-up/clamping semantics to the existing
+C# `RekallAgeRuntimeSimulationClock` rather than re-implementing them. `main.js`
+bridges that push-style loop to a pull-style `frame.awaitNext` JS import so
+`Program.cs` drives its own `while (true) { var elapsed = await
+BrowserHost.AwaitNextFrameAsync(); ... }` loop the same way it already awaits
+every other browser I/O call, without introducing any JS-to-.NET export --
+this codebase had none before and still has none. `Program.cs` now runs the
+real bootstrapped project continuously once one exists
+(`gameBootstrap.Session is { } session`); the bounded WebGPU triangle proof
+remains the fallback compatibility demonstration only when no published
+project manifest is present. Verification: the focused C# selection passed
+6/6 new `RekallAgeWebPlayer` tests (ordinary tick, zero-elapsed
+zero-step-still-renders, pause/resume never advancing simulation while still
+presenting and preserving frame identity, held-key survival across a pause
+boundary, monotonic tick sequence regardless of pause, and resize between
+ticks) against a real `Rekall.Camera3D`/`Rekall.GeometryPrimitive` scene
+executed through the unmodified `RekallAgeRuntimeExecutionLoop`; 10/10 new
+Node tests for `web-player-loop.js` (43/43 including the existing WebGPU and
+input suites); the zero-warning/zero-error Release solution built cleanly;
+and a real trimmed `browser-wasm` publish (`-p:PublishTrimmed=true
+-p:ILLinkTreatWarningsAsErrors=false -p:SuppressTrimAnalysisWarnings=true`,
+the same flags the existing `WebGameExporterTests` harness uses to suppress
+the repository's pre-existing Core/Runtime/BepuPhysics trim-analysis findings
+that are unrelated to this slice) succeeded and correctly fingerprinted both
+new JavaScript modules into the published `wwwroot`. The complete engine
+suite passed 1,650/1,655 with the same five pre-existing, environment-caused
+failures as the prior two checkpoints. Studio passed 53/53. **This is
+source/build/test evidence only (evidence-hierarchy tiers 1-2): no real
+browser or Chromium session exercised this loop this session, so real
+player launch, visual review, and gameplay-input-changes-state proof (tiers
+4-5) remain outstanding and must not be read as claimed.** CLI/MCP/Studio
+publish-web and audit-web commands (Task 8) are next, followed by the
+Clockwork Canopy browser acceptance (Task 9).
+
+A pre-commit review of the Task 5/7 work surfaced three real correctness
+gaps that build/test evidence alone had not caught, and all three are fixed
+in this checkpoint before Task 8 begins. (1) The browser tick loop captured
+`output.Handle` once, before the frame loop started, and kept rendering into
+it on every tick even after a `REKALL_WEB_VIEWPORT_RESIZED` lifecycle fact
+was queued by `main.js`'s `fitCanvas()` -- `input.pullLifecycleEvents()` was
+already wired end-to-end but nothing ever called it, so a real browser
+resize would have silently rendered the new viewport into an old-sized
+target. `RekallAgeWebPlayerLifecycleEventsJson.TryGetLatestResize` now
+parses the queued lifecycle facts each tick in `Program.cs`; on a resize the
+loop calls `ImportCanvasOutput` again at the new size and destroys the old
+target, keeping the previous target only if the re-import itself fails. (2)
+`RekallAgeRenderingDeviceSceneRenderer`'s pipeline had no depth attachment
+(`DepthStencil: null`), so any 3D scene with overlapping geometry -- the
+`WebPlayerTests` sphere included -- had undefined occlusion once actually
+rasterized; correctness of this was invisible to build/test evidence because
+the in-memory conformance device does not rasterize. Fixed generically,
+without touching the WebGPU canvas-import protocol or JavaScript: the new
+`RekallAgeRenderingDeviceSceneResources.ResolveRenderTarget` inspects the
+caller's color target through the already-generic
+`IRekallAgeRenderingDevice.InspectResources()` contract, and composes a
+`Depth32Float` depth texture plus a new render target combining both,
+recreating them only when the caller's color target handle or size changes
+(so it also naturally follows the resize fix above, since a resize produces
+a new color target handle). (3) The `while (true)` browser tick loop had no
+exception handling; any tick exception or a rejected `AwaitNextFrameAsync()`
+promise would have escaped `Main` entirely and frozen the tab on its last
+`#state` text with no diagnostic. Both awaits are now wrapped: a failure
+sets an explicit `REKALL_WEB_FRAME_LOOP_FAILED` / `REKALL_WEB_PLAYER_TICK_EXCEPTION`
+`#state` code, calls `SetReady(false)`, stops the frame loop, and exits the
+loop instead of hanging silently. Verification: 6 new/expanded C# tests (2
+composed-depth-attachment tests in `RenderingDeviceSceneRendererTests`, 4
+resize-lifecycle-JSON tests in `WebInputBridgeContractTests`) plus all
+existing focused suites (`RenderingDeviceSceneRendererTests` 6/6,
+`WebPlayerTests` 6/6, `WebInputBridgeContractTests` 24/24 -- 36/36 total);
+the zero-warning/zero-error Release solution build; a real trimmed
+`browser-wasm` publish with the same suppression flags as prior checkpoints,
+succeeding unchanged. The complete engine suite was run twice under this
+checkpoint; each run showed a small, non-overlapping set of failures (15 in
+one run, 7 in the other, only `WindowsPlayerRecoveryTests` common to both)
+in tests unrelated to any file this session touched (`BuildModulesCommandTests`
+wedged-compiler-timeout tests, `PlayablePackageIntegrityTests` player-publish
+tests, `McpAgentToolExecutorTests` token-budget test, module-schema/scaffold
+tests, `WindowsPlayerRecoveryTests` needing a built Windows player exe) --
+consistent with pre-existing environment/resource-contention flakiness under
+this session's heavy concurrent background test/build load, not a
+regression from this checkpoint's changes. Studio passed 53/53 (a first
+attempt at this same command stalled for roughly an hour under that same
+concurrent load without producing output, since `dotnet test` buffers stdout
+until completion; a clean rerun with `--blame-hang-timeout` for diagnostics
+completed in 13 seconds once contention cleared). **This checkpoint remains
+tiers 1-2 evidence only: no real browser or Chromium session has exercised
+the resize/depth/exception-safety paths added here.**
+
+Task 8 of the genuine-web-game-publishing plan ("expose publish/audit
+through CLI, MCP, Studio") is done. Recon confirmed neither
+`PublishWebGameCommand` nor `AuditWebGameCommand` existed yet -- only the
+Task 3 content-closure exporter (`RekallAgeWebGameExporter`) and module
+registry generator (`RekallAgeWebModuleRegistryGenerator`) did -- so both
+were built as thin orchestration commands over the existing building
+blocks, following `AuditPlayablePackageCommand`'s composite-audit shape and
+`BuildPlayerCommand`'s subprocess-invocation shape.
+`PublishWebGameCommand` (`rekall.game.publish_web`) runs the exact sequence
+already proven by
+`WebGameExporterTests.TrimmedWebAssemblyPublishIncludesTheStaticallyRegisteredAuthoredModule`:
+discover the authored static module(s), generate the registry + MSBuild
+inputs, stage the declarative content closure, restore the freshly
+generated module project(s), then one real trimmed `dotnet publish` of the
+generic `Rekall.Age.Player.Web` project (never a project-specific web
+player, per AGENTS.md) using `--artifacts-path` to isolate the shared
+engine project's own obj/bin per request -- this is required, not
+cosmetic: without it, a concurrent publish (a second agent session, or this
+command racing an unrelated build of the same project, as the conformance
+test suite does) collides writing the same
+`obj/Release/net10.0/Rekall.Age.Player.Web.dll` and fails with a
+file-locked CSC error instead of a graceful command failure; this was
+caught empirically mid-task by a real collision in the full-suite run, not
+by code review, and fixed by switching from an initial (broken)
+`-p:BaseIntermediateOutputPath`/`-p:BaseOutputPath` attempt -- which
+silently produced a `project.assets.json` missing the `browser-wasm`
+target -- to `--artifacts-path`, the same isolation `BuildPlayerCommand`
+already uses successfully for the same class of shared-project problem.
+`AuditWebGameCommand` (`rekall.game.audit_web`) republishes the project
+itself (the same self-contained shape as `AuditPlayablePackageCommand`,
+not a wrapper requiring a prior publish) and then verifies: manifest
+decode/hash/compatibility integrity (via the existing
+`RekallAgeWebGameManifestCodec.DecodeAndValidate`, which already checks
+engine/project-schema/module-SDK identity), module-registry coverage
+against a fresh `Discover()` of the authored project, byte-identical
+content relocation from the manifest's declared hashes, WebAssembly
+runtime-identity artifacts (`dotnet.js`, `*.wasm`, `index.html`), and a
+real static-server-boot check (a loopback `HttpListener` actually serving
+`index.html` and `game.manifest.json`, not a filesystem existence check).
+Per the plan, the audit list also calls for "a browser smoke frame"; that
+is tier 3+ evidence this checkpoint does not claim --
+`AuditWebGameResult.BrowserSmokeFrameVerified` is always `false` with an
+explicit "not yet implemented, requires a real browser session" message,
+kept outside the `Ready` gate so the command stays usable rather than
+silently omitting or faking that check. Both commands are registered in
+`RekallAgeDefaultCommandRegistry`, wired as CLI `game publish-web` /
+`game audit-web` in `Rekall.Age.Cli/Program.cs`, exposed as Publish Web /
+Audit Web buttons in Studio (`RekallAgeStudioViewModel.cs`,
+`MainWindow.xaml` -- the plan referenced a `RekallAgeStudioWindow.xaml`
+that does not exist; the actual Studio window file is `MainWindow.xaml`),
+and classified in `RekallAgeMcpCatalog` under the existing `workflow`
+category (a new `rekall.game.` prefix branch was added to the classifier)
+so agent tool discovery surfaces them without inventing a new category or
+any platformer-specific tool. Verification: a real, end-to-end
+`WebGamePublishingTests.PublishesAndAuditsARealWebGameEndToEnd` test
+(scaffolds a runtime module, builds it, publishes it through the real
+trimmed WebAssembly pipeline, then audits the result -- all five audit
+checks pass, `BrowserSmokeFrameVerified` is confirmed `false`) plus an
+overlap-rejection test; CLI failure-path tests proving the command names
+are reachable and fail closed; an expanded `McpCatalogTests` asserting
+both tools are categorized `workflow`, recommended, and -- per AGENTS.md --
+that no platformer- or genre-specific wording ever appears in the exposed
+tool surface; two Studio `ICommand.CanExecute` tests. The full engine
+suite was run four times total across this checkpoint (two before the
+`--artifacts-path` fix, two after); every run showed a nonzero,
+non-identical failure count (17, 15) confined to tests this session did
+not touch, and root-caused to one specific, reproducible mechanism:
+`BuildPlayerCommand`-based tests (`PlayablePackageIntegrityTests`,
+`BuildPlayerCommandTests`, `AgentAuthoringGauntletTests`, and others)
+invoke real `dotnet publish` against the shared `Rekall.Age.Player`/
+`Rekall.Age.Player.Windows` projects and collide with each other under
+xUnit's default test parallelism -- the same class of contention this
+checkpoint's own fix addresses for `Rekall.Age.Player.Web`, just not yet
+applied to those other commands (out of scope for this task). A
+deliberately concurrent 3-way stress test (the new end-to-end test, the
+pre-existing `WebGameExporterTests` trimmed-publish test, and the overlap
+test, run together) was used to directly confirm the `--artifacts-path`
+fix eliminates the collision for the files this task touched; that
+combination now passes reliably. Studio passed 55/55 (53 pre-existing +
+2 new). The zero-warning/zero-error Release solution build succeeded. A
+second, distinct correctness bug was also caught and fixed mid-task,
+directly by observing its effect rather than by inspection: running
+`PublishWebGameCommand` without `--locked-mode` (necessary, since a
+freshly generated module project cannot be in any committed lock file)
+let `dotnet publish`'s implicit restore silently rewrite the engine's own
+checked-in `src/Rekall.Age.Player.Web/packages.lock.json` with the test
+run's transient temp-module project reference -- caught by `git status`
+showing a real, checked-in file dirtied by a test run, not by code review.
+Fixed with `-p:NuGetLockFilePath` redirecting the lock file into the same
+per-request working directory `--artifacts-path` already isolates;
+verified clean by rerunning the full end-to-end test and confirming
+`git status` reports no diff on either engine `packages.lock.json`
+afterward. **This checkpoint is tiers 1-3 evidence (source/build/test plus
+a real static-server-boot proof): no real browser or Chromium session has
+loaded a published web game this session, so `BrowserSmokeFrameVerified`
+stays `false` and Task 5 step 7's original browser-execution gap remains
+open.** Task 9 (accept Clockwork Canopy unchanged in the browser) is next.
+
+That browser-execution gap is now closed with real tier-4/5 evidence,
+gathered directly rather than deferred further. The `claude-in-chrome`
+extension was unavailable in this unattended session, so a real, separately
+installed Playwright-driven Chromium (not a stub, not headless -- headless
+Chromium's ANGLE/D3D11 WebGPU backend failed device creation outright, a
+real browser-environment constraint, not an engine defect) loaded a real
+`rekall.game.publish_web` output of the existing `Examples/TumblingCubes`
+project (camera, lit cube geometry, a floor, a spawner module, `physics3d`
+capability) served over a genuine local static HTTP server. This surfaced
+four real, previously-undiscovered defects in the actual browser execution
+path -- none visible to any build, unit test, or code review, because the
+in-memory test rendering device and the static-server-boot audit check
+never execute WebGPU or the browser tick loop at all. Each was root-caused
+from the real failure and reverified by republishing and reloading: (1)
+`PublishTrimmed=true` removed BepuPhysics's constraint type processors
+(e.g. `BallSocketTypeProcessor`), which BepuPhysics registers by scanning
+its own assembly rather than through calls the trimmer's static analysis
+can see, throwing `Arg_NoDefCTor` the instant a physics3d scene ticked;
+fixed by rooting the `BepuPhysics`/`BepuUtilities` assemblies via
+`TrimmerRootAssembly` in `Rekall.Age.Player.Web.csproj`. (2) The same
+trimming pass disabled System.Text.Json's reflection contract resolver by
+default, and the engine represents authored component data as untyped
+`JsonObject`/`JsonNode` trees rather than through source-generated
+`JsonSerializerContext` types, so the first tick threw
+`NoMetadataForType` on `System.String`; fixed with
+`<JsonSerializerIsReflectionEnabledByDefault>true</...>`. (3) The real game
+tick loop never called `RekallAgeWebGpuRenderingDevice.FlushAsync` (only
+the old one-shot compatibility proof workload did), so the WebGPU JS
+bridge's bounded `pendingScopes`/`pendingCompilations` queues
+(`webgpu-device.js`, `MAX_PENDING = 64`) never drained and every
+subsequent WebGPU packet failed closed with
+`REKALL_WEBGPU_PENDING_OVERFLOW` within the first frame or two of a
+resource-heavy scene; fixed by flushing once per tick in
+`Program.cs`'s frame loop, folding flush diagnostics into the same
+fail-closed `#state` reporting the tick loop already used. (4) The first
+resulting real WebGPU validation error was concrete and specific:
+`webgpu-device.js` unconditionally set `stencilLoadOp`/`stencilStoreOp` on
+any depth-stencil attachment, but the engine's only depth format
+(`Depth32Float`, added this session for occlusion) carries no stencil
+aspect, which WebGPU rejects outright, faulting the device permanently
+(`RekallAgeWebGpuRenderingDevice.Fault` is sticky by design) on the very
+first real frame; fixed by gating the stencil ops on the attachment
+texture's actual format. (5) Once frame 1 rendered, frame 2 immediately
+failed with `REKALL_WEBGPU_READBACK_PENDING`: the JS bridge stages a CPU
+readback copy for every submit that draws into the live canvas output
+(originally built only for the one-shot pixel-proof compatibility page,
+which calls `readPixels()` once), but the ordinary game loop never calls
+`readPixels()`, so the first frame's unconsumed readback buffer blocked
+every later frame forever; fixed by dropping and replacing an unconsumed
+prior readback instead of throwing, since nothing had mapped or read it.
+After all five fixes, the same real browser loaded the same real published
+build, bootstrapped a five-entity physics scene, and sustained real WebGPU
+frame submission and presentation across 238+ real ticks without a single
+diagnostic, and a canvas screenshot shows two correctly lit, correctly
+occluding cubes on a floor -- genuine visual proof, not merely a
+`Rendered: true`/`DrawCount` counter, which (per the same investigation)
+cannot see a validation failure or a hollow/culled-away frame on their own.
+The engine's own focused rendering/web-player suite (36/36) and the real
+end-to-end publish/exporter suite (15/15) both still pass after these
+production-code changes, and the Release solution build is 0
+warnings/errors. These fixes live entirely in `Rekall.Age.Player.Web`
+(`Program.cs`, `Rekall.Age.Player.Web.csproj`, `wwwroot/webgpu-device.js`)
+and have no unit-test harness of their own -- `webgpu-device.js` is only
+ever exercised by a real WebGPU device, so this real-browser verification
+*is* the regression evidence for this checkpoint, not a substitute for one
+that could exist. Task 9 (accept Clockwork Canopy unchanged in the
+browser) is next, now with a browser-execution path already proven to
+carry a real physics3d scene through a full publish/serve/render/tick
+cycle.
+
+The per-tick flush/readback cost recorded above is now fixed, not just
+deferred. Added `RekallAgeWebGpuRenderingDevice.DrainAsync` (and a matching
+`IRekallAgeWebGpuBridge.DrainAsync`/`webgpu-device.js` `drain()`/
+`webgpu.drain` JS export): it still awaits the queued error-scope and
+shader-compilation promises (so it still detects and reports validation
+errors and still bounds `pendingScopes`/`pendingCompilations` the same way
+`flush()` does), but does not also await
+`device.queue.onSubmittedWorkDone()`, so it no longer serializes CPU and
+GPU every tick; the real tick loop in `Program.cs` now calls `DrainAsync`
+instead of `FlushAsync`. Separately, `RekallAgeWebGpuSubmitPacket` gained a
+`CaptureReadback` flag (default `false`), and `webgpu-device.js` now only
+stages the full-canvas CPU readback copy when a submit explicitly sets it;
+`RekallAgeWebGpuRenderingDevice` exposes this as a distinct
+`SubmitWithPixelReadback` method (deliberately not on the generic
+`IRekallAgeRenderingDevice` contract -- pixel readback stays a WebGPU-
+bridge concern), used only by `WebGpuProofExecution`'s one-shot
+compatibility workload; ordinary scene submission (`Submit`) never
+requests it, so the real tick loop no longer pays for an unread full-canvas
+copy every frame. Reverified against the same real browser/published
+build used above: the same TumblingCubes scene sustained real ticks with
+identical per-frame draw counts and zero diagnostics, and a fresh canvas
+screenshot shows the same two cubes in a visibly different (still
+physically plausible) tumbled pose from the earlier screenshot, confirming
+live simulation continued correctly through the change, not just that it
+still boots. Six existing bridge test fakes across
+`WebGpuProofEvidenceTests`/`WebGpuProofWorkloadTests`/
+`WebGpuRenderingDeviceTests` were updated for the new interface member.
+Focused WebGPU/rendering/player suite: 84/84. Real end-to-end
+publish/exporter suite: 15/15. Release solution build: 0 warnings/errors.
+`git status` clean.
+
+Three follow-up checks de-risked before starting Task 9, since the drain/
+readback changes above touch paths whose success can look identical to a
+silent failure: (1) the standalone WebGPU compatibility proof page (the
+`gameBootstrap.Session is null` branch, the one path that actually depends
+on the now-gated readback existing) was republished with no game content
+and reloaded in the same real browser -- `#state` still reaches `GPU
+WORKLOAD EXECUTED` with a passing pixel proof, confirming the
+`CaptureReadback`/`SubmitWithPixelReadback` gating did not silently break
+the one caller that needs it. (2) The depth-stencil fix was temporarily
+disabled again (`git diff` confirmed a clean revert afterward, no code
+changed under version control), republished, and reloaded: `#state`
+correctly showed the same real `REKALL_WEBGPU_VALIDATION_ERROR` as before,
+confirming `DrainAsync` still surfaces real backend diagnostics rather than
+silently swallowing them the way a no-op drain would. (3) A real browser
+`ArrowUp` keydown/keyup was sent to the same published TumblingCubes build
+via Playwright while intercepting `JSON.stringify` calls carrying
+`heldKeyCodes` (the exact object `main.js`'s `input.snapshot()` serializes
+for the C# side to parse): the snapshot showed `heldKeyCodes: ["ArrowUp"]`
+while held and `[]` immediately after release, proving real keyboard input
+reaches the runtime input bridge end-to-end in a published build, not just
+that the page boots. This directly de-risks Task 9's planned semantic
+input checks (movement/jump/grounding/etc.), which all depend on this same
+path. No further code changes resulted; these were verification-only.
+
+Also fixed while starting Task 9, caught the same way -- by actually
+running a real, larger published scene rather than trusting the smaller
+one to represent it: `MAX_PENDING` in `webgpu-device.js` (bounding
+`pendingScopes`/`pendingCompilations`, a JS safety limit, not a WebGPU or
+hardware constraint) was 64, and a real 28-entity scene's first tick
+creates enough packets to trip `REKALL_WEBGPU_PENDING_OVERFLOW` before the
+per-tick drain gets a chance to run once, dropping that frame. Raised to
+512 for real headroom; reverified clean against the same scene, and the
+compatibility proof page (republished fresh) still passes its pixel proof
+afterward, confirming the raised compilation-pending bound didn't regress
+its shader-compilation path.
+
+**Task 9 needs one authoring decision from the user before it can
+proceed; not a web-publishing defect.** Attempting to "accept Clockwork
+Canopy unchanged in the browser" first looked like a broad rendering
+failure, but closer investigation (below) narrowed it to a single small,
+well-understood finding. Evidence trail, gathered directly and then
+corrected once follow-up checks contradicted the first read of it:
+
+1. Copied `Artifacts/AgentGames/OriginalPlatformer` (gitignored, no git
+   ref -- see below) into scratch, content-hashed the authored source
+   (`rekall.project.json`, `Scenes/`, `Modules/*.cs`/`*.csproj`,
+   `Assets/`, `Shaders/`) as its frozen identity:
+   `5289b667730b6c0f8835f17128723e75d176214a1730279dd187fe975ab7f4bf`.
+   Installed the module SDK and built both modules
+   (`ClockworkPlayable`, `ClockworkRules`) fresh against the copy, then
+   published it through `rekall.game.publish_web` -- all 5
+   `rekall.game.audit_web` checks passed (manifest-integrity,
+   module-registry-coverage, content-relocation, runtime-identity,
+   static-server-boot).
+2. Loaded the real published build in the same real browser used above:
+   it boots, bootstraps a real 28-entity physics/UI scene, and sustains
+   real ticks with zero diagnostics -- the web publishing pipeline itself
+   is working correctly. But the canvas shows almost nothing beyond the
+   three backdrop planes, one small cube, and the HUD.
+3. To rule out a web-specific defect, captured the *same* frozen copy
+   through `render viewport capture ... vulkan` (real native Vulkan GPU
+   rendering) and `... software` (the software rasterizer): both show the
+   same near-empty result -- not a browser/WebGPU bug, since it reproduces
+   identically across all three independent rendering backends.
+4. Hiding the three backdrop planes (`visible: false`) and recapturing
+   ruled out depth-ordering/occlusion as the cause: the same absence
+   persisted with just the clear color behind it.
+5. **The actual cause: `OrthographicSize: 3.4` on `CameraRig` frames only
+   about 9 of this level's ~43 authored units of width.** Re-running the
+   identical frozen scene with `OrthographicSize` temporarily widened to
+   25 renders the *entire* level correctly in one screenshot -- player,
+   multiple platforms, three collectibles, a hazard, all in their authored
+   positions, sharp and correctly composited. Every "missing" entity
+   outside the narrow 3.4 window (`FloatP1-3`, `Platform1`, all three
+   `Hazard`s, `Glow2-6`, `GoalPad`, `Spire`) was simply, correctly outside
+   the camera's frustum -- not a rendering defect. This is confirmed
+   correct camera behavior, not a bug.
+6. One narrower, genuinely unexplained item remains: `Glow1` (a collectible
+   at X=0.5, comfortably inside the narrow 3.4 frustum's X range of
+   [-7.03, 2.03]) does not render at `OrthographicSize: 3.4` even though it
+   does render at `OrthographicSize: 25`. This is a real, minor, single-
+   entity anomaly worth a follow-up look, but it is not the broad
+   rendering failure first suspected, and does not block reasoning about
+   the scene overall.
+7. **The prior "accepted" evidence is stale, not from a different camera.**
+   `Artifacts/AgentGames/OriginalPlatformer/_visual_evidence/
+   Main_runtime_002.png` shows converging-edge, multi-face geometry that
+   an orthographic camera cannot produce -- initially read as evidence the
+   camera itself had changed since acceptance. Checked instead: the PNG's
+   file mtime is `2026-08-23 19:21:52`; commit `219c676` ("render: share
+   camera-correct software scene path", which explicitly replaces "the
+   legacy fixed-oblique cube projection that drew rear faces and made
+   ordinary cubes appear hollow or inside-out") landed at `19:25:50`, four
+   minutes *later*. The accepted screenshot predates that fix -- it was
+   captured through the old software-capture path that drew a fixed
+   oblique view regardless of the authored camera, not through a
+   perspective camera that later became orthographic. The scene's camera
+   has most likely been orthographic all along; the capture path only
+   recently started rendering it honestly.
+
+**Net finding, corrected from the first pass above:** there is no broad
+rendering defect and no baseline mismatch from a camera change. The real,
+much smaller question is authorial: `OrthographicSize: 3.4` frames a small
+fraction of this level, and nobody has looked at what the now-honest
+render actually shows since the capture path was fixed. That's the user's
+call, not an engineering judgment to make alone -- is 3.4 intentional (a
+tightly-framed camera that follows the player, by design), or should it be
+widened to show more of the level? The `Glow1` anomaly (point 6) is a
+separate, smaller, worth-investigating item either way. Diagnostic
+screenshots from this investigation (native Vulkan capture, software
+capture, backdrops-hidden capture, the widened-ortho full-level capture,
+and the prior accepted evidence for comparison) are preserved. Task 9
+resumes once the user answers the framing question; the frozen copy and
+its content hash remain available to continue from.
+
+**Task 9 is complete.** The user chose to widen `OrthographicSize`. Set it
+to `8` on the real, authoritative `CameraRig` entity in
+`Artifacts/AgentGames/OriginalPlatformer/Scenes/Main.age.scene.json`
+(gitignored, no git ref -- this is the actual accepted-game edit, not a
+scratch-only change) -- a reasonable middle ground between the narrow 3.4
+and the whole-level 25, giving a real few-platforms-ahead camera window.
+Verified via both native Vulkan and software viewport captures of the real
+source project before proceeding further: the full nearby level (player,
+platforms, a collectible, a hazard-adjacent platform) renders correctly
+and consistently across both backends at this setting, and the `Glow1`
+anomaly from the investigation above no longer reproduces at this size (it
+renders correctly in both captures) -- resolved as a side effect of the
+widened framing, not separately root-caused.
+
+Re-froze the project after the edit (new content hash:
+`5aba3ea98dc86eef5656a8f1f89ab4768a4510403c6aa9ba178e27683da48a61`),
+reinstalled the module SDK, rebuilt both modules clean, republished
+through `rekall.game.publish_web`, and re-ran `rekall.game.audit_web` --
+all 5 checks passed again. Loading the republished build in the real
+browser surfaced a second real, generic-engine defect, caught the same
+way as everything else in this session: by actually looking at the
+rendered canvas, not just trusting `Rendered: true`. The scene rendered,
+but visibly darker and less saturated than the same scene's native Vulkan
+and software captures -- pixel-sampled to confirm: backdrop colors came
+out at roughly 15-20% of their authored brightness in the browser versus
+the expected floor. Root cause: `RekallAgeSceneWgslShaderSource`'s
+fragment shader (the shared lit-scene shader `RekallAgeRenderingDeviceSceneRenderer`
+uses, added this session for Task 5) computed `lit = ambient + ndotl *
+(1.0 - ambient)` with `ambient = 0.15`, while
+`RekallAgePerspectiveSoftwareSceneRenderer` (the pre-existing software
+renderer) computes `shade = clamp(0.35 + ndotl * 0.75, 0.22, 1.15)` for
+the identical `batch.Frame.LightDirection` -- more than double the
+brightness floor. For a scene whose authored light angle gives low-to-zero
+diffuse contribution on most surfaces (as this one does), that difference
+is the entire visible result: correctly lit on software/native, mostly
+ambient-floor-dark on the newer WGSL path. Fixed by matching the WGSL
+shader's formula to the software renderer's exactly (same 0.35/0.75/
+[0.22, 1.15] constants), so the same scene now looks the same across all
+three backends -- reverified by re-sampling the same pixels after the fix
+(brightness moved from ~15-20% to ~40-47% of authored values, matching
+expectations). Focused suite (`RenderingDeviceSceneRendererTests`,
+`WebPlayerTests`): 12/12.
+
+With the corrected, re-lit, re-widened build, ran a real Playwright
+gameplay sequence against the actual published output (not a synthetic
+fixture): movement (`D`/`A`, confirmed by walking into and colliding with
+the `Glow1` collectible), jump/grounding (the jump command correctly did
+nothing while airborne, only ever applying while `grounded`), gravity and
+falling off a ledge, collectible pickup (canvas draw count dropped 24 to
+23 on contact, matching `Collected=true` + `WithVisible(false)`),
+death/respawn (position returns to the authored spawn point after falling
+past the death plane), reset (an isolated, clean before/after test:
+draws 24 -> 23 (collect) -> 24 (reset restores the collectible) --
+confirms `reset` correctly clears `Collected` and re-shows the entity, not
+just repositions the player), and camera-follow (the world visibly scrolls
+and previously off-screen platforms enter frame as the player moves,
+exactly matching `ApplyPresentation`'s `cameraX = clamp(playerX +
+CameraOffsetX, ...)`). Hazard collision and the goal/win condition were
+**not** reached through scripted play -- both require precise multi-jump
+platforming across level gaps that a blind, scripted input sequence cannot
+reliably execute -- but both use the identical overlap-test and
+lives/death/respawn (or `phase = "won"`) code path already proven correct
+by the death/respawn test above, read directly in
+`ClockworkRulesSystem.cs`. **The authored HUD text (`SCORE ... LIVES ...
+PLAYING`) does not visually render in the web/WebGPU path.** This is a
+pre-existing, already self-documented gap -- `RekallAgeRenderingDeviceSceneRenderer`'s
+own class doc comment states "UI canvas draws are not yet covered by this
+renderer; they are deferred" -- not a regression from this task, and not
+attempted here: implementing UI-canvas/glyph rendering in the generic-
+device renderer is a substantial new rendering feature, not a defect
+repair, and is explicitly out of scope for "accept unchanged." The
+underlying `HudState`/`Label` text data is still computed correctly every
+tick by the backend-agnostic module system; only its on-screen text
+presentation is missing in this specific renderer.
+
+Verification for this task: focused suites (`RenderingDeviceSceneRendererTests`
+12/12, `WebPlayerTests` included), Release solution build 0 warnings/
+errors, full engine test suite (background run) -- see below for the
+specific pass/fail counts and confirmation that any failures match the
+same pre-existing parallel-execution flakiness cluster documented earlier
+this session. `git status` clean after each publish cycle (raw
+`dotnet publish`/`restore` calls outside `PublishWebGameCommand`'s
+lock-file isolation twice wrote to checked-in `packages.lock.json` files
+during this task's diagnostics; both reverted with `git checkout --` before
+committing anything). Known, deliberately out-of-scope items carried
+forward: HUD/UI canvas text rendering (above), and hazard/goal reachability
+via scripted browser input (would need a real jump-timing-aware test
+harness, not attempted this session). The old moving-dot server this task's
+plan says to replace was not located in this session's scope -- see the
+open item below rather than a completed replacement.
 
 The first Godot-reference graphics milestone is verified. A shallow,
 blob-filtered sparse reference checkout at `F:\Dev\godot-reference` pins Godot
@@ -4153,6 +4818,108 @@ portable authoring path, followed by a Galaga-class game in Studio. The queued
 Rain Glass shader acceptance follows those playable proofs
 and still requires the licensed remote image, full-window asset-backed
 composition, two temporally distinct frames, package relocation, and audit.
+
+Task 9's plan item 7 ("replace the old moving-dot server with the accepted
+relocated game") was previously logged as not located in this session's
+scope. It is now done: it referred to this README's own "Web Player Proof"
+section, which documented serving `Rekall.Age.Player.Web`'s bare
+RenderingDevice proof build (a moving shape on an otherwise empty canvas,
+via `python -m http.server` directly against that project's own publish
+output) as if it were the web-publishing story. Promoted the accepted,
+camera-fixed, correctly-lit Clockwork Canopy project into
+`Examples/ClockworkCanopy/` (`rekall.project.json`, `Scenes/Main.age.scene.json`,
+both modules' source and `.csproj` files -- no `bin/`, `obj/`, `.rekall/`, or
+generated lock/transaction files, matching the existing `Examples/TumblingCubes`
+pattern exactly) and re-verified the promoted copy through the ordinary
+commands from a clean checkout: `module install-sdk`, `build modules`,
+`game publish-web`, `game audit-web` -- all 5 audit checks passed
+(manifest-integrity, module-registry-coverage, content-relocation,
+runtime-identity, static-server-boot). `git status` was clean after each
+step (no stray `packages.lock.json` writes this time). Rewrote the README's
+"Web Player Proof" section to document publishing/auditing/serving
+`Examples/ClockworkCanopy` as the primary path, and demoted the bare
+`Rekall.Age.Player.Web` proof to what it actually is: a renderer/bridge
+diagnostic fallback, explicitly not a playable game export. Added
+`.rekall-web-publish/` and `*.web-publish/` to `.gitignore` so the CLI's
+per-project web-publish staging/output directories (e.g.
+`Examples/ClockworkCanopy.web-publish/`) don't show up as untracked cruft.
+This closes the last open item from Task 9; the full plan
+(`docs/superpowers/plans/2026-08-23-genuine-web-game-publishing.md`) is now
+complete end to end.
+
+The previously-documented "pre-existing parallel-execution flakiness
+cluster" (`BuildModulesCommandTests` wedged-compiler tests,
+`McpAgentToolExecutorTests`, `ProjectRuntimeSystemTests`,
+`ScaffoldRuntimeSystemModuleCommandTests`, `WindowsPlayerRecoveryTests`) is
+fixed. All 6 failures turned out to be real, individually diagnosable
+causes, not vague nondeterminism -- confirmed by running each in isolation
+first (5 of 6 failed deterministically alone, only
+`ScaffoldRuntimeSystemModuleCommandTests` needed the full parallel suite to
+reproduce):
+- `BuildModulesCommandTests` (2 tests): spawned `pwsh` (PowerShell 7) as a
+  portable stand-in for a hung external compiler process; `pwsh` is an
+  optional separate install and was not present on this machine.
+  Switched to `powershell` (Windows PowerShell 5.1), which ships with every
+  Windows install and is not a production-path dependency either way.
+- `WindowsPlayerRecoveryTests`: hardcoded the `bin/Debug/net10.0-windows`
+  output path for `Rekall.Age.Player.Windows.exe`, so a Release-only
+  build/test pass (this session's convention) made it fail even though the
+  player was built and fine. Now tries Release first, then Debug, mirroring
+  `WebGameCliTests.FindCliAssemblyPath`'s existing pattern for the CLI
+  assembly.
+- `McpAgentToolExecutorTests.BroadComponentSearchFitsTheAgentToolBudget...`:
+  the built-in component catalog has grown enough since this test was
+  written that a `limit=12` response for its broad multi-topic query now
+  serializes to 13,955 characters, over the 12,000-character agent tool
+  budget (`RekallAgeMcpAgentToolExecutor.ExecuteRegisteredToolAsync`), so
+  the executor correctly truncated it -- exactly the behavior the test's own
+  name says it's proving works. Measured (not guessed) that `limit=9` keeps
+  the same realistic broad query comfortably under budget (~10.4k chars)
+  while every explicitly required contract type still ranks in the top 9.
+- `ProjectRuntimeSystemTests.RuntimeViewportCaptureUsesProjectRuntimeSystem
+  Output`: the test's orbit-scene camera had no explicit `Transform3D`, so
+  it defaulted to the world origin facing +Z. The orbiting cube ends at
+  world X=2, Z=0 -- off to the side of the camera's frustum, not in front of
+  it, once the software renderer honors the real authored camera instead of
+  the legacy oblique-projection fallback (the same class of gap Task 9
+  found in Clockwork Canopy). Gave the camera an explicit position/pitch so
+  the cube stays in frame; measured the actual rendered pixel distribution
+  rather than assuming a screen-side convention, and corrected the
+  assertion to match what real rendering produces (the cube lands
+  left-of-center at this camera setup, not right).
+- `ScaffoldRuntimeSystemModuleCommandTests`: a real engine bug, not test
+  brittleness. `RekallAgeModuleIndexer.IndexAssembly` filtered candidate
+  module types by `!type.IsAbstract` only, which does not exclude open
+  generic types (`Type.ContainsGenericParameters`). Whenever an unbound
+  generic `RekallAgeModule` subclass from another test's dynamically
+  compiled module assembly (`Game.Modules.WebRules.WebRulesModule<T>`) was
+  already loaded into the shared parallel-test-run AppDomain, the indexer's
+  `Activator.CreateInstance` call on it threw
+  `ArgumentException: Cannot create an instance of ... because
+  Type.ContainsGenericParameters is true`, which is exactly why this one
+  only reproduced under full-suite parallel load and never in isolation.
+  Added the missing `!type.ContainsGenericParameters` filter.
+- A sixth, previously-unseen failure surfaced once the above were fixed:
+  `WebGamePublishingTests.PublishesAndAuditsARealWebGameEndToEnd` hit
+  `NuGet.targets error: The process cannot access the file '...
+  packages.lock.json' because it is being used by another process.`
+  `rekall.game.audit_web` republishes through the same
+  `PublishWebGameCommand` path a preceding `rekall.game.publish_web` call
+  in the same test already used, against the same isolated
+  `workingRoot`/lock-file path. On Windows the just-exited `dotnet.exe`
+  process's handle on that file is not always released the instant
+  `WaitForExitAsync` returns -- hit this same error interactively earlier
+  this session too, only fixed then by `dotnet build-server shutdown`.
+  Added a bounded retry (4 attempts, linear backoff) in
+  `PublishWebGameCommand.RunDotNetAsync`, matching only that specific
+  transient NuGet lock-file error string so any real compile/publish
+  failure still surfaces on the first attempt.
+
+Verification: 3 full sequential runs of the complete engine suite as each
+fix landed (1659/1665 -> 1664/1665 after the first 5 fixes -> 1665/1665
+after the `ModuleIndexer` and `PublishWebGameCommand` fixes), 55/55 Studio
+tests, a zero-warning zero-error Release solution build, `git status` clean
+(only the 6 intended files touched, no stray `packages.lock.json` writes).
 
 ## Evidence index
 

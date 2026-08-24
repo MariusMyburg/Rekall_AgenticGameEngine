@@ -1,0 +1,15 @@
+{
+  "name": "Clockwork Canopy",
+  "schemaVersion": 1,
+  "capabilities": [
+    "animation",
+    "audio",
+    "input",
+    "modules",
+    "physics",
+    "rendering2d",
+    "rendering3d",
+    "ui",
+    "world"
+  ]
+}

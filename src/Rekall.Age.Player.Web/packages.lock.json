@@ -47,6 +47,11 @@
         "resolved": "1.0.0",
         "contentHash": "O08bJk78p96Nomx3BOctu6Du65lNbYfsow/rWAmD0fa1UqcECK4IV7JPcUPL3CdRodECOuoyq5V0PKkRi+/94w=="
       },
+      "Serilog": {
+        "type": "Transitive",
+        "resolved": "4.3.1",
+        "contentHash": "savYe7h5yRlkqBVOwP8cIRDOdqKiPmYCU4W87JH38sBmcKD5EBoXvQIw6bNEvZ/pTe1gsiye3VFCzBsoppGkXQ=="
+      },
       "Silk.NET.Core": {
         "type": "Transitive",
         "resolved": "2.23.0",
@@ -123,14 +128,57 @@
         "resolved": "0.8.8",
         "contentHash": "UIDFkA5DC3en3tOJ3Mof11yBx9kUQLsaeo/oFdvN6Bbkr9E9+VCqfIadHci8cu+I51K2Sl7XYWVl2R/mA75NBQ=="
       },
+      "rekall.age.agent": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Project": "[0.1.0-preview.1, )",
+          "Rekall.Age.Validation": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.assetpipeline": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modeling": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )"
+        }
+      },
       "rekall.age.assets": {
         "type": "Project",
         "dependencies": {
           "Rekall.Age.Core": "[0.1.0-preview.1, )"
         }
       },
+      "rekall.age.build": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )"
+        }
+      },
       "rekall.age.core": {
         "type": "Project"
+      },
+      "rekall.age.leveldesign": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.mcp": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Agent": "[0.1.0-preview.1, )",
+          "Rekall.Age.Build": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
+          "Serilog": "[4.3.1, )"
+        }
       },
       "rekall.age.modeling": {
         "type": "Project",
@@ -225,6 +273,26 @@
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
           "Rekall.Age.Modules": "[0.1.0-preview.1, )",
           "Rekall.Age.Project": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
+      "rekall.age.workflows": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.Agent": "[0.1.0-preview.1, )",
+          "Rekall.Age.AssetPipeline": "[0.1.0-preview.1, )",
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
+          "Rekall.Age.Build": "[0.1.0-preview.1, )",
+          "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.LevelDesign": "[0.1.0-preview.1, )",
+          "Rekall.Age.Mcp": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modeling": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
+          "Rekall.Age.Playback": "[0.1.0-preview.1, )",
+          "Rekall.Age.Project": "[0.1.0-preview.1, )",
+          "Rekall.Age.Rendering": "[0.1.0-preview.1, )",
+          "Rekall.Age.Runtime": "[0.1.0-preview.1, )",
+          "Rekall.Age.Validation": "[0.1.0-preview.1, )",
           "Rekall.Age.World": "[0.1.0-preview.1, )"
         }
       },

@@ -62,6 +62,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _switchSceneCommand;
     private readonly RekallAgeAsyncCommand _packageCommand;
     private readonly RekallAgeAsyncCommand _auditPackageCommand;
+    private readonly RekallAgeAsyncCommand _publishWebCommand;
+    private readonly RekallAgeAsyncCommand _auditWebCommand;
     private readonly RekallAgeAsyncCommand _undoCommand;
     private readonly RekallAgeAsyncCommand _redoCommand;
     private readonly RekallAgeAsyncCommand _discoverModelsCommand;
@@ -123,6 +125,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private BitmapSource? _modelingGraphViewportImage;
     private RekallAgeStudioModelingGraphNodeView? _selectedModelingGraphNode;
     private string? _lastPackagePath;
+    private string? _lastWebPublishPath;
     private string _statusText = "Create or open a Rekall AGE project to begin.";
     private string _viewportTitle = "Viewport";
     private string _viewportSummary = "No rendered frame yet.";
@@ -201,6 +204,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _switchSceneCommand = CreateAsyncCommand(SwitchSceneAsync, CanSwitchScene);
         _packageCommand = CreateAsyncCommand(PackageAsync, HasOpenProject);
         _auditPackageCommand = CreateAsyncCommand(AuditPackageAsync, CanAuditPackage);
+        _publishWebCommand = CreateAsyncCommand(PublishWebAsync, HasOpenProject);
+        _auditWebCommand = CreateAsyncCommand(AuditWebAsync, CanAuditWeb);
         _undoCommand = CreateAsyncCommand(UndoAsync, () => HasEditableProject() && _session.CanUndo);
         _redoCommand = CreateAsyncCommand(RedoAsync, () => HasEditableProject() && _session.CanRedo);
         _discoverModelsCommand = CreateAsyncCommand(DiscoverModelsAsync, () => !IsBusy && !IsAgentRunning);
@@ -276,6 +281,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand SwitchSceneCommand => _switchSceneCommand;
     public ICommand PackageCommand => _packageCommand;
     public ICommand AuditPackageCommand => _auditPackageCommand;
+    public ICommand PublishWebCommand => _publishWebCommand;
+    public ICommand AuditWebCommand => _auditWebCommand;
     public ICommand UndoCommand => _undoCommand;
     public ICommand RedoCommand => _redoCommand;
     public ICommand DiscoverModelsCommand => _discoverModelsCommand;
@@ -586,6 +593,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         private set
         {
             if (Set(ref _lastPackagePath, value)) RefreshCommands();
+        }
+    }
+
+    public string? LastWebPublishPath
+    {
+        get => _lastWebPublishPath;
+        private set
+        {
+            if (Set(ref _lastWebPublishPath, value)) RefreshCommands();
         }
     }
 
@@ -907,6 +923,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private bool CanAuditPackage() => HasOpenProject()
         && LastPackagePath is not null
         && (File.Exists(LastPackagePath) || Directory.Exists(LastPackagePath));
+    // Unlike CanAuditPackage, rekall.game.audit_web is self-contained -- it republishes the project itself before
+    // verifying it (the same shape as AuditPlayablePackageCommand's own inspect/run/capture, just for the web
+    // target) -- so it does not depend on a prior successful Publish Web click.
+    private bool CanAuditWeb() => HasOpenProject();
     private bool HasOpenMesh() => !IsBusy && Mode == RekallAgeStudioMode.Edit && _modeling.Mesh is not null;
     private bool CanOpenMeshAsset() => HasEditableProject() && !string.IsNullOrWhiteSpace(SelectedMeshAssetId);
     private bool CanCreateMeshPrimitive() => HasEditableProject()
@@ -1387,6 +1407,41 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             height = 540
         }),
         "Audit playable package",
+        "studio",
+        CancellationToken.None).AsTask());
+
+    private Task PublishWebAsync() => RunAsync(PublishWebOperationAsync);
+
+    private async Task<RekallAgeWorkbenchOperationResult> PublishWebOperationAsync()
+    {
+        var result = await _session.ExecuteAsync(
+            "rekall.game.publish_web",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                outputDirectory = Path.Combine(_session.ProjectRoot!, "Builds", "StudioWebPublish")
+            }),
+            "Publish web game",
+            "studio",
+            CancellationToken.None);
+        if (result.Ok && result.Value is PublishWebGameResult publish && publish.Ready)
+        {
+            LastWebPublishPath = publish.OutputDirectory;
+            AppendAgentLine($"publish-web: {publish.OutputDirectory}");
+        }
+        return result;
+    }
+
+    private Task AuditWebAsync() => RunAsync(() => _session.ExecuteAsync(
+        "rekall.game.audit_web",
+        JsonSerializer.Serialize(new
+        {
+            projectRoot = _session.ProjectRoot,
+            sceneName = _session.SceneName,
+            outputDirectory = Path.Combine(_session.ProjectRoot!, "Builds", "StudioWebPublish")
+        }),
+        "Audit web game",
         "studio",
         CancellationToken.None).AsTask());
 
@@ -2074,6 +2129,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _switchSceneCommand.RaiseCanExecuteChanged();
         _packageCommand.RaiseCanExecuteChanged();
         _auditPackageCommand.RaiseCanExecuteChanged();
+        _publishWebCommand.RaiseCanExecuteChanged();
+        _auditWebCommand.RaiseCanExecuteChanged();
         _undoCommand.RaiseCanExecuteChanged();
         _redoCommand.RaiseCanExecuteChanged();
         _discoverModelsCommand.RaiseCanExecuteChanged();

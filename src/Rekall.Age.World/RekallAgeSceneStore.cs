@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Rekall.Age.Core.Compatibility;
 using Rekall.Age.Core.Product;
 using Rekall.Age.Core.Persistence;
@@ -7,13 +6,6 @@ namespace Rekall.Age.World;
 
 public sealed class RekallAgeSceneStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        MaxDepth = RekallAgeDocumentSchemaProbe.MaximumDocumentDepth
-    };
-
     public string GetScenePath(string projectRoot, string sceneName)
     {
         ValidateSceneName(sceneName);
@@ -88,11 +80,7 @@ public sealed class RekallAgeSceneStore
     }
 
     public string Serialize(RekallAgeSceneDocument scene)
-    {
-        ArgumentNullException.ThrowIfNull(scene);
-        var current = scene with { SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion };
-        return JsonSerializer.Serialize(current, JsonOptions) + Environment.NewLine;
-    }
+        => RekallAgeSceneCodec.Serialize(scene);
 
     public async ValueTask<RekallAgeSceneDocument> LoadAsync(
         string projectRoot,
@@ -112,11 +100,8 @@ public sealed class RekallAgeSceneStore
             RekallAgeProductInfo.Current.ProjectSchemaVersion,
             cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        var scene = snapshot.Deserialize<RekallAgeSceneDocument>(JsonOptions);
-        return new RekallAgeVersionedDocument<RekallAgeSceneDocument>(scene with
-        {
-            SchemaVersion = RekallAgeProductInfo.Current.ProjectSchemaVersion
-        }, snapshot.File.Revision);
+        var scene = RekallAgeSceneCodec.DeserializeValidated(snapshot.File.Bytes, sceneName, snapshot.File.Path);
+        return new RekallAgeVersionedDocument<RekallAgeSceneDocument>(scene, snapshot.File.Revision);
     }
 
     public IReadOnlyList<string> ListSceneNames(string projectRoot)
@@ -148,13 +133,6 @@ public sealed class RekallAgeSceneStore
 
     private static void ValidateSnapshot(RekallAgeDocumentSnapshot snapshot, string expectedSceneName)
     {
-        var scene = snapshot.Deserialize<RekallAgeSceneDocument>(JsonOptions);
-        if (string.IsNullOrWhiteSpace(scene.Id) ||
-            !string.Equals(scene.Name, expectedSceneName, StringComparison.Ordinal) ||
-            scene.Capabilities is null ||
-            scene.Entities is null)
-        {
-            throw new InvalidDataException($"Scene document '{snapshot.File.Path}' has an invalid required shape.");
-        }
+        RekallAgeSceneCodec.DeserializeValidated(snapshot.File.Bytes, expectedSceneName, snapshot.File.Path);
     }
 }

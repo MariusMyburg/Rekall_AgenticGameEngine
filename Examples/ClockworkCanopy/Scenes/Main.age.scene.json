@@ -1,0 +1,1090 @@
+{
+  "schemaVersion": 1,
+  "id": "scene_10cb7fc85f7f45c5a40d726ad7eea467",
+  "name": "Main",
+  "capabilities": [
+    "animation",
+    "audio",
+    "input",
+    "physics",
+    "rendering2d",
+    "rendering3d",
+    "ui",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "ent_b7a720b720ba40459c1f0507736c992a",
+      "name": "BackdropGround",
+      "tags": [],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#4E7A99",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 40,
+            "ScaleY": 10,
+            "ScaleZ": 0.4,
+            "X": 8,
+            "Y": -5.1,
+            "Z": -2
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_9e9bfa275bbd4a21b97589246cdfba53",
+      "name": "BackdropMid",
+      "tags": [],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#6FB888",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 40,
+            "ScaleY": 10,
+            "ScaleZ": 0.4,
+            "X": 8,
+            "Y": -2.9,
+            "Z": -2.6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_9abc6938553348e6bd0e2063c1b7a1f7",
+      "name": "BackdropSky",
+      "tags": [],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#F2B879",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 40,
+            "ScaleY": 10,
+            "ScaleZ": 0.4,
+            "X": 8,
+            "Y": -0.6,
+            "Z": -3.2
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_c45d52885bf74d3c96f4e94e6444be26",
+      "name": "CameraRig",
+      "tags": [],
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "Active": true,
+            "FarClip": 100,
+            "NearClip": 0.01,
+            "ProjectionMode": "Orthographic",
+            "OrthographicSize": 8,
+            "ClearColor": "#CFE8F5"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "ScaleZ": 1,
+            "X": -4.5,
+            "Y": 1,
+            "Z": 8,
+            "Yaw": 180
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e08732f8974e441eb31779611738c863",
+      "name": "FloatP1",
+      "tags": [
+        "platform"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.PlatformState",
+          "properties": {
+            "HalfX": 1.5,
+            "HalfY": 0.4
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#5A7EA6",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleZ": 1,
+            "X": 4,
+            "Y": 3.5,
+            "Z": 0,
+            "ScaleX": 3,
+            "ScaleY": 0.8
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_2257f65ce3bf4f1882c5c936bc9bc999",
+      "name": "FloatP2",
+      "tags": [
+        "platform"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.PlatformState",
+          "properties": {
+            "HalfX": 1.5,
+            "HalfY": 0.4
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#5A7EA6",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleZ": 1,
+            "X": 17,
+            "Y": 3,
+            "Z": 0,
+            "ScaleX": 3,
+            "ScaleY": 0.8
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_29f1080245344af9ab431de80e2dfb07",
+      "name": "FloatP3",
+      "tags": [
+        "platform"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.PlatformState",
+          "properties": {
+            "HalfX": 1.5,
+            "HalfY": 0.4
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#5A7EA6",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleZ": 1,
+            "X": 25,
+            "Y": 5,
+            "Z": 0,
+            "ScaleX": 3,
+            "ScaleY": 0.8
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_afde2033f5e94414b13ad20eb0f7ac19",
+      "name": "Glow1",
+      "tags": [
+        "collectible"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.CollectibleState",
+          "properties": {
+            "Collected": false,
+            "Points": 25,
+            "Radius": 0.8
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#FFD24A",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "ScaleZ": 1,
+            "X": 0.5,
+            "Y": 1.2,
+            "Z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_dcaf8fd5189140bebe38f7117e403c2c",
+      "name": "Glow2",
+      "tags": [
+        "collectible"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.CollectibleState",
+          "properties": {
+            "Collected": false,
+            "Points": 25,
+            "Radius": 0.8
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#FFD24A",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "ScaleZ": 1,
+            "X": 4,
+            "Y": 4.4,
+            "Z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_a840187bf51d4526bc570d75cc5e684a",
+      "name": "Glow3",
+      "tags": [
+        "collectible"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.CollectibleState",
+          "properties": {
+            "Collected": false,
+            "Points": 25,
+            "Radius": 0.8
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#FFD24A",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "ScaleZ": 1,
+            "X": 13,
+            "Y": 1.2,
+            "Z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_b677bb06afff4fecb3a230423727069a",
+      "name": "Glow4",
+      "tags": [
+        "collectible"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.CollectibleState",
+          "properties": {
+            "Collected": false,
+            "Points": 25,
+            "Radius": 0.8
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#FFD24A",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "ScaleZ": 1,
+            "X": 17,
+            "Y": 3.9,
+            "Z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_4d6812a71b1540e9916c0e57b5c2686b",
+      "name": "Glow5",
+      "tags": [
+        "collectible"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.CollectibleState",
+          "properties": {
+            "Collected": false,
+            "Points": 25,
+            "Radius": 0.8
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#FFD24A",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "ScaleZ": 1,
+            "X": 25,
+            "Y": 5.9,
+            "Z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_4ea28713af934bb3b60947d4d715e1db",
+      "name": "Glow6",
+      "tags": [
+        "collectible"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.CollectibleState",
+          "properties": {
+            "Collected": false,
+            "Points": 25,
+            "Radius": 0.8
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#FFD24A",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "ScaleZ": 1,
+            "X": 31,
+            "Y": 1.2,
+            "Z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_0eebf0c8e240457b83b251a7be861e99",
+      "name": "GoalPad",
+      "tags": [
+        "platform"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.PlatformState",
+          "properties": {
+            "HalfX": 2.5,
+            "HalfY": 0.5
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#3E6B4E",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleZ": 1,
+            "X": 43,
+            "Y": -0.5,
+            "Z": 0,
+            "ScaleX": 5,
+            "ScaleY": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_0119e8a7d386491b8fe27f561d5fe281",
+      "name": "GroundA",
+      "tags": [
+        "platform"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.PlatformState",
+          "properties": {
+            "HalfX": 4,
+            "HalfY": 0.5
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#33506E",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleZ": 1,
+            "X": -2,
+            "Y": -0.5,
+            "Z": 0,
+            "ScaleX": 8,
+            "ScaleY": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_57a17efbf59d4b139d60205fa65c1c45",
+      "name": "GroundB",
+      "tags": [
+        "platform"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.PlatformState",
+          "properties": {
+            "HalfX": 4,
+            "HalfY": 0.5
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#33506E",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleZ": 1,
+            "X": 10,
+            "Y": -0.5,
+            "Z": 0,
+            "ScaleX": 8,
+            "ScaleY": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ea98589e822f4fc7bc9c602be5ae2060",
+      "name": "GroundC",
+      "tags": [
+        "platform"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.PlatformState",
+          "properties": {
+            "HalfY": 0.5,
+            "HalfX": 6
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#33506E",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleZ": 1,
+            "X": 22,
+            "Y": -0.5,
+            "Z": 0,
+            "ScaleX": 12,
+            "ScaleY": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_a0649e6fa0614306a1d63a52b8dad21c",
+      "name": "GroundD",
+      "tags": [
+        "platform"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.PlatformState",
+          "properties": {
+            "HalfX": 5,
+            "HalfY": 0.5
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#33506E",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleZ": 1,
+            "X": 34,
+            "Y": -0.5,
+            "Z": 0,
+            "ScaleX": 10,
+            "ScaleY": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_f94b53c0df6f460da135b59dc1c19d2b",
+      "name": "HUDRoot",
+      "tags": [
+        "hud"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.HudState",
+          "properties": {
+            "StatusText": "PLAYING"
+          }
+        },
+        {
+          "type": "Rekall.Label",
+          "properties": {
+            "Text": "SCORE 0    LIVES 3    PLAYING",
+            "X": 20,
+            "Y": 20,
+            "Width": 520,
+            "Height": 48,
+            "AnchorMinX": 0,
+            "AnchorMaxX": 0,
+            "AnchorMinY": 0,
+            "AnchorMaxY": 0,
+            "PivotX": 0,
+            "PivotY": 0,
+            "BackgroundColor": "#172433DD",
+            "ForegroundColor": "#F5F7FAFF",
+            "BorderColor": "#63D6C8FF",
+            "BorderWidth": 2,
+            "FontSize": 24,
+            "FontFamily": "Segoe UI",
+            "FontWeight": "bold",
+            "HorizontalAlignment": "start",
+            "VerticalAlignment": "center",
+            "PaddingLeft": 16,
+            "PaddingRight": 16
+          }
+        },
+        {
+          "type": "Rekall.UiCanvas",
+          "properties": {
+            "ReferenceWidth": 1280,
+            "ReferenceHeight": 720,
+            "Layer": 20,
+            "LayoutDirection": "none"
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_f3d7b5ef7d7f40d9a4e461dd9a67aa3b",
+      "name": "Hazard1",
+      "tags": [
+        "hazard"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.HazardState",
+          "properties": {
+            "Axis": "x",
+            "BaseY": 0.9,
+            "PhaseOffset": 0.5,
+            "Speed": 2,
+            "HalfSize": 0.5,
+            "BaseX": 13.5,
+            "Range": 0.5
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#E85A4F",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "ScaleZ": 1,
+            "Y": 0.9,
+            "Z": 0,
+            "X": 13.5
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_92d7dcfa02b2443583a51ce4773caf77",
+      "name": "Hazard2",
+      "tags": [
+        "hazard"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.HazardState",
+          "properties": {
+            "Axis": "y",
+            "BaseX": 22,
+            "BaseY": 2.5,
+            "PhaseOffset": 1.5,
+            "Speed": 3,
+            "Range": 1.0,
+            "HalfSize": 0.5
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#E85A4F",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "ScaleZ": 1,
+            "X": 22,
+            "Y": 2.5,
+            "Z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_44d4c45463ec4469b566019c42f1c9c5",
+      "name": "Hazard3",
+      "tags": [
+        "hazard"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.HazardState",
+          "properties": {
+            "Axis": "x",
+            "BaseX": 34,
+            "BaseY": 0.9,
+            "PhaseOffset": 0.8,
+            "Speed": 2.5,
+            "Range": 1.0,
+            "HalfSize": 0.5
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#E85A4F",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "ScaleZ": 1,
+            "X": 34,
+            "Y": 0.9,
+            "Z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_96f6ceb68ec94dc1911fbfc5ab11415e",
+      "name": "InputRoot",
+      "tags": [
+        "input"
+      ],
+      "components": [
+        {
+          "type": "Rekall.InputActionMap",
+          "properties": {
+            "Actions": [
+              {
+                "name": "move.horizontal",
+                "negativeKey": "A",
+                "positiveKey": "D"
+              },
+              {
+                "key": "W",
+                "name": "jump"
+              },
+              {
+                "key": "R",
+                "name": "reset"
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "X": 0,
+            "Y": 0,
+            "Z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_34febfc2c1644cdfb1a74b839f4e244d",
+      "name": "LightRig",
+      "tags": [],
+      "components": [
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": {
+            "Color": "#FFE9C4",
+            "Intensity": 1.35
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "Pitch": 55,
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "ScaleZ": 1,
+            "X": 0,
+            "Y": 0,
+            "Yaw": 180,
+            "Z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_acdda0d810184d05b2a7f6be83762bcc",
+      "name": "Pip",
+      "tags": [
+        "player"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.PlayerState",
+          "properties": {
+            "DeathPlane": -6,
+            "Lives": 3,
+            "PlayerHalfX": 0.5,
+            "PlayerHalfY": 0.5,
+            "SpawnX": -4,
+            "SpawnY": 0.5,
+            "X": -4,
+            "Y": 0.5
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#4FC3E8",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "ScaleZ": 1,
+            "X": -4,
+            "Y": 0.5,
+            "Z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_416623090ec64f1aac21a36687b7c7cc",
+      "name": "Platform0",
+      "tags": [
+        "platform"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.PlatformState",
+          "properties": {
+            "HalfX": 1.5,
+            "HalfY": 0.5
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#3B5B7A",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleZ": 1,
+            "X": -2,
+            "Y": -0.5,
+            "Z": 0,
+            "ScaleX": 3,
+            "ScaleY": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_b190749a505248dba731e7096b65c6de",
+      "name": "Platform1",
+      "tags": [
+        "platform"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.PlatformState",
+          "properties": {
+            "HalfX": 1.5,
+            "HalfY": 0.5
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#3B5B7A",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleZ": 1,
+            "X": 4,
+            "Y": 1,
+            "Z": 0,
+            "ScaleX": 3,
+            "ScaleY": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_8951264876874858887100c5e2730f2e",
+      "name": "Spire",
+      "tags": [
+        "goal"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.ClockworkRules.GoalState",
+          "properties": {
+            "HalfSize": 1.5,
+            "Points": 100
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "Color": "#5CE8A0",
+            "Primitive": "Cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "ScaleZ": 1,
+            "X": 43,
+            "Y": 1.5,
+            "Z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

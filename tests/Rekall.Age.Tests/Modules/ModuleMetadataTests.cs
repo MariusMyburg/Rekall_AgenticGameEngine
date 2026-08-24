@@ -133,6 +133,14 @@ public sealed class ModuleMetadataTests
         Assert.Contains(uiCanvas.Properties, property =>
             property.Name == "ReferenceWidth"
             && property.Description?.Contains("scale", StringComparison.OrdinalIgnoreCase) == true);
+        var label = Assert.Single(result.Value.Components, component => component.TypeName == "Rekall.Label");
+        Assert.Contains(label.Properties, property =>
+            property.Name == "AnchorMinX"
+            && property.Description?.Contains("equal", StringComparison.OrdinalIgnoreCase) == true);
+        Assert.Contains(label.Properties, property => property.Name == "OffsetLeft");
+        Assert.Contains(label.Properties, property => property.Name == "OffsetTop");
+        Assert.Contains(label.Properties, property => property.Name == "OffsetRight");
+        Assert.Contains(label.Properties, property => property.Name == "OffsetBottom");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Button");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Transform2D");
         Assert.Contains(result.Value.Components, component => component.TypeName == "Rekall.Transform3D");

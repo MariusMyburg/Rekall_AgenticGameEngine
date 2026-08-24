@@ -42,7 +42,8 @@ public sealed record RekallAgeVulkanSceneFrameUniform(
     Vector3 LightDirection,
     Vector4 LightColor,
     Vector4 LightPosition,
-    Vector4 CameraPosition = default);
+    Vector4 CameraPosition = default,
+    Matrix4x4 SoftwareViewProjection = default);
 
 public sealed record RekallAgeVulkanSceneStereoFrame(
     bool Enabled,

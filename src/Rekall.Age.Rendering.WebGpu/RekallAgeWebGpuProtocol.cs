@@ -44,6 +44,11 @@ public sealed record RekallAgeWebGpuSubmitPacket(
     int Version,
     string? Label,
     IReadOnlyList<RekallAgeWebGpuCommandPacket> Commands,
+    // Whether this submission's canvas-output color attachment (if any) should also stage a CPU pixel readback
+    // copy. Left false by ordinary scene submission: a full-canvas copy every frame is expensive and nothing
+    // consumes it. Only the one-shot WebGPU compatibility proof workload -- which does read the result back --
+    // sets this true, via RekallAgeWebGpuRenderingDevice.SubmitWithPixelReadback.
+    bool CaptureReadback = false,
     string Operation = "submit") : IRekallAgeWebGpuPacket;
 
 public sealed record RekallAgeWebGpuImportCanvasOutputPacket(

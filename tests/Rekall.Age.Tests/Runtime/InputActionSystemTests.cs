@@ -42,6 +42,42 @@ public sealed class InputActionSystemTests
     }
 
     [Fact]
+    public async Task HeldDesktopKeyRemainsDownAcrossCatchUpStepWithoutRepeatingPressEdge()
+    {
+        var world = CreateWorld(new JsonArray
+        {
+            new JsonObject
+            {
+                ["name"] = "move.horizontal",
+                ["positiveKey"] = "D"
+            }
+        });
+        var capturedInput = new RekallAgeRuntimeInputState(
+            MouseDeltaX: 12,
+            MouseWheelDelta: 1,
+            PressedKeys: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "D" },
+            PressedKeysThisFrame: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "D" });
+
+        var first = RekallAgeRuntimeInputPersistence.ForSimulationStep(capturedInput, 0);
+        var catchUp = RekallAgeRuntimeInputPersistence.ForSimulationStep(capturedInput, 1);
+        var firstResult = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, 1, CancellationToken.None, first);
+        var catchUpResult = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(firstResult.World, 1, CancellationToken.None, catchUp);
+
+        var firstAction = Assert.Single(firstResult.World.Subsystems.Input.Actions);
+        Assert.True(firstAction.IsDown);
+        Assert.True(firstAction.WasPressed);
+        var catchUpAction = Assert.Single(catchUpResult.World.Subsystems.Input.Actions);
+        Assert.True(catchUpAction.IsDown);
+        Assert.False(catchUpAction.WasPressed);
+        Assert.Contains("D", catchUp.PressedKeys!);
+        Assert.Null(catchUp.PressedKeysThisFrame);
+        Assert.Equal(0, catchUp.MouseDeltaX);
+        Assert.Equal(0, catchUp.MouseWheelDelta);
+    }
+
+    [Fact]
     public async Task InputActionMapProjectsAxisAndWheelActions()
     {
         var world = CreateWorld(new JsonArray

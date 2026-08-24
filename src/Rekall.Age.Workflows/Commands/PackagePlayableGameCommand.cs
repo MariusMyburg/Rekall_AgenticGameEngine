@@ -192,7 +192,7 @@ public sealed class PackagePlayableGameCommand
     private static IReadOnlyList<string> CreateLaunchArguments(string bundledGameRoot, string sceneName, bool graphics)
     {
         return graphics
-            ? [bundledGameRoot, sceneName, "--graphics", "--backend", "vulkan", "--playable"]
+            ? [bundledGameRoot, sceneName, "--graphics", "--backend", "vulkan"]
             : [bundledGameRoot, sceneName];
     }
 

@@ -614,6 +614,50 @@ public sealed class CaptureRuntimeViewportCommandTests
             && hint.Contains("world", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Theory]
+    [InlineData("Rekall.Label")]
+    [InlineData("Rekall.Button")]
+    [InlineData("Rekall.Panel")]
+    public async Task CaptureRuntimeViewportCommandExcludesInvisibleUiFromRenderingAndCoverageDiagnostics(
+        string componentType)
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var hiddenHud = RekallAgeEntityDocument.Create("Hidden HUD", ["ui"]) with { Visible = false };
+        hiddenHud = hiddenHud
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["ReferenceWidth"] = 100, ["ReferenceHeight"] = 100 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                componentType,
+                new JsonObject
+                {
+                    ["Width"] = 100,
+                    ["Height"] = 100,
+                    ["Text"] = "HIDDEN",
+                    ["BackgroundColor"] = "#ffffffff"
+                }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "ui"])
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Camera3D",
+                    new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("World", ["geometry"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.GeometryPrimitive",
+                    new JsonObject { ["primitive"] = "cube" })))
+            .AddEntity(hiddenHud);
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 1, Path.Combine(root, "Viewport"), 320, 180, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("hidden ui"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(1, result.Value.RenderableCount);
+        Assert.DoesNotContain("ui", result.Value.RenderableKinds);
+        Assert.DoesNotContain("REKALL_VIEWPORT_UI_LARGE_COVERAGE", result.Value.LayoutDiagnostics.WarningCodes);
+    }
+
     [Fact]
     public async Task CaptureRuntimeViewportCommandCanUseVulkanForClearOnlyRuntimeFrames()
     {
@@ -707,7 +751,7 @@ public sealed class CaptureRuntimeViewportCommandTests
             .AddEntity(RekallAgeEntityDocument.Create("KeyDirectionalLight", ["light"])
                 .AddComponent(RekallAgeComponentDocument.Create(
                     "Rekall.Transform3D",
-                    new JsonObject { ["pitch"] = -35, ["yaw"] = -45 }))
+                    new JsonObject { ["pitch"] = -35, ["yaw"] = 135 }))
                 .AddComponent(RekallAgeComponentDocument.Create(
                     "Rekall.DirectionalLight",
                     new JsonObject { ["intensity"] = 1.0 })));
@@ -724,13 +768,14 @@ public sealed class CaptureRuntimeViewportCommandTests
         Assert.Equal(2, result.Value.RenderableCount);
         Assert.Equal(["light", "mesh"], result.Value.RenderableKinds);
         Assert.Equal(0, result.Value.FallbackRenderableCount);
-        Assert.Contains(Enumerable.Range(0, output.Rgba.Length / 4), pixel =>
-        {
-            var index = pixel * 4;
-            return output.Rgba[index] >= 45
-                && output.Rgba[index + 1] >= 70
-                && output.Rgba[index + 2] >= 100;
-        });
+        var background = output.GetPixel(0, 0);
+        var cubeShades = Enumerable.Range(0, output.Rgba.Length / 4)
+            .Select(pixel => output.GetPixel(pixel % output.Width, pixel / output.Width))
+            .Where(pixel => pixel != background)
+            .Select(pixel => (pixel.R, pixel.G, pixel.B))
+            .Distinct()
+            .ToArray();
+        Assert.True(cubeShades.Length >= 2);
     }
 
     private sealed class FakeVulkanViewportCapture : IRekallAgeVulkanRenderPassCapture

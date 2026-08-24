@@ -44,7 +44,7 @@ project, with its exact authored module and scene behavior unchanged.
 - Create: `src/Rekall.Age.Project/RekallAgeMemoryGameContent.cs`
 - Create: `src/Rekall.Age.World/RekallAgeSceneCodec.cs`
 - Modify: `src/Rekall.Age.World/RekallAgeSceneStore.cs`
-- Modify: `src/Rekall.Age.Runtime/RekallAgeRuntimeWorldBuilder.cs`
+- Modify: `src/Rekall.Age.Core/Compatibility/RekallAgeDocumentSchemaProbe.cs`
 - Test: `tests/Rekall.Age.Tests/Project/GameContentTests.cs`
 - Test: `tests/Rekall.Age.Tests/World/SceneCodecTests.cs`
 
@@ -57,9 +57,11 @@ project, with its exact authored module and scene behavior unchanged.
    authoring stores filesystem-based.
 4. Extract serialization and required-shape validation from the scene store into
    the codec and make the store delegate to it.
-5. Add runtime/frame-builder asset-resolution overloads that consume logical
-   content; preserve current project-root overloads as adapters.
-6. Run Project, World, Runtime, and rendering viewport tests; commit.
+5. Keep `RekallAgeRuntimeWorldBuilder` unchanged: it already consumes an
+   in-memory scene and can omit its optional desktop project root. Defer audio,
+   animation, skeletal-mesh, and compiled-mesh content adapters until an
+   accepted web game actually requires those capabilities.
+6. Run Core compatibility, Project, World, and relevant runtime tests; commit.
 
 ## Task 3: Define the hashed web-game artifact and exporter
 

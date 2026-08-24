@@ -38,24 +38,28 @@ public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
                 return cached;
             }
 
-            if (canvasById.TryGetValue(entityId, out var canvas))
-            {
-                return canvas;
-            }
-
             if (!entitiesById.TryGetValue(entityId, out var entity) || !resolving.Add(entityId))
             {
                 return null;
             }
 
             var element = entity.Components.FirstOrDefault(component => ElementTypes.Contains(component.Type, StringComparer.Ordinal));
-            if (element is null || defaultCanvas is null)
+            if (element is null)
+            {
+                resolving.Remove(entityId);
+                return canvasById.GetValueOrDefault(entityId);
+            }
+            if (defaultCanvas is null)
             {
                 resolving.Remove(entityId);
                 return null;
             }
 
-            var parent = entity.ParentId is not null ? Resolve(entity.ParentId) : defaultCanvas;
+            var parent = canvasById.GetValueOrDefault(entityId);
+            if (parent is null && entity.ParentId is not null)
+            {
+                parent = canvasById.GetValueOrDefault(entity.ParentId) ?? Resolve(entity.ParentId);
+            }
             parent ??= defaultCanvas;
             var parentEntity = entitiesById.GetValueOrDefault(entity.ParentId ?? parent.CanvasEntityId);
             var container = parentEntity?.Components.FirstOrDefault(component =>
@@ -147,18 +151,36 @@ public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
 
         if (TryGetPropertyValue(properties, "anchorMinX", out _) || TryGetPropertyValue(properties, "anchorMaxX", out _))
         {
-            var left = parent.X + parent.Width * Math.Clamp(ReadNumber(properties, "anchorMinX", 0), 0, 1) + ReadNumber(properties, "offsetLeft", 0);
-            var right = parent.X + parent.Width * Math.Clamp(ReadNumber(properties, "anchorMaxX", 1), 0, 1) + ReadNumber(properties, "offsetRight", 0);
-            x = Math.Min(left, right);
-            width = Math.Max(0, right - left);
+            var anchorMinX = Math.Clamp(ReadNumber(properties, "anchorMinX", 0), 0, 1);
+            var anchorMaxX = Math.Clamp(ReadNumber(properties, "anchorMaxX", 1), 0, 1);
+            if (anchorMinX == anchorMaxX)
+            {
+                x = parent.X + parent.Width * anchorMinX + ReadNumber(properties, "x", 0) - width * pivotX;
+            }
+            else
+            {
+                var left = parent.X + parent.Width * anchorMinX + ReadNumber(properties, "offsetLeft", 0);
+                var right = parent.X + parent.Width * anchorMaxX + ReadNumber(properties, "offsetRight", 0);
+                x = Math.Min(left, right);
+                width = Math.Max(0, right - left);
+            }
         }
 
         if (TryGetPropertyValue(properties, "anchorMinY", out _) || TryGetPropertyValue(properties, "anchorMaxY", out _))
         {
-            var top = parent.Y + parent.Height * Math.Clamp(ReadNumber(properties, "anchorMinY", 0), 0, 1) + ReadNumber(properties, "offsetTop", 0);
-            var bottom = parent.Y + parent.Height * Math.Clamp(ReadNumber(properties, "anchorMaxY", 1), 0, 1) + ReadNumber(properties, "offsetBottom", 0);
-            y = Math.Min(top, bottom);
-            height = Math.Max(0, bottom - top);
+            var anchorMinY = Math.Clamp(ReadNumber(properties, "anchorMinY", 0), 0, 1);
+            var anchorMaxY = Math.Clamp(ReadNumber(properties, "anchorMaxY", 1), 0, 1);
+            if (anchorMinY == anchorMaxY)
+            {
+                y = parent.Y + parent.Height * anchorMinY + ReadNumber(properties, "y", 0) - height * pivotY;
+            }
+            else
+            {
+                var top = parent.Y + parent.Height * anchorMinY + ReadNumber(properties, "offsetTop", 0);
+                var bottom = parent.Y + parent.Height * anchorMaxY + ReadNumber(properties, "offsetBottom", 0);
+                y = Math.Min(top, bottom);
+                height = Math.Max(0, bottom - top);
+            }
         }
 
         if (containerProperties is not null && layoutDirection is "horizontal" or "vertical")

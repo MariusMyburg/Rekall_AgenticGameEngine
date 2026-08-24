@@ -12,14 +12,14 @@ public sealed class RekallAgeDocumentCompatibilityException : RekallAgeCodedBoun
         int currentVersion,
         string message,
         Exception? innerException = null)
-        : base(code, message, Path.GetFullPath(documentPath), innerException)
+        : base(code, message, NormalizeDocumentPath(documentPath), innerException)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
         ArgumentException.ThrowIfNullOrWhiteSpace(documentKind);
         ArgumentException.ThrowIfNullOrWhiteSpace(documentPath);
 
         DocumentKind = documentKind;
-        DocumentPath = Path.GetFullPath(documentPath);
+        DocumentPath = NormalizeDocumentPath(documentPath);
         DetectedVersion = detectedVersion;
         CurrentVersion = currentVersion;
     }
@@ -31,4 +31,7 @@ public sealed class RekallAgeDocumentCompatibilityException : RekallAgeCodedBoun
     public int? DetectedVersion { get; }
 
     public int CurrentVersion { get; }
+
+    private static string NormalizeDocumentPath(string documentPath) =>
+        Path.IsPathRooted(documentPath) ? Path.GetFullPath(documentPath) : documentPath;
 }

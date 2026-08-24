@@ -55,6 +55,9 @@
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
             <Button Content="Package" Command="{Binding PackageCommand}" />
             <Button Content="Audit Package" Command="{Binding AuditPackageCommand}" />
+            <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
+            <Button Content="Publish Web" Command="{Binding PublishWebCommand}" />
+            <Button Content="Audit Web" Command="{Binding AuditWebCommand}" />
           </StackPanel>
         </Border>
 

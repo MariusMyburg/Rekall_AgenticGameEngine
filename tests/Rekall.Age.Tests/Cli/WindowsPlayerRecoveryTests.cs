@@ -64,16 +64,29 @@ public sealed class WindowsPlayerRecoveryTests
     private static string FindWindowsPlayer()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var executable = Path.Combine(
-            repositoryRoot,
-            "src",
-            "Rekall.Age.Player.Windows",
-            "bin",
-            "Debug",
-            "net10.0-windows",
-            "Rekall.Age.Player.Windows.exe");
-        Assert.True(File.Exists(executable), executable);
-        return executable;
+        // Mirrors WebGameCliTests.FindCliAssemblyPath: prefer whichever configuration was actually
+        // built (Release or Debug) rather than hardcoding Debug, since a Release-only build/test
+        // pass previously made this test fail even though the player itself was built and fine.
+        foreach (var configuration in new[] { "Release", "Debug" })
+        {
+            var candidate = Path.Combine(
+                repositoryRoot,
+                "src",
+                "Rekall.Age.Player.Windows",
+                "bin",
+                configuration,
+                "net10.0-windows",
+                "Rekall.Age.Player.Windows.exe");
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        var expected = Path.Combine(
+            repositoryRoot, "src", "Rekall.Age.Player.Windows", "bin", "Release|Debug", "net10.0-windows", "Rekall.Age.Player.Windows.exe");
+        Assert.Fail($"Rekall.Age.Player.Windows.exe not found in Release or Debug output under {expected}.");
+        return null!;
     }
 
     private static Task<(int ExitCode, string Output)> RunAsync(

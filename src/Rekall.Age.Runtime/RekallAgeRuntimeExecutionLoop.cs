@@ -33,6 +33,28 @@ public sealed class RekallAgeRuntimeExecutionLoop : IDisposable
             systems.AddRange(new RekallAgeProjectRuntimeSystemLoader().Load(projectRoot));
         }
 
+        return CreateDefault(systems, projectRoot);
+    }
+
+    public static RekallAgeRuntimeExecutionLoop CreateDefault(IEnumerable<Type> moduleTypes)
+    {
+        ArgumentNullException.ThrowIfNull(moduleTypes);
+        return CreateDefault(new RekallAgeProjectRuntimeSystemLoader().Load(moduleTypes), null);
+    }
+
+    public static RekallAgeRuntimeExecutionLoop CreateDefault(
+        IEnumerable<RekallAgeRuntimeModuleRegistration> registrations)
+    {
+        ArgumentNullException.ThrowIfNull(registrations);
+        return CreateDefault(new RekallAgeProjectRuntimeSystemLoader().Load(registrations), null);
+    }
+
+    private static RekallAgeRuntimeExecutionLoop CreateDefault(
+        IEnumerable<IRekallAgeRuntimeWorldSystem> projectSystems,
+        string? projectRoot)
+    {
+        var systems = new List<IRekallAgeRuntimeWorldSystem>(projectSystems);
+
         systems.AddRange(
         [
             new RekallAgeInputActionSystem(),

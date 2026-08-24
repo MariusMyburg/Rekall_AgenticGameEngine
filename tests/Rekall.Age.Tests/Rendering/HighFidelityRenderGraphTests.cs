@@ -99,6 +99,77 @@ public sealed class HighFidelityRenderGraphTests
         Assert.DoesNotContain(graph.Diagnostics, item => item.Code == "REKALL_RENDER_GRAPH_MEMORY_BUDGET_EXCEEDED");
     }
 
+    [Fact]
+    public void BuilderReportsViewportDimensionsThatDoNotMatchTheResolvedPlan()
+    {
+        var plan = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High"),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+            2560,
+            1440);
+        var frame = Frame(1280, 720, plan);
+
+        var graph = new RekallAgeHighFidelityRenderGraphBuilder().Build(frame, plan);
+
+        Assert.False(graph.IsValid);
+        Assert.Contains(graph.Diagnostics, item => item.Code == "REKALL_RENDER_GRAPH_VIEWPORT_DIMENSIONS_MISMATCH"
+            && item.Target == "viewport");
+    }
+
+    [Fact]
+    public void GraphRejectsUnsupportedResourceFormatsBeforeEstimatingMemory()
+    {
+        var graph = RekallAgeHighFidelityRenderGraph.Create(
+            [new RekallAgeHighFidelityRenderResource("custom", "R9G9B9E5_UFloat", 2, 2, 1, "transient", ["sampled"])],
+            []);
+
+        Assert.False(graph.IsValid);
+        Assert.Contains(graph.Diagnostics, item => item.Code == "REKALL_RENDER_GRAPH_UNSUPPORTED_FORMAT"
+            && item.Target == "custom");
+    }
+
+    [Fact]
+    public void GraphRejectsCustomDependenciesThatOmitADeclaredResourceRead()
+    {
+        var graph = RekallAgeHighFidelityRenderGraph.Create(
+            [new RekallAgeHighFidelityRenderResource("output", "R8_UNorm", 1, 1, 1, "transient", ["sampled"])],
+            [
+                new RekallAgeHighFidelityRenderPass("writer", "graphics", [], ["output"], 0, true),
+                new RekallAgeHighFidelityRenderPass("reader", "graphics", ["output"], [], 1, true)
+            ],
+            dependencies: []);
+
+        Assert.False(graph.IsValid);
+        Assert.Contains(graph.Diagnostics, item => item.Code == "REKALL_RENDER_GRAPH_DEPENDENCY_MISSING"
+            && item.Target == "output");
+    }
+
+    [Fact]
+    public void GraphRejectsInvalidDependencyEndpointsResourcesAndDuplicatePassNames()
+    {
+        var malformedDependencyGraph = RekallAgeHighFidelityRenderGraph.Create(
+            [new RekallAgeHighFidelityRenderResource("output", "R8_UNorm", 1, 1, 1, "transient", ["sampled"])],
+            [
+                new RekallAgeHighFidelityRenderPass("writer", "graphics", [], ["output"], 0, true),
+                new RekallAgeHighFidelityRenderPass("reader", "graphics", ["output"], [], 1, true)
+            ],
+            [
+                new RekallAgeHighFidelityRenderDependency("missing", "reader", "output"),
+                new RekallAgeHighFidelityRenderDependency("writer", "reader", "other")]);
+        var duplicatePassGraph = RekallAgeHighFidelityRenderGraph.Create(
+            [new RekallAgeHighFidelityRenderResource("output", "R8_UNorm", 1, 1, 1, "transient", ["sampled"])],
+            [
+                new RekallAgeHighFidelityRenderPass("duplicate", "graphics", [], ["output"], 0, true),
+                new RekallAgeHighFidelityRenderPass("duplicate", "graphics", [], [], 1, true)
+            ]);
+
+        Assert.False(malformedDependencyGraph.IsValid);
+        Assert.Contains(malformedDependencyGraph.Diagnostics, item => item.Code == "REKALL_RENDER_GRAPH_INVALID_DEPENDENCY_ENDPOINT");
+        Assert.Contains(malformedDependencyGraph.Diagnostics, item => item.Code == "REKALL_RENDER_GRAPH_INVALID_DEPENDENCY_RESOURCE");
+        Assert.False(duplicatePassGraph.IsValid);
+        Assert.Contains(duplicatePassGraph.Diagnostics, item => item.Code == "REKALL_RENDER_GRAPH_DUPLICATE_PASS");
+    }
+
     private static RekallAgeHighFidelityRenderGraph Build(string preset)
     {
         var plan = new RekallAgeRenderQualityProfileResolver().Resolve(
@@ -106,12 +177,20 @@ public sealed class HighFidelityRenderGraphTests
             RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
             2560,
             1440);
-        var frame = new RekallAgeRuntimeViewportFrame(
+        var frame = Frame(2560, 1440, plan);
+
+        return new RekallAgeHighFidelityRenderGraphBuilder().Build(frame, plan);
+    }
+
+    private static RekallAgeRuntimeViewportFrame Frame(
+        int width,
+        int height,
+        RekallAgeResolvedRenderFeaturePlan plan) => new(
             "Main",
             0,
             0,
-            2560,
-            1440,
+            width,
+            height,
             null,
             [],
             [],
@@ -121,7 +200,4 @@ public sealed class HighFidelityRenderGraphTests
         {
             ResolvedQualityPlan = plan
         };
-
-        return new RekallAgeHighFidelityRenderGraphBuilder().Build(frame, plan);
-    }
 }

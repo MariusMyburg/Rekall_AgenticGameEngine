@@ -72,11 +72,25 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
         passes.Add(Pass("ui", "graphics", ["ldr-color"], ["ldr-color"], nextOrder++));
         passes.Add(Pass("present", "present", ["ldr-color"], ["present-output"], nextOrder));
 
-        return RekallAgeHighFidelityRenderGraph.Create(
+        var graph = RekallAgeHighFidelityRenderGraph.Create(
             resources,
             passes,
             transientBudgetBytes: plan.EstimatedTransientBytes,
             persistentBudgetBytes: plan.EstimatedPersistentBytes);
+        if (frame.Width == plan.OutputWidth && frame.Height == plan.OutputHeight)
+        {
+            return graph;
+        }
+
+        return graph with
+        {
+            Diagnostics = graph.Diagnostics
+                .Append(new RekallAgeHighFidelityRenderGraphDiagnostic(
+                    "REKALL_RENDER_GRAPH_VIEWPORT_DIMENSIONS_MISMATCH",
+                    "viewport",
+                    $"Viewport dimensions {frame.Width}x{frame.Height} do not match resolved output dimensions {plan.OutputWidth}x{plan.OutputHeight}."))
+                .ToArray()
+        };
     }
 
     private static IReadOnlyList<string> ClusterWrites(RekallAgeResolvedRenderFeaturePlan plan) =>

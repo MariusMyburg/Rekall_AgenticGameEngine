@@ -28,9 +28,12 @@ public sealed record RekallAgeHighFidelityRenderGraph(
         var orderedPasses = passes.OrderBy(pass => pass.Order).ThenBy(pass => pass.Name, StringComparer.Ordinal).ToArray();
         var diagnostics = new List<RekallAgeHighFidelityRenderGraphDiagnostic>();
         ValidateResources(orderedResources, diagnostics);
+        ValidatePasses(orderedPasses, diagnostics);
         ValidatePassAccesses(orderedResources, orderedPasses, diagnostics);
-        var resolvedDependencies = dependencies?.ToArray() ?? BuildDependencies(orderedPasses);
-        ValidateCycles(orderedPasses, resolvedDependencies, diagnostics);
+        var expectedDependencies = BuildDependencies(orderedPasses);
+        var resolvedDependencies = dependencies?.ToArray() ?? expectedDependencies;
+        var cycleDependencies = ValidateDependencies(orderedResources, orderedPasses, resolvedDependencies, expectedDependencies, diagnostics);
+        ValidateCycles(orderedPasses, cycleDependencies, diagnostics);
         var estimatedBytes = EstimateBytes(orderedResources, diagnostics);
         ValidateBudget(orderedResources, estimatedBytes, transientBudgetBytes, persistentBudgetBytes, diagnostics);
 
@@ -45,13 +48,20 @@ public sealed record RekallAgeHighFidelityRenderGraph(
     private static readonly HashSet<string> StructuralCodes = new(StringComparer.Ordinal)
     {
         "REKALL_RENDER_GRAPH_DUPLICATE_RESOURCE",
+        "REKALL_RENDER_GRAPH_DUPLICATE_PASS",
         "REKALL_RENDER_GRAPH_INVALID_DIMENSIONS",
         "REKALL_RENDER_GRAPH_DEPTH_COLOR_INCOMPATIBLE",
+        "REKALL_RENDER_GRAPH_UNSUPPORTED_FORMAT",
         "REKALL_RENDER_GRAPH_MISSING_RESOURCE",
         "REKALL_RENDER_GRAPH_MISSING_PRODUCER",
         "REKALL_RENDER_GRAPH_READ_BEFORE_WRITE",
+        "REKALL_RENDER_GRAPH_INVALID_DEPENDENCY_ENDPOINT",
+        "REKALL_RENDER_GRAPH_INVALID_DEPENDENCY_RESOURCE",
+        "REKALL_RENDER_GRAPH_INVALID_DEPENDENCY",
+        "REKALL_RENDER_GRAPH_DEPENDENCY_MISSING",
         "REKALL_RENDER_GRAPH_CYCLE",
-        "REKALL_RENDER_GRAPH_MEMORY_OVERFLOW"
+        "REKALL_RENDER_GRAPH_MEMORY_OVERFLOW",
+        "REKALL_RENDER_GRAPH_VIEWPORT_DIMENSIONS_MISMATCH"
     };
 
     private static void ValidateResources(
@@ -66,6 +76,12 @@ public sealed record RekallAgeHighFidelityRenderGraph(
 
         foreach (var resource in resources)
         {
+            if (!TryBytesPerTexel(resource.Format, out _))
+            {
+                Add(diagnostics, "REKALL_RENDER_GRAPH_UNSUPPORTED_FORMAT", resource.Name,
+                    $"Render resource '{resource.Name}' uses unsupported format '{resource.Format}'.");
+            }
+
             if (resource.Width <= 0 || resource.Height <= 0 || resource.Layers <= 0)
             {
                 Add(diagnostics, "REKALL_RENDER_GRAPH_INVALID_DIMENSIONS", resource.Name,
@@ -80,6 +96,17 @@ public sealed record RekallAgeHighFidelityRenderGraph(
                 Add(diagnostics, "REKALL_RENDER_GRAPH_DEPTH_COLOR_INCOMPATIBLE", resource.Name,
                     $"Render resource '{resource.Name}' has incompatible format '{resource.Format}' and attachment usage.");
             }
+        }
+    }
+
+    private static void ValidatePasses(
+        IReadOnlyList<RekallAgeHighFidelityRenderPass> passes,
+        ICollection<RekallAgeHighFidelityRenderGraphDiagnostic> diagnostics)
+    {
+        foreach (var duplicate in passes.GroupBy(pass => pass.Name, StringComparer.Ordinal).Where(group => group.Count() > 1))
+        {
+            Add(diagnostics, "REKALL_RENDER_GRAPH_DUPLICATE_PASS", duplicate.Key,
+                $"Render pass '{duplicate.Key}' is declared more than once.");
         }
     }
 
@@ -162,6 +189,64 @@ public sealed record RekallAgeHighFidelityRenderGraph(
         return dependencies;
     }
 
+    private static IReadOnlyList<RekallAgeHighFidelityRenderDependency> ValidateDependencies(
+        IReadOnlyList<RekallAgeHighFidelityRenderResource> resources,
+        IReadOnlyList<RekallAgeHighFidelityRenderPass> passes,
+        IReadOnlyList<RekallAgeHighFidelityRenderDependency> dependencies,
+        IReadOnlyList<RekallAgeHighFidelityRenderDependency> expectedDependencies,
+        ICollection<RekallAgeHighFidelityRenderGraphDiagnostic> diagnostics)
+    {
+        var resourcesByName = resources
+            .GroupBy(resource => resource.Name, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        var passesByName = passes
+            .GroupBy(pass => pass.Name, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+        var cycleDependencies = new List<RekallAgeHighFidelityRenderDependency>();
+        foreach (var dependency in dependencies)
+        {
+            if (!passesByName.TryGetValue(dependency.ProducerPass, out var producers)
+                || !passesByName.TryGetValue(dependency.ConsumerPass, out var consumers)
+                || producers.Length != 1
+                || consumers.Length != 1)
+            {
+                Add(diagnostics, "REKALL_RENDER_GRAPH_INVALID_DEPENDENCY_ENDPOINT", dependency.Resource,
+                    $"Render dependency '{dependency.ProducerPass}' -> '{dependency.ConsumerPass}' has an unknown or ambiguous pass endpoint.");
+                continue;
+            }
+
+            cycleDependencies.Add(dependency);
+            var producer = producers[0];
+            var consumer = consumers[0];
+            if (!resourcesByName.ContainsKey(dependency.Resource)
+                || !producer.Writes.Contains(dependency.Resource, StringComparer.Ordinal)
+                || !consumer.Reads.Contains(dependency.Resource, StringComparer.Ordinal))
+            {
+                Add(diagnostics, "REKALL_RENDER_GRAPH_INVALID_DEPENDENCY_RESOURCE", dependency.Resource,
+                    $"Render dependency '{dependency.ProducerPass}' -> '{dependency.ConsumerPass}' does not match declared resource access for '{dependency.Resource}'.");
+                continue;
+            }
+
+            if (!expectedDependencies.Contains(dependency))
+            {
+                Add(diagnostics, "REKALL_RENDER_GRAPH_INVALID_DEPENDENCY", dependency.Resource,
+                    $"Render dependency '{dependency.ProducerPass}' -> '{dependency.ConsumerPass}' does not match the declared pass order for '{dependency.Resource}'.");
+                continue;
+            }
+        }
+
+        foreach (var expected in expectedDependencies)
+        {
+            if (!dependencies.Contains(expected))
+            {
+                Add(diagnostics, "REKALL_RENDER_GRAPH_DEPENDENCY_MISSING", expected.Resource,
+                    $"Render dependency '{expected.ProducerPass}' -> '{expected.ConsumerPass}' is required for '{expected.Resource}'.");
+            }
+        }
+
+        return cycleDependencies;
+    }
+
     private static void ValidateCycles(
         IReadOnlyList<RekallAgeHighFidelityRenderPass> passes,
         IReadOnlyList<RekallAgeHighFidelityRenderDependency> dependencies,
@@ -223,9 +308,14 @@ public sealed record RekallAgeHighFidelityRenderGraph(
         long total = 0;
         foreach (var resource in resources.Where(resource => !resource.Lifetime.Equals("external", StringComparison.OrdinalIgnoreCase)))
         {
+            if (!TryBytesPerTexel(resource.Format, out var bytesPerTexel))
+            {
+                continue;
+            }
+
             try
             {
-                var bytes = checked((long)resource.Width * resource.Height * resource.Layers * BytesPerTexel(resource.Format));
+                var bytes = checked((long)resource.Width * resource.Height * resource.Layers * bytesPerTexel);
                 total = checked(total + bytes);
             }
             catch (OverflowException)
@@ -260,16 +350,20 @@ public sealed record RekallAgeHighFidelityRenderGraph(
         }
     }
 
-    private static int BytesPerTexel(string format) => format.Trim().ToUpperInvariant() switch
+    private static bool TryBytesPerTexel(string format, out int bytesPerTexel)
     {
-        "R8_UNORM" => 1,
-        "R16G16_SFLOAT" => 4,
-        "R32_UINT" => 4,
-        "D32_SFLOAT" => 4,
-        "R8G8B8A8_UNORM" => 4,
-        "R16G16B16A16_SFLOAT" => 8,
-        _ => 0
-    };
+        bytesPerTexel = format.Trim().ToUpperInvariant() switch
+        {
+            "R8_UNORM" => 1,
+            "R16G16_SFLOAT" => 4,
+            "R32_UINT" => 4,
+            "D32_SFLOAT" => 4,
+            "R8G8B8A8_UNORM" => 4,
+            "R16G16B16A16_SFLOAT" => 8,
+            _ => 0
+        };
+        return bytesPerTexel > 0;
+    }
 
     private static void Add(
         ICollection<RekallAgeHighFidelityRenderGraphDiagnostic> diagnostics,

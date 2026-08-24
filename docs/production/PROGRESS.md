@@ -4,9 +4,10 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 09:35 Africa/Johannesburg
+Last verified: 2026-08-24 10:35 Africa/Johannesburg
 
-Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
+Branch: `codex/model-asset-games` (based exactly on `1c269fe`, which merged
+`codex/web-scene-bootstrap` into `master`)
 
 Current execution order is governed by
 [`STRATEGIC-PRIORITIES.md`](STRATEGIC-PRIORITIES.md). The immediate acceptance
@@ -4947,6 +4948,89 @@ fix landed (1659/1665 -> 1664/1665 after the first 5 fixes -> 1665/1665
 after the `ModuleIndexer` and `PublishWebGameCommand` fixes), 55/55 Studio
 tests, a zero-warning zero-error Release solution build, `git status` clean
 (only the 6 intended files touched, no stray `packages.lock.json` writes).
+
+`codex/web-scene-bootstrap` merged into `master` (two merges: the original
+Task 9 completion, then a follow-up with the review-corrected flakiness
+fixes above), both isolated-suite-verified at 1665/1665 before pushing.
+Started `codex/model-asset-games` off `master` for the next standing
+directive: accept two substantial, genuinely 3D, visually strong games
+(Pong and an original Galaga-like game), authored strictly through AGE's
+ordinary CLI/MCP command surface with progressive discovery -- not by
+recalling command/component names from memory or hand-editing scene
+JSON -- and each placing at least one authored, published Model Asset
+whose render mesh *and* physics collider are both resolved through the
+canonical Model Asset path, directly exercising STRATEGIC-PRIORITIES.md
+priority #3. Plan:
+`docs/superpowers/plans/2026-08-24-pong-and-galaga-3d-model-assets.md`.
+
+Built a small Node.js MCP stdio client
+(scratchpad, not committed -- reusable across both games) that speaks the
+real `initialize`/`tools/list`/`tools/call` JSON-RPC protocol against
+`dotnet Rekall.Age.Cli.dll mcp stdio`, the same way an actual MCP client
+would, rather than assuming command names/schemas from source. Finding:
+this entrypoint (`RekallAgeMcpJsonRpcServer`, wired directly in
+`RunMcpStdioAsync`) exposes all 170 registered commands directly via
+`tools/list`/`tools/call` -- it does not go through
+`RekallAgeMcpAgentToolExecutor`'s progressive-discovery gateway
+(`rekall.tools.search`/`rekall.tools.execute`) at all, so that gateway's
+budget-limited exposure model is exercised by its own unit tests but not
+by this actual CLI entrypoint. All of `rekall.modeling.graph.*`,
+`rekall.asset.model.*`, and `rekall.scene.instantiate_asset` were
+genuinely discoverable this way (contrary to an earlier, wrong shortcut of
+grepping `Program.cs` for CLI verbs and concluding they had no discovery
+path -- corrected before it caused any real damage). Two real
+schema/UX findings from driving the actual protocol: (1)
+`rekall.asset.model.publish`'s own tool description says
+`source has exact shape { kind: Mesh, assetId, outputName? }`, literally
+implying the JSON string `"Mesh"` for `kind`, but the actual required
+shape is the enum's underlying integer (`0`) -- the string value throws
+`REKALL_COMMAND_ARGUMENTS_INVALID`; (2) `rekall.scene.instantiate_asset`
+requires an existing scene and fails with a raw
+`Could not find a part of the path ...` filesystem exception rather than a
+structured `REKALL_*` error when the named scene doesn't exist yet.
+Neither blocks authoring once known, but both are genuine friction a real
+client would hit on the very first attempt.
+
+While driving that same discovery-then-publish-then-place sequence to
+build the first real Model Asset test fixture, found and fixed the actual
+substance behind STRATEGIC-PRIORITIES.md priority #3's still-open status:
+runtime rendering and physics never resolved `Rekall.ModelAssetReference`
+at all -- only the older `Rekall.MeshAssetReference`. Confirmed empirically
+(not from source inspection alone, per this session's established
+discipline): published a real box Model Asset through the actual MCP
+command surface, placed it with `rekall.scene.instantiate_asset`, and
+captured the resulting frame -- `Asset-backed: 0, Fallback: 1`, an
+unresolved fallback shape, not the authored box. Fixed with one new
+resolver (`RekallAgeCompiledModelAssetResolver` in `Rekall.Age.Runtime`,
+mirroring the existing `RekallAgeCompiledMeshAssetResolver`'s synchronous
+cached shape) and one new branch each in
+`RekallAgeBepuPhysicsSystem.CreatePhysicsEntity` and
+`RekallAgeRuntimeRenderFrameBuilder`/`RekallAgeCompiledMeshResolver`.
+Re-verified the identical repro after the fix through the same real MCP
+sequence: the placed box now renders its actual modeled geometry (captured
+PNG shows the box), and adding `Rekall.MeshCollider` (`Convex=true`, since
+the schema's own description says dynamic meshes require it) +
+`Rekall.Rigidbody3D` to the same entity produces a real dynamic physics
+body -- `Physics bodies: 1, Physics colliders: 1` -- that falls under
+gravity exactly like the pre-existing `Rekall.MeshAssetReference` path
+already did (`runtime inspect` over 30 frames: `position3D=(0, -1.267, 0)`,
+`linear=(0, -4.905, 0)`, matching free fall). Added
+`ModelAssetRenderingTests`/`ModelAssetPhysicsTests` mirroring the existing
+`MeshAssetRenderingTests`/`MeshAssetPhysicsTests` coverage. Verification:
+full engine suite 1668/1668 (Release and Debug), zero-warning zero-error
+builds both configurations; committed and pushed on
+`codex/model-asset-games` separately from any game content, per the user's
+explicit instruction to keep engine fixes and game authoring in distinct
+commits.
+
+Secondary finding, not yet fixed (does not block the above): the 41 CLI
+test failures seen in an interim run before Debug was ever built in this
+worktree were all `Rekall.Age.Tests.Cli.*` tests whose
+`FindCliAssemblyPath`-equivalent helpers hardcode `bin/Debug` with no
+Release fallback -- the same class of brittleness
+`WindowsPlayerRecoveryTests` had earlier this session (fixed there with a
+Release-then-Debug search), but not yet applied to this larger CLI test
+cluster. Worth a follow-up pass, not blocking.
 
 ## Evidence index
 

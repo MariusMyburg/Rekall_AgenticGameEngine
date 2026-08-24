@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "assetId": "pong-ball-graph",
+  "name": "Pong Ball",
+  "revision": 1,
+  "nodes": [
+    {
+      "nodeId": "sphere",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.35,
+        "segments": 24,
+        "rings": 16
+      }
+    },
+    {
+      "nodeId": "uv",
+      "typeId": "rekall.modeling.project_uv",
+      "typeVersion": 1,
+      "parameters": {
+        "attribute": "uv.generated",
+        "axis": "xy",
+        "scaleU": 0.5,
+        "scaleV": 0.5,
+        "offsetU": 0,
+        "offsetV": 0
+      }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "sphere-uv",
+      "fromNodeId": "sphere",
+      "fromPortId": "geometry",
+      "toNodeId": "uv",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "uv-output",
+      "fromNodeId": "uv",
+      "fromPortId": "geometry",
+      "toNodeId": "output",
+      "toPortId": "input"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "output",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

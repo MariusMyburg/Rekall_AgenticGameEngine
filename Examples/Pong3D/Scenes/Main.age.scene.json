@@ -1,0 +1,519 @@
+{
+  "schemaVersion": 1,
+  "id": "scene_ff5955888917469f8c118f840fa33f38",
+  "name": "Main",
+  "capabilities": [
+    "audio",
+    "input",
+    "physics",
+    "rendering3d",
+    "ui",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "ent_606d509c5b6a46e391f5e9e879d8c675",
+      "name": "BackWall",
+      "tags": [
+        "cube",
+        "geometry",
+        "primitive"
+      ],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#152233"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "z": 3,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 18,
+            "scaleY": 9,
+            "scaleZ": 0.2
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_7dba0ce9f98a4480bb7ed88fe50851d9",
+      "name": "Ball",
+      "tags": [
+        "model-asset"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.PongRules.PongBall",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.MeshCollider",
+          "properties": {
+            "convex": true
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "pong-ball-model"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ff804fb357014ddda19e49e7fe19efa6",
+      "name": "BottomWall",
+      "tags": [
+        "cube",
+        "geometry",
+        "primitive"
+      ],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#3d5570"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": -4.3,
+            "z": 0,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 18,
+            "scaleY": 0.2,
+            "scaleZ": 6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_f2e4d70941554df99230b8250891230d",
+      "name": "FillLight",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": {
+            "color": "#6fb8ff",
+            "intensity": 0.9
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "pitch": 12,
+            "yaw": 5
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_01f239b6c68641199a16c8eae5dbfcfd",
+      "name": "Floor",
+      "tags": [
+        "cube",
+        "geometry",
+        "primitive"
+      ],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#233647"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": -4.5,
+            "z": 0,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 18,
+            "scaleY": 0.2,
+            "scaleZ": 6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_977b974fa9304ed0931252b2f13d2e44",
+      "name": "HudCanvas",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.UiCanvas",
+          "properties": {
+            "ReferenceWidth": 960,
+            "ReferenceHeight": 540,
+            "Layer": 10
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ee31e75554304e0ba2896043998e1942",
+      "name": "InputRoot",
+      "tags": [
+        "input"
+      ],
+      "components": [
+        {
+          "type": "Rekall.InputActionMap",
+          "properties": {
+            "actions": [
+              {
+                "name": "paddle.move",
+                "negativeKey": "S",
+                "positiveKey": "W"
+              },
+              {
+                "name": "reset",
+                "key": "R"
+              }
+            ]
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_79b940fda4c0447fb2dc9f3891929b70",
+      "name": "KeyLight",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": {
+            "color": "#fff2d8",
+            "intensity": 1.85
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "pitch": -35,
+            "yaw": -40
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_772a6967af16494d86f6a587425bfcf8",
+      "name": "LeftPaddle",
+      "tags": [
+        "model-asset"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.PongRules.PongPaddle",
+          "properties": {
+            "side": "left"
+          }
+        },
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 0.35,
+            "height": 2.2,
+            "depth": 0.35
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "pong-paddle-model"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -7,
+            "y": 0,
+            "z": 0,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_7f81b8a519da43ef81b498fe97f8c2b8",
+      "name": "MainCamera",
+      "tags": [
+        "camera"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "active": true,
+            "fieldOfView": 55,
+            "clearColor": "#0a1420"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "y": 6,
+            "z": -13,
+            "pitch": 18
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_c8a2e7ee10614b3690fded065cc36284",
+      "name": "RightPaddle",
+      "tags": [
+        "model-asset"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.PongRules.PongPaddle",
+          "properties": {
+            "side": "right"
+          }
+        },
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 0.35,
+            "height": 2.2,
+            "depth": 0.35
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "pong-paddle-model"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 7,
+            "y": 0,
+            "z": 0,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_3f892b751c6e466382710b010217dc07",
+      "name": "ScoreLeftLabel",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Label",
+          "properties": {
+            "Text": "0",
+            "X": 90,
+            "Y": 24,
+            "Width": 120,
+            "Height": 60,
+            "FontSize": 44,
+            "ForegroundColor": "#eaf6ff",
+            "HorizontalAlignment": "center",
+            "VerticalAlignment": "start"
+          }
+        }
+      ],
+      "parentId": "ent_977b974fa9304ed0931252b2f13d2e44",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_961c071f6a7a494cbf2ac82d40cb506b",
+      "name": "ScoreRightLabel",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Label",
+          "properties": {
+            "Text": "0",
+            "X": 750,
+            "Y": 24,
+            "Width": 120,
+            "Height": 60,
+            "FontSize": 44,
+            "ForegroundColor": "#eaf6ff",
+            "HorizontalAlignment": "center",
+            "VerticalAlignment": "start"
+          }
+        }
+      ],
+      "parentId": "ent_977b974fa9304ed0931252b2f13d2e44",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_a61e75483ada4a0a97b0f71cabea04ce",
+      "name": "TopWall",
+      "tags": [
+        "cube",
+        "geometry",
+        "primitive"
+      ],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#3d5570"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.cube"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 4.3,
+            "z": 0,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 18,
+            "scaleY": 0.2,
+            "scaleZ": 6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

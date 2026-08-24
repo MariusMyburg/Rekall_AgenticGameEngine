@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "pong-ball-model",
+  "displayName": "Pong Ball",
+  "revision": 2,
+  "source": {
+    "kind": 0,
+    "assetId": "pong-ball-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "1e7b6fc5cb03c860ce511e0a1f3a8fcff771682eb835312e55744419deb588c8",
+    "sourceLogicalRevision": 1,
+    "compiledMeshPath": "Assets/Models/Compiled/pong-ball-model/afe3c13f25456eec36eba5bba91f17d745b45ef4cd306cf3f47c730d368b9d2a.age.compiled-mesh.json",
+    "compiledContentHash": "afe3c13f25456eec36eba5bba91f17d745b45ef4cd306cf3f47c730d368b9d2a",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-24T09:24:29.6727539+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

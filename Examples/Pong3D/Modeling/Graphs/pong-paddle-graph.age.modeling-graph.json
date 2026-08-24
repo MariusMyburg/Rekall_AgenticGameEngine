@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "assetId": "pong-paddle-graph",
+  "name": "Pong Paddle",
+  "revision": 1,
+  "nodes": [
+    {
+      "nodeId": "box",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 0.35,
+        "sizeY": 2.2,
+        "sizeZ": 0.35
+      }
+    },
+    {
+      "nodeId": "smooth",
+      "typeId": "rekall.modeling.subdivide_smooth",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "uv",
+      "typeId": "rekall.modeling.project_uv",
+      "typeVersion": 1,
+      "parameters": {
+        "attribute": "uv.generated",
+        "axis": "xy",
+        "scaleU": 0.5,
+        "scaleV": 0.5,
+        "offsetU": 0,
+        "offsetV": 0
+      }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "box-smooth",
+      "fromNodeId": "box",
+      "fromPortId": "geometry",
+      "toNodeId": "smooth",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "smooth-uv",
+      "fromNodeId": "smooth",
+      "fromPortId": "geometry",
+      "toNodeId": "uv",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "uv-output",
+      "fromNodeId": "uv",
+      "fromPortId": "geometry",
+      "toNodeId": "output",
+      "toPortId": "input"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "output",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

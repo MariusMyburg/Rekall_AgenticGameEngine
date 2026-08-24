@@ -1,0 +1,42 @@
+{
+  "assets": [
+    {
+      "id": "pong-ball-model",
+      "name": "pong-ball-model",
+      "displayName": "Pong Ball",
+      "kind": "model",
+      "sourcePath": "C:\\Users\\Marius\\AppData\\Local\\Temp\\RekallAGE-worktrees\\model-asset-games\\Examples\\Pong3D\\Modeling\\Meshes\\pong-ball-mesh.age.mesh.json",
+      "importedPath": "C:\\Users\\Marius\\AppData\\Local\\Temp\\RekallAGE-worktrees\\model-asset-games\\Examples\\Pong3D\\Assets\\Models\\Compiled\\pong-ball-model\\afe3c13f25456eec36eba5bba91f17d745b45ef4cd306cf3f47c730d368b9d2a.age.compiled-mesh.json",
+      "contentHash": "afe3c13f25456eec36eba5bba91f17d745b45ef4cd306cf3f47c730d368b9d2a",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/pong-ball-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "pong-ball-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/pong-ball-model/afe3c13f25456eec36eba5bba91f17d745b45ef4cd306cf3f47c730d368b9d2a.age.compiled-mesh.json",
+        "compiledContentHash": "afe3c13f25456eec36eba5bba91f17d745b45ef4cd306cf3f47c730d368b9d2a"
+      }
+    },
+    {
+      "id": "pong-paddle-model",
+      "name": "pong-paddle-model",
+      "displayName": "Pong Paddle",
+      "kind": "model",
+      "sourcePath": "C:\\Users\\Marius\\AppData\\Local\\Temp\\RekallAGE-worktrees\\model-asset-games\\Examples\\Pong3D\\Modeling\\Meshes\\pong-paddle-mesh.age.mesh.json",
+      "importedPath": "C:\\Users\\Marius\\AppData\\Local\\Temp\\RekallAGE-worktrees\\model-asset-games\\Examples\\Pong3D\\Assets\\Models\\Compiled\\pong-paddle-model\\684f72501eb41df5991acc795078000c869fad8c470b3211013a9a35cb0e03c5.age.compiled-mesh.json",
+      "contentHash": "684f72501eb41df5991acc795078000c869fad8c470b3211013a9a35cb0e03c5",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/pong-paddle-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "pong-paddle-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/pong-paddle-model/684f72501eb41df5991acc795078000c869fad8c470b3211013a9a35cb0e03c5.age.compiled-mesh.json",
+        "compiledContentHash": "684f72501eb41df5991acc795078000c869fad8c470b3211013a9a35cb0e03c5"
+      }
+    }
+  ]
+}

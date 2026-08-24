@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "pong-paddle-model",
+  "displayName": "Pong Paddle",
+  "revision": 2,
+  "source": {
+    "kind": 0,
+    "assetId": "pong-paddle-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "5dd48dbda614a64142b94457473fb84320abb18268055ac9ae74f27b4c4f873f",
+    "sourceLogicalRevision": 1,
+    "compiledMeshPath": "Assets/Models/Compiled/pong-paddle-model/684f72501eb41df5991acc795078000c869fad8c470b3211013a9a35cb0e03c5.age.compiled-mesh.json",
+    "compiledContentHash": "684f72501eb41df5991acc795078000c869fad8c470b3211013a9a35cb0e03c5",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-24T09:24:29.7730297+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

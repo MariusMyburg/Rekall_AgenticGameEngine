@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 11:40 Africa/Johannesburg
+Last verified: 2026-08-24 12:20 Africa/Johannesburg
 
 Branch: `codex/model-asset-games` (based exactly on `1c269fe`, which merged
 `codex/web-scene-bootstrap` into `master`)
@@ -5188,6 +5188,110 @@ Not yet done for Pong: package/relocate/audit via
 `rekall.workflow.audit_playable_package` (only the web publish/audit path
 was exercised); a dedicated evidence archive under `Artifacts/`; direct
 evidence for the `scoreLeft` path noted above.
+
+### A real, repeat CLI/MCP gap fixed: silent input-frame underrun
+
+While re-verifying Pong's `reset` behavior earlier in this branch, and
+again while testing Galaga's fire/enemy-dive logic, hit the same failure
+twice: supplying one `PressedKeys`-held input entry to
+`rekall.runtime.inspect_scene` and requesting many more frames than that,
+expecting the key to stay held. The user asked directly whether this
+needed better advertising to LLM clients; checked the command's own
+schema description before assuming it did, per the discipline that paid
+off on the `instantiate_asset` finding earlier -- and it already says,
+verbatim, `inputs[i] applies only to simulation frame i; omitted later
+frames receive neutral input, so repeat a held semantic sample for every
+frame it must remain down`. The documentation was correct both times; the
+mistake was mine, not re-reading it before constructing a second harness.
+
+What *was* a real gap: hitting this produces a plausible-looking, silently
+wrong result with nothing in the response indicating anything went wrong
+-- documented behavior is not the same as detectable behavior. Fixed by
+adding a structured `REKALL_RUNTIME_INPUT_FRAMES_EXHAUSTED` warning
+observation in `RekallAgeRuntimeSnapshotService.InspectSceneTimelineAsync`
+whenever `0 < inputs.Count < frames`, naming exactly which frames received
+no input and repeating the fix. Verified empirically (the warning now
+appears on the exact repro that previously produced silent wrong Pong
+`reset` behavior earlier this session) and covered with two new tests
+(the warning firing, and its absence when supplied frames fully cover the
+run). Committed separately from any game content, full suite re-verified
+green (1672/1672 + 55/55) after.
+
+### Galaga 3D: an original 3D space-shooter, carrying forward Pong's lessons
+
+Authored `Examples/Galaga3D/` directly from the start (skipping the
+sandbox-then-promote round trip that caused Pong's stale-catalog detour),
+scaffolded both `rekall.module.scaffold_runtime_system` and
+`rekall.module.scaffold_playable` up front (the lesson from discovering
+Pong needed both only after a native-player crash), and wired the HUD
+before writing gameplay logic rather than after.
+
+Two distinct Model Assets -- a player ship (frustum body + box wings + two
+angled frustum fins) and an enemy ship (sphere body + torus ring + two
+frustum legs), each combined via `rekall.modeling.join` rather than
+`rekall.modeling.boolean` (avoids CSG failure risk on disjoint, barely-
+touching primitives; not needed for a stylized low-poly silhouette
+anyway) -- published and placed exactly like Pong's ball/paddle, again
+exercising the priority #3 render+physics Model Asset resolution path.
+The result reads as recognizable ship silhouettes on the first bake, no
+iteration needed (unlike Pong's lighting, which needed several passes).
+
+`GalagaRulesSystem` is a materially different exercise of the runtime SDK
+than `PongRulesSystem`: Pong's entities were all fixed and pre-placed at
+scene-authoring time, but Galaga needs projectiles that are created and
+destroyed during actual gameplay. Confirmed
+`RekallAgeRuntimeModuleSdk.CreateEntity`/`.AddEntity`/`.RemoveEntity`/
+`.UpsertComponent` support this genuinely (discovered by reading the
+scaffolded module's own generated comments, which explicitly document the
+runtime-spawning pattern) -- built a full bullet entity from scratch each
+frame a fire input is live and cooldown has elapsed, including its own
+`Rekall.GeometryPrimitive`/`Rekall.MeshRenderer`/`Rekall.Transform3D`.
+Bullet entity IDs are derived from `world.FrameIndex` (deterministic,
+replay-safe) rather than a mutable instance counter on the system, since
+it is not established whether `IRekallAgeRuntimeModuleSystem` instances
+are reused or recreated across frames and a wrong assumption there would
+silently produce colliding IDs (`AddEntity` no-ops on a duplicate id with
+no error).
+
+Verified via real deterministic `runtime inspect` execution, not by
+hand-tracing the logic: firing/scoring confirmed over a 300-frame run with
+`fire`+`player.move` held on every frame (via a properly repeated
+`Inputs` array, not the single-entry mistake described above) --
+`SCORE 200`, two enemies destroyed, HUD text matching. The enemy-hits-
+player branch was the one genuine open question (the advisor flagged that
+the dive path's sway term has no explicit homing toward the player and
+might be geometrically unreachable from a stationary player, the same
+class of bug as Pong's dead-center serve) -- checked with a real 2000-
+frame idle run (zero input at all) and a declarative assertion rather than
+assuming either way: `lives` assertion `less-than 3` passed with
+`actual: 1`, confirming the branch fires without needing any homing fix.
+Visually verified with a cross-backend capture (`render viewport capture`
+has no input parameter, so this used a frame reached by an enemy's own
+dive timer rather than player-fired bullets) at frame 220, where one enemy
+has visibly broken formation mid-dive; vulkan and software compositions
+agree.
+
+Real, distinct CLI/MCP finding, not yet fixed: `rekall.play.capture_frame`
+and `rekall.workflow.capture_playable_package_frame` both hardcode an
+`{deltaSeconds, primaryAction, verticalAxis}` input shape tied to the
+`ClockworkCanopy` reference platformer's controls, not a generic shape
+driven by a project's own declared `Rekall.InputActionMap` actions (the
+way `rekall.runtime.inspect_scene`'s `PressedKeys`/`SemanticActions` shape
+is). A client authoring any game whose inputs aren't literally "vertical
+axis + one action button" -- Galaga's `fire`/`player.move`, Pong's
+`paddle.move`/`reset` -- cannot drive real gameplay through either
+capture/run/audit workflow tool at all. This blocked getting a
+projectile-in-flight visual capture for Galaga specifically. Not fixed in
+this session: redesigning those two tools' input contract to accept the
+same generic shape `runtime inspect` already uses is a larger, standalone
+change, not a small patch, and deserves its own dedicated pass rather than
+being folded in here.
+
+Not yet done for Galaga: package/relocate/audit workflow; a direct
+projectile-vs-enemy visual capture (blocked by the finding above); native
+Windows player launch attempt (expected to hit the same console-
+redirection artifact already documented for Pong, given the same
+environment); a dedicated evidence archive under `Artifacts/`.
 
 ## Evidence index
 

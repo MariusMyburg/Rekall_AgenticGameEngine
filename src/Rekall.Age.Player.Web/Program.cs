@@ -109,12 +109,15 @@ else
                     // Every tick's frame build records at least one WebGPU packet (typically many: resource
                     // creation, buffer/texture writes, the render pass submission) against the JS bridge's bounded
                     // pendingScopes/pendingCompilations queues (see webgpu-device.js MAX_PENDING); nothing else in
-                    // this loop ever drains them. Without an explicit flush every tick, those queues fill up over a
+                    // this loop ever drains them. Without an explicit drain every tick, those queues fill up over a
                     // handful of frames and every subsequent WebGPU operation starts failing closed with
                     // REKALL_WEBGPU_PENDING_OVERFLOW -- observed directly from a real browser tick on a
                     // resource-heavy scene, not caught by any build or unit test (the in-memory test device has no
-                    // such queue).
-                    flush = await device.FlushAsync(CancellationToken.None);
+                    // such queue). DrainAsync (not FlushAsync) is used here deliberately: it still detects and
+                    // reports the same validation errors and still bounds the same queues, but does not also block
+                    // on device.queue.onSubmittedWorkDone() the way FlushAsync does, which would otherwise
+                    // serialize CPU and GPU every single tick of an ordinarily-running game for no correctness gain.
+                    flush = await device.DrainAsync(CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
@@ -194,6 +197,9 @@ internal static partial class BrowserHost
 
     [JSImport("webgpu.flush", "main.js")]
     internal static partial Task<string> FlushWebGpuAsync();
+
+    [JSImport("webgpu.drain", "main.js")]
+    internal static partial Task<string> DrainWebGpuAsync();
 
     [JSImport("webgpu.readPixels", "main.js")]
     internal static partial Task<string> ReadWebGpuPixelsAsync();

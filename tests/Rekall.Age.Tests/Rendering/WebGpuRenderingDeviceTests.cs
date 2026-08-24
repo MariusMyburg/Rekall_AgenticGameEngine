@@ -441,6 +441,9 @@ public sealed class WebGpuRenderingDeviceTests
 
         public ValueTask<RekallAgeWebGpuBridgeResult> FlushAsync(CancellationToken cancellationToken = default) =>
             ValueTask.FromResult(_flushResult);
+
+        public ValueTask<RekallAgeWebGpuBridgeResult> DrainAsync(CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(_flushResult);
     }
 
     private sealed class SequencedBridge(params RekallAgeWebGpuBridgeResult[] results) : IRekallAgeWebGpuBridge
@@ -448,6 +451,7 @@ public sealed class WebGpuRenderingDeviceTests
         private readonly Queue<RekallAgeWebGpuBridgeResult> _results = new(results);
         public RekallAgeWebGpuBridgeResult Execute(string packetJson) => _results.Count > 0 ? _results.Dequeue() : RekallAgeWebGpuBridgeResult.Success;
         public ValueTask<RekallAgeWebGpuBridgeResult> FlushAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult(RekallAgeWebGpuBridgeResult.Success);
+        public ValueTask<RekallAgeWebGpuBridgeResult> DrainAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult(RekallAgeWebGpuBridgeResult.Success);
     }
 
     private sealed class HiddenTextureDestroyOnceBridge : IRekallAgeWebGpuBridge
@@ -478,11 +482,15 @@ public sealed class WebGpuRenderingDeviceTests
 
         public ValueTask<RekallAgeWebGpuBridgeResult> FlushAsync(CancellationToken cancellationToken = default) =>
             ValueTask.FromResult(RekallAgeWebGpuBridgeResult.Success);
+
+        public ValueTask<RekallAgeWebGpuBridgeResult> DrainAsync(CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(RekallAgeWebGpuBridgeResult.Success);
     }
 
     private sealed class CancellingBridge : IRekallAgeWebGpuBridge
     {
         public RekallAgeWebGpuBridgeResult Execute(string packetJson) => RekallAgeWebGpuBridgeResult.Success;
         public ValueTask<RekallAgeWebGpuBridgeResult> FlushAsync(CancellationToken cancellationToken = default) => ValueTask.FromCanceled<RekallAgeWebGpuBridgeResult>(cancellationToken);
+        public ValueTask<RekallAgeWebGpuBridgeResult> DrainAsync(CancellationToken cancellationToken = default) => ValueTask.FromCanceled<RekallAgeWebGpuBridgeResult>(cancellationToken);
     }
 }

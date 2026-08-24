@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 03:40 Africa/Johannesburg
+Last verified: 2026-08-24 04:20 Africa/Johannesburg
 
 Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
@@ -4346,23 +4346,36 @@ browser) is next, now with a browser-execution path already proven to
 carry a real physics3d scene through a full publish/serve/render/tick
 cycle.
 
-**Known, deliberately deferred cost from fix (3) above, not yet fixed:**
-flushing every tick is correct but expensive as written. `FlushAsync`
-awaits `device.queue.onSubmittedWorkDone()`, so a per-tick call serializes
-CPU and GPU every frame instead of letting the browser pipeline ahead; and
-because `capture.texture` is still set on every canvas submit (not only
-the one-shot proof workload's), every tick also allocates a full-canvas
-readback buffer, copies the whole canvas into it, and destroys it unread
-(~650KB/frame at 640x480, ~8MB/frame at 1080p). Both are consequences of
-reusing machinery built for a single proof frame inside a real per-tick
-loop. The real fix has two parts: a separate per-tick drain that awaits
-only the queued error-scope promises (no `onSubmittedWorkDone`), leaving
-the full `flush()` semantics for the proof workload; and staging the
-readback copy only when a caller actually intends to read pixels, not on
-every canvas submit. Correctness is not at stake -- the current build
-genuinely renders and sustains real ticks -- but this must be fixed before
-any playable-acceptance claim, since it directly affects frame smoothness
-and canvas resolution scales linearly with the wasted per-frame copy.
+The per-tick flush/readback cost recorded above is now fixed, not just
+deferred. Added `RekallAgeWebGpuRenderingDevice.DrainAsync` (and a matching
+`IRekallAgeWebGpuBridge.DrainAsync`/`webgpu-device.js` `drain()`/
+`webgpu.drain` JS export): it still awaits the queued error-scope and
+shader-compilation promises (so it still detects and reports validation
+errors and still bounds `pendingScopes`/`pendingCompilations` the same way
+`flush()` does), but does not also await
+`device.queue.onSubmittedWorkDone()`, so it no longer serializes CPU and
+GPU every tick; the real tick loop in `Program.cs` now calls `DrainAsync`
+instead of `FlushAsync`. Separately, `RekallAgeWebGpuSubmitPacket` gained a
+`CaptureReadback` flag (default `false`), and `webgpu-device.js` now only
+stages the full-canvas CPU readback copy when a submit explicitly sets it;
+`RekallAgeWebGpuRenderingDevice` exposes this as a distinct
+`SubmitWithPixelReadback` method (deliberately not on the generic
+`IRekallAgeRenderingDevice` contract -- pixel readback stays a WebGPU-
+bridge concern), used only by `WebGpuProofExecution`'s one-shot
+compatibility workload; ordinary scene submission (`Submit`) never
+requests it, so the real tick loop no longer pays for an unread full-canvas
+copy every frame. Reverified against the same real browser/published
+build used above: the same TumblingCubes scene sustained real ticks with
+identical per-frame draw counts and zero diagnostics, and a fresh canvas
+screenshot shows the same two cubes in a visibly different (still
+physically plausible) tumbled pose from the earlier screenshot, confirming
+live simulation continued correctly through the change, not just that it
+still boots. Six existing bridge test fakes across
+`WebGpuProofEvidenceTests`/`WebGpuProofWorkloadTests`/
+`WebGpuRenderingDeviceTests` were updated for the new interface member.
+Focused WebGPU/rendering/player suite: 84/84. Real end-to-end
+publish/exporter suite: 15/15. Release solution build: 0 warnings/errors.
+`git status` clean.
 
 ## Next after the current item
 

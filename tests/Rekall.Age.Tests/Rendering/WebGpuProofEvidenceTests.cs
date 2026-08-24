@@ -148,5 +148,7 @@ public sealed class WebGpuProofEvidenceTests
             Flushed = true;
             return ValueTask.FromResult(RekallAgeWebGpuBridgeResult.Success);
         }
+        public ValueTask<RekallAgeWebGpuBridgeResult> DrainAsync(CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(RekallAgeWebGpuBridgeResult.Success);
     }
 }

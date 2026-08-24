@@ -214,13 +214,14 @@ export function createWebGpuExecutor(environment = {}) {
         }
         if (pass) throw new Error('REKALL_WEBGPU_PASS_UNTERMINATED');
         let readback = null;
-        if (capture.texture) {
-            // Any submit that draws into the live canvas output (not just the one-shot compatibility proof
-            // workload's frame) stages a CPU readback copy here -- including every frame of the ordinary game
-            // loop, which never calls readPixels() to consume it. Previously an unconsumed readback from a prior
-            // frame made every later submit throw REKALL_WEBGPU_READBACK_PENDING, so a real published game could
-            // never render past its first tick. Nothing has mapped/read a readback that was never consumed by
-            // readPixels(), so it is safe to drop and replace it here instead of failing.
+        // capture.texture is set opportunistically by attachmentView() whenever a color attachment is the live
+        // canvas output, regardless of caller intent -- that alone is not a reason to pay for a full-canvas GPU
+        // copy every submit. Only actually stage the CPU readback when the caller explicitly asked for it
+        // (packet.captureReadback), which today is only the one-shot compatibility proof workload's single frame.
+        // Earlier this always ran unconditionally, including on every frame of the ordinary game loop (which never
+        // calls readPixels() to consume it): an unconsumed readback from a prior frame made every later submit
+        // throw REKALL_WEBGPU_READBACK_PENDING, so a real published game could never render past its first tick.
+        if (capture.texture && packet.captureReadback) {
             if (pendingReadback) pendingReadback.buffer?.destroy?.();
             if (!Number.isInteger(capture.width) || !Number.isInteger(capture.height) || capture.width <= 0 || capture.height <= 0) throw new Error('REKALL_WEBGPU_READBACK_SIZE_INVALID');
             const bytesPerRow = Math.ceil(capture.width * 4 / 256) * 256;
@@ -274,6 +275,16 @@ export function createWebGpuExecutor(environment = {}) {
         try { await Promise.all([...pendingScopes.splice(0), ...pendingCompilations.splice(0)]); await device?.queue?.onSubmittedWorkDone?.(); const diagnostics = pendingDiagnostics.splice(0); if (pendingOverflow) diagnostics.push(diagnostic('REKALL_WEBGPU_PENDING_OVERFLOW', 'WebGPU pending diagnostics or completion work exceeded the bounded limit.')); pendingOverflow = false; return result(!lost && diagnostics.length === 0, diagnostics); }
         catch (error) { return result(false, [diagnostic('REKALL_WEBGPU_FLUSH_FAILED', 'WebGPU queue completion failed.', error?.name)]); }
     }
+    // Same queue-draining purpose as flush(), without device.queue.onSubmittedWorkDone(): that call blocks until
+    // the GPU has actually finished executing submitted work, which is correct once (the one-shot compatibility
+    // proof workload needs it before reading pixels back) but serializes CPU and GPU if awaited every tick of an
+    // ordinary running game. drain() only awaits the already-queued validation error-scope/shader-compilation
+    // promises (bounding pendingScopes/pendingCompilations the same way flush() does) so a real per-tick call can
+    // still surface a validation error and never overflow, without stalling the frame on GPU completion.
+    async function drain() {
+        try { await Promise.all([...pendingScopes.splice(0), ...pendingCompilations.splice(0)]); const diagnostics = pendingDiagnostics.splice(0); if (pendingOverflow) diagnostics.push(diagnostic('REKALL_WEBGPU_PENDING_OVERFLOW', 'WebGPU pending diagnostics or completion work exceeded the bounded limit.')); pendingOverflow = false; return result(!lost && diagnostics.length === 0, diagnostics); }
+        catch (error) { return result(false, [diagnostic('REKALL_WEBGPU_DRAIN_FAILED', 'WebGPU pending validation work drain failed.', error?.name)]); }
+    }
     async function readPixels() {
         if (!initialized || lost) return result(false, [diagnostic(lost ? 'REKALL_WEBGPU_DEVICE_LOST' : 'REKALL_WEBGPU_NOT_INITIALIZED', 'The WebGPU executor is not available.')]);
         if (!pendingReadback) return result(false, [diagnostic('REKALL_WEBGPU_READBACK_UNAVAILABLE', 'No submitted canvas output is available for pixel readback.')]);
@@ -320,5 +331,5 @@ export function createWebGpuExecutor(environment = {}) {
         const distinct = distance(cyan, blue) >= 80 && distance(cyan, magenta) >= 80 && distance(blue, magenta) >= 80;
         return dark && cyanLike && blueLike && magentaLike && distinct && !allZero;
     }
-    return { initialize, execute, flush, readPixels };
+    return { initialize, execute, flush, drain, readPixels };
 }

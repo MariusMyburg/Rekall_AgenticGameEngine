@@ -18,6 +18,13 @@ internal sealed class WebGpuBrowserBridge : IRekallAgeWebGpuBridge
         catch (Exception exception) { return Failed("REKALL_WEBGPU_BRIDGE_FLUSH_FAILED", "The browser WebGPU bridge could not flush device work.", exception.GetType().Name); }
     }
 
+    public async ValueTask<RekallAgeWebGpuBridgeResult> DrainAsync(CancellationToken cancellationToken = default)
+    {
+        try { return RekallAgeWebGpuProtocol.DeserializeBridgeResult(await BrowserHost.DrainWebGpuAsync().WaitAsync(cancellationToken)); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception exception) { return Failed("REKALL_WEBGPU_BRIDGE_DRAIN_FAILED", "The browser WebGPU bridge could not drain pending validation work.", exception.GetType().Name); }
+    }
+
     public async ValueTask<RekallAgeWebGpuBridgeResult> InitializeAsync(CancellationToken cancellationToken = default)
     {
         try

@@ -247,5 +247,8 @@ public sealed class WebGpuProofWorkloadTests
 
         public ValueTask<RekallAgeWebGpuBridgeResult> FlushAsync(CancellationToken cancellationToken = default) =>
             ValueTask.FromResult(RekallAgeWebGpuBridgeResult.Success);
+
+        public ValueTask<RekallAgeWebGpuBridgeResult> DrainAsync(CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(RekallAgeWebGpuBridgeResult.Success);
     }
 }

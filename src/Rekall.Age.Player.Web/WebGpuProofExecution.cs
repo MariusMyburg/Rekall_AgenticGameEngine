@@ -28,7 +28,7 @@ public static class WebGpuProofExecution
             return Evidence(0, compiled.Diagnostics, null);
         }
 
-        var submission = device.Submit(compiled.CommandBuffer!);
+        var submission = device.SubmitWithPixelReadback(compiled.CommandBuffer!);
         if (!submission.Valid)
         {
             return Evidence(0, submission.Diagnostics, null);

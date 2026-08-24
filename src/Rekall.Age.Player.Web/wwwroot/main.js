@@ -68,6 +68,7 @@ setModuleImports('main.js', {
         initialize: async canvasSelector => JSON.stringify(await webgpu.initialize(canvasSelector)),
         execute: packet => JSON.stringify(webgpu.execute(packet)),
         flush: async () => JSON.stringify(await webgpu.flush()),
+        drain: async () => JSON.stringify(await webgpu.drain()),
         readPixels: async () => JSON.stringify(await webgpu.readPixels()),
         canvasWidth: () => canvas.width,
         canvasHeight: () => canvas.height

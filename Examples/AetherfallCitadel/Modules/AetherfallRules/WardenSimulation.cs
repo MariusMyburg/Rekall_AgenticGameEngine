@@ -30,14 +30,30 @@ internal static class WardenSimulation
         var velocityX = moveX * AetherfallConstants.WardenSpeed;
         var velocityZ = moveZ * AetherfallConstants.WardenSpeed;
         var position = warden.Transform.Position3D;
+        var objectivePhase = warden.ComponentString(
+            AetherfallConstants.WardenStateType,
+            "objectivePhase",
+            "arrival") ?? "arrival";
+        var minimumX = objectivePhase == "arrival"
+            ? AetherfallConstants.ArrivalMinimumX
+            : AetherfallConstants.CitadelMinimumX;
+        var maximumX = objectivePhase == "arrival"
+            ? AetherfallConstants.ArrivalMaximumX
+            : AetherfallConstants.CitadelMaximumX;
+        var minimumZ = objectivePhase == "arrival"
+            ? AetherfallConstants.ArrivalMinimumZ
+            : AetherfallConstants.CitadelMinimumZ;
+        var maximumZ = objectivePhase == "arrival"
+            ? AetherfallConstants.ArrivalMaximumZ
+            : AetherfallConstants.CitadelMaximumZ;
         var nextX = Math.Clamp(
             position.X + velocityX * seconds,
-            AetherfallConstants.ArrivalMinimumX,
-            AetherfallConstants.ArrivalMaximumX);
+            minimumX,
+            maximumX);
         var nextZ = Math.Clamp(
             position.Z + velocityZ * seconds,
-            AetherfallConstants.ArrivalMinimumZ,
-            AetherfallConstants.ArrivalMaximumZ);
+            minimumZ,
+            maximumZ);
         var hasDirection = Math.Abs(moveX) > 0.0001 || Math.Abs(moveZ) > 0.0001;
         var aether = warden.ComponentNumber(AetherfallConstants.WardenStateType, "aether", 100);
         var dashCooldown = Math.Max(
@@ -53,12 +69,12 @@ internal static class WardenSimulation
         {
             nextX = Math.Clamp(
                 nextX + moveX * AetherfallConstants.DashDistance,
-                AetherfallConstants.ArrivalMinimumX,
-                AetherfallConstants.ArrivalMaximumX);
+                minimumX,
+                maximumX);
             nextZ = Math.Clamp(
                 nextZ + moveZ * AetherfallConstants.DashDistance,
-                AetherfallConstants.ArrivalMinimumZ,
-                AetherfallConstants.ArrivalMaximumZ);
+                minimumZ,
+                maximumZ);
             aether -= AetherfallConstants.DashCost;
             dashCooldown = AetherfallConstants.DashCooldownSeconds;
             invulnerability = AetherfallConstants.DashInvulnerabilitySeconds;

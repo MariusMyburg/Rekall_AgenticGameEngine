@@ -67,4 +67,52 @@ internal static class AetherfallEntityFactory
                     ["color"] = "#79f5ff88"
                 });
     }
+
+    public static RekallAgeRuntimeEntity CreateHostilePulse(
+        long frameIndex,
+        string sourceId,
+        RekallAgeRuntimeVector3 origin,
+        double directionX,
+        double directionZ)
+    {
+        var id = $"hostile-pulse-{sourceId}-{frameIndex}";
+        return RekallAgeRuntimeModuleSdk.CreateEntity(id, id)
+            .WithTag("projectile")
+            .WithTag("hostile.projectile")
+            .WithPosition3D(origin)
+            .WithScale3D(new RekallAgeRuntimeVector3(0.3, 0.3, 0.55))
+            .UpsertComponent(
+                AetherfallConstants.ProjectileStateType,
+                new JsonObject
+                {
+                    ["faction"] = "hostile",
+                    ["damage"] = 12,
+                    ["velocityX"] = directionX * 10,
+                    ["velocityZ"] = directionZ * 10,
+                    ["remainingLifetime"] = 2.2,
+                    ["radius"] = 0.45,
+                    ["visualRole"] = "hostile-pulse"
+                })
+            .UpsertComponent(
+                "Rekall.GeometryPrimitive",
+                new JsonObject
+                {
+                    ["primitive"] = "sphere",
+                    ["color"] = "#ff547b"
+                });
+    }
+
+    public static RekallAgeRuntimeEntity CreateGuardianPulse(
+        long frameIndex,
+        int rayIndex,
+        RekallAgeRuntimeVector3 origin,
+        double directionX,
+        double directionZ) =>
+        CreateHostilePulse(
+                frameIndex,
+                $"guardian-{rayIndex}",
+                origin,
+                directionX,
+                directionZ)
+            .WithTag("guardian.projectile");
 }

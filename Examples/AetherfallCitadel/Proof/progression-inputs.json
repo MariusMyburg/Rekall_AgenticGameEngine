@@ -1,0 +1,23 @@
+[
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"move.horizontal","value":-1,"isDown":true},{"name":"move.vertical","value":1,"isDown":true}]},
+  {"deltaSeconds":0.1,"semanticActions":[{"name":"interact","value":1,"isDown":true,"wasPressed":true}]}
+]

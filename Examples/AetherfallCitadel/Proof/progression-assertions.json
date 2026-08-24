@@ -1,0 +1,6 @@
+[
+  {"entityName":"AetherWarden","subject":"component","operator":"exists","componentType":"Game.Modules.AetherfallRules.WardenState"},
+  {"entityName":"AetherWarden","subject":"changed.component.property","operator":"equals","componentType":"Game.Modules.AetherfallRules.WardenState","propertyName":"objectivePhase","expected":true},
+  {"entityName":"ArrivalConduit","subject":"changed.component.property","operator":"equals","componentType":"Game.Modules.AetherfallRules.ConduitState","propertyName":"active","expected":true},
+  {"entityName":"CitadelEncounter","subject":"changed.component.property","operator":"equals","componentType":"Game.Modules.AetherfallRules.EncounterState","propertyName":"activeZone","expected":true}
+]

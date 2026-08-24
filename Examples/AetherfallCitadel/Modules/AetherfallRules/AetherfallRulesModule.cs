@@ -35,6 +35,7 @@ public sealed class WardenState : RekallAgeComponent
     [RekallAgeProperty] public double Invulnerability { get; init; }
     [RekallAgeProperty] public double ShardCount { get; init; }
     [RekallAgeProperty] public string ObjectivePhase { get; init; } = "arrival";
+    [RekallAgeProperty] public string Phase { get; init; } = "playing";
     [RekallAgeProperty] public double FacingX { get; init; }
     [RekallAgeProperty] public double FacingZ { get; init; } = 1;
     [RekallAgeProperty] public double SpawnX { get; init; }
@@ -47,6 +48,7 @@ public sealed class EnemyState : RekallAgeComponent
 {
     [RekallAgeProperty] public string Archetype { get; init; } = "sentinel";
     [RekallAgeProperty] public double Health { get; init; } = 60;
+    [RekallAgeProperty] public double MaximumHealth { get; init; } = 60;
     [RekallAgeProperty] public double Speed { get; init; } = 2;
     [RekallAgeProperty] public double AttackCadence { get; init; } = 1.5;
     [RekallAgeProperty] public double PreferredRange { get; init; } = 6;
@@ -55,6 +57,7 @@ public sealed class EnemyState : RekallAgeComponent
     [RekallAgeProperty] public double SpawnZ { get; init; }
     [RekallAgeProperty] public string Phase { get; init; } = "idle";
     [RekallAgeProperty] public bool Active { get; init; } = true;
+    [RekallAgeProperty] public double AttackClock { get; init; }
 }
 
 [RekallAgeComponent("Projectile State")]

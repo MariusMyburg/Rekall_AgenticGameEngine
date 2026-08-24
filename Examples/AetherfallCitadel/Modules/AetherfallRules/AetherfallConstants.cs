@@ -13,6 +13,10 @@ internal static class AetherfallConstants
     public const string PickupStateType = "Game.Modules.AetherfallRules.PickupState";
     public const string EffectStateType = "Game.Modules.AetherfallRules.EffectState";
     public const string HazardStateType = "Game.Modules.AetherfallRules.HazardState";
+    public const string ConduitStateType = "Game.Modules.AetherfallRules.ConduitState";
+    public const string EncounterStateType = "Game.Modules.AetherfallRules.EncounterState";
+    public const string GuardianStateType = "Game.Modules.AetherfallRules.GuardianState";
+    public const string InteractAction = "interact";
     public const double WardenSpeed = 8.5;
     public const double PulseSpeed = 18;
     public const double PulseDamage = 24;
@@ -29,4 +33,8 @@ internal static class AetherfallConstants
     public const double ArrivalMaximumX = 6.2;
     public const double ArrivalMinimumZ = -14.8;
     public const double ArrivalMaximumZ = 4.0;
+    public const double CitadelMinimumX = -12;
+    public const double CitadelMaximumX = 12;
+    public const double CitadelMinimumZ = -14.8;
+    public const double CitadelMaximumZ = 50;
 }

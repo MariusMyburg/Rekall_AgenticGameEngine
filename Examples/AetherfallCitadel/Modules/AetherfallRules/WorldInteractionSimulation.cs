@@ -154,6 +154,41 @@ internal static class WorldInteractionSimulation
             AetherfallConstants.ProjectileStateType,
             "radius",
             AetherfallConstants.PulseRadius);
+        var faction = projectile.ComponentString(
+            AetherfallConstants.ProjectileStateType,
+            "faction",
+            "warden") ?? "warden";
+        if (faction.Equals("hostile", StringComparison.OrdinalIgnoreCase))
+        {
+            var warden = world.FindEntity(AetherfallConstants.WardenName);
+            if (warden is not null
+                && warden.ComponentNumber(AetherfallConstants.WardenStateType, "invulnerability") <= 0
+                && Overlaps(nextPosition, projectileRadius, warden.Transform.Position3D, 0.7))
+            {
+                var damage = projectile.ComponentNumber(AetherfallConstants.ProjectileStateType, "damage", 12);
+                world = world.UpdateEntity(warden.Id, entity => entity
+                    .WithComponentNumber(
+                        AetherfallConstants.WardenStateType,
+                        "integrity",
+                        Math.Max(0, entity.ComponentNumber(AetherfallConstants.WardenStateType, "integrity", 100) - damage))
+                    .WithComponentNumber(AetherfallConstants.WardenStateType, "invulnerability", 0.35));
+                return world.RemoveEntity(projectile.Id);
+            }
+
+            return UpdateProjectile(world, projectile, nextPosition, seconds);
+        }
+
+        var guardian = world.FindEntity("guardian");
+        if (guardian is not null
+            && !guardian.ComponentBoolean(AetherfallConstants.GuardianStateType, "defeated")
+            && !guardian.ComponentString(AetherfallConstants.GuardianStateType, "stage", "sealed")!
+                .Equals("sealed", StringComparison.OrdinalIgnoreCase)
+            && Overlaps(nextPosition, projectileRadius, guardian.Transform.Position3D, 3.5))
+        {
+            world = ApplyGuardianHit(world, guardian, projectile);
+            return world.RemoveEntity(projectile.Id);
+        }
+
         var hit = world.EntitiesWithComponent(AetherfallConstants.EnemyStateType)
             .FirstOrDefault(enemy =>
                 enemy.ComponentBoolean(AetherfallConstants.EnemyStateType, "active", true)
@@ -164,20 +199,87 @@ internal static class WorldInteractionSimulation
                 AetherfallConstants.ProjectileStateType,
                 "damage",
                 AetherfallConstants.PulseDamage);
+            var previousHealth = hit.ComponentNumber(AetherfallConstants.EnemyStateType, "health", 1);
+            var remainingHealth = Math.Max(0, previousHealth - damage);
             world = world.UpdateEntity(hit.Id, entity =>
             {
-                var health = Math.Max(
-                    0,
-                    entity.ComponentNumber(AetherfallConstants.EnemyStateType, "health", 1) - damage);
                 return entity
-                    .WithComponentNumber(AetherfallConstants.EnemyStateType, "health", health)
-                    .WithComponentBoolean(AetherfallConstants.EnemyStateType, "active", health > 0)
-                    .WithVisible(health > 0);
+                    .WithComponentNumber(AetherfallConstants.EnemyStateType, "health", remainingHealth)
+                    .WithComponentBoolean(AetherfallConstants.EnemyStateType, "active", remainingHealth > 0)
+                    .WithComponentString(AetherfallConstants.EnemyStateType, "phase", remainingHealth > 0 ? "engaged" : "defeated")
+                    .WithVisible(remainingHealth > 0);
             });
+            world = world.UpdateEntity("warden", entity => entity
+                .WithComponentNumber(
+                    AetherfallConstants.WardenStateType,
+                    "score",
+                    entity.ComponentNumber(AetherfallConstants.WardenStateType, "score")
+                    + (remainingHealth <= 0 ? 100 : 25))
+                .WithComponentNumber(
+                    AetherfallConstants.WardenStateType,
+                    "combo",
+                    entity.ComponentNumber(AetherfallConstants.WardenStateType, "combo") + 1));
             world = world.EmitEvent(hit, "combat.hit", nameof(WorldInteractionSimulation));
             return world.RemoveEntity(projectile.Id);
         }
 
+        return UpdateProjectile(world, projectile, nextPosition, seconds);
+    }
+
+    private static RekallAgeRuntimeWorld ApplyGuardianHit(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeEntity guardian,
+        RekallAgeRuntimeEntity projectile)
+    {
+        var damage = projectile.ComponentNumber(
+            AetherfallConstants.ProjectileStateType,
+            "damage",
+            AetherfallConstants.PulseDamage);
+        var vulnerable = guardian.ComponentBoolean(AetherfallConstants.GuardianStateType, "vulnerable");
+        if (!vulnerable)
+        {
+            var shield = Math.Max(
+                0,
+                guardian.ComponentNumber(AetherfallConstants.GuardianStateType, "shield", 100) - damage);
+            world = world.UpdateEntity(guardian.Id, entity => entity
+                .WithComponentNumber(AetherfallConstants.GuardianStateType, "shield", shield)
+                .WithComponentBoolean(AetherfallConstants.GuardianStateType, "vulnerable", shield <= 0)
+                .WithComponentString(
+                    AetherfallConstants.GuardianStateType,
+                    "stage",
+                    shield <= 0 ? "vulnerable" : "shielded"));
+            return world.EmitEvent(guardian, "guardian.shield_hit", nameof(WorldInteractionSimulation));
+        }
+
+        var health = Math.Max(
+            0,
+            guardian.ComponentNumber(AetherfallConstants.GuardianStateType, "health", 500) - damage);
+        var stage = health <= 0 ? "defeated" : health <= 250 ? "enraged" : "vulnerable";
+        world = world.UpdateEntity(guardian.Id, entity => entity
+            .WithComponentNumber(AetherfallConstants.GuardianStateType, "health", health)
+            .WithComponentString(AetherfallConstants.GuardianStateType, "stage", stage)
+            .WithComponentBoolean(AetherfallConstants.GuardianStateType, "defeated", health <= 0));
+        if (health <= 0)
+        {
+            world = world.UpdateEntity("warden", entity => entity.WithComponentString(
+                AetherfallConstants.WardenStateType,
+                "phase",
+                "victory"));
+            world = world.UpdateEntity("encounter", entity => entity
+                .WithComponentBoolean(AetherfallConstants.EncounterStateType, "completed", true)
+                .WithComponentString(AetherfallConstants.EncounterStateType, "gateState", "core-open"));
+            world = world.UpdateEntity("core-gate", entity => entity.WithVisible(false));
+        }
+
+        return world.EmitEvent(guardian, "guardian.hit", nameof(WorldInteractionSimulation));
+    }
+
+    private static RekallAgeRuntimeWorld UpdateProjectile(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeEntity projectile,
+        RekallAgeRuntimeVector3 nextPosition,
+        double seconds)
+    {
         var lifetime = projectile.ComponentNumber(
             AetherfallConstants.ProjectileStateType,
             "remainingLifetime",

@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 05:10 Africa/Johannesburg
+Last verified: 2026-08-24 05:35 Africa/Johannesburg
 
 Branch: `codex/web-scene-bootstrap` (based exactly on `861d59b`)
 
@@ -4413,12 +4413,12 @@ compatibility proof page (republished fresh) still passes its pixel proof
 afterward, confirming the raised compilation-pending bound didn't regress
 its shader-compilation path.
 
-**Task 9 is blocked on a finding that needs the user's decision, not
-further autonomous guessing.** Attempting to "accept Clockwork Canopy
-unchanged in the browser" surfaced that the project's *current* authored
-state cannot be verified against any valid accepted baseline, on any
-platform -- not a web-publishing defect. Sequence of evidence, gathered
-directly rather than assumed:
+**Task 9 needs one authoring decision from the user before it can
+proceed; not a web-publishing defect.** Attempting to "accept Clockwork
+Canopy unchanged in the browser" first looked like a broad rendering
+failure, but closer investigation (below) narrowed it to a single small,
+well-understood finding. Evidence trail, gathered directly and then
+corrected once follow-up checks contradicted the first read of it:
 
 1. Copied `Artifacts/AgentGames/OriginalPlatformer` (gitignored, no git
    ref -- see below) into scratch, content-hashed the authored source
@@ -4434,66 +4434,63 @@ directly rather than assumed:
 2. Loaded the real published build in the same real browser used above:
    it boots, bootstraps a real 28-entity physics/UI scene, and sustains
    real ticks with zero diagnostics -- the web publishing pipeline itself
-   is working correctly. But the canvas shows almost nothing: three flat
-   color bands (the three giant backdrop planes) and one small cube, no
-   player, platforms, collectibles, hazards, or goal, despite the runtime
-   correctly reporting 28 renderable entities and zero culled.
-3. To rule out this being a web-specific defect, captured the *same*
-   frozen copy through `render viewport capture ... vulkan` (real native
-   Vulkan GPU rendering, not the browser) and `... software` (the
-   software rasterizer): both show the *same* near-empty result. This is
-   not a browser/WebGPU bug -- it reproduces identically across all three
-   independent rendering backends the engine has, so it predates and is
-   unrelated to this session's web-publishing work.
-4. To test whether the three giant backdrop planes (they sit at
-   Z = -2..-3.2, "behind" the Z=0 gameplay layer from the camera's
-   position at Z=8) were winning the depth test against nearer gameplay
-   geometry and hiding it, set their `visible` to `false` in the frozen
-   copy's scene JSON and recaptured with `software`: gameplay still did
-   not appear -- only the background clear color replaced the backdrop
-   bands, and the same one small cube remained. This rules out depth
-   ordering/occlusion; whatever is wrong is per-entity (most entities
-   never rasterize a visible pixel at all), not a compositing order bug.
-   The frame builder's own layout diagnostics (`Layout bounds: spatial=21,
-   x=51.50, ...`) confirm every entity's authored transform is read
-   correctly and spans the full ~43-unit level width, so the defect is
-   downstream of transform ingestion -- in mesh building or rasterization,
-   not scene loading. The exact defect was not pinned down further within
-   this session's time budget once point 5 below made root-causing
-   secondary to the acceptance question itself.
-5. **The project's own prior accepted evidence does not match the
-   project's current state.** `Artifacts/AgentGames/OriginalPlatformer/
-   _visual_evidence/Main_runtime_002.png` (and the matching image in
-   `_diag/` and `_evidence/`) shows a `PLAYING`-scored scene with visible
-   platforms and a `GOAL AHEAD ->` HUD hint, rendered with converging
-   edges and multiple visible cube faces (front, top, *and* side) --
-   unmistakably a **perspective** camera. The scene's currently authored
-   `CameraRig` entity has `"ProjectionMode": "Orthographic"`. An
-   axis-aligned orthographic camera cannot produce the converging-edge,
-   multi-face perspective look in that accepted image. That means the
-   accepted evidence was captured under a different camera configuration
-   than what the project currently contains -- either the orthographic
-   camera is a later authoring change nobody has visually verified since,
-   or the accepted evidence is stale/from an unrelated run. Either way,
-   **there is no currently-valid "accepted" reference to check an
-   unchanged web publish against**, and this project has no git history
-   to date the change against (`Artifacts/` is gitignored by design, since
-   it holds generated/session-local game output, not engine source).
+   is working correctly. But the canvas shows almost nothing beyond the
+   three backdrop planes, one small cube, and the HUD.
+3. To rule out a web-specific defect, captured the *same* frozen copy
+   through `render viewport capture ... vulkan` (real native Vulkan GPU
+   rendering) and `... software` (the software rasterizer): both show the
+   same near-empty result -- not a browser/WebGPU bug, since it reproduces
+   identically across all three independent rendering backends.
+4. Hiding the three backdrop planes (`visible: false`) and recapturing
+   ruled out depth-ordering/occlusion as the cause: the same absence
+   persisted with just the clear color behind it.
+5. **The actual cause: `OrthographicSize: 3.4` on `CameraRig` frames only
+   about 9 of this level's ~43 authored units of width.** Re-running the
+   identical frozen scene with `OrthographicSize` temporarily widened to
+   25 renders the *entire* level correctly in one screenshot -- player,
+   multiple platforms, three collectibles, a hazard, all in their authored
+   positions, sharp and correctly composited. Every "missing" entity
+   outside the narrow 3.4 window (`FloatP1-3`, `Platform1`, all three
+   `Hazard`s, `Glow2-6`, `GoalPad`, `Spire`) was simply, correctly outside
+   the camera's frustum -- not a rendering defect. This is confirmed
+   correct camera behavior, not a bug.
+6. One narrower, genuinely unexplained item remains: `Glow1` (a collectible
+   at X=0.5, comfortably inside the narrow 3.4 frustum's X range of
+   [-7.03, 2.03]) does not render at `OrthographicSize: 3.4` even though it
+   does render at `OrthographicSize: 25`. This is a real, minor, single-
+   entity anomaly worth a follow-up look, but it is not the broad
+   rendering failure first suspected, and does not block reasoning about
+   the scene overall.
+7. **The prior "accepted" evidence is stale, not from a different camera.**
+   `Artifacts/AgentGames/OriginalPlatformer/_visual_evidence/
+   Main_runtime_002.png` shows converging-edge, multi-face geometry that
+   an orthographic camera cannot produce -- initially read as evidence the
+   camera itself had changed since acceptance. Checked instead: the PNG's
+   file mtime is `2026-08-23 19:21:52`; commit `219c676` ("render: share
+   camera-correct software scene path", which explicitly replaces "the
+   legacy fixed-oblique cube projection that drew rear faces and made
+   ordinary cubes appear hollow or inside-out") landed at `19:25:50`, four
+   minutes *later*. The accepted screenshot predates that fix -- it was
+   captured through the old software-capture path that drew a fixed
+   oblique view regardless of the authored camera, not through a
+   perspective camera that later became orthographic. The scene's camera
+   has most likely been orthographic all along; the capture path only
+   recently started rendering it honestly.
 
-None of this is a defect in the web publishing pipeline built this
-session (Tasks 5-8), which is now demonstrably solid against a real,
-substantial, 28-entity scene. It is a question about what "the accepted
-Clockwork Canopy" actually is, which is the user's call, not an
-engineering judgment to make alone: whether to treat the orthographic
-camera as an unverified authoring regression to fix (and re-accept on
-Windows first, under whichever camera is correct, before touching the
-browser again), to accept it as intentional and debug why gameplay
-entities don't rasterize under it, or something else entirely. Diagnostic
+**Net finding, corrected from the first pass above:** there is no broad
+rendering defect and no baseline mismatch from a camera change. The real,
+much smaller question is authorial: `OrthographicSize: 3.4` frames a small
+fraction of this level, and nobody has looked at what the now-honest
+render actually shows since the capture path was fixed. That's the user's
+call, not an engineering judgment to make alone -- is 3.4 intentional (a
+tightly-framed camera that follows the player, by design), or should it be
+widened to show more of the level? The `Glow1` anomaly (point 6) is a
+separate, smaller, worth-investigating item either way. Diagnostic
 screenshots from this investigation (native Vulkan capture, software
-capture, backdrops-hidden capture, and the prior accepted evidence for
-comparison) are preserved for that decision. Task 9 is paused here
-pending it; the frozen copy, its content hash, and this evidence remain
-available to resume from once the user decides.
+capture, backdrops-hidden capture, the widened-ortho full-level capture,
+and the prior accepted evidence for comparison) are preserved. Task 9
+resumes once the user answers the framing question; the frozen copy and
+its content hash remain available to continue from.
 
 The first Godot-reference graphics milestone is verified. A shallow,
 blob-filtered sparse reference checkout at `F:\Dev\godot-reference` pins Godot

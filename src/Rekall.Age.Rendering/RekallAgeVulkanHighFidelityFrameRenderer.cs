@@ -24,9 +24,12 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
             || pass.Type.Equals("brightExtract", StringComparison.OrdinalIgnoreCase));
         var composite = frame.PostProcessStack.Passes.FirstOrDefault(pass =>
             pass.Type.Equals("composite", StringComparison.OrdinalIgnoreCase));
+        var retainedPasses = new Dictionary<string, int>(StringComparer.Ordinal);
         for (var index = 0; index < frame.PostProcessStack.Passes.Count; index++)
         {
-            AddPostDiagnostics(frame.PostProcessStack.Passes[index], index, resolved, diagnostics);
+            var pass = frame.PostProcessStack.Passes[index];
+            AddPostDiagnostics(pass, index, resolved, diagnostics);
+            AddCollapsedPassDiagnostic(pass, index, retainedPasses, diagnostics);
         }
 
         graph = graph with { Diagnostics = diagnostics };
@@ -55,6 +58,14 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
         var prefix = $"post.pass[{index}]";
         if (type is "bloom" or "brightextract")
         {
+            AddRoutingDiagnostics(
+                pass,
+                prefix,
+                resolved.Post.Bloom ? "scene-hdr" : "ignored",
+                "ignored",
+                resolved.Post.Bloom ? "bloom-pyramid" : "ignored",
+                diagnostics);
+
             if (!resolved.Post.Bloom)
             {
                 AddDiagnostic(
@@ -100,6 +111,14 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
 
         if (type == "composite")
         {
+            AddRoutingDiagnostics(
+                pass,
+                prefix,
+                "scene-hdr",
+                resolved.Post.Bloom ? "bloom-pyramid" : "ignored",
+                "ldr-color",
+                diagnostics);
+
             if (!double.IsFinite(pass.Intensity) || pass.Intensity < 0)
             {
                 AddDiagnostic(diagnostics, "REKALL_RENDER_POST_SETTING_CLAMPED", $"{prefix}.intensity", pass.Intensity, ResolveNonNegative(pass.Intensity));
@@ -115,6 +134,7 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
 
         if (type is "tone-map" or "tonemap")
         {
+            AddRoutingDiagnostics(pass, prefix, "scene-hdr", "ignored", "ldr-color", diagnostics);
             return;
         }
 
@@ -124,6 +144,77 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
             $"{prefix}.type",
             pass.Type,
             "ignored");
+    }
+
+    private static void AddCollapsedPassDiagnostic(
+        RekallAgeRuntimeViewportPostProcessPass pass,
+        int index,
+        IDictionary<string, int> retainedPasses,
+        ICollection<RekallAgeHighFidelityRenderGraphDiagnostic> diagnostics)
+    {
+        var semantic = pass.Type.Trim().ToLowerInvariant() switch
+        {
+            "bloom" or "brightextract" => "bloom",
+            "composite" => "composite",
+            "tone-map" or "tonemap" => "tone-map",
+            _ => null
+        };
+        if (semantic is null)
+        {
+            return;
+        }
+
+        if (retainedPasses.TryAdd(semantic, index))
+        {
+            return;
+        }
+
+        var retainedIndex = retainedPasses[semantic];
+        AddDiagnostic(
+            diagnostics,
+            "REKALL_RENDER_POST_PASS_COLLAPSED",
+            $"post.pass[{index}].type",
+            pass.Type,
+            $"ignored; post.pass[{retainedIndex}] retained");
+    }
+
+    private static void AddRoutingDiagnostics(
+        RekallAgeRuntimeViewportPostProcessPass pass,
+        string prefix,
+        string resolvedInput,
+        string resolvedSource,
+        string resolvedOutput,
+        ICollection<RekallAgeHighFidelityRenderGraphDiagnostic> diagnostics)
+    {
+        if (!pass.Input.Equals("sceneColor", StringComparison.OrdinalIgnoreCase))
+        {
+            AddDiagnostic(
+                diagnostics,
+                "REKALL_RENDER_POST_ROUTING_SUBSTITUTED",
+                $"{prefix}.input",
+                pass.Input,
+                resolvedInput);
+        }
+
+        if (pass.Source is not null)
+        {
+            AddDiagnostic(
+                diagnostics,
+                "REKALL_RENDER_POST_ROUTING_SUBSTITUTED",
+                $"{prefix}.source",
+                pass.Source,
+                resolvedSource);
+        }
+
+        if (!pass.Output.Equals("sceneColor", StringComparison.OrdinalIgnoreCase))
+        {
+            AddDiagnostic(
+                diagnostics,
+                "REKALL_RENDER_POST_ROUTING_SUBSTITUTED",
+                $"{prefix}.output",
+                pass.Output,
+                resolvedOutput);
+        }
     }
 
     private static void AddDiagnostic(

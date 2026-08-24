@@ -131,6 +131,151 @@ public sealed class VulkanSceneCommandPlanTests
         AssertPostDiagnostic(plan, "REKALL_RENDER_POST_PASS_UNSUPPORTED", "post.pass[1].type", "vignette", "ignored");
     }
 
+    [Fact]
+    public void HighFidelityPlanReportsSubstitutedRecognizedPassRouting()
+    {
+        var quality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High", Bloom: true),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+            128,
+            72);
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main", 0, 0, 128, 72, null, [], [], 0,
+            new RekallAgeRuntimeViewportOverlay(false, 0), [])
+        {
+            ResolvedQualityPlan = quality,
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post",
+                "Routed Post",
+                true,
+                [
+                    new RekallAgeRuntimeViewportPostProcessPass(
+                        "Bloom",
+                        "bloom",
+                        Input: "lighting-hdr",
+                        Source: "pre-bloom",
+                        Output: "bright-pass",
+                        Scale: 0.25),
+                    new RekallAgeRuntimeViewportPostProcessPass(
+                        "Composite",
+                        "composite",
+                        Input: "ungraded-scene",
+                        Source: "soft-glow",
+                        Output: "composited-hdr"),
+                    new RekallAgeRuntimeViewportPostProcessPass(
+                        "Tone Map",
+                        "tone-map",
+                        Input: "composited-hdr",
+                        Source: "authored-lut",
+                        Output: "display-color")
+                ])
+        };
+
+        var plan = Assert.IsType<RekallAgeVulkanHighFidelityFramePlan>(
+            new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame));
+
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_ROUTING_SUBSTITUTED", "post.pass[0].input", "lighting-hdr", "scene-hdr");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_ROUTING_SUBSTITUTED", "post.pass[0].source", "pre-bloom", "ignored");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_ROUTING_SUBSTITUTED", "post.pass[0].output", "bright-pass", "bloom-pyramid");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_ROUTING_SUBSTITUTED", "post.pass[1].input", "ungraded-scene", "scene-hdr");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_ROUTING_SUBSTITUTED", "post.pass[1].source", "soft-glow", "bloom-pyramid");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_ROUTING_SUBSTITUTED", "post.pass[1].output", "composited-hdr", "ldr-color");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_ROUTING_SUBSTITUTED", "post.pass[2].input", "composited-hdr", "scene-hdr");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_ROUTING_SUBSTITUTED", "post.pass[2].source", "authored-lut", "ignored");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_ROUTING_SUBSTITUTED", "post.pass[2].output", "display-color", "ldr-color");
+    }
+
+    [Fact]
+    public void HighFidelityPlanReportsDisabledBloomRoutesAsIgnored()
+    {
+        var quality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("Performance", Bloom: false),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+            128,
+            72);
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main", 0, 0, 128, 72, null, [], [], 0,
+            new RekallAgeRuntimeViewportOverlay(false, 0), [])
+        {
+            ResolvedQualityPlan = quality,
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post",
+                "Disabled Bloom Routes",
+                true,
+                [
+                    new RekallAgeRuntimeViewportPostProcessPass(
+                        "Bloom",
+                        "bloom",
+                        Input: "lighting-hdr",
+                        Source: "pre-bloom",
+                        Output: "bright-pass",
+                        Scale: 0.25),
+                    new RekallAgeRuntimeViewportPostProcessPass(
+                        "Composite",
+                        "composite",
+                        Source: "soft-glow")
+                ])
+        };
+
+        var plan = Assert.IsType<RekallAgeVulkanHighFidelityFramePlan>(
+            new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame));
+
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_ROUTING_SUBSTITUTED", "post.pass[0].input", "lighting-hdr", "ignored");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_ROUTING_SUBSTITUTED", "post.pass[0].source", "pre-bloom", "ignored");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_ROUTING_SUBSTITUTED", "post.pass[0].output", "bright-pass", "ignored");
+        AssertPostDiagnostic(plan, "REKALL_RENDER_POST_ROUTING_SUBSTITUTED", "post.pass[1].source", "soft-glow", "ignored");
+    }
+
+    [Fact]
+    public void HighFidelityPlanReportsEveryLaterCollapsedRecognizedPass()
+    {
+        var quality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High", Bloom: true),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+            128,
+            72);
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main", 0, 0, 128, 72, null, [], [], 0,
+            new RekallAgeRuntimeViewportOverlay(false, 0), [])
+        {
+            ResolvedQualityPlan = quality,
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post",
+                "Repeated Post",
+                true,
+                [
+                    new RekallAgeRuntimeViewportPostProcessPass("Bloom A", "bloom", Scale: 0.25),
+                    new RekallAgeRuntimeViewportPostProcessPass("Bloom B", "brightExtract", Scale: 0.25),
+                    new RekallAgeRuntimeViewportPostProcessPass("Composite A", "composite"),
+                    new RekallAgeRuntimeViewportPostProcessPass("Composite B", "composite"),
+                    new RekallAgeRuntimeViewportPostProcessPass("Tone Map A", "tone-map"),
+                    new RekallAgeRuntimeViewportPostProcessPass("Tone Map B", "tonemap")
+                ])
+        };
+
+        var plan = Assert.IsType<RekallAgeVulkanHighFidelityFramePlan>(
+            new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame));
+
+        AssertPostDiagnostic(
+            plan,
+            "REKALL_RENDER_POST_PASS_COLLAPSED",
+            "post.pass[1].type",
+            "brightExtract",
+            "ignored; post.pass[0] retained");
+        AssertPostDiagnostic(
+            plan,
+            "REKALL_RENDER_POST_PASS_COLLAPSED",
+            "post.pass[3].type",
+            "composite",
+            "ignored; post.pass[2] retained");
+        AssertPostDiagnostic(
+            plan,
+            "REKALL_RENDER_POST_PASS_COLLAPSED",
+            "post.pass[5].type",
+            "tonemap",
+            "ignored; post.pass[4] retained");
+    }
+
     private static RekallAgeVulkanScenePreparedFrame CreatePreparedFrame(RekallAgeVulkanSceneRenderTarget target)
     {
         var camera = new RekallAgeRuntimeViewportCamera(

@@ -329,3 +329,93 @@ Result: `Passed: 1744, Failed: 8, Skipped: 0, Total: 1752` in 3 minutes 47 secon
 - Compatibility: legacy capture activation and target/readback behavior are unchanged; OpenXR call sites pass their existing same-size target through the generalized scene-pipeline viewport path.
 - Mutation check: unconditional bloom, viewport-sized HDR, ignored radius, empty degradation diagnostics, and omitted linear-filter validation each make at least one new test fail.
 - Remaining concern is unchanged: eight environment-specific Windows AppContainer module-host tests prevent a completely green repository-wide command but do not affect native Vulkan trustworthiness.
+
+## Fix Round 2: Authored routing and pass multiplicity diagnostics
+
+Implementation commit: `da6190c` (`fix: report substituted HDR post semantics`).
+
+The remaining Important finding was addressed through three isolated RED/GREEN cycles in `VulkanSceneCommandPlanTests`. The Vulkan executor still implements the approved single-resource graph; this round makes every authored routing substitution and every later collapsed recognized pass inspectable instead of inventing unsupported resource routing or pass multiplicity. The approved spec and plan were not changed because the graph resources, executable pass order, and acceptance gates did not change.
+
+### Recognized pass routing RED/GREEN
+
+Added `HighFidelityPlanReportsSubstitutedRecognizedPassRouting`, which authors non-default `Input`, `Source`, and `Output` on bloom, composite, and tone-map passes and requires an exact diagnostic target plus requested/resolved value for all nine fields.
+
+RED command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~HighFidelityPlanReportsSubstitutedRecognizedPassRouting"
+```
+
+RED result: `Failed: 1, Passed: 0`; `Assert.Contains` received an empty diagnostic collection. GREEN for the same command: `Passed: 1, Failed: 0` in 26 ms.
+
+Recognized passes now emit `REKALL_RENDER_POST_ROUTING_SUBSTITUTED` with stable targets such as `post.pass[0].input`. Resolved facts name the actual graph target: `scene-hdr`, `bloom-pyramid`, or `ldr-color`; unused sources resolve to `ignored`. Default `sceneColor`/null routing remains the supported shorthand and does not produce noise.
+
+### Graph-authoritative disabled routing RED/GREEN
+
+Added `HighFidelityPlanReportsDisabledBloomRoutesAsIgnored` to keep those facts authoritative when resolved quality removes bloom.
+
+RED command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~HighFidelityPlanReportsDisabledBloomRoutesAsIgnored"
+```
+
+RED result: `Failed: 1, Passed: 0`; the diagnostic collection incorrectly resolved the disabled bloom input to `scene-hdr` and the composite source to the absent `bloom-pyramid`. GREEN for the same command: `Passed: 1, Failed: 0` in 22 ms. Disabled bloom input/source/output and composite bloom source now resolve to `ignored`, matching the validated graph.
+
+### Duplicate recognized pass RED/GREEN
+
+Added `HighFidelityPlanReportsEveryLaterCollapsedRecognizedPass` with two bloom/bright-extract, two composite, and two tone-map/tonemap passes.
+
+RED command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~HighFidelityPlanReportsEveryLaterCollapsedRecognizedPass"
+```
+
+RED result: `Failed: 1, Passed: 0`; the diagnostic collection was empty. GREEN for the same command: `Passed: 1, Failed: 0` in 22 ms.
+
+Planning now tracks the first recognized pass for each supported semantic. Every later occurrence emits `REKALL_RENDER_POST_PASS_COLLAPSED` at that later pass's exact `.type` target, preserves the authored type as `requested`, and resolves to `ignored; post.pass[N] retained`. Bloom and `brightExtract`, plus `tone-map` and `tonemap`, share their respective semantic groups. Routing and setting diagnostics are still evaluated for every later pass before the collapse fact is added, so no authored field on a collapsed pass becomes silent.
+
+### Fix Round 2 verification
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~HighFidelityPlanReportsSubstitutedRecognizedPassRouting|FullyQualifiedName~HighFidelityPlanReportsDisabledBloomRoutesAsIgnored|FullyQualifiedName~HighFidelityPlanReportsEveryLaterCollapsedRecognizedPass"
+```
+
+Result: `Passed: 3, Failed: 0, Skipped: 0` in 28 ms.
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~VulkanHighFidelityCaptureTests|FullyQualifiedName~VulkanSceneCaptureTests|FullyQualifiedName~VulkanSceneCommandPlanTests|FullyQualifiedName~VulkanShaderCompilerTests"
+```
+
+Result: `Passed: 29, Failed: 0, Skipped: 0` in 2 seconds. This reran the native Vulkan captures and the existing native degradation-report propagation assertion; no native executor or shader change was necessary for this metadata-only fix.
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~Rekall.Age.Tests.Rendering"
+```
+
+Result: `Passed: 548, Failed: 0, Skipped: 0` in 3 seconds.
+
+```powershell
+dotnet restore Rekall.AGE.sln --locked-mode
+dotnet build src\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj --no-restore
+dotnet format Rekall.AGE.sln --no-restore --verify-no-changes --include src\Rekall.Age.Rendering\RekallAgeVulkanHighFidelityFrameRenderer.cs tests\Rekall.Age.Tests\Rendering\VulkanSceneCommandPlanTests.cs
+git diff --check
+```
+
+Results: locked restore reported every project up to date; renderer build succeeded with `0 Warning(s), 0 Error(s)`; format and diff checks exited 0 (Git emitted only CRLF conversion notices before the implementation commit).
+
+### Fix Round 2 changed files
+
+- `src/Rekall.Age.Rendering/RekallAgeVulkanHighFidelityFrameRenderer.cs`
+- `tests/Rekall.Age.Tests/Rendering/VulkanSceneCommandPlanTests.cs`
+- `.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-3-report.md`
+
+### Fix Round 2 self-review
+
+- Completeness: every non-default public routing field on every recognized pass is examined, including later collapsed passes; every later occurrence of all three recognized semantic groups is diagnosed.
+- Truthfulness: resolved resource names come from the current graph topology, and bloom-disabled routes resolve to `ignored` rather than naming an unallocated resource.
+- Stability: diagnostics use fixed codes, index-qualified targets, invariant requested/resolved values, and deterministic authored-pass order.
+- Scope: no backend-neutral contract, resource, pass order, native command, shader, or gameplay behavior changed. The compatibility path is untouched.
+- Mutation check: removing route inspection, bloom-quality routing, or retained-pass tracking makes its corresponding direct test fail.
+- Concern unchanged from Fix Round 1: eight environment-specific Windows AppContainer module-host tests prevented a fully green repository-wide run there. Round 2 changed rendering plan diagnostics only and verified all 548 rendering tests plus the combined native Task 3 suite; the unrelated full repository command was not repeated.

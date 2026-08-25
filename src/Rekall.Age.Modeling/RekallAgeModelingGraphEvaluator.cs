@@ -257,12 +257,19 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                 InputGeometry(node, "geometry", incoming, values),
                 "subdivide_faces",
                 new JsonObject()),
-            "rekall.modeling.subdivide_smooth" => ApplySemanticOperation(
+            "rekall.modeling.edge_crease" => ApplySemanticOperation(
                 graph,
                 node,
                 InputGeometry(node, "geometry", incoming, values),
-                "subdivide_smooth",
-                new JsonObject()),
+                "set_edge_crease",
+                new JsonObject
+                {
+                    ["weight"] = ReadNumber(node, "weight", 1),
+                    ["attribute"] = ReadString(node, "attribute", "crease.edge")
+                },
+                RekallAgeGeometryDomain.Edge),
+            "rekall.modeling.subdivide_smooth" => ApplySmoothSubdivision(
+                graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.bevel" => ApplySemanticOperation(
                 graph,
                 node,
@@ -685,6 +692,20 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Transform scale components must be nonzero.", node.NodeId);
         }
         return new(TransformMesh(graph, node, source, translation, rotation, scale, node.NodeId));
+    }
+
+    private static NodeValue ApplySmoothSubdivision(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        NodeValue input)
+    {
+        var levels = ReadInteger(node, "levels", 1, 1, 6);
+        var creaseAttribute = ReadString(node, "creaseAttribute", "crease.edge");
+        var current = input;
+        for (var level = 0; level < levels; level++)
+            current = ApplySemanticOperation(graph, node, current, "subdivide_smooth",
+                new JsonObject { ["creaseAttribute"] = creaseAttribute });
+        return current;
     }
 
     private static RekallAgeMeshAsset TransformMesh(

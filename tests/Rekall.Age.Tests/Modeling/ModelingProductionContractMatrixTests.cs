@@ -17,6 +17,7 @@ public sealed class ModelingProductionContractMatrixTests
         "project_uv",
         "subdivide_faces",
         "subdivide_smooth",
+        "set_edge_crease",
         "merge_by_distance"
     };
 
@@ -189,11 +190,11 @@ public sealed class ModelingProductionContractMatrixTests
     public void ProductionMatricesExactlyCoverThePublishedOperationAndModifierCatalogs()
     {
         var operationIds = new RekallAgeMeshOperationExecutor().Descriptors.Select(item => item.OperationId).ToArray();
-        Assert.Equal(21, operationIds.Length);
+        Assert.Equal(22, operationIds.Length);
         Assert.All(new[]
         {
             "transform", "reverse_faces", "triangulate_faces", "extrude_faces", "delete",
-            "generate_normals", "project_uv", "mark_uv_seams", "unwrap_pack_uv", "subdivide_faces", "subdivide_smooth", "merge_by_distance",
+            "generate_normals", "project_uv", "mark_uv_seams", "unwrap_pack_uv", "subdivide_faces", "subdivide_smooth", "set_edge_crease", "merge_by_distance",
             "bevel_edges", "inset_faces", "solidify", "weighted_normals",
             "fill_holes", "bridge_edge_loops", "poke_faces", "dissolve_edges", "bisect_plane"
         }, expected => Assert.Contains(expected, operationIds));
@@ -242,17 +243,22 @@ public sealed class ModelingProductionContractMatrixTests
         RekallAgeGeometryDomain domain,
         RekallAgeMeshAsset source)
     {
-        var elementIds = operationId is "extrude_faces" or "delete"
+        IReadOnlyList<ulong> elementIds = operationId is "extrude_faces" or "delete"
             ? [source.Topology.FaceIds[0]]
-            : domain == RekallAgeGeometryDomain.Point
-                ? source.Topology.PointIds
-                : source.Topology.FaceIds;
+            : domain switch
+            {
+                RekallAgeGeometryDomain.Point => source.Topology.PointIds,
+                RekallAgeGeometryDomain.Edge => source.Topology.EdgeIds,
+                RekallAgeGeometryDomain.Corner => source.Topology.CornerIds,
+                _ => source.Topology.FaceIds
+            };
         var parameters = operationId switch
         {
             "transform" => new JsonObject { ["x"] = 0.25, ["y"] = -0.5, ["z"] = 0.75 },
             "extrude_faces" => new JsonObject { ["x"] = 0.0, ["y"] = 0.0, ["z"] = 0.5 },
             "generate_normals" => new JsonObject { ["attribute"] = "normal.contract" },
             "project_uv" => new JsonObject { ["attribute"] = "uv.contract", ["axis"] = "xz" },
+            "set_edge_crease" => new JsonObject { ["weight"] = 0.75 },
             "merge_by_distance" => new JsonObject { ["distance"] = 0.0001 },
             _ => new JsonObject()
         };

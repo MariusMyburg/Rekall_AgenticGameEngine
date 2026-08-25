@@ -75,8 +75,7 @@ public sealed class RekallAgeModifierStackEvaluator
                 Select(source, RekallAgeGeometryDomain.Face, selection), VectorParameters(modifier.Parameters))).Mesh,
             "rekall.modifier.subdivide" => _executor.Execute(source, new("subdivide_faces", RekallAgeGeometryDomain.Face,
                 Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject())).Mesh,
-            "rekall.modifier.subdivide_smooth" => _executor.Execute(source, new("subdivide_smooth", RekallAgeGeometryDomain.Face,
-                source.Topology.FaceIds, new JsonObject())).Mesh,
+            "rekall.modifier.subdivide_smooth" => ExecuteSmoothSubdivision(source, modifier.Parameters),
             "rekall.modifier.merge_by_distance" => _executor.Execute(source, new("merge_by_distance", RekallAgeGeometryDomain.Point,
                 Select(source, RekallAgeGeometryDomain.Point, selection), new JsonObject { ["distance"] = ReadNumber(modifier.Parameters, "distance", 0.0001) })).Mesh,
             "rekall.modifier.bevel" => _executor.Execute(source, new("bevel_edges", RekallAgeGeometryDomain.Edge,
@@ -110,6 +109,19 @@ public sealed class RekallAgeModifierStackEvaluator
                 })).Mesh,
             _ => throw new RekallAgeMeshOperationException("REKALL_MODIFIER_TYPE_UNKNOWN", $"Modifier type '{modifier.TypeId}' is not executable.")
         };
+    }
+
+    private RekallAgeMeshAsset ExecuteSmoothSubdivision(RekallAgeMeshAsset source, JsonObject parameters)
+    {
+        var levels = ReadInteger(parameters, "levels", 1);
+        if (levels < 1 || levels > 6)
+            throw new RekallAgeMeshOperationException("REKALL_MODIFIER_PARAMETER_INVALID", "Smooth subdivision levels must be from 1 through 6.");
+        var creaseAttribute = ReadString(parameters, "creaseAttribute", "crease.edge");
+        var current = source;
+        for (var level = 0; level < levels; level++)
+            current = _executor.Execute(current, new("subdivide_smooth", RekallAgeGeometryDomain.Face, current.Topology.FaceIds,
+                new JsonObject { ["creaseAttribute"] = creaseAttribute })).Mesh;
+        return current;
     }
 
     private static IReadOnlyList<ulong> Select(RekallAgeMeshAsset mesh, RekallAgeGeometryDomain domain, string selection)

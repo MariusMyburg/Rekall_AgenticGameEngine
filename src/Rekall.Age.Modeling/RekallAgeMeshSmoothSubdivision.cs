@@ -14,6 +14,17 @@ public sealed partial class RekallAgeMeshOperationExecutor
             throw Failure("REKALL_MESH_OPERATION_SMOOTH_REQUIRES_COMPLETE_SURFACE", "Smooth subdivision currently requires every face so it cannot introduce cracks across an unselected boundary.");
 
         var topology = source.Topology;
+        var creaseAttributeName = ReadBoundedString(request.Parameters, "creaseAttribute", "crease.edge");
+        var creaseAttribute = source.Attributes.FirstOrDefault(item => item.Name == creaseAttributeName);
+        if (creaseAttribute is not null && (creaseAttribute.Domain != RekallAgeGeometryDomain.Edge || creaseAttribute.ValueType != RekallAgeGeometryValueType.Float))
+            throw Failure("REKALL_MESH_OPERATION_ATTRIBUTE_CONFLICT", $"Attribute '{creaseAttributeName}' exists with an incompatible domain or type.");
+        var edgeCreases = Enumerable.Range(0, topology.EdgeIds.Count).Select(index =>
+        {
+            if (creaseAttribute is null) return 0d;
+            var value = creaseAttribute.Values[index].GetDouble();
+            if (!double.IsFinite(value)) throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", $"Crease attribute '{creaseAttributeName}' contains a non-finite value.");
+            return Math.Clamp(value, 0, 1);
+        }).ToArray();
         var edgeFaces = Enumerable.Range(0, topology.EdgeIds.Count).Select(_ => new List<int>()).ToArray();
         var pointFaces = Enumerable.Range(0, topology.PointIds.Count).Select(_ => new HashSet<int>()).ToArray();
         var pointEdges = Enumerable.Range(0, topology.PointIds.Count).Select(_ => new List<int>()).ToArray();
@@ -42,9 +53,10 @@ public sealed partial class RekallAgeMeshOperationExecutor
         {
             var edge = topology.EdgePointIndices[edgeIndex];
             var a = topology.Positions[edge.A]; var b = topology.Positions[edge.B];
-            return edgeFaces[edgeIndex].Count == 2
-                ? Divide(Add(Add(a, b), Add(facePoints[edgeFaces[edgeIndex][0]], facePoints[edgeFaces[edgeIndex][1]])), 4)
-                : Divide(Add(a, b), 2);
+            var midpoint = Divide(Add(a, b), 2);
+            if (edgeFaces[edgeIndex].Count != 2) return midpoint;
+            var smooth = Divide(Add(Add(a, b), Add(facePoints[edgeFaces[edgeIndex][0]], facePoints[edgeFaces[edgeIndex][1]])), 4);
+            return Lerp(smooth, midpoint, edgeCreases[edgeIndex]);
         }).ToArray();
         var smoothedOriginals = Enumerable.Range(0, topology.PointIds.Count).Select(pointIndex =>
         {
@@ -64,7 +76,19 @@ public sealed partial class RekallAgeMeshOperationExecutor
                 return Divide(Add(topology.Positions[endpoints.A], topology.Positions[endpoints.B]), 2);
             }));
             var n = adjacentFaces.Length;
-            return Divide(Add(Add(faceAverage, Multiply(edgeMidpointAverage, 2)), Multiply(point, n - 3)), n);
+            var smooth = Divide(Add(Add(faceAverage, Multiply(edgeMidpointAverage, 2)), Multiply(point, n - 3)), n);
+            var creased = pointEdges[pointIndex]
+                .Where(edge => edgeCreases[edge] > 0)
+                .Select(edge => (Edge: edge, Weight: edgeCreases[edge], Neighbor: OtherPoint(topology.EdgePointIndices[edge], pointIndex)))
+                .OrderByDescending(item => item.Weight).ThenBy(item => topology.EdgeIds[item.Edge]).ToArray();
+            if (creased.Length >= 3)
+                return Lerp(smooth, point, creased.Take(3).Average(item => item.Weight));
+            if (creased.Length == 2)
+            {
+                var creasePoint = Divide(Add(Multiply(point, 6), Add(topology.Positions[creased[0].Neighbor], topology.Positions[creased[1].Neighbor])), 8);
+                return Lerp(smooth, creasePoint, (creased[0].Weight + creased[1].Weight) * 0.5);
+            }
+            return smooth;
         }).ToArray();
 
         var nextPointId = NextId(topology.PointIds); var pointIds = topology.PointIds.ToList();
@@ -156,6 +180,33 @@ public sealed partial class RekallAgeMeshOperationExecutor
     private static RekallAgeGeometryVector3 Add(RekallAgeGeometryVector3 a, RekallAgeGeometryVector3 b) => new(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
     private static RekallAgeGeometryVector3 Multiply(RekallAgeGeometryVector3 value, double factor) => new(value.X * factor, value.Y * factor, value.Z * factor);
     private static RekallAgeGeometryVector3 Divide(RekallAgeGeometryVector3 value, double divisor) => Multiply(value, 1 / divisor);
+    private static RekallAgeGeometryVector3 Lerp(RekallAgeGeometryVector3 a, RekallAgeGeometryVector3 b, double weight) =>
+        Add(Multiply(a, 1 - weight), Multiply(b, weight));
+
+    private static RekallAgeMeshOperationResult SetEdgeCrease(RekallAgeMeshAsset source, RekallAgeMeshOperationRequest request)
+    {
+        RequireDomain(request, RekallAgeGeometryDomain.Edge);
+        var edgeIndices = ResolveIndices(source.Topology.EdgeIds, request.ElementIds, "edge");
+        var weight = ReadFiniteDouble(request.Parameters, "weight");
+        if (weight < 0 || weight > 1)
+            throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "Edge crease weight must be in [0, 1].");
+        var attributeName = ReadBoundedString(request.Parameters, "attribute", "crease.edge");
+        var existing = source.Attributes.FirstOrDefault(item => item.Name == attributeName);
+        if (existing is not null && (existing.Domain != RekallAgeGeometryDomain.Edge || existing.ValueType != RekallAgeGeometryValueType.Float))
+            throw Failure("REKALL_MESH_OPERATION_ATTRIBUTE_CONFLICT", $"Attribute '{attributeName}' exists with an incompatible domain or type.");
+        var values = existing?.Values.ToArray() ?? Enumerable.Repeat(JsonSerializer.SerializeToElement(0d), source.Topology.EdgeIds.Count).ToArray();
+        foreach (var index in edgeIndices) values[index] = JsonSerializer.SerializeToElement(weight);
+        var attribute = new RekallAgeGeometryAttribute(attributeName, RekallAgeGeometryDomain.Edge, RekallAgeGeometryValueType.Float,
+            values, "subdivision-crease", RekallAgeGeometryInterpolation.Linear, JsonSerializer.SerializeToElement(0d));
+        var mesh = source with
+        {
+            Revision = checked(source.Revision + 1),
+            Attributes = source.Attributes.Where(item => item.Name != attributeName).Append(attribute).OrderBy(item => item.Name, StringComparer.Ordinal).ToArray()
+        };
+        var ids = request.ElementIds.Order().ToArray();
+        return Result(source, mesh, ChangeSet(RekallAgeMeshChangeKind.Attributes, modifiedEdges: ids, changedAttributes: [attributeName]),
+            ids.Select(id => Preserve(RekallAgeGeometryDomain.Edge, id)).ToArray());
+    }
 
     private static IReadOnlyList<RekallAgeMeshSelection> PropagateSmoothSelections(
         IReadOnlyList<RekallAgeMeshSelection> selections,

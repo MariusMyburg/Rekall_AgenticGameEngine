@@ -75,10 +75,17 @@ public sealed partial class RekallAgeMeshOperationExecutor
             []),
         new(
             "subdivide_smooth",
-            "Applies one Catmull-Clark-style smooth subdivision level to a complete manifold or boundary surface.",
+            "Applies one crease-aware Catmull-Clark-style smooth subdivision level to a complete manifold or boundary surface.",
             RekallAgeGeometryDomain.Face,
             RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
-            []),
+            [StringParameter("creaseAttribute", "crease.edge", "Optional edge-domain Float crease weight attribute; values are clamped to zero through one.")]),
+        new(
+            "set_edge_crease",
+            "Authors bounded subdivision crease weights on selected stable edges.",
+            RekallAgeGeometryDomain.Edge,
+            RekallAgeMeshChangeKind.Attributes,
+            [new("weight", RekallAgeGeometryValueType.Float, true, null, "Finite crease weight from zero (smooth) through one (sharp)."),
+             StringParameter("attribute", "crease.edge", "Destination edge-domain Float crease attribute.")]),
         new(
             "merge_by_distance",
             "Welds selected points within a finite distance using deterministic spatial hashing, deduplicates resulting edges, and preserves stable provenance.",
@@ -193,6 +200,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
             "unwrap_pack_uv" => UnwrapPackUv(source, request),
             "subdivide_faces" => SubdivideFaces(source, request),
             "subdivide_smooth" => SubdivideSmooth(source, request),
+            "set_edge_crease" => SetEdgeCrease(source, request),
             "merge_by_distance" => MergeByDistance(source, request),
             "bevel_edges" => BevelEdges(source, request),
             "inset_faces" => InsetFaces(source, request),

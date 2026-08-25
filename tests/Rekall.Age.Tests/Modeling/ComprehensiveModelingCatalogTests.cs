@@ -21,12 +21,14 @@ public sealed class ComprehensiveModelingCatalogTests
             "bevel_edges",
             "inset_faces",
             "solidify",
-            "weighted_normals");
+            "weighted_normals",
+            "set_edge_crease");
         AssertContainsAll(nodes,
             "rekall.modeling.bevel",
             "rekall.modeling.inset",
             "rekall.modeling.mirror",
             "rekall.modeling.array",
+            "rekall.modeling.edge_crease",
             "rekall.modeling.curve.profile_sweep",
             "rekall.modeling.primitive.plane",
             "rekall.modeling.primitive.disc",

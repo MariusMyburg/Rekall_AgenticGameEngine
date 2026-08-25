@@ -501,6 +501,14 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   Complete UV/repair/optimization operations and prove round-trip/cook/visual
   evidence before starting character deformation.
 
+  2026-08-26 subdivision tranche: AGE now authors bounded edge-domain Float
+  crease weights through `set_edge_crease` and
+  `rekall.modeling.edge_crease`. Crease weights affect both edge points and
+  vertex rules, propagate onto child edges, and work with bounded 1–6 level
+  smooth subdivision in procedural graphs and modifier stacks. The focused
+  production modeling slice passes 204 tests. Decimate/remesh/shrinkwrap and
+  final visual asset acceptance remain, so Wave 2 is not yet complete.
+
 - [ ] **Step 2: Execute Wave 3 as an independently accepted tranche**
 
   Complete deformation, rigs, weights, constraints, and animated character

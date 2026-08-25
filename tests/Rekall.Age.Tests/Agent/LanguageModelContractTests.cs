@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Agent.LanguageModels;
 
@@ -139,5 +140,46 @@ public sealed class LanguageModelContractTests
         Assert.All(
             new[] { error.RequestId!, error.RequestedValue!, error.ResolvedValue! },
             value => Assert.DoesNotContain(secret, value, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs()
+    {
+        const string secret = "sk-identifier-secret";
+        var error = new RekallAgeLanguageModelProviderException(
+            $"REKALL_{secret}_FAILED",
+            $"provider-{secret}",
+            $"Provider rejected {secret}.",
+            requestId: $"request-{secret}",
+            requestedValue: $"requested={secret}",
+            resolvedValue: $"resolved={secret}",
+            sensitiveValues: [secret]);
+        var structuredLog = JsonSerializer.Serialize(new
+        {
+            error.Code,
+            error.ProviderId,
+            error.RequestId,
+            error.RequestedValue,
+            error.ResolvedValue,
+            error.Message,
+            Exception = error.ToString()
+        });
+
+        Assert.Equal("REKALL_LANGUAGE_MODEL_PROVIDER_ERROR", error.Code);
+        Assert.Equal("unknown", error.ProviderId);
+        Assert.DoesNotContain(secret, structuredLog, StringComparison.Ordinal);
+        Assert.DoesNotContain(secret, error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues()
+    {
+        var error = new RekallAgeLanguageModelProviderException(
+            " rekall-provider invalid ",
+            " Provider API ",
+            "Provider request failed.");
+
+        Assert.Equal("REKALL_PROVIDER_INVALID", error.Code);
+        Assert.Equal("provider-api", error.ProviderId);
     }
 }

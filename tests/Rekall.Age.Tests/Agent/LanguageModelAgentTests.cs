@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Agent.LanguageModels;
 
@@ -243,6 +244,131 @@ public sealed class LanguageModelAgentTests
         await model.EnumerationDisposed.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(0, model.ChatAsyncCalls);
         Assert.Empty(tools.Executions);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AgentRejectsRuntimeNullStreamEventsAndText(bool nullEvent)
+    {
+        var response = new RekallAgeLanguageModelResponse(
+            "test", "model", "Ready", string.Empty, [], "stop", new(1, 1, 1));
+        RekallAgeLanguageModelStreamEvent[] events = nullEvent
+            ? [null!]
+            :
+            [
+                new(RekallAgeLanguageModelStreamEventKind.TextDelta, null!),
+                new(RekallAgeLanguageModelStreamEventKind.Completed, string.Empty, response)
+            ];
+        var agent = new RekallAgeLanguageModelAgent(
+            new ScriptedStreamingModelClient(events),
+            new RecordingToolExecutor());
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(async () =>
+            await agent.RunAsync(
+                new RekallAgeLanguageModelAgentRequest("model", "system", "task") { MaxTurns = 1 },
+                CancellationToken.None));
+
+        Assert.Equal("REKALL_LANGUAGE_MODEL_STREAM_INVALID", error.Code);
+        Assert.Equal("test", error.ProviderId);
+    }
+
+    [Theory]
+    [InlineData("ProviderId")]
+    [InlineData("Model")]
+    [InlineData("Content")]
+    [InlineData("Thinking")]
+    [InlineData("ToolCalls")]
+    [InlineData("FinishReason")]
+    [InlineData("Usage")]
+    [InlineData("ToolCalls[0]")]
+    [InlineData("ToolCalls[0].Name")]
+    [InlineData("ToolCalls[0].Arguments")]
+    public async Task AgentRejectsDeserializedCompletedResponsesWithNullRequiredMembers(string malformation)
+    {
+        var response = CreateMalformedStreamResponse(malformation);
+        RekallAgeLanguageModelStreamEvent[] events =
+            [new(RekallAgeLanguageModelStreamEventKind.Completed, string.Empty, response)];
+        var agent = new RekallAgeLanguageModelAgent(
+            new ScriptedStreamingModelClient(events),
+            new RecordingToolExecutor());
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(async () =>
+            await agent.RunAsync(
+                new RekallAgeLanguageModelAgentRequest("model", "system", "task") { MaxTurns = 1 },
+                CancellationToken.None));
+
+        Assert.Equal("REKALL_LANGUAGE_MODEL_STREAM_INVALID", error.Code);
+        Assert.Equal("test", error.ProviderId);
+        Assert.False(error.Retryable);
+    }
+
+    [Fact]
+    public async Task AgentAssociatesSameNameToolResultsWithExactProviderCallIds()
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", string.Empty, string.Empty,
+                SameNameDistinctCalls(),
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Ready", string.Empty, [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new DistinctResultToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task") { MaxTurns = 2 },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        AssertDistinctToolCallAssociations(model.Requests[1].Messages);
+    }
+
+    [Theory]
+    [InlineData(6, true)]
+    [InlineData(5, false)]
+    public async Task AgentRetainsOrPrunesSameNameCallResultBlockAtomicallyThroughRecoveryAndTrimming(
+        int maxContextMessages,
+        bool expectRawAssociations)
+    {
+        var model = new ScriptedModelClient(
+            new RekallAgeLanguageModelResponse(
+                "test", "model", string.Empty, "unfinished", [], "length", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", string.Empty, string.Empty,
+                SameNameDistinctCalls(),
+                "tool_calls", new(1, 1, 1)),
+            new RekallAgeLanguageModelResponse(
+                "test", "model", "Ready", string.Empty, [], "stop", new(1, 1, 1)));
+        var agent = new RekallAgeLanguageModelAgent(model, new DistinctResultToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", string.Empty, "task")
+            {
+                MaxTurns = 3,
+                MaxContextMessages = maxContextMessages
+            },
+            CancellationToken.None);
+
+        Assert.True(result.Completed);
+        Assert.Equal("low", model.Requests[1].Think);
+        var nextMessages = model.Requests[2].Messages;
+        var ledger = Assert.Single(nextMessages, message =>
+            message.Role == "user"
+            && message.Content.StartsWith("Persistent Rekall tool ledger", StringComparison.Ordinal));
+        Assert.Contains("\"marker\":\"alpha\"", ledger.Content, StringComparison.Ordinal);
+        Assert.Contains("\"result\":\"alpha-result\"", ledger.Content, StringComparison.Ordinal);
+        Assert.Contains("\"marker\":\"beta\"", ledger.Content, StringComparison.Ordinal);
+        Assert.Contains("\"result\":\"beta-result\"", ledger.Content, StringComparison.Ordinal);
+        if (expectRawAssociations)
+        {
+            AssertDistinctToolCallAssociations(nextMessages);
+        }
+        else
+        {
+            Assert.DoesNotContain(nextMessages, message =>
+                message.Role == "assistant" && message.ToolCalls is { Count: > 0 });
+            Assert.DoesNotContain(nextMessages, message => message.Role == "tool");
+        }
     }
 
     [Fact]
@@ -2440,6 +2566,91 @@ public sealed class LanguageModelAgentTests
         }
     }
 
+    private static RekallAgeLanguageModelResponse CreateMalformedStreamResponse(string malformation)
+    {
+        var response = new RekallAgeLanguageModelResponse(
+            "test",
+            "model",
+            "Ready",
+            "reasoning",
+            [new RekallAgeLanguageModelToolCall("inspect", new JsonObject { ["root"] = "game" })],
+            "tool_calls",
+            new RekallAgeLanguageModelUsage(1, 1, 1));
+        var json = JsonSerializer.SerializeToNode(response)!.AsObject();
+        switch (malformation)
+        {
+            case "ToolCalls[0]":
+                json["ToolCalls"]!.AsArray()[0] = null;
+                break;
+            case "ToolCalls[0].Name":
+                json["ToolCalls"]!.AsArray()[0]!.AsObject()["Name"] = null;
+                break;
+            case "ToolCalls[0].Arguments":
+                json["ToolCalls"]!.AsArray()[0]!.AsObject()["Arguments"] = null;
+                break;
+            default:
+                json[malformation] = null;
+                break;
+        }
+
+        return json.Deserialize<RekallAgeLanguageModelResponse>()!;
+    }
+
+    private static IReadOnlyList<RekallAgeLanguageModelToolCall> SameNameDistinctCalls() =>
+    [
+        new RekallAgeLanguageModelToolCall(
+            "inspect",
+            new JsonObject { ["marker"] = "alpha" })
+        {
+            Id = "call_alpha"
+        },
+        new RekallAgeLanguageModelToolCall(
+            "inspect",
+            new JsonObject { ["marker"] = "beta" })
+        {
+            Id = "call_beta"
+        }
+    ];
+
+    private static void AssertDistinctToolCallAssociations(
+        IReadOnlyList<RekallAgeLanguageModelMessage> messages)
+    {
+        var assistant = Assert.Single(messages, message =>
+            message.Role == "assistant" && message.ToolCalls is { Count: 2 });
+        Assert.Collection(
+            assistant.ToolCalls!,
+            call =>
+            {
+                Assert.Equal("inspect", call.Name);
+                Assert.Equal("call_alpha", call.Id);
+                Assert.Equal("alpha", call.Arguments["marker"]!.GetValue<string>());
+            },
+            call =>
+            {
+                Assert.Equal("inspect", call.Name);
+                Assert.Equal("call_beta", call.Id);
+                Assert.Equal("beta", call.Arguments["marker"]!.GetValue<string>());
+            });
+        Assert.Collection(
+            messages.Where(message => message.Role == "tool"),
+            result =>
+            {
+                Assert.Equal("inspect", result.ToolName);
+                Assert.Equal("call_alpha", result.ToolCallId);
+                Assert.Contains("\"marker\":\"alpha\"", result.Content, StringComparison.Ordinal);
+                Assert.Contains("\"result\":\"alpha-result\"", result.Content, StringComparison.Ordinal);
+                Assert.DoesNotContain("beta-result", result.Content, StringComparison.Ordinal);
+            },
+            result =>
+            {
+                Assert.Equal("inspect", result.ToolName);
+                Assert.Equal("call_beta", result.ToolCallId);
+                Assert.Contains("\"marker\":\"beta\"", result.Content, StringComparison.Ordinal);
+                Assert.Contains("\"result\":\"beta-result\"", result.Content, StringComparison.Ordinal);
+                Assert.DoesNotContain("alpha-result", result.Content, StringComparison.Ordinal);
+            });
+    }
+
     private sealed class ScriptedStreamingModelClient(params RekallAgeLanguageModelStreamEvent[][] streams)
         : IRekallAgeLanguageModelClient, IRekallAgeStreamingLanguageModelClient
     {
@@ -2602,6 +2813,26 @@ public sealed class LanguageModelAgentTests
         {
             Executions.Add((name, arguments));
             return ValueTask.FromResult<JsonNode>(new JsonObject { ["ready"] = true });
+        }
+    }
+
+    private sealed class DistinctResultToolExecutor : IRekallAgeAgentToolExecutor
+    {
+        public IReadOnlyList<RekallAgeLanguageModelTool> Tools { get; } =
+            [new("inspect", "Inspect", new JsonObject { ["type"] = "object" })];
+
+        public ValueTask<JsonNode> ExecuteAsync(
+            string name,
+            JsonObject arguments,
+            CancellationToken cancellationToken)
+        {
+            var marker = arguments["marker"]!.GetValue<string>();
+            return ValueTask.FromResult<JsonNode>(new JsonObject
+            {
+                ["ok"] = true,
+                ["marker"] = marker,
+                ["result"] = marker + "-result"
+            });
         }
     }
 

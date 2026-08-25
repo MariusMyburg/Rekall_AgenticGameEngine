@@ -620,6 +620,14 @@ public sealed class RekallAgeLanguageModelAgent(
             .ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (streamEvent is null)
+            {
+                throw InvalidStream("The provider stream emitted a null event.");
+            }
+            if (streamEvent.Text is null)
+            {
+                throw InvalidStream("The provider stream event omitted its required text value.");
+            }
             if (completedResponse is not null)
             {
                 throw InvalidStream("The provider stream emitted data after its Completed event.");
@@ -627,8 +635,10 @@ public sealed class RekallAgeLanguageModelAgent(
 
             if (streamEvent.Kind == RekallAgeLanguageModelStreamEventKind.Completed)
             {
-                completedResponse = streamEvent.Response
+                var response = streamEvent.Response
                     ?? throw InvalidStream("The provider stream Completed event omitted its final response.");
+                ValidateCompletedStreamResponse(response);
+                completedResponse = response;
                 progress?.Report(new RekallAgeLanguageModelAgentProgress(
                     turn,
                     "model.completed",
@@ -653,6 +663,55 @@ public sealed class RekallAgeLanguageModelAgent(
         cancellationToken.ThrowIfCancellationRequested();
         return completedResponse
             ?? throw InvalidStream("The provider stream ended without a Completed response.");
+    }
+
+    private void ValidateCompletedStreamResponse(RekallAgeLanguageModelResponse response)
+    {
+        if (string.IsNullOrWhiteSpace(response.ProviderId))
+        {
+            throw InvalidStream("The provider stream response omitted its required provider identity.");
+        }
+        if (string.IsNullOrWhiteSpace(response.Model))
+        {
+            throw InvalidStream("The provider stream response omitted its required model identity.");
+        }
+        if (response.Content is null)
+        {
+            throw InvalidStream("The provider stream response omitted its required content value.");
+        }
+        if (response.Thinking is null)
+        {
+            throw InvalidStream("The provider stream response omitted its required thinking value.");
+        }
+        if (response.ToolCalls is null)
+        {
+            throw InvalidStream("The provider stream response omitted its required tool-call collection.");
+        }
+        if (response.FinishReason is null)
+        {
+            throw InvalidStream("The provider stream response omitted its required finish reason.");
+        }
+        if (response.Usage is null)
+        {
+            throw InvalidStream("The provider stream response omitted its required usage value.");
+        }
+
+        for (var index = 0; index < response.ToolCalls.Count; index++)
+        {
+            var call = response.ToolCalls[index];
+            if (call is null)
+            {
+                throw InvalidStream($"The provider stream response tool call at index {index} was null.");
+            }
+            if (string.IsNullOrWhiteSpace(call.Name))
+            {
+                throw InvalidStream($"The provider stream response tool call at index {index} omitted its name.");
+            }
+            if (call.Arguments is null)
+            {
+                throw InvalidStream($"The provider stream response tool call at index {index} omitted its arguments.");
+            }
+        }
     }
 
     private RekallAgeLanguageModelProviderException InvalidStream(string message) => new(

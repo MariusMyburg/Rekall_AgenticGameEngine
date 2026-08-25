@@ -20,6 +20,7 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
     private readonly int _maximumTerminalEventCharacters;
     private readonly int _maximumTextCharacters;
     private readonly int _maximumArgumentCharacters;
+    private readonly string? _sessionCredential;
 
     public RekallAgeOpenAiResponseStreamReader(
         RekallAgeOpenAiToolNameMap toolNameMap,
@@ -28,7 +29,8 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
         int maxEventCharacters = DefaultMaximumEventCharacters,
         int maxTextCharacters = DefaultMaximumTextCharacters,
         int maxArgumentCharacters = DefaultMaximumArgumentCharacters,
-        int maxTerminalEventCharacters = DefaultMaximumTerminalEventCharacters)
+        int maxTerminalEventCharacters = DefaultMaximumTerminalEventCharacters,
+        string? sessionCredential = null)
     {
         _toolNameMap = toolNameMap ?? throw new ArgumentNullException(nameof(toolNameMap));
         _sensitiveValues = sensitiveValues ?? [];
@@ -45,6 +47,7 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
         }
         _maximumTextCharacters = Positive(maxTextCharacters, nameof(maxTextCharacters));
         _maximumArgumentCharacters = Positive(maxArgumentCharacters, nameof(maxArgumentCharacters));
+        _sessionCredential = sessionCredential;
     }
 
     public async IAsyncEnumerable<RekallAgeLanguageModelStreamEvent> ReadAsync(
@@ -53,7 +56,7 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
     {
         ArgumentNullException.ThrowIfNull(stream);
         var eventData = new StringBuilder();
-        var state = new StreamState();
+        var state = new StreamState(_sessionCredential);
         await foreach (var line in ReadBoundedLinesAsync(stream, cancellationToken).ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -175,24 +178,18 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
             {
                 var delta = ReadString(root, "delta") ?? string.Empty;
                 AddTextCharacters(state, delta.Length);
-                return
-                [
-                    new RekallAgeLanguageModelStreamEvent(
-                        RekallAgeLanguageModelStreamEventKind.TextDelta,
-                        delta)
-                ];
+                return DeltaEvent(
+                    RekallAgeLanguageModelStreamEventKind.TextDelta,
+                    state.TextRedactor.Push(delta));
             }
             case "response.reasoning_summary_text.delta":
             case "response.reasoning_text.delta":
             {
                 var delta = ReadString(root, "delta") ?? string.Empty;
                 AddTextCharacters(state, delta.Length);
-                return
-                [
-                    new RekallAgeLanguageModelStreamEvent(
-                        RekallAgeLanguageModelStreamEventKind.ThinkingDelta,
-                        delta)
-                ];
+                return DeltaEvent(
+                    RekallAgeLanguageModelStreamEventKind.ThinkingDelta,
+                    state.ThinkingRedactor.Push(delta));
             }
             case "response.output_item.added":
             case "response.output_item.done":
@@ -203,6 +200,10 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
                 var delta = ReadString(root, "delta") ?? string.Empty;
                 var itemId = ReadString(root, "item_id") ?? OutputIndexKey(root);
                 AppendArguments(itemId, delta, state);
+                if (!string.IsNullOrEmpty(_sessionCredential))
+                {
+                    return [];
+                }
                 return
                 [
                     new RekallAgeLanguageModelStreamEvent(
@@ -213,8 +214,11 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
             case "response.function_call_arguments.done":
             {
                 var itemId = ReadString(root, "item_id") ?? OutputIndexKey(root);
-                ReplaceArguments(itemId, ReadString(root, "arguments") ?? string.Empty, state);
-                return [];
+                var arguments = ReadString(root, "arguments") ?? string.Empty;
+                ReplaceArguments(itemId, arguments, state);
+                return string.IsNullOrEmpty(_sessionCredential)
+                    ? []
+                    : DeltaEvent(RekallAgeLanguageModelStreamEventKind.ToolCallDelta, arguments);
             }
             case "response.completed":
             case "response.incomplete":
@@ -227,19 +231,27 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
                     responseObject,
                     _toolNameMap,
                     _sensitiveValues,
-                    _requestId);
+                    _requestId,
+                    _sessionCredential);
                 ValidateFinalAccumulations(response, state);
                 state.Completed = true;
-                return
-                [
-                    new RekallAgeLanguageModelStreamEvent(
-                        RekallAgeLanguageModelStreamEventKind.Usage,
-                        string.Empty),
-                    new RekallAgeLanguageModelStreamEvent(
-                        RekallAgeLanguageModelStreamEventKind.Completed,
-                        string.Empty,
-                        response)
-                ];
+                var completedEvents = new List<RekallAgeLanguageModelStreamEvent>();
+                AddDeltaIfPresent(
+                    completedEvents,
+                    RekallAgeLanguageModelStreamEventKind.TextDelta,
+                    state.TextRedactor.Flush());
+                AddDeltaIfPresent(
+                    completedEvents,
+                    RekallAgeLanguageModelStreamEventKind.ThinkingDelta,
+                    state.ThinkingRedactor.Flush());
+                completedEvents.Add(new RekallAgeLanguageModelStreamEvent(
+                    RekallAgeLanguageModelStreamEventKind.Usage,
+                    string.Empty));
+                completedEvents.Add(new RekallAgeLanguageModelStreamEvent(
+                    RekallAgeLanguageModelStreamEventKind.Completed,
+                    string.Empty,
+                    response));
+                return completedEvents;
             }
             case "error":
                 throw ProviderEventError(root);
@@ -268,6 +280,14 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
 
     private void AppendArguments(string itemId, string delta, StreamState state)
     {
+        if (!string.IsNullOrEmpty(_sessionCredential))
+        {
+            state.ArgumentValues.TryGetValue(itemId, out var existingArguments);
+            var arguments = (existingArguments ?? string.Empty) + delta;
+            RejectCredentialBearingArguments(arguments);
+            state.ArgumentValues[itemId] = arguments;
+        }
+
         state.ArgumentLengths.TryGetValue(itemId, out var existingLength);
         var newLength = checked(existingLength + delta.Length);
         ReplaceArgumentLength(itemId, existingLength, newLength, state);
@@ -275,6 +295,12 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
 
     private void ReplaceArguments(string itemId, string arguments, StreamState state)
     {
+        if (!string.IsNullOrEmpty(_sessionCredential))
+        {
+            RejectCredentialBearingArguments(arguments);
+            state.ArgumentValues[itemId] = arguments;
+        }
+
         state.ArgumentLengths.TryGetValue(itemId, out var existingLength);
         ReplaceArgumentLength(itemId, existingLength, arguments.Length, state);
     }
@@ -309,6 +335,36 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
         state.TotalTextCharacters += characters;
     }
 
+    private void RejectCredentialBearingArguments(string arguments)
+    {
+        if (RekallAgeOpenAiLanguageModelClient.ContainsSessionCredential(
+                arguments,
+                _sessionCredential))
+        {
+            throw StreamError(
+                "REKALL_OPENAI_TOOL_ARGUMENTS_INVALID",
+                "OpenAI streamed an unsafe function-call payload.");
+        }
+    }
+
+    private static IReadOnlyList<RekallAgeLanguageModelStreamEvent> DeltaEvent(
+        RekallAgeLanguageModelStreamEventKind kind,
+        string value) =>
+        value.Length == 0
+            ? []
+            : [new RekallAgeLanguageModelStreamEvent(kind, value)];
+
+    private static void AddDeltaIfPresent(
+        ICollection<RekallAgeLanguageModelStreamEvent> events,
+        RekallAgeLanguageModelStreamEventKind kind,
+        string value)
+    {
+        if (value.Length > 0)
+        {
+            events.Add(new RekallAgeLanguageModelStreamEvent(kind, value));
+        }
+    }
+
     private void ValidateFinalAccumulations(
         RekallAgeLanguageModelResponse response,
         StreamState state)
@@ -339,6 +395,7 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
             "openai",
             "OpenAI stream reported a provider error.",
             requestId: _requestId,
+            providerDetail: ReadString(error, "message"),
             sensitiveValues: _sensitiveValues);
     }
 
@@ -437,7 +494,7 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
     private static int Positive(int value, string parameterName) =>
         value > 0 ? value : throw new ArgumentOutOfRangeException(parameterName);
 
-    private sealed class StreamState
+    private sealed class StreamState(string? sessionCredential)
     {
         public bool Completed { get; set; }
 
@@ -446,5 +503,64 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
         public int TotalArgumentCharacters { get; set; }
 
         public Dictionary<string, int> ArgumentLengths { get; } = new(StringComparer.Ordinal);
+
+        public Dictionary<string, string> ArgumentValues { get; } = new(StringComparer.Ordinal);
+
+        public CredentialRedactor TextRedactor { get; } = new(sessionCredential);
+
+        public CredentialRedactor ThinkingRedactor { get; } = new(sessionCredential);
+    }
+
+    private sealed class CredentialRedactor(string? credential)
+    {
+        private const string Redaction = "[REDACTED]";
+        private readonly StringBuilder _pending = new();
+
+        public string Push(string value)
+        {
+            if (string.IsNullOrEmpty(credential))
+            {
+                return value;
+            }
+
+            _pending.Append(value);
+            var safe = new StringBuilder(value.Length);
+            while (_pending.Length >= credential.Length)
+            {
+                if (StartsWithCredential())
+                {
+                    safe.Append(Redaction);
+                    _pending.Remove(0, credential.Length);
+                }
+                else
+                {
+                    safe.Append(_pending[0]);
+                    _pending.Remove(0, 1);
+                }
+            }
+
+            return safe.ToString();
+        }
+
+        public string Flush()
+        {
+            var value = _pending.ToString();
+            _pending.Clear();
+            return value;
+        }
+
+        private bool StartsWithCredential()
+        {
+            for (var index = 0; index < credential!.Length; index++)
+            {
+                if (char.ToUpperInvariant(_pending[index])
+                    != char.ToUpperInvariant(credential[index]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
 }

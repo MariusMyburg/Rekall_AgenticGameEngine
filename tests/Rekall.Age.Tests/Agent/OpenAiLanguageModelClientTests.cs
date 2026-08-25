@@ -270,8 +270,32 @@ public sealed class OpenAiLanguageModelClientTests
                 new RekallAgeLanguageModelRequest("gpt-5.6-sol", [], []) { Think = "true" },
                 CancellationToken.None).AsTask());
 
-        Assert.Equal("REKALL_OPENAI_REASONING_EFFORT_UNSUPPORTED", error.Code);
+        Assert.Equal("REKALL_OPENAI_REQUEST_INVALID", error.Code);
         Assert.Equal("true", error.RequestedValue);
+        Assert.Equal("none,low,medium,high,xhigh,max", error.ResolvedValue);
+        Assert.Equal(0, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task TemperatureWithExplicitReasoningIsRejectedWithRequestedAndResolvedFactsBeforeHttp()
+    {
+        var handler = new RecordingHandler((_, _) =>
+            Task.FromResult(JsonResponse(CompletedResponseJson())));
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(httpClient, "test-api-key");
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() =>
+            client.ChatAsync(
+                new RekallAgeLanguageModelRequest("gpt-5.6-sol", [], [])
+                {
+                    Think = "high",
+                    Temperature = 0.25
+                },
+                CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_OPENAI_REQUEST_INVALID", error.Code);
+        Assert.Equal("temperature=0.25;reasoning.effort=high", error.RequestedValue);
+        Assert.Equal("omit temperature or reasoning.effort", error.ResolvedValue);
         Assert.Equal(0, handler.CallCount);
     }
 
@@ -288,7 +312,7 @@ public sealed class OpenAiLanguageModelClientTests
                 new RekallAgeLanguageModelRequest("gpt-5.6", [], []),
                 CancellationToken.None).AsTask());
 
-        Assert.Equal("REKALL_OPENAI_MODEL_UNSUPPORTED", error.Code);
+        Assert.Equal("REKALL_OPENAI_MODEL_UNAVAILABLE", error.Code);
         Assert.Equal("gpt-5.6", error.RequestedValue);
         Assert.Equal("gpt-5.6-sol", error.ResolvedValue);
         Assert.Equal(0, handler.CallCount);
@@ -412,6 +436,171 @@ public sealed class OpenAiLanguageModelClientTests
 
         Assert.Equal("I cannot comply with that request.", response.Content);
         Assert.Equal("stop", response.FinishReason);
+    }
+
+    [Fact]
+    public async Task JsonSuccessRedactsSessionCredentialFromSurfacedTextReasoningIdsAndRetainedMessages()
+    {
+        var sessionCredential = "credential-" + Guid.NewGuid().ToString("N");
+        var responseBody = new JsonObject
+        {
+            ["id"] = $"response-{sessionCredential}",
+            ["model"] = "gpt-5.6-sol",
+            ["status"] = "completed",
+            ["output"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["id"] = "reasoning-safe",
+                    ["type"] = "reasoning",
+                    ["summary"] = new JsonArray
+                    {
+                        new JsonObject { ["type"] = "summary_text", ["text"] = $"thinking {sessionCredential}" }
+                    },
+                    ["encrypted_content"] = "opaque-safe"
+                },
+                new JsonObject
+                {
+                    ["id"] = "message-safe",
+                    ["type"] = "message",
+                    ["role"] = "assistant",
+                    ["content"] = new JsonArray
+                    {
+                        new JsonObject { ["type"] = "output_text", ["text"] = $"answer {sessionCredential}" }
+                    }
+                }
+            },
+            ["usage"] = new JsonObject { ["input_tokens"] = 1, ["output_tokens"] = 1 }
+        }.ToJsonString();
+        var handler = new RecordingHandler((_, _) => Task.FromResult(JsonResponse(responseBody)));
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(httpClient, sessionCredential);
+
+        var response = await client.ChatAsync(EmptyRequest(), CancellationToken.None);
+
+        var surfaced = string.Join('\n',
+        [
+            response.Content,
+            response.Thinking,
+            response.ResponseId ?? string.Empty,
+            .. response.OpaqueProviderState?.Items ?? []
+        ]);
+        Assert.False(surfaced.Contains(sessionCredential, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("[REDACTED]", response.Content, StringComparison.Ordinal);
+        Assert.Contains("[REDACTED]", response.Thinking, StringComparison.Ordinal);
+        Assert.Contains("[REDACTED]", response.ResponseId, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task JsonSuccessRedactsSessionCredentialFromProviderStatusAndOpaquePropertyNames()
+    {
+        var sessionCredential = "credential-" + Guid.NewGuid().ToString("N");
+        var content = new JsonObject
+        {
+            ["type"] = "output_text",
+            ["text"] = "safe answer",
+            [$"metadata-{sessionCredential}"] = "safe value"
+        };
+        var responseBody = new JsonObject
+        {
+            ["id"] = "response-safe",
+            ["model"] = "gpt-5.6-sol",
+            ["status"] = $"provider-{sessionCredential}",
+            ["output"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["id"] = "message-safe",
+                    ["type"] = "message",
+                    ["role"] = "assistant",
+                    ["content"] = new JsonArray(content)
+                }
+            },
+            ["usage"] = new JsonObject { ["input_tokens"] = 1, ["output_tokens"] = 1 }
+        }.ToJsonString();
+        var handler = new RecordingHandler((_, _) => Task.FromResult(JsonResponse(responseBody)));
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(httpClient, sessionCredential);
+
+        var response = await client.ChatAsync(EmptyRequest(), CancellationToken.None);
+
+        Assert.False(response.FinishReason.Contains(
+            sessionCredential,
+            StringComparison.OrdinalIgnoreCase));
+        var opaque = string.Join('\n', response.OpaqueProviderState?.Items ?? []);
+        Assert.False(opaque.Contains(sessionCredential, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task JsonSuccessRejectsCredentialInToolCallPayloadBeforeItCanBeExecutedOrRetained()
+    {
+        var sessionCredential = "credential-" + Guid.NewGuid().ToString("N");
+        var responseBody = new JsonObject
+        {
+            ["id"] = "response-safe",
+            ["model"] = "gpt-5.6-sol",
+            ["status"] = "completed",
+            ["output"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["id"] = "function-safe",
+                    ["type"] = "function_call",
+                    ["call_id"] = "call-safe",
+                    ["name"] = "rekall_scene_inspect_d7c351b75103",
+                    ["arguments"] = new JsonObject { ["value"] = sessionCredential }.ToJsonString()
+                }
+            },
+            ["usage"] = new JsonObject { ["input_tokens"] = 1, ["output_tokens"] = 1 }
+        }.ToJsonString();
+        var handler = new RecordingHandler((_, _) => Task.FromResult(JsonResponse(responseBody)));
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(httpClient, sessionCredential);
+        var request = new RekallAgeLanguageModelRequest(
+            "gpt-5.6-sol",
+            [],
+            [new RekallAgeLanguageModelTool("rekall.scene.inspect", "Inspect.", new JsonObject())]);
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() =>
+            client.ChatAsync(request, CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_OPENAI_TOOL_ARGUMENTS_INVALID", error.Code);
+        Assert.False(error.ToString().Contains(sessionCredential, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task CredentialBearingOpaqueContinuationIsRejectedBeforeHttp()
+    {
+        var sessionCredential = "credential-" + Guid.NewGuid().ToString("N");
+        var handler = new RecordingHandler((_, _) =>
+            Task.FromResult(JsonResponse(CompletedResponseJson())));
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(httpClient, sessionCredential);
+        var opaqueItem = new JsonObject
+        {
+            ["type"] = "message",
+            ["role"] = "assistant",
+            ["content"] = new JsonArray
+            {
+                new JsonObject { ["type"] = "output_text", ["text"] = sessionCredential }
+            }
+        }.ToJsonString();
+        var request = new RekallAgeLanguageModelRequest(
+            "gpt-5.6-sol",
+            [
+                new RekallAgeLanguageModelMessage("assistant", string.Empty)
+                {
+                    OpaqueProviderState = new RekallAgeLanguageModelOpaqueState("openai", [opaqueItem])
+                }
+            ],
+            []);
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() =>
+            client.ChatAsync(request, CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_OPENAI_CONTINUATION_INVALID", error.Code);
+        Assert.Equal(0, handler.CallCount);
+        Assert.False(error.ToString().Contains(sessionCredential, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -666,7 +855,7 @@ public sealed class OpenAiLanguageModelClientTests
             Exception = error.ToString()
         });
 
-        Assert.Equal("REKALL_OPENAI_INVALID_API_KEY", error.Code);
+        Assert.Equal("REKALL_OPENAI_AUTHENTICATION_FAILED", error.Code);
         Assert.Equal(401, error.HttpStatus);
         Assert.Equal("req_secure_123", error.RequestId);
         Assert.False(error.Retryable);
@@ -674,6 +863,46 @@ public sealed class OpenAiLanguageModelClientTests
         Assert.DoesNotContain(userContent, diagnostics, StringComparison.Ordinal);
         Assert.DoesNotContain(body, diagnostics, StringComparison.Ordinal);
         Assert.DoesNotContain("Authorization", diagnostics, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized, "invalid_api_key", "REKALL_OPENAI_AUTHENTICATION_FAILED")]
+    [InlineData(HttpStatusCode.Forbidden, "permission_denied", "REKALL_OPENAI_AUTHENTICATION_FAILED")]
+    [InlineData(HttpStatusCode.TooManyRequests, "vendor_rate_limit", "REKALL_OPENAI_RATE_LIMITED")]
+    [InlineData(HttpStatusCode.NotFound, "model_not_found", "REKALL_OPENAI_MODEL_UNAVAILABLE")]
+    [InlineData(HttpStatusCode.BadRequest, "invalid_request_error", "REKALL_OPENAI_REQUEST_INVALID")]
+    [InlineData(HttpStatusCode.RequestTimeout, "request_timeout", "REKALL_OPENAI_UNAVAILABLE")]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "vendor_backend_failure", "REKALL_OPENAI_UNAVAILABLE")]
+    public async Task HttpBoundaryMapsStatusAndProviderCategoriesToCanonicalDiagnostics(
+        HttpStatusCode statusCode,
+        string providerCode,
+        string expectedCode)
+    {
+        var providerDetail = new string('x', 5_000);
+        var responseBody = new JsonObject
+        {
+            ["error"] = new JsonObject
+            {
+                ["code"] = providerCode,
+                ["message"] = providerDetail
+            }
+        }.ToJsonString();
+        var handler = new RecordingHandler((_, _) =>
+            Task.FromResult(JsonResponse(responseBody, statusCode)));
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(
+            httpClient,
+            "test-api-key",
+            null,
+            (_, _) => ValueTask.CompletedTask);
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() =>
+            client.ChatAsync(EmptyRequest(), CancellationToken.None).AsTask());
+
+        Assert.Equal(expectedCode, error.Code);
+        Assert.NotNull(error.ProviderDetail);
+        Assert.InRange(error.ProviderDetail.Length, 1, 1_024);
+        Assert.DoesNotContain(providerCode, error.Code, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -789,7 +1018,7 @@ public sealed class OpenAiLanguageModelClientTests
         var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() =>
             client.ChatAsync(EmptyRequest(), CancellationToken.None).AsTask());
 
-        Assert.Equal("REKALL_OPENAI_SERVER_ERROR", error.Code);
+        Assert.Equal("REKALL_OPENAI_UNAVAILABLE", error.Code);
         Assert.True(error.Retryable);
         Assert.Equal(3, handler.CallCount);
         Assert.Equal([TimeSpan.FromMilliseconds(150), TimeSpan.FromMilliseconds(500)], delays.Delays);
@@ -855,7 +1084,7 @@ public sealed class OpenAiLanguageModelClientTests
         var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() =>
             client.ChatAsync(EmptyRequest(), CancellationToken.None).AsTask());
 
-        Assert.Equal("REKALL_OPENAI_TRANSPORT_ERROR", error.Code);
+        Assert.Equal("REKALL_OPENAI_UNAVAILABLE", error.Code);
         Assert.True(error.Retryable);
         Assert.Equal(1, handler.CallCount);
         Assert.DoesNotContain(transportSecret, error.ToString(), StringComparison.Ordinal);
@@ -884,6 +1113,102 @@ public sealed class OpenAiLanguageModelClientTests
             streamEvent.Kind == RekallAgeLanguageModelStreamEventKind.Completed);
         Assert.True(content.IsDisposed);
         Assert.True(content.Stream.IsDisposed);
+    }
+
+    [Fact]
+    public async Task SseSuccessRedactsSessionCredentialFromDeltasFinalFieldsAndRetainedMessages()
+    {
+        var sessionCredential = "credential-" + Guid.NewGuid().ToString("N");
+        var completion = new JsonObject
+        {
+            ["type"] = "response.completed",
+            ["response"] = new JsonObject
+            {
+                ["id"] = $"response-{sessionCredential}",
+                ["model"] = "gpt-5.6-sol",
+                ["status"] = "completed",
+                ["output"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["id"] = "message-safe",
+                        ["type"] = "message",
+                        ["role"] = "assistant",
+                        ["content"] = new JsonArray
+                        {
+                            new JsonObject { ["type"] = "output_text", ["text"] = $"answer {sessionCredential}" }
+                        }
+                    }
+                },
+                ["usage"] = new JsonObject { ["input_tokens"] = 1, ["output_tokens"] = 1 }
+            }
+        };
+        var delta = new JsonObject
+        {
+            ["type"] = "response.output_text.delta",
+            ["delta"] = $"answer {sessionCredential}"
+        };
+        var body = $"data: {delta.ToJsonString()}\n\ndata: {completion.ToJsonString()}\n\n";
+        var handler = new RecordingHandler((_, _) => Task.FromResult(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "text/event-stream")
+            }));
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(httpClient, sessionCredential);
+
+        var events = await ReadAllAsync(client.StreamChatAsync(EmptyRequest(), CancellationToken.None));
+
+        var surfaced = string.Join('\n', events.SelectMany(item =>
+            new[]
+            {
+                item.Text,
+                item.Response?.Content ?? string.Empty,
+                item.Response?.Thinking ?? string.Empty,
+                item.Response?.ResponseId ?? string.Empty
+            }.Concat(item.Response?.OpaqueProviderState?.Items ?? [])));
+        Assert.False(surfaced.Contains(sessionCredential, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("[REDACTED]", surfaced, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SseSuccessRejectsCredentialInToolArgumentsWithoutSurfacingThePayload()
+    {
+        var sessionCredential = "credential-" + Guid.NewGuid().ToString("N");
+        var arguments = new JsonObject { ["value"] = sessionCredential }.ToJsonString();
+        var delta = new JsonObject
+        {
+            ["type"] = "response.function_call_arguments.delta",
+            ["item_id"] = "function-safe",
+            ["delta"] = arguments
+        };
+        var done = new JsonObject
+        {
+            ["type"] = "response.function_call_arguments.done",
+            ["item_id"] = "function-safe",
+            ["arguments"] = arguments
+        };
+        var body = $"data: {delta.ToJsonString()}\n\ndata: {done.ToJsonString()}\n\n";
+        var handler = new RecordingHandler((_, _) => Task.FromResult(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "text/event-stream")
+            }));
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(httpClient, sessionCredential);
+        var surfaced = new List<string>();
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(async () =>
+        {
+            await foreach (var streamEvent in client.StreamChatAsync(EmptyRequest(), CancellationToken.None))
+            {
+                surfaced.Add(streamEvent.Text);
+            }
+        });
+
+        Assert.Equal("REKALL_OPENAI_TOOL_ARGUMENTS_INVALID", error.Code);
+        Assert.False(string.Join('\n', surfaced).Contains(sessionCredential, StringComparison.OrdinalIgnoreCase));
+        Assert.False(error.ToString().Contains(sessionCredential, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

@@ -8,7 +8,18 @@ public sealed record RekallAgeLanguageModelProviderDescriptor(
     string Id,
     string DisplayName,
     string DefaultModel,
-    string AuthenticationKind);
+    string AuthenticationKind)
+{
+    public string AuthenticationState { get; init; } = "unknown";
+
+    public bool IsAvailable { get; init; } = true;
+
+    public string Availability => IsAvailable ? "available" : "unavailable";
+
+    public IReadOnlyList<RekallAgeLanguageModelProviderDiagnostic> Diagnostics { get; init; } = [];
+}
+
+public sealed record RekallAgeLanguageModelProviderDiagnostic(string Code, string Message);
 
 public sealed class RekallAgeLanguageModelProviderSettings
 {
@@ -24,12 +35,6 @@ public sealed class RekallAgeLanguageModelProviderSettings
 
 public sealed class RekallAgeLanguageModelProviderCatalog
 {
-    private static readonly IReadOnlyList<RekallAgeLanguageModelProviderDescriptor> DefaultProviders =
-    [
-        new("ollama", "Ollama", "qwen3.5:35b", "none"),
-        new("openai", "OpenAI", "gpt-5.6-sol", "api-key")
-    ];
-
     private readonly RekallAgeLanguageModelProviderSettings _settings;
     private readonly Func<HttpClient> _httpClientFactory;
 
@@ -39,9 +44,39 @@ public sealed class RekallAgeLanguageModelProviderCatalog
     {
         _settings = settings ?? ReadEnvironmentSettings();
         _httpClientFactory = httpClientFactory ?? CreateHttpClient;
+        Providers = DescribeProviders(_settings);
     }
 
-    public IReadOnlyList<RekallAgeLanguageModelProviderDescriptor> Providers => DefaultProviders;
+    public IReadOnlyList<RekallAgeLanguageModelProviderDescriptor> Providers { get; }
+
+    public IReadOnlyList<RekallAgeLanguageModelProviderDescriptor> DescribeProviders(
+        RekallAgeLanguageModelProviderSettings? sessionSettings = null)
+    {
+        var settings = sessionSettings ?? _settings;
+        var hasOpenAiApiKey = !string.IsNullOrWhiteSpace(settings.OpenAiApiKey);
+        return Array.AsReadOnly<RekallAgeLanguageModelProviderDescriptor>(
+        [
+            new("ollama", "Local Ollama", "qwen3.5:35b", "none")
+            {
+                AuthenticationState = "not-required",
+                IsAvailable = true,
+                Diagnostics = []
+            },
+            new("openai", "OpenAI API", "gpt-5.6-sol", "api-key")
+            {
+                AuthenticationState = hasOpenAiApiKey ? "configured" : "required",
+                IsAvailable = hasOpenAiApiKey,
+                Diagnostics = hasOpenAiApiKey
+                    ? []
+                    : Array.AsReadOnly(
+                    [
+                        new RekallAgeLanguageModelProviderDiagnostic(
+                            "REKALL_OPENAI_API_KEY_MISSING",
+                            "OpenAI requires OPENAI_API_KEY or a session-only API key.")
+                    ])
+            }
+        ]);
+    }
 
     public RekallAgeLanguageModelProviderLease Acquire(
         string providerId,
@@ -52,22 +87,24 @@ public sealed class RekallAgeLanguageModelProviderCatalog
         ArgumentNullException.ThrowIfNull(registry);
         var settings = sessionSettings ?? _settings;
         var normalizedProviderId = providerId.Trim().ToLowerInvariant();
-        if (!Providers.Any(provider => provider.Id == normalizedProviderId))
+        var providers = DescribeProviders(settings);
+        var descriptor = providers.SingleOrDefault(provider => provider.Id == normalizedProviderId);
+        if (descriptor is null)
         {
             throw new RekallAgeLanguageModelProviderException(
                 "REKALL_LANGUAGE_MODEL_PROVIDER_UNSUPPORTED",
                 normalizedProviderId,
                 "The requested language-model provider is unsupported.",
                 requestedValue: normalizedProviderId,
-                resolvedValue: string.Join(',', Providers.Select(provider => provider.Id)));
+                resolvedValue: string.Join(',', providers.Select(provider => provider.Id)));
         }
 
-        if (normalizedProviderId == "openai" && string.IsNullOrWhiteSpace(settings.OpenAiApiKey))
+        if (!descriptor.IsAvailable && descriptor.Diagnostics.FirstOrDefault() is { } diagnostic)
         {
             throw new RekallAgeLanguageModelProviderException(
-                "REKALL_OPENAI_API_KEY_MISSING",
-                "openai",
-                "OpenAI requires OPENAI_API_KEY for this session.");
+                diagnostic.Code,
+                descriptor.Id,
+                diagnostic.Message);
         }
 
         var httpClient = _httpClientFactory();

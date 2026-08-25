@@ -3216,7 +3216,12 @@ internal static class RekallAgeCli
     {
         foreach (var provider in new RekallAgeLanguageModelProviderCatalog().Providers)
         {
-            Console.WriteLine($"{provider.Id}\t{provider.DisplayName}\t{provider.DefaultModel}\t{provider.AuthenticationKind}");
+            var diagnostics = provider.Diagnostics.Count == 0
+                ? "-"
+                : string.Join(',', provider.Diagnostics.Select(diagnostic => diagnostic.Code));
+            Console.WriteLine(
+                $"{provider.Id}\t{provider.DisplayName}\t{provider.DefaultModel}\t{provider.AuthenticationKind}"
+                + $"\t{provider.AuthenticationState}\t{provider.Availability}\t{diagnostics}");
         }
 
         return 0;
@@ -3254,7 +3259,7 @@ internal static class RekallAgeCli
     {
         var catalog = new RekallAgeLanguageModelProviderCatalog();
         var descriptor = catalog.Providers.SingleOrDefault(item => item.Id.Equals(provider, StringComparison.OrdinalIgnoreCase));
-        using var lease = catalog.Acquire(provider, registry);
+        await using var lease = catalog.Acquire(provider, registry);
         var models = await lease.Runner.ListModelsAsync(cancellationToken);
         Console.WriteLine($"{descriptor?.DisplayName ?? lease.ProviderId} models: {models.Count}");
         foreach (var model in models)
@@ -3282,7 +3287,7 @@ internal static class RekallAgeCli
             return 2;
         }
 
-        using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire(provider, registry);
+        await using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire(provider, registry);
         var tools = new RekallAgeMcpAgentToolExecutor(registry, $"rekall-{lease.ProviderId}-agent", progressiveDiscovery: true);
         var agent = new RekallAgeLanguageModelAgent(lease.ModelClient, tools);
         var result = await agent.RunAsync(
@@ -3330,7 +3335,7 @@ internal static class RekallAgeCli
             return 2;
         }
 
-        using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire(provider, registry);
+        await using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire(provider, registry);
         var result = await lease.Runner.RunAsync(
             new RekallAgeProjectAgentSessionRequest(projectRoot, sceneName, model, task)
             {

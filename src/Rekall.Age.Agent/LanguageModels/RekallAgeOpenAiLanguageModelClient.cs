@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -85,7 +86,7 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
             cancellationToken);
         await EnsureSuccessAsync(response, sensitiveValues, cancellationToken);
         var root = await ReadObjectAsync(response, sensitiveValues, cancellationToken);
-        return MapResponse(root, toolNameMap, sensitiveValues, RequestId(response));
+        return MapResponse(root, toolNameMap, sensitiveValues, RequestId(response), _apiKey);
     }
 
     public async IAsyncEnumerable<RekallAgeLanguageModelStreamEvent> StreamChatAsync(
@@ -106,7 +107,8 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
         var reader = new RekallAgeOpenAiResponseStreamReader(
             toolNameMap,
             sensitiveValues,
-            RequestId(response));
+            RequestId(response),
+            sessionCredential: _apiKey);
         await foreach (var streamEvent in reader.ReadAsync(stream, cancellationToken).ConfigureAwait(false))
         {
             yield return streamEvent;
@@ -122,7 +124,7 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
         var payload = new JsonObject
         {
             ["model"] = ModelId,
-            ["input"] = BuildInput(request.Messages, toolNameMap, sensitiveValues),
+            ["input"] = BuildInput(request.Messages, toolNameMap, sensitiveValues, _apiKey),
             ["tools"] = BuildTools(request.Tools, toolNameMap),
             ["stream"] = stream,
             ["store"] = false,
@@ -130,6 +132,7 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
             ["include"] = new JsonArray("reasoning.encrypted_content"),
             ["reasoning"] = BuildReasoning(request.Think, sensitiveValues)
         };
+        ValidateOptionCombination(request, sensitiveValues);
         if (request.MaxOutputTokens is { } maxOutputTokens)
         {
             payload["max_output_tokens"] = maxOutputTokens;
@@ -146,7 +149,8 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
     private static JsonArray BuildInput(
         IReadOnlyList<RekallAgeLanguageModelMessage> messages,
         RekallAgeOpenAiToolNameMap toolNameMap,
-        IReadOnlyCollection<string> sensitiveValues)
+        IReadOnlyCollection<string> sensitiveValues,
+        string sessionCredential)
     {
         var input = new JsonArray();
         foreach (var message in messages)
@@ -166,7 +170,12 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
                 case "assistant":
                     if (message.OpaqueProviderState is not null)
                     {
-                        ReplayOpaqueProviderState(message.OpaqueProviderState, input, toolNameMap, sensitiveValues);
+                        ReplayOpaqueProviderState(
+                            message.OpaqueProviderState,
+                            input,
+                            toolNameMap,
+                            sensitiveValues,
+                            sessionCredential);
                         break;
                     }
 
@@ -233,7 +242,8 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
         RekallAgeLanguageModelOpaqueState state,
         JsonArray input,
         RekallAgeOpenAiToolNameMap toolNameMap,
-        IReadOnlyCollection<string> sensitiveValues)
+        IReadOnlyCollection<string> sensitiveValues,
+        string sessionCredential)
     {
         if (!state.ProviderId.Equals("openai", StringComparison.Ordinal))
         {
@@ -249,6 +259,10 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
             try
             {
                 item = JsonNode.Parse(serializedItem) as JsonObject ?? throw new JsonException();
+                if (ContainsSessionCredential(item, sessionCredential))
+                {
+                    throw new JsonException();
+                }
                 ValidateOpaqueOutputItem(item, toolNameMap);
             }
             catch (Exception exception) when (exception is JsonException or KeyNotFoundException)
@@ -311,10 +325,11 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
         if (!SupportedReasoningEfforts.Contains(requestedEffort))
         {
             throw new RekallAgeLanguageModelProviderException(
-                "REKALL_OPENAI_REASONING_EFFORT_UNSUPPORTED",
+                "REKALL_OPENAI_REQUEST_INVALID",
                 "openai",
                 "OpenAI reasoning effort is unsupported for the configured model.",
                 requestedValue: requestedEffort,
+                resolvedValue: string.Join(',', SupportedReasoningEfforts),
                 sensitiveValues: sensitiveValues);
         }
 
@@ -326,7 +341,8 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
         JsonObject root,
         RekallAgeOpenAiToolNameMap toolNameMap,
         IReadOnlyCollection<string> sensitiveValues,
-        string? requestId)
+        string? requestId,
+        string? sessionCredential = null)
     {
         var model = ReadString(root, "model");
         if (!string.Equals(model, ModelId, StringComparison.Ordinal))
@@ -350,6 +366,7 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
                 "openai",
                 "OpenAI response generation failed.",
                 requestId: requestId,
+                providerDetail: ReadString(responseError, "message"),
                 sensitiveValues: sensitiveValues);
         }
 
@@ -367,10 +384,14 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
                         switch (ReadString(content, "type"))
                         {
                             case "output_text":
-                                text.Append(ReadString(content, "text"));
+                                text.Append(RedactSessionCredential(
+                                    ReadString(content, "text"),
+                                    sessionCredential));
                                 break;
                             case "refusal":
-                                text.Append(ReadString(content, "refusal"));
+                                text.Append(RedactSessionCredential(
+                                    ReadString(content, "refusal"),
+                                    sessionCredential));
                                 break;
                         }
                     }
@@ -381,13 +402,20 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
                     {
                         if (ReadString(summary, "type") == "summary_text")
                         {
-                            reasoning.Append(ReadString(summary, "text"));
+                            reasoning.Append(RedactSessionCredential(
+                                ReadString(summary, "text"),
+                                sessionCredential));
                         }
                     }
 
                     break;
                 case "function_call":
-                    calls.Add(MapToolCall(output, toolNameMap, sensitiveValues, requestId));
+                    calls.Add(MapToolCall(
+                        output,
+                        toolNameMap,
+                        sensitiveValues,
+                        requestId,
+                        sessionCredential));
                     break;
             }
         }
@@ -407,14 +435,20 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
         {
             "completed" when calls.Count > 0 => "tool_calls",
             "completed" => "stop",
-            "incomplete" => ReadString(root["incomplete_details"] as JsonObject, "reason") ?? "incomplete",
+            "incomplete" => RedactSessionCredential(
+                ReadString(root["incomplete_details"] as JsonObject, "reason"),
+                sessionCredential) ?? "incomplete",
             "cancelled" => "cancelled",
-            _ => status
+            _ => RedactSessionCredential(status, sessionCredential) ?? string.Empty
         };
         RekallAgeLanguageModelOpaqueState? opaqueProviderState;
         try
         {
-            opaqueProviderState = CreateOpaqueProviderState(outputItems);
+            opaqueProviderState = CreateOpaqueProviderState(
+                outputItems,
+                sensitiveValues,
+                requestId,
+                sessionCredential);
         }
         catch (ArgumentException)
         {
@@ -435,19 +469,46 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
             finishReason,
             usage)
         {
-            ResponseId = ReadString(root, "id"),
+            ResponseId = RedactSessionCredential(ReadString(root, "id"), sessionCredential),
             OpaqueProviderState = opaqueProviderState
         };
     }
 
     private static RekallAgeLanguageModelOpaqueState? CreateOpaqueProviderState(
-        IReadOnlyList<JsonObject> outputItems)
+        IReadOnlyList<JsonObject> outputItems,
+        IReadOnlyCollection<string> sensitiveValues,
+        string? requestId,
+        string? sessionCredential)
     {
         var items = outputItems
             .Where(output => ReadString(output, "type") is "function_call" or "message"
                 || (ReadString(output, "type") == "reasoning"
                     && !string.IsNullOrWhiteSpace(ReadString(output, "encrypted_content"))))
-            .Select(output => output.ToJsonString(JsonOptions))
+            .Select(output =>
+            {
+                if (!ContainsSessionCredential(output, sessionCredential))
+                {
+                    return output.ToJsonString(JsonOptions);
+                }
+
+                var outputType = ReadString(output, "type");
+                if (outputType == "message"
+                    || outputType == "reasoning"
+                    && !ContainsSessionCredential(
+                        ReadString(output, "encrypted_content"),
+                        sessionCredential))
+                {
+                    return RedactSessionCredential(output, sessionCredential)
+                        .ToJsonString(JsonOptions);
+                }
+
+                throw new RekallAgeLanguageModelProviderException(
+                    "REKALL_OPENAI_RESPONSE_INVALID",
+                    "openai",
+                    "OpenAI returned unsafe opaque continuation state.",
+                    requestId: requestId,
+                    sensitiveValues: sensitiveValues);
+            })
             .ToArray();
         return items.Length == 0
             ? null
@@ -458,8 +519,19 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
         JsonObject output,
         RekallAgeOpenAiToolNameMap toolNameMap,
         IReadOnlyCollection<string> sensitiveValues,
-        string? requestId)
+        string? requestId,
+        string? sessionCredential)
     {
+        if (ContainsSessionCredential(output, sessionCredential))
+        {
+            throw new RekallAgeLanguageModelProviderException(
+                "REKALL_OPENAI_TOOL_ARGUMENTS_INVALID",
+                "openai",
+                "OpenAI returned an unsafe function-call payload.",
+                requestId: requestId,
+                sensitiveValues: sensitiveValues);
+        }
+
         var alias = ReadString(output, "name");
         string canonicalName;
         try
@@ -558,7 +630,7 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
             catch (HttpRequestException)
             {
                 throw ProviderError(
-                    "REKALL_OPENAI_TRANSPORT_ERROR",
+                    "REKALL_OPENAI_UNAVAILABLE",
                     "OpenAI transport request failed.",
                     sensitiveValues,
                     retryable: true);
@@ -588,11 +660,14 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
         }
 
         string? providerCode = null;
+        string? providerDetail = null;
         try
         {
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             var root = await JsonNode.ParseAsync(stream, cancellationToken: cancellationToken) as JsonObject;
-            providerCode = ReadString(root?["error"] as JsonObject, "code");
+            var responseError = root?["error"] as JsonObject;
+            providerCode = ReadString(responseError, "code");
+            providerDetail = ReadString(responseError, "message");
         }
         catch (JsonException)
         {
@@ -607,6 +682,7 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
             httpStatus: statusCode,
             requestId: RequestId(response),
             retryable: IsTransient(response.StatusCode),
+            providerDetail: providerDetail,
             sensitiveValues: sensitiveValues);
     }
 
@@ -638,7 +714,7 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
         if (!string.Equals(requestedModel, ModelId, StringComparison.Ordinal))
         {
             throw new RekallAgeLanguageModelProviderException(
-                "REKALL_OPENAI_MODEL_UNSUPPORTED",
+                "REKALL_OPENAI_MODEL_UNAVAILABLE",
                 "openai",
                 "OpenAI provider requires its configured model identifier exactly.",
                 requestedValue: requestedModel,
@@ -691,26 +767,74 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
         bool retryable = false) =>
         new(code, "openai", message, retryable: retryable, sensitiveValues: sensitiveValues);
 
-    internal static string ProviderCode(string? providerCode, HttpStatusCode? statusCode)
+    private static void ValidateOptionCombination(
+        RekallAgeLanguageModelRequest request,
+        IReadOnlyCollection<string> sensitiveValues)
     {
-        if (!string.IsNullOrWhiteSpace(providerCode))
+        if (request.Temperature is not { } temperature || request.Think is null)
         {
-            var normalized = new string(providerCode
-                .Select(character => char.IsAsciiLetterOrDigit(character) ? char.ToUpperInvariant(character) : '_')
-                .ToArray());
-            return $"REKALL_OPENAI_{normalized}";
+            return;
         }
 
-        return statusCode switch
+        throw new RekallAgeLanguageModelProviderException(
+            "REKALL_OPENAI_REQUEST_INVALID",
+            "openai",
+            "OpenAI does not accept temperature with an explicit reasoning effort for the configured model.",
+            requestedValue: $"temperature={temperature.ToString(CultureInfo.InvariantCulture)};reasoning.effort={request.Think}",
+            resolvedValue: "omit temperature or reasoning.effort",
+            sensitiveValues: sensitiveValues);
+    }
+
+    internal static string ProviderCode(string? providerCode, HttpStatusCode? statusCode)
+    {
+        if (statusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
-            HttpStatusCode.RequestTimeout => "REKALL_OPENAI_REQUEST_TIMEOUT",
-            HttpStatusCode.TooManyRequests => "REKALL_OPENAI_RATE_LIMITED",
-            HttpStatusCode.BadRequest => "REKALL_OPENAI_BAD_REQUEST",
-            HttpStatusCode.Unauthorized => "REKALL_OPENAI_UNAUTHORIZED",
-            HttpStatusCode.Forbidden => "REKALL_OPENAI_FORBIDDEN",
-            _ when statusCode is not null && (int)statusCode >= 500 => "REKALL_OPENAI_SERVER_ERROR",
-            _ => "REKALL_OPENAI_HTTP_ERROR"
-        };
+            return "REKALL_OPENAI_AUTHENTICATION_FAILED";
+        }
+        if (statusCode == HttpStatusCode.TooManyRequests)
+        {
+            return "REKALL_OPENAI_RATE_LIMITED";
+        }
+        if (statusCode == HttpStatusCode.RequestTimeout
+            || statusCode is not null && (int)statusCode >= 500)
+        {
+            return "REKALL_OPENAI_UNAVAILABLE";
+        }
+
+        var normalizedProviderCode = providerCode?.Trim().ToLowerInvariant();
+        if (normalizedProviderCode is "invalid_api_key" or "authentication_error"
+            or "permission_denied" or "insufficient_permissions")
+        {
+            return "REKALL_OPENAI_AUTHENTICATION_FAILED";
+        }
+        if (normalizedProviderCode is "rate_limit_exceeded" or "rate_limit_error")
+        {
+            return "REKALL_OPENAI_RATE_LIMITED";
+        }
+        if (normalizedProviderCode is "model_not_found" or "model_unavailable" or "unsupported_model")
+        {
+            return "REKALL_OPENAI_MODEL_UNAVAILABLE";
+        }
+        if (normalizedProviderCode is "server_error" or "service_unavailable" or "overloaded_error"
+            or "internal_error" or "request_timeout")
+        {
+            return "REKALL_OPENAI_UNAVAILABLE";
+        }
+        if (normalizedProviderCode is "invalid_request_error" or "invalid_request"
+            or "invalid_value" or "unsupported_parameter")
+        {
+            return "REKALL_OPENAI_REQUEST_INVALID";
+        }
+        if (statusCode == HttpStatusCode.NotFound)
+        {
+            return "REKALL_OPENAI_MODEL_UNAVAILABLE";
+        }
+        if (statusCode is not null && (int)statusCode is >= 400 and < 500)
+        {
+            return "REKALL_OPENAI_REQUEST_INVALID";
+        }
+
+        return "REKALL_OPENAI_UNAVAILABLE";
     }
 
     private static Uri NormalizeBaseUri(Uri baseUri)
@@ -768,6 +892,93 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
 
     private static string? ReadString(JsonObject? value, string name) =>
         value?[name] is JsonValue node && node.TryGetValue<string>(out var text) ? text : null;
+
+    internal static bool ContainsSessionCredential(JsonNode? value, string? sessionCredential)
+    {
+        if (string.IsNullOrEmpty(sessionCredential) || value is null)
+        {
+            return false;
+        }
+
+        return value switch
+        {
+            JsonValue jsonValue when jsonValue.TryGetValue<string>(out var text) =>
+                ContainsSessionCredential(text, sessionCredential),
+            JsonObject jsonObject => jsonObject.Any(item =>
+                ContainsSessionCredential(item.Key, sessionCredential)
+                || ContainsSessionCredential(item.Value, sessionCredential)),
+            JsonArray jsonArray => jsonArray.Any(item =>
+                ContainsSessionCredential(item, sessionCredential)),
+            _ => false
+        };
+    }
+
+    internal static bool ContainsSessionCredential(string? value, string? sessionCredential) =>
+        !string.IsNullOrEmpty(value)
+        && !string.IsNullOrEmpty(sessionCredential)
+        && value.Contains(sessionCredential, StringComparison.OrdinalIgnoreCase);
+
+    internal static string? RedactSessionCredential(string? value, string? sessionCredential) =>
+        ContainsSessionCredential(value, sessionCredential)
+            ? value!.Replace(sessionCredential!, "[REDACTED]", StringComparison.OrdinalIgnoreCase)
+            : value;
+
+    private static JsonNode RedactSessionCredential(JsonNode value, string? sessionCredential)
+    {
+        var clone = value.DeepClone();
+        RedactSessionCredentialInPlace(clone, sessionCredential);
+        return clone;
+    }
+
+    private static void RedactSessionCredentialInPlace(JsonNode? value, string? sessionCredential)
+    {
+        switch (value)
+        {
+            case JsonObject jsonObject:
+                foreach (var propertyName in jsonObject.Select(item => item.Key).ToArray())
+                {
+                    var propertyValue = jsonObject[propertyName];
+                    var redactedPropertyName = RedactSessionCredential(
+                        propertyName,
+                        sessionCredential)!;
+                    var targetPropertyName = propertyName;
+                    if (!propertyName.Equals(redactedPropertyName, StringComparison.Ordinal))
+                    {
+                        jsonObject.Remove(propertyName);
+                        while (jsonObject.ContainsKey(redactedPropertyName))
+                        {
+                            redactedPropertyName += "-redacted";
+                        }
+                        jsonObject[redactedPropertyName] = propertyValue;
+                        targetPropertyName = redactedPropertyName;
+                    }
+                    if (propertyValue is JsonValue jsonValue
+                        && jsonValue.TryGetValue<string>(out var text))
+                    {
+                        jsonObject[targetPropertyName] = RedactSessionCredential(text, sessionCredential);
+                    }
+                    else
+                    {
+                        RedactSessionCredentialInPlace(propertyValue, sessionCredential);
+                    }
+                }
+                break;
+            case JsonArray jsonArray:
+                for (var index = 0; index < jsonArray.Count; index++)
+                {
+                    var item = jsonArray[index];
+                    if (item is JsonValue jsonValue && jsonValue.TryGetValue<string>(out var text))
+                    {
+                        jsonArray[index] = RedactSessionCredential(text, sessionCredential);
+                    }
+                    else
+                    {
+                        RedactSessionCredentialInPlace(item, sessionCredential);
+                    }
+                }
+                break;
+        }
+    }
 
     private static int ReadInt32(JsonObject value, string name) =>
         value[name] is JsonValue node && node.TryGetValue<int>(out var number) ? number : 0;

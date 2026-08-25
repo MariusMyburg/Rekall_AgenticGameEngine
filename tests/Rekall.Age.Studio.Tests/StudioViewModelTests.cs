@@ -53,7 +53,7 @@ public sealed class StudioViewModelTests
         Assert.Empty(viewModel.LanguageModels);
         Assert.Empty(viewModel.SelectedLanguageModel);
         Assert.Equal(
-            "REKALL_OPENAI_API_KEY_MISSING: OpenAI requires OPENAI_API_KEY for this session.",
+            "REKALL_OPENAI_API_KEY_MISSING: OpenAI requires OPENAI_API_KEY or a session-only API key.",
             viewModel.ProviderStatus);
         Assert.False(viewModel.RefreshLanguageModelsCommand.CanExecute(null));
         Assert.DoesNotContain("qwen", viewModel.ProviderStatus, StringComparison.OrdinalIgnoreCase);
@@ -94,7 +94,7 @@ public sealed class StudioViewModelTests
             Assert.Equal("openai", viewModel.SelectedLanguageModelProvider.Id);
             Assert.Equal(["gpt-5.6-sol", "gpt-5.6-sol-preview"], viewModel.LanguageModels);
             Assert.Equal("gpt-5.6-sol", viewModel.SelectedLanguageModel);
-            Assert.Equal("OpenAI ready with 2 models.", viewModel.ProviderStatus);
+            Assert.Equal("OpenAI API ready with 2 models.", viewModel.ProviderStatus);
             Assert.False(viewModel.IsAgentRunning);
         }
         finally
@@ -116,12 +116,21 @@ public sealed class StudioViewModelTests
             new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
             catalog,
             new RecordingPreviewSession());
+        var missingCredentialDescriptor = viewModel.LanguageModelProviders.Single(
+            provider => provider.Id == "openai");
+        Assert.Equal("required", missingCredentialDescriptor.AuthenticationState);
+        Assert.False(missingCredentialDescriptor.IsAvailable);
         viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "openai");
         await viewModel.WaitForLanguageModelProviderTransitionAsync();
 
         await viewModel.ApplyOpenAiApiKeyAsync(secret);
 
         Assert.True(viewModel.HasSessionOpenAiCredential);
+        var configuredDescriptor = viewModel.LanguageModelProviders.Single(provider => provider.Id == "openai");
+        Assert.Equal("configured", configuredDescriptor.AuthenticationState);
+        Assert.True(configuredDescriptor.IsAvailable);
+        Assert.Empty(configuredDescriptor.Diagnostics);
+        Assert.Equal(configuredDescriptor, viewModel.SelectedLanguageModelProvider);
         Assert.Equal("gpt-5.6-sol", viewModel.SelectedLanguageModel);
         var inspectable = string.Join('\n',
             [viewModel.ProviderStatus, viewModel.StatusText, .. viewModel.ValidationLines, .. viewModel.AgentLines]);
@@ -175,7 +184,7 @@ public sealed class StudioViewModelTests
         Assert.Equal(["gpt-5.6-sol-preview"], viewModel.LanguageModels);
         Assert.Empty(viewModel.SelectedLanguageModel);
         Assert.Equal(
-            "REKALL_LANGUAGE_MODEL_DEFAULT_UNAVAILABLE: OpenAI did not return its configured default model. "
+            "REKALL_LANGUAGE_MODEL_DEFAULT_UNAVAILABLE: OpenAI API did not return its configured default model. "
             + "Requested: gpt-5.6-sol. Resolved: gpt-5.6-sol-preview.",
             viewModel.ProviderStatus);
     }
@@ -1446,7 +1455,8 @@ public sealed class StudioViewModelTests
                 catalog,
                 CancellationToken.None);
 
-            const string expected = "REKALL_OPENAI_API_KEY_MISSING: OpenAI requires OPENAI_API_KEY for this session.";
+            const string expected =
+                "REKALL_OPENAI_API_KEY_MISSING: OpenAI requires OPENAI_API_KEY or a session-only API key.";
             Assert.False(result.Succeeded);
             Assert.Equal(expected, result.Status);
             Assert.False(File.Exists(Path.Combine(root, "rekall.project.json")));

@@ -15,7 +15,10 @@ public sealed class AgentCliTests
         const string sessionKey = "session-key-must-not-appear";
         var cli = FindCliAssemblyPath();
 
-        var providers = await RunAsync(cli, null, "agent", "providers");
+        var providers = await RunAsync(
+            cli,
+            new Dictionary<string, string> { ["OPENAI_API_KEY"] = string.Empty },
+            "agent", "providers");
         var missingAuth = await RunAsync(
             cli,
             new Dictionary<string, string> { ["OPENAI_API_KEY"] = string.Empty },
@@ -30,12 +33,18 @@ public sealed class AgentCliTests
             "agent", "models", "missing-provider");
 
         Assert.Equal(0, providers.ExitCode);
-        Assert.Contains("ollama\tOllama\tqwen3.5:35b\tnone", providers.Output, StringComparison.Ordinal);
-        Assert.Contains("openai\tOpenAI\tgpt-5.6-sol\tapi-key", providers.Output, StringComparison.Ordinal);
+        Assert.Contains(
+            "ollama\tLocal Ollama\tqwen3.5:35b\tnone\tnot-required\tavailable\t-",
+            providers.Output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "openai\tOpenAI API\tgpt-5.6-sol\tapi-key\trequired\tunavailable\tREKALL_OPENAI_API_KEY_MISSING",
+            providers.Output,
+            StringComparison.Ordinal);
         Assert.Equal(1, missingAuth.ExitCode);
         Assert.Contains("REKALL_OPENAI_API_KEY_MISSING", missingAuth.Output, StringComparison.Ordinal);
         Assert.Equal(1, unsupportedModel.ExitCode);
-        Assert.Contains("REKALL_OPENAI_MODEL_UNSUPPORTED", unsupportedModel.Output, StringComparison.Ordinal);
+        Assert.Contains("REKALL_OPENAI_MODEL_UNAVAILABLE", unsupportedModel.Output, StringComparison.Ordinal);
         Assert.Contains("Requested: not-gpt-5.6-sol", unsupportedModel.Output, StringComparison.Ordinal);
         Assert.Contains("Resolved: gpt-5.6-sol", unsupportedModel.Output, StringComparison.Ordinal);
         Assert.Equal(1, unsupportedProvider.ExitCode);

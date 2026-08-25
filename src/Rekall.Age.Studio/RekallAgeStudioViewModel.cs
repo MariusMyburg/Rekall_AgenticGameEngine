@@ -304,7 +304,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             _languageModelProviderLease = _languageModelProviderCatalog.Acquire("ollama", _agentRegistry);
             _languageModelRunner = _languageModelProviderLease.Runner;
-            _providerStatus = "Ollama ready. Refresh models.";
+            _providerStatus = $"{_selectedLanguageModelProvider.DisplayName} ready. Refresh models.";
         }
         else
         {
@@ -385,7 +385,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> ActionLines { get; } = [];
     public ObservableCollection<string> RuntimeObservationLines { get; } = [];
     public IReadOnlyList<RekallAgeLanguageModelProviderDescriptor> LanguageModelProviders =>
-        _languageModelProviderCatalog.Providers;
+        _languageModelProviderCatalog.DescribeProviders(SessionLanguageModelProviderSettings());
     public ObservableCollection<string> LanguageModels { get; } = [];
     public IReadOnlyList<string> ReasoningEfforts { get; } =
         ["none", "low", "medium", "high", "xhigh", "max"];
@@ -679,7 +679,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             ArgumentNullException.ThrowIfNull(value);
             lock (_languageModelLifecycleSync)
             {
-                if (!LanguageModelProviders.Contains(value) || !Set(ref _selectedLanguageModelProvider, value)) return;
+                if (!LanguageModelProviders.Any(provider => provider.Id == value.Id)
+                    || !Set(ref _selectedLanguageModelProvider, value)) return;
                 Replace(LanguageModels, []);
                 SelectedLanguageModel = string.Empty;
                 ProviderStatus = $"Switching to {value.DisplayName}…";
@@ -1438,7 +1439,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
             try
             {
-                ReleaseLanguageModelRunner();
+                await ReleaseLanguageModelRunnerAsync().ConfigureAwait(false);
             }
             catch (Exception)
             {
@@ -2617,6 +2618,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             _sessionOpenAiApiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey;
             OnPropertyChanged(nameof(HasSessionOpenAiCredential));
+            OnPropertyChanged(nameof(LanguageModelProviders));
+            _selectedLanguageModelProvider = LanguageModelProviders.Single(
+                provider => provider.Id == _selectedLanguageModelProvider.Id);
+            OnPropertyChanged(nameof(SelectedLanguageModelProvider));
             if (SelectedLanguageModelProvider.Id != "openai")
             {
                 ProviderStatus = _sessionOpenAiApiKey is null
@@ -2668,7 +2673,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             if (!IsCurrentLanguageModelTransition(provider, generation)) return;
             await CancelAndAwaitLanguageModelRefreshAsync();
             await CancelAgentAsync();
-            ReleaseLanguageModelRunner();
+            await ReleaseLanguageModelRunnerAsync();
             _lifecycleCancellation.Token.ThrowIfCancellationRequested();
             acquiredLease = _languageModelProviderCatalog.Acquire(
                 provider.Id,
@@ -2700,7 +2705,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             try
             {
-                acquiredLease?.Dispose();
+                if (acquiredLease is not null)
+                {
+                    await acquiredLease.DisposeAsync();
+                }
             }
             catch (Exception)
             {
@@ -2875,18 +2883,24 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         return string.Join(' ', facts);
     }
 
-    private void ReleaseLanguageModelRunner()
+    private async Task ReleaseLanguageModelRunnerAsync()
     {
         _languageModelRunner = null;
-        if (_languageModelProviderLease is not null)
+        var providerLease = _languageModelProviderLease;
+        _languageModelProviderLease = null;
+        var fixedRunner = _fixedLanguageModelRunner;
+        _fixedLanguageModelRunner = null;
+        if (providerLease is not null)
         {
-            _languageModelProviderLease.Dispose();
-            _languageModelProviderLease = null;
+            await providerLease.DisposeAsync().ConfigureAwait(false);
         }
-        if (_fixedLanguageModelRunner is not null)
+        if (fixedRunner is IAsyncDisposable asyncDisposableRunner)
         {
-            _fixedLanguageModelRunner.Dispose();
-            _fixedLanguageModelRunner = null;
+            await asyncDisposableRunner.DisposeAsync().ConfigureAwait(false);
+        }
+        else
+        {
+            fixedRunner?.Dispose();
         }
     }
 

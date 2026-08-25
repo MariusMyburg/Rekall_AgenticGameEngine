@@ -75,7 +75,7 @@ public sealed class OpenAiResponseStreamReaderTests
         var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() =>
             ReadAllAsync(reader, stream, CancellationToken.None));
 
-        Assert.Equal("REKALL_OPENAI_RATE_LIMIT_EXCEEDED", error.Code);
+        Assert.Equal("REKALL_OPENAI_RATE_LIMITED", error.Code);
         Assert.Equal("req_stream_error", error.RequestId);
         Assert.DoesNotContain(secret, error.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("rejected", error.ToString(), StringComparison.OrdinalIgnoreCase);
@@ -149,7 +149,8 @@ public sealed class OpenAiResponseStreamReaderTests
         var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() =>
             ReadAllAsync(reader, stream, CancellationToken.None));
 
-        Assert.Equal("REKALL_OPENAI_SERVER_ERROR", error.Code);
+        Assert.Equal("REKALL_OPENAI_UNAVAILABLE", error.Code);
+        Assert.Equal(providerMessage, error.ProviderDetail);
         Assert.DoesNotContain(providerMessage, error.ToString(), StringComparison.Ordinal);
     }
 

@@ -11,15 +11,60 @@ public sealed class LanguageModelProviderCatalogTests
     [Fact]
     public void DefaultCatalogPublishesInspectableProviderDescriptorsWithoutCredentials()
     {
-        var catalog = new RekallAgeLanguageModelProviderCatalog();
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = " " });
 
-        Assert.Equal(
-        [
-            new RekallAgeLanguageModelProviderDescriptor("ollama", "Ollama", "qwen3.5:35b", "none"),
-            new RekallAgeLanguageModelProviderDescriptor("openai", "OpenAI", "gpt-5.6-sol", "api-key")
-        ],
-        catalog.Providers);
-        Assert.DoesNotContain("OPENAI_API_KEY", string.Join('\n', catalog.Providers));
+        var ollama = Assert.Single(catalog.Providers, provider => provider.Id == "ollama");
+        Assert.Equal("Local Ollama", ollama.DisplayName);
+        Assert.Equal("qwen3.5:35b", ollama.DefaultModel);
+        Assert.Equal("none", ollama.AuthenticationKind);
+        Assert.Equal("not-required", ollama.AuthenticationState);
+        Assert.True(ollama.IsAvailable);
+        Assert.Equal("available", ollama.Availability);
+        Assert.Empty(ollama.Diagnostics);
+
+        var openAi = Assert.Single(catalog.Providers, provider => provider.Id == "openai");
+        Assert.Equal("OpenAI API", openAi.DisplayName);
+        Assert.Equal("gpt-5.6-sol", openAi.DefaultModel);
+        Assert.Equal("api-key", openAi.AuthenticationKind);
+        Assert.Equal("required", openAi.AuthenticationState);
+        Assert.False(openAi.IsAvailable);
+        Assert.Equal("unavailable", openAi.Availability);
+        var diagnostic = Assert.Single(openAi.Diagnostics);
+        Assert.Equal("REKALL_OPENAI_API_KEY_MISSING", diagnostic.Code);
+        Assert.Equal("OpenAI requires OPENAI_API_KEY or a session-only API key.", diagnostic.Message);
+        Assert.DoesNotContain("Authorization", string.Join('\n', catalog.Providers), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ConfiguredOpenAiDescriptorIsAvailableWithoutExposingAuthenticationMaterial()
+    {
+        var sessionCredential = "credential-" + Guid.NewGuid().ToString("N");
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = sessionCredential });
+
+        var openAi = Assert.Single(catalog.Providers, provider => provider.Id == "openai");
+
+        Assert.Equal("configured", openAi.AuthenticationState);
+        Assert.True(openAi.IsAvailable);
+        Assert.Equal("available", openAi.Availability);
+        Assert.Empty(openAi.Diagnostics);
+        Assert.False(openAi.ToString().Contains(sessionCredential, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ExistingPositionalDescriptorConstructionRemainsSourceCompatible()
+    {
+        var descriptor = new RekallAgeLanguageModelProviderDescriptor(
+            "custom",
+            "Custom Provider",
+            "model",
+            "external");
+
+        Assert.Equal("custom", descriptor.Id);
+        Assert.Equal("Custom Provider", descriptor.DisplayName);
+        Assert.Equal("model", descriptor.DefaultModel);
+        Assert.Equal("external", descriptor.AuthenticationKind);
     }
 
     [Fact]
@@ -124,7 +169,78 @@ public sealed class LanguageModelProviderCatalogTests
         Assert.Equal(1, handler.DisposeCount);
     }
 
-    private sealed class DisposalTrackingHandler : HttpMessageHandler
+    [Fact]
+    public async Task RepeatedAsyncLeaseDisposalAwaitsOneAsyncPreferredShutdownAndDisposesHttpOnce()
+    {
+        var handler = new DisposalTrackingHandler();
+        var runner = new AsyncPreferredRunner(blockDisposal: true);
+        var lease = new RekallAgeLanguageModelProviderLease(
+            "test",
+            new HttpClient(handler, disposeHandler: true),
+            new TestModelClient(),
+            runner);
+
+        var first = lease.DisposeAsync().AsTask();
+        await runner.DisposeEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var second = lease.DisposeAsync().AsTask();
+
+        Assert.False(first.IsCompleted);
+        Assert.False(second.IsCompleted);
+        Assert.Equal(1, runner.AsyncDisposeCount);
+        Assert.Equal(0, runner.SyncDisposeCount);
+        Assert.Equal(0, handler.DisposeCount);
+
+        runner.ReleaseDispose.TrySetResult();
+        await Task.WhenAll(first, second);
+
+        Assert.Equal(1, runner.AsyncDisposeCount);
+        Assert.Equal(0, runner.SyncDisposeCount);
+        Assert.Equal(1, handler.DisposeCount);
+        Assert.Throws<ObjectDisposedException>(() => _ = lease.Runner);
+    }
+
+    [Fact]
+    public void SynchronousLeaseDisposalStillPrefersAsyncRunnerAndCompletesExactlyOnce()
+    {
+        var handler = new DisposalTrackingHandler();
+        var runner = new AsyncPreferredRunner(blockDisposal: false);
+        var lease = new RekallAgeLanguageModelProviderLease(
+            "test",
+            new HttpClient(handler, disposeHandler: true),
+            new TestModelClient(),
+            runner);
+
+        lease.Dispose();
+        lease.Dispose();
+
+        Assert.Equal(1, runner.AsyncDisposeCount);
+        Assert.Equal(0, runner.SyncDisposeCount);
+        Assert.Equal(1, handler.DisposeCount);
+    }
+
+    [Fact]
+    public async Task RepeatedAsyncLeaseDisposalCompletesWhenHttpDisposalFails()
+    {
+        var handler = new DisposalTrackingHandler(throwOnDispose: true);
+        var runner = new CountingRunner();
+        var lease = new RekallAgeLanguageModelProviderLease(
+            "test",
+            new HttpClient(handler, disposeHandler: true),
+            new TestModelClient(),
+            runner);
+
+        var first = lease.DisposeAsync().AsTask();
+        var second = lease.DisposeAsync().AsTask();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(5)));
+
+        Assert.Equal("Synthetic HTTP disposal failure.", exception.Message);
+        Assert.Equal(1, runner.DisposeCount);
+        Assert.Equal(1, handler.DisposeCount);
+    }
+
+    private sealed class DisposalTrackingHandler(bool throwOnDispose = false) : HttpMessageHandler
     {
         public int DisposeCount => _disposeCount;
         public bool Disposed => DisposeCount > 0;
@@ -135,6 +251,11 @@ public sealed class LanguageModelProviderCatalogTests
         protected override void Dispose(bool disposing)
         {
             Interlocked.Increment(ref _disposeCount);
+            if (throwOnDispose)
+            {
+                throw new InvalidOperationException("Synthetic HTTP disposal failure.");
+            }
+
             base.Dispose(disposing);
         }
 
@@ -153,6 +274,44 @@ public sealed class LanguageModelProviderCatalogTests
             IProgress<RekallAgeLanguageModelAgentProgress>? progress,
             CancellationToken cancellationToken) => throw new NotSupportedException();
         public void Dispose() => Interlocked.Increment(ref _disposeCount);
+    }
+
+    private sealed class AsyncPreferredRunner(bool blockDisposal) :
+        IRekallAgeProjectAgentRunner,
+        IDisposable,
+        IAsyncDisposable
+    {
+        private int _asyncDisposeCount;
+        private int _syncDisposeCount;
+
+        public string ProviderId => "test";
+        public int AsyncDisposeCount => Volatile.Read(ref _asyncDisposeCount);
+        public int SyncDisposeCount => Volatile.Read(ref _syncDisposeCount);
+        public TaskCompletionSource DisposeEntered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseDispose { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([]);
+
+        public ValueTask<RekallAgeProjectAgentSessionResult> RunAsync(
+            RekallAgeProjectAgentSessionRequest request,
+            IProgress<RekallAgeLanguageModelAgentProgress>? progress,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void Dispose() => Interlocked.Increment(ref _syncDisposeCount);
+
+        public async ValueTask DisposeAsync()
+        {
+            Interlocked.Increment(ref _asyncDisposeCount);
+            DisposeEntered.TrySetResult();
+            if (blockDisposal)
+            {
+                await ReleaseDispose.Task;
+            }
+        }
     }
 
     private sealed class TestModelClient : IRekallAgeLanguageModelClient

@@ -5,6 +5,7 @@ namespace Rekall.Age.Agent.LanguageModels;
 public sealed class RekallAgeLanguageModelProviderException : Exception
 {
     private const int MaximumMessageCharacters = 4_096;
+    private const int MaximumProviderDetailCharacters = 1_024;
     private const int MaximumIdentifierCharacters = 128;
     private const string FallbackCode = "REKALL_LANGUAGE_MODEL_PROVIDER_ERROR";
     private const string FallbackProviderId = "unknown";
@@ -18,6 +19,7 @@ public sealed class RekallAgeLanguageModelProviderException : Exception
         bool retryable = false,
         string? requestedValue = null,
         string? resolvedValue = null,
+        string? providerDetail = null,
         IReadOnlyCollection<string>? sensitiveValues = null)
         : base(BuildMessage(message, sensitiveValues))
     {
@@ -28,6 +30,7 @@ public sealed class RekallAgeLanguageModelProviderException : Exception
         Retryable = retryable;
         RequestedValue = Redact(requestedValue, sensitiveValues);
         ResolvedValue = Redact(resolvedValue, sensitiveValues);
+        ProviderDetail = Bound(Redact(providerDetail, sensitiveValues), MaximumProviderDetailCharacters);
     }
 
     public string Code { get; }
@@ -43,6 +46,8 @@ public sealed class RekallAgeLanguageModelProviderException : Exception
     public string? RequestedValue { get; }
 
     public string? ResolvedValue { get; }
+
+    public string? ProviderDetail { get; }
 
     private static string BuildCode(string? code, IReadOnlyCollection<string>? sensitiveValues)
     {
@@ -102,6 +107,11 @@ public sealed class RekallAgeLanguageModelProviderException : Exception
 
         return redacted;
     }
+
+    private static string? Bound(string? value, int maximumCharacters) =>
+        value is null || value.Length <= maximumCharacters
+            ? value
+            : value[..(maximumCharacters - 1)] + "…";
 
     private static bool ContainsSensitiveValue(
         string? value,

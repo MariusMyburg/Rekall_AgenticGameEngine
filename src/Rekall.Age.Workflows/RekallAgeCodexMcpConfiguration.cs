@@ -1,5 +1,6 @@
 using Rekall.Age.Agent.Codex;
 using Rekall.Age.Agent.LanguageModels;
+using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Product;
 
 namespace Rekall.Age.Workflows;
@@ -64,7 +65,19 @@ public sealed class RekallAgeCodexMcpConfiguration
             "The packaged Rekall AGE CLI executable required for Codex MCP tools is unavailable.");
     }
 
-    public RekallAgeCodexMcpServer CreateValidatedServer()
+    public RekallAgeCodexMcpServer CreateValidatedServer(string projectRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
+        ValidateExecutable();
+
+        var normalizedProjectRoot = RekallAgeProjectCommandScope.NormalizeProjectRoot(projectRoot);
+        return new RekallAgeCodexMcpServer(
+            ServerName,
+            CliExecutablePath,
+            ["mcp", "stdio", "--project-root", normalizedProjectRoot]);
+    }
+
+    public void ValidateExecutable()
     {
         if (!File.Exists(CliExecutablePath))
         {
@@ -73,8 +86,6 @@ public sealed class RekallAgeCodexMcpConfiguration
                 "codex",
                 "The packaged Rekall AGE CLI executable required for Codex MCP tools is unavailable.");
         }
-
-        return new RekallAgeCodexMcpServer(ServerName, CliExecutablePath, ["mcp", "stdio"]);
     }
 
     private static string CandidateFromDistribution(RekallAgeDistributionPaths distribution) =>

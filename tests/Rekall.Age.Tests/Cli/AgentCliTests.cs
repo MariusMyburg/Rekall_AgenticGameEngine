@@ -206,6 +206,25 @@ public sealed class AgentCliTests
         Assert.Contains("Invalid maximum turn count 'zero'.", result.Output, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ScopedMcpStdioDefaultsTheStructuredProjectRootForOrdinaryToolExecution()
+    {
+        var projectRoot = TestPaths.CreateTempDirectory();
+        const string request =
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{"
+            + "\"name\":\"rekall.project.create\",\"arguments\":{"
+            + "\"name\":\"Prism Relay\",\"capabilities\":[\"world\"]}}}";
+
+        var result = await RunWithInputAsync(
+            FindCliAssemblyPath(),
+            request,
+            "mcp", "stdio", "--project-root", projectRoot);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("\"isError\":false", result.Output, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(projectRoot, "rekall.project.json")), result.Output);
+    }
+
     private static async Task<(int ExitCode, string Output)> RunAsync(
         string cliAssembly,
         IReadOnlyDictionary<string, string>? environment,
@@ -236,6 +255,35 @@ public sealed class AgentCliTests
         using var process = Process.Start(startInfo)!;
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        return (process.ExitCode, await output + await error);
+    }
+
+    private static async Task<(int ExitCode, string Output)> RunWithInputAsync(
+        string cliAssembly,
+        string input,
+        params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            WorkingDirectory = FindRepositoryRoot()
+        };
+        startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
+        startInfo.ArgumentList.Add(cliAssembly);
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(startInfo)!;
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
+        await process.StandardInput.WriteLineAsync(input);
+        process.StandardInput.Close();
         await process.WaitForExitAsync();
         return (process.ExitCode, await output + await error);
     }

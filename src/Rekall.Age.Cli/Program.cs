@@ -263,6 +263,7 @@ internal static class RekallAgeCli
                 ["render", "glb", "export", var root, var scene, var outputPath, var frames] =>
                     await ExportSceneGlbAsync(registry, context, root, scene, outputPath, frames),
                 ["mcp", "stdio"] => await RunMcpStdioAsync(registry, context),
+                ["mcp", "stdio", "--project-root", var root] => await RunMcpStdioAsync(registry, context, root),
                 ["command", "execute", var name, var argumentsJson] =>
                     await ExecuteRegisteredCommandAsync(registry, context, name, argumentsJson),
                 ["studio", "open", var root, var scene] => await OpenStudioModelAsync(root, scene),
@@ -2323,9 +2324,10 @@ internal static class RekallAgeCli
 
     private static async Task<int> RunMcpStdioAsync(
         RekallAgeCommandRegistry registry,
-        RekallAgeCommandContext context)
+        RekallAgeCommandContext context,
+        string? projectRoot = null)
     {
-        var server = new RekallAgeMcpJsonRpcServer(registry);
+        var server = new RekallAgeMcpJsonRpcServer(registry, projectRoot);
         await server.RunStdioAsync(Console.In, Console.Out, context);
         return 0;
     }

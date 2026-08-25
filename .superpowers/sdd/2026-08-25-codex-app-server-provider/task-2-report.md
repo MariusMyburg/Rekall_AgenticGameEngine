@@ -4,7 +4,7 @@
 
 Implemented the functional Codex App Server project-agent runner and connected each Codex project thread to AGE through the packaged `Rekall.Age.Cli mcp stdio` server.
 
-The runner uses one ephemeral Codex thread per project run, an absolute project working directory, exact model `gpt-5.6-sol`, `workspace-write`, network disabled, and the project root as the only writable root. The MCP server is named `rekall-age` and is supplied as an exact executable path plus the structured argument array `mcp`, `stdio`; no shell command string is constructed.
+The runner uses one ephemeral Codex thread per project run, an absolute project working directory, exact model `gpt-5.6-sol`, `workspace-write`, network disabled, and the project root as the only writable root. The MCP server is named `rekall-age` and is supplied as an exact executable path plus the structured argument array `mcp`, `stdio`, `--project-root`, and the normalized selected root; no shell command string is constructed.
 
 ## Implemented contracts
 
@@ -76,3 +76,13 @@ Final fresh verification is rerun after this report before commit.
 - RED: the focused transcript test failed because `thread/start.params.ephemeral` was absent.
 - GREEN: the same focused transcript test passed after the contract, client serialization, and project-run setting were connected.
 - Deferred aggregate-result bounds and dead-client retry reset were intentionally left unchanged.
+
+## Final integration fix round 1: MCP project-root authority
+
+- Extracted `RekallAgeProjectCommandScope` from the embedded project-agent executor so Ollama/OpenAI and the external Codex MCP bridge share one normalization, defaulting, gateway-decoding, and validation rule.
+- Codex now launches the packaged host with the structured arguments `mcp`, `stdio`, `--project-root`, `<normalized selected root>`.
+- Scoped MCP servers default omitted direct and gateway target roots to the selected project and reject any different absolute root with `REKALL_AGENT_PROJECT_SCOPE_VIOLATION` before registry execution.
+- Plain `mcp stdio` remains unscoped for explicit non-agent use. A real `rekall.project.create` MCP test preserves the ordinary Prism Relay-style path.
+- RED evidence: the Codex transcript exposed missing root arguments; scoped MCP tests exposed the absent boundary; and the CLI rejected the scoped stdio form with exit code 2.
+- GREEN evidence: focused MCP/project-session/Codex-runner/CLI tests passed 51/51; the one broader engine suite passed 2,075/2,075; the warning-as-error solution build completed with zero warnings and errors.
+- Deferred lifecycle and aggregate-result hardening remained unchanged.

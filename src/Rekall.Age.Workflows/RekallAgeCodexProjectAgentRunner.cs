@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Agent.Codex;
 using Rekall.Age.Agent.LanguageModels;
+using Rekall.Age.Core.Commands;
 
 namespace Rekall.Age.Workflows;
 
@@ -173,7 +174,7 @@ public sealed class RekallAgeCodexProjectAgentRunner :
         RekallAgeCodexTurn? turn = null;
         try
         {
-            var projectRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(request.ProjectRoot));
+            var projectRoot = RekallAgeProjectCommandScope.NormalizeProjectRoot(request.ProjectRoot);
             client = await EnsureClientAsync(runCancellation.Token).ConfigureAwait(false);
             var account = await client.ReadAccountAsync(cancellationToken: runCancellation.Token).ConfigureAwait(false);
             if (!account.IsAuthenticated)
@@ -199,7 +200,7 @@ public sealed class RekallAgeCodexProjectAgentRunner :
                     resolvedValue: string.Join(',', models.Where(model => !model.Hidden).Select(model => model.Model)));
             }
 
-            var mcpServer = _mcpConfiguration.CreateValidatedServer();
+            var mcpServer = _mcpConfiguration.CreateValidatedServer(projectRoot);
             thread = await client.StartThreadAsync(
                 new RekallAgeCodexThreadStartRequest(projectRoot, RequiredModel, DeveloperInstructions)
                 {
@@ -467,7 +468,7 @@ public sealed class RekallAgeCodexProjectAgentRunner :
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeTask) is not null, this);
             if (_client is null)
             {
-                _ = _mcpConfiguration.CreateValidatedServer();
+                _mcpConfiguration.ValidateExecutable();
                 _client = await _clientFactory(cancellationToken).ConfigureAwait(false);
             }
 

@@ -22,12 +22,13 @@ public sealed class CodexProjectAgentRunnerTests
             File.WriteAllText(expectedPath, "packaged-cli-fixture");
 
             var configuration = RekallAgeCodexMcpConfiguration.Resolve(fixture.FullName);
-            var server = configuration.CreateValidatedServer();
+            var projectRoot = Directory.CreateDirectory(Path.Combine(fixture.FullName, "Project")).FullName;
+            var server = configuration.CreateValidatedServer(projectRoot);
 
             Assert.Equal(Path.GetFullPath(expectedPath), configuration.CliExecutablePath);
             Assert.Equal("rekall-age", server.Name);
             Assert.Equal(Path.GetFullPath(expectedPath), server.Command);
-            Assert.Equal(["mcp", "stdio"], server.Arguments);
+            Assert.Equal(["mcp", "stdio", "--project-root", Path.GetFullPath(projectRoot)], server.Arguments);
         }
         finally
         {
@@ -106,7 +107,7 @@ public sealed class CodexProjectAgentRunnerTests
             var mcp = config["mcp_servers"]!["rekall-age"]!.AsObject();
             Assert.Equal(Path.GetFullPath(cliPath), mcp["command"]!.GetValue<string>());
             Assert.Equal(
-                ["mcp", "stdio"],
+                ["mcp", "stdio", "--project-root", Path.GetFullPath(projectRoot)],
                 mcp["args"]!.AsArray().Select(item => item!.GetValue<string>()));
             Assert.DoesNotContain("mcp stdio", mcp["command"]!.GetValue<string>(), StringComparison.Ordinal);
             var developerInstructions = parameters["developerInstructions"]!.GetValue<string>();

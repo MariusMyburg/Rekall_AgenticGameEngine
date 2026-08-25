@@ -1,8 +1,10 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Rekall.Age.Agent.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Mcp;
+using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime.Commands;
 using Rekall.Age.Workflows.Commands;
@@ -251,6 +253,138 @@ public sealed class McpJsonRpcServerTests
             StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ScopedServerDefaultsOrAcceptsTheSelectedProjectRootBeforeExecutingHandler(bool supplyProjectRoot)
+    {
+        var selectedRoot = TestPaths.CreateTempDirectory();
+        var command = new ScopedMutationCommand("rekall.test.scoped-mutation");
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(command);
+        var server = new RekallAgeMcpJsonRpcServer(registry, selectedRoot);
+        var arguments = new JsonObject { ["value"] = "Prism Relay" };
+        if (supplyProjectRoot)
+        {
+            arguments["projectRoot"] = selectedRoot;
+        }
+
+        var response = await server.HandleJsonLineAsync(
+            ToolCall("rekall.test.scoped-mutation", arguments),
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        Assert.False(document.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.Equal(1, command.InvocationCount);
+        Assert.Equal(Path.TrimEndingDirectorySeparator(Path.GetFullPath(selectedRoot)), command.LastProjectRoot);
+    }
+
+    [Fact]
+    public async Task ScopedServerRejectsDirectAlternateProjectRootBeforeHandlerRuns()
+    {
+        var selectedRoot = TestPaths.CreateTempDirectory();
+        var alternateRoot = TestPaths.CreateTempDirectory();
+        var command = new ScopedMutationCommand("rekall.test.scoped-mutation");
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(command);
+        var server = new RekallAgeMcpJsonRpcServer(registry, selectedRoot);
+
+        var response = await server.HandleJsonLineAsync(
+            ToolCall("rekall.test.scoped-mutation", new JsonObject
+            {
+                ["projectRoot"] = alternateRoot,
+                ["value"] = "must not run"
+            }),
+            CreateContext());
+
+        AssertScopeViolation(response);
+        Assert.Equal(0, command.InvocationCount);
+    }
+
+    [Fact]
+    public async Task ScopedServerRejectsGatewayEncodedAlternateProjectRootBeforeHandlerRuns()
+    {
+        var selectedRoot = TestPaths.CreateTempDirectory();
+        var alternateRoot = TestPaths.CreateTempDirectory();
+        var target = new ScopedMutationCommand("rekall.test.scoped-mutation");
+        var gateway = new GatewayMutationCommand();
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(target);
+        registry.Register(gateway);
+        var server = new RekallAgeMcpJsonRpcServer(registry, selectedRoot);
+        var encodedArguments = new JsonObject
+        {
+            ["projectRoot"] = alternateRoot,
+            ["value"] = "must not run"
+        }.ToJsonString();
+
+        var response = await server.HandleJsonLineAsync(
+            ToolCall("rekall.tools.execute", new JsonObject
+            {
+                ["name"] = target.Name,
+                ["arguments"] = encodedArguments
+            }),
+            CreateContext());
+
+        AssertScopeViolation(response);
+        Assert.Equal(0, gateway.InvocationCount);
+        Assert.Equal(0, target.InvocationCount);
+    }
+
+    [Fact]
+    public async Task ScopedServerDefaultsGatewayEncodedTargetRootBeforeGatewayHandlerRuns()
+    {
+        var selectedRoot = TestPaths.CreateTempDirectory();
+        var target = new ScopedMutationCommand("rekall.test.scoped-mutation");
+        var gateway = new GatewayMutationCommand();
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(target);
+        registry.Register(gateway);
+        var server = new RekallAgeMcpJsonRpcServer(registry, selectedRoot);
+
+        var response = await server.HandleJsonLineAsync(
+            ToolCall("rekall.tools.execute", new JsonObject
+            {
+                ["name"] = target.Name,
+                ["arguments"] = new JsonObject { ["value"] = "Prism Relay" }.ToJsonString()
+            }),
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        Assert.False(document.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.Equal(1, gateway.InvocationCount);
+        var forwarded = Assert.IsType<JsonObject>(gateway.LastArguments);
+        Assert.Equal(
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(selectedRoot)),
+            forwarded["projectRoot"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task UnscopedServerPreservesOrdinaryPrismRelayProjectRootUsage()
+    {
+        var prismRelayRoot = TestPaths.CreateTempDirectory();
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CreateProjectCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(
+            ToolCall("rekall.project.create", new JsonObject
+            {
+                ["projectRoot"] = prismRelayRoot,
+                ["name"] = "Prism Relay",
+                ["capabilities"] = new JsonArray("world")
+            }),
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        Assert.False(document.RootElement.GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.Equal(
+            "Prism Relay",
+            document.RootElement.GetProperty("result").GetProperty("structuredContent")
+                .GetProperty("value").GetProperty("manifest").GetProperty("name").GetString());
+        Assert.True(File.Exists(Path.Combine(prismRelayRoot, "rekall.project.json")));
+    }
+
     [Fact]
     public async Task ToolsCallReturnsJsonRpcErrorForUnknownTool()
     {
@@ -269,6 +403,28 @@ public sealed class McpJsonRpcServerTests
         var registry = new RekallAgeCommandRegistry();
         registry.Register(new EchoCommand());
         return new RekallAgeMcpJsonRpcServer(registry);
+    }
+
+    private static string ToolCall(string name, JsonObject arguments) => new JsonObject
+    {
+        ["jsonrpc"] = "2.0",
+        ["id"] = 50,
+        ["method"] = "tools/call",
+        ["params"] = new JsonObject
+        {
+            ["name"] = name,
+            ["arguments"] = arguments
+        }
+    }.ToJsonString();
+
+    private static void AssertScopeViolation(string? response)
+    {
+        using var document = JsonDocument.Parse(response!);
+        var result = document.RootElement.GetProperty("result");
+        Assert.True(result.GetProperty("isError").GetBoolean());
+        Assert.Equal(
+            "REKALL_AGENT_PROJECT_SCOPE_VIOLATION",
+            result.GetProperty("structuredContent").GetProperty("errors")[0].GetProperty("code").GetString());
     }
 
     private static RekallAgeCommandContext CreateContext()
@@ -325,6 +481,64 @@ public sealed class McpJsonRpcServerTests
                 new EchoResult(request.Message),
                 "Runtime assertion failed.",
                 [error]));
+        }
+    }
+
+    private sealed record ScopedMutationRequest(string ProjectRoot, string Value);
+
+    private sealed record ScopedMutationResult(string ProjectRoot, string Value);
+
+    private sealed class ScopedMutationCommand(string name) : IRekallAgeCommand<ScopedMutationRequest, ScopedMutationResult>
+    {
+        public int InvocationCount { get; private set; }
+
+        public string? LastProjectRoot { get; private set; }
+
+        public string Name => name;
+
+        public RekallAgeCommandSchema Schema => new(
+            Name,
+            "Records a project-scoped mutation for MCP scope tests.",
+            typeof(ScopedMutationRequest).FullName!,
+            typeof(ScopedMutationResult).FullName!);
+
+        public ValueTask<RekallAgeCommandResult<ScopedMutationResult>> ExecuteAsync(
+            ScopedMutationRequest request,
+            RekallAgeCommandContext context)
+        {
+            InvocationCount++;
+            LastProjectRoot = request.ProjectRoot;
+            return ValueTask.FromResult(RekallAgeCommandResult<ScopedMutationResult>.Success(
+                new ScopedMutationResult(request.ProjectRoot, request.Value)));
+        }
+    }
+
+    private sealed record GatewayMutationRequest(string Name, JsonNode? Arguments);
+
+    private sealed record GatewayMutationResult(string Name);
+
+    private sealed class GatewayMutationCommand : IRekallAgeCommand<GatewayMutationRequest, GatewayMutationResult>
+    {
+        public int InvocationCount { get; private set; }
+
+        public JsonNode? LastArguments { get; private set; }
+
+        public string Name => "rekall.tools.execute";
+
+        public RekallAgeCommandSchema Schema => new(
+            Name,
+            "Records a gateway invocation for MCP scope tests.",
+            typeof(GatewayMutationRequest).FullName!,
+            typeof(GatewayMutationResult).FullName!);
+
+        public ValueTask<RekallAgeCommandResult<GatewayMutationResult>> ExecuteAsync(
+            GatewayMutationRequest request,
+            RekallAgeCommandContext context)
+        {
+            InvocationCount++;
+            LastArguments = request.Arguments;
+            return ValueTask.FromResult(RekallAgeCommandResult<GatewayMutationResult>.Success(
+                new GatewayMutationResult(request.Name)));
         }
     }
 }

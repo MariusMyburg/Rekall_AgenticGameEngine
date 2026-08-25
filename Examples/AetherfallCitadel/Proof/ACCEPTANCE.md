@@ -57,7 +57,10 @@ This newer modeling/rendering tranche is still in progress and does not replace
 the accepted gameplay evidence above.
 
 - A persisted cubic Bézier curve resource now drives the broken entrance arch;
-  its graph and published mesh are checked for source/evaluated drift.
+  its graph and published mesh are checked for source/evaluated drift. The
+  graph now uses the generic uniform arc-length resample node at 48 path points
+  before its 16-sided profile sweep, producing an 8,752-point/12,532-face
+  beveled and weathered architectural mesh instead of a visibly segmented arc.
 - A real 1280x720 High-quality Vulkan capture on the NVIDIA GeForce RTX 5090
   exposed a generic renderer defect: native scene lighting discarded authored
   environment ambient values, while native post-processing ignored authored

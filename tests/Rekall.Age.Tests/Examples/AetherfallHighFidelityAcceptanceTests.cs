@@ -22,8 +22,10 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         Assert.Equal(RekallAgeCurveSplineKind.CubicBezier, spline.Kind);
         Assert.Equal(3, spline.ControlPoints.Count);
         var source = Assert.Single(graph.Nodes, node => node.TypeId == "rekall.modeling.curve.source");
+        var resample = Assert.Single(graph.Nodes, node => node.TypeId == "rekall.modeling.curve.resample");
         Assert.True(JsonNode.DeepEquals(source.Parameters["document"], JsonSerializer.SerializeToNode(curve, RekallAgeModelingJson.Options)));
-        Assert.Contains(graph.Links, link => link.FromPortId == "curve" && link.ToPortId == "curve");
+        Assert.Equal(48, resample.Parameters["count"]!.GetValue<int>());
+        Assert.Contains(graph.Links, link => link.FromNodeId == source.NodeId && link.ToNodeId == resample.NodeId);
 
         var evaluation = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
             graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default,
@@ -31,7 +33,7 @@ public sealed class AetherfallHighFidelityAcceptanceTests
 
         Assert.True(evaluation.Succeeded, string.Join(Environment.NewLine, evaluation.Diagnostics.Select(item => item.Message)));
         var mesh = evaluation.Outputs["mesh"];
-        Assert.True(mesh.Topology.PointIds.Count >= 4_000);
+        Assert.True(mesh.Topology.PointIds.Count >= 8_000);
         Assert.Contains(mesh.Attributes, item => item.Name == "curve.source.span");
         Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
     }

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall-broken-arch-model",
   "displayName": "Broken Processional Arch",
-  "revision": 5,
+  "revision": 6,
   "source": {
     "kind": "Mesh",
     "assetId": "aetherfall-broken-arch-mesh",
@@ -10,12 +10,12 @@
   },
   "buildState": 0,
   "lastSuccessfulBuild": {
-    "sourceFileRevision": "2c8af6171a35e9d6beed10110cf737ce5ce87d7c5ab1b841925b5cd7d206f2f1",
-    "sourceLogicalRevision": 5,
-    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-broken-arch-model/5121cec9f5e9f4ac8627707761fe01cdce3e531a98d1c2f18f84a92865612eae.age.compiled-mesh.json",
-    "compiledContentHash": "5121cec9f5e9f4ac8627707761fe01cdce3e531a98d1c2f18f84a92865612eae",
+    "sourceFileRevision": "153829a413b727919a8172d4f31bb12567654fbbe9f662bcfd05003e815f2908",
+    "sourceLogicalRevision": 6,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-broken-arch-model/7b0a24c2ddbda10ed5cf290568e2b205c972ff3071f03fc76651760f544e4c2b.age.compiled-mesh.json",
+    "compiledContentHash": "7b0a24c2ddbda10ed5cf290568e2b205c972ff3071f03fc76651760f544e4c2b",
     "compilerVersion": "rekall-age-model-compiler-v1",
-    "builtAtUtc": "2026-08-25T21:41:55.6386882+00:00",
+    "builtAtUtc": "2026-08-25T22:13:38.7132146+00:00",
     "diagnostics": []
   },
   "frozen": false

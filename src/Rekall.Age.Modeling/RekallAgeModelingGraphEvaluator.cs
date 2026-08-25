@@ -177,7 +177,8 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             "rekall.modeling.primitive.cone" => new(CreateCone(graph, node)),
             "rekall.modeling.primitive.ico_sphere" => new(CreateIcoSphere(graph, node)),
             "rekall.modeling.primitive.capsule" => new(CreateCapsule(graph, node)),
-            "rekall.modeling.curve.profile_sweep" => new(CreateProfileSweep(graph, node)),
+            "rekall.modeling.curve.source" => new(Curve: CreateCurveSource(node)),
+            "rekall.modeling.curve.profile_sweep" => new(CreateProfileSweep(graph, node, incoming, values)),
             "rekall.modeling.transform" => TransformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.deform.noise" => NoiseDeformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.scatter.area" => ScatterAreaGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
@@ -1083,7 +1084,8 @@ public sealed partial class RekallAgeModelingGraphEvaluator
     private sealed record NodeValue(
         RekallAgeMeshAsset? Mesh = null,
         IReadOnlyList<double>? Scalars = null,
-        string? MaterialAssetId = null);
+        string? MaterialAssetId = null,
+        RekallAgeEvaluatedCurve? Curve = null);
 
     private sealed class EvaluationException : Exception
     {

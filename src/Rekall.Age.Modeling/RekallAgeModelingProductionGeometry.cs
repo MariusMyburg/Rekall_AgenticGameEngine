@@ -93,9 +93,51 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         int Ring(int ring, int segment) => 1 + ring * segments + segment;
     }
 
-    private static RekallAgeMeshAsset CreateProfileSweep(RekallAgeModelingGraphAsset graph, RekallAgeModelingGraphNode node)
+    private static RekallAgeEvaluatedCurve CreateCurveSource(RekallAgeModelingGraphNode node)
     {
-        var path = ReadPointArray(node, "pathPoints", minimum: 2);
+        if (node.Parameters["document"] is not JsonObject document)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Curve source requires a versioned object-valued 'document'.", node.NodeId);
+        RekallAgeCurveAsset? curve;
+        try { curve = document.Deserialize<RekallAgeCurveAsset>(RekallAgeModelingJson.Options); }
+        catch (JsonException error) { throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", $"Curve document could not be read: {error.Message}", node.NodeId); }
+        if (curve is null) throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Curve document is empty.", node.NodeId);
+        try { return new RekallAgeCurveEvaluator().Evaluate(curve, ReadInteger(node, "resolution", 8, 1, 4096)); }
+        catch (Exception error) when (error is InvalidDataException or ArgumentOutOfRangeException)
+        {
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_CURVE_INVALID", error.Message, node.NodeId);
+        }
+    }
+
+    private static RekallAgeMeshAsset CreateProfileSweep(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        IReadOnlyList<RekallAgeModelingGraphLink> incoming,
+        IReadOnlyDictionary<string, NodeValue> values)
+    {
+        var curveLink = incoming.SingleOrDefault(link => link.ToPortId == "curve");
+        RekallAgeEvaluatedCurveSpline evaluatedSpline;
+        if (curveLink is not null)
+        {
+            var curve = values[curveLink.FromNodeId].Curve
+                ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", "Profile sweep curve input did not evaluate to a curve.", node.NodeId);
+            if (curve.Splines.Count != 1)
+                throw new EvaluationException("REKALL_MODELING_EVALUATION_CURVE_SPLINE_COUNT_UNSUPPORTED", "Profile sweep currently accepts exactly one evaluated spline per node; use one sweep node per spline and join the results.", node.NodeId);
+            evaluatedSpline = curve.Splines[0];
+        }
+        else
+        {
+            var legacy = ReadPointArray(node, "pathPoints", minimum: 2);
+            var points = legacy.Select((point, index) =>
+            {
+                var before = legacy[Math.Max(0, index - 1)]; var after = legacy[Math.Min(legacy.Count - 1, index + 1)];
+                var delta = new RekallAgeGeometryVector3(after.X - before.X, after.Y - before.Y, after.Z - before.Z);
+                var length = Math.Sqrt(delta.X * delta.X + delta.Y * delta.Y + delta.Z * delta.Z);
+                if (length <= 1e-12) throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Profile sweep path contains coincident spans.", node.NodeId);
+                return new RekallAgeEvaluatedCurvePoint(point, new(delta.X / length, delta.Y / length, delta.Z / length), 1, 0, 0, (ulong)(index + 1), (ulong)(index + 1), 0);
+            }).ToArray();
+            evaluatedSpline = new(0, false, points);
+        }
+        var path = evaluatedSpline.Points;
         var profileKind = ReadString(node, "profile", "circle").ToLowerInvariant();
         var profileSegments = ReadInteger(node, "profileSegments", 8, profileKind == "rectangle" ? 4 : 3, 4096);
         var radius = ReadPositive(node, "radius", 0.25);
@@ -112,28 +154,39 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         Vector3? previousNormal = null;
         for (var ring = 0; ring < path.Count; ring++)
         {
-            var point = ToVector(path[ring]);
-            var tangent = Vector3.Normalize(ToVector(path[Math.Min(path.Count - 1, ring + 1)]) - ToVector(path[Math.Max(0, ring - 1)]));
+            var pathPoint = path[ring];
+            var point = ToVector(pathPoint.Position);
+            var tangent = ToVector(pathPoint.Tangent);
             if (!Finite(tangent)) throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Profile sweep path contains coincident spans.", node.NodeId);
             var normal = previousNormal is null ? InitialNormal(tangent) : Vector3.Normalize(previousNormal.Value - tangent * Vector3.Dot(previousNormal.Value, tangent));
             if (!Finite(normal)) normal = InitialNormal(tangent);
             var binormal = Vector3.Normalize(Vector3.Cross(tangent, normal));
+            var cosine = (float)Math.Cos(pathPoint.TiltRadians); var sine = (float)Math.Sin(pathPoint.TiltRadians);
+            var tiltedNormal = normal * cosine + binormal * sine;
+            var tiltedBinormal = -normal * sine + binormal * cosine;
             previousNormal = normal;
             foreach (var sample in profile)
             {
-                var value = point + normal * sample.X + binormal * sample.Y;
+                var value = point + tiltedNormal * sample.X * (float)pathPoint.Radius + tiltedBinormal * sample.Y * (float)pathPoint.Radius;
                 positions.Add(new(value.X, value.Y, value.Z));
             }
         }
-        var faces = new List<int[]>((path.Count - 1) * profileSegments + 2);
-        for (var ring = 0; ring < path.Count - 1; ring++) for (var p = 0; p < profileSegments; p++) faces.Add([Point(ring, p), Point(ring + 1, p), Point(ring + 1, (p + 1) % profileSegments), Point(ring, (p + 1) % profileSegments)]);
-        if (ReadBoolean(node, "capStart", true)) faces.Add(Enumerable.Range(0, profileSegments).Reverse().Select(p => Point(0, p)).ToArray());
-        if (ReadBoolean(node, "capEnd", true)) faces.Add(Enumerable.Range(0, profileSegments).Select(p => Point(path.Count - 1, p)).ToArray());
-        var mesh = BuildMesh(graph, node, positions, faces, createUvs: true);
+        var spanCount = evaluatedSpline.Cyclic ? path.Count : path.Count - 1;
+        var faces = new List<int[]>(spanCount * profileSegments + 2);
+        for (var ring = 0; ring < spanCount; ring++) for (var p = 0; p < profileSegments; p++) { var nextRing = (ring + 1) % path.Count; faces.Add([Point(ring, p), Point(nextRing, p), Point(nextRing, (p + 1) % profileSegments), Point(ring, (p + 1) % profileSegments)]); }
+        if (!evaluatedSpline.Cyclic && ReadBoolean(node, "capStart", true)) faces.Add(Enumerable.Range(0, profileSegments).Reverse().Select(p => Point(0, p)).ToArray());
+        if (!evaluatedSpline.Cyclic && ReadBoolean(node, "capEnd", true)) faces.Add(Enumerable.Range(0, profileSegments).Select(p => Point(path.Count - 1, p)).ToArray());
+        var mesh = BuildMesh(graph, node, positions, faces);
+        var uvValues = mesh.Topology.CornerPointIndices.Select(pointIndex =>
+        {
+            var ring = pointIndex / profileSegments; var profileIndex = pointIndex % profileSegments;
+            return JsonSerializer.SerializeToElement(new[] { profileIndex / (double)profileSegments, ring / (double)Math.Max(1, path.Count - (evaluatedSpline.Cyclic ? 0 : 1)) });
+        }).ToArray();
+        var spans = path.SelectMany(point => Enumerable.Repeat(JsonSerializer.SerializeToElement($"{point.SourceSplineId}:{point.SourceStartControlPointId}:{point.SourceEndControlPointId}:{point.SegmentT:R}"), profileSegments)).ToArray();
         var materialId = ReadString(node, "materialAssetId", "material.default");
         var slotName = ReadString(node, "slotName", "Sweep");
         var materialValues = Enumerable.Range(0, mesh.Topology.FaceIds.Count).Select(_ => JsonSerializer.SerializeToElement(0)).ToArray();
-        return mesh with { MaterialSlots = [new(slotName, materialId)], Attributes = mesh.Attributes.Append(new("material.index", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Int32, materialValues, "material-index", RekallAgeGeometryInterpolation.Nearest, JsonSerializer.SerializeToElement(0))).ToArray() };
+        return mesh with { MaterialSlots = [new(slotName, materialId)], Attributes = [new("uv.generated", RekallAgeGeometryDomain.Corner, RekallAgeGeometryValueType.Float2, uvValues, "texcoord-0"), new("curve.source.span", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.String, spans, "curve-source-span", RekallAgeGeometryInterpolation.Nearest), new("material.index", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Int32, materialValues, "material-index", RekallAgeGeometryInterpolation.Nearest, JsonSerializer.SerializeToElement(0))] };
         int Point(int ring, int profileIndex) => ring * profileSegments + profileIndex;
     }
 

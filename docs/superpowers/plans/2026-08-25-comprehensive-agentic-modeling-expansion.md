@@ -220,7 +220,12 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   parallel-transport frames without flips, radius/tilt interpolation, curve
   resampling, and closed profile sweep with UV/material output.
 
-- [ ] **Step 2: Implement curve source/evaluation**
+  Current tranche proves document round-trip, stable-ID validation, cubic
+  Bezier sampling, cyclic seam closure, radius/tilt interpolation, persisted
+  resources, graph transport, sweep UV/material output, and source-span facts.
+  Resample/reverse/trim/fillet/join coverage remains.
+
+- [x] **Step 2: Implement curve source/evaluation**
 
   Keep source control data distinct from sampled evaluated points. Cache by
   curve revision, spline parameters, requested resolution, and dependencies.

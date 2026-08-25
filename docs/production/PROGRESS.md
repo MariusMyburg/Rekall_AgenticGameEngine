@@ -4,10 +4,10 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 13:54 Africa/Johannesburg
+Last verified: 2026-08-25 02:06 Africa/Johannesburg
 
-Branch: `codex/model-asset-games` (based exactly on `1c269fe`, which merged
-`codex/web-scene-bootstrap` into `master`)
+Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
+commit `01f48ff`)
 
 Current execution order is governed by
 [`STRATEGIC-PRIORITIES.md`](STRATEGIC-PRIORITIES.md). The immediate acceptance
@@ -5338,6 +5338,40 @@ rejects traversal and reparse-point game roots, and publishes self-contained.
 Final Release verification passed 1,688/1,688 engine tests and 55/55 Studio
 tests, and independent reviews report no remaining Critical or Important
 findings.
+
+## 2026-08-25 Windows AppContainer module-host gate restored
+
+The high-fidelity branch's renderer Task 6 gate exposed exactly eight failures
+in `ModuleHostWindowsIsolationTests`. Phase 1 evidence showed that native
+containment was already established correctly: the staged executable and load
+plan existed, the profile had zero capabilities, the process was assigned to a
+kill-on-close job with an active-process limit of one and a 512 MiB memory
+limit, and the broker successfully wrote the first typed request. The worker
+then exited with CLR code `0xE0434352`; bounded stderr identified a
+`FileNotFoundException` for `Rekall.Age.Rendering.Abstractions` while the source-
+generated JSON context was resolving `host.initialize`. Because no response
+frame was written, the broker observed a truncated frame/transport EOF.
+
+The complete-output executable path passed the same finite initialize/shutdown
+protocol. A new staged-but-uncontained regression then reproduced the EOF,
+isolating the defect to the manifest-backed payload inventory rather than
+AppContainer, job assignment, stdio inheritance, protocol framing, or timing.
+Commit `bf292d2` had added the rendering-contract project as a worker runtime
+dependency without adding its assembly to the real isolation fixture's exact
+host-payload allowlist. The repair adds that one dependency to the verified
+manifest inventory. The stager still checks and copies exact size/SHA-256
+entries; no capability, ACL, handle, timeout, retry, protocol, or unrestricted
+fallback changed.
+
+The independent regression passed 1/1 after its witnessed RED. The complete
+Windows isolation class passed 9/9, followed by ten consecutive passes (90/90)
+with zero worker processes and zero staged `session-*` trees remaining. The
+broader module selection passed 185/185. The complete engine project passed
+1,813/1,813 with zero failures or skips and again left no worker/session
+residue. No Studio code was affected; an additional isolation run passed all 35
+non-ViewModel Studio tests and separately captured the pre-existing long-running
+`HeadlessAutomationCreatesProjectAndCompletesAgentGauntlet` case at the test
+runner's five-minute hang boundary.
 
 ## Evidence index
 

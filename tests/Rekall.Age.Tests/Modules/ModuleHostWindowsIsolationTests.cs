@@ -246,6 +246,51 @@ public sealed class ModuleHostWindowsIsolationTests
     }
 
     [Fact]
+    public async Task StagedWorkerPayloadCompletesFiniteProtocolBeforeContainment()
+    {
+        Assert.True(OperatingSystem.IsWindows());
+        var projectRoot = await CreateModuleAsync();
+        var hostRoot = await CreateRealHostPayloadAsync();
+        await using var staged = await new RekallAgeModuleHostStager(TestPaths.CreateTempDirectory()).StageAsync(
+            projectRoot,
+            hostRoot,
+            CancellationToken.None);
+        using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(staged.HostExecutablePath)
+        {
+            WorkingDirectory = staged.Root,
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        })!;
+        var codec = new RekallAgeModuleHostFrameCodec();
+        await codec.WriteAsync(
+            process.StandardInput.BaseStream,
+            RekallAgeModuleHostEnvelope.Request(
+                1,
+                RekallAgeModuleHostOperations.Initialize,
+                new RekallAgeModuleHostInitializeRequest(staged.LoadPlanPath)),
+            CancellationToken.None);
+        await codec.WriteAsync(
+            process.StandardInput.BaseStream,
+            RekallAgeModuleHostEnvelope.Request(2, RekallAgeModuleHostOperations.Shutdown, new { }),
+            CancellationToken.None);
+        process.StandardInput.Close();
+
+        var initialize = await codec.ReadAsync(process.StandardOutput.BaseStream, CancellationToken.None);
+        var shutdown = await codec.ReadAsync(process.StandardOutput.BaseStream, CancellationToken.None);
+        using var exitTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await process.WaitForExitAsync(exitTimeout.Token);
+        var standardError = await process.StandardError.ReadToEndAsync(exitTimeout.Token);
+
+        Assert.True(initialize.Ok, initialize.Error?.Message);
+        Assert.True(shutdown.Ok, shutdown.Error?.Message);
+        Assert.Equal(0, process.ExitCode);
+        Assert.Equal(string.Empty, standardError);
+    }
+
+    [Fact]
     public async Task NoCapabilityAppContainerWorkerCompletesFiniteProtocolInsideKillOnCloseJob()
     {
         Assert.True(OperatingSystem.IsWindows());
@@ -376,6 +421,7 @@ public sealed class ModuleHostWindowsIsolationTests
             "Rekall.Age.ModuleHost.runtimeconfig.json",
             "Rekall.Age.Modules.dll",
             "Rekall.Age.Core.dll",
+            "Rekall.Age.Rendering.Abstractions.dll",
             "Rekall.Age.Runtime.Abstractions.dll",
             "Rekall.Age.World.dll"
         };

@@ -386,6 +386,72 @@ git commit -m "feat: render scalable atmospheric fog volumes"
 
 ---
 
+### Task 5A: Windows AppContainer Module-Host Zero-Failure Gate
+
+**Files:**
+- Modify: `tests/Rekall.Age.Tests/Modules/ModuleHostWindowsIsolationTests.cs`
+- Modify: `docs/production/PROGRESS.md`
+- Modify: `docs/superpowers/plans/2026-08-24-high-fidelity-forward-plus-foundation.md`
+
+**Root cause and invariant:**
+- Commit `bf292d2` made `Rekall.Age.Rendering.Abstractions.dll` a declared worker
+  runtime dependency, but the Windows isolation fixture's manifest-backed real
+  host payload retained its earlier eight-file allowlist. The stager correctly
+  copied only that verified inventory, so the CLR terminated the worker with
+  `0xE0434352` and a `FileNotFoundException` before `host.initialize` could
+  write a response; the broker's truncated-frame/`EndOfStreamException` was
+  downstream evidence, not a codec or AppContainer defect.
+- A real restricted-worker payload must contain every runtime assembly required
+  by the worker's dependency graph, and every file must still cross the
+  boundary only through the existing size/SHA-256 verified manifest and
+  immutable stager. Do not compensate with broader ACLs/capabilities,
+  unrestricted fallback, retries, relaxed timeouts, or protocol changes.
+
+- [x] **Phase 1:** reproduce all 8/8 failures and capture launch, stage, profile,
+  job, exit, stderr, stdio, and protocol evidence. Native launch completed with
+  zero capabilities, a one-process/512 MiB kill-on-close job, and present staged
+  inputs; the worker exited `0xE0434352` with bounded stderr naming the omitted
+  rendering-contract assembly before its first response frame.
+- [x] **Pattern/hypothesis:** compare the complete-output executable path, which
+  passed finite typed initialize/shutdown with exit 0 and empty stderr, against
+  the staged path. A staged-but-uncontained worker reproduced the same EOF,
+  proving the inventory boundary independently of AppContainer.
+- [x] **RED/GREEN:** add
+  `StagedWorkerPayloadCompletesFiniteProtocolBeforeContainment`; witness its
+  truncated-frame RED, add only `Rekall.Age.Rendering.Abstractions.dll` to the
+  exact manifest fixture, then witness 1/1 GREEN.
+- [x] **Security and race gate:** run the complete 9-test Windows isolation class
+  once and then ten consecutive times (90/90). Secret scrubbing, unstaged
+  read/write denial, child/network denial, bounded 64 KiB stderr, typed framing,
+  request timeout/crash classification, no-capability profile, and job limits
+  all remained effective. Dedicated roots ended with zero module-host processes
+  and zero `session-*` trees.
+- [x] **Repository gate:** `FullyQualifiedName~Module` passed 185/185 and the
+  complete `Rekall.Age.Tests` project passed 1,813/1,813 with zero failures or
+  skips; both post-run checks found zero module-host processes/session trees.
+  No Studio code or test fixture was affected. An additional Studio isolation
+  check passed all 35 non-ViewModel tests and identified the unrelated existing
+  long-running `HeadlessAutomationCreatesProjectAndCompletesAgentGauntlet` case
+  with the test runner's five-minute hang evidence.
+
+**Architecture decision:** retain the existing no-capability AppContainer,
+explicit three-handle inheritance, immutable verified staging, typed framed
+protocol, and kill-on-close job unchanged. The repair belongs at the payload
+inventory source that omitted a declared dependency.
+
+**Verification commands:**
+
+```powershell
+dotnet build src/Rekall.Age.ModuleHost/Rekall.Age.ModuleHost.csproj -c Debug --no-restore
+dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Debug --no-build --filter "FullyQualifiedName~ModuleHostWindowsIsolationTests"
+1..10 | ForEach-Object { dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Debug --no-build --filter "FullyQualifiedName~ModuleHostWindowsIsolationTests" }
+dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Debug --no-build --filter "FullyQualifiedName~Module"
+dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Debug --no-build
+dotnet build Rekall.AGE.sln -c Debug --no-restore
+```
+
+---
+
 ### Task 6: Generic GPU Particle Emitters
 
 **Files:**

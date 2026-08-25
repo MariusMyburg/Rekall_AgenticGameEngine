@@ -53,7 +53,7 @@ public sealed class RekallAgeModelingNodeCatalog
         Primitive("rekall.modeling.primitive.capsule", "Capsule", [Number("radius", "Radius", 0.5, 0.0001, 1_000_000, "world-unit"), Number("depth", "Total Depth", 2, 0.0001, 1_000_000, "world-unit"), Integer("segments", "Segments", 16, 3, 4_096), Integer("hemisphereRings", "Hemisphere Rings", 4, 2, 1_024)]),
         Node("rekall.modeling.curve.source", "Curve Resource", "Evaluates a versioned poly or cubic-Bezier curve document with stable spline/control-point IDs, radius, tilt, and provenance.",
             [Output("curve", RekallAgeModelingValueType.Curve)],
-            [Text("document", "Curve Document", "{}"), Integer("resolution", "Resolution Per Segment", 8, 1, 4096)]),
+            [Structured("document", "Curve Document", new JsonObject()), Integer("resolution", "Resolution Per Segment", 8, 1, 4096)]),
         Node("rekall.modeling.curve.line", "Curve Line", "Builds a straight evaluated curve with deterministic source IDs and independently authored endpoint radius and tilt.",
             [Output("curve", RekallAgeModelingValueType.Curve)],
             [Vector3("start", "Start"), Vector3("end", "End", defaultValue: 1), Number("startRadius", "Start Radius", 1, 0.0001, 1_000_000), Number("endRadius", "End Radius", 1, 0.0001, 1_000_000), Number("startTilt", "Start Tilt", 0, -1_000_000, 1_000_000, "radian"), Number("endTilt", "End Tilt", 0, -1_000_000, 1_000_000, "radian")]),
@@ -247,6 +247,10 @@ public sealed class RekallAgeModelingNodeCatalog
     private static RekallAgeModelingParameterDescriptor Text(
         string id, string name, string value, IReadOnlyList<string>? choices = null) =>
         new(id, name, RekallAgeModelingValueType.String, JsonValue.Create(value), EnumChoices: choices);
+
+    private static RekallAgeModelingParameterDescriptor Structured(
+        string id, string name, JsonNode value) =>
+        new(id, name, RekallAgeModelingValueType.Json, value);
 
     private static string Identity(RekallAgeModelingNodeDescriptor descriptor) =>
         Identity(descriptor.TypeId, descriptor.TypeVersion);

@@ -16,7 +16,8 @@ public enum RekallAgeModelingValueType
     Vector4,
     String,
     Material,
-    Curve
+    Curve,
+    Json
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<RekallAgeModelingPortDirection>))]

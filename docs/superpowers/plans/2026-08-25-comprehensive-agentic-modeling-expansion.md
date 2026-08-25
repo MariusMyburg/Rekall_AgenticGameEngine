@@ -408,6 +408,12 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   samples, and logical/file revision advancement. Studio curve-resource
   creation and the complete all-descriptor editor matrix remain.
 
+  2026-08-26 Studio tranche: modeling descriptors now include an explicit
+  structured-JSON value type. The curve-source document editor parses and
+  returns JSON objects/arrays instead of converting documents into quoted
+  strings, rejects malformed input, and preserves edited curve resources
+  through the generic parameter surface. Focused Studio session tests pass.
+
 - [ ] **Step 2: Add generic selection and inspection commands**
 
   Implement grow/shrink/loop/ring/island/material/sharp/seam queries and named

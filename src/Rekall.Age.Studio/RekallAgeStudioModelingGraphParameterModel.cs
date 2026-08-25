@@ -79,6 +79,8 @@ public sealed class RekallAgeStudioModelingGraphParameterModel : INotifyProperty
                 return TryParseVector(3, out value);
             case RekallAgeModelingValueType.Vector4:
                 return TryParseVector(4, out value);
+            case RekallAgeModelingValueType.Json:
+                return TryParseJson(out value);
             default:
                 return false;
         }
@@ -105,6 +107,20 @@ public sealed class RekallAgeStudioModelingGraphParameterModel : INotifyProperty
             }
             value = result;
             return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private bool TryParseJson(out JsonNode? value)
+    {
+        value = null;
+        try
+        {
+            value = JsonNode.Parse(ValueText);
+            return value is JsonObject or JsonArray;
         }
         catch (JsonException)
         {

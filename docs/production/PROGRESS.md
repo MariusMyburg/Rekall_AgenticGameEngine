@@ -5339,7 +5339,7 @@ Final Release verification passed 1,688/1,688 engine tests and 55/55 Studio
 tests, and independent reviews report no remaining Critical or Important
 findings.
 
-## 2026-08-25 Windows AppContainer engine gate restored; repository gate open
+## 2026-08-25 Windows AppContainer and Studio repository gates restored
 
 The high-fidelity branch's renderer Task 6 gate exposed exactly eight failures
 in `ModuleHostWindowsIsolationTests`. Phase 1 evidence showed that native
@@ -5384,21 +5384,43 @@ engine project passed its new total of 1,814/1,814 with zero failures or skips.
 This strengthens the completed engine gate but does not change the open Studio
 status below.
 
-Overall repository/Studio verification remains OPEN and blocks renderer Task 6
-and final delivery. No Studio code was affected by the AppContainer fixture
-repair, but the complete Studio project did not return after 31:06 of sustained
-CPU. Isolation passed all 35 non-ViewModel Studio tests, then a five-minute
-per-test blame run passed 10 ViewModel tests and captured
-`HeadlessAutomationCreatesProjectAndCompletesAgentGauntlet` as incomplete.
-Evidence is retained at
+The Studio follow-up is now complete. Its initial 30-second exact reproduction
+again recorded
+`HeadlessAutomationCreatesProjectAndCompletesAgentGauntlet` as incomplete, and
+a bounded three-turn diagnostic exposed the repeated boundary: engine discovery
+passed, then two consecutive `rekall.workflow.agent_authoring_gauntlet` calls
+failed `package-created` because module build found no module projects. Studio
+had created a valid but zero-entity scene; the gauntlet used scene-file
+existence as its preservation test, mislabeled that empty scene as authored,
+and skipped the blueprint plus agent-owned playable module. With no requested
+turn limit, the deterministic model repeated the failed terminal tool while the
+agent ledger and transcript continued to grow. The earlier 31:06 and five-minute
+evidence remains retained at
 `.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-5a-evidence/task-5a-studio-viewmodel-isolation.trx`
 and
 `.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-5a-evidence/35827907-8866-4a94-b4c7-9a394a02628f/Sequence_a2412baa567843ee99ae5a061543f113.xml`;
 the adjacent dump is
 `testhost_57332_20260825T020605_hangdump.dmp`.
-That headless-gauntlet path requires its own root-cause RED/GREEN repair and an
-actual complete Studio zero-failure result before the repository gate can be
-closed.
+
+The fixed invariant is content-based and preserves the data-loss guarantee: a
+loaded scene with authored entities is never replaced, while an existing empty
+editor scene receives the same generic blueprint, agent-owned playable module,
+deterministic assertions, package, audit, and proof capture as a fresh scene.
+`GauntletAuthorsAnExistingEmptyEditorSceneBeforePackaging` witnessed the root
+cause RED in 83 ms with `REKALL_MODULE_PROJECTS_MISSING`, then passed the real
+end-to-end gauntlet in 8 seconds. The full four-test gauntlet class passed 4/4
+in 26.5 seconds, and the original unmodified Studio automation passed three
+consecutive runs at 9 seconds each.
+
+Final verification is zero-failure: the complete Studio project passed 65/65
+in 46.6 seconds; the complete engine project passed its new total of
+1,815/1,815 in 4 minutes 6 seconds with zero skips; and `Rekall.AGE.sln` built
+in 5.47 seconds with zero warnings and zero errors. The exact Studio and engine
+TRX files are retained under
+`.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-5b-evidence/`.
+Post-run checks found zero Rekall test/worker/player processes, zero staged
+`session-*` trees in the current engine roots, and zero current-run Studio
+automation roots. Task 5B is complete and Task 6/final delivery are unblocked.
 
 ## Evidence index
 

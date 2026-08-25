@@ -463,10 +463,9 @@ dotnet build Rekall.AGE.sln -c Debug --no-restore
 
 ---
 
-### Task 5B: Studio Headless-Gauntlet Verification Follow-up — BLOCKING
+### Task 5B: Studio Headless-Gauntlet Verification Follow-up — COMPLETE
 
-**Status:** OPEN. Do not begin Task 6 or claim complete repository verification
-until this follow-up is green.
+**Status:** COMPLETE. Task 6 and final repository delivery are unblocked.
 
 **Observed evidence:**
 - The complete Studio project remained CPU-active for 31:06 without returning a
@@ -482,19 +481,39 @@ until this follow-up is green.
   `.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-5a-evidence/35827907-8866-4a94-b4c7-9a394a02628f/Sequence_a2412baa567843ee99ae5a061543f113.xml`,
   and the adjacent `testhost_57332_20260825T020605_hangdump.dmp`.
 
-- [ ] Apply systematic debugging to the headless gauntlet's CPU-active path and
+- [x] Apply systematic debugging to the headless gauntlet's CPU-active path and
   identify the first non-progressing boundary.
-- [ ] Add a witnessed RED regression for that root cause and implement one fix
+- [x] Add a witnessed RED regression for that root cause and implement one fix
   without weakening the gauntlet or hiding it behind a retry/skip.
-- [ ] Run the complete Studio project to an actual zero-failure result.
-- [ ] Reconfirm the complete engine project, update the tracked verification
+- [x] Run the complete Studio project to an actual zero-failure result.
+- [x] Reconfirm the complete engine project, update the tracked verification
   evidence, and only then unblock Task 6/final delivery.
+
+**Resolution:** Studio project creation persisted an intentionally empty scene,
+but the gauntlet treated scene-file existence as proof of authored content. It
+therefore skipped both generic blueprint and agent-owned playable-module
+authoring, failed `package-created` at module build with
+`REKALL_MODULE_PROJECTS_MISSING`, and the no-limit deterministic agent repeated
+the failed terminal workflow indefinitely. The gauntlet now preserves a scene
+only when the loaded document has authored entities; an existing empty editor
+scene follows the same complete author/build/package/audit path as a newly
+created scene. Authored non-empty scenes remain preserved.
+
+The focused empty-editor-scene regression had a witnessed 83 ms RED and passed
+in 8 seconds after the one-line invariant repair. All four gauntlet tests passed
+4/4 in 26.5 seconds. The original unmodified Studio case passed three
+consecutive runs in 9 seconds each. The complete Studio project passed 65/65 in
+46.6 seconds, the complete engine project passed its new total of 1,815/1,815
+in 4 minutes 6 seconds, and the complete solution built with zero warnings and
+zero errors in 5.47 seconds. Post-run checks found zero Rekall test/worker/player
+processes, zero staged `session-*` trees in the current engine roots, and zero
+current-run Studio automation roots.
 
 ---
 
 ### Task 6: Generic GPU Particle Emitters
 
-**Blocked by:** open Task 5B Studio headless-gauntlet verification.
+**Unblocked by:** completed Task 5B Studio headless-gauntlet verification.
 
 **Files:**
 - Create: `src/Rekall.Age.Rendering/RekallAgeVulkanParticlePlanner.cs`

@@ -97,7 +97,8 @@ public sealed class RunAgentAuthoringGauntletCommand
             return Failure(request with { ProjectRoot = projectRoot, SceneName = sceneName }, checks, null, null, scene.Summary, scene.Errors);
         }
 
-        if (sceneAlreadyExists)
+        var sceneHasAuthoredEntities = sceneAlreadyExists && scene.Value.Scene.Entities.Count > 0;
+        if (sceneHasAuthoredEntities)
         {
             checks.Add(new RekallAgeAgentAuthoringGauntletCheck(
                 "scene-preserved",
@@ -140,8 +141,8 @@ public sealed class RunAgentAuthoringGauntletCommand
                 sceneName,
                 outputDirectory,
                 Frames: 2,
-                Inputs: sceneAlreadyExists ? null : [new RekallAgePlaybackInput(1, PrimaryAction: true)],
-                Assertions: sceneAlreadyExists
+                Inputs: sceneHasAuthoredEntities ? null : [new RekallAgePlaybackInput(1, PrimaryAction: true)],
+                Assertions: sceneHasAuthoredEntities
                     ? null
                     :
                     [

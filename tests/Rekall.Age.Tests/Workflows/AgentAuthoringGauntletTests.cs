@@ -11,6 +11,39 @@ namespace Rekall.Age.Tests.Workflows;
 public sealed class AgentAuthoringGauntletTests
 {
     [Fact]
+    public async Task GauntletAuthorsAnExistingEmptyEditorSceneBeforePackaging()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Editor Project", ["world", "rendering2d"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"]),
+            CancellationToken.None);
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("existing empty editor scene gauntlet"),
+            CancellationToken.None);
+
+        var result = await new RunAgentAuthoringGauntletCommand().ExecuteAsync(
+            new RunAgentAuthoringGauntletRequest(root, "Editor Project", "Main", Path.Combine(root, "Package")),
+            context);
+
+        Assert.True(result.Ok, result.Summary + Environment.NewLine + string.Join(
+            Environment.NewLine,
+            result.Errors.Select(error => $"{error.Code}: {error.Message}")));
+        Assert.True(result.Value.Ready);
+        Assert.Contains(result.Value.Checks, check => check is { Name: "scene-blueprint-authored", Passed: true });
+        Assert.DoesNotContain(result.Value.Checks, check => check.Name == "scene-preserved");
+        var authored = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+        Assert.Contains(authored.Entities, entity => entity.Name == "Agent Authored Marker");
+        Assert.NotNull(result.Value.Package);
+        Assert.NotNull(result.Value.Audit);
+    }
+
+    [Fact]
     public async Task GauntletPackagesExistingThreeDimensionalGameWithoutReplacingAuthoredScene()
     {
         var root = TestPaths.CreateTempDirectory();

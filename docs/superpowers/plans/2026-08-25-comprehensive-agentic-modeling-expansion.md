@@ -224,8 +224,10 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   Bezier sampling, cyclic seam closure, radius/tilt interpolation, persisted
   resources, graph transport, sweep UV/material output, and source-span facts.
   The Aetherfall broken processional arch now consumes this contract through a
-  persisted Bezier resource and published model. Resample/reverse/trim/fillet/
-  join coverage remains.
+  persisted Bezier resource and published model. Deterministic line/circle
+  builders plus typed reverse and uniform arc-length resample graph operations
+  are now implemented with radius, tilt, and source-span preservation. Trim,
+  fillet, and join coverage remains.
 
 - [x] **Step 2: Implement curve source/evaluation**
 

@@ -8,6 +8,68 @@ namespace Rekall.Age.Tests.Modeling;
 public sealed class CurveAuthoringTests
 {
     [Fact]
+    public void LineAndCircleBuildersProduceDeterministicOpenAndCyclicCurves()
+    {
+        var operations = new RekallAgeCurveOperations();
+
+        var line = Assert.Single(operations.Line(new(0, 0, 0), new(0, 3, 0), 0.5, 1.5).Splines);
+        var circle = Assert.Single(operations.Circle(new(2, 3, 4), 2, 8, "xz").Splines);
+
+        Assert.False(line.Cyclic);
+        Assert.Equal(2, line.Points.Count);
+        Assert.Equal(0.5, line.Points[0].Radius);
+        Assert.Equal(1.5, line.Points[1].Radius);
+        Assert.True(circle.Cyclic);
+        Assert.Equal(8, circle.Points.Count);
+        Assert.Equal(new RekallAgeGeometryVector3(4, 3, 4), circle.Points[0].Position);
+        Assert.All(circle.Points, point => Assert.Equal(2, Distance(point.Position, new(2, 3, 4)), 8));
+    }
+
+    [Fact]
+    public void ReverseAndArcLengthResamplePreserveShapeRadiusTiltAndProvenance()
+    {
+        var operations = new RekallAgeCurveOperations();
+        var source = operations.Line(new(0, 0, 0), new(0, 4, 0), 1, 2, 0, Math.PI);
+
+        var resampled = Assert.Single(operations.Resample(source, 5).Splines);
+        var reversed = Assert.Single(operations.Reverse(new([resampled])).Splines);
+
+        Assert.Equal([0d, 1d, 2d, 3d, 4d], resampled.Points.Select(point => point.Position.Y));
+        Assert.Equal(1.5, resampled.Points[2].Radius, 8);
+        Assert.Equal(Math.PI / 2, resampled.Points[2].TiltRadians, 8);
+        Assert.Equal(resampled.Points[^1].Position, reversed.Points[0].Position);
+        Assert.Equal(new RekallAgeGeometryVector3(0, -1, 0), reversed.Points[0].Tangent);
+        Assert.Equal(2UL, reversed.Points[0].SourceStartControlPointId);
+        Assert.Equal(1UL, reversed.Points[0].SourceEndControlPointId);
+    }
+
+    [Fact]
+    public async Task CurveBuilderAndOperationsComposeThroughTypedGraphPorts()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create("curve-operations", "Curve Operations",
+            [
+                new("line", "rekall.modeling.curve.line", 1, new JsonObject { ["start"] = new JsonArray(0d, 0d, 0d), ["end"] = new JsonArray(0d, 4d, 0d) }),
+                new("resample", "rekall.modeling.curve.resample", 1, new JsonObject { ["count"] = 9 }),
+                new("reverse", "rekall.modeling.curve.reverse", 1, new JsonObject()),
+                new("sweep", "rekall.modeling.curve.profile_sweep", 1, new JsonObject { ["profile"] = "circle", ["profileSegments"] = 8, ["radius"] = 0.2 }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("line-resample", "line", "curve", "resample", "curve"),
+                new("resample-reverse", "resample", "curve", "reverse", "curve"),
+                new("reverse-sweep", "reverse", "curve", "sweep", "curve"),
+                new("sweep-output", "sweep", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, new(0, 0, "test", "desktop"), CancellationToken.None);
+
+        Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics.Select(item => item.Message)));
+        Assert.Equal(72, result.Outputs["mesh"].Topology.PointIds.Count);
+        Assert.True(new RekallAgeMeshValidator().Validate(result.Outputs["mesh"]).IsValid);
+    }
+
+    [Fact]
     public void VersionedCurveDocumentRoundTripsStableIdsAndValidates()
     {
         var curve = BezierCurve();
@@ -134,4 +196,7 @@ public sealed class CurveAuthoringTests
 
     private static RekallAgeCurveControlPoint PolyPoint(ulong id, double x, double y) =>
         new(id, new(x, y, 0), new(x, y, 0), new(x, y, 0));
+
+    private static double Distance(RekallAgeGeometryVector3 a, RekallAgeGeometryVector3 b) =>
+        Math.Sqrt(Math.Pow(a.X - b.X, 2) + Math.Pow(a.Y - b.Y, 2) + Math.Pow(a.Z - b.Z, 2));
 }

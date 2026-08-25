@@ -108,6 +108,52 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         }
     }
 
+    private static RekallAgeEvaluatedCurve CreateCurveLine(RekallAgeModelingGraphNode node)
+    {
+        try
+        {
+            return new RekallAgeCurveOperations().Line(
+                ReadVector3(node, "start", new(0, 0, 0)),
+                ReadVector3(node, "end", new(0, 1, 0)),
+                ReadPositive(node, "startRadius", 1),
+                ReadPositive(node, "endRadius", 1),
+                ReadNumber(node, "startTilt", 0),
+                ReadNumber(node, "endTilt", 0));
+        }
+        catch (Exception error) when (error is InvalidDataException or ArgumentException)
+        {
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_CURVE_INVALID", error.Message, node.NodeId);
+        }
+    }
+
+    private static RekallAgeEvaluatedCurve CreateCurveCircle(RekallAgeModelingGraphNode node)
+    {
+        try
+        {
+            return new RekallAgeCurveOperations().Circle(
+                ReadVector3(node, "center", new(0, 0, 0)),
+                ReadPositive(node, "radius", 1),
+                ReadInteger(node, "segments", 32, 3, 100_000),
+                ReadString(node, "plane", "xy"));
+        }
+        catch (Exception error) when (error is InvalidDataException or ArgumentException)
+        {
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_CURVE_INVALID", error.Message, node.NodeId);
+        }
+    }
+
+    private static RekallAgeEvaluatedCurve InputCurve(
+        RekallAgeModelingGraphNode node,
+        string portId,
+        IReadOnlyList<RekallAgeModelingGraphLink> incoming,
+        IReadOnlyDictionary<string, NodeValue> values)
+    {
+        var link = incoming.SingleOrDefault(item => item.ToPortId == portId)
+            ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_MISSING", $"Input '{portId}' is missing.", node.NodeId);
+        return values[link.FromNodeId].Curve
+            ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", $"Input '{portId}' is not a curve.", node.NodeId);
+    }
+
     private static RekallAgeMeshAsset CreateProfileSweep(
         RekallAgeModelingGraphAsset graph,
         RekallAgeModelingGraphNode node,

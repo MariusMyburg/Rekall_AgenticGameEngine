@@ -68,6 +68,8 @@ public sealed record RekallAgeLanguageModelAgentResult(
     RekallAgeLanguageModelUsage Usage,
     IReadOnlyList<RekallAgeLanguageModelMessage> Transcript)
 {
+    public string? ResponseId { get; init; }
+
     public IReadOnlyList<RekallAgeLanguageModelToolExecution> ToolExecutions { get; init; } =
         Array.Empty<RekallAgeLanguageModelToolExecution>();
 }
@@ -170,6 +172,7 @@ public sealed class RekallAgeLanguageModelAgent(
         var toolCallCount = 0;
         var toolExecutions = new List<RekallAgeLanguageModelToolExecution>();
         var finalContent = string.Empty;
+        string? responseId = null;
         var completionAuditPending = false;
         var runtimeCheckpointPrompted = false;
         var runtimeRepairReserveActivated = false;
@@ -259,6 +262,7 @@ public sealed class RekallAgeLanguageModelAgent(
             }
             totalDuration = checked(totalDuration + response.Usage.TotalDurationNanoseconds);
             finalContent = response.Content;
+            responseId = response.ResponseId;
             transcript.Add(new RekallAgeLanguageModelMessage(
                 "assistant",
                 response.Content,
@@ -606,6 +610,7 @@ public sealed class RekallAgeLanguageModelAgent(
             },
             transcript.ToArray())
         {
+            ResponseId = responseId,
             ToolExecutions = toolExecutions.ToArray()
         };
     }

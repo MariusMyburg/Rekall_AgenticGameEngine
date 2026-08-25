@@ -185,6 +185,7 @@ public sealed class LanguageModelAgentTests
             item => Assert.InRange(item.Message.Length, 0, 4_096));
         Assert.Equal(9, result.Usage.CachedInputTokens);
         Assert.Equal(5, result.Usage.ReasoningTokens);
+        Assert.Equal("response_2", result.ResponseId);
         var firstAssistant = Assert.Single(
             result.Transcript,
             message => message.Role == "assistant" && message.ToolCalls?.Count == 1);

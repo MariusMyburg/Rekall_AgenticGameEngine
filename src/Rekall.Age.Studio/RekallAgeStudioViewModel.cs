@@ -3,7 +3,6 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -36,12 +35,13 @@ public enum RekallAgeStudioMode
 public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDisposable
 {
     private readonly RekallAgeWorkbenchSession _session;
-    private readonly HttpClient? _ollamaHttpClient;
-    private readonly RekallAgeProjectAgentSession _agentSession;
+    private readonly RekallAgeCommandRegistry _agentRegistry;
+    private readonly RekallAgeLanguageModelProviderCatalog _languageModelProviderCatalog;
     private readonly IRekallAgeStudioPreviewSession _previewSession;
     private readonly SemaphoreSlim _modeTransitionGate = new(1, 1);
     private readonly CancellationTokenSource _lifecycleCancellation = new();
     private readonly object _disposeSync = new();
+    private readonly object _languageModelLifecycleSync = new();
     private readonly object _renderingOperationsSync = new();
     private readonly HashSet<Task> _activeRenderingOperations = [];
     private readonly RekallAgeAsyncCommand _openCommand;
@@ -105,6 +105,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _applyModelingGraphParametersCommand;
     private Process? _player;
     private CancellationTokenSource? _agentCancellation;
+    private RekallAgeLanguageModelProviderLease? _languageModelProviderLease;
+    private IRekallAgeProjectAgentRunner? _languageModelRunner;
+    private IDisposable? _fixedLanguageModelRunner;
+    private CancellationTokenSource? _languageModelRefreshCancellation;
+    private Task _languageModelProviderTransition = Task.CompletedTask;
+    private Task? _activeLanguageModelRefresh;
+    private Task? _activeAgentRun;
+    private string? _sessionOpenAiApiKey;
     private bool _isBusy;
     private bool _isAgentRunning;
     private bool _isLiveViewportEnabled = true;
@@ -122,7 +130,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _propertyNameInput = "position";
     private string _propertyValueInput = "[0, 0, 0]";
     private string _propertySchemaHelp = "Select a registered property to see its type and constraints.";
-    private string _selectedOllamaModel = "qwen3.5:35b";
+    private RekallAgeLanguageModelProviderDescriptor _selectedLanguageModelProvider = null!;
+    private string _selectedLanguageModel = string.Empty;
+    private string _selectedReasoningEffort = "medium";
+    private string _providerStatus = string.Empty;
     private string _agentTaskInput = string.Empty;
     private string? _selectedMeshAssetId;
     private string _modelAssetIdInput = string.Empty;
@@ -209,18 +220,29 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     internal int? AgentMaxTurns { get; set; }
 
     public RekallAgeStudioViewModel()
-        : this(new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()), null)
+        : this(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            new RekallAgeLanguageModelProviderCatalog(),
+            null,
+            new RekallAgeStudioPreviewSession(),
+            null)
     {
     }
 
     internal RekallAgeStudioViewModel(RekallAgeWorkbenchSession session)
-        : this(session, null)
+        : this(
+            session,
+            new RekallAgeLanguageModelProviderCatalog(),
+            null,
+            new RekallAgeStudioPreviewSession(),
+            null)
     {
     }
 
     internal RekallAgeStudioViewModel(Action<string> openPackageFolder)
         : this(
             new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            new RekallAgeLanguageModelProviderCatalog(),
             null,
             new RekallAgeStudioPreviewSession(),
             openPackageFolder)
@@ -230,7 +252,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     internal RekallAgeStudioViewModel(
         RekallAgeWorkbenchSession session,
         IRekallAgeLanguageModelClient? languageModelClient)
-        : this(session, languageModelClient, new RekallAgeStudioPreviewSession())
+        : this(
+            session,
+            new RekallAgeLanguageModelProviderCatalog(),
+            languageModelClient,
+            new RekallAgeStudioPreviewSession(),
+            null)
     {
     }
 
@@ -239,19 +266,52 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         IRekallAgeLanguageModelClient? languageModelClient,
         IRekallAgeStudioPreviewSession previewSession,
         Action<string>? openPackageFolder = null)
+        : this(
+            session,
+            new RekallAgeLanguageModelProviderCatalog(),
+            languageModelClient,
+            previewSession,
+            openPackageFolder)
     {
-        _session = session;
-        _previewSession = previewSession;
+    }
+
+    internal RekallAgeStudioViewModel(
+        RekallAgeWorkbenchSession session,
+        RekallAgeLanguageModelProviderCatalog languageModelProviderCatalog,
+        IRekallAgeStudioPreviewSession previewSession,
+        Action<string>? openPackageFolder = null)
+        : this(session, languageModelProviderCatalog, null, previewSession, openPackageFolder)
+    {
+    }
+
+    private RekallAgeStudioViewModel(
+        RekallAgeWorkbenchSession session,
+        RekallAgeLanguageModelProviderCatalog languageModelProviderCatalog,
+        IRekallAgeLanguageModelClient? fixedLanguageModelClient,
+        IRekallAgeStudioPreviewSession previewSession,
+        Action<string>? openPackageFolder)
+    {
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        _languageModelProviderCatalog = languageModelProviderCatalog
+            ?? throw new ArgumentNullException(nameof(languageModelProviderCatalog));
+        _previewSession = previewSession ?? throw new ArgumentNullException(nameof(previewSession));
         _openPackageFolder = openPackageFolder ?? OpenDirectoryInExplorer;
-        if (languageModelClient is null)
+        _agentRegistry = RekallAgeDefaultCommandRegistry.Create();
+        _selectedLanguageModelProvider = _languageModelProviderCatalog.Providers.Single(provider => provider.Id == "ollama");
+        _selectedLanguageModel = _selectedLanguageModelProvider.DefaultModel;
+        if (fixedLanguageModelClient is null)
         {
-            _ollamaHttpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
-            var configuredOllamaUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL");
-            languageModelClient = new RekallAgeOllamaLanguageModelClient(
-                _ollamaHttpClient,
-                new Uri(string.IsNullOrWhiteSpace(configuredOllamaUrl) ? "http://127.0.0.1:11434" : configuredOllamaUrl));
+            _languageModelProviderLease = _languageModelProviderCatalog.Acquire("ollama", _agentRegistry);
+            _languageModelRunner = _languageModelProviderLease.Runner;
+            _providerStatus = "Ollama ready. Refresh models.";
         }
-        _agentSession = new RekallAgeProjectAgentSession(languageModelClient, RekallAgeDefaultCommandRegistry.Create());
+        else
+        {
+            var runner = new RekallAgeLanguageModelProjectAgentRunner(fixedLanguageModelClient, _agentRegistry);
+            _languageModelRunner = runner;
+            _fixedLanguageModelRunner = runner;
+            _providerStatus = $"{fixedLanguageModelClient.ProviderId} test session ready.";
+        }
         _openCommand = CreateAsyncCommand(OpenFromInputsAsync, CanOpenOrCreate);
         _createCommand = CreateAsyncCommand(CreateFromInputsAsync, CanOpenOrCreate);
         _addEntityCommand = CreateAsyncCommand(AddEntityAsync, HasEditableProject);
@@ -289,7 +349,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _auditWebCommand = CreateAsyncCommand(AuditWebAsync, CanAuditWeb);
         _undoCommand = CreateAsyncCommand(UndoAsync, () => HasEditableProject() && _session.CanUndo);
         _redoCommand = CreateAsyncCommand(RedoAsync, () => HasEditableProject() && _session.CanRedo);
-        _discoverModelsCommand = CreateAsyncCommand(DiscoverModelsAsync, () => !IsBusy && !IsAgentRunning);
+        _discoverModelsCommand = CreateAsyncCommand(
+            DiscoverModelsAsync,
+            () => !IsBusy && !IsAgentRunning && _languageModelRunner is not null);
         _runAgentCommand = CreateAsyncCommand(RunAgentAsync, CanRunAgent);
         _cancelAgentCommand = CreateAsyncCommand(CancelAgentAsync, () => IsAgentRunning);
         _refreshMeshAssetsCommand = CreateAsyncCommand(RefreshMeshAssetsAsync, HasOpenProject);
@@ -321,7 +383,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> SceneSummaryLines { get; } = [];
     public ObservableCollection<string> ActionLines { get; } = [];
     public ObservableCollection<string> RuntimeObservationLines { get; } = [];
-    public ObservableCollection<string> OllamaModels { get; } = [];
+    public IReadOnlyList<RekallAgeLanguageModelProviderDescriptor> LanguageModelProviders =>
+        _languageModelProviderCatalog.Providers;
+    public ObservableCollection<string> LanguageModels { get; } = [];
+    public IReadOnlyList<string> ReasoningEfforts { get; } =
+        ["none", "low", "medium", "high", "xhigh", "max"];
     public ObservableCollection<string> AgentLines { get; } = [];
     public IReadOnlyList<string> PackageTargets { get; } =
         [RekallAgePlayablePackageTargets.Windows, RekallAgePlayablePackageTargets.Headless];
@@ -386,7 +452,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand AuditWebCommand => _auditWebCommand;
     public ICommand UndoCommand => _undoCommand;
     public ICommand RedoCommand => _redoCommand;
-    public ICommand DiscoverModelsCommand => _discoverModelsCommand;
+    public ICommand RefreshLanguageModelsCommand => _discoverModelsCommand;
     public ICommand RunAgentCommand => _runAgentCommand;
     public ICommand CancelAgentCommand => _cancelAgentCommand;
     public ICommand RefreshMeshAssetsCommand => _refreshMeshAssetsCommand;
@@ -604,12 +670,45 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         private set => Set(ref _propertySchemaHelp, value);
     }
 
-    public string SelectedOllamaModel
+    public RekallAgeLanguageModelProviderDescriptor SelectedLanguageModelProvider
     {
-        get => _selectedOllamaModel;
+        get => _selectedLanguageModelProvider;
         set
         {
-            if (Set(ref _selectedOllamaModel, value)) RefreshCommands();
+            ArgumentNullException.ThrowIfNull(value);
+            if (!LanguageModelProviders.Contains(value) || !Set(ref _selectedLanguageModelProvider, value)) return;
+            Replace(LanguageModels, []);
+            SelectedLanguageModel = string.Empty;
+            ProviderStatus = $"Switching to {value.DisplayName}…";
+            QueueLanguageModelProviderTransition(value);
+            RefreshCommands();
+        }
+    }
+
+    public string SelectedLanguageModel
+    {
+        get => _selectedLanguageModel;
+        set
+        {
+            if (Set(ref _selectedLanguageModel, value ?? string.Empty)) RefreshCommands();
+        }
+    }
+
+    public string ProviderStatus
+    {
+        get => _providerStatus;
+        private set => Set(ref _providerStatus, value);
+    }
+
+    public bool HasSessionOpenAiCredential => _sessionOpenAiApiKey is not null;
+
+    public string SelectedReasoningEffort
+    {
+        get => _selectedReasoningEffort;
+        set
+        {
+            if (!ReasoningEfforts.Contains(value, StringComparer.Ordinal)) return;
+            Set(ref _selectedReasoningEffort, value);
         }
     }
 
@@ -1243,6 +1342,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         _lifecycleCancellation.Cancel();
         _agentCancellation?.Cancel();
+        Task providerTransition;
+        Task? activeLanguageModelRefresh;
+        Task? activeAgentRun;
+        lock (_languageModelLifecycleSync)
+        {
+            providerTransition = _languageModelProviderTransition;
+            activeLanguageModelRefresh = _activeLanguageModelRefresh;
+            activeAgentRun = _activeAgentRun;
+        }
         Task[] renderingOperations;
         lock (_renderingOperationsSync)
         {
@@ -1259,10 +1367,23 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             ReportUnexpectedFailure(exception);
         }
+        try
+        {
+            await providerTransition.ConfigureAwait(false);
+            if (activeLanguageModelRefresh is not null)
+            {
+                await activeLanguageModelRefresh.ConfigureAwait(false);
+            }
+            if (activeAgentRun is not null) await activeAgentRun.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+        }
         await StopCoreAsync(resetEditPreview: false, CancellationToken.None);
         await _previewSession.DisposeAsync();
         _agentCancellation?.Dispose();
-        _ollamaHttpClient?.Dispose();
+        ReleaseLanguageModelRunner();
+        _sessionOpenAiApiKey = null;
         _lifecycleCancellation.Dispose();
         _modeTransitionGate.Dispose();
     }
@@ -1291,7 +1412,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private bool CanEditProperty() => CanEditComponent() && !string.IsNullOrWhiteSpace(PropertyNameInput);
     private bool CanRunAgent() => HasEditableProject()
         && !IsAgentRunning
-        && !string.IsNullOrWhiteSpace(SelectedOllamaModel)
+        && _languageModelRunner is not null
+        && !string.IsNullOrWhiteSpace(SelectedLanguageModel)
         && !string.IsNullOrWhiteSpace(AgentTaskInput);
     private bool CanSwitchScene() => HasEditableProject()
         && !string.IsNullOrWhiteSpace(SceneNameInput)
@@ -2210,32 +2332,83 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         "studio",
         CancellationToken.None).AsTask());
 
-    private async Task DiscoverModelsAsync()
+    private Task DiscoverModelsAsync()
+    {
+        lock (_languageModelLifecycleSync)
+        {
+            if (_activeLanguageModelRefresh is { IsCompleted: false }) return _activeLanguageModelRefresh;
+            var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifecycleCancellation.Token);
+            _languageModelRefreshCancellation = cancellation;
+            _activeLanguageModelRefresh = DiscoverModelsCoreAsync(cancellation);
+            return _activeLanguageModelRefresh;
+        }
+    }
+
+    private async Task DiscoverModelsCoreAsync(CancellationTokenSource operationCancellation)
     {
         IsBusy = true;
         try
         {
-            var models = await _agentSession.ListModelsAsync(CancellationToken.None);
-            Replace(OllamaModels, models.Select(model => model.Id));
-            if (OllamaModels.Contains("qwen3.5:35b"))
-            {
-                SelectedOllamaModel = "qwen3.5:35b";
-            }
-            else if (OllamaModels.Count > 0 && !OllamaModels.Contains(SelectedOllamaModel))
-            {
-                SelectedOllamaModel = OllamaModels[0];
-            }
-            StatusText = OllamaModels.Count == 0
-                ? "Ollama is reachable but no local models are installed."
-                : $"Found {OllamaModels.Count} local Ollama model{(OllamaModels.Count == 1 ? string.Empty : "s")}.";
+            await LoadLanguageModelsAsync(operationCancellation.Token);
+        }
+        catch (RekallAgeLanguageModelProviderException exception)
+        {
+            ReportLanguageModelProviderFailure(exception);
+        }
+        catch (OperationCanceledException) when (operationCancellation.IsCancellationRequested)
+        {
         }
         finally
         {
+            lock (_languageModelLifecycleSync)
+            {
+                if (ReferenceEquals(_languageModelRefreshCancellation, operationCancellation))
+                {
+                    _languageModelRefreshCancellation = null;
+                }
+            }
+            operationCancellation.Dispose();
             IsBusy = false;
         }
     }
 
-    private async Task RunAgentAsync()
+    private Task RunAgentAsync()
+    {
+        Task operationTask;
+        lock (_languageModelLifecycleSync)
+        {
+            if (_activeAgentRun is { IsCompleted: false }) return _activeAgentRun;
+            var runner = _languageModelRunner;
+            if (runner is null) return Task.CompletedTask;
+            operationTask = RunAgentCoreAsync(
+                runner,
+                runner.ProviderId,
+                SelectedLanguageModel);
+            _activeAgentRun = operationTask;
+        }
+
+        return AwaitAgentRunAsync(operationTask);
+    }
+
+    private async Task AwaitAgentRunAsync(Task operationTask)
+    {
+        try
+        {
+            await operationTask.ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_languageModelLifecycleSync)
+            {
+                if (ReferenceEquals(_activeAgentRun, operationTask)) _activeAgentRun = null;
+            }
+        }
+    }
+
+    private async Task RunAgentCoreAsync(
+        IRekallAgeProjectAgentRunner runner,
+        string providerId,
+        string model)
     {
         if (_session.ProjectRoot is null || _session.SceneName is null) return;
         _agentCancellation?.Dispose();
@@ -2245,29 +2418,40 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         IsBusy = true;
         AgentLines.Clear();
         _lastAgentToolExecutions.Clear();
-        AppendAgentLine($"model: {SelectedOllamaModel}");
+        AppendAgentLine($"provider: {providerId}");
+        AppendAgentLine($"model: {model}");
         AppendAgentLine($"task: {AgentTaskInput.Trim()}");
+        var agentStopwatch = Stopwatch.StartNew();
         try
         {
             IProgress<RekallAgeLanguageModelAgentProgress> progress = SynchronizationContext.Current is null
                 ? new ImmediateProgress<RekallAgeLanguageModelAgentProgress>(ReportAgentProgress)
                 : new Progress<RekallAgeLanguageModelAgentProgress>(ReportAgentProgress);
-            var result = await _agentSession.RunAsync(
+            var result = await runner.RunAsync(
                 new RekallAgeProjectAgentSessionRequest(
                     _session.ProjectRoot,
                     _session.SceneName,
-                    SelectedOllamaModel,
+                    model,
                     AgentTaskInput)
                 {
                     MaxTurns = AgentMaxTurns,
+                    Think = SelectedReasoningEffort,
                     RequireCompletionAudit = true,
                     RequireCompletionAuditToolEvidence = !TreatGauntletAsTerminalSuccess,
                     TreatGauntletAsTerminalSuccess = TreatGauntletAsTerminalSuccess
                 },
                 progress,
                 cancellationToken);
+            agentStopwatch.Stop();
             _lastAgentToolExecutions.Clear();
             _lastAgentToolExecutions.AddRange(result.AgentResult.ToolExecutions);
+            AppendAgentLine($"response: {result.AgentResult.ResponseId ?? "unavailable"}");
+            AppendAgentLine(
+                $"usage: input={result.AgentResult.Usage.PromptTokens} output={result.AgentResult.Usage.CompletionTokens} "
+                + $"cached={result.AgentResult.Usage.CachedInputTokens?.ToString(CultureInfo.InvariantCulture) ?? "unavailable"} "
+                + $"reasoning={result.AgentResult.Usage.ReasoningTokens?.ToString(CultureInfo.InvariantCulture) ?? "unavailable"}");
+            AppendAgentLine($"tools: {result.AgentResult.ToolCallCount}");
+            AppendAgentLine($"elapsed: {agentStopwatch.Elapsed.TotalMilliseconds.ToString("F0", CultureInfo.InvariantCulture)} ms");
             AppendAgentLine(result.Summary);
             if (!string.IsNullOrWhiteSpace(result.AgentResult.FinalContent))
             {
@@ -2288,6 +2472,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 ? result.Summary
                 : $"{result.Summary} Review Validation and AI Agent output.";
         }
+        catch (RekallAgeLanguageModelProviderException exception)
+        {
+            ReportLanguageModelProviderFailure(exception);
+            AppendAgentLine(ProviderStatus);
+        }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             StatusText = "AI authoring cancelled.";
@@ -2302,11 +2491,167 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
-    private Task CancelAgentAsync()
+    private async Task CancelAgentAsync()
     {
         _agentCancellation?.Cancel();
         StatusText = "Cancelling AI authoring…";
-        return Task.CompletedTask;
+        Task? activeRun;
+        lock (_languageModelLifecycleSync)
+        {
+            activeRun = _activeAgentRun;
+        }
+        if (activeRun is not null) await activeRun;
+    }
+
+    public Task ApplyOpenAiApiKeyAsync(string? apiKey)
+    {
+        _sessionOpenAiApiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey;
+        OnPropertyChanged(nameof(HasSessionOpenAiCredential));
+        if (SelectedLanguageModelProvider.Id != "openai")
+        {
+            ProviderStatus = _sessionOpenAiApiKey is null
+                ? "OpenAI session key cleared."
+                : "OpenAI session key accepted in memory for this Studio session.";
+            return Task.CompletedTask;
+        }
+
+        Replace(LanguageModels, []);
+        SelectedLanguageModel = string.Empty;
+        ProviderStatus = "Refreshing OpenAI session authentication…";
+        QueueLanguageModelProviderTransition(SelectedLanguageModelProvider);
+        return WaitForLanguageModelProviderTransitionAsync();
+    }
+
+    internal Task WaitForLanguageModelProviderTransitionAsync()
+    {
+        lock (_languageModelLifecycleSync)
+        {
+            return _languageModelProviderTransition;
+        }
+    }
+
+    private void QueueLanguageModelProviderTransition(
+        RekallAgeLanguageModelProviderDescriptor provider)
+    {
+        lock (_languageModelLifecycleSync)
+        {
+            _languageModelProviderTransition = TransitionLanguageModelProviderAfterAsync(
+                _languageModelProviderTransition,
+                provider);
+        }
+    }
+
+    private async Task TransitionLanguageModelProviderAfterAsync(
+        Task previousTransition,
+        RekallAgeLanguageModelProviderDescriptor provider)
+    {
+        try
+        {
+            await previousTransition;
+            await CancelAndAwaitLanguageModelRefreshAsync();
+            await CancelAgentAsync();
+            ReleaseLanguageModelRunner();
+            _lifecycleCancellation.Token.ThrowIfCancellationRequested();
+            _languageModelProviderLease = _languageModelProviderCatalog.Acquire(
+                provider.Id,
+                _agentRegistry,
+                SessionLanguageModelProviderSettings());
+            _languageModelRunner = _languageModelProviderLease.Runner;
+            await LoadLanguageModelsAsync(_lifecycleCancellation.Token);
+        }
+        catch (RekallAgeLanguageModelProviderException exception)
+        {
+            ReportLanguageModelProviderFailure(exception);
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            RefreshCommands();
+        }
+    }
+
+    private async Task CancelAndAwaitLanguageModelRefreshAsync()
+    {
+        CancellationTokenSource? cancellation;
+        Task? refresh;
+        lock (_languageModelLifecycleSync)
+        {
+            cancellation = _languageModelRefreshCancellation;
+            refresh = _activeLanguageModelRefresh;
+        }
+        cancellation?.Cancel();
+        if (refresh is not null) await refresh;
+    }
+
+    private async Task LoadLanguageModelsAsync(CancellationToken cancellationToken)
+    {
+        var runner = _languageModelRunner;
+        if (runner is null)
+        {
+            Replace(LanguageModels, []);
+            SelectedLanguageModel = string.Empty;
+            return;
+        }
+
+        var models = await runner.ListModelsAsync(cancellationToken);
+        Replace(LanguageModels, models.Select(model => model.Id));
+        SelectedLanguageModel = LanguageModels.Contains(SelectedLanguageModelProvider.DefaultModel)
+            ? SelectedLanguageModelProvider.DefaultModel
+            : LanguageModels.FirstOrDefault() ?? string.Empty;
+        ProviderStatus = LanguageModels.Count == 0
+            ? $"{SelectedLanguageModelProvider.DisplayName} is reachable but returned no models."
+            : $"{SelectedLanguageModelProvider.DisplayName} ready with {LanguageModels.Count} model{(LanguageModels.Count == 1 ? string.Empty : "s")}.";
+        StatusText = ProviderStatus;
+    }
+
+    private RekallAgeLanguageModelProviderSettings? SessionLanguageModelProviderSettings() =>
+        _sessionOpenAiApiKey is null
+            ? null
+            : new RekallAgeLanguageModelProviderSettings
+            {
+                OllamaUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL"),
+                OpenAiApiKey = _sessionOpenAiApiKey,
+                OpenAiUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OPENAI_URL")
+            };
+
+    private void ReportLanguageModelProviderFailure(
+        RekallAgeLanguageModelProviderException exception)
+    {
+        ProviderStatus = FormatLanguageModelProviderDiagnostic(exception);
+        StatusText = ProviderStatus;
+        Replace(ValidationLines, [$"error: {ProviderStatus}"]);
+    }
+
+    private static string FormatLanguageModelProviderDiagnostic(
+        RekallAgeLanguageModelProviderException exception)
+    {
+        var facts = new List<string> { $"{exception.Code}: {exception.Message}" };
+        if (!string.IsNullOrWhiteSpace(exception.RequestedValue))
+        {
+            facts.Add($"Requested: {Bound(exception.RequestedValue, 256)}.");
+        }
+        if (!string.IsNullOrWhiteSpace(exception.ResolvedValue))
+        {
+            facts.Add($"Resolved: {Bound(exception.ResolvedValue, 256)}.");
+        }
+        return string.Join(' ', facts);
+    }
+
+    private void ReleaseLanguageModelRunner()
+    {
+        _languageModelRunner = null;
+        if (_languageModelProviderLease is not null)
+        {
+            _languageModelProviderLease.Dispose();
+            _languageModelProviderLease = null;
+        }
+        if (_fixedLanguageModelRunner is not null)
+        {
+            _fixedLanguageModelRunner.Dispose();
+            _fixedLanguageModelRunner = null;
+        }
     }
 
     private void ReportAgentProgress(RekallAgeLanguageModelAgentProgress progress)

@@ -1,5 +1,9 @@
+using System.Collections.Concurrent;
 using System.IO;
 using System.IO.Compression;
+using System.Net;
+using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Agent.LanguageModels;
@@ -23,6 +27,131 @@ namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioViewModelTests
 {
+    [Fact]
+    public async Task ProviderSelectionExposesStableMissingOpenAiCredentialGateWithoutRetainingOllamaModels()
+    {
+        var ollama = new ProviderLifecycleHandler(blockOllamaChat: false);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = " " },
+            () => new HttpClient(ollama, disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+
+        Assert.Equal(["ollama", "openai"], viewModel.LanguageModelProviders.Select(provider => provider.Id));
+        Assert.Equal(["none", "low", "medium", "high", "xhigh", "max"], viewModel.ReasoningEfforts);
+        Assert.Equal("medium", viewModel.SelectedReasoningEffort);
+        Assert.Equal("ollama", viewModel.SelectedLanguageModelProvider.Id);
+        await ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
+        Assert.Equal(["gemma3:latest", "qwen3.5:35b"], viewModel.LanguageModels);
+        Assert.Equal("qwen3.5:35b", viewModel.SelectedLanguageModel);
+
+        viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "openai");
+        await viewModel.WaitForLanguageModelProviderTransitionAsync();
+
+        Assert.Empty(viewModel.LanguageModels);
+        Assert.Empty(viewModel.SelectedLanguageModel);
+        Assert.Equal(
+            "REKALL_OPENAI_API_KEY_MISSING: OpenAI requires OPENAI_API_KEY for this session.",
+            viewModel.ProviderStatus);
+        Assert.False(viewModel.RefreshLanguageModelsCommand.CanExecute(null));
+        Assert.DoesNotContain("qwen", viewModel.ProviderStatus, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ProviderSwitchCancelsAndAwaitsTheCurrentRunBeforeDisposingItsLeaseAndLoadingTheExactDefault()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-provider-switch-" + Guid.NewGuid().ToString("N"));
+        var ollama = new ProviderLifecycleHandler(blockOllamaChat: true);
+        var openAi = new ProviderLifecycleHandler(blockOllamaChat: false);
+        var handlers = new Queue<ProviderLifecycleHandler>([ollama, openAi]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = "session-test-key" },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                catalog,
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Provider Switch",
+                SceneNameInput = "Main",
+                AgentTaskInput = "Inspect the open project."
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
+
+            var run = ExecuteAsync(viewModel.RunAgentCommand);
+            await ollama.WaitForChatAsync();
+            viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "openai");
+            await viewModel.WaitForLanguageModelProviderTransitionAsync();
+            await run;
+
+            Assert.Equal(["chat-cancelled", "lease-disposed"], ollama.Events);
+            Assert.Equal("openai", viewModel.SelectedLanguageModelProvider.Id);
+            Assert.Equal(["gpt-5.6-sol", "gpt-5.6-sol-preview"], viewModel.LanguageModels);
+            Assert.Equal("gpt-5.6-sol", viewModel.SelectedLanguageModel);
+            Assert.Equal("OpenAI ready with 2 models.", viewModel.ProviderStatus);
+            Assert.False(viewModel.IsAgentRunning);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task OpenAiSessionKeyUnlocksTheSelectedProviderWithoutAppearingInInspectableStudioState()
+    {
+        const string secret = "studio-session-secret-must-stay-private";
+        var handlers = new Queue<ProviderLifecycleHandler>(
+            [new(blockOllamaChat: false), new(blockOllamaChat: false)]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = " " },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+        viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "openai");
+        await viewModel.WaitForLanguageModelProviderTransitionAsync();
+
+        await viewModel.ApplyOpenAiApiKeyAsync(secret);
+
+        Assert.True(viewModel.HasSessionOpenAiCredential);
+        Assert.Equal("gpt-5.6-sol", viewModel.SelectedLanguageModel);
+        var inspectable = string.Join('\n',
+            [viewModel.ProviderStatus, viewModel.StatusText, .. viewModel.ValidationLines, .. viewModel.AgentLines]);
+        Assert.DoesNotContain(secret, inspectable, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProviderSwitchCancelsAndAwaitsModelRefreshBeforeDisposingItsLease()
+    {
+        var ollama = new ProviderLifecycleHandler(blockOllamaChat: false, blockOllamaModels: true);
+        var openAi = new ProviderLifecycleHandler(blockOllamaChat: false);
+        var handlers = new Queue<ProviderLifecycleHandler>([ollama, openAi]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = "session-test-key" },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+
+        var refresh = ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
+        await ollama.WaitForModelsAsync();
+        viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "openai");
+        await viewModel.WaitForLanguageModelProviderTransitionAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await refresh;
+
+        Assert.Equal(["models-cancelled", "lease-disposed"], ollama.Events);
+        Assert.Equal("gpt-5.6-sol", viewModel.SelectedLanguageModel);
+    }
+
     [Fact]
     public async Task PartialComparisonFailureKeepsUsableTypedEvidenceVisibleWithItsError()
     {
@@ -995,6 +1124,43 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task HeadlessOpenAiAutomationStopsAtTheStableCredentialGateAndWritesEvidence()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-openai-gate-" + Guid.NewGuid().ToString("N"));
+        var evidence = Path.Combine(root, "evidence", "result.json");
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = " " },
+            () => new HttpClient(new ProviderLifecycleHandler(blockOllamaChat: false), disposeHandler: true));
+        try
+        {
+            var result = await RekallAgeStudioAutomation.RunWithCatalogAsync(
+                new RekallAgeStudioAutomationOptions(
+                    root,
+                    "Credential Gate",
+                    "Main",
+                    "gpt-5.6-sol",
+                    "Author a game.",
+                    evidence)
+                {
+                    Provider = "openai"
+                },
+                catalog,
+                CancellationToken.None);
+
+            const string expected = "REKALL_OPENAI_API_KEY_MISSING: OpenAI requires OPENAI_API_KEY for this session.";
+            Assert.False(result.Succeeded);
+            Assert.Equal(expected, result.Status);
+            Assert.False(File.Exists(Path.Combine(root, "rekall.project.json")));
+            Assert.True(File.Exists(evidence));
+            Assert.Contains(expected, await File.ReadAllTextAsync(evidence), StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task StudioStartsWithAnEmptyOrdinaryLanguageAuthoringRequest()
     {
         await using var viewModel = new RekallAgeStudioViewModel(
@@ -1014,6 +1180,7 @@ public sealed class StudioViewModelTests
                 "--project", "game",
                 "--project-name", "Game",
                 "--scene", "Main",
+                "--provider", "openai",
                 "--model", "model",
                 "--task", "Author a game",
                 "--evidence", "evidence.json",
@@ -1025,6 +1192,7 @@ public sealed class StudioViewModelTests
 
         Assert.True(parsed, error);
         Assert.Equal("game", options!.ProjectRoot);
+        Assert.Equal("openai", options.Provider);
         Assert.False(options.TreatGauntletAsTerminalSuccess);
         Assert.Equal(40, options.MaxTurns);
         Assert.False(RekallAgeStudioAutomation.TryParse(
@@ -1051,6 +1219,12 @@ public sealed class StudioViewModelTests
             Assert.NotEmpty(result.AgentToolExecutions);
             Assert.True(File.Exists(result.PackageArchivePath));
             Assert.True(File.Exists(evidence));
+            Assert.Contains("provider: deterministic", result.AgentTranscript);
+            Assert.Contains("model: deterministic", result.AgentTranscript);
+            Assert.Contains(result.AgentTranscript, line => line.StartsWith("response: deterministic-response-", StringComparison.Ordinal));
+            Assert.Contains("usage: input=200 output=20 cached=unavailable reasoning=unavailable", result.AgentTranscript);
+            Assert.Contains("tools: 2", result.AgentTranscript);
+            Assert.Contains(result.AgentTranscript, line => line.StartsWith("elapsed: ", StringComparison.Ordinal) && line.EndsWith(" ms", StringComparison.Ordinal));
         }
         finally
         {
@@ -1326,6 +1500,88 @@ public sealed class StudioViewModelTests
         public void Release() => _release.TrySetResult();
     }
 
+    private sealed class ProviderLifecycleHandler(
+        bool blockOllamaChat,
+        bool blockOllamaModels = false) : HttpMessageHandler
+    {
+        private readonly TaskCompletionSource _chatStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _modelsStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _disposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly ConcurrentQueue<string> _events = new();
+
+        public IReadOnlyList<string> Events => _events.ToArray();
+
+        public Task WaitForChatAsync() => _chatStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        public Task WaitForModelsAsync() => _modelsStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/api/tags", StringComparison.Ordinal))
+            {
+                _modelsStarted.TrySetResult();
+                if (blockOllamaModels)
+                {
+                    var cancellation = Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    var completed = await Task.WhenAny(cancellation, _disposed.Task);
+                    if (ReferenceEquals(completed, cancellation))
+                    {
+                        _events.Enqueue("models-cancelled");
+                        await cancellation;
+                    }
+
+                    throw new OperationCanceledException("The provider lease was disposed before model refresh cancellation was observed.");
+                }
+                return JsonResponse("""
+                    {"models":[{"name":"qwen3.5:35b","size":24000000000},{"name":"gemma3:latest","size":3000}]}
+                    """);
+            }
+
+            if (request.RequestUri.AbsolutePath.EndsWith("/api/chat", StringComparison.Ordinal))
+            {
+                _chatStarted.TrySetResult();
+                if (blockOllamaChat)
+                {
+                    try
+                    {
+                        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _events.Enqueue("chat-cancelled");
+                        throw;
+                    }
+                }
+
+                return JsonResponse("""
+                    {"model":"qwen3.5:35b","message":{"role":"assistant","content":"complete"},"done":true,"done_reason":"stop","total_duration":1,"prompt_eval_count":1,"eval_count":1}
+                    """);
+            }
+
+            if (request.RequestUri.AbsolutePath.EndsWith("/models", StringComparison.Ordinal))
+            {
+                return JsonResponse("""
+                    {"data":[{"id":"gpt-5.6-sol-preview"},{"id":"gpt-5.6-sol"}]}
+                    """);
+            }
+
+            throw new InvalidOperationException($"Unexpected provider request: {request.Method} {request.RequestUri.AbsolutePath}");
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            _events.Enqueue("lease-disposed");
+            _disposed.TrySetResult();
+            base.Dispose(disposing);
+        }
+
+        private static HttpResponseMessage JsonResponse(string json) => new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+    }
+
     private sealed class GauntletModel(string projectRoot) : IRekallAgeLanguageModelClient
     {
         private int _calls;
@@ -1355,7 +1611,10 @@ public sealed class StudioViewModelTests
                 "Run the complete generic proof.",
                 [call],
                 "tool_calls",
-                new RekallAgeLanguageModelUsage(100, 10, 1)));
+                new RekallAgeLanguageModelUsage(100, 10, 1))
+            {
+                ResponseId = $"deterministic-response-{_calls}"
+            });
         }
     }
 

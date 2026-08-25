@@ -547,12 +547,28 @@
                 </TabItem>
                 <TabItem Header="AI Agent">
                     <Grid Margin="8">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="330" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                            <TextBlock Text="Local Ollama model" Foreground="#9FB0C4" />
-                            <ComboBox ItemsSource="{Binding OllamaModels}" SelectedItem="{Binding SelectedOllamaModel}"
+                            <TextBlock Text="Language-model provider" Foreground="#9FB0C4" />
+                            <ComboBox ItemsSource="{Binding LanguageModelProviders}"
+                                      SelectedItem="{Binding SelectedLanguageModelProvider, Mode=TwoWay}"
+                                      DisplayMemberPath="DisplayName" Margin="0,3,0,6" />
+                            <TextBlock Text="OpenAI session key" Foreground="#9FB0C4" />
+                            <Grid Margin="0,3,0,6">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <PasswordBox x:Name="OpenAiApiKeyInput" PasswordChar="●" ToolTip="Held in memory for this Studio session only." />
+                                <Button Grid.Column="1" Content="Apply" Click="OnApplyOpenAiApiKeyClick" Padding="8,4" Margin="6,0,0,0" />
+                            </Grid>
+                            <TextBlock Text="Model" Foreground="#9FB0C4" />
+                            <ComboBox ItemsSource="{Binding LanguageModels}"
+                                      SelectedItem="{Binding SelectedLanguageModel, Mode=TwoWay}"
                                       IsEditable="True" Margin="0,3,0,6" />
-                            <Button Content="Discover Models" Command="{Binding DiscoverModelsCommand}" Padding="8,4" Margin="0,0,0,8" />
+                            <TextBlock Text="Reasoning effort" Foreground="#9FB0C4" />
+                            <ComboBox ItemsSource="{Binding ReasoningEfforts}"
+                                      SelectedItem="{Binding SelectedReasoningEffort, Mode=TwoWay}"
+                                      Margin="0,3,0,6" />
+                            <TextBlock Text="{Binding ProviderStatus}" Foreground="#75869A" TextWrapping="Wrap" Margin="0,0,0,6" />
+                            <Button Content="Refresh Models" Command="{Binding RefreshLanguageModelsCommand}" Padding="8,4" Margin="0,0,0,8" />
                             <TextBlock Text="Game-authoring task" Foreground="#9FB0C4" />
                             <Grid Height="86" Margin="0,3,0,6">
                                 <TextBox Text="{Binding AgentTaskInput, UpdateSourceTrigger=PropertyChanged}"

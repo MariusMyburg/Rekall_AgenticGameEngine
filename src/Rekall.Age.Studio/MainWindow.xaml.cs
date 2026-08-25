@@ -89,6 +89,13 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnApplyOpenAiApiKeyClick(object sender, RoutedEventArgs e)
+    {
+        var sessionKey = OpenAiApiKeyInput.Password;
+        OpenAiApiKeyInput.Clear();
+        await _viewModel.ApplyOpenAiApiKeyAsync(sessionKey);
+    }
+
     private void ApplyLayout(RekallAgeStudioLayout layout)
     {
         Width = layout.WindowWidth;

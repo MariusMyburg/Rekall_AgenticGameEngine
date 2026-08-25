@@ -20,6 +20,16 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 additionalLightDirection;
     vec4 additionalLightColor;
     vec4 additionalLightPosition;
+    vec4 additionalLightParameters;
+    vec4 additionalLightColor2;
+    vec4 additionalLightPosition2;
+    vec4 additionalLightParameters2;
+    vec4 additionalLightColor3;
+    vec4 additionalLightPosition3;
+    vec4 additionalLightParameters3;
+    vec4 additionalLightColor4;
+    vec4 additionalLightPosition4;
+    vec4 additionalLightParameters4;
     vec4 environmentParameters;
 } frame;
 
@@ -755,11 +765,18 @@ void main()
     float cloudShadow = sampleCloudShadow(fragWorldPosition, light);
     float directionalShadow = sampleDirectionalShadow(fragWorldPosition, normal);
     vec3 additionalDirect = vec3(0.0);
-    if (any(greaterThan(frame.additionalLightColor.rgb, vec3(0.0001))))
+    vec4 practicalColors[4] = vec4[](frame.additionalLightColor, frame.additionalLightColor2, frame.additionalLightColor3, frame.additionalLightColor4);
+    vec4 practicalPositions[4] = vec4[](frame.additionalLightPosition, frame.additionalLightPosition2, frame.additionalLightPosition3, frame.additionalLightPosition4);
+    vec4 practicalParameters[4] = vec4[](frame.additionalLightParameters, frame.additionalLightParameters2, frame.additionalLightParameters3, frame.additionalLightParameters4);
+    for (int practicalIndex = 0; practicalIndex < 4; practicalIndex++)
     {
-        vec3 additionalLight = frame.additionalLightPosition.w > 0.5
-            ? normalize(frame.additionalLightPosition.xyz - fragWorldPosition)
-            : normalize(-frame.additionalLightDirection.xyz);
+        if (dot(practicalColors[practicalIndex].rgb, practicalColors[practicalIndex].rgb) <= 0.000001) continue;
+        vec3 practicalOffset = practicalPositions[practicalIndex].xyz - fragWorldPosition;
+        float practicalDistance = length(practicalOffset);
+        vec3 additionalLight = practicalOffset / max(practicalDistance, 0.0001);
+        float practicalRange = max(practicalParameters[practicalIndex].x, 0.001);
+        float practicalWindow = pow(clamp(1.0 - practicalDistance / practicalRange, 0.0, 1.0), 2.0);
+        float practicalAttenuation = practicalWindow / (1.0 + 0.045 * practicalDistance * practicalDistance);
         vec3 additionalHalfVector = normalize(view + additionalLight);
         float additionalNdotl = max(dot(normal, additionalLight), 0.0);
         float additionalD = distributionGgx(normal, additionalHalfVector, roughness);
@@ -770,11 +787,12 @@ void main()
         vec3 additionalDiffuse = (1.0 - additionalF) * (1.0 - metallic) * albedo / PI;
         additionalDiffuse *= mix(1.0, 0.42, waterCoverage);
         vec3 additionalTransmittance = surfaceAtmosphereTransmittance(fragWorldPosition, additionalLight);
-        additionalDirect = (additionalDiffuse + additionalSpecular)
-            * frame.additionalLightColor.rgb
+        additionalDirect += (additionalDiffuse + additionalSpecular)
+            * practicalColors[practicalIndex].rgb
             * additionalTransmittance
             * additionalNdotl
-            * 1.8;
+            * practicalAttenuation
+            * 4.5;
     }
     vec3 color = emissive
         + ambient

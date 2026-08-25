@@ -95,6 +95,16 @@ the accepted gameplay evidence above.
   fallback assets, while distinct colors fall from 12,738 to 12,129 and broad
   ground/ruin speckling is visibly reduced. Large unlit black faces remain a
   separate material/lighting/composition deficiency and are not accepted.
+- Native Vulkan now consumes the same four deterministically selected
+  practical point lights already available to the Windows player instead of
+  silently discarding lights two through four. The frame ABI carries each
+  light's color, position, range, and priority, and the shader applies bounded
+  range-window plus inverse-square-style attenuation. This removed the old
+  non-physical whole-court flood from the first point light and exposed the
+  intended localized warm pools. The aligned frame is now too dark overall
+  (mean luminance 0.036), so camera-relevant practical selection/authored cool
+  fill and material readability remain required; global exposure is not used
+  to conceal that deficiency.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, prop geometry remains visibly coarse, and the

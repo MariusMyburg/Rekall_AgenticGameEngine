@@ -151,7 +151,19 @@ public sealed class VulkanScenePreparedFrameTests
             new System.Numerics.Vector3(0.1f, 0.2f, 0.3f),
             new System.Numerics.Vector4(0.4f, 0.5f, 0.6f, 0.7f),
             new System.Numerics.Vector4(8, 9, 10, 1),
-            EnvironmentParameters: new System.Numerics.Vector4(0.55f, -0.35f, 11.2f, 1));
+            AdditionalLightColor: new System.Numerics.Vector4(2, 1, 0, 1),
+            AdditionalLightPosition: new System.Numerics.Vector4(1, 2, 3, 1),
+            AdditionalLightParameters: new System.Numerics.Vector4(7, 4, 0, 0),
+            EnvironmentParameters: new System.Numerics.Vector4(0.55f, -0.35f, 11.2f, 1))
+        {
+            PointLights =
+            [
+                new("one", new(2, 1, 0, 1), new(1, 2, 3, 1), new(7, 4, 0, 0)),
+                new("two", new(0, 3, 1, 1), new(4, 5, 6, 1), new(8, 3, 0, 0)),
+                new("three", new(1, 0, 4, 1), new(7, 8, 9, 1), new(9, 2, 0, 0)),
+                new("four", new(2, 2, 2, 1), new(10, 11, 12, 1), new(10, 1, 0, 0))
+            ]
+        };
 
         var uniform = RekallAgeVulkanSceneUniformUploadBuilder.BuildFrameUniform(frame);
         var push = RekallAgeVulkanSceneUniformUploadBuilder.BuildDrawPushConstants(
@@ -172,6 +184,11 @@ public sealed class VulkanScenePreparedFrameTests
         Assert.Equal(0.2f, uniform.LightY);
         Assert.Equal(0.6f, uniform.LightB);
         Assert.Equal(10, uniform.LightPositionZ);
+        Assert.Equal(7, uniform.AdditionalLightRange);
+        Assert.Equal(3, uniform.AdditionalLight2G);
+        Assert.Equal(6, uniform.AdditionalLight2PositionZ);
+        Assert.Equal(9, uniform.AdditionalLight3Range);
+        Assert.Equal(12, uniform.AdditionalLight4PositionZ);
         Assert.Equal(0.55f, uniform.EnvironmentAmbientEnergy);
         Assert.Equal(-0.35f, uniform.EnvironmentExposure);
         Assert.Equal(11.2f, uniform.EnvironmentWhitePoint);

@@ -142,6 +142,20 @@ public sealed class RekallAgeVulkanParticlePlanner
             "Particle emitter was culled by the active camera layer mask or visibility distance.",
             cameraCulled);
 
+        if (candidates.Count > 0 && (!FloatRepresentable(deltaSeconds) || deltaSeconds < 0))
+        {
+            var timestepRejected = candidates
+                .Select(item => item.EntityId)
+                .OrderBy(item => item, StringComparer.Ordinal)
+                .ToArray();
+            rejected.AddRange(timestepRejected);
+            diagnostics.Add(new RekallAgeVulkanParticleDiagnostic(
+                "REKALL_PARTICLE_TIMESTEP_INVALID",
+                "Particle simulation delta seconds must be finite, non-negative, and representable by the GPU float contract.",
+                timestepRejected));
+            candidates.Clear();
+        }
+
         var globalCapacity = Math.Clamp(quality.MaximumActiveParticles, 0, MaximumGlobalCapacity);
         var ranges = new List<RekallAgeVulkanParticleEmitterRange>();
         var overflow = new HashSet<string>(StringComparer.Ordinal);

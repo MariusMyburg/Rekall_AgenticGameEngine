@@ -278,15 +278,13 @@ public sealed class VulkanParticleCaptureTests
     [Theory]
     [InlineData("disabled")]
     [InlineData("zero-emission")]
-    [InlineData("rejected")]
-    public async Task InactiveParticleOnlyScenesUseTruthfulClearCapture(string scenario)
+    public async Task IntentionallyInactiveParticleOnlyScenesUseQuietTruthfulClearCapture(string scenario)
     {
         var emitter = HighFidelityRenderGraphTests.ParticleEmitter(8);
         emitter = scenario switch
         {
             "disabled" => emitter with { Enabled = false },
             "zero-emission" => emitter with { SpawnRate = 0, Bursts = [] },
-            "rejected" => emitter with { SimulationSpace = "screen" },
             _ => throw new ArgumentOutOfRangeException(nameof(scenario))
         };
         var frame = Frame(withEmitter: false) with { Renderables = [], ParticleEmitters = [emitter] };
@@ -299,6 +297,71 @@ public sealed class VulkanParticleCaptureTests
         Assert.Equal(0, result.MeshCount);
         Assert.Null(result.HighFidelityFrame);
         Assert.Empty(result.Errors);
+    }
+
+    [Theory]
+    [InlineData("simulation-space", "REKALL_PARTICLE_SIMULATION_SPACE_UNSUPPORTED")]
+    [InlineData("size", "REKALL_PARTICLE_SIZE_CURVE_INVALID")]
+    public async Task RejectedParticleOnlyScenesClearWithoutExecutionAndPreserveDiagnostic(string scenario, string expectedCode)
+    {
+        var emitter = HighFidelityRenderGraphTests.ParticleEmitter(8);
+        emitter = scenario switch
+        {
+            "simulation-space" => emitter with { SimulationSpace = "screen" },
+            "size" => emitter with { SizeCurve = [new(0, -1)] },
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+        };
+        var frame = Frame(withEmitter: false) with { Renderables = [], ParticleEmitters = [emitter] };
+        var output = TestPaths.CreateTempDirectory();
+        using var capture = new RekallAgeNativeVulkanSceneCapture();
+
+        var result = await capture.CaptureSceneAsync(frame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(result.Captured, string.Join(Environment.NewLine, result.Errors));
+        Assert.Equal(0, result.MeshCount);
+        Assert.Empty(result.Errors);
+        var report = Assert.IsType<RekallAgeHighFidelityFrameReport>(result.HighFidelityFrame);
+        Assert.False(report.Executed);
+        Assert.Empty(report.Resources);
+        Assert.Empty(report.Passes);
+        Assert.Contains(report.Diagnostics, item => item.StartsWith(expectedCode, StringComparison.Ordinal));
+        var particles = Assert.IsType<RekallAgeHighFidelityParticleReport>(report.Particles);
+        Assert.False(particles.Enabled);
+        Assert.Equal(0, particles.AllocatedCapacity);
+        Assert.Equal(0, particles.SimulationDispatchCount);
+        Assert.Equal(0, particles.DrawCount);
+        Assert.Equal([emitter.EntityId], particles.RejectedEntityIds);
+        Assert.Contains(particles.Diagnostics, item => item.StartsWith(expectedCode, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task HugeFiniteParticleTimestepRejectsBeforePackingAndSurfacesNonExecutedNativeReport()
+    {
+        var emitter = HighFidelityRenderGraphTests.ParticleEmitter(8);
+        var frame = Frame(withEmitter: false) with
+        {
+            Renderables = [],
+            ParticleEmitters = [emitter],
+            DeltaSeconds = double.MaxValue
+        };
+        var output = TestPaths.CreateTempDirectory();
+        using var capture = new RekallAgeNativeVulkanSceneCapture();
+
+        var result = await capture.CaptureSceneAsync(frame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(result.Captured, string.Join(Environment.NewLine, result.Errors));
+        Assert.Empty(result.Errors);
+        var report = Assert.IsType<RekallAgeHighFidelityFrameReport>(result.HighFidelityFrame);
+        Assert.False(report.Executed);
+        var particles = Assert.IsType<RekallAgeHighFidelityParticleReport>(report.Particles);
+        Assert.False(particles.Enabled);
+        Assert.Equal(0, particles.AllocatedCapacity);
+        Assert.Equal(0, particles.PlannedSpawnCount);
+        Assert.Equal(0, particles.SimulationDispatchCount);
+        Assert.Equal(0, particles.DrawCount);
+        Assert.Equal(0, particles.DeltaSeconds);
+        Assert.Equal([emitter.EntityId], particles.RejectedEntityIds);
+        Assert.Contains(particles.Diagnostics, item => item.StartsWith("REKALL_PARTICLE_TIMESTEP_INVALID:", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -282,6 +282,38 @@ public sealed class VulkanParticlePlannerTests
         Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_TRANSFORM_INVALID" && item.EntityIds.SequenceEqual(["transform"]));
     }
 
+    [Fact]
+    public void ParticleSimulationTimestepRejectsInvalidGpuPackValuesAndAcceptsFloatBoundary()
+    {
+        var planner = new RekallAgeVulkanParticlePlanner();
+        var frame = Frame(Emitter("emitter", 1, 8));
+        var invalidTimesteps = new[]
+        {
+            double.NaN,
+            double.PositiveInfinity,
+            double.NegativeInfinity,
+            -1.0 / 60.0,
+            Math.BitIncrement((double)float.MaxValue),
+            double.MaxValue
+        };
+
+        foreach (var invalidTimestep in invalidTimesteps)
+        {
+            var plan = planner.Plan(frame, new(8), invalidTimestep);
+
+            Assert.Empty(plan.Emitters);
+            Assert.Equal(0, plan.AllocatedCapacity);
+            Assert.Equal(["emitter"], plan.RejectedEntityIds);
+            var diagnostic = Assert.Single(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_TIMESTEP_INVALID");
+            Assert.Equal(["emitter"], diagnostic.EntityIds);
+        }
+
+        var boundary = planner.Plan(frame, new(8), (double)float.MaxValue);
+
+        Assert.Single(boundary.Emitters);
+        Assert.DoesNotContain(boundary.Diagnostics, item => item.Code == "REKALL_PARTICLE_TIMESTEP_INVALID");
+    }
+
     private static RekallAgeRuntimeViewportFrame Frame(params RekallAgeRuntimeViewportParticleEmitter[] emitters) =>
         Frame(1, 1.0 / 60.0, emitters);
 

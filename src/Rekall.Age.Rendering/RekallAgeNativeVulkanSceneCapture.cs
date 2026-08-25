@@ -107,8 +107,17 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 outputDirectory,
                 RekallAgeVulkanClearColor.Default,
                 cancellationToken);
+            var clearResult = FromClearCapture(frame, assets, clear);
+            if (executableParticlePlan is { } resolvedParticlePlan
+                && resolvedParticlePlan.ParticlePlan.Diagnostics.Count > 0)
+            {
+                clearResult = clearResult with
+                {
+                    HighFidelityFrame = CreateClearParticleDiagnosticReport(resolvedParticlePlan)
+                };
+            }
             return await CompositeUiOverlayAsync(
-                FromClearCapture(frame, assets, clear),
+                clearResult,
                 frame,
                 assets,
                 cancellationToken);
@@ -410,6 +419,45 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             GraphicsPipelineCreated: false,
             TextureResourcesCreated: assets.Images.Count > 0,
             Errors: clear.Errors);
+    }
+
+    private static RekallAgeHighFidelityFrameReport CreateClearParticleDiagnosticReport(
+        RekallAgeVulkanHighFidelityFramePlan plan)
+    {
+        var particlePlan = plan.ParticlePlan;
+        return new RekallAgeHighFidelityFrameReport(
+            Executed: false,
+            SceneColorFormat: "R16G16B16A16_SFloat",
+            OutputColorFormat: "R8G8B8A8_UNorm",
+            Resources: [],
+            Passes: [],
+            Diagnostics: particlePlan.Diagnostics
+                .Select(item => $"{item.Code} [particle-simulate]: {item.Message}")
+                .ToArray())
+        {
+            Particles = new RekallAgeHighFidelityParticleReport(
+                Enabled: false,
+                AllocatedCapacity: 0,
+                PlannedSpawnCount: 0,
+                SimulationDispatch: particlePlan.SimulationDispatch,
+                SimulationDispatchCount: 0,
+                DrawCount: 0,
+                IndirectDraw: false,
+                DepthTested: false,
+                DepthWrite: false,
+                SceneDepthSampled: false,
+                HdrOutput: false,
+                DeltaSeconds: 0,
+                OverflowEntityIds: particlePlan.OverflowEntityIds,
+                RejectedEntityIds: particlePlan.RejectedEntityIds,
+                Diagnostics: particlePlan.Diagnostics
+                    .Select(item => $"{item.Code}: {item.Message}")
+                    .ToArray())
+            {
+                SimulationSource = particlePlan.SimulationSource,
+                SimulationDestination = particlePlan.SimulationDestination
+            }
+        };
     }
 
     private static RekallAgeVulkanSceneCaptureResult Unavailable(
@@ -4845,7 +4893,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     false,
                     executed && plan.ParticlePlan.AllocatedCapacity > 0,
                     executed && plan.ParticlePlan.AllocatedCapacity > 0,
-                    commandPlan?.PreparedFrame.Frame.DeltaSeconds ?? 0,
+                    executed && plan.ParticlePlan.AllocatedCapacity > 0
+                        ? commandPlan?.PreparedFrame.Frame.DeltaSeconds ?? 0
+                        : 0,
                     plan.ParticlePlan.OverflowEntityIds,
                     plan.ParticlePlan.RejectedEntityIds,
                     plan.ParticlePlan.Diagnostics.Select(item => $"{item.Code}: {item.Message}").ToArray())

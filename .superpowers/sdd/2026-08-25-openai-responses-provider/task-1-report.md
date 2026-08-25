@@ -139,7 +139,7 @@ Identifier safety, including preservation of valid structured facts (corrected a
 dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs|FullyQualifiedName~ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues|FullyQualifiedName~ProviderExceptionPreservesStructuredFactsAndRedactsSuppliedSecrets|FullyQualifiedName~ProviderExceptionRedactsSuppliedSecretsFromStructuredLoggableFields"
 ```
 
-Discovered tests: `ProviderExceptionPreservesStructuredFactsAndRedactsSuppliedSecrets`, `ProviderExceptionRedactsSuppliedSecretsFromStructuredLoggableFields`, `ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs`, and `ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues`. Fresh result: 4 passed, 0 failed, 0 skipped; test duration 28ms. The discovery command plus this test run had a combined command wall time of 7.2s. The superseded filter included two nonexistent names and actually selected only 2 tests; its exact audit is recorded below.
+Discovered tests: `ProviderExceptionPreservesStructuredFactsAndRedactsSuppliedSecrets`, `ProviderExceptionRedactsSuppliedSecretsFromStructuredLoggableFields`, `ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs`, and `ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues`. Fresh result: 4 passed, 0 failed, 0 skipped; test duration 28ms. The discovery command plus this test run had a combined command wall time of 7.2s.
 
 Malformed-stream rejection plus distinct cancellation behavior:
 
@@ -213,15 +213,7 @@ dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter
 
 Result: 6 passed, 0 failed, 0 skipped; test duration 27ms; command wall time 4.2s.
 
-### Report filter audit and correction
-
-The exact previously recorded command was rerun verbatim:
-
-```powershell
-dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs|FullyQualifiedName~ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues|FullyQualifiedName~ProviderExceptionExposesStructuredFactsAndRedactsSensitiveValues|FullyQualifiedName~ProviderExceptionPreservesValidStableIdentifiers"
-```
-
-Actual result: 2 passed, 0 failed, 0 skipped; test duration 30ms; command wall time 3.8s. The first two names existed; `ProviderExceptionExposesStructuredFactsAndRedactsSensitiveValues` and `ProviderExceptionPreservesValidStableIdentifiers` did not exist and selected no tests. The earlier 4-test claim was inaccurate.
+### Corrected report filter evidence
 
 The corrected filter was first run in discovery mode:
 
@@ -248,3 +240,15 @@ dotnet build Rekall.AGE.sln --no-restore
 Focused result: 112 passed, 0 failed, 0 skipped; test duration 620ms. Build result: succeeded with 0 warnings and 0 errors; MSBuild elapsed 5.15s. The combined command wall time was 9.8s. No project references or dependencies changed.
 
 Final task audit: 0 worktree-rooted long-lived `dotnet`, `testhost`, or Rekall processes and 0 untracked temp/backup artifacts. After the report commit, all round-2 task files are committed. The only remaining worktree modification is the controller-owned SDD ledger line in `progress.md`, which the controller explicitly directed this task not to modify, stage, or commit. No blocking implementation concerns remain.
+
+## Review fix round 3 — 2026-08-25
+
+Documentation-only correction: removed the historical invalid-filter reproduction and every reference to its two retired test identifiers. A full-report search for the controller-specified retired-name alternation returned `STALE_NAME_MATCHES=0` in 0.3s.
+
+The preserved corrected filter was rerun exactly:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs|FullyQualifiedName~ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues|FullyQualifiedName~ProviderExceptionPreservesStructuredFactsAndRedactsSuppliedSecrets|FullyQualifiedName~ProviderExceptionRedactsSuppliedSecretsFromStructuredLoggableFields"
+```
+
+Result: 4 passed, 0 failed, 0 skipped; test duration 23ms; command wall time 16.0s. No implementation, test, build, dependency, or controller-owned `progress.md` changes were made in this round.

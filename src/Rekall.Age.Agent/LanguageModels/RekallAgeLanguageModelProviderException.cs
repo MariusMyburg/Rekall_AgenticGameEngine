@@ -46,18 +46,15 @@ public sealed class RekallAgeLanguageModelProviderException : Exception
 
     private static string BuildCode(string? code, IReadOnlyCollection<string>? sensitiveValues)
     {
-        if (ContainsSensitiveValue(code, sensitiveValues))
-        {
-            return FallbackCode;
-        }
-
         var normalized = NormalizeIdentifier(
             code,
             '_',
             upperInvariant: true,
             allowHyphens: false,
             allowDots: false);
-        return normalized.Length is > 0 and <= MaximumIdentifierCharacters
+        return !ContainsSensitiveValue(code, sensitiveValues)
+            && !ContainsSensitiveValue(normalized, sensitiveValues)
+            && normalized.Length is > 0 and <= MaximumIdentifierCharacters
             && normalized.StartsWith("REKALL_", StringComparison.Ordinal)
             ? normalized
             : FallbackCode;
@@ -65,18 +62,15 @@ public sealed class RekallAgeLanguageModelProviderException : Exception
 
     private static string BuildProviderId(string? providerId, IReadOnlyCollection<string>? sensitiveValues)
     {
-        if (ContainsSensitiveValue(providerId, sensitiveValues))
-        {
-            return FallbackProviderId;
-        }
-
         var normalized = NormalizeIdentifier(
             providerId,
             '-',
             upperInvariant: false,
             allowHyphens: true,
             allowDots: true);
-        return normalized.Length is > 0 and <= MaximumIdentifierCharacters
+        return !ContainsSensitiveValue(providerId, sensitiveValues)
+            && !ContainsSensitiveValue(normalized, sensitiveValues)
+            && normalized.Length is > 0 and <= MaximumIdentifierCharacters
             ? normalized
             : FallbackProviderId;
     }
@@ -102,7 +96,7 @@ public sealed class RekallAgeLanguageModelProviderException : Exception
         {
             foreach (var sensitiveValue in sensitiveValues.Where(value => !string.IsNullOrEmpty(value)))
             {
-                redacted = redacted.Replace(sensitiveValue, "[REDACTED]", StringComparison.Ordinal);
+                redacted = redacted.Replace(sensitiveValue, "[REDACTED]", StringComparison.OrdinalIgnoreCase);
             }
         }
 
@@ -116,7 +110,7 @@ public sealed class RekallAgeLanguageModelProviderException : Exception
         && sensitiveValues is not null
         && sensitiveValues.Any(sensitiveValue =>
             !string.IsNullOrEmpty(sensitiveValue)
-            && value.Contains(sensitiveValue, StringComparison.Ordinal));
+            && value.Contains(sensitiveValue, StringComparison.OrdinalIgnoreCase));
 
     private static string NormalizeIdentifier(
         string? value,

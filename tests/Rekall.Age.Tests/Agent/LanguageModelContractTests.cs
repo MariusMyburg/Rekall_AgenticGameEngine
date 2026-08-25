@@ -171,6 +171,79 @@ public sealed class LanguageModelContractTests
         Assert.DoesNotContain(secret, error.ToString(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("SECRET", "rekall_secret_failed", "provider-secret", "secret")]
+    [InlineData("secret", "REKALL_SECRET_FAILED", "PROVIDER-SECRET", "SECRET")]
+    [InlineData("SeCrEt", "rekall_secret_failed", "provider-SECRET", "sEcReT")]
+    [InlineData("SÉCRET", "rekall_sécret_failed", "provider-sécret", "sécret")]
+    public void ProviderExceptionRejectsCaseVariantSecretsAcrossAllSerializedPublicFields(
+        string secret,
+        string code,
+        string providerId,
+        string fieldValue)
+    {
+        var error = new RekallAgeLanguageModelProviderException(
+            code,
+            providerId,
+            $"Provider rejected {fieldValue}.",
+            requestId: $"request-{fieldValue}",
+            requestedValue: $"requested={fieldValue}",
+            resolvedValue: $"resolved={fieldValue}",
+            sensitiveValues: [secret]);
+        var structuredLog = JsonSerializer.Serialize(new
+        {
+            error.Code,
+            error.ProviderId,
+            error.RequestId,
+            error.RequestedValue,
+            error.ResolvedValue,
+            error.Message,
+            Exception = error.ToString()
+        });
+
+        Assert.Equal("REKALL_LANGUAGE_MODEL_PROVIDER_ERROR", error.Code);
+        Assert.Equal("unknown", error.ProviderId);
+        Assert.DoesNotContain(secret, structuredLog, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(
+        "a_b",
+        "rekall_a b_failed",
+        "provider-safe",
+        "REKALL_LANGUAGE_MODEL_PROVIDER_ERROR",
+        "provider-safe")]
+    [InlineData(
+        "a-b",
+        "REKALL_SAFE_FAILED",
+        "provider a b",
+        "REKALL_SAFE_FAILED",
+        "unknown")]
+    public void ProviderExceptionRejectsSecretsCreatedByIdentifierSanitization(
+        string secret,
+        string code,
+        string providerId,
+        string expectedCode,
+        string expectedProviderId)
+    {
+        var error = new RekallAgeLanguageModelProviderException(
+            code,
+            providerId,
+            "Provider request failed.",
+            sensitiveValues: [secret]);
+        var structuredLog = JsonSerializer.Serialize(new
+        {
+            error.Code,
+            error.ProviderId,
+            error.Message,
+            Exception = error.ToString()
+        });
+
+        Assert.Equal(expectedCode, error.Code);
+        Assert.Equal(expectedProviderId, error.ProviderId);
+        Assert.DoesNotContain(secret, structuredLog, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues()
     {

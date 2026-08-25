@@ -707,6 +707,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool HasSessionOpenAiCredential => _sessionOpenAiApiKey is not null;
 
+    public RekallAgeCodexApprovalCallback? CodexApprovalHandler { get; set; }
+
+    internal ValueTask<RekallAgeCodexApprovalDecision> RouteCodexApprovalAsync(
+        RekallAgeCodexApprovalRequest request,
+        CancellationToken cancellationToken) =>
+        CodexApprovalHandler?.Invoke(request, cancellationToken)
+        ?? ValueTask.FromResult(RekallAgeCodexApprovalDecision.Decline);
+
     public string SelectedReasoningEffort
     {
         get => _selectedReasoningEffort;
@@ -2680,6 +2688,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 _agentRegistry,
                 sessionSettings);
             var runner = acquiredLease.Runner;
+            if (runner is RekallAgeCodexProjectAgentRunner codexRunner)
+            {
+                codexRunner.ApprovalCallback = RouteCodexApprovalAsync;
+            }
             var models = await runner.ListModelsAsync(_lifecycleCancellation.Token);
             lock (_languageModelLifecycleSync)
             {
@@ -2687,7 +2699,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 _languageModelProviderLease = acquiredLease;
                 _languageModelRunner = runner;
                 acquiredLease = null;
-                ApplyLanguageModels(provider, models);
+                ApplyLanguageModels(EffectiveProviderDescriptor(provider, runner), models);
             }
         }
         catch (RekallAgeLanguageModelProviderException exception)
@@ -2757,10 +2769,17 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             if (!IsCurrentLanguageModelTransitionLocked(provider, generation)
                 || !ReferenceEquals(_languageModelRunner, runner)) return false;
-            ApplyLanguageModels(provider, models);
+            ApplyLanguageModels(EffectiveProviderDescriptor(provider, runner), models);
             return true;
         }
     }
+
+    private static RekallAgeLanguageModelProviderDescriptor EffectiveProviderDescriptor(
+        RekallAgeLanguageModelProviderDescriptor provider,
+        IRekallAgeProjectAgentRunner runner) =>
+        runner is RekallAgeCodexProjectAgentRunner codexRunner
+            ? codexRunner.CurrentProviderDescriptor
+            : provider;
 
     private void ApplyLanguageModels(
         RekallAgeLanguageModelProviderDescriptor provider,
@@ -2780,9 +2799,20 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
 
         SelectedLanguageModel = provider.DefaultModel;
-        ProviderStatus = $"{provider.DisplayName} ready with {LanguageModels.Count} model{(LanguageModels.Count == 1 ? string.Empty : "s")}.";
+        var authentication = provider.Id == "codex"
+            ? $" via {CodexAuthenticationLabel(provider.AuthenticationState)}"
+            : string.Empty;
+        ProviderStatus = $"{provider.DisplayName} ready{authentication} with {LanguageModels.Count} model{(LanguageModels.Count == 1 ? string.Empty : "s")}.";
         StatusText = ProviderStatus;
     }
+
+    private static string CodexAuthenticationLabel(string authenticationState) =>
+        authenticationState switch
+        {
+            "chatgpt" => "ChatGPT",
+            "api-key" => "API key",
+            _ => "Codex authentication"
+        };
 
     private bool IsCurrentLanguageModelTransition(
         RekallAgeLanguageModelProviderDescriptor provider,

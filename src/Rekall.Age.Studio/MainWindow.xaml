@@ -568,7 +568,7 @@
                                       SelectedItem="{Binding SelectedReasoningEffort, Mode=TwoWay}"
                                       Margin="0,3,0,6" />
                             <TextBlock Text="{Binding ProviderStatus}" Foreground="#75869A" TextWrapping="Wrap" Margin="0,0,0,6" />
-                            <Button Content="Refresh Models" Command="{Binding RefreshLanguageModelsCommand}" Padding="8,4" Margin="0,0,0,8" />
+                            <Button Content="Refresh Provider Status &amp; Models" Command="{Binding RefreshLanguageModelsCommand}" Padding="8,4" Margin="0,0,0,8" />
                             <TextBlock Text="Game-authoring task" Foreground="#9FB0C4" />
                             <Grid Height="86" Margin="0,3,0,6">
                                 <TextBox Text="{Binding AgentTaskInput, UpdateSourceTrigger=PropertyChanged}"

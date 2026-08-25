@@ -361,13 +361,24 @@ public sealed class RekallAgeCodexProjectAgentRunner :
                     }
                 }
 
+                var decisionValue = serverRequest.Method == "mcpServer/elicitation/request"
+                    && decision == RekallAgeCodexApprovalDecision.AcceptForSession
+                        ? "accept"
+                        : ApprovalDecisionValue(decision);
+                var response = serverRequest.Method == "mcpServer/elicitation/request"
+                    ? new JsonObject { ["action"] = decisionValue }
+                    : new JsonObject { ["decision"] = decisionValue };
+                if (serverRequest.Method == "mcpServer/elicitation/request"
+                    && decision is RekallAgeCodexApprovalDecision.Accept or RekallAgeCodexApprovalDecision.AcceptForSession)
+                {
+                    response["content"] = new JsonObject();
+                }
                 await client.RespondToServerRequestAsync(
                     serverRequest,
-                    new JsonObject { ["decision"] = ApprovalDecisionValue(decision) },
+                    response,
                     cancellationToken).ConfigureAwait(false);
-                evidence.Report(
-                    "approval",
-                    $"{serverRequest.Method}: {ApprovalDecisionValue(decision)}");
+                var approvalFact = $"{serverRequest.Method}: {decisionValue}";
+                evidence.AddDiagnostic("REKALL_CODEX_APPROVAL", approvalFact);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

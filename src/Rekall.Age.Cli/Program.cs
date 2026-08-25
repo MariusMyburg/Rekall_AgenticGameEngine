@@ -58,14 +58,18 @@ internal static class RekallAgeCli
                 ["agent", "providers"] => ListLanguageModelProviders(),
                 ["agent", "models", var provider] =>
                     await ListLanguageModelsAsync(registry, provider, cancellationToken),
+                ["agent", "auth", var provider, "status"] =>
+                    await ShowLanguageModelAuthenticationStatusAsync(registry, provider, cancellationToken),
                 ["agent", "run", var provider, var model, var task] =>
                     await RunLanguageModelAgentAsync(registry, provider, model, task, "24", cancellationToken),
                 ["agent", "run", var provider, var model, var task, var maxTurns] =>
                     await RunLanguageModelAgentAsync(registry, provider, model, task, maxTurns, cancellationToken),
                 ["agent", "run-project", var provider, var model, var root, var scene, var task] =>
-                    await RunProjectLanguageModelAgentAsync(registry, provider, model, root, scene, task, "24", cancellationToken),
+                    await RunProjectLanguageModelAgentAsync(registry, provider, model, root, scene, task, "24", null, cancellationToken),
                 ["agent", "run-project", var provider, var model, var root, var scene, var task, var maxTurns] =>
-                    await RunProjectLanguageModelAgentAsync(registry, provider, model, root, scene, task, maxTurns, cancellationToken),
+                    await RunProjectLanguageModelAgentAsync(registry, provider, model, root, scene, task, maxTurns, null, cancellationToken),
+                ["agent", "run-project", var provider, var model, var root, var scene, var task, "--approval-policy", var approvalPolicy] =>
+                    await RunProjectLanguageModelAgentAsync(registry, provider, model, root, scene, task, "24", approvalPolicy, cancellationToken),
                 ["distribution", "assemble", var output, var cli, var studio, var headless, var windows, var sdk, var readme, var notice, var thirdParty] =>
                     await AssembleDistributionAsync(
                         registry, context, output, cli, studio, headless, windows, sdk, readme, notice, thirdParty),
@@ -3233,7 +3237,7 @@ internal static class RekallAgeCli
         cancellationToken.IsCancellationRequested
         && arguments.Count >= 2
         && arguments[0].Equals("agent", StringComparison.OrdinalIgnoreCase)
-        && arguments[1] is "models" or "run" or "run-project";
+        && arguments[1] is "models" or "run" or "run-project" or "auth";
 
     private static void WriteLanguageModelProviderDiagnostic(RekallAgeLanguageModelProviderException error)
     {
@@ -3268,6 +3272,35 @@ internal static class RekallAgeCli
         }
 
         return 0;
+    }
+
+    private static async Task<int> ShowLanguageModelAuthenticationStatusAsync(
+        RekallAgeCommandRegistry registry,
+        string provider,
+        CancellationToken cancellationToken)
+    {
+        if (!provider.Equals("codex", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new RekallAgeLanguageModelProviderException(
+                "REKALL_CODEX_AUTH_PROVIDER_REQUIRED",
+                provider,
+                "Authentication status is available here only for the Codex-managed provider.",
+                requestedValue: provider,
+                resolvedValue: "codex");
+        }
+
+        await using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire("codex", registry);
+        var runner = (RekallAgeCodexProjectAgentRunner)lease.Runner;
+        var descriptor = await runner.DescribeProviderAsync(cancellationToken);
+        Console.WriteLine($"Provider: {descriptor.Id}");
+        Console.WriteLine($"Authentication: {descriptor.AuthenticationState}");
+        Console.WriteLine($"Availability: {descriptor.Availability}");
+        Console.WriteLine($"Default model: {descriptor.DefaultModel}");
+        foreach (var diagnostic in descriptor.Diagnostics)
+        {
+            Console.WriteLine($"{diagnostic.Code}: {diagnostic.Message}");
+        }
+        return descriptor.IsAvailable ? 0 : 1;
     }
 
     private static async Task<int> RunLanguageModelAgentAsync(
@@ -3324,6 +3357,7 @@ internal static class RekallAgeCli
         string sceneName,
         string taskOrPath,
         string maxTurnsText,
+        string? approvalPolicy,
         CancellationToken cancellationToken)
     {
         var task = File.Exists(taskOrPath)
@@ -3335,7 +3369,13 @@ internal static class RekallAgeCli
             return 2;
         }
 
-        await using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire(provider, registry);
+        var settings = approvalPolicy is null
+            ? null
+            : new RekallAgeLanguageModelProviderSettings { CodexApprovalPolicy = approvalPolicy };
+        await using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire(
+            provider,
+            registry,
+            settings);
         var result = await lease.Runner.RunAsync(
             new RekallAgeProjectAgentSessionRequest(projectRoot, sceneName, model, task)
             {

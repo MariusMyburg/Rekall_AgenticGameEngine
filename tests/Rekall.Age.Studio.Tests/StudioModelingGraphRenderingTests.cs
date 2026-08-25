@@ -119,7 +119,8 @@ public sealed class StudioModelingGraphRenderingTests
                 window.Height = 820;
                 window.Show();
                 window.UpdateLayout();
-                var graphTabs = Descendants<TabControl>(window).Single(item => item.Items.Count == 2);
+                var graphTabs = Descendants<TabControl>(window).Single(item =>
+                    item.Items.OfType<TabItem>().Any(tab => string.Equals(tab.Header as string, "Mesh Edit", StringComparison.Ordinal)));
                 graphTabs.SelectedIndex = 1;
                 window.UpdateLayout();
 

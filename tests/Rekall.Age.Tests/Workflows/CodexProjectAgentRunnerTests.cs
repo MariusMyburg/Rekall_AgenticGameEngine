@@ -261,7 +261,12 @@ public sealed class CodexProjectAgentRunnerTests
                 """{"id":"approval-1","result":{"decision":"decline"}}""");
             await CompleteTurnAsync(process, "completed");
 
-            Assert.True((await run).Succeeded);
+            var result = await run;
+            Assert.True(result.Succeeded);
+            Assert.Contains(
+                "item/commandExecution/requestApproval: decline",
+                result.Summary,
+                StringComparison.Ordinal);
         }
         finally
         {
@@ -303,7 +308,50 @@ public sealed class CodexProjectAgentRunnerTests
             Assert.Equal("item/fileChange/requestApproval", observed.Method);
             await CompleteTurnAsync(process, "completed");
 
-            Assert.True((await run).Succeeded);
+            var result = await run;
+            Assert.True(result.Succeeded);
+            Assert.Contains(
+                "item/fileChange/requestApproval: accept",
+                result.Summary,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(fixture.FullName, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task McpElicitationApprovalUsesTheAppServerActionResponseContract()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var fixture = Directory.CreateTempSubdirectory("rekall-codex-mcp-approval-");
+        try
+        {
+            var process = new FakeCodexProcess();
+            await using var runner = CreateRunner(
+                fixture.FullName,
+                process,
+                approvalCallback: (_, _) =>
+                    ValueTask.FromResult(RekallAgeCodexApprovalDecision.Accept));
+            var run = await StartRunThroughTurnAsync(
+                runner,
+                process,
+                fixture.FullName,
+                progress: null,
+                timeout.Token,
+                timeout.Token);
+
+            await process.WriteServerLineAsync(
+                """{"id":"mcp-approval-1","method":"mcpServer/elicitation/request","params":{"serverName":"rekall-age","threadId":"thread-1","turnId":"turn-1","mode":"form","message":"Approve tool call","requestedSchema":{"type":"object","properties":{}}}}""");
+            AssertJson(
+                await process.ReadClientLineAsync(timeout.Token),
+                """{"id":"mcp-approval-1","result":{"action":"accept","content":{}}}""");
+            await CompleteTurnAsync(process, "completed");
+
+            var result = await run;
+            Assert.True(result.Succeeded);
+            Assert.Contains("mcpServer/elicitation/request: accept", result.Summary, StringComparison.Ordinal);
         }
         finally
         {

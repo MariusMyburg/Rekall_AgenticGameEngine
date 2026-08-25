@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Rekall.Age.Agent.Codex;
 using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Assets;
 using Rekall.Age.Core.Commands;
@@ -28,6 +29,34 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioViewModelTests
 {
     [Fact]
+    public async Task CodexApprovalRequestsRouteToTheStudioHandlerAndDefaultToDecline()
+    {
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            new EmptyModel());
+        using var parameters = JsonDocument.Parse("{\"itemId\":\"change-1\"}");
+        var request = new RekallAgeCodexApprovalRequest(
+            "item/fileChange/requestApproval",
+            parameters.RootElement.Clone());
+
+        Assert.Equal(
+            RekallAgeCodexApprovalDecision.Decline,
+            await viewModel.RouteCodexApprovalAsync(request, CancellationToken.None));
+
+        RekallAgeCodexApprovalRequest? observed = null;
+        viewModel.CodexApprovalHandler = (candidate, _) =>
+        {
+            observed = candidate;
+            return ValueTask.FromResult(RekallAgeCodexApprovalDecision.AcceptForSession);
+        };
+
+        Assert.Equal(
+            RekallAgeCodexApprovalDecision.AcceptForSession,
+            await viewModel.RouteCodexApprovalAsync(request, CancellationToken.None));
+        Assert.Equal(request, observed);
+    }
+
+    [Fact]
     public async Task ProviderSelectionExposesStableMissingOpenAiCredentialGateWithoutRetainingOllamaModels()
     {
         var ollama = new ProviderLifecycleHandler(blockOllamaChat: false);
@@ -39,7 +68,7 @@ public sealed class StudioViewModelTests
             catalog,
             new RecordingPreviewSession());
 
-        Assert.Equal(["ollama", "openai"], viewModel.LanguageModelProviders.Select(provider => provider.Id));
+        Assert.Equal(["ollama", "openai", "codex"], viewModel.LanguageModelProviders.Select(provider => provider.Id));
         Assert.Equal(["none", "low", "medium", "high", "xhigh", "max"], viewModel.ReasoningEfforts);
         Assert.Equal("medium", viewModel.SelectedReasoningEffort);
         Assert.Equal("ollama", viewModel.SelectedLanguageModelProvider.Id);
@@ -1508,6 +1537,26 @@ public sealed class StudioViewModelTests
             [RekallAgeStudioAutomation.AutomationSwitch, "--project", "game"],
             out _, out var missing));
         Assert.Contains("--model", missing, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AutomationArgumentsAcceptCodexAsAProjectAgentProvider()
+    {
+        var parsed = RekallAgeStudioAutomation.TryParse(
+            [
+                RekallAgeStudioAutomation.AutomationSwitch,
+                "--project", "game",
+                "--project-name", "Game",
+                "--provider", "codex",
+                "--model", "gpt-5.6-sol",
+                "--task", "Author and prove a game",
+                "--evidence", "evidence.json"
+            ],
+            out var options,
+            out var error);
+
+        Assert.True(parsed, error);
+        Assert.Equal("codex", options!.Provider);
     }
 
     [Fact]

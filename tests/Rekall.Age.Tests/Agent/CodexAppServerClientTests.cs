@@ -10,6 +10,114 @@ namespace Rekall.Age.Tests.Agent;
 public sealed class CodexAppServerClientTests
 {
     [Fact]
+    public void WindowsNpmShimResolvesToStructuredNodeLaunchWithoutUsingAShell()
+    {
+        var fixture = Directory.CreateTempSubdirectory("rekall-codex-npm-");
+        try
+        {
+            var node = Path.Combine(fixture.FullName, "node.exe");
+            var shim = Path.Combine(fixture.FullName, "codex.cmd");
+            var entry = Path.Combine(
+                fixture.FullName,
+                "node_modules",
+                "@openai",
+                "codex",
+                "bin",
+                "codex.js");
+            Directory.CreateDirectory(Path.GetDirectoryName(entry)!);
+            File.WriteAllText(node, string.Empty);
+            File.WriteAllText(shim, string.Empty);
+            File.WriteAllText(entry, string.Empty);
+
+            var startInfo = RekallAgeCodexAppServerClient.CreateStartInfo(
+                configuredExecutable: null,
+                pathEnvironment: fixture.FullName,
+                isWindows: true);
+
+            Assert.Equal(node, startInfo.FileName);
+            Assert.Equal([entry, "app-server", "--listen", "stdio://"], startInfo.ArgumentList);
+            Assert.False(startInfo.UseShellExecute);
+        }
+        finally
+        {
+            Directory.Delete(fixture.FullName, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task EphemeralSmokeThreadCanUseReadOnlySandboxWithoutWritableRootConfiguration()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var process = new FakeCodexProcess();
+        var factory = new FakeCodexProcessFactory(process);
+        var start = RekallAgeCodexAppServerClient.StartAsync(
+            new RekallAgeCodexAppServerOptions
+            {
+                ExecutablePath = "codex-test",
+                ClientVersion = "test",
+                ShutdownTimeout = TimeSpan.FromMilliseconds(50),
+                InterruptTimeout = TimeSpan.FromMilliseconds(50)
+            },
+            factory,
+            timeout.Token);
+        _ = await process.ReadClientLineAsync(timeout.Token);
+        await process.WriteServerLineAsync(
+            """{"id":1,"result":{"userAgent":"codex-cli/test","platformFamily":"windows","platformOs":"windows","codexHome":"C:\\bounded"}}""");
+        _ = await process.ReadClientLineAsync(timeout.Token);
+        await using var client = await start;
+        var root = Path.GetFullPath(Path.GetTempPath());
+
+        var thread = client.StartThreadAsync(
+            new RekallAgeCodexThreadStartRequest(root, "gpt-5.6-sol", "Perform a bounded smoke check.")
+            {
+                ApprovalPolicy = "never",
+                Ephemeral = true,
+                Sandbox = "read-only"
+            },
+            timeout.Token);
+
+        var request = JsonNode.Parse(await process.ReadClientLineAsync(timeout.Token))!.AsObject();
+        Assert.Equal("read-only", request["params"]!["sandbox"]!.GetValue<string>());
+        Assert.Null(request["params"]!["config"]!["sandbox_workspace_write"]);
+        await process.WriteServerLineAsync(
+            "{\"id\":2,\"result\":{\"thread\":{\"id\":\"smoke\"},\"model\":\"gpt-5.6-sol\",\"cwd\":"
+            + JsonValue.Create(root)!.ToJsonString()
+            + "}}");
+        Assert.Equal("smoke", (await thread).Id);
+    }
+
+    [Fact]
+    public async Task NotificationRedactionAcceptsOrdinaryStringArraysWithoutBreakingTheProtocolReader()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var process = new FakeCodexProcess();
+        var start = RekallAgeCodexAppServerClient.StartAsync(
+            new RekallAgeCodexAppServerOptions
+            {
+                ExecutablePath = "codex-test",
+                ClientVersion = "test",
+                ShutdownTimeout = TimeSpan.FromMilliseconds(50),
+                InterruptTimeout = TimeSpan.FromMilliseconds(50)
+            },
+            new FakeCodexProcessFactory(process),
+            timeout.Token);
+        _ = await process.ReadClientLineAsync(timeout.Token);
+        await process.WriteServerLineAsync(
+            """{"id":1,"result":{"userAgent":"codex-cli/test","platformFamily":"windows","platformOs":"windows","codexHome":"C:\\bounded"}}""");
+        _ = await process.ReadClientLineAsync(timeout.Token);
+        await using var client = await start;
+
+        await process.WriteServerLineAsync(
+            """{"method":"item/completed","params":{"threadId":"thread-1","item":{"type":"commandExecution","command":["pwsh","-NoProfile","Get-Content SKILL.md"],"status":"completed"}}}""");
+
+        var notification = await client.ReadNotificationAsync(timeout.Token);
+        Assert.Equal("item/completed", notification.Method);
+        Assert.Equal(
+            ["pwsh", "-NoProfile", "Get-Content SKILL.md"],
+            notification.Params.GetProperty("item").GetProperty("command").EnumerateArray().Select(item => item.GetString()));
+    }
+
+    [Fact]
     public async Task InstalledV2TranscriptRoutesOutOfOrderResponsesAndSeparatesInboundKinds()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));

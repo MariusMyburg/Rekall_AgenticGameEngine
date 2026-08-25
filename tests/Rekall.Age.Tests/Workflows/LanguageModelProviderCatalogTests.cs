@@ -10,6 +10,25 @@ namespace Rekall.Age.Tests.Workflows;
 public sealed class LanguageModelProviderCatalogTests
 {
     [Fact]
+    public async Task ExplicitCodexNeverApprovalPolicyCreatesAnAutoAcceptingNoninteractiveRunner()
+    {
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { CodexApprovalPolicy = "never" });
+        await using var lease = catalog.Acquire(
+            "codex",
+            RekallAgeDefaultCommandRegistry.Create());
+
+        var runner = Assert.IsType<RekallAgeCodexProjectAgentRunner>(lease.Runner);
+        Assert.Equal("on-request", runner.ApprovalPolicy);
+        Assert.NotNull(runner.ApprovalCallback);
+        using var parameters = JsonDocument.Parse("{}");
+        var decision = await runner.ApprovalCallback(
+            new RekallAgeCodexApprovalRequest("item/mcpToolCall/requestApproval", parameters.RootElement.Clone()),
+            CancellationToken.None);
+        Assert.Equal(RekallAgeCodexApprovalDecision.Accept, decision);
+    }
+
+    [Fact]
     public void DefaultCatalogPublishesInspectableProviderDescriptorsWithoutCredentials()
     {
         var catalog = new RekallAgeLanguageModelProviderCatalog(

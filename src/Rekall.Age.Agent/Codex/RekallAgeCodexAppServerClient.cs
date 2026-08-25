@@ -103,19 +103,10 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         var executable = !string.IsNullOrWhiteSpace(options.ExecutablePath)
             ? options.ExecutablePath
             : Environment.GetEnvironmentVariable("REKALL_AGE_CODEX_PATH");
-        executable = string.IsNullOrWhiteSpace(executable) ? "codex" : executable;
-
-        var startInfo = new ProcessStartInfo(executable)
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-        startInfo.ArgumentList.Add("app-server");
-        startInfo.ArgumentList.Add("--listen");
-        startInfo.ArgumentList.Add("stdio://");
+        var startInfo = CreateStartInfo(
+            executable,
+            Environment.GetEnvironmentVariable("PATH"),
+            OperatingSystem.IsWindows());
 
         IRekallAgeCodexProcess process;
         try
@@ -140,6 +131,103 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
             await client.DisposeAsync();
             throw;
         }
+    }
+
+    internal static ProcessStartInfo CreateStartInfo(
+        string? configuredExecutable,
+        string? pathEnvironment,
+        bool isWindows)
+    {
+        var executable = string.IsNullOrWhiteSpace(configuredExecutable)
+            ? "codex"
+            : configuredExecutable;
+        string? nodeEntryPoint = null;
+        if (isWindows
+            && (string.IsNullOrWhiteSpace(configuredExecutable)
+                || executable.Equals("codex", StringComparison.OrdinalIgnoreCase)
+                || executable.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)))
+        {
+            var shim = ResolveWindowsNpmShim(executable, pathEnvironment);
+            if (shim is not null)
+            {
+                executable = shim.Value.NodeExecutable;
+                nodeEntryPoint = shim.Value.EntryPoint;
+            }
+        }
+
+        var startInfo = new ProcessStartInfo(executable)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        if (nodeEntryPoint is not null)
+        {
+            startInfo.ArgumentList.Add(nodeEntryPoint);
+        }
+        startInfo.ArgumentList.Add("app-server");
+        startInfo.ArgumentList.Add("--listen");
+        startInfo.ArgumentList.Add("stdio://");
+        return startInfo;
+    }
+
+    private static (string NodeExecutable, string EntryPoint)? ResolveWindowsNpmShim(
+        string executable,
+        string? pathEnvironment)
+    {
+        IEnumerable<string> directories;
+        if (Path.IsPathFullyQualified(executable))
+        {
+            directories = [Path.GetDirectoryName(executable)!];
+        }
+        else
+        {
+            directories = (pathEnvironment ?? string.Empty)
+                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        }
+
+        foreach (var directory in directories)
+        {
+            var shim = Path.IsPathFullyQualified(executable)
+                ? executable
+                : Path.Combine(directory, "codex.cmd");
+            if (!shim.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) || !File.Exists(shim))
+            {
+                continue;
+            }
+
+            var entryPoint = Path.Combine(
+                directory,
+                "node_modules",
+                "@openai",
+                "codex",
+                "bin",
+                "codex.js");
+            var localNode = Path.Combine(directory, "node.exe");
+            var nodeExecutable = File.Exists(localNode)
+                ? localNode
+                : FindExecutableOnPath("node.exe", pathEnvironment);
+            if (File.Exists(entryPoint) && nodeExecutable is not null)
+            {
+                return (Path.GetFullPath(nodeExecutable), Path.GetFullPath(entryPoint));
+            }
+        }
+
+        return null;
+    }
+
+    private static string? FindExecutableOnPath(string executable, string? pathEnvironment)
+    {
+        foreach (var directory in (pathEnvironment ?? string.Empty)
+                     .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var candidate = Path.Combine(directory, executable);
+            if (File.Exists(candidate)) return candidate;
+        }
+
+        return null;
     }
 
     public async Task<RekallAgeCodexAccount> ReadAccountAsync(
@@ -221,6 +309,10 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         {
             throw new ArgumentException("The Codex model and developer instructions are required.", nameof(request));
         }
+        if (request.Sandbox is not "workspace-write" and not "read-only")
+        {
+            throw new ArgumentException("The Codex sandbox must be workspace-write or read-only.", nameof(request));
+        }
 
         var projectRoot = NormalizeProjectRoot(request.ProjectRoot);
         var config = CreateThreadConfig(request, projectRoot);
@@ -231,7 +323,7 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
             ["cwd"] = projectRoot,
             ["developerInstructions"] = request.DeveloperInstructions,
             ["model"] = request.Model,
-            ["sandbox"] = "workspace-write"
+            ["sandbox"] = request.Sandbox
         };
         if (request.Ephemeral)
         {
@@ -272,14 +364,15 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         RekallAgeCodexThreadStartRequest request,
         string projectRoot)
     {
-        var config = new JsonObject
+        var config = new JsonObject();
+        if (request.Sandbox == "workspace-write")
         {
-            ["sandbox_workspace_write"] = new JsonObject
+            config["sandbox_workspace_write"] = new JsonObject
             {
                 ["network_access"] = request.NetworkEnabled,
                 ["writable_roots"] = new JsonArray(projectRoot)
-            }
-        };
+            };
+        }
         if (request.McpServers.Count == 0)
         {
             return config;
@@ -704,9 +797,10 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         {
             FailAll(ProtocolInvalid("Codex emitted malformed JSONL protocol data."));
         }
-        catch (Exception)
+        catch (Exception error)
         {
-            FailAll(ProtocolInvalid("The Codex App Server output stream failed."));
+            FailAll(ProtocolInvalid(
+                $"The Codex App Server output stream failed while processing a protocol event ({error.GetType().Name})."));
         }
     }
 
@@ -871,9 +965,9 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
 
         if (node is JsonArray jsonArray)
         {
-            foreach (var item in jsonArray)
+            for (var index = 0; index < jsonArray.Count; index++)
             {
-                SanitizeRetainedNode(item, identityOrAuthenticationContext);
+                SanitizeRetainedNode(jsonArray[index], identityOrAuthenticationContext);
             }
 
             return;

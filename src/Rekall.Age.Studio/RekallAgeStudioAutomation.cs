@@ -82,9 +82,9 @@ public static class RekallAgeStudioAutomation
             return false;
         }
 
-        if (provider is not "ollama" and not "openai")
+        if (provider is not "ollama" and not "openai" and not "codex")
         {
-            error = "--provider must be exactly ollama or openai.";
+            error = "--provider must be exactly ollama, openai, or codex.";
             return false;
         }
 

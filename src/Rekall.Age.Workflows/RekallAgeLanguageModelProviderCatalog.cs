@@ -31,6 +31,8 @@ public sealed class RekallAgeLanguageModelProviderSettings
 
     public string? OpenAiUrl { get; init; }
 
+    public string? CodexApprovalPolicy { get; init; }
+
     public override string ToString() => "Language model provider settings.";
 }
 
@@ -38,7 +40,7 @@ public sealed class RekallAgeLanguageModelProviderCatalog
 {
     private readonly RekallAgeLanguageModelProviderSettings _settings;
     private readonly Func<HttpClient> _httpClientFactory;
-    private readonly Func<RekallAgeCodexProjectAgentRunner> _codexRunnerFactory;
+    private readonly Func<RekallAgeCodexProjectAgentRunner>? _codexRunnerFactory;
 
     public RekallAgeLanguageModelProviderCatalog(
         RekallAgeLanguageModelProviderSettings? settings = null,
@@ -47,8 +49,7 @@ public sealed class RekallAgeLanguageModelProviderCatalog
     {
         _settings = settings ?? ReadEnvironmentSettings();
         _httpClientFactory = httpClientFactory ?? CreateHttpClient;
-        _codexRunnerFactory = codexRunnerFactory
-            ?? (() => new RekallAgeCodexProjectAgentRunner(RekallAgeCodexMcpConfiguration.Resolve()));
+        _codexRunnerFactory = codexRunnerFactory;
         Providers = DescribeProviders(_settings);
     }
 
@@ -186,7 +187,26 @@ public sealed class RekallAgeLanguageModelProviderCatalog
         {
             if (normalizedProviderId == "codex")
             {
-                var codexRunner = _codexRunnerFactory();
+                var approvalPolicy = string.IsNullOrWhiteSpace(settings.CodexApprovalPolicy)
+                    ? "on-request"
+                    : settings.CodexApprovalPolicy;
+                if (approvalPolicy is not "on-request" and not "never")
+                {
+                    throw new RekallAgeLanguageModelProviderException(
+                        "REKALL_CODEX_APPROVAL_POLICY_INVALID",
+                        "codex",
+                        "Codex approval policy must be on-request or never.",
+                        requestedValue: approvalPolicy,
+                        resolvedValue: "on-request,never");
+                }
+                var codexRunner = _codexRunnerFactory?.Invoke()
+                    ?? new RekallAgeCodexProjectAgentRunner(
+                        RekallAgeCodexMcpConfiguration.Resolve(),
+                        approvalPolicy: approvalPolicy == "never" ? "on-request" : approvalPolicy,
+                        approvalCallback: approvalPolicy == "never"
+                            ? static (_, _) => ValueTask.FromResult(
+                                RekallAgeCodexApprovalDecision.Accept)
+                            : null);
                 return new RekallAgeLanguageModelProviderLease(
                     normalizedProviderId,
                     httpClient,

@@ -10,7 +10,7 @@ namespace Rekall.Age.Tests.Cli;
 public sealed class AgentCliTests
 {
     [Fact]
-    public async Task ProviderCommandsExposeBothProvidersAndFailClosedWithoutLeakingSessionCredentials()
+    public async Task ProviderCommandsExposeAllProvidersAndFailClosedWithoutLeakingSessionCredentials()
     {
         const string sessionKey = "session-key-must-not-appear";
         var cli = FindCliAssemblyPath();
@@ -41,6 +41,10 @@ public sealed class AgentCliTests
             "openai\tOpenAI API\tgpt-5.6-sol\tapi-key\trequired\tunavailable\tREKALL_OPENAI_API_KEY_MISSING",
             providers.Output,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "codex\tCodex App Server\tgpt-5.6-sol\tcodex-managed\tunknown\tavailable\t-",
+            providers.Output,
+            StringComparison.Ordinal);
         Assert.Equal(1, missingAuth.ExitCode);
         Assert.Contains("REKALL_OPENAI_API_KEY_MISSING", missingAuth.Output, StringComparison.Ordinal);
         Assert.Equal(1, unsupportedModel.ExitCode);
@@ -50,10 +54,36 @@ public sealed class AgentCliTests
         Assert.Equal(1, unsupportedProvider.ExitCode);
         Assert.Contains("REKALL_LANGUAGE_MODEL_PROVIDER_UNSUPPORTED", unsupportedProvider.Output, StringComparison.Ordinal);
         Assert.Contains("Requested: missing-provider", unsupportedProvider.Output, StringComparison.Ordinal);
-        Assert.Contains("Resolved: ollama,openai", unsupportedProvider.Output, StringComparison.Ordinal);
+        Assert.Contains("Resolved: ollama,openai,codex", unsupportedProvider.Output, StringComparison.Ordinal);
         Assert.DoesNotContain(sessionKey, providers.Output, StringComparison.Ordinal);
         Assert.DoesNotContain(sessionKey, missingAuth.Output, StringComparison.Ordinal);
         Assert.DoesNotContain(sessionKey, unsupportedModel.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AuthStatusCommandRejectsProvidersWhoseCredentialsAreNotCodexManaged()
+    {
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            null,
+            "agent", "auth", "ollama", "status");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("REKALL_CODEX_AUTH_PROVIDER_REQUIRED", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Requested: ollama", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Resolved: codex", result.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunProjectAcceptsExplicitNeverApprovalPolicyBeforeProviderResolution()
+    {
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            null,
+            "agent", "run-project", "missing-provider", "model", ".", "Main", "inspect", "--approval-policy", "never");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("REKALL_LANGUAGE_MODEL_PROVIDER_UNSUPPORTED", result.Output, StringComparison.Ordinal);
     }
 
     [Fact]

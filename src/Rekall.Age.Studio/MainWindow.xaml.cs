@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using Rekall.Age.Editor.Contracts;
+using Rekall.Age.Workflows;
 using Serilog;
 
 namespace Rekall.Age.Studio;
@@ -24,6 +25,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _viewModel.CodexApprovalHandler = RequestCodexApprovalAsync;
         DataContext = _viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _previewTimer = new DispatcherTimer(DispatcherPriority.Background)
@@ -87,6 +89,25 @@ public partial class MainWindow : Window
             if (_viewModel.RefreshMeshAssetsCommand.CanExecute(null)) _viewModel.RefreshMeshAssetsCommand.Execute(null);
             if (_viewModel.RefreshModelingGraphsCommand.CanExecute(null)) _viewModel.RefreshModelingGraphsCommand.Execute(null);
         }
+    }
+
+    private async ValueTask<RekallAgeCodexApprovalDecision> RequestCodexApprovalAsync(
+        RekallAgeCodexApprovalRequest request,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var choice = await Dispatcher.InvokeAsync(() => MessageBox.Show(
+            this,
+            $"Codex requests approval for {request.Method}. Allow this action?",
+            "Codex approval",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question));
+        return choice switch
+        {
+            MessageBoxResult.Yes => RekallAgeCodexApprovalDecision.Accept,
+            MessageBoxResult.Cancel => RekallAgeCodexApprovalDecision.Cancel,
+            _ => RekallAgeCodexApprovalDecision.Decline
+        };
     }
 
     private async void OnApplyOpenAiApiKeyClick(object sender, RoutedEventArgs e)

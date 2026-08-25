@@ -46,6 +46,8 @@ public sealed record RekallAgeCodexThreadStartRequest(
 
     public bool NetworkEnabled { get; init; }
 
+    public string Sandbox { get; init; } = "workspace-write";
+
     public IReadOnlyList<RekallAgeCodexMcpServer> McpServers { get; init; } = [];
 }
 

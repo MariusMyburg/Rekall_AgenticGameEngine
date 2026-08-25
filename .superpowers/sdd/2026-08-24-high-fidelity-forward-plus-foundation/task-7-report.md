@@ -138,3 +138,95 @@ The verified Task 7 test gates total zero failures and zero skips. The final 2,5
 - No Task 7 `testhost`/`vstest` command remains active after the completed gates. Worktree cleanliness is verified after the evidence commit in the handoff.
 - Residual acceptance work: Task 10 must run the required High 2,560x1,440/60, 600-representative-frame GPU timestamp gate. Unsupported hardware remains truthful through `REKALL_GPU_TIMESTAMPS_UNAVAILABLE`; it cannot satisfy that later performance acceptance gate.
 - The implementation records only passes actually executed by the current native path. Graph-declared but currently unimplemented passes are not assigned fabricated durations.
+
+---
+
+## Review fix round 1/5 (2026-08-25)
+
+Implementation commit: `5e445c2` (`fix: isolate GPU quality capture lifecycle`)
+
+This section supersedes the earlier statement that native comparison warms the same scene frame and that the returned timing frame equals the captured frame. Task 7 deliberately reads a completed prior frame. Fix round 1 now uses frame `N-1` as the isolated temporal/timestamp warmup and frame `N` as the aligned measured image; the timing report remains truthfully labeled `N-1`.
+
+### Root causes and repairs
+
+1. **Submitted-fence failure crossed the resource-ownership boundary unsafely.** `vkQueueSubmit` could succeed, then `vkWaitForFences` could return timeout/error and throw before either the timestamp lease or frame-resource lifetime was transitioned. The common `finally` cancelled only `Recording` queries and unconditionally disposed `VulkanState`. Persistent frames do not own their device, so that disposal skipped device idle and destroyed the submitted fence, command pool, buffers, images, descriptors, and pipelines while the queue might still reference them.
+
+   The repair adds an independently testable submission state machine: `NotSubmitted -> Submitted -> FenceCompleted`, `RecoveredAfterDeviceIdle`, or terminal `DeviceLost`. `VulkanState.Dispose` refuses unresolved submitted work. A failed fence wait first attempts `vkDeviceWaitIdle`; successful idle makes resource destruction safe and invalidates the abandoned `InFlight` query lease, while `ErrorDeviceLost` takes a separate rebuild path. If neither completion nor device loss can be established, the persistent context retains the complete frame state, refuses new submissions, and retries idle recovery on the next capture. Persistent disposal also refuses to destroy native children when idle cannot be established. This favors bounded poisoned-session retention over invalid Vulkan destruction.
+
+2. **Comparison ownership was scoped to the command instead of one preset.** The public compare command held one default `CaptureRuntimeViewportCommand`, whose native scene capture held one persistent Vulkan context. Fog history, particles, and query pools could therefore cross preset and invocation boundaries.
+
+   The default compare operation now creates one fresh `RekallAgeNativeVulkanSceneCapture` session per requested preset, uses that same session only for its `N-1` warmup and aligned `N` measurement, then disposes it deterministically before moving to the next preset. Each later preset and later command invocation begins with fresh temporal generations. The authored runtime input and scene frame remain identical across presets; only caller-scoped rendering work changes.
+
+3. **Capture facts stopped at the shared command boundary.** `CaptureRuntimeViewportResult` already carried draw/dispatch counts, but it had no next commands and the CLI printed neither workload nor recovery/follow-up actions.
+
+   The shared capture result now adds an init-only `SuggestedCommands` property, preserving the existing positional record constructor and request forms. It always returns exactly two generic strings, sanitizes and bounds authored path/name fragments, and caps every command at 512 characters. The commands point to `rekall.render.compare_quality_presets` and `rekall.render.performance.inspect_scene_budget`. The CLI prints `Workload: draws=<n>; dispatches=<n>` plus `Next:` lines. MCP uses the unchanged registry/executor serialization path and exposes `drawCount`, `dispatchCount`, and `suggestedCommands` from that same result.
+
+### Strict RED evidence
+
+The systematic-debugging trace identified the queue/fence, persistent-session, and presentation boundaries before test or production edits. The writing-good-tests reference and strict TDD skill were applied before editing tests.
+
+Exact initial RED command (dedicated NTFS root, sequential execution):
+
+```powershell
+$taskTemp = 'D:\RekallAgeTask7FixRed'
+New-Item -ItemType Directory -Force -Path $taskTemp | Out-Null
+$env:TEMP = $taskTemp
+$env:TMP = $taskTemp
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --filter "FullyQualifiedName~VulkanGpuProfilerTests|FullyQualifiedName~CaptureRuntimeViewportCommandTests|FullyQualifiedName~RuntimeInspectCliTests|FullyQualifiedName~McpAgentToolExecutorTests" --no-restore --verbosity minimal
+```
+
+Expected RED after 21.1 seconds: build failed with 12 contract errors. `CaptureRuntimeViewportResult.SuggestedCommands`, `RekallAgeVulkanSubmissionLifecycle`, `RekallAgeVulkanSubmissionState`, `RekallAgeVulkanGpuQueryPoolLifecycle.InvalidateSubmitted`, and the test-visible quality-capture high-fidelity evidence did not exist. Representative exact diagnostics were `CS1061: 'CaptureRuntimeViewportResult' does not contain a definition for 'SuggestedCommands'`, `CS0246: The type or namespace name 'RekallAgeVulkanSubmissionLifecycle' could not be found`, and `CS1061: 'RekallAgeVulkanGpuQueryPoolLifecycle' does not contain a definition for 'InvalidateSubmitted'`.
+
+The first compiling GREEN attempt exposed one legitimate prior-frame expectation mismatch: 70/71 passed and `NativePresetComparisonWarmsEachPresetSoReturnedMetricsMatchThatPreset` reported expected frame 2 / actual frame 1 for both presets. The implementation was not relabeled or substituted. The regression was corrected to assert the task-specified completed prior-frame provenance (`capture.FrameIndex - 1`) while keeping the aligned image at frame 2.
+
+### Lifecycle and provenance regressions
+
+- `SubmittedFrameTimeoutRetainsResourcesUntilDeviceIdleAndInvalidatesItsQueryLease` starts after a modeled successful submit, records `Result.Timeout`, proves resources/query slot remain unreleasable, then records successful device idle, invalidates the exact fence-token lease, and proves generation-safe reuse.
+- `SubmittedFrameWaitErrorFollowedByDeviceLossRequiresRebuildBeforeRelease` starts after a modeled successful submit, records `Result.ErrorUnknown`, proves retention, then records `Result.ErrorDeviceLost` from idle recovery and proves the separate device-rebuild terminal state.
+- Production code marks the frame submitted immediately after successful `vkQueueSubmit`, before profiler bookkeeping that could itself throw. Thus every later exception observes the correct native ownership state.
+- A fence success completes the query normally for delayed readback. Idle recovery/device loss discards the failed capture's query lease; it is never reported as a later successful capture and never exhausts the two-slot pool.
+- A still-unresolved persistent state is held as a complete `VulkanState`, not partially dismantled. No subsequent frame may use that persistent device until idle recovery succeeds or device loss causes deterministic teardown/recreation.
+- GPU timing facts remain exclusively `vulkan-timestamp-query` results. This fix adds no CPU clocks or timing substitution.
+
+### Isolated preset comparison evidence
+
+`NativeTemporalFogComparisonIsIsolatedAcrossPresetOrderAndRepeatedInvocations` authors a real Camera3D, cube, global fog volume, and tone-map stack, then runs the same `CompareQualityPresetsCommand` instance three times:
+
+1. Performance, Low;
+2. Low, Performance;
+3. Performance, Low again.
+
+All comparisons use Vulkan, frame 4, 64x48 output, a shared bounded render-only override (`resolutionScale=0.5`, one 128px shadow cascade, `froxel-low`, bloom/SSAO disabled, zero particles), and GPU timings. Every measured preset reports temporal reprojection, `HistorySampled=true`, and `HistoryResourceGeneration=1`, proving the history came from its own fresh session's frame-3 warmup. For each preset, PNG bytes are identical across forward, reversed, and repeated invocations. JSON serialization of the authored scene before and after is identical.
+
+### CLI, command, and MCP compatibility evidence
+
+- Command behavior asserts the software capture reports `DrawCount=1`, `DispatchCount=0`, exactly two useful generic suggestions, and a maximum 512-character length.
+- CLI behavior exercises the existing longest positional viewport invocation unchanged, then asserts quality output plus `Workload: draws=1; dispatches=0` and both `Next:` commands.
+- MCP behavior registers the real capture command, executes `rekall.render.capture_runtime_viewport` through `RekallAgeMcpAgentToolExecutor` with JSON arguments, and asserts serialized `value.drawCount`, `value.dispatchCount`, and the bounded `value.suggestedCommands`. This is execution/serialization coverage, not a catalog-string check.
+- No request constructor, legacy CLI route, positional invocation, command name, or existing response field was removed or reordered. Suggested commands are an additive init property. Compare still returns requested/resolved preset, paths/image analysis, degradations, resource bytes, draw/dispatch counts, and truthful timing reports in caller order.
+
+### Godot reference note for the fix
+
+No source was copied. The existing Task 7 references remain the relevant architectural provenance: `F:\Dev\godot-reference\servers\rendering\rendering_device.cpp` (per-frame-slot prior-result retrieval/reset and bounded timestamp capture) reinforced that an unread/in-flight slot is an ownership object, not merely a metric buffer; `F:\Dev\godot-reference\drivers\vulkan\rendering_device_driver_vulkan.cpp` (query-pool ownership/read/reset and timestamp-period conversion) reinforced keeping pool destruction behind a completed device lifecycle. Rekall's explicit fence/idle/device-loss seam and retained full-frame state are independent implementations tailored to this renderer.
+
+### Exact GREEN verification
+
+All test commands were sequential. No project-wide suites contended for publish outputs.
+
+| Command | Exact result |
+|---|---|
+| Same four-class filter as RED at `D:\RekallAgeTask7FixGreen1` | 71/71 passed, 0 failed, 0 skipped; test duration 10 s; command wall time 16.0 s. |
+| `VulkanHighFidelityCaptureTests|VulkanParticleCaptureTests|VulkanGpuProfilerTests|CaptureRuntimeViewportCommandTests|RuntimeInspectCliTests|McpAgentToolExecutorTests|McpCatalogTests|ScenePerformanceBudgetCommandTests|RenderQualityProfileTests|HighFidelityRenderGraphTests` at `D:\RekallAgeTask7FixRegression` | 140/140 passed, 0 failed, 0 skipped; test duration 36 s; command wall time 40.3 s. |
+| `dotnet build Rekall.AGE.sln --no-restore -m:1 --verbosity:minimal` at `D:\RekallAgeTask7FixBuild` | Build succeeded; 0 warnings, 0 errors; MSBuild elapsed 7.93 s; command wall time 8.4 s. |
+| `dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --no-build --verbosity minimal` at `D:\RekallAgeTask7FixFull` | 1,874/1,874 passed, 0 failed, 0 skipped; test duration 4 m 27 s. |
+
+Every focused, adjacent, and full-core verification gate completed with zero failures and zero skips. `git diff --check` reported no whitespace errors; only Git's existing LF-to-CRLF working-copy notices were emitted.
+
+### Process, temp, and residual status
+
+- Implementation commit: `5e445c2`. Evidence-report commit is recorded in the handoff because a commit cannot contain its own final hash.
+- No `dotnet`, `testhost`, or `vstest.console` process whose command line referenced this worktree/test project remained after verification.
+- The exact five fix-round roots `D:\RekallAgeTask7FixRed`, `D:\RekallAgeTask7FixGreen1`, `D:\RekallAgeTask7FixRegression`, `D:\RekallAgeTask7FixBuild`, and `D:\RekallAgeTask7FixFull` remain. Their resolved absolute paths matched the intended allow-list, but the validated PowerShell `Remove-Item -LiteralPath ... -Recurse -Force` process was rejected by execution policy before launch; no partial deletion occurred. The earlier seventeen Task 7 test roots also remain as already reported.
+- If both a fence wait and repeated device-idle recovery return non-device-loss failures, the poisoned native context intentionally retains/leaks its device and children rather than risk destroying in-use Vulkan objects. This is the safe terminal behavior for an unprovable driver state; a later capture retries recovery when the session remains live.
+- The review's three Minor items remain intentionally deferred: general ownership-aware capture-command/registry shutdown, explicit `resolved=unavailable` for unsupported compare preset diagnostics, and broader MCP quality-override execution coverage beyond this capture behavior.
+- Task 10 still owns the High 2,560x1,440/60 over 600 representative GPU-timestamped frames acceptance gate.

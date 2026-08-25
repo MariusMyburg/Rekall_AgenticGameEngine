@@ -262,7 +262,10 @@ public sealed class RekallAgeLanguageModelAgent(
             transcript.Add(new RekallAgeLanguageModelMessage(
                 "assistant",
                 response.Content,
-                ToolCalls: response.ToolCalls));
+                ToolCalls: response.ToolCalls)
+            {
+                OpaqueProviderState = response.OpaqueProviderState
+            });
 
             if (response.ToolCalls.Count == 0 && IsOutputLimitFinishReason(response.FinishReason))
             {

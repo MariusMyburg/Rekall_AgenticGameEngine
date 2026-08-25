@@ -163,3 +163,80 @@ Confirmed root causes from backward data-flow tracing:
 RED/GREEN state for this fix round: no new RED has been run because the restart arrived immediately after root-cause investigation and before test editing. Exact next action after restart: add provider-neutral opaque-state contract/agent-copy tests and a two-turn recording-handler continuation test first, then run the narrow new-test filter and capture the expected RED before implementing; repeat that strict RED -> GREEN cycle for endpoint validation, terminal SSE bounds/refusals, and each missing branch-coverage fixture.
 
 Files changed/uncommitted before this checkpoint: no task-owned source/test file; only this report is being committed. The controller-owned `progress.md` remains modified, unstaged, and untouched.
+
+## Fix round 1 completion evidence (2026-08-25)
+
+Status: **DONE**
+
+Fix base/checkpoint: `985be1f4ecce26aec61965c9fbfc338845e4eb5e`.
+
+### Implemented repair
+
+- Added `RekallAgeLanguageModelOpaqueState`, a provider-neutral, provider-tagged continuation contract with a defensive immutable copy, a maximum of 256 items, a 4,194,304-character per-item bound, and an 8,388,608-character aggregate bound. Opaque items are excluded from JSON serialization at the state, message, and response boundaries, and `ToString()` reports only provider/count metadata.
+- The agent copies response opaque state into its assistant transcript entry. OpenAI requests always send `"include":["reasoning.encrypted_content"]`; OpenAI responses capture only encrypted reasoning items plus `function_call` and assistant `message` items, preserving provider output order. A following request validates the provider tag and allowlisted item shape, then replays those exact items before `function_call_output` items.
+- Cross-provider, malformed/non-allowlisted, and oversized continuation state is rejected deterministically before HTTP or with stable redacted provider errors. No opaque provider item, encrypted reasoning content, API key, user/tool content, or provider message is copied into diagnostics or this report.
+- Base URIs now reject query, fragment, and user-info components. Only `AbsolutePath` has redundant trailing slashes normalized, and recording-handler tests assert the actual `models` and `responses` request URIs.
+- SSE uses separate bounded envelopes: ordinary events remain limited to 262,144 characters, while terminal `response.completed`, `response.incomplete`, and `response.failed` envelopes are bounded at 8,388,608 characters. A valid completion larger than 262,144 characters now reaches final response validation and mapping.
+- Non-streaming refusal parts and streaming `response.refusal.delta` events are preserved as provider-neutral content/text deltas.
+- Added direct behavior tests for Retry-After HTTP-date, invalid UTF-8, post-completion data, `response.failed`, `response.incomplete`, two parallel calls, `response.function_call_arguments.done`, `response.output_item.done`, and transport exceptions. The prior report claims now have executable coverage rather than source-shape inference.
+- The deferred minor retry classification (`>=500` rather than exact `500..599`) was not changed.
+
+### Strict RED -> GREEN evidence
+
+1. Opaque continuation contract, agent copy, and two-turn ordered replay
+   - RED command: `dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~OpaqueProviderState|FullyQualifiedName~TwoTurnReasoningAndParallelCalls"`
+   - RED outcome: compilation failed on the missing `RekallAgeLanguageModelOpaqueState` and missing `OpaqueProviderState` message/response properties, exactly identifying the absent continuation contract.
+   - GREEN command: the same command.
+   - GREEN outcome: **3 passed, 0 failed**.
+2. Base URI component rejection and actual request routing
+   - RED command: `dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~EndpointComponentsThatCanMisroute|FullyQualifiedName~CustomEndpointNormalizesOnlyItsPath"`
+   - RED outcome: **3 failed, 1 passed**; query, fragment, and user-info fixtures each failed with `No exception was thrown`, while the actual path-routing fixture characterized the already-correct simple path case.
+   - GREEN command: the same command.
+   - GREEN outcome: **4 passed, 0 failed**.
+3. Large terminal envelope and refusal preservation
+   - RED command: `dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~NonStreamingRefusal|FullyQualifiedName~ValidCompletionEnvelope|FullyQualifiedName~RefusalDelta"`
+   - RED outcome after correcting a test-only raw-string fixture: **3 failed, 0 passed**; non-streaming refusal content was empty, the large terminal line raised `REKALL_OPENAI_STREAM_EVENT_TOO_LARGE`, and refusal deltas were absent.
+   - GREEN command: `dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~NonStreamingRefusal|FullyQualifiedName~ValidCompletionEnvelope|FullyQualifiedName~RefusalDelta|FullyQualifiedName~OneSseEventCannotExceedConfiguredBound"`
+   - GREEN outcome: **4 passed, 0 failed**, including the existing ordinary-event bound regression.
+4. Bounded continuation failure mapping
+   - RED command: `dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~OpaqueContinuation"`
+   - RED outcome: **1 failed, 2 passed**; an oversized provider item escaped as `ArgumentOutOfRangeException` instead of the required stable provider error.
+   - GREEN command: the same command.
+   - GREEN outcome: **3 passed, 0 failed**, with `REKALL_OPENAI_CONTINUATION_TOO_LARGE` and no provider text in diagnostics.
+5. Direct opaque-state serialization redaction
+   - RED command: `dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~OpaqueProviderStateIsDefensivelyCopied"`
+   - RED outcome: **1 failed** because direct state serialization contained the encrypted fixture.
+   - GREEN command: the same command.
+   - GREEN outcome: **1 passed, 0 failed** after excluding item payloads from serialization.
+
+Characterization command for the previously unproven protocol branches:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~RetryAfterHttpDate|FullyQualifiedName~TransportException|FullyQualifiedName~EventAfterCompletion|FullyQualifiedName~InvalidUtf8|FullyQualifiedName~ResponseFailed|FullyQualifiedName~ResponseIncomplete|FullyQualifiedName~FunctionArgumentDone"
+```
+
+Result: **8 passed, 0 failed**. These branches required tests but no additional production mutation beyond the fixes above.
+
+### Final verification
+
+Focused suite covering every amended Task 2 path:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~OpenAi|FullyQualifiedName~LanguageModelAgentTests|FullyQualifiedName~LanguageModelContractTests|FullyQualifiedName~OllamaLanguageModelClientTests"
+```
+
+Result: **166 passed, 0 failed, 0 skipped, total 166** (328 ms).
+
+Solution build:
+
+```powershell
+dotnet build Rekall.AGE.sln --no-restore
+```
+
+Result: **Build succeeded; 0 warnings, 0 errors** (9.50 s).
+
+`git diff --check` passed for task-owned changes; only line-ending notices were printed, including the controller-owned `progress.md`, which remained unstaged and untouched. No real network/API call was made. All HTTP and SSE evidence came from deterministic in-memory handlers and streams.
+
+### Fix round 1 concerns
+
+None. The explicitly deferred `>=500` retry-classification minor remains ledgered for final review.

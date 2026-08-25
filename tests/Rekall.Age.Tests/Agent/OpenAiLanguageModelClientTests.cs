@@ -61,6 +61,50 @@ public sealed class OpenAiLanguageModelClientTests
         Assert.Equal("baseUri", error.ParamName);
     }
 
+    [Theory]
+    [InlineData("https://example.com/v1/?tenant=alpha")]
+    [InlineData("https://example.com/v1/#responses")]
+    [InlineData("https://user:password@example.com/v1/")]
+    public void EndpointComponentsThatCanMisrouteOrLeakCredentialsAreRejected(string endpoint)
+    {
+        using var httpClient = new HttpClient(new RecordingHandler((_, _) =>
+            Task.FromResult(JsonResponse("{}"))));
+
+        var error = Assert.Throws<ArgumentException>(() =>
+            new RekallAgeOpenAiLanguageModelClient(httpClient, "test-api-key", new Uri(endpoint)));
+
+        Assert.Equal("baseUri", error.ParamName);
+    }
+
+    [Fact]
+    public async Task CustomEndpointNormalizesOnlyItsPathAndResolvesActualRequestUris()
+    {
+        var requestUris = new List<Uri>();
+        var handler = new RecordingHandler((request, _) =>
+        {
+            requestUris.Add(request.RequestUri!);
+            return Task.FromResult(request.Method == HttpMethod.Get
+                ? JsonResponse("{\"data\":[]}")
+                : JsonResponse(CompletedResponseJson()));
+        });
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(
+            httpClient,
+            "test-api-key",
+            new Uri("https://example.com/custom/openai/v1///"));
+
+        await client.ListModelsAsync(CancellationToken.None);
+        await client.ChatAsync(EmptyRequest(), CancellationToken.None);
+
+        Assert.Equal(new Uri("https://example.com/custom/openai/v1/"), client.BaseUri);
+        Assert.Equal(
+        [
+            new Uri("https://example.com/custom/openai/v1/models"),
+            new Uri("https://example.com/custom/openai/v1/responses")
+        ],
+            requestUris);
+    }
+
     [Fact]
     public async Task ListModelsUsesAuthorizedModelsEndpointAndReturnsSortedZeroSizeEntries()
     {
@@ -343,6 +387,175 @@ public sealed class OpenAiLanguageModelClientTests
         Assert.Equal(0, response.Usage.TotalDurationNanoseconds);
     }
 
+    [Fact]
+    public async Task NonStreamingRefusalContentIsPreserved()
+    {
+        var handler = new RecordingHandler((_, _) => Task.FromResult(JsonResponse("""
+            {
+              "id":"resp_refusal",
+              "model":"gpt-5.6-sol",
+              "status":"completed",
+              "output":[{
+                "id":"msg_refusal",
+                "type":"message",
+                "role":"assistant",
+                "status":"completed",
+                "content":[{"type":"refusal","refusal":"I cannot comply with that request."}]
+              }],
+              "usage":{"input_tokens":3,"output_tokens":4,"total_tokens":7}
+            }
+            """)));
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(httpClient, "test-api-key");
+
+        var response = await client.ChatAsync(EmptyRequest(), CancellationToken.None);
+
+        Assert.Equal("I cannot comply with that request.", response.Content);
+        Assert.Equal("stop", response.FinishReason);
+    }
+
+    [Fact]
+    public async Task TwoTurnReasoningAndParallelCallsReplayExactOrderedOutputBeforeToolResults()
+    {
+        var requestBodies = new List<JsonObject>();
+        var responseIndex = 0;
+        var handler = new RecordingHandler(async (request, _) =>
+        {
+            requestBodies.Add(JsonNode.Parse(await request.Content!.ReadAsStringAsync())!.AsObject());
+            return responseIndex++ == 0
+                ? JsonResponse(TwoParallelCallsResponseJson())
+                : JsonResponse(CompletedResponseJson());
+        });
+        using var http = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(http, "sk-test");
+        var tools = new[]
+        {
+            new RekallAgeLanguageModelTool("rekall.scene.inspect", "Inspect.", new JsonObject()),
+            new RekallAgeLanguageModelTool("rekall.context.engine_status", "Status.", new JsonObject())
+        };
+
+        var first = await client.ChatAsync(
+            new RekallAgeLanguageModelRequest(
+                "gpt-5.6-sol",
+                [new RekallAgeLanguageModelMessage("user", "Run both checks.")],
+                tools),
+            CancellationToken.None);
+        var assistant = new RekallAgeLanguageModelMessage("assistant", first.Content, ToolCalls: first.ToolCalls)
+        {
+            OpaqueProviderState = first.OpaqueProviderState
+        };
+        await client.ChatAsync(
+            new RekallAgeLanguageModelRequest(
+                "gpt-5.6-sol",
+                [
+                    new RekallAgeLanguageModelMessage("user", "Run both checks."),
+                    assistant,
+                    new RekallAgeLanguageModelMessage("tool", "{\"ok\":true}", "rekall.scene.inspect")
+                    {
+                        ToolCallId = "call_alpha"
+                    },
+                    new RekallAgeLanguageModelMessage("tool", "{\"ready\":true}", "rekall.context.engine_status")
+                    {
+                        ToolCallId = "call_beta"
+                    }
+                ],
+                tools),
+            CancellationToken.None);
+
+        Assert.NotNull(first.OpaqueProviderState);
+        Assert.Equal("openai", first.OpaqueProviderState.ProviderId);
+        Assert.Equal(4, first.OpaqueProviderState.Items.Count);
+        Assert.Equal(2, first.ToolCalls.Count);
+        Assert.All(requestBodies, body => Assert.Equal(
+            "reasoning.encrypted_content",
+            Assert.Single(body["include"]!.AsArray())!.GetValue<string>()));
+        var replayedInput = requestBodies[1]["input"]!.AsArray();
+        Assert.Collection(
+            replayedInput,
+            item => AssertMessage(item, "user", "Run both checks."),
+            item =>
+            {
+                Assert.Equal("reasoning", item!["type"]!.GetValue<string>());
+                Assert.Equal("encrypted-reasoning-state", item["encrypted_content"]!.GetValue<string>());
+            },
+            item =>
+            {
+                Assert.Equal("function_call", item!["type"]!.GetValue<string>());
+                Assert.Equal("call_alpha", item["call_id"]!.GetValue<string>());
+            },
+            item =>
+            {
+                Assert.Equal("message", item!["type"]!.GetValue<string>());
+                Assert.Equal("Interim", item["content"]![0]!["text"]!.GetValue<string>());
+            },
+            item =>
+            {
+                Assert.Equal("function_call", item!["type"]!.GetValue<string>());
+                Assert.Equal("call_beta", item["call_id"]!.GetValue<string>());
+            },
+            item =>
+            {
+                Assert.Equal("function_call_output", item!["type"]!.GetValue<string>());
+                Assert.Equal("call_alpha", item["call_id"]!.GetValue<string>());
+            },
+            item =>
+            {
+                Assert.Equal("function_call_output", item!["type"]!.GetValue<string>());
+                Assert.Equal("call_beta", item["call_id"]!.GetValue<string>());
+            });
+        Assert.DoesNotContain(
+            "encrypted-reasoning-state",
+            JsonSerializer.Serialize(assistant),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OversizedOpaqueContinuationReturnsStableRedactedProviderError()
+    {
+        const string privateMarker = "private-continuation-marker";
+        var providerText = privateMarker
+            + new string('x', RekallAgeLanguageModelOpaqueState.MaximumItemCharacters);
+        var body =
+            "{\"id\":\"resp_oversized\",\"model\":\"gpt-5.6-sol\",\"status\":\"completed\",\"output\":[{\"id\":\"msg_oversized\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":"
+            + JsonSerializer.Serialize(providerText)
+            + "}]}],\"usage\":{\"input_tokens\":1,\"output_tokens\":1,\"total_tokens\":2}}";
+        var handler = new RecordingHandler((_, _) => Task.FromResult(JsonResponse(body)));
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(httpClient, "test-api-key");
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() =>
+            client.ChatAsync(EmptyRequest(), CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_OPENAI_CONTINUATION_TOO_LARGE", error.Code);
+        Assert.DoesNotContain(privateMarker, error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("other-provider", "{\"type\":\"message\",\"role\":\"assistant\",\"content\":[]}", "REKALL_OPENAI_CONTINUATION_PROVIDER_INVALID")]
+    [InlineData("openai", "{\"type\":\"computer_call\",\"id\":\"private-opaque-item\"}", "REKALL_OPENAI_CONTINUATION_INVALID")]
+    public async Task InvalidOpaqueContinuationIsRejectedBeforeHttp(
+        string providerId,
+        string item,
+        string expectedCode)
+    {
+        var handler = new RecordingHandler((_, _) => Task.FromResult(JsonResponse(CompletedResponseJson())));
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(httpClient, "test-api-key");
+        var assistant = new RekallAgeLanguageModelMessage("assistant", string.Empty)
+        {
+            OpaqueProviderState = new RekallAgeLanguageModelOpaqueState(providerId, [item])
+        };
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() =>
+            client.ChatAsync(
+                new RekallAgeLanguageModelRequest("gpt-5.6-sol", [assistant], []),
+                CancellationToken.None).AsTask());
+
+        Assert.Equal(expectedCode, error.Code);
+        Assert.Equal(0, handler.CallCount);
+        Assert.DoesNotContain("private-opaque-item", error.ToString(), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("{")]
     [InlineData("[]")]
@@ -529,6 +742,37 @@ public sealed class OpenAiLanguageModelClientTests
     }
 
     [Fact]
+    public async Task RateLimitRetryHonorsRetryAfterHttpDate()
+    {
+        var retryAt = DateTimeOffset.UtcNow.AddSeconds(7);
+        var delays = new DelayRecorder();
+        var handlerCallCount = 0;
+        var handler = new RecordingHandler((_, _) =>
+        {
+            if (handlerCallCount++ > 0)
+            {
+                return Task.FromResult(JsonResponse(CompletedResponseJson()));
+            }
+
+            var response = JsonResponse("{}", HttpStatusCode.TooManyRequests);
+            response.Headers.RetryAfter = new RetryConditionHeaderValue(retryAt);
+            return Task.FromResult(response);
+        });
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(
+            httpClient,
+            "test-api-key",
+            null,
+            delays.DelayAsync);
+
+        await client.ChatAsync(EmptyRequest(), CancellationToken.None);
+
+        var delay = Assert.Single(delays.Delays);
+        Assert.InRange(delay, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(7.1));
+        Assert.Equal(2, handler.CallCount);
+    }
+
+    [Fact]
     public async Task RetryCountIsBoundedForPersistentServerFailure()
     {
         var delays = new DelayRecorder();
@@ -597,6 +841,24 @@ public sealed class OpenAiLanguageModelClientTests
             client.ChatAsync(EmptyRequest(), cancellation.Token).AsTask());
 
         Assert.Equal(1, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task TransportExceptionReturnsStableRedactedErrorWithoutRetry()
+    {
+        const string transportSecret = "private-transport-message";
+        var handler = new RecordingHandler((_, _) =>
+            throw new HttpRequestException($"Connection failed with {transportSecret}."));
+        using var httpClient = new HttpClient(handler);
+        var client = new RekallAgeOpenAiLanguageModelClient(httpClient, "test-api-key");
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() =>
+            client.ChatAsync(EmptyRequest(), CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_OPENAI_TRANSPORT_ERROR", error.Code);
+        Assert.True(error.Retryable);
+        Assert.Equal(1, handler.CallCount);
+        Assert.DoesNotContain(transportSecret, error.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -687,6 +949,21 @@ public sealed class OpenAiLanguageModelClientTests
             "output_tokens_details":{"reasoning_tokens":0},
             "total_tokens":2
           }
+        }
+        """;
+
+    private static string TwoParallelCallsResponseJson() => """
+        {
+          "id":"resp_parallel",
+          "model":"gpt-5.6-sol",
+          "status":"completed",
+          "output":[
+            {"id":"rs_parallel","type":"reasoning","summary":[{"type":"summary_text","text":"reasoning summary"}],"encrypted_content":"encrypted-reasoning-state"},
+            {"id":"fc_alpha","type":"function_call","call_id":"call_alpha","name":"rekall_scene_inspect_d7c351b75103","arguments":"{\"detail\":true}","status":"completed"},
+            {"id":"msg_parallel","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"Interim","annotations":[]}]},
+            {"id":"fc_beta","type":"function_call","call_id":"call_beta","name":"rekall_context_engine_status_8179b61222fc","arguments":"{}","status":"completed"}
+          ],
+          "usage":{"input_tokens":8,"input_tokens_details":{"cached_tokens":0},"output_tokens":4,"output_tokens_details":{"reasoning_tokens":2},"total_tokens":12}
         }
         """;
 

@@ -9,6 +9,7 @@ namespace Rekall.Age.Agent.LanguageModels;
 internal sealed class RekallAgeOpenAiResponseStreamReader
 {
     private const int DefaultMaximumEventCharacters = 262_144;
+    private const int DefaultMaximumTerminalEventCharacters = 8_388_608;
     private const int DefaultMaximumTextCharacters = 4_194_304;
     private const int DefaultMaximumArgumentCharacters = 4_194_304;
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
@@ -16,6 +17,7 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
     private readonly IReadOnlyCollection<string> _sensitiveValues;
     private readonly string? _requestId;
     private readonly int _maximumEventCharacters;
+    private readonly int _maximumTerminalEventCharacters;
     private readonly int _maximumTextCharacters;
     private readonly int _maximumArgumentCharacters;
 
@@ -25,12 +27,22 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
         string? requestId = null,
         int maxEventCharacters = DefaultMaximumEventCharacters,
         int maxTextCharacters = DefaultMaximumTextCharacters,
-        int maxArgumentCharacters = DefaultMaximumArgumentCharacters)
+        int maxArgumentCharacters = DefaultMaximumArgumentCharacters,
+        int maxTerminalEventCharacters = DefaultMaximumTerminalEventCharacters)
     {
         _toolNameMap = toolNameMap ?? throw new ArgumentNullException(nameof(toolNameMap));
         _sensitiveValues = sensitiveValues ?? [];
         _requestId = requestId;
         _maximumEventCharacters = Positive(maxEventCharacters, nameof(maxEventCharacters));
+        _maximumTerminalEventCharacters = Positive(
+            maxTerminalEventCharacters,
+            nameof(maxTerminalEventCharacters));
+        if (_maximumTerminalEventCharacters < _maximumEventCharacters)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxTerminalEventCharacters),
+                "The terminal SSE event bound cannot be smaller than the ordinary event bound.");
+        }
         _maximumTextCharacters = Positive(maxTextCharacters, nameof(maxTextCharacters));
         _maximumArgumentCharacters = Positive(maxArgumentCharacters, nameof(maxArgumentCharacters));
     }
@@ -80,7 +92,7 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
             }
 
             var additionalCharacters = value.Length + (eventData.Length == 0 ? 0 : 1);
-            if (eventData.Length > _maximumEventCharacters - additionalCharacters)
+            if (eventData.Length > _maximumTerminalEventCharacters - additionalCharacters)
             {
                 throw StreamError(
                     "REKALL_OPENAI_STREAM_EVENT_TOO_LARGE",
@@ -127,12 +139,26 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
         }
         catch (JsonException)
         {
+            if (data.Length > _maximumEventCharacters)
+            {
+                throw StreamError(
+                    "REKALL_OPENAI_STREAM_EVENT_TOO_LARGE",
+                    "OpenAI streamed an SSE event beyond the configured bound.");
+            }
+
             throw StreamError(
                 "REKALL_OPENAI_STREAM_INVALID",
                 "OpenAI streamed an invalid JSON event.");
         }
 
         var type = ReadString(root, "type") ?? string.Empty;
+        if (data.Length > _maximumEventCharacters
+            && type is not "response.completed" and not "response.incomplete" and not "response.failed")
+        {
+            throw StreamError(
+                "REKALL_OPENAI_STREAM_EVENT_TOO_LARGE",
+                "OpenAI streamed an SSE event beyond the configured bound.");
+        }
         if (state.Completed)
         {
             throw StreamError(
@@ -145,6 +171,7 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
         switch (type)
         {
             case "response.output_text.delta":
+            case "response.refusal.delta":
             {
                 var delta = ReadString(root, "delta") ?? string.Empty;
                 AddTextCharacters(state, delta.Length);
@@ -354,7 +381,7 @@ internal sealed class RekallAgeOpenAiResponseStreamReader
                         continue;
                     }
 
-                    if (line.WrittenCount >= _maximumEventCharacters)
+                    if (line.WrittenCount >= _maximumTerminalEventCharacters)
                     {
                         throw StreamError(
                             "REKALL_OPENAI_STREAM_EVENT_TOO_LARGE",

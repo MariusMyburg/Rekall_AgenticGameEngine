@@ -196,6 +196,48 @@ public sealed class LanguageModelAgentTests
         Assert.Single(result.Transcript, message => message.Role == "assistant" && message.Content == "Ready");
     }
 
+    [Fact]
+    public async Task AgentCopiesOpaqueProviderStateIntoAssistantTranscriptAndNextTurn()
+    {
+        var opaqueState = new RekallAgeLanguageModelOpaqueState(
+            "test",
+            ["{\"type\":\"reasoning\",\"encrypted_content\":\"opaque-state\"}"]);
+        var firstResponse = new RekallAgeLanguageModelResponse(
+            "test",
+            "model",
+            string.Empty,
+            string.Empty,
+            [new RekallAgeLanguageModelToolCall("inspect", new JsonObject()) { Id = "call_state" }],
+            "tool_calls",
+            new RekallAgeLanguageModelUsage(1, 1, 0))
+        {
+            OpaqueProviderState = opaqueState
+        };
+        var finalResponse = new RekallAgeLanguageModelResponse(
+            "test",
+            "model",
+            "Ready",
+            string.Empty,
+            [],
+            "stop",
+            new RekallAgeLanguageModelUsage(1, 1, 0));
+        var model = new ScriptedModelClient(firstResponse, finalResponse);
+        var agent = new RekallAgeLanguageModelAgent(model, new RecordingToolExecutor());
+
+        var result = await agent.RunAsync(
+            new RekallAgeLanguageModelAgentRequest("model", "system", "task") { MaxTurns = 2 },
+            CancellationToken.None);
+
+        var nextTurnAssistant = Assert.Single(
+            model.Requests[1].Messages,
+            message => message.Role == "assistant" && message.ToolCalls is { Count: 1 });
+        Assert.Same(opaqueState, nextTurnAssistant.OpaqueProviderState);
+        var transcriptAssistant = Assert.Single(
+            result.Transcript,
+            message => message.Role == "assistant" && message.ToolCalls is { Count: 1 });
+        Assert.Same(opaqueState, transcriptAssistant.OpaqueProviderState);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

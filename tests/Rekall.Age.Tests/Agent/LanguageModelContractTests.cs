@@ -7,6 +7,37 @@ namespace Rekall.Age.Tests.Agent;
 public sealed class LanguageModelContractTests
 {
     [Fact]
+    public void OpaqueProviderStateIsDefensivelyCopiedBoundedAndExcludedFromSerialization()
+    {
+        const string encryptedItem = "{\"type\":\"reasoning\",\"encrypted_content\":\"private-encrypted-state\"}";
+        var sourceItems = new List<string> { encryptedItem };
+        var state = new RekallAgeLanguageModelOpaqueState("openai", sourceItems);
+        var message = new RekallAgeLanguageModelMessage("assistant", string.Empty)
+        {
+            OpaqueProviderState = state
+        };
+
+        sourceItems[0] = "mutated";
+        sourceItems.Add("added");
+        var serializedState = JsonSerializer.Serialize(state);
+        var serializedMessage = JsonSerializer.Serialize(message);
+
+        Assert.Equal("openai", state.ProviderId);
+        Assert.Equal([encryptedItem], state.Items);
+        Assert.DoesNotContain("private-encrypted-state", state.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("private-encrypted-state", serializedState, StringComparison.Ordinal);
+        Assert.DoesNotContain(nameof(RekallAgeLanguageModelOpaqueState.Items), serializedState, StringComparison.Ordinal);
+        Assert.DoesNotContain("private-encrypted-state", serializedMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain(nameof(RekallAgeLanguageModelMessage.OpaqueProviderState), serializedMessage, StringComparison.Ordinal);
+        Assert.Throws<ArgumentException>(() => new RekallAgeLanguageModelOpaqueState(" ", [encryptedItem]));
+        Assert.Throws<ArgumentException>(() => new RekallAgeLanguageModelOpaqueState("openai", []));
+        Assert.Throws<ArgumentException>(() => new RekallAgeLanguageModelOpaqueState("openai", [string.Empty]));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RekallAgeLanguageModelOpaqueState(
+            "openai",
+            [new string('x', RekallAgeLanguageModelOpaqueState.MaximumItemCharacters + 1)]));
+    }
+
+    [Fact]
     public void ExistingPositionalRecordsRemainSourceCompatible()
     {
         var messages = new[] { new RekallAgeLanguageModelMessage("user", "hello") };

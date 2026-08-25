@@ -127,6 +127,7 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
             ["stream"] = stream,
             ["store"] = false,
             ["parallel_tool_calls"] = true,
+            ["include"] = new JsonArray("reasoning.encrypted_content"),
             ["reasoning"] = BuildReasoning(request.Think, sensitiveValues)
         };
         if (request.MaxOutputTokens is { } maxOutputTokens)
@@ -163,6 +164,12 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
                     });
                     break;
                 case "assistant":
+                    if (message.OpaqueProviderState is not null)
+                    {
+                        ReplayOpaqueProviderState(message.OpaqueProviderState, input, toolNameMap, sensitiveValues);
+                        break;
+                    }
+
                     if (message.Content.Length > 0)
                     {
                         input.Add(new JsonObject
@@ -220,6 +227,63 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
         }
 
         return input;
+    }
+
+    private static void ReplayOpaqueProviderState(
+        RekallAgeLanguageModelOpaqueState state,
+        JsonArray input,
+        RekallAgeOpenAiToolNameMap toolNameMap,
+        IReadOnlyCollection<string> sensitiveValues)
+    {
+        if (!state.ProviderId.Equals("openai", StringComparison.Ordinal))
+        {
+            throw ProviderError(
+                "REKALL_OPENAI_CONTINUATION_PROVIDER_INVALID",
+                "OpenAI cannot replay opaque state from another provider.",
+                sensitiveValues);
+        }
+
+        foreach (var serializedItem in state.Items)
+        {
+            JsonObject item;
+            try
+            {
+                item = JsonNode.Parse(serializedItem) as JsonObject ?? throw new JsonException();
+                ValidateOpaqueOutputItem(item, toolNameMap);
+            }
+            catch (Exception exception) when (exception is JsonException or KeyNotFoundException)
+            {
+                throw ProviderError(
+                    "REKALL_OPENAI_CONTINUATION_INVALID",
+                    "OpenAI opaque continuation state is invalid.",
+                    sensitiveValues);
+            }
+
+            input.Add(item);
+        }
+    }
+
+    private static void ValidateOpaqueOutputItem(
+        JsonObject item,
+        RekallAgeOpenAiToolNameMap toolNameMap)
+    {
+        switch (ReadString(item, "type"))
+        {
+            case "reasoning" when !string.IsNullOrWhiteSpace(ReadString(item, "encrypted_content")):
+                return;
+            case "function_call" when
+                !string.IsNullOrWhiteSpace(ReadString(item, "call_id"))
+                && !string.IsNullOrWhiteSpace(ReadString(item, "name"))
+                && ReadString(item, "arguments") is not null:
+                _ = toolNameMap.ToCanonical(ReadString(item, "name")!);
+                return;
+            case "message" when
+                ReadString(item, "role") == "assistant"
+                && item["content"] is JsonArray:
+                return;
+            default:
+                throw new JsonException();
+        }
     }
 
     private static JsonArray BuildTools(
@@ -289,19 +353,25 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
                 sensitiveValues: sensitiveValues);
         }
 
+        var outputItems = (root["output"] as JsonArray ?? []).OfType<JsonObject>().ToArray();
         var text = new StringBuilder();
         var reasoning = new StringBuilder();
         var calls = new List<RekallAgeLanguageModelToolCall>();
-        foreach (var output in (root["output"] as JsonArray ?? []).OfType<JsonObject>())
+        foreach (var output in outputItems)
         {
             switch (ReadString(output, "type"))
             {
                 case "message":
                     foreach (var content in (output["content"] as JsonArray ?? []).OfType<JsonObject>())
                     {
-                        if (ReadString(content, "type") == "output_text")
+                        switch (ReadString(content, "type"))
                         {
-                            text.Append(ReadString(content, "text"));
+                            case "output_text":
+                                text.Append(ReadString(content, "text"));
+                                break;
+                            case "refusal":
+                                text.Append(ReadString(content, "refusal"));
+                                break;
                         }
                     }
 
@@ -341,6 +411,21 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
             "cancelled" => "cancelled",
             _ => status
         };
+        RekallAgeLanguageModelOpaqueState? opaqueProviderState;
+        try
+        {
+            opaqueProviderState = CreateOpaqueProviderState(outputItems);
+        }
+        catch (ArgumentException)
+        {
+            throw new RekallAgeLanguageModelProviderException(
+                "REKALL_OPENAI_CONTINUATION_TOO_LARGE",
+                "openai",
+                "OpenAI returned continuation state beyond the configured bound.",
+                requestId: requestId,
+                sensitiveValues: sensitiveValues);
+        }
+
         return new RekallAgeLanguageModelResponse(
             "openai",
             model!,
@@ -350,8 +435,23 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
             finishReason,
             usage)
         {
-            ResponseId = ReadString(root, "id")
+            ResponseId = ReadString(root, "id"),
+            OpaqueProviderState = opaqueProviderState
         };
+    }
+
+    private static RekallAgeLanguageModelOpaqueState? CreateOpaqueProviderState(
+        IReadOnlyList<JsonObject> outputItems)
+    {
+        var items = outputItems
+            .Where(output => ReadString(output, "type") is "function_call" or "message"
+                || (ReadString(output, "type") == "reasoning"
+                    && !string.IsNullOrWhiteSpace(ReadString(output, "encrypted_content"))))
+            .Select(output => output.ToJsonString(JsonOptions))
+            .ToArray();
+        return items.Length == 0
+            ? null
+            : new RekallAgeLanguageModelOpaqueState("openai", items);
     }
 
     private static RekallAgeLanguageModelToolCall MapToolCall(
@@ -578,6 +678,9 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
         values.AddRange(request.Messages
             .SelectMany(message => message.ToolCalls ?? [])
             .Select(call => call.Arguments.ToJsonString(JsonOptions)));
+        values.AddRange(request.Messages
+            .Where(message => message.OpaqueProviderState is not null)
+            .SelectMany(message => message.OpaqueProviderState!.Items));
         return values.Where(value => !string.IsNullOrEmpty(value)).ToArray();
     }
 
@@ -620,8 +723,18 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
                 "OpenAI base URI must use HTTPS, except that loopback HTTP is allowed.",
                 nameof(baseUri));
         }
+        if (baseUri.UserInfo.Length > 0 || baseUri.Query.Length > 0 || baseUri.Fragment.Length > 0)
+        {
+            throw new ArgumentException(
+                "OpenAI base URI cannot contain user information, a query, or a fragment.",
+                nameof(baseUri));
+        }
 
-        return new Uri(baseUri.AbsoluteUri.TrimEnd('/') + '/', UriKind.Absolute);
+        var builder = new UriBuilder(baseUri)
+        {
+            Path = baseUri.AbsolutePath.TrimEnd('/') + '/'
+        };
+        return builder.Uri;
     }
 
     private static bool IsTransient(HttpStatusCode statusCode) =>

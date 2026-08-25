@@ -74,3 +74,35 @@ Observed: 25 passed, 0 failed, 0 skipped.
 
 - `dotnet build Rekall.AGE.sln --no-restore`: passed with 0 warnings and 0 errors.
 - `129b36c` — `fix: harden language model provider CLI`
+
+## Fix round 2 (cancellation scope follow-up)
+
+### Findings addressed
+
+- The CLI now emits `REKALL_LANGUAGE_MODEL_CANCELLED` only when the caller-provided token is actually cancelled and the routed command is one of `agent models`, `agent run`, or `agent run-project`.
+- An internal/timeout `OperationCanceledException` with an active caller token is not classified as user cancellation unless that token was requested. It therefore follows the existing generic CLI failure path without provider details.
+- A cancelled non-agent command likewise follows the generic CLI failure path rather than receiving the language-model-specific result.
+
+### Review-fix RED evidence
+
+1. `dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~AgentCliTests.CancelledNonAgentCommand"`
+   - Failed as expected: a pre-cancelled real `context summary` CLI route rendered `REKALL_LANGUAGE_MODEL_CANCELLED`.
+2. `dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~AgentCliTests.InternalAgentCancellation"`
+   - Failed as expected: the token-aware language-model cancellation classifier did not exist.
+
+### Review-fix GREEN evidence
+
+1. `dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~AgentCliTests.Cancelled|FullyQualifiedName~AgentCliTests.InternalAgentCancellation"`
+   - Passed: 3 passed, 0 failed. This covers the valid externally-cancelled OpenAI agent command, actual non-agent CLI routing/output, and an uncancelled caller token at the cancellation classifier boundary.
+2. `dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~LanguageModelProviderCatalogTests|FullyQualifiedName~AgentCliTests|FullyQualifiedName~ProjectAgentSessionTests"`
+   - Passed: 27 passed, 0 failed, 0 skipped.
+3. `dotnet build Rekall.AGE.sln --no-restore`
+   - Passed: 0 warnings, 0 errors.
+
+### Commit
+
+- `807e6ed` — `fix: scope language model cancellation handling`
+
+### Concerns
+
+None.

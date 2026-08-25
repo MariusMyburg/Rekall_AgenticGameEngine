@@ -112,6 +112,46 @@ public sealed class AgentCliTests
     }
 
     [Fact]
+    public async Task CancelledNonAgentCommandDoesNotRenderALanguageModelCancellation()
+    {
+        var originalError = Console.Error;
+        var output = new StringWriter();
+        try
+        {
+            Console.SetError(output);
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+
+            var exitCode = await InvokeCliAsync(
+                ["context", "summary", TestPaths.CreateTempDirectory()],
+                cancellation.Token);
+
+            Assert.Equal(1, exitCode);
+            Assert.DoesNotContain("REKALL_LANGUAGE_MODEL_CANCELLED", output.ToString(), StringComparison.Ordinal);
+            Assert.Contains("Unexpected error", output.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+    }
+
+    [Fact]
+    public void InternalAgentCancellationWithoutCallerCancellationDoesNotQualifyForLanguageModelCancellation()
+    {
+        var assembly = Assembly.LoadFrom(FindCliAssemblyPath());
+        var method = assembly.GetType("RekallAgeCli", throwOnError: true)!.GetMethod(
+            "IsUserRequestedLanguageModelCancellation",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)!;
+
+        var qualifies = (bool)method.Invoke(
+            null,
+            [new[] { "agent", "models", "openai" }, CancellationToken.None])!;
+
+        Assert.False(qualifies);
+    }
+
+    [Fact]
     public async Task ExistingOllamaAgentFormsStillReachTheirOriginalArgumentValidation()
     {
         var result = await RunAsync(

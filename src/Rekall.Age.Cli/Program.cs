@@ -499,7 +499,8 @@ internal static class RekallAgeCli
             WriteLanguageModelProviderDiagnostic(ex);
             return 1;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (
+            IsUserRequestedLanguageModelCancellation(args, cancellationToken))
         {
             Log.Information("Language-model command cancelled. Args={Args} LogDirectory={LogDirectory}", DescribeInvocation(args), logDirectory);
             Console.Error.WriteLine("REKALL_LANGUAGE_MODEL_CANCELLED: The language-model operation was cancelled.");
@@ -3220,6 +3221,14 @@ internal static class RekallAgeCli
 
         return 0;
     }
+
+    private static bool IsUserRequestedLanguageModelCancellation(
+        IReadOnlyList<string> arguments,
+        CancellationToken cancellationToken) =>
+        cancellationToken.IsCancellationRequested
+        && arguments.Count >= 2
+        && arguments[0].Equals("agent", StringComparison.OrdinalIgnoreCase)
+        && arguments[1] is "models" or "run" or "run-project";
 
     private static void WriteLanguageModelProviderDiagnostic(RekallAgeLanguageModelProviderException error)
     {

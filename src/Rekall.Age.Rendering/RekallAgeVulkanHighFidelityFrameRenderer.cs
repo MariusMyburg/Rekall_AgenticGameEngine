@@ -10,17 +10,18 @@ namespace Rekall.Age.Rendering;
 public sealed class RekallAgeVulkanHighFidelityFrameRenderer
 {
     public RekallAgeVulkanHighFidelityFramePlan? Plan(RekallAgeRuntimeViewportFrame frame)
-        => Plan(frame, null, null);
+        => Plan(frame, null, null, null);
 
     public RekallAgeVulkanHighFidelityFramePlan? Plan(
         RekallAgeRuntimeViewportFrame frame,
         IReadOnlyList<RekallAgeVulkanSceneMesh>? meshes) =>
-        Plan(frame, meshes, null);
+        Plan(frame, meshes, null, null);
 
     public RekallAgeVulkanHighFidelityFramePlan? Plan(
         RekallAgeRuntimeViewportFrame frame,
         IReadOnlyList<RekallAgeVulkanSceneMesh>? meshes,
-        RekallAgeVulkanFogHistory? previousFogHistory)
+        RekallAgeVulkanFogHistory? previousFogHistory,
+        RekallAgeVulkanParticleHistory? previousParticleHistory = null)
     {
         ArgumentNullException.ThrowIfNull(frame);
         if (frame.ResolvedQualityPlan is not { } resolved
@@ -29,8 +30,18 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
             return null;
         }
 
-        var graph = new RekallAgeHighFidelityRenderGraphBuilder().Build(frame, resolved);
+        var particlePlan = new RekallAgeVulkanParticlePlanner().Plan(
+            frame,
+            resolved.Particles,
+            frame.DeltaSeconds,
+            previousParticleHistory);
+        var graph = new RekallAgeHighFidelityRenderGraphBuilder().Build(frame, resolved, particlePlan);
         var diagnostics = new List<RekallAgeHighFidelityRenderGraphDiagnostic>(graph.Diagnostics);
+        diagnostics.AddRange(particlePlan.Diagnostics.Select(diagnostic =>
+            new RekallAgeHighFidelityRenderGraphDiagnostic(
+                diagnostic.Code,
+                "particle-simulate",
+                diagnostic.Message)));
         var effectiveCamera = new RekallAgeVulkanSceneBatchBuilder().ResolveEffectiveCamera(frame, meshes ?? []);
         var selectedDirectionalRenderable = SelectDirectionalLight(frame);
         var directionalLight = selectedDirectionalRenderable is null
@@ -85,7 +96,8 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
                     : 0,
                 BloomRadius: ResolveRadius(bloom?.Radius ?? 1)),
             shadowPlan,
-            fogPlan)
+            fogPlan,
+            particlePlan)
         {
             DirectionalLight = directionalLight,
             EffectiveCamera = effectiveCamera
@@ -473,7 +485,8 @@ public sealed record RekallAgeVulkanHighFidelityFramePlan(
     RekallAgeHighFidelityRenderGraph Graph,
     RekallAgeHighFidelityPostSettings PostSettings,
     RekallAgeVulkanShadowPlan ShadowPlan,
-    RekallAgeVulkanFogPlan FogPlan)
+    RekallAgeVulkanFogPlan FogPlan,
+    RekallAgeVulkanParticlePlan ParticlePlan)
 {
     public bool Ready => Graph.IsValid;
 
@@ -512,6 +525,46 @@ public sealed record RekallAgeHighFidelityFrameReport(
 
     public IReadOnlyList<RekallAgeHighFidelityFogDebugCapture> FogDebugCaptures { get; init; } =
         Array.Empty<RekallAgeHighFidelityFogDebugCapture>();
+
+    public RekallAgeHighFidelityParticleReport? Particles { get; init; }
+
+    public IReadOnlyList<RekallAgeHighFidelityParticleDebugCapture> ParticleDebugCaptures { get; init; } =
+        Array.Empty<RekallAgeHighFidelityParticleDebugCapture>();
+}
+
+public sealed record RekallAgeHighFidelityParticleReport(
+    bool Enabled,
+    int AllocatedCapacity,
+    int ActiveSlotCount,
+    RekallAgeVulkanParticleDispatch SimulationDispatch,
+    int SimulationDispatchCount,
+    int DrawCount,
+    bool IndirectDraw,
+    bool DepthTested,
+    bool DepthWrite,
+    bool SceneDepthSampled,
+    bool HdrOutput,
+    double DeltaSeconds,
+    IReadOnlyList<string> OverflowEntityIds,
+    IReadOnlyList<string> RejectedEntityIds,
+    IReadOnlyList<string> Diagnostics)
+{
+    public int StateResourceGeneration { get; init; }
+
+    public bool PreviousStateReused { get; init; }
+
+    public string SimulationSource { get; init; } = string.Empty;
+
+    public string SimulationDestination { get; init; } = string.Empty;
+}
+
+public sealed record RekallAgeHighFidelityParticleDebugCapture(
+    string Kind,
+    string OutputPath,
+    bool NonBlank,
+    ulong ByteChecksum)
+{
+    public string Source { get; init; } = string.Empty;
 }
 
 public sealed record RekallAgeHighFidelityFogReport(

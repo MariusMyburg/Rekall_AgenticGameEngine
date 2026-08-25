@@ -145,6 +145,7 @@ public sealed class RekallAgeRuntimeExecutionLoop : IDisposable
             {
                 FrameIndex = nextFrameIndex,
                 ElapsedTime = nextElapsed,
+                DeltaSeconds = stepDelta.TotalSeconds,
                 SystemsRun = _systems.Select(system => system.Id).ToArray()
             });
         }

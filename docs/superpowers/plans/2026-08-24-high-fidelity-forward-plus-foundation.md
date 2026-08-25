@@ -147,7 +147,7 @@ Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/Rekall.Age.Rendering.Abstractions src/Rekall.Age.Runtime.Abstractions src/Rekall.Age.Runtime src/Rekall.Age.Rendering/RekallAgeRenderQualityProfileResolver.cs tests/Rekall.Age.Tests/Rendering
@@ -550,25 +550,27 @@ and residue audit are in
 - Consumes: `Rekall.ParticleEmitter3D`, deterministic frame/delta/seed, depth, camera basis, and resolved particle capacity.
 - Produces: `RekallAgeVulkanParticlePlan` with stable emitter ranges, simulation dispatches, bounds, material/draw mode, and overflow observations.
 
-- [ ] **Step 1: Write failing deterministic planner tests**
+- [x] **Step 1: Write failing deterministic planner tests**
 
 Assert the same emitter/seed/frame produces identical spawn ranges and that capacity overflow selects emitters by authored priority then stable entity ID. Reject unbounded lifetime, non-finite curves, and capacities above the safety ceiling.
 
-- [ ] **Step 2: Project the authored emitter contract**
+- [x] **Step 2: Project the authored emitter contract**
 
 Support continuous rate, bounded bursts, lifetime, deterministic seed, local/world simulation, velocity cone, gravity/drag, size/color curves, quad/mesh mode, lit/unlit, emissive intensity, soft-particle fade, texture/flipbook, priority, and visibility distance.
 
-- [ ] **Step 3: Implement persistent GPU state and compute simulation**
+- [x] **Step 3: Implement persistent GPU state and compute simulation**
 
 Allocate double-buffered particle state per resolved global capacity. Dispatch simulation with `DeltaSeconds`, recycle dead particles deterministically, and generate an indirect draw count without CPU readback.
 
-- [ ] **Step 4: Render particles after fog integration**
+- [x] **Step 4: Render particles after fog integration**
 
 Implement camera-facing quads first, depth testing without depth writes, alpha/additive modes, HDR emissive output, soft depth intersection, and layer/camera masking. Mesh/ribbon/beam modes remain explicit later capability flags, not silent quad substitutions.
 
-- [ ] **Step 5: Add particle bounds/overdraw debug views and run tests**
+- [x] **Step 5: Add particle bounds/overdraw debug views and run tests**
 
 Run the particle, projection, render-graph, and high-fidelity capture suites. Assert disabled emitters and zero spawn rate allocate no active slots.
+
+Executable contract note: active particles add graph-authoritative `particle-upload` and `particle-simulate` passes after fog, followed by the existing transparent/HDR pass. State A/B are persistent initialized history inputs whose exact source/destination alternates with renderer-session history; emitter, active-index, and indirect buffers remain bounded per-frame resources. Empty frames retain the pre-particle topology and allocate no particle resources.
 
 - [ ] **Step 6: Commit**
 

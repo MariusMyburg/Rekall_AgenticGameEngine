@@ -13,6 +13,8 @@ public sealed record RekallAgeRuntimeWorld(
     RekallAgeRuntimeSubsystemViews Subsystems,
     IReadOnlyList<RekallAgeRuntimeObservation> Observations)
 {
+    public double DeltaSeconds { get; init; } = 1.0 / 60.0;
+
     public IReadOnlyList<string> SystemsRun { get; init; } = Array.Empty<string>();
 
     public string? ProjectRoot { get; init; }
@@ -335,6 +337,9 @@ public sealed record RekallAgeRuntimeRenderView(
     public IReadOnlyList<RekallAgeRuntimeFogVolume> FogVolumes { get; init; } =
         Array.Empty<RekallAgeRuntimeFogVolume>();
 
+    public IReadOnlyList<RekallAgeRuntimeParticleEmitter> ParticleEmitters { get; init; } =
+        Array.Empty<RekallAgeRuntimeParticleEmitter>();
+
     public static RekallAgeRuntimeRenderView Empty { get; } = new(
         Array.Empty<RekallAgeRuntimeRenderCamera>(),
         Array.Empty<RekallAgeRuntimeRenderSprite>(),
@@ -476,6 +481,48 @@ public sealed record RekallAgeRuntimeFogVolume(
     double HeightFalloff,
     double BlendDistance,
     int Priority)
+{
+    public string ProjectionSource { get; init; } = RekallAgeRuntimeProjectionSources.Authored;
+
+    public RekallAgeRuntimeTransform Transform { get; init; } = RekallAgeRuntimeTransform.Identity;
+}
+
+public sealed record RekallAgeRuntimeParticleBurst(double TimeSeconds, int Count);
+
+public sealed record RekallAgeRuntimeParticleScalarKey(double NormalizedAge, double Value);
+
+public sealed record RekallAgeRuntimeParticleColorKey(double NormalizedAge, string Color);
+
+public sealed record RekallAgeRuntimeParticleEmitter(
+    string EntityId,
+    string EntityName,
+    bool Enabled,
+    string SimulationSpace,
+    int Capacity,
+    double SpawnRate,
+    IReadOnlyList<RekallAgeRuntimeParticleBurst> Bursts,
+    double LifetimeSeconds,
+    uint DeterministicSeed,
+    RekallAgeRuntimeVector3 VelocityDirection,
+    double VelocityConeDegrees,
+    double MinimumSpeed,
+    double MaximumSpeed,
+    RekallAgeRuntimeVector3 Gravity,
+    double Drag,
+    IReadOnlyList<RekallAgeRuntimeParticleScalarKey> SizeCurve,
+    IReadOnlyList<RekallAgeRuntimeParticleColorKey> ColorCurve,
+    string DrawMode,
+    bool Lit,
+    double EmissiveIntensity,
+    double SoftParticleFade,
+    string? TextureAssetId,
+    int FlipbookColumns,
+    int FlipbookRows,
+    double FlipbookFramesPerSecond,
+    string BlendMode,
+    int Priority,
+    double VisibilityDistance,
+    string Layer)
 {
     public string ProjectionSource { get; init; } = RekallAgeRuntimeProjectionSources.Authored;
 

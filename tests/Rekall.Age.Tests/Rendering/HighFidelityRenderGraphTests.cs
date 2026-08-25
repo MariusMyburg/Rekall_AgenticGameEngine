@@ -20,6 +20,52 @@ public sealed class HighFidelityRenderGraphTests
     }
 
     [Fact]
+    public void ActiveParticlesDeclarePersistentPingPongIndirectResourcesAndComputeBeforePostFogDraw()
+    {
+        var plan = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High", MaximumActiveParticles: 64),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+            256,
+            144);
+        var frame = Frame(256, 144, plan) with { ParticleEmitters = [ParticleEmitter(64)] };
+
+        var graph = new RekallAgeHighFidelityRenderGraphBuilder().Build(frame, plan);
+
+        Assert.Contains(graph.Resources, resource => resource is
+        {
+            Name: "particle-state-a",
+            Format: "R32_UInt",
+            Width: 64,
+            Height: 1,
+            Layers: 16,
+            Lifetime: "persistent"
+        } && resource.Usage.Contains("storage", StringComparer.Ordinal));
+        Assert.Contains(graph.Resources, resource => resource.Name == "particle-state-b" && resource.Lifetime == "persistent");
+        Assert.Contains(graph.Resources, resource => resource.Name == "particle-active-indices" && resource.Usage.Contains("storage", StringComparer.Ordinal));
+        Assert.Contains(graph.Resources, resource => resource.Name == "particle-indirect" && resource.Usage.Contains("indirect", StringComparer.Ordinal));
+        var simulation = Assert.Single(graph.Passes, pass => pass.Name == "particle-simulate");
+        var particles = Assert.Single(graph.Passes, pass => pass.Name == "transparent-particles");
+        Assert.Equal("compute", simulation.Kind);
+        Assert.Contains("particle-state-a", simulation.Reads);
+        Assert.Contains("particle-state-b", simulation.Writes);
+        Assert.Contains("particle-indirect", simulation.Writes);
+        Assert.Contains("particle-state-b", particles.Reads);
+        Assert.Contains("particle-indirect", particles.Reads);
+        Assert.True(simulation.Order < particles.Order);
+        Assert.True(graph.Passes.Single(pass => pass.Name == "fog-integrate").Order < simulation.Order);
+        Assert.True(graph.IsValid, string.Join(Environment.NewLine, graph.Diagnostics.Select(item => item.Code)));
+    }
+
+    [Fact]
+    public void EmptyParticlePlanDeclaresNoParticleAllocationOrSimulationPass()
+    {
+        var graph = Build("High");
+
+        Assert.DoesNotContain(graph.Resources, resource => resource.Name.StartsWith("particle-", StringComparison.Ordinal));
+        Assert.DoesNotContain(graph.Passes, pass => pass.Name == "particle-simulate");
+    }
+
+    [Fact]
     public void FroxelGraphDeclaresDepthAndPersistentHistoryAuthority()
     {
         var graph = Build("High");
@@ -258,4 +304,13 @@ public sealed class HighFidelityRenderGraphTests
         {
             ResolvedQualityPlan = plan
         };
+
+    internal static RekallAgeRuntimeViewportParticleEmitter ParticleEmitter(int capacity) => new(
+        "particle-emitter", "Particle Emitter", true, "world", capacity, 60, [], 2, 7,
+        0, 1, 0, 15, 1, 2,
+        0, -1, 0, 0.1,
+        [new(0, 1), new(1, 0.1)],
+        [new(0, "#ff8020ff"), new(1, "#ff200000")],
+        "quad", false, 8, 0.5, null, 1, 1, 0, "additive", 5, 100, "default",
+        new RekallAgeRuntimeViewportTransform(0, 0, 2, 0, 0, 0, 1, 1, 1));
 }

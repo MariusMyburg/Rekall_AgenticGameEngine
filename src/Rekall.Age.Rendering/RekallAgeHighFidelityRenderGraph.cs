@@ -119,6 +119,11 @@ public sealed record RekallAgeHighFidelityRenderGraph(
         var resourceLifetimes = resources
             .GroupBy(resource => resource.Name, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First().Lifetime, StringComparer.Ordinal);
+        var initializedPersistentResources = resources
+            .Where(resource => resource.Lifetime.Equals("persistent", StringComparison.OrdinalIgnoreCase)
+                && resource.Usage.Contains("history-input", StringComparer.OrdinalIgnoreCase))
+            .Select(resource => resource.Name)
+            .ToHashSet(StringComparer.Ordinal);
         var producers = passes
             .Where(pass => pass.Enabled)
             .SelectMany(pass => pass.Writes.Select(resource => (Resource: resource, Pass: pass)))
@@ -139,6 +144,11 @@ public sealed record RekallAgeHighFidelityRenderGraph(
             foreach (var resource in pass.Reads.Where(resourceNames.Contains))
             {
                 if (resourceLifetimes[resource].Equals("external", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (initializedPersistentResources.Contains(resource))
                 {
                     continue;
                 }

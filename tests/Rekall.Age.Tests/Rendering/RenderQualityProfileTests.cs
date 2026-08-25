@@ -5,6 +5,33 @@ namespace Rekall.Age.Tests.Rendering;
 
 public sealed class RenderQualityProfileTests
 {
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void ParticleCapacityDegradesToZeroWithoutRequiredComputeAndStorageBufferCapabilities(
+        bool supportsCompute,
+        bool supportsStorageBuffers)
+    {
+        var plan = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High", MaximumActiveParticles: 64_000),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("particle-limited") with
+            {
+                SupportsCompute = supportsCompute,
+                SupportsStorageBuffers = supportsStorageBuffers
+            },
+            1920,
+            1080);
+
+        Assert.Equal(0, plan.Particles.MaximumActiveParticles);
+        Assert.Contains(plan.Degradations, item => item is
+        {
+            Code: "REKALL_RENDER_FEATURE_DEVICE_CLAMPED",
+            Feature: "maximumActiveParticles",
+            RequestedValue: "64000",
+            ResolvedValue: "0"
+        });
+    }
+
     [Fact]
     public void FroxelGridIsProportionallyClampedToDevice3DAndComputeLimitsWithStableDegradation()
     {

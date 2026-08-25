@@ -19,6 +19,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         var environments = PreserveAuthored(world.Subsystems.Rendering.Environments);
         var shadowSettings = PreserveAuthored(world.Subsystems.Rendering.ShadowSettings);
         var fogVolumes = PreserveAuthored(world.Subsystems.Rendering.FogVolumes);
+        var particleEmitters = PreserveAuthored(world.Subsystems.Rendering.ParticleEmitters);
         var bodies = new List<RekallAgeRuntimePhysicsBody>();
         var colliders = new List<RekallAgeRuntimePhysicsCollider>();
         var triggers = new List<RekallAgeRuntimePhysicsCollider>();
@@ -181,6 +182,42 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             ReadNumber(component.Properties, "heightFalloff", 0),
                             ReadNumber(component.Properties, "blendDistance", 0),
                             ReadInt32(component.Properties, "priority", 0))
+                        {
+                            ProjectionSource = RekallAgeRuntimeProjectionSources.BuiltIn,
+                            Transform = entity.Transform
+                        });
+                        break;
+                    case "Rekall.ParticleEmitter3D":
+                        particleEmitters.Add(new RekallAgeRuntimeParticleEmitter(
+                            entity.Id,
+                            entity.Name,
+                            ReadBoolean(component.Properties, "enabled", true),
+                            NormalizeParticleMode(ReadString(component.Properties, "simulationSpace"), "world"),
+                            ReadInt32(component.Properties, "capacity", 1024),
+                            ReadNumber(component.Properties, "spawnRate", 0),
+                            ReadParticleBursts(component.Properties),
+                            ReadNumber(component.Properties, "lifetime", 1),
+                            ReadUInt32(component.Properties, "seed", 1),
+                            ReadVector3(component.Properties, "velocityDirection", new RekallAgeRuntimeVector3(0, 1, 0)),
+                            ReadNumber(component.Properties, "velocityConeDegrees", 0),
+                            ReadNumber(component.Properties, "minimumSpeed", 0),
+                            ReadNumber(component.Properties, "maximumSpeed", 0),
+                            ReadVector3(component.Properties, "gravity", new RekallAgeRuntimeVector3(0, 0, 0)),
+                            ReadNumber(component.Properties, "drag", 0),
+                            ReadParticleScalarCurve(component.Properties, "sizeCurve", [new(0, 1), new(1, 1)]),
+                            ReadParticleColorCurve(component.Properties, "colorCurve", [new(0, "#ffffffff"), new(1, "#ffffff00")]),
+                            NormalizeParticleMode(ReadString(component.Properties, "drawMode"), "quad"),
+                            ReadBoolean(component.Properties, "lit", false),
+                            ReadNumber(component.Properties, "emissiveIntensity", 1),
+                            ReadNumber(component.Properties, "softParticleFade", 0),
+                            ReadString(component.Properties, "texture") ?? ReadString(component.Properties, "textureAssetId"),
+                            ReadInt32(component.Properties, "flipbookColumns", 1),
+                            ReadInt32(component.Properties, "flipbookRows", 1),
+                            ReadNumber(component.Properties, "flipbookFramesPerSecond", 0),
+                            NormalizeParticleMode(ReadString(component.Properties, "blendMode"), "alpha"),
+                            ReadInt32(component.Properties, "priority", 0),
+                            ReadNumber(component.Properties, "visibilityDistance", double.MaxValue),
+                            renderLayer)
                         {
                             ProjectionSource = RekallAgeRuntimeProjectionSources.BuiltIn,
                             Transform = entity.Transform
@@ -713,7 +750,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                     QualityProfiles = Sort(qualityProfiles),
                     Environments = Sort(environments),
                     ShadowSettings = Sort(shadowSettings),
-                    FogVolumes = Sort(fogVolumes)
+                    FogVolumes = Sort(fogVolumes),
+                    ParticleEmitters = Sort(particleEmitters)
                 },
                 new RekallAgeRuntimePhysicsView(
                     Sort(bodies),
@@ -836,6 +874,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             RekallAgeRuntimeEnvironment3D value => value.ProjectionSource != RekallAgeRuntimeProjectionSources.BuiltIn,
             RekallAgeRuntimeShadowSettings value => value.ProjectionSource != RekallAgeRuntimeProjectionSources.BuiltIn,
             RekallAgeRuntimeFogVolume value => value.ProjectionSource != RekallAgeRuntimeProjectionSources.BuiltIn,
+            RekallAgeRuntimeParticleEmitter value => value.ProjectionSource != RekallAgeRuntimeProjectionSources.BuiltIn,
             _ => true
         };
     }
@@ -956,6 +995,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             "Rekall.GeometryPrimitive" or
             "Rekall.GeometryMesh" or
             "Rekall.LineSegments" or
+            "Rekall.ParticleEmitter3D" or
             "Rekall.MultiplayerSession" or
             "Rekall.NetworkIdentity" or
             "Rekall.NetworkTransform" or
@@ -1082,6 +1122,71 @@ public sealed class RekallAgeRuntimeProjectionBuilder
     {
         return properties is null ? fallback : ReadInt32(properties, name, fallback);
     }
+
+    private static uint ReadUInt32(JsonObject properties, string name, uint fallback)
+    {
+        var number = ReadNumber(properties, name, fallback);
+        return double.IsFinite(number) && number >= uint.MinValue && number <= uint.MaxValue
+            ? (uint)number
+            : fallback;
+    }
+
+    private static RekallAgeRuntimeVector3 ReadVector3(
+        JsonObject properties,
+        string name,
+        RekallAgeRuntimeVector3 fallback)
+    {
+        if (!TryGetPropertyValue(properties, name, out var node) || node is not JsonObject vector)
+        {
+            return fallback;
+        }
+
+        return new RekallAgeRuntimeVector3(
+            ReadNumber(vector, "x", fallback.X),
+            ReadNumber(vector, "y", fallback.Y),
+            ReadNumber(vector, "z", fallback.Z));
+    }
+
+    private static IReadOnlyList<RekallAgeRuntimeParticleBurst> ReadParticleBursts(JsonObject properties) =>
+        (ReadArray(properties, "bursts") ?? [])
+            .OfType<JsonObject>()
+            .Select(item => new RekallAgeRuntimeParticleBurst(
+                ReadNumber(item, "time", 0),
+                ReadInt32(item, "count", 0)))
+            .ToArray();
+
+    private static IReadOnlyList<RekallAgeRuntimeParticleScalarKey> ReadParticleScalarCurve(
+        JsonObject properties,
+        string name,
+        IReadOnlyList<RekallAgeRuntimeParticleScalarKey> fallback)
+    {
+        var array = ReadArray(properties, name);
+        return array is null
+            ? fallback
+            : array.OfType<JsonObject>()
+                .Select(item => new RekallAgeRuntimeParticleScalarKey(
+                    ReadNumber(item, "time", 0),
+                    ReadNumber(item, "value", 0)))
+                .ToArray();
+    }
+
+    private static IReadOnlyList<RekallAgeRuntimeParticleColorKey> ReadParticleColorCurve(
+        JsonObject properties,
+        string name,
+        IReadOnlyList<RekallAgeRuntimeParticleColorKey> fallback)
+    {
+        var array = ReadArray(properties, name);
+        return array is null
+            ? fallback
+            : array.OfType<JsonObject>()
+                .Select(item => new RekallAgeRuntimeParticleColorKey(
+                    ReadNumber(item, "time", 0),
+                    ReadString(item, "color") ?? "#ffffffff"))
+                .ToArray();
+    }
+
+    private static string NormalizeParticleMode(string? value, string fallback) =>
+        string.IsNullOrWhiteSpace(value) ? fallback : value.Trim().ToLowerInvariant();
 
     private static int? ReadOptionalInt32(JsonObject properties, string name)
     {
@@ -1222,6 +1327,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             RekallAgeRuntimeEnvironment3D value => value.EntityName,
             RekallAgeRuntimeShadowSettings value => value.EntityName,
             RekallAgeRuntimeFogVolume value => value.EntityName,
+            RekallAgeRuntimeParticleEmitter value => value.EntityName,
             RekallAgeRuntimePhysicsBody value => value.EntityName,
             RekallAgeRuntimePhysicsCollider value => value.EntityName,
             RekallAgeRuntimeAudioListener value => value.EntityName,
@@ -1251,6 +1357,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             RekallAgeRuntimeEnvironment3D value => value.EntityId,
             RekallAgeRuntimeShadowSettings value => value.EntityId,
             RekallAgeRuntimeFogVolume value => value.EntityId,
+            RekallAgeRuntimeParticleEmitter value => value.EntityId,
             RekallAgeRuntimePhysicsBody value => value.EntityId,
             RekallAgeRuntimePhysicsCollider value => value.EntityId,
             RekallAgeRuntimeAudioListener value => value.EntityId,

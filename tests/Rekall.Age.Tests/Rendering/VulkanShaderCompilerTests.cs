@@ -83,6 +83,9 @@ public sealed class VulkanShaderCompilerTests
         Assert.True(File.Exists(Path.Combine(shaderDirectory, "rekall_scene.frag")));
         Assert.True(File.Exists(Path.Combine(shaderDirectory, "rekall_bloom.comp")));
         Assert.True(File.Exists(Path.Combine(shaderDirectory, "rekall_tonemap.frag")));
+        Assert.True(File.Exists(Path.Combine(shaderDirectory, "rekall_particles.comp")));
+        Assert.True(File.Exists(Path.Combine(shaderDirectory, "rekall_particles.vert")));
+        Assert.True(File.Exists(Path.Combine(shaderDirectory, "rekall_particles.frag")));
     }
 
     [Fact]
@@ -121,5 +124,19 @@ public sealed class VulkanShaderCompilerTests
                 Assert.NotEmpty(spirv);
                 Assert.Equal(0, spirv.Length % 4);
             });
+    }
+
+    [Fact]
+    public void CompilerBuildsGpuParticleSimulationAndHdrDrawShaders()
+    {
+        var result = new RekallAgeVulkanShaderCompiler().CompileParticlePipeline();
+
+        Assert.True(result.Compiled, string.Join(Environment.NewLine, result.Errors));
+        Assert.NotEmpty(result.Compute.Spirv);
+        Assert.NotEmpty(result.Vertex.Spirv);
+        Assert.NotEmpty(result.Fragment.Spirv);
+        Assert.EndsWith("rekall_particles.comp", result.Compute.SourcePath, StringComparison.Ordinal);
+        Assert.EndsWith("rekall_particles.vert", result.Vertex.SourcePath, StringComparison.Ordinal);
+        Assert.EndsWith("rekall_particles.frag", result.Fragment.SourcePath, StringComparison.Ordinal);
     }
 }

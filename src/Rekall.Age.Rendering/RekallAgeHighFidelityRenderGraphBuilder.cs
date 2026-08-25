@@ -9,10 +9,12 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
 {
     public RekallAgeHighFidelityRenderGraph Build(
         RekallAgeRuntimeViewportFrame frame,
-        RekallAgeResolvedRenderFeaturePlan plan)
+        RekallAgeResolvedRenderFeaturePlan plan,
+        RekallAgeVulkanParticlePlan? particlePlan = null)
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(plan);
+        particlePlan ??= new RekallAgeVulkanParticlePlanner().Plan(frame, plan.Particles, frame.DeltaSeconds);
 
         var resources = new List<RekallAgeHighFidelityRenderResource>
         {
@@ -45,6 +47,15 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
             resources.Add(Resource("fog-history", "R16G16B16A16_SFloat", plan.Fog.FroxelWidth, plan.Fog.FroxelHeight, plan.Fog.FroxelDepth, "persistent", ["sampled", "transfer-destination"]));
         }
 
+        if (particlePlan.AllocatedCapacity > 0)
+        {
+            resources.Add(Resource("particle-state-a", "R32_UInt", particlePlan.AllocatedCapacity, 1, 16, "persistent", ["storage", "history-input"]));
+            resources.Add(Resource("particle-state-b", "R32_UInt", particlePlan.AllocatedCapacity, 1, 16, "persistent", ["storage", "history-input"]));
+            resources.Add(Resource("particle-emitter-data", "R32_UInt", Math.Max(1, particlePlan.Emitters.Count), 1, 40, "transient", ["transfer-destination", "storage"]));
+            resources.Add(Resource("particle-active-indices", "R32_UInt", particlePlan.AllocatedCapacity, 1, 1, "transient", ["storage"]));
+            resources.Add(Resource("particle-indirect", "R32_UInt", 4, 1, 1, "transient", ["storage", "indirect", "transfer-destination"]));
+        }
+
         if (plan.Post.Bloom)
         {
             resources.Add(Resource("bloom-pyramid", "R16G16B16A16_SFloat", DivideRoundUp(plan.RenderWidth, 4), DivideRoundUp(plan.RenderHeight, 4), 1, "transient", ["storage", "sampled"]));
@@ -71,7 +82,26 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
             passes.Add(Pass("fog-debug-readback", "transfer", ["fog-froxel"], ["fog-debug-readback"], nextOrder++));
         }
 
-        passes.Add(Pass("transparent-particles", "graphics", ["depth-buffer", "scene-hdr"], ["scene-hdr"], nextOrder++));
+
+        if (particlePlan.AllocatedCapacity > 0)
+        {
+            passes.Add(Pass("particle-upload", "transfer", [], ["particle-emitter-data"], nextOrder++));
+            passes.Add(Pass(
+                "particle-simulate",
+                "compute",
+                [particlePlan.SimulationSource, "particle-emitter-data"],
+                [particlePlan.SimulationDestination, "particle-active-indices", "particle-indirect"],
+                nextOrder++));
+        }
+
+        var transparentReads = new List<string> { "depth-buffer", "scene-hdr" };
+        if (particlePlan.AllocatedCapacity > 0)
+        {
+            transparentReads.Add(particlePlan.SimulationDestination);
+            transparentReads.Add("particle-active-indices");
+            transparentReads.Add("particle-indirect");
+        }
+        passes.Add(Pass("transparent-particles", "graphics", transparentReads, ["scene-hdr"], nextOrder++));
         if (plan.Post.Bloom)
         {
             passes.Add(Pass("bloom", "compute", ["scene-hdr"], ["bloom-pyramid"], nextOrder++));
@@ -87,11 +117,17 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
         passes.Add(Pass("ui", "graphics", ["ldr-color"], ["ldr-color"], nextOrder++));
         passes.Add(Pass("present", "present", ["ldr-color"], ["present-output"], nextOrder));
 
+        var extraParticlePersistentBytes = checked((long)particlePlan.AllocatedCapacity * 64L);
+        var particleTransientBytes = particlePlan.AllocatedCapacity == 0
+            ? 0L
+            : checked((long)particlePlan.AllocatedCapacity * sizeof(uint)
+                + (long)Math.Max(1, particlePlan.Emitters.Count) * 160L
+                + 4L * sizeof(uint));
         var graph = RekallAgeHighFidelityRenderGraph.Create(
             resources,
             passes,
-            transientBudgetBytes: plan.EstimatedTransientBytes,
-            persistentBudgetBytes: plan.EstimatedPersistentBytes);
+            transientBudgetBytes: checked(plan.EstimatedTransientBytes + particleTransientBytes),
+            persistentBudgetBytes: checked(plan.EstimatedPersistentBytes + extraParticlePersistentBytes));
         if (frame.Width == plan.OutputWidth && frame.Height == plan.OutputHeight)
         {
             return graph;

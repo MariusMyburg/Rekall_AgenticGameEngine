@@ -49,6 +49,13 @@ public sealed class RekallAgeRenderQualityProfileResolver
             fogMode = "analytic";
         }
 
+        if (particles > 0 && (!capabilities.SupportsCompute || !capabilities.SupportsStorageBuffers))
+        {
+            var requested = particles;
+            particles = 0;
+            AddDeviceClamp(degradations, "maximumActiveParticles", requested, particles);
+        }
+
         var timestamps = intent.EnableGpuTimestamps;
         if (timestamps && !capabilities.SupportsTimestampQueries)
         {

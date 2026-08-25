@@ -185,6 +185,8 @@ Particle behavior is authored data. The renderer/simulation provides generic exe
 - flipbook animation, soft-particle depth fading, lit/unlit materials, emissive HDR output, and optional collision/depth interaction
 - effect LOD, distance culling, capacity limits, and overflow observations
 
+The first native quad implementation uses graph-declared persistent ping-pong state, per-frame emitter and active-index buffers, and GPU-authored indirect arguments. Its executable order is fog integration, particle upload/simulation, transparent particle draw into scene HDR, then bloom/tone mapping. Persistent state is initialized to zero on first use or discontinuity and reused only for consecutive frames with matching resolved capacity. Compute/storage-buffer capability and storage-range checks occur before allocation; unsupported draw modes and bounded overflow remain explicit diagnostics.
+
 Game modules emit generic custom facts or add/update emitter entities. The engine never contains an Aetherfall-specific hit, dash, weapon, or boss effect.
 
 ## Animated Model Fidelity

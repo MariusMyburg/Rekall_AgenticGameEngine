@@ -109,9 +109,61 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             Culling = culling,
             CameraViews = cameraViews,
             HeadsetCamera = headsetCamera,
-            FogVolumes = BuildFogVolumes(world)
+            FogVolumes = BuildFogVolumes(world),
+            ParticleEmitters = BuildParticleEmitters(world),
+            DeltaSeconds = world.DeltaSeconds
         };
     }
+
+    private static IReadOnlyList<RekallAgeRuntimeViewportParticleEmitter> BuildParticleEmitters(RekallAgeRuntimeWorld world) =>
+        world.Subsystems.Rendering.ParticleEmitters
+            .Select(emitter => new RekallAgeRuntimeViewportParticleEmitter(
+                emitter.EntityId,
+                emitter.EntityName,
+                emitter.Enabled,
+                emitter.SimulationSpace,
+                emitter.Capacity,
+                emitter.SpawnRate,
+                emitter.Bursts.Select(item => new RekallAgeRuntimeViewportParticleBurst(item.TimeSeconds, item.Count)).ToArray(),
+                emitter.LifetimeSeconds,
+                emitter.DeterministicSeed,
+                emitter.VelocityDirection.X,
+                emitter.VelocityDirection.Y,
+                emitter.VelocityDirection.Z,
+                emitter.VelocityConeDegrees,
+                emitter.MinimumSpeed,
+                emitter.MaximumSpeed,
+                emitter.Gravity.X,
+                emitter.Gravity.Y,
+                emitter.Gravity.Z,
+                emitter.Drag,
+                emitter.SizeCurve.Select(item => new RekallAgeRuntimeViewportParticleScalarKey(item.NormalizedAge, item.Value)).ToArray(),
+                emitter.ColorCurve.Select(item => new RekallAgeRuntimeViewportParticleColorKey(item.NormalizedAge, item.Color)).ToArray(),
+                emitter.DrawMode,
+                emitter.Lit,
+                emitter.EmissiveIntensity,
+                emitter.SoftParticleFade,
+                emitter.TextureAssetId,
+                emitter.FlipbookColumns,
+                emitter.FlipbookRows,
+                emitter.FlipbookFramesPerSecond,
+                emitter.BlendMode,
+                emitter.Priority,
+                emitter.VisibilityDistance,
+                emitter.Layer,
+                new RekallAgeRuntimeViewportTransform(
+                    emitter.Transform.Position3D.X,
+                    emitter.Transform.Position3D.Y,
+                    emitter.Transform.Position3D.Z,
+                    emitter.Transform.Rotation3D.X,
+                    emitter.Transform.Rotation3D.Y,
+                    emitter.Transform.Rotation3D.Z,
+                    emitter.Transform.Scale3D.X,
+                    emitter.Transform.Scale3D.Y,
+                    emitter.Transform.Scale3D.Z)))
+            .OrderByDescending(item => item.Priority)
+            .ThenBy(item => item.EntityId, StringComparer.Ordinal)
+            .ToArray();
 
     private static IReadOnlyList<RekallAgeRuntimeViewportFogVolume> BuildFogVolumes(RekallAgeRuntimeWorld world) =>
         world.Subsystems.Rendering.FogVolumes

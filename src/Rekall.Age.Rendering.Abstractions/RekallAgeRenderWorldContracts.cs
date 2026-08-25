@@ -59,6 +59,11 @@ public sealed record RekallAgeRuntimeViewportFrame(
     public IReadOnlyList<RekallAgeRuntimeViewportFogVolume> FogVolumes { get; init; } =
         Array.Empty<RekallAgeRuntimeViewportFogVolume>();
 
+    public IReadOnlyList<RekallAgeRuntimeViewportParticleEmitter> ParticleEmitters { get; init; } =
+        Array.Empty<RekallAgeRuntimeViewportParticleEmitter>();
+
+    public double DeltaSeconds { get; init; } = 1.0 / 60.0;
+
     public RekallAgeRuntimeViewportFrame ForHeadsetOutput()
     {
         return HeadsetCamera is null ? this : ForCameraView(HeadsetCamera);
@@ -223,6 +228,48 @@ public sealed record RekallAgeRuntimeViewportFogVolume(
     double HeightFalloff,
     double BlendDistance,
     int Priority,
+    RekallAgeRuntimeViewportTransform Transform);
+
+public sealed record RekallAgeRuntimeViewportParticleBurst(double TimeSeconds, int Count);
+
+public sealed record RekallAgeRuntimeViewportParticleScalarKey(double NormalizedAge, double Value);
+
+public sealed record RekallAgeRuntimeViewportParticleColorKey(double NormalizedAge, string Color);
+
+public sealed record RekallAgeRuntimeViewportParticleEmitter(
+    string EntityId,
+    string EntityName,
+    bool Enabled,
+    string SimulationSpace,
+    int Capacity,
+    double SpawnRate,
+    IReadOnlyList<RekallAgeRuntimeViewportParticleBurst> Bursts,
+    double LifetimeSeconds,
+    uint DeterministicSeed,
+    double VelocityDirectionX,
+    double VelocityDirectionY,
+    double VelocityDirectionZ,
+    double VelocityConeDegrees,
+    double MinimumSpeed,
+    double MaximumSpeed,
+    double GravityX,
+    double GravityY,
+    double GravityZ,
+    double Drag,
+    IReadOnlyList<RekallAgeRuntimeViewportParticleScalarKey> SizeCurve,
+    IReadOnlyList<RekallAgeRuntimeViewportParticleColorKey> ColorCurve,
+    string DrawMode,
+    bool Lit,
+    double EmissiveIntensity,
+    double SoftParticleFade,
+    string? TextureAssetId,
+    int FlipbookColumns,
+    int FlipbookRows,
+    double FlipbookFramesPerSecond,
+    string BlendMode,
+    int Priority,
+    double VisibilityDistance,
+    string Layer,
     RekallAgeRuntimeViewportTransform Transform);
 
 public sealed record RekallAgeRuntimeViewportTransform(

@@ -81,7 +81,7 @@ public static class RekallAgeVulkanSceneCommandPlanBuilder
             plan = plan with
             {
                 PostPasses = highFidelityGraph.Passes
-                    .Where(pass => pass.Name is "fog-integrate" or "fog-debug-readback" or "transparent-particles" or "bloom" or "tone-map" or "ui" or "present")
+                    .Where(pass => pass.Name is "fog-integrate" or "fog-debug-readback" or "particle-upload" or "particle-simulate" or "transparent-particles" or "bloom" or "tone-map" or "ui" or "present")
                     .ToArray()
             };
         }

@@ -76,6 +76,20 @@ public sealed class RekallAgeVulkanShaderCompiler
             errors);
     }
 
+    public RekallAgeVulkanParticleShaderCompilationResult CompileParticlePipeline()
+    {
+        var errors = new List<string>();
+        var compute = CompileShader(Path.Combine("Shaders", "rekall_particles.comp"), RekallAgeVulkanShaderStage.Compute, errors);
+        var vertex = CompileShader(Path.Combine("Shaders", "rekall_particles.vert"), RekallAgeVulkanShaderStage.Vertex, errors);
+        var fragment = CompileShader(Path.Combine("Shaders", "rekall_particles.frag"), RekallAgeVulkanShaderStage.Fragment, errors);
+        return new RekallAgeVulkanParticleShaderCompilationResult(
+            errors.Count == 0 && compute.Spirv.Length > 0 && vertex.Spirv.Length > 0 && fragment.Spirv.Length > 0,
+            compute,
+            vertex,
+            fragment,
+            errors);
+    }
+
     public string ResolveShaderPath(string path)
     {
         if (Path.IsPathRooted(path) && File.Exists(path))
@@ -228,6 +242,13 @@ public sealed record RekallAgeVulkanCompiledShader(
     RekallAgeVulkanShaderStage Stage,
     string SourcePath,
     byte[] Spirv);
+
+public sealed record RekallAgeVulkanParticleShaderCompilationResult(
+    bool Compiled,
+    RekallAgeVulkanCompiledShader Compute,
+    RekallAgeVulkanCompiledShader Vertex,
+    RekallAgeVulkanCompiledShader Fragment,
+    IReadOnlyList<string> Errors);
 
 public enum RekallAgeVulkanShaderStage
 {

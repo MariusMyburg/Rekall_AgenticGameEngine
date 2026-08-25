@@ -480,6 +480,14 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   slot, producing two draw surfaces instead of 21 alternating runs. Additional
   architecture kits and richer texture/material authoring remain.
 
+  The repeated weathered-ruin model now also uses the same generic contract:
+  its structural mass and carved trim are authored as separate material graph
+  branches, compiled to exactly two coalesced surfaces, and rebuilt once for all
+  30 scene instances. The settled Vulkan frame proves the surfaces resolve with
+  no observations or fallbacks. Remaining scene work must improve shadowed
+  masonry readability and soften the harsh lit-trim contrast without flattening
+  the requested deep-black presentation.
+
 - [ ] **Step 4: Prove visible improvement**
 
   Capture the same Windows-player view and require rounded hard edges, layered

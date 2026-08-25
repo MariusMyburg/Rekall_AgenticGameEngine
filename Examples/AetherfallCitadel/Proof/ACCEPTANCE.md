@@ -151,6 +151,18 @@ the accepted gameplay evidence above.
   real HUD canvas being authored invisible while its child labels remained
   visible. The canvas is now active, and the exact deterministic movement proof
   still changes Warden X by `0.506840` with both assertions passing.
+- The shared weathered-ruin model now publishes two semantic graph-authored PBR
+  surfaces: `aetherfall.ruin-mass.material` for the sooted structural masonry
+  and `aetherfall.ruin-trim.material` for coping, string courses, pilaster caps,
+  facade ribs, and crown blocks. The rebuilt artifact retains 7,392 vertices
+  and 3,024 triangles while all 30 placed instances gain material-readable
+  profiling. The settled real RTX 5090 High frame has 24,639 distinct colors,
+  mean luminance 0.078, 201 render-work draws, and zero observations or asset
+  fallbacks. The matching `desktop60` budget passes with 63 scene draw calls,
+  162,632 triangles, 594,744 vertices, and no blockers or warnings. The capture
+  also shows that shadowed masonry is still crushed too close to black and the
+  directly lit trim contrast is too hard; those remain active lighting/material-
+  range work rather than accepted final quality.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, prop geometry remains visibly coarse, and the

@@ -57,7 +57,9 @@ public sealed class RekallAgeLanguageModelProviderCatalog
             throw new RekallAgeLanguageModelProviderException(
                 "REKALL_LANGUAGE_MODEL_PROVIDER_UNSUPPORTED",
                 normalizedProviderId,
-                "The requested language-model provider is unsupported.");
+                "The requested language-model provider is unsupported.",
+                requestedValue: normalizedProviderId,
+                resolvedValue: string.Join(',', Providers.Select(provider => provider.Id)));
         }
 
         if (normalizedProviderId == "openai" && string.IsNullOrWhiteSpace(settings.OpenAiApiKey))

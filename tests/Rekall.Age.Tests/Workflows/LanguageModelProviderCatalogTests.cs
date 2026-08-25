@@ -43,6 +43,19 @@ public sealed class LanguageModelProviderCatalogTests
     }
 
     [Fact]
+    public void UnsupportedProviderReportsRequestedAndSupportedProviderValues()
+    {
+        var catalog = new RekallAgeLanguageModelProviderCatalog();
+
+        var error = Assert.Throws<RekallAgeLanguageModelProviderException>(() =>
+            catalog.Acquire("missing-provider", new RekallAgeCommandRegistry()));
+
+        Assert.Equal("REKALL_LANGUAGE_MODEL_PROVIDER_UNSUPPORTED", error.Code);
+        Assert.Equal("missing-provider", error.RequestedValue);
+        Assert.Equal("ollama,openai", error.ResolvedValue);
+    }
+
+    [Fact]
     public void SessionSettingsSerializationRedactsTheOpenAiKey()
     {
         var settings = new RekallAgeLanguageModelProviderSettings
@@ -85,17 +98,70 @@ public sealed class LanguageModelProviderCatalogTests
         Assert.False(secondHandler.Disposed);
     }
 
+    [Fact]
+    public async Task ConcurrentLeaseDisposalDisposesEachOwnedResourceExactlyOnce()
+    {
+        var handler = new DisposalTrackingHandler();
+        var runner = new CountingRunner();
+        var lease = new RekallAgeLanguageModelProviderLease(
+            "test",
+            new HttpClient(handler, disposeHandler: true),
+            new TestModelClient(),
+            runner);
+        using var start = new Barrier(33);
+        var disposals = Enumerable.Range(0, 32)
+            .Select(_ => Task.Factory.StartNew(() =>
+            {
+                start.SignalAndWait();
+                lease.Dispose();
+            }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default))
+            .ToArray();
+
+        start.SignalAndWait();
+        await Task.WhenAll(disposals);
+
+        Assert.Equal(1, runner.DisposeCount);
+        Assert.Equal(1, handler.DisposeCount);
+    }
+
     private sealed class DisposalTrackingHandler : HttpMessageHandler
     {
-        public bool Disposed { get; private set; }
+        public int DisposeCount => _disposeCount;
+        public bool Disposed => DisposeCount > 0;
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
 
         protected override void Dispose(bool disposing)
         {
-            Disposed = true;
+            Interlocked.Increment(ref _disposeCount);
             base.Dispose(disposing);
         }
+
+        private int _disposeCount;
+    }
+
+    private sealed class CountingRunner : IRekallAgeProjectAgentRunner, IDisposable
+    {
+        private int _disposeCount;
+        public string ProviderId => "test";
+        public int DisposeCount => _disposeCount;
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([]);
+        public ValueTask<RekallAgeProjectAgentSessionResult> RunAsync(
+            RekallAgeProjectAgentSessionRequest request,
+            IProgress<RekallAgeLanguageModelAgentProgress>? progress,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+        public void Dispose() => Interlocked.Increment(ref _disposeCount);
+    }
+
+    private sealed class TestModelClient : IRekallAgeLanguageModelClient
+    {
+        public string ProviderId => "test";
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([]);
+        public ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

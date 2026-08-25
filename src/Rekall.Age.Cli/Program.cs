@@ -496,7 +496,13 @@ internal static class RekallAgeCli
         catch (RekallAgeLanguageModelProviderException ex)
         {
             Log.Error(ex, "Language-model provider command failed. Provider={Provider} Code={Code} Args={Args} LogDirectory={LogDirectory}", ex.ProviderId, ex.Code, DescribeInvocation(args), logDirectory);
-            Console.Error.WriteLine($"{ex.Code}: {ex.Message}");
+            WriteLanguageModelProviderDiagnostic(ex);
+            return 1;
+        }
+        catch (OperationCanceledException)
+        {
+            Log.Information("Language-model command cancelled. Args={Args} LogDirectory={LogDirectory}", DescribeInvocation(args), logDirectory);
+            Console.Error.WriteLine("REKALL_LANGUAGE_MODEL_CANCELLED: The language-model operation was cancelled.");
             return 1;
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
@@ -3214,6 +3220,23 @@ internal static class RekallAgeCli
 
         return 0;
     }
+
+    private static void WriteLanguageModelProviderDiagnostic(RekallAgeLanguageModelProviderException error)
+    {
+        Console.Error.WriteLine($"{error.Code}: {error.Message}");
+        if (!string.IsNullOrWhiteSpace(error.RequestedValue))
+        {
+            Console.Error.WriteLine($"Requested: {BoundedLanguageModelDiagnosticValue(error.RequestedValue)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(error.ResolvedValue))
+        {
+            Console.Error.WriteLine($"Resolved: {BoundedLanguageModelDiagnosticValue(error.ResolvedValue)}");
+        }
+    }
+
+    private static string BoundedLanguageModelDiagnosticValue(string value) =>
+        value.Length <= 128 ? value : value[..127] + "…";
 
     private static async Task<int> ListLanguageModelsAsync(
         RekallAgeCommandRegistry registry,

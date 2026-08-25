@@ -6,7 +6,7 @@ public sealed class RekallAgeLanguageModelProviderLease : IDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly IDisposable? _disposableRunner;
-    private bool _disposed;
+    private int _disposeState;
 
     internal RekallAgeLanguageModelProviderLease(
         string providerId,
@@ -47,12 +47,11 @@ public sealed class RekallAgeLanguageModelProviderLease : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
         {
             return;
         }
 
-        _disposed = true;
         try
         {
             _disposableRunner?.Dispose();
@@ -64,5 +63,7 @@ public sealed class RekallAgeLanguageModelProviderLease : IDisposable
     }
 
     private void ThrowIfDisposed() =>
-        ObjectDisposedException.ThrowIf(_disposed, nameof(RekallAgeLanguageModelProviderLease));
+        ObjectDisposedException.ThrowIf(
+            Volatile.Read(ref _disposeState) != 0,
+            nameof(RekallAgeLanguageModelProviderLease));
 }

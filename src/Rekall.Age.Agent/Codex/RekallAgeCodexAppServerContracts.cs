@@ -12,6 +12,7 @@ public static class RekallAgeCodexErrorCodes
     public const string ProtocolInvalid = "REKALL_CODEX_PROTOCOL_INVALID";
     public const string TurnFailed = "REKALL_CODEX_TURN_FAILED";
     public const string Cancelled = "REKALL_CODEX_CANCELLED";
+    public const string LoginFailed = "REKALL_CODEX_LOGIN_FAILED";
 }
 
 public sealed record RekallAgeCodexInitializeResult(
@@ -23,6 +24,9 @@ public sealed record RekallAgeCodexAccount(
     string? AuthenticationType,
     bool RequiresOpenAiAuthentication,
     bool IsAuthenticated);
+
+public delegate ValueTask RekallAgeCodexAuthenticationLauncher(
+    Uri authenticationUri);
 
 public sealed record RekallAgeCodexReasoningEffort(string Id, string Description);
 

@@ -254,6 +254,86 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         return new RekallAgeCodexAccount(authenticationType, requiresOpenAiAuth, isAuthenticated);
     }
 
+    public async ValueTask<RekallAgeCodexAccount> SignInWithChatGptAsync(
+        RekallAgeCodexAuthenticationLauncher launchAuthentication,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(launchAuthentication);
+        var result = await RequestAsync(
+            "account/login/start",
+            new JsonObject
+            {
+                ["type"] = "chatgpt",
+                ["useHostedLoginSuccessPage"] = true,
+                ["appBrand"] = "chatgpt"
+            },
+            cancellationToken).ConfigureAwait(false);
+        var loginId = GetRequiredString(result, "loginId", "account/login/start");
+        var authUrl = GetRequiredString(result, "authUrl", "account/login/start");
+        if (!Uri.TryCreate(authUrl, UriKind.Absolute, out var authenticationUri)
+            || authenticationUri.Scheme is not ("https" or "http"))
+        {
+            throw ProtocolInvalid("Codex returned an invalid account/login/start authentication URL.");
+        }
+
+        try
+        {
+            await launchAuthentication(authenticationUri).ConfigureAwait(false);
+            while (true)
+            {
+                var notification = await ReadNotificationAsync(cancellationToken).ConfigureAwait(false);
+                if (!notification.Method.Equals("account/login/completed", StringComparison.Ordinal)
+                    || !notification.Params.TryGetProperty("loginId", out var completedId)
+                    || completedId.ValueKind != JsonValueKind.String
+                    || !loginId.Equals(completedId.GetString(), StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                if (!TryGetBoolean(notification.Params, "success", out var success))
+                {
+                    throw ProtocolInvalid("Codex returned an invalid account/login/completed notification.");
+                }
+                if (!success)
+                {
+                    throw ProviderError(RekallAgeCodexErrorCodes.LoginFailed,
+                        "Codex sign-in did not complete. Retry the ChatGPT sign-in flow.");
+                }
+
+                var account = await ReadAccountAsync(refreshToken: true, cancellationToken).ConfigureAwait(false);
+                if (!account.IsAuthenticated)
+                {
+                    throw ProviderError(RekallAgeCodexErrorCodes.LoginFailed,
+                        "Codex sign-in completed without an authenticated account. Retry sign-in.");
+                }
+                return account;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await RequestAsync(
+                    "account/login/cancel",
+                    new JsonObject { ["loginId"] = loginId },
+                    CancellationToken.None).ConfigureAwait(false);
+            }
+            catch
+            {
+                // The stable local cancellation result is authoritative.
+            }
+            throw ProviderError(RekallAgeCodexErrorCodes.Cancelled, "Codex sign-in was cancelled.");
+        }
+        catch (RekallAgeLanguageModelProviderException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            throw ProviderError(RekallAgeCodexErrorCodes.LoginFailed,
+                "Codex sign-in could not be completed. Retry the ChatGPT sign-in flow.");
+        }
+    }
+
     public async Task<IReadOnlyList<RekallAgeCodexModel>> ListModelsAsync(
         bool includeHidden = false,
         CancellationToken cancellationToken = default)

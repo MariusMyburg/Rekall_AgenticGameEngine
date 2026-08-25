@@ -86,6 +86,18 @@ public sealed class RekallAgeCodexProjectAgentRunner :
         return account;
     }
 
+    public async ValueTask<RekallAgeCodexAccount> SignInWithChatGptAsync(
+        RekallAgeCodexAuthenticationLauncher launchAuthentication,
+        CancellationToken cancellationToken = default)
+    {
+        var client = await EnsureClientAsync(cancellationToken).ConfigureAwait(false);
+        var account = await client.SignInWithChatGptAsync(launchAuthentication, cancellationToken).ConfigureAwait(false);
+        Volatile.Write(
+            ref _currentProviderDescriptor,
+            RekallAgeLanguageModelProviderCatalog.DescribeCodexProvider(account));
+        return account;
+    }
+
     public async ValueTask<RekallAgeLanguageModelProviderDescriptor> DescribeProviderAsync(
         CancellationToken cancellationToken)
     {
@@ -192,9 +204,11 @@ public sealed class RekallAgeCodexProjectAgentRunner :
                 runCancellation.Token).ConfigureAwait(false);
 
             using var pumpCancellation = new CancellationTokenSource();
+            var terminalNotificationObserved = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
             var pumps = new[]
             {
-                PumpNotificationsAsync(client, evidence, pumpCancellation.Token),
+                PumpNotificationsAsync(client, evidence, terminalNotificationObserved, pumpCancellation.Token),
                 PumpServerRequestsAsync(client, evidence, pumpCancellation.Token),
                 PumpDiagnosticsAsync(client, evidence, pumpCancellation.Token)
             };
@@ -208,10 +222,10 @@ public sealed class RekallAgeCodexProjectAgentRunner :
             }
             finally
             {
-                // The App Server stdout reader observes notifications before turn/completed, but the
-                // independent bounded consumers may still need one scheduler slice to project those
-                // already-queued facts into the result before their blocking reads are cancelled.
-                await Task.Delay(TimeSpan.FromMilliseconds(25)).ConfigureAwait(false);
+                // The notification channel is FIFO. Observing the terminal notification proves every
+                // preceding tool/message/usage fact has been projected before the pump is cancelled.
+                try { await terminalNotificationObserved.Task.WaitAsync(TimeSpan.FromSeconds(1)).ConfigureAwait(false); }
+                catch (TimeoutException) { }
                 pumpCancellation.Cancel();
                 await ObservePumpCompletionAsync(pumps).ConfigureAwait(false);
             }
@@ -389,13 +403,19 @@ public sealed class RekallAgeCodexProjectAgentRunner :
     private static async Task PumpNotificationsAsync(
         RekallAgeCodexAppServerClient client,
         RunEvidence evidence,
+        TaskCompletionSource terminalNotificationObserved,
         CancellationToken cancellationToken)
     {
         try
         {
             while (true)
             {
-                evidence.Observe(await client.ReadNotificationAsync(cancellationToken).ConfigureAwait(false));
+                var notification = await client.ReadNotificationAsync(cancellationToken).ConfigureAwait(false);
+                evidence.Observe(notification);
+                if (notification.Method.Equals("turn/completed", StringComparison.Ordinal))
+                {
+                    terminalNotificationObserved.TrySetResult();
+                }
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

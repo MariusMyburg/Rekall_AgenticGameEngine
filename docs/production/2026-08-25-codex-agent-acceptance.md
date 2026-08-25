@@ -66,3 +66,11 @@ No genre-specific engine behavior or deferred pathological Task 1/2 hardening wa
 The first full Studio run exposed a test-only ambiguous selector: two tab controls legitimately contained two items. The selector now identifies the actual `Mesh Edit` tab. Its isolated rerun and the complete Studio suite both passed. The Studio process already open for the user was not closed.
 
 Final process review found no task-owned Codex CLI, AGE CLI, player, `dotnet`, or `testhost` process. The remaining `codex.exe` and two CUA Node processes belong to the running Codex desktop application.
+
+## Review fix round 1
+
+Studio approval prompts now render a maximum 1,200-character allowlisted summary of the sanitized request. Supported requests show command, working directory, changed paths, reason, and MCP server/tool/message facts when supplied. Credential-like and unknown fields are never rendered; unknown methods or supported methods without an informative allowlisted fact are declined without prompting.
+
+Fresh Codex users can now select **Sign in to Codex** in Studio or run `rekall agent auth codex login`. AGE uses the documented App Server `account/login/start` browser flow, waits for `account/login/completed`, refreshes safe account/model state, and sends `account/login/cancel` when the user cancels after launch. Studio exposes a separate cancellation action. No Codex auth file is read, the transient authentication URL is handed directly to the OS browser rather than retained in status/evidence, and failures expose stable `REKALL_CODEX_LOGIN_FAILED` or `REKALL_CODEX_CANCELLED` facts without server identity/token detail.
+
+Review-focused tests passed 15/15 engine and 4/4 Studio. Fresh full verification passed Studio 86/86 in 48 seconds, engine 2,068/2,068 in 4 minutes 33 seconds, and the solution build with zero warnings/errors in 4.74 seconds. An engine run also exposed that a fixed 25 ms scheduler delay could lose queued tool evidence under load; the runner now waits for the FIFO terminal notification, proving all preceding tool/message/usage notifications were projected before cancellation. The exact regressions passed 2/2. One unrelated module-host scheduler-jitter test timed out during an intermediate loaded run, passed its immediate isolated rerun in 3 seconds, and passed again in the final complete 2,068-test run.

@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using Rekall.Age.Agent.Codex;
 using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Assets;
 using Rekall.Age.Core.Commands;
@@ -78,6 +79,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _undoCommand;
     private readonly RekallAgeAsyncCommand _redoCommand;
     private readonly RekallAgeAsyncCommand _discoverModelsCommand;
+    private readonly RekallAgeAsyncCommand _signInCodexCommand;
+    private readonly RekallAgeAsyncCommand _cancelCodexSignInCommand;
     private readonly RekallAgeAsyncCommand _runAgentCommand;
     private readonly RekallAgeAsyncCommand _cancelAgentCommand;
     private readonly RekallAgeStudioModelingSession _modeling = new();
@@ -113,6 +116,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private long _languageModelProviderTransitionGeneration;
     private Task? _activeLanguageModelRefresh;
     private Task? _activeAgentRun;
+    private Task? _activeCodexSignIn;
+    private CancellationTokenSource? _codexSignInCancellation;
     private string? _sessionOpenAiApiKey;
     private bool _isBusy;
     private bool _isAgentRunning;
@@ -353,6 +358,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _discoverModelsCommand = CreateAsyncCommand(
             DiscoverModelsAsync,
             () => !IsBusy && !IsAgentRunning && _languageModelRunner is not null);
+        _signInCodexCommand = CreateAsyncCommand(SignInCodexAsync,
+            () => !IsBusy && !IsAgentRunning && _activeCodexSignIn is not { IsCompleted: false }
+                && SelectedLanguageModelProvider.Id == "codex" && _languageModelRunner is RekallAgeCodexProjectAgentRunner);
+        _cancelCodexSignInCommand = CreateAsyncCommand(CancelCodexSignInAsync,
+            () => _activeCodexSignIn is { IsCompleted: false });
         _runAgentCommand = CreateAsyncCommand(RunAgentAsync, CanRunAgent);
         _cancelAgentCommand = CreateAsyncCommand(CancelAgentAsync, () => IsAgentRunning);
         _refreshMeshAssetsCommand = CreateAsyncCommand(RefreshMeshAssetsAsync, HasOpenProject);
@@ -454,6 +464,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand UndoCommand => _undoCommand;
     public ICommand RedoCommand => _redoCommand;
     public ICommand RefreshLanguageModelsCommand => _discoverModelsCommand;
+
+    public ICommand SignInCodexCommand => _signInCodexCommand;
+
+    public ICommand CancelCodexSignInCommand => _cancelCodexSignInCommand;
     public ICommand RunAgentCommand => _runAgentCommand;
     public ICommand CancelAgentCommand => _cancelAgentCommand;
     public ICommand RefreshMeshAssetsCommand => _refreshMeshAssetsCommand;
@@ -681,6 +695,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             {
                 if (!LanguageModelProviders.Any(provider => provider.Id == value.Id)
                     || !Set(ref _selectedLanguageModelProvider, value)) return;
+                _codexSignInCancellation?.Cancel();
                 Replace(LanguageModels, []);
                 SelectedLanguageModel = string.Empty;
                 ProviderStatus = $"Switching to {value.DisplayName}…";
@@ -708,6 +723,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public bool HasSessionOpenAiCredential => _sessionOpenAiApiKey is not null;
 
     public RekallAgeCodexApprovalCallback? CodexApprovalHandler { get; set; }
+
+    public RekallAgeCodexAuthenticationLauncher? CodexAuthenticationLauncher { get; set; }
 
     internal ValueTask<RekallAgeCodexApprovalDecision> RouteCodexApprovalAsync(
         RekallAgeCodexApprovalRequest request,
@@ -1367,6 +1384,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             try
             {
                 _agentCancellation?.Cancel();
+                _codexSignInCancellation?.Cancel();
             }
             catch (Exception)
             {
@@ -1376,11 +1394,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             Task providerTransition;
             Task? activeLanguageModelRefresh;
             Task? activeAgentRun;
+            Task? activeCodexSignIn;
             lock (_languageModelLifecycleSync)
             {
                 providerTransition = _languageModelProviderTransition;
                 activeLanguageModelRefresh = _activeLanguageModelRefresh;
                 activeAgentRun = _activeAgentRun;
+                activeCodexSignIn = _activeCodexSignIn;
             }
             Task[] renderingOperations;
             lock (_renderingOperationsSync)
@@ -1403,6 +1423,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             var languageModelOperations = new List<Task> { providerTransition };
             if (activeLanguageModelRefresh is not null) languageModelOperations.Add(activeLanguageModelRefresh);
             if (activeAgentRun is not null) languageModelOperations.Add(activeAgentRun);
+            if (activeCodexSignIn is not null) languageModelOperations.Add(activeCodexSignIn);
             try
             {
                 await Task.WhenAll(languageModelOperations).ConfigureAwait(false);
@@ -2418,6 +2439,50 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         "Audit web game",
         "studio",
         CancellationToken.None).AsTask());
+
+    private async Task SignInCodexAsync()
+    {
+        if (_languageModelRunner is not RekallAgeCodexProjectAgentRunner runner
+            || CodexAuthenticationLauncher is null)
+        {
+            ProviderStatus = "REKALL_CODEX_LOGIN_LAUNCH_UNAVAILABLE: Studio cannot open the Codex sign-in page.";
+            return;
+        }
+
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifecycleCancellation.Token);
+        _codexSignInCancellation = cancellation;
+        ProviderStatus = "Opening Codex ChatGPT sign-in…";
+        RefreshCommands();
+        try
+        {
+            var signIn = runner.SignInWithChatGptAsync(
+                CodexAuthenticationLauncher, cancellation.Token).AsTask();
+            _activeCodexSignIn = signIn;
+            var account = await signIn;
+            ProviderStatus = $"Codex sign-in completed via {CodexAuthenticationLabel(account.AuthenticationType ?? string.Empty)}. Refreshing models…";
+            await DiscoverModelsAsync();
+        }
+        catch (RekallAgeLanguageModelProviderException error)
+        {
+            ProviderStatus = $"{error.Code}: {error.Message}";
+            StatusText = ProviderStatus;
+        }
+        finally
+        {
+            if (ReferenceEquals(_codexSignInCancellation, cancellation)) _codexSignInCancellation = null;
+            RefreshCommands();
+        }
+    }
+
+    private async Task CancelCodexSignInAsync()
+    {
+        _codexSignInCancellation?.Cancel();
+        if (_activeCodexSignIn is not null)
+        {
+            try { await _activeCodexSignIn; }
+            catch (RekallAgeLanguageModelProviderException) { }
+        }
+    }
 
     private Task DiscoverModelsAsync()
     {
@@ -3624,6 +3689,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _undoCommand.RaiseCanExecuteChanged();
         _redoCommand.RaiseCanExecuteChanged();
         _discoverModelsCommand.RaiseCanExecuteChanged();
+        _signInCodexCommand.RaiseCanExecuteChanged();
+        _cancelCodexSignInCommand.RaiseCanExecuteChanged();
         _runAgentCommand.RaiseCanExecuteChanged();
         _cancelAgentCommand.RaiseCanExecuteChanged();
         _refreshMeshAssetsCommand.RaiseCanExecuteChanged();

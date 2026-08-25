@@ -29,6 +29,53 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioViewModelTests
 {
     [Fact]
+    public void CodexApprovalSummaryShowsAllowlistedActionFactsAndOmitsCredentialLikeFields()
+    {
+        using var document = JsonDocument.Parse(
+            """{"command":["dotnet","build"],"cwd":"C:\\Game","reason":"Build modules","apiKey":"secret-key","token":"secret-token","changes":[{"path":"Scenes/Main.age.scene.json"}],"mcpServer":"rekall-age","toolName":"rekall.build.modules","message":"Compile authored modules"}""");
+        var request = new RekallAgeCodexApprovalRequest(
+            "mcpServer/elicitation/request",
+            document.RootElement.Clone());
+
+        Assert.True(RekallAgeCodexApprovalPresenter.TryFormat(request, out var summary));
+        Assert.Contains("dotnet build", summary, StringComparison.Ordinal);
+        Assert.Contains("C:\\Game", summary, StringComparison.Ordinal);
+        Assert.Contains("Scenes/Main.age.scene.json", summary, StringComparison.Ordinal);
+        Assert.Contains("rekall-age", summary, StringComparison.Ordinal);
+        Assert.Contains("rekall.build.modules", summary, StringComparison.Ordinal);
+        Assert.Contains("Compile authored modules", summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-key", summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-token", summary, StringComparison.Ordinal);
+        Assert.True(summary.Length <= 1_200);
+    }
+
+    [Fact]
+    public void CodexApprovalSummaryFailsClosedForUnknownMethodsOrUninformativeShapes()
+    {
+        using var unknown = JsonDocument.Parse("""{"command":"dangerous"}""");
+        Assert.False(RekallAgeCodexApprovalPresenter.TryFormat(
+            new RekallAgeCodexApprovalRequest("unknown/request", unknown.RootElement.Clone()), out _));
+        using var secretOnly = JsonDocument.Parse("""{"apiKey":"secret"}""");
+        Assert.False(RekallAgeCodexApprovalPresenter.TryFormat(
+            new RekallAgeCodexApprovalRequest("item/commandExecution/requestApproval", secretOnly.RootElement.Clone()), out _));
+    }
+
+    [Fact]
+    public async Task StudioViewModelExposesFailClosedCodexSignInAndCancellationActions()
+    {
+        var viewModel = new RekallAgeStudioViewModel();
+        try
+        {
+            Assert.False(viewModel.SignInCodexCommand.CanExecute(null));
+            Assert.False(viewModel.CancelCodexSignInCommand.CanExecute(null));
+        }
+        finally
+        {
+            await viewModel.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task CodexApprovalRequestsRouteToTheStudioHandlerAndDefaultToDecline()
     {
         await using var viewModel = new RekallAgeStudioViewModel(

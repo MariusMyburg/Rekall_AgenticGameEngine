@@ -72,6 +72,10 @@ public sealed class AgentCliTests
         Assert.Contains("REKALL_CODEX_AUTH_PROVIDER_REQUIRED", result.Output, StringComparison.Ordinal);
         Assert.Contains("Requested: ollama", result.Output, StringComparison.Ordinal);
         Assert.Contains("Resolved: codex", result.Output, StringComparison.Ordinal);
+
+        var login = await RunAsync(FindCliAssemblyPath(), null, "agent", "auth", "ollama", "login");
+        Assert.Equal(1, login.ExitCode);
+        Assert.Contains("REKALL_CODEX_AUTH_PROVIDER_REQUIRED", login.Output, StringComparison.Ordinal);
     }
 
     [Fact]

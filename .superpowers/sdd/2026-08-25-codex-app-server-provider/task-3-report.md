@@ -37,3 +37,9 @@ Full evidence and exact artifact paths are recorded in `docs/production/2026-08-
 ## Residual blockers
 
 None for Task 3. The retained Prism Relay root is intentional acceptance evidence, not an unbounded process or secret-bearing residue. Deferred pathological Task 1/2 hardening and flagship Aetherfall visual/gameplay work were not expanded into this functionality-first task.
+
+## Fix round 1
+
+Addressed both Important review findings. Studio approvals now show bounded allowlisted sanitized action facts and fail closed for unknown/uninformative request shapes. Studio and CLI now expose the documented Codex ChatGPT browser login lifecycle, including completion, safe refresh, cancellation, and stable failure states without auth-file reads or identity/token retention. Under full-suite load, the existing fixed terminal-drain delay exposed a real tool-evidence race; FIFO terminal-notification acknowledgement replaced it and the exact regression passed.
+
+Fresh verification: focused engine 15/15, focused Studio 4/4, full Studio 86/86, full engine 2,068/2,068, solution build 0 warnings/errors. The user's open Studio was not closed.

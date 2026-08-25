@@ -124,7 +124,7 @@ public sealed class RekallAgeLanguageModelProviderCatalog
 
         var authenticationState = account.AuthenticationType switch
         {
-            "apiKey" => "api-key",
+            "apiKey" or "apikey" => "api-key",
             { Length: > 0 } value => value,
             _ => "authenticated"
         };

@@ -4,11 +4,88 @@ using System.Text;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
 using Rekall.Age.Agent.Codex;
+using Rekall.Age.Agent.LanguageModels;
 
 namespace Rekall.Age.Tests.Agent;
 
 public sealed class CodexAppServerClientTests
 {
+    [Fact]
+    public async Task ChatGptLoginUsesStartCompletionAndReturnsSafeAuthenticatedState()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var process = new FakeCodexProcess();
+        var client = await StartInitializedClientAsync(process, cancellationToken: timeout.Token);
+        await using (client)
+        {
+            var loginTask = client.SignInWithChatGptAsync(_ => ValueTask.CompletedTask, timeout.Token);
+            AssertJson(await process.ReadClientLineAsync(timeout.Token),
+                """{"id":2,"method":"account/login/start","params":{"appBrand":"chatgpt","type":"chatgpt","useHostedLoginSuccessPage":true}}""");
+            await process.WriteServerLineAsync(
+                """{"id":2,"result":{"type":"chatgpt","loginId":"login-1","authUrl":"https://chatgpt.com/auth/safe"}}""");
+            await process.WriteServerLineAsync(
+                """{"method":"account/login/completed","params":{"loginId":"login-1","success":true,"error":null}}""");
+            AssertJson(await process.ReadClientLineAsync(timeout.Token),
+                """{"id":3,"method":"account/read","params":{"refreshToken":true}}""");
+            await process.WriteServerLineAsync(
+                """{"id":3,"result":{"account":{"type":"chatgpt","email":"private@example.invalid"},"requiresOpenaiAuth":true}}""");
+
+            var account = await loginTask;
+            Assert.Equal("chatgpt", account.AuthenticationType);
+            Assert.DoesNotContain("private@example.invalid", account.ToString(), StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public async Task CancellingChatGptLoginSendsProtocolCancelAndReturnsStableSafeError()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cancel = new CancellationTokenSource();
+        var process = new FakeCodexProcess();
+        var client = await StartInitializedClientAsync(process, cancellationToken: timeout.Token);
+        await using (client)
+        {
+            var launched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var loginTask = client.SignInWithChatGptAsync(_ =>
+            {
+                launched.TrySetResult();
+                return ValueTask.CompletedTask;
+            }, cancel.Token).AsTask();
+            _ = await process.ReadClientLineAsync(timeout.Token);
+            await process.WriteServerLineAsync(
+                """{"id":2,"result":{"type":"chatgpt","loginId":"login-2","authUrl":"https://chatgpt.com/auth/private-state"}}""");
+            await launched.Task.WaitAsync(timeout.Token);
+            cancel.Cancel();
+            AssertJson(await process.ReadClientLineAsync(timeout.Token),
+                """{"id":3,"method":"account/login/cancel","params":{"loginId":"login-2"}}""");
+            await process.WriteServerLineAsync("""{"id":3,"result":{}}""");
+
+            var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() => loginTask);
+            Assert.Equal(RekallAgeCodexErrorCodes.Cancelled, error.Code);
+            Assert.DoesNotContain("private-state", error.ToString(), StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public async Task FailedChatGptLoginReturnsStableErrorWithoutRetainingServerDetail()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var process = new FakeCodexProcess();
+        var client = await StartInitializedClientAsync(process, cancellationToken: timeout.Token);
+        await using (client)
+        {
+            var loginTask = client.SignInWithChatGptAsync(_ => ValueTask.CompletedTask, timeout.Token).AsTask();
+            _ = await process.ReadClientLineAsync(timeout.Token);
+            await process.WriteServerLineAsync(
+                """{"id":2,"result":{"type":"chatgpt","loginId":"login-3","authUrl":"https://chatgpt.com/auth/safe"}}""");
+            await process.WriteServerLineAsync(
+                """{"method":"account/login/completed","params":{"loginId":"login-3","success":false,"error":"identity-and-token-detail"}}""");
+            var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() => loginTask);
+            Assert.Equal(RekallAgeCodexErrorCodes.LoginFailed, error.Code);
+            Assert.DoesNotContain("identity-and-token-detail", error.ToString(), StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     [Fact]
     public void WindowsNpmShimResolvesToStructuredNodeLaunchWithoutUsingAShell()
     {

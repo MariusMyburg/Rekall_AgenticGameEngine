@@ -27,6 +27,7 @@ using Rekall.Age.Workflows;
 using Rekall.Age.Workflows.Commands;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Serilog;
@@ -60,6 +61,8 @@ internal static class RekallAgeCli
                     await ListLanguageModelsAsync(registry, provider, cancellationToken),
                 ["agent", "auth", var provider, "status"] =>
                     await ShowLanguageModelAuthenticationStatusAsync(registry, provider, cancellationToken),
+                ["agent", "auth", var provider, "login"] =>
+                    await SignInLanguageModelProviderAsync(registry, provider, cancellationToken),
                 ["agent", "run", var provider, var model, var task] =>
                     await RunLanguageModelAgentAsync(registry, provider, model, task, "24", cancellationToken),
                 ["agent", "run", var provider, var model, var task, var maxTurns] =>
@@ -3301,6 +3304,34 @@ internal static class RekallAgeCli
             Console.WriteLine($"{diagnostic.Code}: {diagnostic.Message}");
         }
         return descriptor.IsAvailable ? 0 : 1;
+    }
+
+    private static async Task<int> SignInLanguageModelProviderAsync(
+        RekallAgeCommandRegistry registry,
+        string provider,
+        CancellationToken cancellationToken)
+    {
+        if (!provider.Equals("codex", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new RekallAgeLanguageModelProviderException(
+                "REKALL_CODEX_AUTH_PROVIDER_REQUIRED", provider,
+                "Interactive sign-in is available here only for the Codex-managed provider.",
+                requestedValue: provider, resolvedValue: "codex");
+        }
+
+        await using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire("codex", registry);
+        var runner = (RekallAgeCodexProjectAgentRunner)lease.Runner;
+        Console.WriteLine("Starting Codex ChatGPT sign-in…");
+        var account = await runner.SignInWithChatGptAsync(
+            authenticationUri =>
+            {
+                Process.Start(new ProcessStartInfo(authenticationUri.AbsoluteUri) { UseShellExecute = true });
+                Console.WriteLine("The sign-in page was opened in your browser. Complete it there; press Ctrl+C to cancel.");
+                return ValueTask.CompletedTask;
+            },
+            cancellationToken);
+        Console.WriteLine($"Codex sign-in completed. Authentication: {account.AuthenticationType switch { "chatgpt" => "chatgpt", "apiKey" or "apikey" => "api-key", _ => "authenticated" }}");
+        return 0;
     }
 
     private static async Task<int> RunLanguageModelAgentAsync(

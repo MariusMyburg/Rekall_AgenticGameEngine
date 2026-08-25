@@ -10,6 +10,22 @@ namespace Rekall.Age.Tests.Workflows;
 public sealed class LanguageModelProviderCatalogTests
 {
     [Fact]
+    public void CodexAuthenticationDescriptorsExposeOnlySafeChatGptApiKeyAndRequiredStates()
+    {
+        var chatGpt = RekallAgeLanguageModelProviderCatalog.DescribeCodexProvider(
+            new RekallAgeCodexAccount("chatgpt", true, true));
+        var apiKey = RekallAgeLanguageModelProviderCatalog.DescribeCodexProvider(
+            new RekallAgeCodexAccount("apikey", true, true));
+        var required = RekallAgeLanguageModelProviderCatalog.DescribeCodexProvider(
+            new RekallAgeCodexAccount(null, true, false));
+
+        Assert.Equal("chatgpt", chatGpt.AuthenticationState);
+        Assert.Equal("api-key", apiKey.AuthenticationState);
+        Assert.Equal("required", required.AuthenticationState);
+        Assert.Equal(RekallAgeCodexErrorCodes.AuthenticationRequired, Assert.Single(required.Diagnostics).Code);
+    }
+
+    [Fact]
     public async Task ExplicitCodexNeverApprovalPolicyCreatesAnAutoAcceptingNoninteractiveRunner()
     {
         var catalog = new RekallAgeLanguageModelProviderCatalog(

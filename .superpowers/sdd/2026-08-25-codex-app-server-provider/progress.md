@@ -33,4 +33,6 @@ Task 2: minor (deferred) — aggregate result/tool collection bounds and dead-cl
 Task 2: fix round 1/5 in progress — serialize explicit `ephemeral: true` for every Codex project thread and prove exact transcript.
 Task 2: fix round 1/5 (1 addressed, 0 open — every project thread now explicitly ephemeral; commits 6355fe0..7ab99d5)
 Task 2: complete (commits d877076..7ab99d5, review clean; controller focused 21/21; build 0 warnings/errors; two non-blocking hardening minors deferred)
-Task 3: complete (implementation ab73565; authenticated ChatGPT/Sol smoke 1/1; real Prism Relay AGE MCP gauntlet and strict independent gameplay proof passed; Studio 83/83; engine 2064/2064; build 0 warnings/errors; no residual blocker)
+Task 3: review found 2 Important ordinary-workflow gaps, 0 Critical — Studio approval prompts hide the sanitized action details, and fresh users have no in-product Codex sign-in path. Retained Prism Relay artifacts/hashes and focused cancellation evidence verified; no Ollama/OpenAI regression found.
+Task 3: fix round 1/5 in progress — add bounded safe approval summaries plus Codex App Server login onboarding in CLI/Studio; do not expand into deferred lifecycle hardening.
+Task 3: fix round 1/5 (2 Important findings addressed, 0 open — bounded fail-closed Studio action summaries; documented App Server start/completion/cancel login in Studio and CLI; focused engine 15/15, Studio 4/4; full Studio 86/86, engine 2068/2068, build 0 warnings/errors)

@@ -4,7 +4,7 @@
 
 The Codex App Server provider is accepted through both deterministic tests and a real authenticated end-to-end AGE authoring run. The AGE CLI and Studio expose Codex as a provider, report only safe authentication/model facts, and route approval requests through explicit policies. The real run used ChatGPT authentication and `gpt-5.6-sol`; no account identity, credential, or token value was read or emitted.
 
-On Windows, the installed npm shim is resolved without a shell to the structured launch `node.exe <codex.js> app-server --listen stdio://`. The acceptance machine required Codex CLI `0.149.1` because the previously installed `0.130.0` model catalog did not expose `gpt-5.6-sol`.
+On Windows, the installed npm shim is resolved without a shell to the structured launch `node.exe <codex.js> app-server --listen stdio://`. The accepted protocol is the JSONL App Server protocol shipped with Codex CLI `0.149.1`; its `initialize` response does not advertise a separate numeric protocol version. The acceptance machine required `0.149.1` because the previously installed `0.130.0` model catalog did not expose `gpt-5.6-sol`.
 
 ## Authenticated protocol smoke
 

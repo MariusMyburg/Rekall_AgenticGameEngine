@@ -293,3 +293,73 @@ The unchanged final-frame and GPU-state bounds artifacts retain their fix-round-
 - No task `dotnet`, `testhost`, or `vstest` process remained after the final gates.
 - Exact isolated NTFS roots remain outside the worktree because execution policy rejected the verified literal `Remove-Item -Recurse -Force` command before process creation: `...task6-fix2-final-engine` (8,054 files / 1,152,055,916 bytes), `...task6-fix2-engine` (8,054 files / 1,152,027,088 bytes), and the prior `...task6-fix-engine` (8,033 files / 1,151,988,697 bytes). The empty `...task6-fix2-final-studio` root also remains. No deletion was performed or partially performed.
 - Scoped limitations from fix round 1 remain, including the reviewer-deferred host-upload graph observation. No new Vulkan validation error, crash, assertion, or functional concern remains in the required round-2 scope.
+
+---
+
+## Review fix round 3/5 — timestep packing and clear-result diagnostic truthfulness
+
+Date: 2026-08-25
+
+Reviewed fix-round-2 implementation: `de7c13b5cebae11a6a4f84ed476a22d860dd4718`
+
+Fix implementation commit: `a629c984ff844ef5e65767a9029f74ab67791fb6`
+
+### Root causes and corrected contracts
+
+| Finding | Root cause | Corrected executable contract |
+|---|---|---|
+| Particle timestep silently packed as zero | Particle emitter fields were float-range validated, but the frame-global `DeltaSeconds` bypassed the planner contract. Native push-constant packing called `FiniteFloat`; a finite value above `float.MaxValue` became zero while the plan still allocated particles and the report retained the huge authored double. | After otherwise executable emitters are resolved, the planner validates the particle simulation timestep as finite, non-negative, and inclusively float-representable. Invalid values reject all otherwise executable ranges before allocation with stable `REKALL_PARTICLE_TIMESTEP_INVALID` identity and entity IDs. Zero, normal engine deltas, and exact `float.MaxValue` remain accepted. A rejected/non-executed particle report uses delta zero rather than claiming a submitted timestep. |
+| Rejected particle-only diagnostics disappeared | The meshless shortcut resolved a diagnostic-rich high-fidelity plan to determine executable capacity, then discarded it by returning plain `FromClearCapture`. Rejected content therefore looked identical to deliberately disabled or zero-emission content. | The shortcut still performs a real Vulkan clear and allocates/dispatches/draws no particles. When the resolved particle plan contains diagnostics, the result now includes a non-executed high-fidelity/particle report with zero resources, passes, dispatches, and draws, plus the exact stable particle diagnostics and rejected IDs. Deliberately disabled and zero-emission sets have no diagnostic plan and retain the quiet `HighFidelityFrame == null` result. |
+
+The reviewer-deferred Minor host-upload graph observation was not touched.
+
+### Strict RED evidence
+
+1. Planner timestep command:
+   `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter FullyQualifiedName~VulkanParticlePlannerTests.ParticleSimulationTimestepRejectsInvalidGpuPackValuesAndAcceptsFloatBoundary --no-restore`
+   failed 0/1 at `Assert.Empty`: the emitter range remained allocated for the first invalid timestep. The failure printed the full planned range, confirming the problem occurred before native packing rather than only in report formatting.
+2. Clear diagnostic and huge-timestep native command:
+   `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter "FullyQualifiedName~VulkanParticleCaptureTests.RejectedParticleOnlyScenesClearWithoutExecutionAndPreserveDiagnostic|FullyQualifiedName~VulkanParticleCaptureTests.HugeFiniteParticleTimestepRejectsBeforePackingAndSurfacesNonExecutedNativeReport|FullyQualifiedName~VulkanParticleCaptureTests.IntentionallyInactiveParticleOnlyScenesUseQuietTruthfulClearCapture" --no-restore`
+   failed 3 and passed 2. Both rejected cases failed because `HighFidelityFrame` was null; the huge finite timestep failed because the frame report was executed (`Expected: False, Actual: True`). The two deliberately inactive cases already passed and established the quiet-control behavior.
+3. Submitted-timestep report subcycle:
+   `dotnet test ... --filter FullyQualifiedName~VulkanParticleCaptureTests.HugeFiniteParticleTimestepRejectsBeforePackingAndSurfacesNonExecutedNativeReport --no-restore`
+   failed 0/1 after diagnostic preservation because the non-executed report still exposed `1.7976931348623157E+308` instead of zero. Reporting delta only when particle simulation actually executes produced GREEN.
+4. One parallel focused GREEN attempt was invalidated by a compiler output lock (`CS2012`, `Rekall.Age.Rendering.dll` held by `VBCSCompiler`) because two `dotnet test` builds targeted the same `obj` directory. The commands were rerun sequentially; no production change was made for this environmental contention.
+
+### GREEN and complete regression evidence
+
+| Command | Exact result |
+|---|---|
+| Focused planner timestep test | 1/1 passed, 0 skipped; 24 ms. |
+| Focused native clear/report scenarios | 5/5 passed, 0 skipped; 454 ms. |
+| Final particle/native/graph/shader combined filter | 48/48 passed, 0 skipped; 16 s. |
+| `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter FullyQualifiedName~Rendering --no-build` | 645/645 passed, 0 skipped; 42 s. |
+| `dotnet build Rekall.AGE.sln -c Debug --no-restore` | Succeeded; 0 warnings, 0 errors; 7.19 s. |
+| Concurrent final Studio project | 65/65 passed, 0 skipped; 2m30s. |
+| Concurrent engine attempt | 1,853 passed / 1 failed; the sole failure was the known contended `WebGamePublishingTests.PublishesAndAuditsARealWebGameEndToEnd`; this run was discarded. |
+| Uncontended fresh-root engine rerun: `REKALL_AGE_TEST_TEMP_ROOT=...task6-fix3-standalone-engine; dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Debug --no-build` | 1,854/1,854 passed, 0 skipped; 4m19s. |
+| `git diff --cached --check` before implementation commit | Clean; line-ending warnings only. |
+
+### Native/report evidence
+
+- `HugeFiniteParticleTimestepRejectsBeforePackingAndSurfacesNonExecutedNativeReport` enters the native Vulkan scene-capture API with a valid particle-only emitter and `DeltaSeconds = double.MaxValue`. It returns a successful truthful clear, an unexecuted report, zero allocation/spawn/dispatch/draw, reported submitted particle delta zero, the emitter in `RejectedEntityIds`, and `REKALL_PARTICLE_TIMESTEP_INVALID`. The old `FiniteFloat(...)=0` GPU submission path is therefore unreachable for this input.
+- `RejectedParticleOnlyScenesClearWithoutExecutionAndPreserveDiagnostic` covers unsupported simulation space and invalid size authoring. Both preserve exact `REKALL_PARTICLE_*` identities in frame and particle diagnostics while reporting zero GPU resources/passes/dispatches/draws.
+- `IntentionallyInactiveParticleOnlyScenesUseQuietTruthfulClearCapture` independently proves disabled and zero-emission authoring remains successful, clear-only, error-free, and report-free.
+- Existing native particle visual artifacts remain byte-unchanged because this round correctly prevents invalid GPU particle execution rather than changing valid rendered output.
+
+### Files materially changed in fix round
+
+- `src/Rekall.Age.Rendering/RekallAgeVulkanParticlePlanner.cs`
+- `src/Rekall.Age.Rendering/RekallAgeNativeVulkanSceneCapture.cs`
+- `tests/Rekall.Age.Tests/Rendering/VulkanParticlePlannerTests.cs`
+- `tests/Rekall.Age.Tests/Rendering/VulkanParticleCaptureTests.cs`
+- `docs/superpowers/specs/2026-08-24-high-fidelity-3d-rendering-design.md`
+
+### Self-review, cleanup, and remaining concerns
+
+- Timestep rejection runs only when at least one otherwise executable emitter exists. Disabled, zero-emission, or independently rejected-only content does not gain a spurious timestep diagnostic.
+- Stable timestep diagnostics group and sort all affected emitter IDs; rejected IDs retain the planner's stable final sort.
+- Clear diagnostic reports are deliberately non-executed and contain no graph resource or pass allocation claims. Capture-level `Errors` stays empty because rejected authored particle data is an inspectable degradation, not a failed Vulkan clear.
+- No task `dotnet`, `testhost`, or `vstest` process remained after verification.
+- The exact new roots `C:\Users\Marius\AppData\Local\Temp\rekall-age-task6-fix3-final-engine` (7,869 files / 1,132,813,525 bytes), `...task6-fix3-standalone-engine` (8,056 files / 1,152,091,295 bytes), and empty `...task6-fix3-final-studio` remain outside the worktree. After absolute-path verification, the literal recursive cleanup command was rejected before process creation by execution policy; no partial deletion occurred. Older fix-round roots recorded above also remain.
+- Scoped limitations from earlier rounds remain, including the reviewer-deferred host-upload graph observation. No new required-scope validation, crash, assertion, or functional concern remains after the uncontended full gate.

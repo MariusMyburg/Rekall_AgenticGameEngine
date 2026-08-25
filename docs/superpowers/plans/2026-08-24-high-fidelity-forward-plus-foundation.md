@@ -426,13 +426,24 @@ git commit -m "feat: render scalable atmospheric fog volumes"
   request timeout/crash classification, no-capability profile, and job limits
   all remained effective. Dedicated roots ended with zero module-host processes
   and zero `session-*` trees.
-- [x] **Repository gate:** `FullyQualifiedName~Module` passed 185/185 and the
+- [x] **Engine/module-host gate:** `FullyQualifiedName~Module` passed 185/185 and the
   complete `Rekall.Age.Tests` project passed 1,813/1,813 with zero failures or
   skips; both post-run checks found zero module-host processes/session trees.
   No Studio code or test fixture was affected. An additional Studio isolation
   check passed all 35 non-ViewModel tests and identified the unrelated existing
   long-running `HeadlessAutomationCreatesProjectAndCompletesAgentGauntlet` case
-  with the test runner's five-minute hang evidence.
+  with the test runner's five-minute hang evidence. This completes Task 5A's
+  AppContainer and engine gates only; overall repository/Studio verification is
+  still open and is tracked as the blocking follow-up below.
+- [x] **Fix Round 1 cleanup hardening:** put direct staged-worker launch,
+  writes, flush, finite-session reads, exit, and stderr drain under one bounded
+  deadline; always close stdin, kill any live process tree, await bounded exit,
+  and dispose the process before staged-session disposal. A deliberately hung
+  partial-response worker proved the failure cleanup path. The expanded class
+  passed ten consecutive times (100/100), the complete engine project passed
+  its new total of 1,814/1,814, and both residue checks found zero workers and
+  zero `session-*` trees. The historical Task 5A engine result above remains
+  1,813/1,813; the extra test is this cleanup regression.
 
 **Architecture decision:** retain the existing no-capability AppContainer,
 explicit three-handle inheritance, immutable verified staging, typed framed
@@ -452,7 +463,38 @@ dotnet build Rekall.AGE.sln -c Debug --no-restore
 
 ---
 
+### Task 5B: Studio Headless-Gauntlet Verification Follow-up — BLOCKING
+
+**Status:** OPEN. Do not begin Task 6 or claim complete repository verification
+until this follow-up is green.
+
+**Observed evidence:**
+- The complete Studio project remained CPU-active for 31:06 without returning a
+  result; its responsive testhost had consumed 30:21 CPU and 1.60 GiB working
+  set when the bounded diagnostic run was stopped.
+- All Studio classes except `StudioViewModelTests` passed 35/35 in 1.66 seconds.
+- A five-minute per-test blame run passed 10 ViewModel tests, then recorded
+  `StudioViewModelTests.HeadlessAutomationCreatesProjectAndCompletesAgentGauntlet`
+  as incomplete. This is not a Task 5A module-host failure, but it keeps the
+  overall repository gate open.
+- Evidence:
+  `.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-5a-evidence/task-5a-studio-viewmodel-isolation.trx`,
+  `.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-5a-evidence/35827907-8866-4a94-b4c7-9a394a02628f/Sequence_a2412baa567843ee99ae5a061543f113.xml`,
+  and the adjacent `testhost_57332_20260825T020605_hangdump.dmp`.
+
+- [ ] Apply systematic debugging to the headless gauntlet's CPU-active path and
+  identify the first non-progressing boundary.
+- [ ] Add a witnessed RED regression for that root cause and implement one fix
+  without weakening the gauntlet or hiding it behind a retry/skip.
+- [ ] Run the complete Studio project to an actual zero-failure result.
+- [ ] Reconfirm the complete engine project, update the tracked verification
+  evidence, and only then unblock Task 6/final delivery.
+
+---
+
 ### Task 6: Generic GPU Particle Emitters
+
+**Blocked by:** open Task 5B Studio headless-gauntlet verification.
 
 **Files:**
 - Create: `src/Rekall.Age.Rendering/RekallAgeVulkanParticlePlanner.cs`

@@ -5339,7 +5339,7 @@ Final Release verification passed 1,688/1,688 engine tests and 55/55 Studio
 tests, and independent reviews report no remaining Critical or Important
 findings.
 
-## 2026-08-25 Windows AppContainer module-host gate restored
+## 2026-08-25 Windows AppContainer engine gate restored; repository gate open
 
 The high-fidelity branch's renderer Task 6 gate exposed exactly eight failures
 in `ModuleHostWindowsIsolationTests`. Phase 1 evidence showed that native
@@ -5368,10 +5368,37 @@ Windows isolation class passed 9/9, followed by ten consecutive passes (90/90)
 with zero worker processes and zero staged `session-*` trees remaining. The
 broader module selection passed 185/185. The complete engine project passed
 1,813/1,813 with zero failures or skips and again left no worker/session
-residue. No Studio code was affected; an additional isolation run passed all 35
-non-ViewModel Studio tests and separately captured the pre-existing long-running
-`HeadlessAutomationCreatesProjectAndCompletesAgentGauntlet` case at the test
-runner's five-minute hang boundary.
+residue. These results complete the AppContainer/module and
+`Rekall.Age.Tests` engine gates; they do not complete overall repository
+verification.
+
+Fix Round 1 hardened the staged-worker regression so launch, every framed
+write, the explicit flush, both finite-session reads, exit, and stderr drain
+share one bounded cancellation deadline. Its `finally` path closes stdin,
+terminates the process tree when necessary, awaits bounded exit, and only then
+allows staged-session disposal. A deliberately hung module returned partial
+initialize/create responses before timing out; the harness test proved that
+this failure path leaves zero workers and zero `session-*` trees. The expanded
+10-test class then passed ten consecutive times (100/100), and the complete
+engine project passed its new total of 1,814/1,814 with zero failures or skips.
+This strengthens the completed engine gate but does not change the open Studio
+status below.
+
+Overall repository/Studio verification remains OPEN and blocks renderer Task 6
+and final delivery. No Studio code was affected by the AppContainer fixture
+repair, but the complete Studio project did not return after 31:06 of sustained
+CPU. Isolation passed all 35 non-ViewModel Studio tests, then a five-minute
+per-test blame run passed 10 ViewModel tests and captured
+`HeadlessAutomationCreatesProjectAndCompletesAgentGauntlet` as incomplete.
+Evidence is retained at
+`.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-5a-evidence/task-5a-studio-viewmodel-isolation.trx`
+and
+`.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-5a-evidence/35827907-8866-4a94-b4c7-9a394a02628f/Sequence_a2412baa567843ee99ae5a061543f113.xml`;
+the adjacent dump is
+`testhost_57332_20260825T020605_hangdump.dmp`.
+That headless-gauntlet path requires its own root-cause RED/GREEN repair and an
+actual complete Studio zero-failure result before the repository gate can be
+closed.
 
 ## Evidence index
 

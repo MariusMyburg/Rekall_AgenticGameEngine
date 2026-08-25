@@ -20,6 +20,7 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 additionalLightDirection;
     vec4 additionalLightColor;
     vec4 additionalLightPosition;
+    vec4 environmentParameters;
 } frame;
 
 layout(set = 1, binding = 0) uniform DrawUniformBuffer
@@ -730,7 +731,9 @@ void main()
     vec3 diffuse = (1.0 - f) * (1.0 - metallic) * albedo / PI;
     diffuse *= mix(1.0, 0.42, waterCoverage);
     vec3 directTransmittance = surfaceAtmosphereTransmittance(fragWorldPosition, light);
-    float ambientStrength = hasAtmosphereData() ? spaceAmbientFloor() : 0.035;
+    float ambientStrength = hasAtmosphereData()
+        ? spaceAmbientFloor()
+        : 0.12 * max(frame.environmentParameters.x, 0.0);
     vec3 ambient = albedo * ambientStrength * occlusion;
     vec3 waterFresnel = fresnelSchlick(ndotv, vec3(0.02));
     ambient += waterFresnel * frame.lightColor.rgb * directTransmittance * waterCoverage * 0.018;

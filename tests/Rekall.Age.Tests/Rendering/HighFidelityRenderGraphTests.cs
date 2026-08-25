@@ -6,6 +6,29 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class HighFidelityRenderGraphTests
 {
     [Fact]
+    public void FramePlanUsesAuthoredEnvironmentExposureAndWhitePoint()
+    {
+        var quality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent("High"),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+            1280,
+            720);
+        var frame = Frame(1280, 720, quality) with
+        {
+            Environment = new RekallAgeRuntimeViewportEnvironment(
+                "environment", "Environment", null, 0.55, -0.35, "agx", 11.2, null, "color"),
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post", "Post", true, [new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")])
+        };
+
+        var plan = Assert.IsType<RekallAgeVulkanHighFidelityFramePlan>(
+            new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame));
+
+        Assert.Equal(-0.35, plan.PostSettings.Exposure);
+        Assert.Equal(11.2, plan.PostSettings.WhitePoint);
+    }
+
+    [Fact]
     public void BuilderCompilesHighIntoTheDeclaredForwardPlusPassOrder()
     {
         var graph = Build("High");

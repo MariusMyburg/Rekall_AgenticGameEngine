@@ -150,7 +150,8 @@ public sealed class VulkanScenePreparedFrameTests
             System.Numerics.Matrix4x4.CreateTranslation(1, 2, 3),
             new System.Numerics.Vector3(0.1f, 0.2f, 0.3f),
             new System.Numerics.Vector4(0.4f, 0.5f, 0.6f, 0.7f),
-            new System.Numerics.Vector4(8, 9, 10, 1));
+            new System.Numerics.Vector4(8, 9, 10, 1),
+            EnvironmentParameters: new System.Numerics.Vector4(0.55f, -0.35f, 11.2f, 1));
 
         var uniform = RekallAgeVulkanSceneUniformUploadBuilder.BuildFrameUniform(frame);
         var push = RekallAgeVulkanSceneUniformUploadBuilder.BuildDrawPushConstants(
@@ -171,6 +172,10 @@ public sealed class VulkanScenePreparedFrameTests
         Assert.Equal(0.2f, uniform.LightY);
         Assert.Equal(0.6f, uniform.LightB);
         Assert.Equal(10, uniform.LightPositionZ);
+        Assert.Equal(0.55f, uniform.EnvironmentAmbientEnergy);
+        Assert.Equal(-0.35f, uniform.EnvironmentExposure);
+        Assert.Equal(11.2f, uniform.EnvironmentWhitePoint);
+        Assert.Equal(1, uniform.EnvironmentToneMapper);
         Assert.Equal(0.8f, push.RoughnessFactor);
         Assert.Equal(3, push.EmissiveStrength);
         Assert.Equal(0.1f, push.AtmosphereRayleighR);

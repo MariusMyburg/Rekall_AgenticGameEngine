@@ -4542,7 +4542,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec3 directTransmittance = surfaceAtmosphereTransmittance(fsin_WorldPosition, light);
             float ambientStrength = hasAtmosphereData()
                 ? spaceAmbientFloor()
-                : 0.035 * max(Frame.EnvironmentParameters.x, 0.0);
+                : 0.12 * max(Frame.EnvironmentParameters.x, 0.0);
             vec3 ambient = albedo * ambientStrength * occlusion;
             vec3 waterFresnel = fresnelSchlick(ndotv, vec3(0.02));
             ambient += waterFresnel * Frame.LightColor.rgb * directTransmittance * waterCoverage * 0.018;

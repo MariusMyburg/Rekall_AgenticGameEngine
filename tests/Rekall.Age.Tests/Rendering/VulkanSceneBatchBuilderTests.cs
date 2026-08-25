@@ -7,6 +7,28 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VulkanSceneBatchBuilderTests
 {
     [Fact]
+    public void BuildProjectsAuthoredEnvironmentIntoFrameUniform()
+    {
+        var frame = CreateFrame() with
+        {
+            Environment = new RekallAgeRuntimeViewportEnvironment(
+                "environment",
+                "Environment",
+                null,
+                AmbientEnergy: 0.55,
+                Exposure: -0.35,
+                ToneMapper: "agx",
+                WhitePoint: 11.2,
+                ColorGradeAssetId: null,
+                BackgroundPolicy: "color")
+        };
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, []);
+
+        Assert.Equal(new Vector4(0.55f, -0.35f, 11.2f, 1), batch.Frame.EnvironmentParameters);
+    }
+
+    [Fact]
     public void DynamicRebuildReusesStableTopologyAndUpdatesDrawTransform()
     {
         var initial = CreateFrame(new RekallAgeRuntimeViewportRenderable(

@@ -82,11 +82,17 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
         }
 
         graph = graph with { Diagnostics = diagnostics };
+        var environmentExposure = frame.Environment is { Exposure: var exposure } && double.IsFinite(exposure)
+            ? Math.Clamp(exposure, -8, 8)
+            : 0;
+        var environmentWhitePoint = frame.Environment is { WhitePoint: var whitePoint } && double.IsFinite(whitePoint)
+            ? Math.Clamp(whitePoint, 0.1, 64)
+            : 11.2;
         return new RekallAgeVulkanHighFidelityFramePlan(
             graph,
             new RekallAgeHighFidelityPostSettings(
-                Exposure: 1,
-                WhitePoint: 16,
+                Exposure: environmentExposure,
+                WhitePoint: environmentWhitePoint,
                 Saturation: 1,
                 Contrast: 1.05,
                 GradeStrength: 1,

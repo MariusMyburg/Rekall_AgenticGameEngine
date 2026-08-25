@@ -133,7 +133,8 @@ public sealed record RekallAgeVulkanSceneFrameUniform(
     Vector3 AdditionalLightDirection = default,
     Vector4 AdditionalLightColor = default,
     Vector4 AdditionalLightPosition = default,
-    Vector4 AdditionalLightParameters = default)
+    Vector4 AdditionalLightParameters = default,
+    Vector4 EnvironmentParameters = default)
 {
     public IReadOnlyList<RekallAgeVulkanPointLight> PointLights { get; init; } = [];
 }

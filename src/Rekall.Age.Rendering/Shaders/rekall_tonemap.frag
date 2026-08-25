@@ -47,7 +47,9 @@ void main()
     vec3 hdr = texture(sceneHdr, fragUv).rgb;
     hdr += upsampleBloom(fragUv) * max(parameters.bloomIntensity, 0.0);
     hdr *= exp2(parameters.exposure);
-    hdr /= max(parameters.whitePoint, 0.0001);
+    // 11.2 is the conventional neutral scene-white reference. Authored white
+    // points adjust highlight placement without crushing all midtones.
+    hdr *= 11.2 / max(parameters.whitePoint, 0.0001);
     vec3 graded = agxCurve(hdr);
     float luminance = dot(graded, vec3(0.2126, 0.7152, 0.0722));
     graded = mix(vec3(luminance), graded, max(parameters.saturation, 0.0));

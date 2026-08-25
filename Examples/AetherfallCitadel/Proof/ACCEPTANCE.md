@@ -50,3 +50,32 @@ The checked-in input and assertion payloads beside this file reproduce these pro
 - Made the gauntlet preserve an existing authored scene instead of clearing it, removing a credible data-loss hazard.
 
 Generated packages and screenshots live under the ignored `Builds/` directory; this file and its JSON payloads are the durable, reproducible acceptance record.
+
+## Active high-fidelity expansion checkpoint — 2026-08-25
+
+This newer modeling/rendering tranche is still in progress and does not replace
+the accepted gameplay evidence above.
+
+- A persisted cubic Bézier curve resource now drives the broken entrance arch;
+  its graph and published mesh are checked for source/evaluated drift.
+- A real 1280x720 High-quality Vulkan capture on the NVIDIA GeForce RTX 5090
+  exposed a generic renderer defect: native scene lighting discarded authored
+  environment ambient values, while native post-processing ignored authored
+  exposure/white point and divided HDR lighting by a fixed white point of 16.
+- AGE now transports environment parameters through the native frame-uniform
+  ABI, uses authored exposure and white point, and treats the conventional 11.2
+  scene-white value as a neutral highlight reference rather than a blanket
+  midtone divisor. The Windows player and native scene renderer share the same
+  calibrated ambient coefficient.
+- The aligned repaired frame is informative with 12,732 distinct colors,
+  dominant-color share 30.9%, mean luminance 0.188, 141 draws, 4 dispatches,
+  zero missing assets, and zero fallback assets. Aetherfall exposure is now
+  -1.15 for dark but readable presentation.
+- The capture also proved that unit-strength micro-normal maps were producing
+  distracting high-frequency noise across the whole scene. Authored material
+  instances now use a 0.35 normal scale. This materially reduces the visible
+  noise while preserving stone and ground relief.
+
+The frame is diagnostic progress, not final visual acceptance: several ruin
+silhouettes remain too black, prop geometry remains visibly coarse, and the
+composition is not yet at the requested Diablo/Alan Wake quality bar.

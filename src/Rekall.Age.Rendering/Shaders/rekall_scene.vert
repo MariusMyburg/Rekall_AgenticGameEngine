@@ -20,6 +20,7 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 additionalLightDirection;
     vec4 additionalLightColor;
     vec4 additionalLightPosition;
+    vec4 environmentParameters;
 } frame;
 
 layout(set = 1, binding = 0) uniform DrawUniformBuffer

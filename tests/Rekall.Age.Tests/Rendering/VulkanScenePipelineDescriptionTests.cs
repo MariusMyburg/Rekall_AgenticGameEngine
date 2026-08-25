@@ -78,6 +78,11 @@ public sealed class VulkanScenePipelineDescriptionTests
         Assert.Contains("layout(set = 2, binding = 10) uniform texture2D cloudShadowTexture;", fragment);
         Assert.Contains("layout(set = 2, binding = 12) uniform texture2D surfaceWaterTexture;", fragment);
         Assert.Contains("vec4 lightPosition;", fragment);
+        Assert.Contains("vec4 environmentParameters;", vertex);
+        Assert.Contains("vec4 environmentParameters;", fragment);
+        Assert.Contains("0.12 * max(frame.environmentParameters.x, 0.0)", fragment);
+        var toneMap = File.ReadAllText(Path.Combine(shaderDirectory, "rekall_tonemap.frag"));
+        Assert.Contains("hdr *= 11.2 / max(parameters.whitePoint, 0.0001);", toneMap);
         Assert.Contains("frame.lightPosition.w > 0.5", fragment);
         Assert.Contains("vec4 emissiveFactors;", fragment);
         Assert.Contains("vec4 atmosphereFactors0;", fragment);

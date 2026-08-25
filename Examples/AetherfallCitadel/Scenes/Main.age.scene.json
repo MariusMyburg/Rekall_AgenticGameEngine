@@ -265,6 +265,7 @@
             "emissiveColor": "#262b2b",
             "emissiveStrength": 0.012,
             "baseColorTexture": "asset_citadel-obsidian-albedo-v1_d4ec000a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -616,6 +617,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_aetherfall-wet-slate-albedo-v2_b446bcf3",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -668,6 +670,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_aetherfall-weathered-masonry-albedo-v2_d174a66a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -949,6 +952,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.02,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -992,6 +996,7 @@
             "emissiveColor": "#4d504d",
             "emissiveStrength": 0.02,
             "baseColorTexture": "asset_citadel-irregular-masonry-albedo-v1_eead99b7",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-irregular-masonry-normal-dx-v1_39fadc77"
           }
         },
@@ -1055,6 +1060,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -1107,6 +1113,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -1140,6 +1147,7 @@
             "metallicFactor": 0.04,
             "roughnessFactor": 0.9,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70",
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015
@@ -1193,6 +1201,7 @@
             "metallicFactor": 0.04,
             "roughnessFactor": 0.9,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70",
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015
@@ -1265,6 +1274,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -1317,6 +1327,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -1471,6 +1482,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -1523,6 +1535,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -1578,6 +1591,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -1634,6 +1648,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -1689,6 +1704,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -1744,6 +1760,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -1800,6 +1817,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -1855,6 +1873,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -2914,6 +2933,7 @@
             "emissiveColor": "#303432",
             "emissiveStrength": 0.01,
             "baseColorTexture": "asset_citadel-obsidian-albedo-v1_d4ec000a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -2965,6 +2985,7 @@
             "emissiveColor": "#303432",
             "emissiveStrength": 0.01,
             "baseColorTexture": "asset_citadel-obsidian-albedo-v1_d4ec000a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -3016,6 +3037,7 @@
             "emissiveColor": "#303432",
             "emissiveStrength": 0.01,
             "baseColorTexture": "asset_citadel-obsidian-albedo-v1_d4ec000a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -3067,6 +3089,7 @@
             "emissiveColor": "#303432",
             "emissiveStrength": 0.01,
             "baseColorTexture": "asset_citadel-obsidian-albedo-v1_d4ec000a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -3118,6 +3141,7 @@
             "emissiveColor": "#303432",
             "emissiveStrength": 0.01,
             "baseColorTexture": "asset_citadel-obsidian-albedo-v1_d4ec000a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -3169,6 +3193,7 @@
             "emissiveColor": "#303432",
             "emissiveStrength": 0.01,
             "baseColorTexture": "asset_citadel-obsidian-albedo-v1_d4ec000a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -3220,6 +3245,7 @@
             "emissiveColor": "#303432",
             "emissiveStrength": 0.01,
             "baseColorTexture": "asset_citadel-obsidian-albedo-v1_d4ec000a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -3271,6 +3297,7 @@
             "emissiveColor": "#303432",
             "emissiveStrength": 0.01,
             "baseColorTexture": "asset_citadel-obsidian-albedo-v1_d4ec000a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -4144,6 +4171,7 @@
             "emissiveColor": "#29302d",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_aetherfall-wet-slate-albedo-v2_b446bcf3",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -4244,6 +4272,7 @@
             "emissiveColor": "#29302d",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -4303,6 +4332,7 @@
             "emissiveColor": "#29302d",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -4362,6 +4392,7 @@
             "emissiveColor": "#29302d",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -4420,6 +4451,7 @@
             "emissiveColor": "#29302d",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -4478,6 +4510,7 @@
             "emissiveColor": "#29302d",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -4536,6 +4569,7 @@
             "emissiveColor": "#29302d",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -4594,6 +4628,7 @@
             "emissiveColor": "#29302d",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -4652,6 +4687,7 @@
             "emissiveColor": "#29302d",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -4711,6 +4747,7 @@
             "emissiveColor": "#29302d",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -4770,6 +4807,7 @@
             "emissiveColor": "#29302d",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -4829,6 +4867,7 @@
             "emissiveColor": "#29302d",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -4868,6 +4907,7 @@
             "emissiveColor": "#242a28",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-irregular-masonry-albedo-v1_eead99b7",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-irregular-masonry-normal-dx-v1_39fadc77",
             "emissiveTexture": "asset_citadel-aether-emissive-v1_b30b5718"
           }
@@ -4985,6 +5025,7 @@
             "emissiveColor": "#242a28",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -5030,6 +5071,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -5074,6 +5116,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         }
@@ -5418,7 +5461,7 @@
           "type": "Rekall.Environment3D",
           "properties": {
             "ambientEnergy": 0.55,
-            "exposure": -0.35,
+            "exposure": -1.15,
             "toneMapper": "agx",
             "whitePoint": 11.2,
             "colorGrade": "aetherfall-survival-horror",
@@ -6504,6 +6547,7 @@
             "emissiveColor": "#59615f",
             "emissiveStrength": 0.02,
             "baseColorTexture": "asset_aetherfall-weathered-masonry-albedo-v2_d174a66a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -6556,6 +6600,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -6602,6 +6647,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -6661,6 +6707,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -6707,6 +6754,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -6766,6 +6814,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -6812,6 +6861,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -6871,6 +6921,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -6917,6 +6968,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -6976,6 +7028,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -7022,6 +7075,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -7081,6 +7135,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -7127,6 +7182,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -7186,6 +7242,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -7232,6 +7289,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -7291,6 +7349,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -7337,6 +7396,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -7396,6 +7456,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -7442,6 +7503,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -7501,6 +7563,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -7547,6 +7610,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -7606,6 +7670,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -7652,6 +7717,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -7711,6 +7777,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -7757,6 +7824,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -7816,6 +7884,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -7862,6 +7931,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -7921,6 +7991,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -7967,6 +8038,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -8026,6 +8098,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -8072,6 +8145,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -8124,6 +8198,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -8176,6 +8251,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -8228,6 +8304,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -8280,6 +8357,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -8332,6 +8410,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -8384,6 +8463,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -8436,6 +8516,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -8488,6 +8569,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -8540,6 +8622,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -8599,6 +8682,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -8651,6 +8735,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -8703,6 +8788,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -8755,6 +8841,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -8807,6 +8894,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -8859,6 +8947,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -8911,6 +9000,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -8963,6 +9053,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9015,6 +9106,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9067,6 +9159,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9119,6 +9212,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9171,6 +9265,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9223,6 +9318,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9275,6 +9371,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9327,6 +9424,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9379,6 +9477,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9431,6 +9530,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9483,6 +9583,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9535,6 +9636,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9587,6 +9689,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9639,6 +9742,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9691,6 +9795,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9743,6 +9848,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9795,6 +9901,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9847,6 +9954,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9899,6 +10007,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -9951,6 +10060,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -10016,6 +10126,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -10075,6 +10186,7 @@
             "emissiveColor": "#343a39",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
           }
         },
@@ -10165,6 +10277,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -10218,6 +10331,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -10271,6 +10385,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_aetherfall-weathered-masonry-albedo-v2_d174a66a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -10324,6 +10439,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_aetherfall-weathered-masonry-albedo-v2_d174a66a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -10377,6 +10493,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -10430,6 +10547,7 @@
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -10484,6 +10602,7 @@
             "emissiveColor": "#545955",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -10538,6 +10657,7 @@
             "emissiveColor": "#545955",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },
@@ -10592,6 +10712,7 @@
             "emissiveColor": "#545955",
             "emissiveStrength": 0.005,
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
           }
         },

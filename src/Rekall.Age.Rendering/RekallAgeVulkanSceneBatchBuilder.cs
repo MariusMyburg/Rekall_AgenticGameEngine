@@ -233,6 +233,14 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         {
             additionalLight = SceneLight.Disabled;
         }
+        var environment = frame.Environment;
+        var environmentParameters = environment is null
+            ? new Vector4(1, 0, 11.2f, 0)
+            : new Vector4(
+                (float)Math.Clamp(environment.AmbientEnergy, 0, 16),
+                (float)Math.Clamp(environment.Exposure, -8, 8),
+                (float)Math.Clamp(environment.WhitePoint, 0.1, 64),
+                environment.ToneMapper.Equals("agx", StringComparison.OrdinalIgnoreCase) ? 1 : 0);
         return new RekallAgeVulkanSceneFrameUniform(
             camera.ViewProjection,
             light.Direction,
@@ -243,7 +251,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             additionalLight.Direction,
             additionalLight.Color,
             additionalLight.Position,
-            new Vector4(additionalLight.Range, additionalLight.Priority, 0, 0))
+            new Vector4(additionalLight.Range, additionalLight.Priority, 0, 0),
+            environmentParameters)
         {
             PointLights = pointLights.Select(item => new RekallAgeVulkanPointLight(
                 item.EntityId ?? string.Empty, item.Color, item.Position, new Vector4(item.Range, item.Priority, 0, 0))).ToArray()

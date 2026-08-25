@@ -228,6 +228,82 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task ProviderSwitchAfterFaultedAgentRunReleasesOldLeaseAndLoadsNewProvider()
+    {
+        const string upstreamPayload = "opaque-switch-after-run-payload";
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-switch-after-run-" + Guid.NewGuid().ToString("N"));
+        var ollama = new ProviderLifecycleHandler(
+            blockOllamaChat: false,
+            chatFailure: new InvalidDataException(upstreamPayload));
+        var openAi = new ProviderLifecycleHandler(blockOllamaChat: false);
+        var handlers = new Queue<ProviderLifecycleHandler>([ollama, openAi]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = "session-test-key" },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+        var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession())
+        {
+            ProjectPathInput = root,
+            ProjectNameInput = "Switch After Failed Run",
+            SceneNameInput = "Main",
+            AgentTaskInput = "Inspect the project."
+        };
+        try
+        {
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.RunAgentCommand);
+
+            viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(
+                provider => provider.Id == "openai");
+            await viewModel.WaitForLanguageModelProviderTransitionAsync();
+
+            Assert.Equal("openai", viewModel.SelectedLanguageModelProvider.Id);
+            Assert.Equal(["gpt-5.6-sol", "gpt-5.6-sol-preview"], viewModel.LanguageModels);
+            Assert.Equal("gpt-5.6-sol", viewModel.SelectedLanguageModel);
+            Assert.Equal(["lease-disposed"], ollama.Events);
+            var inspectable = string.Join('\n', [viewModel.ProviderStatus, viewModel.StatusText, .. viewModel.ValidationLines]);
+            Assert.DoesNotContain(upstreamPayload, inspectable, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await viewModel.DisposeAsync();
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ProviderSwitchAfterFaultedModelRefreshReleasesOldLeaseAndLoadsNewProvider()
+    {
+        const string upstreamPayload = "opaque-switch-after-refresh-payload";
+        var ollama = new ProviderLifecycleHandler(
+            blockOllamaChat: false,
+            modelFailure: new InvalidDataException(upstreamPayload));
+        var openAi = new ProviderLifecycleHandler(blockOllamaChat: false);
+        var handlers = new Queue<ProviderLifecycleHandler>([ollama, openAi]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = "session-test-key" },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+
+        await ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
+        viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(
+            provider => provider.Id == "openai");
+        await viewModel.WaitForLanguageModelProviderTransitionAsync();
+
+        Assert.Equal("openai", viewModel.SelectedLanguageModelProvider.Id);
+        Assert.Equal(["gpt-5.6-sol", "gpt-5.6-sol-preview"], viewModel.LanguageModels);
+        Assert.Equal("gpt-5.6-sol", viewModel.SelectedLanguageModel);
+        Assert.Equal(["lease-disposed"], ollama.Events);
+        var inspectable = string.Join('\n', [viewModel.ProviderStatus, viewModel.StatusText, .. viewModel.ValidationLines]);
+        Assert.DoesNotContain(upstreamPayload, inspectable, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ShutdownCleansUpProviderAndSessionCredentialAfterFaultingAgentRun()
     {
         const string sessionCredential = "studio-shutdown-run-session-credential";
@@ -315,6 +391,63 @@ public sealed class StudioViewModelTests
         {
             try { await viewModel.DisposeAsync(); }
             catch { }
+        }
+    }
+
+    [Fact]
+    public async Task ShutdownCleansUpWhenAgentCancellationCallbackThrows()
+    {
+        const string sessionCredential = "studio-shutdown-cancellation-session-credential";
+        const string upstreamPayload = "opaque-cancellation-callback-payload";
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-throwing-cancellation-" + Guid.NewGuid().ToString("N"));
+        var model = new BlockingFaultingModel(upstreamPayload);
+        var preview = new RecordingPreviewSession();
+        RekallAgeStudioViewModel? viewModel = null;
+        try
+        {
+            viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                model,
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Cancellation Cleanup",
+                SceneNameInput = "Main",
+                AgentTaskInput = "Inspect the project."
+            };
+            await viewModel.ApplyOpenAiApiKeyAsync(sessionCredential);
+            await ExecuteAsync(viewModel.CreateCommand);
+            var run = ExecuteAsync(viewModel.RunAgentCommand);
+            await model.WaitForChatAsync();
+
+            var agentCancellation = Assert.IsType<CancellationTokenSource>(
+                typeof(RekallAgeStudioViewModel)
+                    .GetField("_agentCancellation", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .GetValue(viewModel));
+            using var throwingRegistration = agentCancellation.Token.Register(() =>
+            {
+                model.ReleaseChat();
+                throw new InvalidDataException(upstreamPayload);
+            });
+            var shutdown = viewModel.DisposeAsync().AsTask();
+            await Task.WhenAll(run, shutdown);
+
+            Assert.True(preview.IsDisposed);
+            Assert.False(viewModel.HasSessionOpenAiCredential);
+            Assert.False(viewModel.RefreshLanguageModelsCommand.CanExecute(null));
+            var inspectable = string.Join('\n', [viewModel.ProviderStatus, viewModel.StatusText, .. viewModel.ValidationLines]);
+            Assert.Contains("REKALL_STUDIO_LANGUAGE_MODEL_SHUTDOWN_FAILED", inspectable, StringComparison.Ordinal);
+            Assert.DoesNotContain(sessionCredential, inspectable, StringComparison.Ordinal);
+            Assert.DoesNotContain(upstreamPayload, inspectable, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (viewModel is not null)
+            {
+                try { await viewModel.DisposeAsync(); }
+                catch { }
+            }
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
 
@@ -1671,7 +1804,8 @@ public sealed class StudioViewModelTests
         bool blockOllamaModels = false,
         IReadOnlyList<string>? openAiModels = null,
         bool pauseModelResponse = false,
-        Exception? modelFailure = null) : HttpMessageHandler
+        Exception? modelFailure = null,
+        Exception? chatFailure = null) : HttpMessageHandler
     {
         private readonly TaskCompletionSource _chatStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _modelsStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1714,6 +1848,7 @@ public sealed class StudioViewModelTests
             if (request.RequestUri.AbsolutePath.EndsWith("/api/chat", StringComparison.Ordinal))
             {
                 _chatStarted.TrySetResult();
+                if (chatFailure is not null) throw chatFailure;
                 if (blockOllamaChat)
                 {
                     try

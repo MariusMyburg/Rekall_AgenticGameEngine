@@ -73,3 +73,34 @@ The three load-bearing Studio lifecycle findings were repaired without changing 
 - Full engine was not rerun in this fix round because the diff changes only `Rekall.Age.Studio`, its test project, and this report; no shared engine behavior or engine test bytes changed. The prior unchanged full-engine result remains 2,001 passed, 0 failed.
 
 The controller-owned `progress.md` remained unstaged and unmodified by this fix round. No live-auth or hardware evidence claims were changed.
+
+## Review fix round 2 — 2026-08-25
+
+Base reviewed: `b12c475de7dd6ebbd55ae0f23330c74f8a9d91b5`.
+
+The two remaining concrete Studio lifecycle defects were fixed without changing shared engine code:
+
+- Both lifecycle and agent cancellation now execute inside the shutdown cleanup-protecting `try/finally`. A cancellation callback failure is converted to the stable redacted `REKALL_STUDIO_LANGUAGE_MODEL_SHUTDOWN_FAILED` diagnostic; it cannot prevent preview disposal, runner/lease release, session-key clearing, or synchronization-object disposal.
+- Provider switching now observes and clears a previously faulted agent-run or model-refresh task without allowing that already-reported fault to abort runner release and selected-provider acquisition. Real fake-HTTP Ollama-to-OpenAI switches after each failure prove that the Ollama lease is disposed, OpenAI models load, and the exact `gpt-5.6-sol` default is selected. Existing generation gating and absent-default behavior remain covered.
+
+### Strict RED → GREEN evidence
+
+1. Throwing cancellation callback during shutdown:
+   - Command: `dotnet test tests\Rekall.Age.Studio.Tests\Rekall.Age.Studio.Tests.csproj --no-restore --filter "FullyQualifiedName~ShutdownCleansUpWhenAgentCancellationCallbackThrows" --verbosity minimal`
+   - RED: 0 passed, 1 failed; `DisposeAsync` propagated an `AggregateException` carrying the opaque callback payload before cleanup (3.7266 s).
+   - GREEN: 1 passed, 0 failed (4.8298 s).
+2. Provider switch after failed run and failed refresh:
+   - Command: `dotnet test tests\Rekall.Age.Studio.Tests\Rekall.Age.Studio.Tests.csproj --no-restore --filter "FullyQualifiedName~ProviderSwitchAfterFaultedAgentRunReleasesOldLeaseAndLoadsNewProvider|FullyQualifiedName~ProviderSwitchAfterFaultedModelRefreshReleasesOldLeaseAndLoadsNewProvider" --verbosity minimal`
+   - RED: 0 passed, 2 failed; both transitions left the selected OpenAI provider with an empty model list because the previous fault aborted before releasing the Ollama runner (3.7215 s).
+   - GREEN: 2 passed, 0 failed (3.6926 s).
+
+### Fix verification
+
+- Seven-test lifecycle/default/generation focused set: 7 passed, 0 failed (3.3461 s).
+- Full Studio command: `dotnet test tests\Rekall.Age.Studio.Tests\Rekall.Age.Studio.Tests.csproj --no-restore --verbosity minimal`
+  - 81 passed, 0 failed (51.2134 s).
+- Warning-free solution command: `dotnet build Rekall.AGE.sln --no-restore --verbosity minimal`
+  - Build succeeded, 0 warnings, 0 errors (6.1723 s; MSBuild elapsed 5.98 s).
+- Full engine was not rerun because this fix round changes only Studio, Studio tests, and this report; no shared-engine behavior or test bytes changed.
+
+The controller-owned `progress.md` remained unstaged and unmodified by this fix round. No live-auth or hardware evidence claims were changed.

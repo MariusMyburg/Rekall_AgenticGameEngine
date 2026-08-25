@@ -1344,24 +1344,41 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private async Task DisposeCoreAsync()
     {
-        _lifecycleCancellation.Cancel();
-        _agentCancellation?.Cancel();
-        Task providerTransition;
-        Task? activeLanguageModelRefresh;
-        Task? activeAgentRun;
-        lock (_languageModelLifecycleSync)
-        {
-            providerTransition = _languageModelProviderTransition;
-            activeLanguageModelRefresh = _activeLanguageModelRefresh;
-            activeAgentRun = _activeAgentRun;
-        }
-        Task[] renderingOperations;
-        lock (_renderingOperationsSync)
-        {
-            renderingOperations = [.. _activeRenderingOperations];
-        }
         try
         {
+            try
+            {
+                _lifecycleCancellation.Cancel();
+            }
+            catch (Exception)
+            {
+                ReportLanguageModelShutdownFailure();
+            }
+
+            try
+            {
+                _agentCancellation?.Cancel();
+            }
+            catch (Exception)
+            {
+                ReportLanguageModelShutdownFailure();
+            }
+
+            Task providerTransition;
+            Task? activeLanguageModelRefresh;
+            Task? activeAgentRun;
+            lock (_languageModelLifecycleSync)
+            {
+                providerTransition = _languageModelProviderTransition;
+                activeLanguageModelRefresh = _activeLanguageModelRefresh;
+                activeAgentRun = _activeAgentRun;
+            }
+            Task[] renderingOperations;
+            lock (_renderingOperationsSync)
+            {
+                renderingOperations = [.. _activeRenderingOperations];
+            }
+
             try
             {
                 await Task.WhenAll(renderingOperations).ConfigureAwait(false);
@@ -2580,6 +2597,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             await activeRun;
         }
+        catch (Exception)
+        {
+            // The command boundary already records the bounded, redacted failure.
+            // Provider transition must still release the old runner and acquire the selected provider.
+        }
         finally
         {
             lock (_languageModelLifecycleSync)
@@ -2702,6 +2724,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         try
         {
             await refresh;
+        }
+        catch (Exception)
+        {
+            // The command boundary already records the bounded, redacted failure.
+            // Provider transition must still release the old runner and acquire the selected provider.
         }
         finally
         {

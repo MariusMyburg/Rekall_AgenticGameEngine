@@ -21,8 +21,20 @@ public delegate ValueTask<RekallAgeCodexApprovalDecision> RekallAgeCodexApproval
     RekallAgeCodexApprovalRequest request,
     CancellationToken cancellationToken);
 
-public sealed class RekallAgeCodexProjectAgentRunner :
+public interface IRekallAgeCodexProjectAgentRunner :
     IRekallAgeProjectAgentRunner,
+    IRekallAgeLanguageModelClient,
+    IAsyncDisposable
+{
+    RekallAgeCodexApprovalCallback? ApprovalCallback { get; set; }
+    RekallAgeLanguageModelProviderDescriptor CurrentProviderDescriptor { get; }
+    ValueTask<RekallAgeCodexAccount> SignInWithChatGptAsync(
+        RekallAgeCodexAuthenticationLauncher launchAuthentication,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class RekallAgeCodexProjectAgentRunner :
+    IRekallAgeCodexProjectAgentRunner,
     IRekallAgeLanguageModelClient,
     IAsyncDisposable
 {

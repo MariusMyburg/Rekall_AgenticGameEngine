@@ -43,3 +43,9 @@ None for Task 3. The retained Prism Relay root is intentional acceptance evidenc
 Addressed both Important review findings. Studio approvals now show bounded allowlisted sanitized action facts and fail closed for unknown/uninformative request shapes. Studio and CLI now expose the documented Codex ChatGPT browser login lifecycle, including completion, safe refresh, cancellation, and stable failure states without auth-file reads or identity/token retention. Under full-suite load, the existing fixed terminal-drain delay exposed a real tool-evidence race; FIFO terminal-notification acknowledgement replaced it and the exact regression passed.
 
 Fresh verification: focused engine 15/15, focused Studio 4/4, full Studio 86/86, full engine 2,068/2,068, solution build 0 warnings/errors. The user's open Studio was not closed.
+
+## Fix round 2
+
+The provider transition now retains the acquired Codex lease/runner when model discovery reports authentication-required, without making the provider runnable. This enables the Studio sign-in command for a fresh account; successful login refreshes Sol models and enables the ordinary agent command. Provider switching cancels/awaits an active login before disposing the retained lease. Codex-specific behavior is expressed through `IRekallAgeCodexProjectAgentRunner`, preserving provider-neutral and testable lifecycle ownership. Approval method admission now uses exact ordinal equality for the three supported protocol methods and rejects prefix/suffix confusables.
+
+Focused verification passed Studio 14/14 and engine 24/24; the solution build succeeded with zero warnings/errors. Full suites were not repeated because this narrow round is directly covered and fix round 1 already established the complete 86/86 and 2,068/2,068 baseline.

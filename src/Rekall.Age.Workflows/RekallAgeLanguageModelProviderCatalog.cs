@@ -40,12 +40,12 @@ public sealed class RekallAgeLanguageModelProviderCatalog
 {
     private readonly RekallAgeLanguageModelProviderSettings _settings;
     private readonly Func<HttpClient> _httpClientFactory;
-    private readonly Func<RekallAgeCodexProjectAgentRunner>? _codexRunnerFactory;
+    private readonly Func<IRekallAgeCodexProjectAgentRunner>? _codexRunnerFactory;
 
     public RekallAgeLanguageModelProviderCatalog(
         RekallAgeLanguageModelProviderSettings? settings = null,
         Func<HttpClient>? httpClientFactory = null,
-        Func<RekallAgeCodexProjectAgentRunner>? codexRunnerFactory = null)
+        Func<IRekallAgeCodexProjectAgentRunner>? codexRunnerFactory = null)
     {
         _settings = settings ?? ReadEnvironmentSettings();
         _httpClientFactory = httpClientFactory ?? CreateHttpClient;

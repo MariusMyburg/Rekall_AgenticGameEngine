@@ -55,6 +55,10 @@ public sealed class StudioViewModelTests
         using var unknown = JsonDocument.Parse("""{"command":"dangerous"}""");
         Assert.False(RekallAgeCodexApprovalPresenter.TryFormat(
             new RekallAgeCodexApprovalRequest("unknown/request", unknown.RootElement.Clone()), out _));
+        Assert.False(RekallAgeCodexApprovalPresenter.TryFormat(
+            new RekallAgeCodexApprovalRequest("unknown/commandExecution/requestApproval", unknown.RootElement.Clone()), out _));
+        Assert.False(RekallAgeCodexApprovalPresenter.TryFormat(
+            new RekallAgeCodexApprovalRequest("item/commandExecution/requestApproval/unsupported", unknown.RootElement.Clone()), out _));
         using var secretOnly = JsonDocument.Parse("""{"apiKey":"secret"}""");
         Assert.False(RekallAgeCodexApprovalPresenter.TryFormat(
             new RekallAgeCodexApprovalRequest("item/commandExecution/requestApproval", secretOnly.RootElement.Clone()), out _));
@@ -72,6 +76,53 @@ public sealed class StudioViewModelTests
         finally
         {
             await viewModel.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task FreshUnauthenticatedCodexSelectionRetainsRunnerAndRecoversThroughStudioSignIn()
+    {
+        var runner = new UnauthenticatedCodexRunner();
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings(),
+            () => new HttpClient(new ProviderLifecycleHandler(false), disposeHandler: true),
+            () => runner);
+        var root = Path.Combine(Path.GetTempPath(), "rekall-studio-codex-signin-" + Guid.NewGuid().ToString("N"));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+        try
+        {
+            viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(item => item.Id == "codex");
+            await viewModel.WaitForLanguageModelProviderTransitionAsync();
+
+            Assert.Contains(RekallAgeCodexErrorCodes.AuthenticationRequired, viewModel.ProviderStatus, StringComparison.Ordinal);
+            Assert.True(viewModel.SignInCodexCommand.CanExecute(null));
+            viewModel.CodexAuthenticationLauncher = uri =>
+            {
+                runner.LaunchedUri = uri;
+                return ValueTask.CompletedTask;
+            };
+            await ExecuteAsync(viewModel.SignInCodexCommand);
+
+            Assert.Equal("https://chatgpt.com/sign-in", runner.LaunchedUri?.AbsoluteUri);
+            Assert.Equal([RekallAgeCodexProjectAgentRunner.RequiredModel], viewModel.LanguageModels);
+            Assert.Equal(RekallAgeCodexProjectAgentRunner.RequiredModel, viewModel.SelectedLanguageModel);
+            viewModel.ProjectPathInput = root;
+            viewModel.ProjectNameInput = "Codex Sign-In";
+            viewModel.SceneNameInput = "Main";
+            viewModel.AgentTaskInput = "Author a small game.";
+            await ExecuteAsync(viewModel.CreateCommand);
+            Assert.True(viewModel.RunAgentCommand.CanExecute(null));
+
+            viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(item => item.Id == "ollama");
+            await viewModel.WaitForLanguageModelProviderTransitionAsync();
+            Assert.Equal(1, runner.DisposeCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
 
@@ -2148,6 +2199,61 @@ public sealed class StudioViewModelTests
             return new RekallAgeStudioPreviewFrame(
                 image, frame, 0, 0, "software-live",
                 new RekallAgeStudioViewportInteractionSnapshot(100, 100, Regions));
+        }
+    }
+
+    private sealed class UnauthenticatedCodexRunner : IRekallAgeCodexProjectAgentRunner
+    {
+        private bool _authenticated;
+        public int DisposeCount { get; private set; }
+        public Uri? LaunchedUri { get; set; }
+        public string ProviderId => "codex";
+        public RekallAgeCodexApprovalCallback? ApprovalCallback { get; set; }
+        public RekallAgeLanguageModelProviderDescriptor CurrentProviderDescriptor { get; private set; } =
+            RekallAgeLanguageModelProviderCatalog.DescribeCodexProvider(
+                new RekallAgeCodexAccount(null, true, false));
+
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_authenticated)
+            {
+                return ValueTask.FromException<IReadOnlyList<RekallAgeLanguageModelInfo>>(
+                    new RekallAgeLanguageModelProviderException(
+                        RekallAgeCodexErrorCodes.AuthenticationRequired, "codex",
+                        "Codex authentication is required. Sign in through Codex and retry."));
+            }
+            return ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>(
+                [new RekallAgeLanguageModelInfo(RekallAgeCodexProjectAgentRunner.RequiredModel, 0)]);
+        }
+
+        public async ValueTask<RekallAgeCodexAccount> SignInWithChatGptAsync(
+            RekallAgeCodexAuthenticationLauncher launchAuthentication,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await launchAuthentication(new Uri("https://chatgpt.com/sign-in"));
+            _authenticated = true;
+            var account = new RekallAgeCodexAccount("chatgpt", true, true);
+            CurrentProviderDescriptor = RekallAgeLanguageModelProviderCatalog.DescribeCodexProvider(account);
+            return account;
+        }
+
+        public ValueTask<RekallAgeProjectAgentSessionResult> RunAsync(
+            RekallAgeProjectAgentSessionRequest request,
+            IProgress<RekallAgeLanguageModelAgentProgress>? progress,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromException<RekallAgeProjectAgentSessionResult>(new NotSupportedException());
+
+        public ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromException<RekallAgeLanguageModelResponse>(new NotSupportedException());
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            return ValueTask.CompletedTask;
         }
     }
 

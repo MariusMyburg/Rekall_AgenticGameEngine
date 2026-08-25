@@ -389,8 +389,8 @@ internal static class RekallAgeCodexApprovalPresenter
 
     internal static bool TryFormat(RekallAgeCodexApprovalRequest request, out string summary)
     {
-        var supported = request.Method.Contains("commandExecution/requestApproval", StringComparison.Ordinal)
-            || request.Method.Contains("fileChange/requestApproval", StringComparison.Ordinal)
+        var supported = request.Method.Equals("item/commandExecution/requestApproval", StringComparison.Ordinal)
+            || request.Method.Equals("item/fileChange/requestApproval", StringComparison.Ordinal)
             || request.Method.Equals("mcpServer/elicitation/request", StringComparison.Ordinal);
         if (!supported || request.Parameters.ValueKind != System.Text.Json.JsonValueKind.Object)
         {

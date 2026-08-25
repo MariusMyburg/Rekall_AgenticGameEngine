@@ -360,7 +360,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             () => !IsBusy && !IsAgentRunning && _languageModelRunner is not null);
         _signInCodexCommand = CreateAsyncCommand(SignInCodexAsync,
             () => !IsBusy && !IsAgentRunning && _activeCodexSignIn is not { IsCompleted: false }
-                && SelectedLanguageModelProvider.Id == "codex" && _languageModelRunner is RekallAgeCodexProjectAgentRunner);
+                && SelectedLanguageModelProvider.Id == "codex" && _languageModelRunner is IRekallAgeCodexProjectAgentRunner);
         _cancelCodexSignInCommand = CreateAsyncCommand(CancelCodexSignInAsync,
             () => _activeCodexSignIn is { IsCompleted: false });
         _runAgentCommand = CreateAsyncCommand(RunAgentAsync, CanRunAgent);
@@ -2442,7 +2442,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private async Task SignInCodexAsync()
     {
-        if (_languageModelRunner is not RekallAgeCodexProjectAgentRunner runner
+        if (_languageModelRunner is not IRekallAgeCodexProjectAgentRunner runner
             || CodexAuthenticationLauncher is null)
         {
             ProviderStatus = "REKALL_CODEX_LOGIN_LAUNCH_UNAVAILABLE: Studio cannot open the Codex sign-in page.";
@@ -2745,6 +2745,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             await previousTransition;
             if (!IsCurrentLanguageModelTransition(provider, generation)) return;
             await CancelAndAwaitLanguageModelRefreshAsync();
+            await CancelAndAwaitCodexSignInAsync();
             await CancelAgentAsync();
             await ReleaseLanguageModelRunnerAsync();
             _lifecycleCancellation.Token.ThrowIfCancellationRequested();
@@ -2753,11 +2754,29 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 _agentRegistry,
                 sessionSettings);
             var runner = acquiredLease.Runner;
-            if (runner is RekallAgeCodexProjectAgentRunner codexRunner)
+            if (runner is IRekallAgeCodexProjectAgentRunner codexRunner)
             {
                 codexRunner.ApprovalCallback = RouteCodexApprovalAsync;
             }
-            var models = await runner.ListModelsAsync(_lifecycleCancellation.Token);
+            IReadOnlyList<RekallAgeLanguageModelInfo> models;
+            try
+            {
+                models = await runner.ListModelsAsync(_lifecycleCancellation.Token);
+            }
+            catch (RekallAgeLanguageModelProviderException exception)
+                when (exception.Code == RekallAgeCodexErrorCodes.AuthenticationRequired
+                    && runner is IRekallAgeCodexProjectAgentRunner)
+            {
+                lock (_languageModelLifecycleSync)
+                {
+                    if (!IsCurrentLanguageModelTransitionLocked(provider, generation)) return;
+                    _languageModelProviderLease = acquiredLease;
+                    _languageModelRunner = runner;
+                    acquiredLease = null;
+                }
+                ReportLanguageModelTransitionFailureIfCurrent(provider, generation, exception);
+                return;
+            }
             lock (_languageModelLifecycleSync)
             {
                 if (!IsCurrentLanguageModelTransitionLocked(provider, generation)) return;
@@ -2824,6 +2843,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
+    private async Task CancelAndAwaitCodexSignInAsync()
+    {
+        _codexSignInCancellation?.Cancel();
+        var signIn = _activeCodexSignIn;
+        if (signIn is null) return;
+        try { await signIn; }
+        catch (RekallAgeLanguageModelProviderException) { }
+    }
+
     private bool TryApplyLanguageModels(
         RekallAgeLanguageModelProviderDescriptor provider,
         IRekallAgeProjectAgentRunner runner,
@@ -2842,7 +2870,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private static RekallAgeLanguageModelProviderDescriptor EffectiveProviderDescriptor(
         RekallAgeLanguageModelProviderDescriptor provider,
         IRekallAgeProjectAgentRunner runner) =>
-        runner is RekallAgeCodexProjectAgentRunner codexRunner
+        runner is IRekallAgeCodexProjectAgentRunner codexRunner
             ? codexRunner.CurrentProviderDescriptor
             : provider;
 

@@ -65,8 +65,8 @@ AGE remains an independent C# implementation.
 | Weighted/custom corner normals | Partial | `weighted_normals`, graph and functional modifier-stack nodes; focused finite unit corner-normal and ordered-stack proofs | `MOD_weighted_normal.cc`, normal edit | Add corner-angle/face-strength policy, custom-normal editing, and transfer |
 | Tangents per UV map | Implemented foundation | mesh compiler tests | Blender tangent APIs | Add explicit inspection/regeneration command |
 | Planar UV projection | Implemented | `project_uv` | UV projection concepts | Current node must remain corner-domain |
-| Box/cylindrical/spherical/camera projection | Planned Wave 2 | Wave 2 UV task | Blender UV project/warp | Projection nodes and strict orientation tests |
-| Seams/islands/unwrap/pack | Planned Wave 2 | Wave 2 UV task | UV parametrizer/pack sources | Deterministic chart/pack implementation and Studio UV mode |
+| Box/cylindrical/spherical/camera projection | Partial | `project_uv` supports deterministic planar, box, cylindrical, and spherical corner projection with strict finite replay tests | Blender UV project/warp | Add camera projection and richer authored origins/orientations |
+| Seams/islands/unwrap/pack | Partial | `mark_uv_seams`, public island inspection, `unwrap_pack_uv`, and graph/lightmap nodes provide deterministic seam-bounded planar charts and bounded packing | UV parametrizer/pack sources | Add angle/conformal solvers, partial-island selection, texel-density policies, tangent regeneration command, and Studio UV mode |
 | Multi-material face assignment | Implemented foundation | material slots/assign node | Blender face material indices | Preserve across every new operation/modifier |
 | Semantic material graphs | Implemented foundation | material graph catalogs/compilers | Blender shader nodes; Godot materials | Expand physically based node library and layered materials later |
 

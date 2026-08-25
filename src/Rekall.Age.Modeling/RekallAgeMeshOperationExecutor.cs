@@ -62,6 +62,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
             RekallAgeMeshChangeKind.Attributes,
             [
                 StringParameter("attribute", "uv.generated", "Destination corner UV attribute name."),
+                StringParameter("projection", "planar", "Projection mode: planar, box, cylindrical, or spherical."),
                 StringParameter("axis", "xy", "Projection axis: xy, xz, or yz."),
                 NumberParameter("scaleU", 1), NumberParameter("scaleV", 1),
                 NumberParameter("offsetU"), NumberParameter("offsetV")
@@ -96,6 +97,18 @@ public sealed partial class RekallAgeMeshOperationExecutor
                 new("clampOverlap", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Clamp width locally before inset regions overlap."),
                 new("hardenNormals", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(false), "Preserve hard face transitions for the normal-authoring stage.")
             ]),
+        new(
+            "mark_uv_seams",
+            "Marks selected stable edges as UV chart seams in a named edge-domain Bool attribute.",
+            RekallAgeGeometryDomain.Edge,
+            RekallAgeMeshChangeKind.Attributes,
+            [StringParameter("attribute", "uv.seam", "Destination edge seam attribute."), new("marked", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Whether selected edges are marked as seams.")]),
+        new(
+            "unwrap_pack_uv",
+            "Builds deterministic seam-bounded UV islands, planar-parameterizes them, and packs them into a named corner map.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Attributes,
+            [StringParameter("attribute", "uv.lightmap", "Destination corner UV attribute."), StringParameter("seamAttribute", "uv.seam", "Edge seam attribute used to split charts."), NumberParameter("margin", 0.01), StringParameter("semantic", "texcoord-1", "Texture-coordinate semantic for the generated map.")]),
         new(
             "inset_faces",
             "Insets selected polygon faces by a bounded thickness with optional normal-axis depth and explicit border faces.",
@@ -176,6 +189,8 @@ public sealed partial class RekallAgeMeshOperationExecutor
             "delete" => DeleteFaces(source, request),
             "generate_normals" => GenerateNormals(source, request),
             "project_uv" => ProjectUv(source, request),
+            "mark_uv_seams" => MarkUvSeams(source, request),
+            "unwrap_pack_uv" => UnwrapPackUv(source, request),
             "subdivide_faces" => SubdivideFaces(source, request),
             "subdivide_smooth" => SubdivideSmooth(source, request),
             "merge_by_distance" => MergeByDistance(source, request),
@@ -283,18 +298,21 @@ public sealed partial class RekallAgeMeshOperationExecutor
         RequireDomain(request, RekallAgeGeometryDomain.Face);
         var faceIndices = ResolveIndices(source.Topology.FaceIds, request.ElementIds, "face");
         var attributeName = ReadBoundedString(request.Parameters, "attribute", "uv.generated"); var axis = ReadBoundedString(request.Parameters, "axis", "xy").ToLowerInvariant();
+        var projection = ReadBoundedString(request.Parameters, "projection", "planar").ToLowerInvariant();
         if (axis is not ("xy" or "xz" or "yz")) throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "UV projection axis must be 'xy', 'xz', or 'yz'.");
+        if (projection is not ("planar" or "box" or "cylindrical" or "spherical")) throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "UV projection mode must be planar, box, cylindrical, or spherical.");
         var existing = source.Attributes.FirstOrDefault(item => item.Name == attributeName);
         if (existing is not null && (existing.Domain != RekallAgeGeometryDomain.Corner || existing.ValueType != RekallAgeGeometryValueType.Float2)) throw Failure("REKALL_MESH_OPERATION_ATTRIBUTE_CONFLICT", $"Attribute '{attributeName}' exists with an incompatible domain or type.");
         var scaleU = ReadFiniteDouble(request.Parameters, "scaleU", 1); var scaleV = ReadFiniteDouble(request.Parameters, "scaleV", 1); var offsetU = ReadFiniteDouble(request.Parameters, "offsetU"); var offsetV = ReadFiniteDouble(request.Parameters, "offsetV");
         var values = existing?.Values.ToArray() ?? Enumerable.Repeat(JsonSerializer.SerializeToElement(new[] { 0d, 0d }), source.Topology.CornerIds.Count).ToArray(); var modifiedCorners = new List<ulong>();
         foreach (var faceIndex in faceIndices)
         {
+            var normal = UvFaceNormal(source.Topology, faceIndex);
             for (var corner = source.Topology.FaceOffsets[faceIndex]; corner < source.Topology.FaceOffsets[faceIndex + 1]; corner++)
             {
                 var point = source.Topology.Positions[source.Topology.CornerPointIndices[corner]];
-                var (first, second) = axis switch { "xy" => (point.X, point.Y), "xz" => (point.X, point.Z), _ => (point.Y, point.Z) };
-                var u = first * scaleU + offsetU; var v = second * scaleV + offsetV;
+                var projected = RekallAgeUvProjection.Project(point, projection, axis, normal);
+                var u = projected.X * scaleU + offsetU; var v = projected.Y * scaleV + offsetV;
                 if (!double.IsFinite(u) || !double.IsFinite(v)) throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "UV projection produced a non-finite coordinate.");
                 values[corner] = JsonSerializer.SerializeToElement(new[] { u, v }); modifiedCorners.Add(source.Topology.CornerIds[corner]);
             }

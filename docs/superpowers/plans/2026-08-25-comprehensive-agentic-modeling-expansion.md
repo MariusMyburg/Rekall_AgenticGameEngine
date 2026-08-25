@@ -304,13 +304,13 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   projection, angle/conformal unwrap policies, deterministic packing, and
   generated lightmap UV maps.
 
-- [ ] **Step 1: Write RED UV tests**
+- [x] **Step 1: Write RED UV tests**
 
   Prove corner-domain seams, island discovery, projection orientation, unwrap
   continuity, non-overlapping pack bounds/margins, deterministic replay,
   multiple named maps, and tangent regeneration.
 
-- [ ] **Step 2: Implement projection and islands**
+- [x] **Step 2: Implement projection and islands**
 
   Build islands from seam/boundary edges and map each projection using explicit
   axis/origin/scale policies.
@@ -320,7 +320,12 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   Add deterministic chart parameterization and stable size-descending packing.
   Reject degenerate charts with exact face IDs and repair actions.
 
-- [ ] **Step 4: Run GREEN**
+  Current tranche provides deterministic seam-bounded dominant-plane charts,
+  bounded grid packing, multiple named maps, and a separate lightmap channel.
+  Angle/conformal parameterization, size-descending density-aware packing,
+  partial-island selection, and face-specific degenerate repair facts remain.
+
+- [x] **Step 4: Run GREEN**
 
   Run UV, tangent, compiler, material, GLB, and catalog tests.
 

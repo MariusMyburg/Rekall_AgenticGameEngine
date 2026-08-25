@@ -189,11 +189,11 @@ public sealed class ModelingProductionContractMatrixTests
     public void ProductionMatricesExactlyCoverThePublishedOperationAndModifierCatalogs()
     {
         var operationIds = new RekallAgeMeshOperationExecutor().Descriptors.Select(item => item.OperationId).ToArray();
-        Assert.Equal(19, operationIds.Length);
+        Assert.Equal(21, operationIds.Length);
         Assert.All(new[]
         {
             "transform", "reverse_faces", "triangulate_faces", "extrude_faces", "delete",
-            "generate_normals", "project_uv", "subdivide_faces", "subdivide_smooth", "merge_by_distance",
+            "generate_normals", "project_uv", "mark_uv_seams", "unwrap_pack_uv", "subdivide_faces", "subdivide_smooth", "merge_by_distance",
             "bevel_edges", "inset_faces", "solidify", "weighted_normals",
             "fill_holes", "bridge_edge_loops", "poke_faces", "dissolve_edges", "bisect_plane"
         }, expected => Assert.Contains(expected, operationIds));

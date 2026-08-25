@@ -212,11 +212,36 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                 new JsonObject
                 {
                     ["attribute"] = ReadString(node, "attribute", "uv.generated"),
+                    ["projection"] = ReadString(node, "projection", "planar"),
                     ["axis"] = ReadString(node, "axis", "xy"),
                     ["scaleU"] = ReadNumber(node, "scaleU", 1),
                     ["scaleV"] = ReadNumber(node, "scaleV", 1),
                     ["offsetU"] = ReadNumber(node, "offsetU", 0),
                     ["offsetV"] = ReadNumber(node, "offsetV", 0)
+                }),
+            "rekall.modeling.uv.unwrap_pack" => ApplySemanticOperation(
+                graph,
+                node,
+                InputGeometry(node, "geometry", incoming, values),
+                "unwrap_pack_uv",
+                new JsonObject
+                {
+                    ["attribute"] = ReadString(node, "attribute", "uv.generated"),
+                    ["seamAttribute"] = ReadString(node, "seamAttribute", "uv.seam"),
+                    ["margin"] = ReadNumber(node, "margin", 0.01),
+                    ["semantic"] = ReadString(node, "semantic", "texcoord-0")
+                }),
+            "rekall.modeling.uv.lightmap" => ApplySemanticOperation(
+                graph,
+                node,
+                InputGeometry(node, "geometry", incoming, values),
+                "unwrap_pack_uv",
+                new JsonObject
+                {
+                    ["attribute"] = ReadString(node, "attribute", "uv.lightmap"),
+                    ["seamAttribute"] = ReadString(node, "seamAttribute", "uv.seam"),
+                    ["margin"] = ReadNumber(node, "margin", 0.02),
+                    ["semantic"] = "texcoord-1"
                 }),
             "rekall.modeling.subdivide" => ApplySemanticOperation(
                 graph,

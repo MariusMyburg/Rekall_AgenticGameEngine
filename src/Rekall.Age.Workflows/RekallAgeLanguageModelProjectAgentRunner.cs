@@ -3,10 +3,11 @@ using Rekall.Age.Core.Commands;
 
 namespace Rekall.Age.Workflows;
 
-public sealed class RekallAgeLanguageModelProjectAgentRunner : IRekallAgeProjectAgentRunner
+public sealed class RekallAgeLanguageModelProjectAgentRunner : IRekallAgeProjectAgentRunner, IDisposable
 {
     private readonly IRekallAgeLanguageModelClient _modelClient;
     private readonly RekallAgeProjectAgentSession _session;
+    private bool _disposed;
 
     public RekallAgeLanguageModelProjectAgentRunner(
         IRekallAgeLanguageModelClient modelClient,
@@ -14,18 +15,39 @@ public sealed class RekallAgeLanguageModelProjectAgentRunner : IRekallAgeProject
     {
         _modelClient = modelClient ?? throw new ArgumentNullException(nameof(modelClient));
         ArgumentNullException.ThrowIfNull(registry);
-        _session = new RekallAgeProjectAgentSession(modelClient, registry);
+        _session = new RekallAgeProjectAgentSession(
+            modelClient,
+            registry,
+            $"rekall-{modelClient.ProviderId}-agent");
     }
 
-    public string ProviderId => _modelClient.ProviderId;
+    public string ProviderId
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _modelClient.ProviderId;
+        }
+    }
 
     public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(
-        CancellationToken cancellationToken) =>
-        _session.ListModelsAsync(cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        return _session.ListModelsAsync(cancellationToken);
+    }
 
     public ValueTask<RekallAgeProjectAgentSessionResult> RunAsync(
         RekallAgeProjectAgentSessionRequest request,
         IProgress<RekallAgeLanguageModelAgentProgress>? progress,
-        CancellationToken cancellationToken) =>
-        _session.RunAsync(request, progress, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        return _session.RunAsync(request, progress, cancellationToken);
+    }
+
+    public void Dispose() => _disposed = true;
+
+    private void ThrowIfDisposed() =>
+        ObjectDisposedException.ThrowIf(_disposed, nameof(RekallAgeLanguageModelProjectAgentRunner));
 }

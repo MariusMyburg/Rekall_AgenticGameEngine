@@ -31,13 +31,17 @@ public sealed class RekallAgeProjectAgentSession
 {
     private readonly IRekallAgeLanguageModelClient _modelClient;
     private readonly RekallAgeCommandRegistry _registry;
+    private readonly string _actorId;
 
     public RekallAgeProjectAgentSession(
         IRekallAgeLanguageModelClient modelClient,
-        RekallAgeCommandRegistry registry)
+        RekallAgeCommandRegistry registry,
+        string actorId = "rekall-studio-agent")
     {
         _modelClient = modelClient ?? throw new ArgumentNullException(nameof(modelClient));
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        ArgumentException.ThrowIfNullOrWhiteSpace(actorId);
+        _actorId = actorId;
     }
 
     public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
@@ -60,7 +64,7 @@ public sealed class RekallAgeProjectAgentSession
             projectRoot,
             request.SceneName,
             _registry,
-            new RekallAgeMcpAgentToolExecutor(_registry, "rekall-studio-agent", progressiveDiscovery: true));
+            new RekallAgeMcpAgentToolExecutor(_registry, _actorId, progressiveDiscovery: true));
         var agent = new RekallAgeLanguageModelAgent(_modelClient, tools);
         var scopedTask = RekallAgeAgentTaskComposer.Compose(projectRoot, request.SceneName, request.Task);
         var result = await agent.RunAsync(

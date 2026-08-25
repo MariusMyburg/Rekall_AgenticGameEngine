@@ -55,15 +55,17 @@ internal static class RekallAgeCli
             var context = new RekallAgeCommandContext(IsMcpStdio(args) ? "mcp" : "cli", transaction, cancellationToken);
             var exitCode = args switch
             {
-                ["agent", "models", "ollama"] => await ListOllamaModelsAsync(cancellationToken),
-                ["agent", "run", "ollama", var model, var task] =>
-                    await RunOllamaAgentAsync(registry, model, task, "24", cancellationToken),
-                ["agent", "run", "ollama", var model, var task, var maxTurns] =>
-                    await RunOllamaAgentAsync(registry, model, task, maxTurns, cancellationToken),
-                ["agent", "run-project", "ollama", var model, var root, var scene, var task] =>
-                    await RunProjectOllamaAgentAsync(registry, model, root, scene, task, "24", cancellationToken),
-                ["agent", "run-project", "ollama", var model, var root, var scene, var task, var maxTurns] =>
-                    await RunProjectOllamaAgentAsync(registry, model, root, scene, task, maxTurns, cancellationToken),
+                ["agent", "providers"] => ListLanguageModelProviders(),
+                ["agent", "models", var provider] =>
+                    await ListLanguageModelsAsync(registry, provider, cancellationToken),
+                ["agent", "run", var provider, var model, var task] =>
+                    await RunLanguageModelAgentAsync(registry, provider, model, task, "24", cancellationToken),
+                ["agent", "run", var provider, var model, var task, var maxTurns] =>
+                    await RunLanguageModelAgentAsync(registry, provider, model, task, maxTurns, cancellationToken),
+                ["agent", "run-project", var provider, var model, var root, var scene, var task] =>
+                    await RunProjectLanguageModelAgentAsync(registry, provider, model, root, scene, task, "24", cancellationToken),
+                ["agent", "run-project", var provider, var model, var root, var scene, var task, var maxTurns] =>
+                    await RunProjectLanguageModelAgentAsync(registry, provider, model, root, scene, task, maxTurns, cancellationToken),
                 ["distribution", "assemble", var output, var cli, var studio, var headless, var windows, var sdk, var readme, var notice, var thirdParty] =>
                     await AssembleDistributionAsync(
                         registry, context, output, cli, studio, headless, windows, sdk, readme, notice, thirdParty),
@@ -488,6 +490,12 @@ internal static class RekallAgeCli
         catch (RekallAgeCodedBoundaryException ex)
         {
             Log.Error(ex, "CLI command rejected at a coded boundary. Code={Code} Target={Target} Args={Args} LogDirectory={LogDirectory}", ex.Code, ex.Target, DescribeInvocation(args), logDirectory);
+            Console.Error.WriteLine($"{ex.Code}: {ex.Message}");
+            return 1;
+        }
+        catch (RekallAgeLanguageModelProviderException ex)
+        {
+            Log.Error(ex, "Language-model provider command failed. Provider={Provider} Code={Code} Args={Args} LogDirectory={LogDirectory}", ex.ProviderId, ex.Code, DescribeInvocation(args), logDirectory);
             Console.Error.WriteLine($"{ex.Code}: {ex.Message}");
             return 1;
         }
@@ -3197,12 +3205,26 @@ internal static class RekallAgeCli
         return result.Ok ? 0 : 1;
     }
 
-    private static async Task<int> ListOllamaModelsAsync(CancellationToken cancellationToken)
+    private static int ListLanguageModelProviders()
     {
-        using var httpClient = CreateOllamaHttpClient();
-        var client = new RekallAgeOllamaLanguageModelClient(httpClient, ResolveOllamaBaseUri());
-        var models = await client.ListModelsAsync(cancellationToken);
-        Console.WriteLine($"Ollama models: {models.Count}");
+        foreach (var provider in new RekallAgeLanguageModelProviderCatalog().Providers)
+        {
+            Console.WriteLine($"{provider.Id}\t{provider.DisplayName}\t{provider.DefaultModel}\t{provider.AuthenticationKind}");
+        }
+
+        return 0;
+    }
+
+    private static async Task<int> ListLanguageModelsAsync(
+        RekallAgeCommandRegistry registry,
+        string provider,
+        CancellationToken cancellationToken)
+    {
+        var catalog = new RekallAgeLanguageModelProviderCatalog();
+        var descriptor = catalog.Providers.SingleOrDefault(item => item.Id.Equals(provider, StringComparison.OrdinalIgnoreCase));
+        using var lease = catalog.Acquire(provider, registry);
+        var models = await lease.Runner.ListModelsAsync(cancellationToken);
+        Console.WriteLine($"{descriptor?.DisplayName ?? lease.ProviderId} models: {models.Count}");
         foreach (var model in models)
         {
             Console.WriteLine($"{model.Id}\t{model.SizeBytes}");
@@ -3211,8 +3233,9 @@ internal static class RekallAgeCli
         return 0;
     }
 
-    private static async Task<int> RunOllamaAgentAsync(
+    private static async Task<int> RunLanguageModelAgentAsync(
         RekallAgeCommandRegistry registry,
+        string provider,
         string model,
         string taskOrPath,
         string maxTurnsText,
@@ -3227,10 +3250,9 @@ internal static class RekallAgeCli
             return 2;
         }
 
-        using var httpClient = CreateOllamaHttpClient();
-        var modelClient = new RekallAgeOllamaLanguageModelClient(httpClient, ResolveOllamaBaseUri());
-        var tools = new RekallAgeMcpAgentToolExecutor(registry, "rekall-ollama-agent", progressiveDiscovery: true);
-        var agent = new RekallAgeLanguageModelAgent(modelClient, tools);
+        using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire(provider, registry);
+        var tools = new RekallAgeMcpAgentToolExecutor(registry, $"rekall-{lease.ProviderId}-agent", progressiveDiscovery: true);
+        var agent = new RekallAgeLanguageModelAgent(lease.ModelClient, tools);
         var result = await agent.RunAsync(
             new RekallAgeLanguageModelAgentRequest(
                 model,
@@ -3242,6 +3264,7 @@ internal static class RekallAgeCli
             },
             cancellationToken);
         Console.WriteLine(result.FinalContent);
+        Console.WriteLine($"Provider: {lease.ProviderId}");
         Console.WriteLine("Tool execution trace: " + string.Join(" -> ", result.ToolExecutions.Select(execution =>
             execution.Name == "rekall.tools.execute"
                 ? execution.Arguments["name"]?.GetValue<string>() ?? execution.Name
@@ -3256,8 +3279,9 @@ internal static class RekallAgeCli
         return result.Completed ? 0 : 1;
     }
 
-    private static async Task<int> RunProjectOllamaAgentAsync(
+    private static async Task<int> RunProjectLanguageModelAgentAsync(
         RekallAgeCommandRegistry registry,
+        string provider,
         string model,
         string projectRoot,
         string sceneName,
@@ -3274,10 +3298,8 @@ internal static class RekallAgeCli
             return 2;
         }
 
-        using var httpClient = CreateOllamaHttpClient();
-        var modelClient = new RekallAgeOllamaLanguageModelClient(httpClient, ResolveOllamaBaseUri());
-        var session = new RekallAgeProjectAgentSession(modelClient, registry);
-        var result = await session.RunAsync(
+        using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire(provider, registry);
+        var result = await lease.Runner.RunAsync(
             new RekallAgeProjectAgentSessionRequest(projectRoot, sceneName, model, task)
             {
                 MaxTurns = maxTurns,
@@ -3286,6 +3308,7 @@ internal static class RekallAgeCli
             progress: null,
             cancellationToken);
         Console.WriteLine(result.AgentResult.FinalContent);
+        Console.WriteLine($"Provider: {lease.ProviderId}");
         Console.WriteLine("Tool execution trace: " + string.Join(" -> ", result.AgentResult.ToolExecutions.Select(execution =>
             execution.Name == "rekall.tools.execute"
                 ? execution.Arguments["name"]?.GetValue<string>() ?? execution.Name
@@ -3294,17 +3317,6 @@ internal static class RekallAgeCli
         if (failures.Length > 0) Console.WriteLine(failures);
         Console.WriteLine(result.Summary);
         return result.Succeeded ? 0 : 1;
-    }
-
-    private static HttpClient CreateOllamaHttpClient() => new()
-    {
-        Timeout = TimeSpan.FromMinutes(30)
-    };
-
-    private static Uri ResolveOllamaBaseUri()
-    {
-        var configured = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL");
-        return new Uri(string.IsNullOrWhiteSpace(configured) ? "http://127.0.0.1:11434" : configured, UriKind.Absolute);
     }
 
     private static async Task<int> AssembleDistributionAsync(

@@ -154,6 +154,19 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", $"Input '{portId}' is not a curve.", node.NodeId);
     }
 
+    private static IReadOnlyList<RekallAgeEvaluatedCurve> InputCurves(
+        RekallAgeModelingGraphNode node,
+        string portId,
+        IReadOnlyList<RekallAgeModelingGraphLink> incoming,
+        IReadOnlyDictionary<string, NodeValue> values)
+    {
+        var links = incoming.Where(item => item.ToPortId == portId).ToArray();
+        if (links.Length == 0)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_MISSING", $"Input '{portId}' is missing.", node.NodeId);
+        return links.Select(link => values[link.FromNodeId].Curve
+            ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", $"Input '{portId}' is not a curve.", node.NodeId)).ToArray();
+    }
+
     private static RekallAgeMeshAsset CreateProfileSweep(
         RekallAgeModelingGraphAsset graph,
         RekallAgeModelingGraphNode node,

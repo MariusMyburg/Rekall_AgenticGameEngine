@@ -214,7 +214,7 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   point IDs, and nodes for line, circle, Bezier path, resample, reverse, trim,
   fillet, join, and `curve.profile_sweep`.
 
-- [ ] **Step 1: Write RED curve tests**
+- [x] **Step 1: Write RED curve tests**
 
   Prove serialization, stable IDs, validation, Bezier sampling, cyclic seams,
   parallel-transport frames without flips, radius/tilt interpolation, curve
@@ -226,8 +226,10 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   The Aetherfall broken processional arch now consumes this contract through a
   persisted Bezier resource and published model. Deterministic line/circle
   builders plus typed reverse and uniform arc-length resample graph operations
-  are now implemented with radius, tilt, and source-span preservation. Trim,
-  fillet, and join coverage remains.
+  are now implemented with radius, tilt, and source-span preservation. Typed
+  normalized arc-length trim, ordered endpoint join with automatic reversal,
+  and bounded multi-segment corner fillet nodes complete the planned practical
+  curve-operation inventory.
 
 - [x] **Step 2: Implement curve source/evaluation**
 

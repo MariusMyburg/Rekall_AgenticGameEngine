@@ -70,6 +70,57 @@ public sealed class CurveAuthoringTests
     }
 
     [Fact]
+    public void TrimJoinAndFilletCreateUsableAuthoredPathSegments()
+    {
+        var operations = new RekallAgeCurveOperations();
+        var first = operations.Resample(operations.Line(new(0, 0, 0), new(0, 4, 0)), 5);
+        var second = operations.Line(new(0, 8, 0), new(0, 4, 0));
+
+        var trimmed = Assert.Single(operations.Trim(first, 0.25, 0.75).Splines);
+        var joined = Assert.Single(operations.Join([first, second], 0.001).Splines);
+        var corner = new RekallAgeEvaluatedCurve([new(8, false,
+        [
+            EvaluatedPoint(1, 0, 0), EvaluatedPoint(2, 2, 0), EvaluatedPoint(3, 2, 2)
+        ])]);
+        var filleted = Assert.Single(operations.Fillet(corner, 0.5, 4).Splines);
+
+        Assert.Equal([1d, 2d, 3d], trimmed.Points.Select(point => point.Position.Y));
+        Assert.Equal(new RekallAgeGeometryVector3(0, 8, 0), joined.Points[^1].Position);
+        Assert.Equal(6, joined.Points.Count);
+        Assert.Equal(new RekallAgeGeometryVector3(0, 0, 0), filleted.Points[0].Position);
+        Assert.Equal(new RekallAgeGeometryVector3(2, 2, 0), filleted.Points[^1].Position);
+        Assert.True(filleted.Points.Count > corner.Splines[0].Points.Count);
+        Assert.DoesNotContain(filleted.Points, point => point.Position == new RekallAgeGeometryVector3(2, 0, 0));
+    }
+
+    [Fact]
+    public async Task JoinTrimAndFilletNodesExecuteAsAReusableModelingGraph()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create("curve-fillet-graph", "Curve Fillet Graph",
+            [
+                new("a", "rekall.modeling.curve.line", 1, new JsonObject { ["start"] = Vec(0, 0, 0), ["end"] = Vec(2, 0, 0) }),
+                new("b", "rekall.modeling.curve.line", 1, new JsonObject { ["start"] = Vec(2, 0, 0), ["end"] = Vec(2, 2, 0) }),
+                new("join", "rekall.modeling.curve.join", 1, new JsonObject { ["tolerance"] = 0.001 }),
+                new("trim", "rekall.modeling.curve.trim", 1, new JsonObject { ["start"] = 0d, ["end"] = 1d }),
+                new("fillet", "rekall.modeling.curve.fillet", 1, new JsonObject { ["radius"] = 0.4, ["segments"] = 5 }),
+                new("sweep", "rekall.modeling.curve.profile_sweep", 1, new JsonObject { ["profile"] = "circle", ["profileSegments"] = 8, ["radius"] = 0.1 }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("a-join", "a", "curve", "join", "curve"), new("b-join", "b", "curve", "join", "curve"),
+                new("join-trim", "join", "curve", "trim", "curve"), new("trim-fillet", "trim", "curve", "fillet", "curve"),
+                new("fillet-sweep", "fillet", "curve", "sweep", "curve"), new("sweep-output", "sweep", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, new(0, 0, "test", "desktop"), CancellationToken.None);
+
+        Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics.Select(item => item.Message)));
+        Assert.True(result.Outputs["mesh"].Topology.PointIds.Count > 24);
+        Assert.True(new RekallAgeMeshValidator().Validate(result.Outputs["mesh"]).IsValid);
+    }
+
+    [Fact]
     public void VersionedCurveDocumentRoundTripsStableIdsAndValidates()
     {
         var curve = BezierCurve();
@@ -197,6 +248,11 @@ public sealed class CurveAuthoringTests
     private static RekallAgeCurveControlPoint PolyPoint(ulong id, double x, double y) =>
         new(id, new(x, y, 0), new(x, y, 0), new(x, y, 0));
 
+    private static RekallAgeEvaluatedCurvePoint EvaluatedPoint(ulong id, double x, double y) =>
+        new(new(x, y, 0), new(1, 0, 0), 1, 0, 8, id, id + 1, 0);
+
     private static double Distance(RekallAgeGeometryVector3 a, RekallAgeGeometryVector3 b) =>
         Math.Sqrt(Math.Pow(a.X - b.X, 2) + Math.Pow(a.Y - b.Y, 2) + Math.Pow(a.Z - b.Z, 2));
+
+    private static JsonArray Vec(double x, double y, double z) => new(x, y, z);
 }

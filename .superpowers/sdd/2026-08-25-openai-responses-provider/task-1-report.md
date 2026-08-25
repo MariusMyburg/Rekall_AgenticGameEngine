@@ -133,13 +133,13 @@ Both mutations were reverted before GREEN verification.
 
 ### GREEN evidence
 
-Identifier safety, including preservation of valid structured facts:
+Identifier safety, including preservation of valid structured facts (corrected and rerun during review fix round 2):
 
 ```powershell
-dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs|FullyQualifiedName~ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues|FullyQualifiedName~ProviderExceptionExposesStructuredFactsAndRedactsSensitiveValues|FullyQualifiedName~ProviderExceptionPreservesValidStableIdentifiers"
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs|FullyQualifiedName~ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues|FullyQualifiedName~ProviderExceptionPreservesStructuredFactsAndRedactsSuppliedSecrets|FullyQualifiedName~ProviderExceptionRedactsSuppliedSecretsFromStructuredLoggableFields"
 ```
 
-Result: 4 passed, 0 failed, 0 skipped; test duration 30ms; command wall time 8.3s.
+Discovered tests: `ProviderExceptionPreservesStructuredFactsAndRedactsSuppliedSecrets`, `ProviderExceptionRedactsSuppliedSecretsFromStructuredLoggableFields`, `ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs`, and `ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues`. Fresh result: 4 passed, 0 failed, 0 skipped; test duration 28ms. The discovery command plus this test run had a combined command wall time of 7.2s. The superseded filter included two nonexistent names and actually selected only 2 tests; its exact audit is recorded below.
 
 Malformed-stream rejection plus distinct cancellation behavior:
 
@@ -176,3 +176,75 @@ Result: build succeeded, 0 warnings, 0 errors; MSBuild elapsed 6.84s; command wa
 `git diff --check` and `git diff --cached --check` reported no whitespace errors; Git emitted only the repository's normal Windows line-ending conversion notices. No project references or installed dependencies changed.
 
 At implementation commit `5ba97ffc354338d341be327a21eab79939e319d9`, before this report-only update, the worktree was clean. The final audit found 0 matching long-lived `dotnet`, `testhost`, or Rekall processes rooted in this worktree and 0 untracked temp/backup artifacts. No blocking or residual concerns were identified for this review round.
+
+## Review fix round 2 — 2026-08-25
+
+Implementation commit: `df400695e182ec0f232f9479d4f550d83b1af69f` (`fix: make provider secret checks normalization-safe`).
+
+### Root cause and repair
+
+The round-1 identifier policy checked supplied sensitive values only in the raw `Code`/`ProviderId` input with `StringComparison.Ordinal`, then uppercased codes and lowercased provider IDs. A case-variant credential could therefore evade the raw check and become visible in the normalized public field. Identifier sanitization could also introduce a sensitive substring through its `_`/`-` separator replacement, because the final candidate was never rechecked. Finally, message/request/value redaction retained the same case-sensitive comparison, so differently cased provider text could remain in serialized public fields.
+
+The repair applies one culture-independent policy throughout: raw identifiers and their final normalized candidates are both checked using `StringComparison.OrdinalIgnoreCase`; any unsafe candidate uses the existing stable fallback; and all message/request/requested/resolved redaction uses ordinal-ignore-case replacement. The tests cover upper-, lower-, mixed-case, and Unicode `SÉCRET`/`sécret` pairs, serialize every public loggable text field plus `ToString()`, and separately prove that sanitization-created `a_b`/`a-b` substrings are rejected. Valid secret-free identifiers remain unchanged.
+
+### RED evidence
+
+Case-variant and Unicode public-field serialization:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ProviderExceptionRejectsCaseVariantSecretsAcrossAllSerializedPublicFields"
+```
+
+Result: 4 failed, 0 passed, 0 skipped; test duration 27ms; command wall time 16.3s. All four rows exposed a non-fallback code after case normalization; the serialized fields also retained differently cased sensitive text.
+
+Sensitive substrings introduced by identifier sanitization:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ProviderExceptionRejectsSecretsCreatedByIdentifierSanitization"
+```
+
+Result: 2 failed, 0 passed, 0 skipped; test duration 32ms; command wall time 5.4s. `rekall_a b_failed` became the unsafe code `REKALL_A_B_FAILED`, and `provider a b` became the unsafe provider ID `provider-a-b`.
+
+### GREEN evidence
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ProviderExceptionRejectsCaseVariantSecretsAcrossAllSerializedPublicFields|FullyQualifiedName~ProviderExceptionRejectsSecretsCreatedByIdentifierSanitization"
+```
+
+Result: 6 passed, 0 failed, 0 skipped; test duration 27ms; command wall time 4.2s.
+
+### Report filter audit and correction
+
+The exact previously recorded command was rerun verbatim:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs|FullyQualifiedName~ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues|FullyQualifiedName~ProviderExceptionExposesStructuredFactsAndRedactsSensitiveValues|FullyQualifiedName~ProviderExceptionPreservesValidStableIdentifiers"
+```
+
+Actual result: 2 passed, 0 failed, 0 skipped; test duration 30ms; command wall time 3.8s. The first two names existed; `ProviderExceptionExposesStructuredFactsAndRedactsSensitiveValues` and `ProviderExceptionPreservesValidStableIdentifiers` did not exist and selected no tests. The earlier 4-test claim was inaccurate.
+
+The corrected filter was first run in discovery mode:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --list-tests --filter "FullyQualifiedName~ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs|FullyQualifiedName~ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues|FullyQualifiedName~ProviderExceptionPreservesStructuredFactsAndRedactsSuppliedSecrets|FullyQualifiedName~ProviderExceptionRedactsSuppliedSecretsFromStructuredLoggableFields"
+```
+
+It discovered exactly these four tests:
+
+- `Rekall.Age.Tests.Agent.LanguageModelContractTests.ProviderExceptionPreservesStructuredFactsAndRedactsSuppliedSecrets`
+- `Rekall.Age.Tests.Agent.LanguageModelContractTests.ProviderExceptionRedactsSuppliedSecretsFromStructuredLoggableFields`
+- `Rekall.Age.Tests.Agent.LanguageModelContractTests.ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs`
+- `Rekall.Age.Tests.Agent.LanguageModelContractTests.ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues`
+
+The same corrected filter without `--list-tests` passed 4/4 with 0 failures and 0 skips in 28ms; discovery plus execution command wall time was 7.2s.
+
+### Regression verification
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~LanguageModelContractTests|FullyQualifiedName~LanguageModelAgentTests|FullyQualifiedName~ProjectAgentRunnerTests|FullyQualifiedName~ProjectAgentSessionTests|FullyQualifiedName~OllamaLanguageModelClientTests"
+dotnet build Rekall.AGE.sln --no-restore
+```
+
+Focused result: 112 passed, 0 failed, 0 skipped; test duration 620ms. Build result: succeeded with 0 warnings and 0 errors; MSBuild elapsed 5.15s. The combined command wall time was 9.8s. No project references or dependencies changed.
+
+Final task audit: 0 worktree-rooted long-lived `dotnet`, `testhost`, or Rekall processes and 0 untracked temp/backup artifacts. After the report commit, all round-2 task files are committed. The only remaining worktree modification is the controller-owned SDD ledger line in `progress.md`, which the controller explicitly directed this task not to modify, stage, or commit. No blocking implementation concerns remain.

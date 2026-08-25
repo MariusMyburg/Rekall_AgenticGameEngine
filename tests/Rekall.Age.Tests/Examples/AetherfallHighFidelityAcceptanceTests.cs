@@ -76,6 +76,12 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             .Where(role => role is not null)
             .Distinct(StringComparer.Ordinal).Count() >= 6);
         Assert.All(emitters, component => Assert.True(Number(component?["properties"], "emissiveIntensity") > 0));
+
+        var practicals = components.Where(component => Type(component) == "Rekall.PointLight")
+            .Where(component => Number(component?["properties"], "priority") >= 70)
+            .ToArray();
+        Assert.True(practicals.Length >= 4, $"Expected four prioritized practical lights, found {practicals.Length}.");
+        Assert.All(practicals, component => Assert.True(Number(component?["properties"], "range") >= 14));
     }
 
     [Fact]

@@ -6391,7 +6391,8 @@
           "properties": {
         "color": "#d18442",
         "intensity": 8.5,
-        "range": 10,
+        "range": 14,
+        "priority": 70,
         "shadowPriority": 70,
             "castShadows": true
           }
@@ -10223,7 +10224,8 @@
           "properties": {
         "color": "#5586a2",
         "intensity": 8.8,
-        "range": 9.5,
+        "range": 14,
+            "priority": 90,
             "shadowPriority": 90,
             "castShadows": false
           }
@@ -10748,7 +10750,8 @@
           "properties": {
             "color": "#e2a45f",
             "intensity": 12,
-            "range": 8.5,
+            "range": 14,
+            "priority": 100,
             "shadowPriority": 100,
             "castShadows": true
           }
@@ -10781,7 +10784,8 @@
           "properties": {
             "color": "#607b8b",
             "intensity": 2.8,
-            "range": 14,
+            "range": 22,
+            "priority": 80,
             "shadowPriority": 80
           }
         },

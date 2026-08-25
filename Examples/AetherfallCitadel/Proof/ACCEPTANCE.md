@@ -105,6 +105,13 @@ the accepted gameplay evidence above.
   (mean luminance 0.036), so camera-relevant practical selection/authored cool
   fill and material readability remain required; global exposure is not used
   to conceal that deficiency.
+- Aetherfall now uses the generic light `priority` contract (separate from
+  shadow priority) to select the arrival hearth, Warden softbox, amber
+  practical, and moon pool for its four-light budget. Their authored local
+  ranges were widened to 14/14/14/22 world units. The aligned High frame rises
+  from mean luminance 0.036 to 0.069 and from 16,029 to 24,001 distinct colors,
+  with localized warm/cool pools and retained deep blacks. Architecture and
+  character detail remain below final acceptance.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, prop geometry remains visibly coarse, and the

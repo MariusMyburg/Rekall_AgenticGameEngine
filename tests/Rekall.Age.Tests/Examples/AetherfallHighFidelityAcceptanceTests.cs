@@ -1,13 +1,41 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Rendering;
 using Rekall.Age.World;
 using Rekall.Age.Runtime;
+using Rekall.Age.Modeling;
+using Rekall.Age.Modeling.Contracts;
 
 namespace Rekall.Age.Tests.Examples;
 
 public sealed class AetherfallHighFidelityAcceptanceTests
 {
+    [Fact]
+    public async Task BrokenArchConsumesPersistedBezierCurveThroughTheGenericGraphPipeline()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var curve = await new RekallAgeCurveAssetStore().LoadAsync(projectRoot, "aetherfall.broken-arch", CancellationToken.None);
+        var graph = await new RekallAgeModelingGraphAssetStore().LoadAsync(projectRoot, "aetherfall.broken-arch.graph", CancellationToken.None);
+
+        var spline = Assert.Single(curve.Splines);
+        Assert.Equal(RekallAgeCurveSplineKind.CubicBezier, spline.Kind);
+        Assert.Equal(3, spline.ControlPoints.Count);
+        var source = Assert.Single(graph.Nodes, node => node.TypeId == "rekall.modeling.curve.source");
+        Assert.True(JsonNode.DeepEquals(source.Parameters["document"], JsonSerializer.SerializeToNode(curve, RekallAgeModelingJson.Options)));
+        Assert.Contains(graph.Links, link => link.FromPortId == "curve" && link.ToPortId == "curve");
+
+        var evaluation = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default,
+            new(607, 0, "aetherfall-acceptance", "desktop"), CancellationToken.None);
+
+        Assert.True(evaluation.Succeeded, string.Join(Environment.NewLine, evaluation.Diagnostics.Select(item => item.Message)));
+        var mesh = evaluation.Outputs["mesh"];
+        Assert.True(mesh.Topology.PointIds.Count >= 4_000);
+        Assert.Contains(mesh.Attributes, item => item.Name == "curve.source.span");
+        Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
+    }
+
     [Fact]
     public void ResonanceCourtAuthorsACompleteScalableHighFidelityContract()
     {

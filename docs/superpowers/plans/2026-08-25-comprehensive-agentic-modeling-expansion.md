@@ -223,7 +223,9 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   Current tranche proves document round-trip, stable-ID validation, cubic
   Bezier sampling, cyclic seam closure, radius/tilt interpolation, persisted
   resources, graph transport, sweep UV/material output, and source-span facts.
-  Resample/reverse/trim/fillet/join coverage remains.
+  The Aetherfall broken processional arch now consumes this contract through a
+  persisted Bezier resource and published model. Resample/reverse/trim/fillet/
+  join coverage remains.
 
 - [x] **Step 2: Implement curve source/evaluation**
 

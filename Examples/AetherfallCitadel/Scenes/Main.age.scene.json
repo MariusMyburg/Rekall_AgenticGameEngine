@@ -126,7 +126,7 @@
           "properties": {
             "active": true,
             "projectionMode": "perspective",
-            "fieldOfView": 38,
+            "fieldOfView": 40,
             "clearColor": "#080b0b"
           }
         },
@@ -134,9 +134,9 @@
           "type": "Rekall.Transform3D",
           "properties": {
             "x": 0,
-            "y": 10.6,
-            "z": -20.2,
-            "pitch": 34
+            "y": 17.5,
+            "z": -30,
+            "pitch": 42
           }
         }
       ],

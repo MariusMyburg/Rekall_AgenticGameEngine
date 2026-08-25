@@ -28,13 +28,13 @@ internal static class PresentationSimulation
         }
 
         var seconds = Math.Clamp(context.DeltaTime.TotalSeconds, 0, AetherfallConstants.MaximumDeltaSeconds);
-        var targetX = Math.Clamp(warden.Transform.Position3D.X * 0.65, -8, 8);
-        var targetZ = Math.Clamp(warden.Transform.Position3D.Z - 13.2, -25.2, 29.8);
+        var targetX = Math.Clamp(warden.Transform.Position3D.X * 0.55, -8, 8);
+        var targetZ = Math.Clamp(warden.Transform.Position3D.Z - 18, -30, 25);
         var smoothing = 1 - Math.Exp(-6 * seconds);
         var cameraPosition = camera.Transform.Position3D;
         world = world.UpdateEntity(camera.Id, entity => entity.WithPosition3D(new RekallAgeRuntimeVector3(
             cameraPosition.X + (targetX - cameraPosition.X) * smoothing,
-            13,
+            17.5,
             cameraPosition.Z + (targetZ - cameraPosition.Z) * smoothing)));
 
         var integrity = Math.Round(warden.ComponentNumber(AetherfallConstants.WardenStateType, "integrity", 100));

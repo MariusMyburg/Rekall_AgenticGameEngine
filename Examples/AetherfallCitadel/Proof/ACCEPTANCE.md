@@ -159,13 +159,29 @@ the accepted gameplay evidence above.
   multiplying the already-dark masonry toward black. The rebuilt artifact
   retains 7,392 vertices and 3,024 triangles while all 30 placed instances gain
   material-readable profiling. The settled real RTX 5090 High frame has 24,628
-  distinct colors,
-  mean luminance 0.078, 201 render-work draws, and zero observations or asset
+  distinct colors, mean luminance 0.078, 201 render-work draws, and zero
+  observations or asset
   fallbacks. The matching `desktop60` budget passes with 63 scene draw calls,
   162,632 triangles, 594,744 vertices, and no blockers or warnings. The capture
   also shows that shadowed masonry is still crushed too close to black and the
   directly lit trim contrast is too hard; those remain active lighting/material-
   range work rather than accepted final quality.
+- The agent-authored follow camera now uses a 40-degree field of view and
+  settles at `(0,17.5,-30)` with a 42-degree downward pitch at the opening
+  position. This reduces the oversized over-the-shoulder player presentation
+  and exposes substantially more continuous ground, approach rubble, gate, and
+  surrounding silhouette in a Diablo-like elevated three-quarter composition.
+  The real High capture records 21,305 distinct colors, mean luminance 0.050,
+  71.2% dominant-color share, 194 render-work draws, and zero observations or
+  asset fallbacks. The stricter composition also makes the remaining deficiency
+  explicit: too much of the surrounding authored terrain and architecture still
+  collapses into near-black negative space, so density and indirect readability
+  remain active work rather than being hidden by a close camera.
+- After the camera scene/module mutation, the exact deterministic movement proof
+  still passes both assertions and moves Warden X by `0.506840`; the focused
+  presentation test proves the runtime follow height and 40-degree FOV. The
+  matching High `desktop60` budget remains clean at 63 scene draw calls, 162,632
+  triangles, and 594,744 vertices.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, prop geometry remains visibly coarse, and the

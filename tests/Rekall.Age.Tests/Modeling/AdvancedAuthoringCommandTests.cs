@@ -15,7 +15,9 @@ public sealed class AdvancedAuthoringCommandTests
         "rekall.material.graph.validate", "rekall.material.graph.compile",
         "rekall.material.instance.create", "rekall.material.instance.inspect",
         "rekall.modifier.types.search", "rekall.modifier.stack.create", "rekall.modifier.stack.inspect",
-        "rekall.modifier.stack.apply_patch", "rekall.modifier.stack.evaluate", "rekall.modifier.stack.bake"
+        "rekall.modifier.stack.apply_patch", "rekall.modifier.stack.evaluate", "rekall.modifier.stack.bake",
+        "rekall.modeling.curve.create", "rekall.modeling.curve.replace", "rekall.modeling.curve.inspect",
+        "rekall.modeling.curve.list", "rekall.modeling.curve.evaluate"
     ];
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -65,6 +67,42 @@ public sealed class AdvancedAuthoringCommandTests
         }
         """);
         Assert.True(instance.Ok, instance.Summary);
+    }
+
+    [Fact]
+    public async Task JsonCurveLoopCreatesInspectsEvaluatesAndRevisionReplacesResource()
+    {
+        var root = TestPaths.CreateTempDirectory(); var registry = RekallAgeDefaultCommandRegistry.Create();
+        var splines = """
+          [ { "splineId": 7, "kind": "CubicBezier", "cyclic": false, "controlPoints": [
+            { "controlPointId": 11, "position": { "x": 0, "y": 0, "z": 0 }, "handleIn": { "x": 0, "y": 0, "z": 0 }, "handleOut": { "x": 0.5, "y": 1, "z": 0 }, "radius": 1, "tiltRadians": 0 },
+            { "controlPointId": 12, "position": { "x": 2, "y": 1, "z": 0 }, "handleIn": { "x": 1.5, "y": 0, "z": 0 }, "handleOut": { "x": 2, "y": 1, "z": 0 }, "radius": 1, "tiltRadians": 0 }
+          ] } ]
+        """;
+        var created = await Execute(registry, "rekall.modeling.curve.create", $$"""
+        { "projectRoot": {{JsonSerializer.Serialize(root)}}, "assetId": "curve.command", "name": "Command Curve", "splines": {{splines}} }
+        """);
+        Assert.True(created.Ok, created.Summary);
+        var fileRevision = JsonSerializer.SerializeToElement(created.Value, JsonOptions).GetProperty("curve").GetProperty("fileRevision").GetString();
+
+        var evaluated = await Execute(registry, "rekall.modeling.curve.evaluate", $$"""
+        { "projectRoot": {{JsonSerializer.Serialize(root)}}, "assetId": "curve.command", "resolutionPerSegment": 4, "maximumSamples": 3 }
+        """);
+        Assert.True(evaluated.Ok, evaluated.Summary);
+        var evaluation = JsonSerializer.SerializeToElement(evaluated.Value, JsonOptions).GetProperty("evaluation");
+        Assert.Equal(5, evaluation.GetProperty("pointCount").GetInt32());
+        Assert.True(evaluation.GetProperty("samplesTruncated").GetBoolean());
+
+        var replaced = await Execute(registry, "rekall.modeling.curve.replace", $$"""
+        { "projectRoot": {{JsonSerializer.Serialize(root)}}, "assetId": "curve.command", "expectedRevision": {{JsonSerializer.Serialize(fileRevision)}}, "name": "Command Curve 2", "splines": {{splines}} }
+        """);
+        Assert.True(replaced.Ok, replaced.Summary);
+        Assert.Equal(2, JsonSerializer.SerializeToElement(replaced.Value, JsonOptions).GetProperty("curve").GetProperty("logicalRevision").GetInt64());
+
+        var listed = await Execute(registry, "rekall.modeling.curve.list", $$"""{ "projectRoot": {{JsonSerializer.Serialize(root)}} }""");
+        var inspected = await Execute(registry, "rekall.modeling.curve.inspect", $$"""{ "projectRoot": {{JsonSerializer.Serialize(root)}}, "assetId": "curve.command" }""");
+        Assert.True(listed.Ok, listed.Summary);
+        Assert.True(inspected.Ok, inspected.Summary);
     }
 
     private static ValueTask<RekallAgeDynamicCommandResult> Execute(RekallAgeCommandRegistry registry, string name, string json) =>

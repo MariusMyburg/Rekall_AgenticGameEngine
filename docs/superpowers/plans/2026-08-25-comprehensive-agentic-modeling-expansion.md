@@ -401,6 +401,13 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   typed Studio parameter editor with ranges, units, enums, defaults, and
   validation diagnostics.
 
+  2026-08-26 tranche: persisted curve resources are now callable through the
+  default registry and MCP catalog with typed `create`, optimistic `replace`,
+  `inspect`, deterministic `list`, and bounded `evaluate` commands. The JSON
+  closed-loop proves stable IDs, Bezier enum binding, bounded evaluation
+  samples, and logical/file revision advancement. Studio curve-resource
+  creation and the complete all-descriptor editor matrix remain.
+
 - [ ] **Step 2: Add generic selection and inspection commands**
 
   Implement grow/shrink/loop/ring/island/material/sharp/seam queries and named

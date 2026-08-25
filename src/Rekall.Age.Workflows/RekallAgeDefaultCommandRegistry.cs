@@ -166,6 +166,11 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new EvaluateModelingGraphCommand(modelingGraphRuntime));
         registry.Register(new BakeModelingGraphCommand(modelingGraphRuntime));
         registry.Register(new InspectModelingEvaluationCommand(modelingGraphRuntime));
+        registry.Register(new CreateCurveAssetCommand());
+        registry.Register(new ReplaceCurveAssetCommand());
+        registry.Register(new InspectCurveAssetCommand());
+        registry.Register(new ListCurveAssetsCommand());
+        registry.Register(new EvaluateCurveAssetCommand());
         registry.Register(new SearchMaterialNodeTypesCommand());
         registry.Register(new InspectMaterialNodeTypeCommand());
         registry.Register(new CreateMaterialGraphCommand());

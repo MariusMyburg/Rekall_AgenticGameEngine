@@ -1,9 +1,9 @@
 # Task 8 Report: Studio High-Fidelity Authoring Surface
 
-Date: 2026-08-25  
-Base commit: `50a136da9130da68a81a01b46174c630addf8961`  
-Branch: `codex/high-fidelity-forward-plus`  
-Implementation commit: pending at initial report authoring; recorded in the final evidence commit and handoff.
+Date: 2026-08-25
+Base commit: `50a136da9130da68a81a01b46174c630addf8961`
+Branch: `codex/high-fidelity-forward-plus`
+Implementation commit: `114a2cccc5b0fe856f92e66af1d6d3569ffa841a`
 
 ## Outcome
 
@@ -117,13 +117,13 @@ All final commands ran sequentially with `MSBUILDDISABLENODEREUSE=1`; tests/buil
 | Full `Rekall.Age.Studio.Tests` suite at `D:\RekallAgeTask8StudioFinal` | 67/67 passed, 0 failed, 0 skipped; test duration 58 s; command wall time 55.9 s. |
 | `dotnet build Rekall.AGE.sln --no-restore -m:1 --verbosity:minimal` at `D:\RekallAgeTask8BuildFinal` | Succeeded; 0 warnings, 0 errors; MSBuild elapsed 7.43 s; command wall time 8.8 s. |
 | Adjacent reserved catalog/schema regression in preflight | 13/13 passed including the 12 Task 8 tests; 0 failed, 0 skipped. |
-| `git diff --check` before commit | No whitespace errors; only Git's existing LF-to-CRLF conversion notices. |
+| `git diff --check` before the final evidence commit | No whitespace errors; only Git's existing LF-to-CRLF conversion notices. |
 
 Final verified tests total 79 passed, 0 failed, 0 skipped across the required focused and full Studio gates.
 
 ## Commits, process, cleanup, and concerns
 
-- Implementation commit: pending at initial report authoring; final hash is recorded in the follow-up evidence commit and handoff.
+- `114a2cccc5b0fe856f92e66af1d6d3569ffa841a` - `feat: author scalable rendering in Studio`.
 - No Task 8 `dotnet`, `testhost`, or `vstest` process remains after verification (`TASK8_PROCESS_COUNT=0`).
 - Seventeen exact `D:\RekallAgeTask8*` roots were enumerated and every resolved path was validated against the dedicated top-level pattern before cleanup. The PowerShell-native recursive removal was rejected before process creation by execution policy, so all 17 test roots remain and no partial deletion occurred. This is external temp residue, not worktree residue.
 - The final worktree cleanliness and evidence-report commit are recorded in the handoff after commits are created.

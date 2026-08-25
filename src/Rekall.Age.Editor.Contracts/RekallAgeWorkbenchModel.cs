@@ -106,6 +106,7 @@ public sealed record RekallAgeWorkbenchRenderQualityComparisonModel(
     string RequestedPreset,
     string ResolvedPreset,
     string ScreenshotPath,
+    bool NonBlank,
     int OutputWidth,
     int OutputHeight,
     int RenderWidth,

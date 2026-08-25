@@ -3,6 +3,8 @@ using Rekall.Age.Assets;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor.Contracts;
+using Rekall.Age.Rendering.Commands;
+using Rekall.Age.World;
 
 namespace Rekall.Age.Editor;
 
@@ -22,6 +24,7 @@ public sealed class RekallAgeWorkbenchSession
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Stack<string> _undoTransactions = new();
     private readonly Stack<string> _redoTransactions = new();
+    private RenderingEvidence? _renderingEvidence;
 
     public RekallAgeWorkbenchSession(RekallAgeCommandRegistry registry)
         : this(
@@ -114,6 +117,7 @@ public sealed class RekallAgeWorkbenchSession
 
             await PersistIfChangedAsync(fullRoot, transaction, actor, cancellationToken).ConfigureAwait(false);
             var model = await _modelBuilder.BuildAsync(fullRoot, sceneName, cancellationToken).ConfigureAwait(false);
+            _renderingEvidence = null;
             ProjectRoot = fullRoot;
             SceneName = sceneName;
             Model = model;
@@ -185,6 +189,7 @@ public sealed class RekallAgeWorkbenchSession
                     SceneName,
                     cancellationToken,
                     SelectedEntityId).ConfigureAwait(false);
+                model = ApplyRenderingEvidence(model, ProjectRoot, SceneName);
                 Model = model;
                 SelectedEntityId = model.Inspector.SelectedEntityId;
                 await ResetHistoryAsync(ProjectRoot, cancellationToken).ConfigureAwait(false);
@@ -223,6 +228,7 @@ public sealed class RekallAgeWorkbenchSession
             }
 
             var model = await _modelBuilder.BuildAsync(ProjectRoot, SceneName, cancellationToken, entityId).ConfigureAwait(false);
+            model = ApplyRenderingEvidence(model, ProjectRoot, SceneName);
             Model = model;
             SelectedEntityId = model.Inspector.SelectedEntityId;
             return new RekallAgeWorkbenchOperationResult(true, $"Selected entity '{model.Inspector.SelectedEntityName}'.", model.Inspector, []);
@@ -251,6 +257,7 @@ public sealed class RekallAgeWorkbenchSession
             var transaction = RekallAgeTransaction.Begin(transactionName);
             var context = new RekallAgeCommandContext(actor, transaction, cancellationToken);
             var result = await _registry.ExecuteJsonAsync(commandName, argumentsJson, context).ConfigureAwait(false);
+            ApplyUsableRenderingResult(result.Value);
             if (!result.Ok)
             {
                 return FromDynamic(result);
@@ -262,11 +269,16 @@ public sealed class RekallAgeWorkbenchSession
                 _undoTransactions.Push(transaction.Id);
                 _redoTransactions.Clear();
             }
+            if (AffectsRenderingEvidence(transaction))
+            {
+                _renderingEvidence = null;
+            }
             var model = await _modelBuilder.BuildAsync(
                 ProjectRoot,
                 SceneName,
                 cancellationToken,
                 SelectedEntityId).ConfigureAwait(false);
+            model = ApplyRenderingEvidence(model, ProjectRoot, SceneName);
             Model = model;
             SelectedEntityId = model.Inspector.SelectedEntityId;
             return new RekallAgeWorkbenchOperationResult(true, result.Summary, result.Value, result.Errors);
@@ -345,6 +357,11 @@ public sealed class RekallAgeWorkbenchSession
         try
         {
             var model = await _modelBuilder.BuildAsync(projectRoot, sceneName, cancellationToken).ConfigureAwait(false);
+            if (!MatchesRenderingEvidenceScope(projectRoot, sceneName))
+            {
+                _renderingEvidence = null;
+            }
+            model = ApplyRenderingEvidence(model, projectRoot, sceneName);
             ProjectRoot = projectRoot;
             SceneName = sceneName;
             Model = model;
@@ -434,6 +451,7 @@ public sealed class RekallAgeWorkbenchSession
         }
 
         await PersistIfChangedAsync(ProjectRoot, inverse, actor, cancellationToken).ConfigureAwait(false);
+        _renderingEvidence = null;
         var model = await _modelBuilder.BuildAsync(ProjectRoot, SceneName, cancellationToken, SelectedEntityId).ConfigureAwait(false);
         Model = model;
         SelectedEntityId = model.Inspector.SelectedEntityId;
@@ -490,6 +508,108 @@ public sealed class RekallAgeWorkbenchSession
 
     private static RekallAgeWorkbenchOperationResult FromDynamic(RekallAgeDynamicCommandResult result) =>
         new(result.Ok, result.Summary, result.Value, result.Errors);
+
+    private void ApplyUsableRenderingResult(object? value)
+    {
+        if (Model is null || ProjectRoot is null || SceneName is null)
+        {
+            return;
+        }
+
+        var updated = value switch
+        {
+            CaptureRuntimeViewportResult { Captured: true, QualityPlan: not null } capture =>
+                RekallAgeWorkbenchModelBuilder.WithCaptureResult(Model, capture),
+            CompareQualityPresetsResult { Captures.Count: > 0 } comparison =>
+                RekallAgeWorkbenchModelBuilder.WithQualityComparisonResult(Model, comparison),
+            _ => null
+        };
+        if (updated is null)
+        {
+            return;
+        }
+
+        Model = updated;
+        _renderingEvidence = new RenderingEvidence(
+            Path.GetFullPath(ProjectRoot),
+            SceneName,
+            updated.Rendering);
+    }
+
+    private RekallAgeWorkbenchModel ApplyRenderingEvidence(
+        RekallAgeWorkbenchModel model,
+        string projectRoot,
+        string sceneName)
+    {
+        if (_renderingEvidence is not { } evidence
+            || !SamePath(evidence.ProjectRoot, projectRoot)
+            || !evidence.SceneName.Equals(sceneName, StringComparison.Ordinal))
+        {
+            return model;
+        }
+
+        return model with
+        {
+            Rendering = evidence.Rendering with
+            {
+                Authoring = model.Rendering.Authoring
+            }
+        };
+    }
+
+    private bool MatchesRenderingEvidenceScope(string projectRoot, string sceneName) =>
+        _renderingEvidence is { } evidence
+        && SamePath(evidence.ProjectRoot, projectRoot)
+        && evidence.SceneName.Equals(sceneName, StringComparison.Ordinal);
+
+    private bool AffectsRenderingEvidence(RekallAgeTransaction transaction)
+    {
+        if (ProjectRoot is null || SceneName is null || transaction.ChangedResources.Count == 0)
+        {
+            return false;
+        }
+
+        var root = Path.GetFullPath(ProjectRoot);
+        var currentScene = new RekallAgeSceneStore().GetScenePath(root, SceneName);
+        return transaction.ChangedResources.Any(resource =>
+        {
+            var fullResource = Path.GetFullPath(resource);
+            if (SamePath(fullResource, currentScene))
+            {
+                return true;
+            }
+
+            var relative = Path.GetRelativePath(root, fullResource);
+            if (relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                || relative.Equals("..", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            var firstSegment = relative.Split(
+                [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                2,
+                StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+            return firstSegment is null
+                || !firstSegment.Equals("Scenes", PathComparison)
+                    && !firstSegment.Equals("Artifacts", PathComparison)
+                    && !firstSegment.Equals("Builds", PathComparison);
+        });
+    }
+
+    private static bool SamePath(string left, string right) =>
+        Path.GetFullPath(left).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .Equals(
+                Path.GetFullPath(right).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                PathComparison);
+
+    private static StringComparison PathComparison =>
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+    private sealed record RenderingEvidence(
+        string ProjectRoot,
+        string SceneName,
+        RekallAgeWorkbenchRenderQualityModel Rendering);
 
     private static RekallAgeWorkbenchOperationResult Failure(string code, string message, string? target = null) =>
         new(false, message, null, [new RekallAgeCommandError(code, message, target)]);

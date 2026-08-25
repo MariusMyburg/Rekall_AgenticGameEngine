@@ -1,13 +1,17 @@
 using System.IO;
 using System.IO.Compression;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Assets;
+using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor;
 using Rekall.Age.Modeling;
 using Rekall.Age.Project;
 using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Studio;
 using Rekall.Age.Workflows;
 using Rekall.Age.Workflows.Commands;
@@ -19,6 +23,90 @@ namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioViewModelTests
 {
+    [Fact]
+    public async Task PartialComparisonFailureKeepsUsableTypedEvidenceVisibleWithItsError()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-partial-comparison-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await CreateQualityProjectAsync(root);
+            var registry = new RekallAgeCommandRegistry();
+            registry.Register(new PartialQualityComparisonCommand());
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(registry),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.OpenCommand);
+
+            await ExecuteAsync(viewModel.CompareQualityCommand);
+
+            var comparison = Assert.Single(viewModel.RenderQualityComparisons);
+            Assert.Equal("D:/captures/partial-high.png", comparison.ScreenshotPath);
+            Assert.Equal("High", viewModel.ResolvedQualityPreset);
+            Assert.Single(viewModel.RenderDebugViews);
+            Assert.Contains(viewModel.ValidationLines, line =>
+                line.Contains("REKALL_TEST_PARTIAL_COMPARISON", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DisposeCancelsAndAwaitsActiveQualityCaptureBeforePreviewDependencies()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-cancel-quality-" + Guid.NewGuid().ToString("N"));
+        RekallAgeStudioViewModel? viewModel = null;
+        Task? captureTask = null;
+        Task? disposeTask = null;
+        var command = new CancellationBlockingCaptureCommand();
+        var preview = new RecordingPreviewSession();
+        preview.BlockDispose();
+        try
+        {
+            await CreateQualityProjectAsync(root);
+            var registry = new RekallAgeCommandRegistry();
+            registry.Register(command);
+            viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(registry),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.OpenCommand);
+
+            captureTask = ExecuteAsync(viewModel.CaptureQualityCommand);
+            await command.WaitForStartAsync();
+            var cancellationObserved = command.WaitForCancellationAsync();
+            var previewDisposeEntered = preview.WaitForDisposeAsync();
+            disposeTask = viewModel.DisposeAsync().AsTask();
+
+            var firstLifecycleSignal = await Task.WhenAny(cancellationObserved, previewDisposeEntered);
+
+            Assert.Same(cancellationObserved, firstLifecycleSignal);
+            Assert.False(previewDisposeEntered.IsCompleted);
+        }
+        finally
+        {
+            command.Release();
+            preview.ReleaseDispose();
+            if (captureTask is not null) await captureTask.WaitAsync(TimeSpan.FromSeconds(5));
+            if (disposeTask is not null) await disposeTask.WaitAsync(TimeSpan.FromSeconds(5));
+            else if (viewModel is not null) await viewModel.DisposeAsync();
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+
+        Assert.DoesNotContain(viewModel!.ValidationLines, line =>
+            line.Contains("REKALL_STUDIO_UNEXPECTED_FAILURE", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task AttachQualityProfileUsesTheSharedBuiltInComponentContract()
     {
@@ -1128,6 +1216,115 @@ public sealed class StudioViewModelTests
 
     private static Task ExecuteAsync(System.Windows.Input.ICommand command) =>
         ((RekallAgeAsyncCommand)command).ExecuteAsync(null);
+
+    private static async Task CreateQualityProjectAsync(string root)
+    {
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Studio Quality", ["world", "rendering3d"]),
+            default);
+        var quality = RekallAgeEntityDocument.Create("Quality", ["rendering"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.RenderQualityProfile",
+                new JsonObject { ["preset"] = "High" }));
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"]).AddEntity(quality),
+            default);
+    }
+
+    private static RekallAgeQualityPresetCapture PartialQualityCapture(bool nonBlank = false) => new(
+        "High",
+        "High",
+        1,
+        "D:/captures/partial-high.png",
+        nonBlank,
+        320,
+        180,
+        320,
+        180,
+        4096,
+        1,
+        0,
+        [],
+        new RekallAgeGpuFrameTimingReport(
+            true,
+            null,
+            1,
+            [new RekallAgeGpuPassTiming("forward", 2_000_000, 2)],
+            2_500_000,
+            2.5,
+            "vulkan-timestamp-query"),
+        RekallAgeViewportFrameAnalysis.NotAnalyzed);
+
+    private sealed class PartialQualityComparisonCommand
+        : IRekallAgeCommand<CompareQualityPresetsRequest, CompareQualityPresetsResult>
+    {
+        public string Name => "rekall.render.compare_quality_presets";
+        public RekallAgeCommandSchema Schema => new(
+            Name,
+            "Returns one usable comparison capture followed by a deterministic failure.",
+            typeof(CompareQualityPresetsRequest).FullName!,
+            typeof(CompareQualityPresetsResult).FullName!);
+
+        public ValueTask<RekallAgeCommandResult<CompareQualityPresetsResult>> ExecuteAsync(
+            CompareQualityPresetsRequest request,
+            RekallAgeCommandContext context)
+        {
+            var value = new CompareQualityPresetsResult(
+                request.SceneName,
+                1,
+                [PartialQualityCapture()],
+                ["command execute rekall.render.performance.inspect_scene_budget"]);
+            var error = new RekallAgeCommandError(
+                "REKALL_TEST_PARTIAL_COMPARISON",
+                "The second requested preset failed after the first capture completed.",
+                "Performance");
+            return ValueTask.FromResult(RekallAgeCommandResult<CompareQualityPresetsResult>.Failure(
+                value,
+                error.Message,
+                [error]));
+        }
+    }
+
+    private sealed class CancellationBlockingCaptureCommand
+        : IRekallAgeCommand<CaptureRuntimeViewportRequest, CaptureRuntimeViewportResult>
+    {
+        private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _cancellationObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public string Name => "rekall.render.capture_runtime_viewport";
+        public RekallAgeCommandSchema Schema => new(
+            Name,
+            "Waits deterministically for lifecycle cancellation.",
+            typeof(CaptureRuntimeViewportRequest).FullName!,
+            typeof(CaptureRuntimeViewportResult).FullName!);
+
+        public async ValueTask<RekallAgeCommandResult<CaptureRuntimeViewportResult>> ExecuteAsync(
+            CaptureRuntimeViewportRequest request,
+            RekallAgeCommandContext context)
+        {
+            _started.TrySetResult();
+            using var registration = context.CancellationToken.Register(() => _cancellationObserved.TrySetResult());
+            var signal = await Task.WhenAny(_cancellationObserved.Task, _release.Task);
+            if (ReferenceEquals(signal, _cancellationObserved.Task))
+            {
+                await _release.Task;
+                context.CancellationToken.ThrowIfCancellationRequested();
+            }
+
+            var error = new RekallAgeCommandError("REKALL_TEST_CAPTURE_RELEASED", "The deterministic capture was released by its test.");
+            return RekallAgeCommandResult<CaptureRuntimeViewportResult>.Failure(
+                default!,
+                error.Message,
+                [error]);
+        }
+
+        public Task WaitForStartAsync() => _started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        public Task WaitForCancellationAsync() => _cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        public void Release() => _release.TrySetResult();
+    }
 
     private sealed class GauntletModel(string projectRoot) : IRekallAgeLanguageModelClient
     {

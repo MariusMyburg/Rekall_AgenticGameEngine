@@ -539,7 +539,7 @@ public sealed class RekallAgeWorkbenchModelBuilder
                     $"{item.RequestedPreset} final",
                     "final",
                     item.ScreenshotPath,
-                    true)).ToArray()
+                    item.NonBlank)).ToArray()
             }
         };
     }
@@ -581,6 +581,7 @@ public sealed class RekallAgeWorkbenchModelBuilder
         capture.RequestedPreset,
         capture.ResolvedPreset,
         capture.ScreenshotPath,
+        capture.NonBlank,
         capture.OutputWidth,
         capture.OutputHeight,
         capture.RenderWidth,

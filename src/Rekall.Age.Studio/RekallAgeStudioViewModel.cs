@@ -42,6 +42,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly SemaphoreSlim _modeTransitionGate = new(1, 1);
     private readonly CancellationTokenSource _lifecycleCancellation = new();
     private readonly object _disposeSync = new();
+    private readonly object _renderingOperationsSync = new();
+    private readonly HashSet<Task> _activeRenderingOperations = [];
     private readonly RekallAgeAsyncCommand _openCommand;
     private readonly RekallAgeAsyncCommand _createCommand;
     private readonly RekallAgeAsyncCommand _addEntityCommand;
@@ -268,8 +270,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _captureCommand = CreateAsyncCommand(CaptureAsync, HasEditableProject);
         _attachQualityProfileCommand = CreateAsyncCommand(AttachQualityProfileAsync, CanAttachQualityProfile);
         _applyQualityCommand = CreateAsyncCommand(() => RunAsync(ApplyRenderQualityAsync), HasQualityProfile);
-        _captureQualityCommand = CreateAsyncCommand(() => RunAsync(CaptureQualityAsync), HasEditableProject);
-        _compareQualityCommand = CreateAsyncCommand(() => RunAsync(CompareQualityAsync), CanCompareQuality);
+        _captureQualityCommand = CreateAsyncCommand(
+            () => RunRenderingAsync(CaptureQualityAsync),
+            HasEditableProject);
+        _compareQualityCommand = CreateAsyncCommand(
+            () => RunRenderingAsync(CompareQualityAsync),
+            CanCompareQuality);
         _simulateCommand = CreateAsyncCommand(StartSimulationAsync, () => HasOpenProject() && Mode == RekallAgeStudioMode.Edit);
         _pauseSimulationCommand = CreateAsyncCommand(ToggleSimulationPauseAsync, () => !IsBusy && IsSimulating);
         _stepSimulationCommand = CreateAsyncCommand(StepSimulationAsync, () => !IsBusy && IsSimulating && IsSimulationPaused);
@@ -1237,6 +1243,22 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         _lifecycleCancellation.Cancel();
         _agentCancellation?.Cancel();
+        Task[] renderingOperations;
+        lock (_renderingOperationsSync)
+        {
+            renderingOperations = [.. _activeRenderingOperations];
+        }
+        try
+        {
+            await Task.WhenAll(renderingOperations).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            ReportUnexpectedFailure(exception);
+        }
         await StopCoreAsync(resetEditPreview: false, CancellationToken.None);
         await _previewSession.DisposeAsync();
         _agentCancellation?.Dispose();
@@ -1937,7 +1959,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         return result! with { Summary = $"Set requested render quality to '{SelectedQualityPreset}' through generic component mutations." };
     }
 
-    private async Task<RekallAgeWorkbenchOperationResult> CaptureQualityAsync()
+    private async Task<RekallAgeWorkbenchOperationResult> CaptureQualityAsync(
+        CancellationToken cancellationToken)
     {
         if (!TryBuildQualityOverrides(out var overrides, out var parseError))
         {
@@ -1962,10 +1985,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             }),
             $"Capture {SelectedQualityPreset} render quality",
             "studio",
-            CancellationToken.None);
+            cancellationToken);
     }
 
-    private async Task<RekallAgeWorkbenchOperationResult> CompareQualityAsync()
+    private async Task<RekallAgeWorkbenchOperationResult> CompareQualityAsync(
+        CancellationToken cancellationToken)
     {
         if (!TryBuildQualityOverrides(out var overrides, out var parseError))
         {
@@ -1989,7 +2013,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             }),
             $"Compare {SelectedQualityPreset} and {ComparisonQualityPreset} render quality",
             "studio",
-            CancellationToken.None);
+            cancellationToken);
     }
 
     private bool TryBuildQualityOverrides(
@@ -2259,7 +2283,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 "studio-agent",
                 cancellationToken);
             if (_session.Model is not null) ApplyModel(_session.Model);
-            var capture = await CaptureOperationAsync();
+            var capture = await CaptureOperationAsync(cancellationToken);
             StatusText = result.Succeeded && validation.Ok && capture.Ok
                 ? result.Summary
                 : $"{result.Summary} Review Validation and AI Agent output.";
@@ -2313,9 +2337,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private static string Bound(string value, int maxCharacters) =>
         value.Length <= maxCharacters ? value : value[..maxCharacters] + "…";
 
-    private Task CaptureAsync() => RunAsync(CaptureOperationAsync);
+    private Task CaptureAsync() => RunRenderingAsync(CaptureOperationAsync);
 
-    private async Task<RekallAgeWorkbenchOperationResult> CaptureOperationAsync()
+    private async Task<RekallAgeWorkbenchOperationResult> CaptureOperationAsync(
+        CancellationToken cancellationToken)
     {
         ViewportVisuallyInformative = false;
         var result = await _session.ExecuteAsync(
@@ -2333,7 +2358,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             }),
             "Capture Viewport",
             "studio",
-            CancellationToken.None);
+            cancellationToken);
         if (result.Ok && result.Value is CaptureRuntimeViewportResult capture && capture.Captured)
         {
             ViewportImage = LoadBitmap(capture.ScreenshotPath);
@@ -2571,10 +2596,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             var result = await operation();
             StatusText = result.Summary;
-            if (result.Ok && _session.Model is not null)
+            if (_session.Model is not null)
             {
                 ApplyModel(_session.Model);
-                ApplyRenderingOperationResult(result.Value);
+            }
+            if (result.Ok)
+            {
                 foreach (var warning in result.Errors)
                 {
                     ValidationLines.Add($"warning: {warning.Code} - {warning.Message}");
@@ -2594,9 +2621,55 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             StatusText = ex.Message;
             Replace(ValidationLines, [$"error: REKALL_STUDIO_OPERATION_FAILED - {ex.Message}"]);
         }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+            StatusText = "Studio rendering operation canceled during shutdown.";
+        }
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    private Task RunRenderingAsync(
+        Func<CancellationToken, Task<RekallAgeWorkbenchOperationResult>> operation,
+        bool refreshPreviewAfter = false)
+    {
+        CancellationTokenSource operationCancellation;
+        Task operationTask;
+        lock (_renderingOperationsSync)
+        {
+            if (_lifecycleCancellation.IsCancellationRequested)
+            {
+                return Task.CompletedTask;
+            }
+
+            operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                _lifecycleCancellation.Token);
+            operationTask = RunAsync(
+                () => operation(operationCancellation.Token),
+                refreshPreviewAfter);
+            _activeRenderingOperations.Add(operationTask);
+        }
+
+        return AwaitRenderingOperationAsync(operationTask, operationCancellation);
+    }
+
+    private async Task AwaitRenderingOperationAsync(
+        Task operationTask,
+        CancellationTokenSource operationCancellation)
+    {
+        try
+        {
+            await operationTask.ConfigureAwait(false);
+        }
+        finally
+        {
+            operationCancellation.Dispose();
+            lock (_renderingOperationsSync)
+            {
+                _activeRenderingOperations.Remove(operationTask);
+            }
         }
     }
 
@@ -2669,28 +2742,6 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             ViewportSummary = $"Camera {model.Runtime.ActiveCameraName ?? "none"} · {model.Runtime.RenderableCount} renderables";
         }
         RefreshSceneGizmo();
-    }
-
-    private void ApplyRenderingOperationResult(object? value)
-    {
-        if (_currentModel is null) return;
-        switch (value)
-        {
-            case CaptureRuntimeViewportResult capture:
-                _currentModel = RekallAgeWorkbenchModelBuilder.WithCaptureResult(_currentModel, capture);
-                ApplyRendering(_currentModel.Rendering, synchronizeAuthoring: false);
-                if (capture.Captured && File.Exists(capture.ScreenshotPath))
-                {
-                    ViewportImage = LoadBitmap(capture.ScreenshotPath);
-                    ViewportRenderableCount = capture.RenderableCount;
-                    ViewportSummary = $"{capture.Width}×{capture.Height} · {capture.QualityPlan?.RequestedPreset ?? "authored"} requested · {capture.QualityPlan?.ResolvedPreset ?? "unavailable"} resolved";
-                }
-                break;
-            case CompareQualityPresetsResult comparison:
-                _currentModel = RekallAgeWorkbenchModelBuilder.WithQualityComparisonResult(_currentModel, comparison);
-                ApplyRendering(_currentModel.Rendering, synchronizeAuthoring: false);
-                break;
-        }
     }
 
     private void ApplyRendering(

@@ -179,7 +179,7 @@ public sealed class WorkbenchReadModelTests
                     "Performance",
                     3,
                     "D:/captures/performance.png",
-                    true,
+                    false,
                     320,
                     180,
                     80,
@@ -223,10 +223,14 @@ public sealed class WorkbenchReadModelTests
             mapped.Rendering.Comparisons.Select(item => item.ScreenshotPath));
         Assert.Equal("Performance", mapped.Rendering.Comparisons[0].RequestedPreset);
         Assert.Equal("Performance", mapped.Rendering.Comparisons[0].ResolvedPreset);
+        Assert.False(mapped.Rendering.Comparisons[0].NonBlank);
         Assert.Equal("Unavailable", mapped.Rendering.Comparisons[0].TotalGpuMillisecondsText);
         Assert.Equal("Epic", mapped.Rendering.Comparisons[1].RequestedPreset);
         Assert.Equal("High", mapped.Rendering.Comparisons[1].ResolvedPreset);
+        Assert.True(mapped.Rendering.Comparisons[1].NonBlank);
         Assert.Equal("2.500 ms", mapped.Rendering.Comparisons[1].TotalGpuMillisecondsText);
+        Assert.False(mapped.Rendering.DebugViews[0].NonBlank);
+        Assert.True(mapped.Rendering.DebugViews[1].NonBlank);
         var mappedDegradation = Assert.Single(mapped.Rendering.Comparisons[0].Degradations);
         Assert.Equal(degradation.Code, mappedDegradation.Code);
         Assert.Equal("0.01", mappedDegradation.RequestedValue);

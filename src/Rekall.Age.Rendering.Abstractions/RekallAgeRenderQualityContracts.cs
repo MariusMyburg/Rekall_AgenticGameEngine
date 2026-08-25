@@ -18,6 +18,48 @@ public sealed record RekallAgeRenderQualityIntent(
     public bool EnableGpuTimestamps { get; init; }
 }
 
+/// <summary>
+/// Bounded, caller-scoped render-work overrides. Applying these values never mutates authored scene or gameplay state.
+/// </summary>
+public sealed record RekallAgeRenderQualityOverrides(
+    double? ResolutionScale = null,
+    int? ShadowCascadeCount = null,
+    int? ShadowResolution = null,
+    string? FogMode = null,
+    bool? Bloom = null,
+    bool? Ssao = null,
+    int? MaximumActiveParticles = null);
+
+/// <summary>
+/// Backend-neutral duration for one executed render pass, sourced from a GPU timestamp query.
+/// </summary>
+public sealed record RekallAgeGpuPassTiming(
+    string Name,
+    double Nanoseconds,
+    double Milliseconds);
+
+/// <summary>
+/// Inspectable GPU timing result. Unavailable timing is represented by a stable code and nullable totals, never CPU time.
+/// </summary>
+public sealed record RekallAgeGpuFrameTimingReport(
+    bool Available,
+    string? Code,
+    int FrameIndex,
+    IReadOnlyList<RekallAgeGpuPassTiming> Passes,
+    double? TotalNanoseconds,
+    double? TotalMilliseconds,
+    string Provenance)
+{
+    public static RekallAgeGpuFrameTimingReport Unavailable(int frameIndex) => new(
+        false,
+        "REKALL_GPU_TIMESTAMPS_UNAVAILABLE",
+        frameIndex,
+        Array.Empty<RekallAgeGpuPassTiming>(),
+        null,
+        null,
+        "unavailable");
+}
+
 public sealed record RekallAgeResolvedRenderFeaturePlan(
     string RequestedPreset,
     string ResolvedPreset,

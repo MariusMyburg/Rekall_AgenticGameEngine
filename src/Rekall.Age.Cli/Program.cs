@@ -17,6 +17,7 @@ using Rekall.Age.Playback.Commands;
 using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.Runtime.Commands;
@@ -99,6 +100,19 @@ internal static class RekallAgeCli
                     await InspectScenePerformanceBudgetAsync(registry, context, root, scene, frames, "1920", "1080", profile),
                 ["render", "performance", "budget", var root, var scene, var profile, var frames, var width, var height] =>
                     await InspectScenePerformanceBudgetAsync(registry, context, root, scene, frames, width, height, profile),
+                ["render", "performance", "budget", var root, var scene, var profile, var frames, var width, var height, var qualityPreset, var overridesJson, var includeGpuTimings] =>
+                    await InspectScenePerformanceBudgetAsync(
+                        registry,
+                        context,
+                        root,
+                        scene,
+                        frames,
+                        width,
+                        height,
+                        profile,
+                        qualityPreset,
+                        overridesJson,
+                        includeGpuTimings),
                 ["render", "virtual-geometry", "inspect", var root, var scene] =>
                     await InspectVirtualGeometrySceneAsync(registry, context, root, scene, "0", "1920", "1080"),
                 ["render", "virtual-geometry", "inspect", var root, var scene, var frames] =>
@@ -206,6 +220,35 @@ internal static class RekallAgeCli
                     await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height, backend, null),
                 ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory, var width, var height, var backend, var inputsJson] =>
                     await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height, backend, inputsJson),
+                ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory, var width, var height, var backend, var inputsJson, var qualityPreset, var overridesJson, var includeGpuTimings] =>
+                    await CaptureRuntimeViewportAsync(
+                        registry,
+                        context,
+                        root,
+                        scene,
+                        frames,
+                        outputDirectory,
+                        width,
+                        height,
+                        backend,
+                        inputsJson,
+                        qualityPreset,
+                        overridesJson,
+                        includeGpuTimings),
+                ["render", "quality", "compare", var root, var scene, var frames, var outputDirectory, var width, var height, var backend, var presets, var overridesJson, var includeGpuTimings] =>
+                    await CompareQualityPresetsAsync(
+                        registry,
+                        context,
+                        root,
+                        scene,
+                        frames,
+                        outputDirectory,
+                        width,
+                        height,
+                        backend,
+                        presets,
+                        overridesJson,
+                        includeGpuTimings),
                 ["render", "glb", "export", var root, var scene, var outputPath] =>
                     await ExportSceneGlbAsync(registry, context, root, scene, outputPath, "0"),
                 ["render", "glb", "export", var root, var scene, var outputPath, var frames] =>
@@ -619,14 +662,22 @@ internal static class RekallAgeCli
         string frames,
         string width,
         string height,
-        string profile)
+        string profile,
+        string? qualityPreset = null,
+        string? qualityOverridesJson = null,
+        string includeGpuTimings = "false")
     {
         var frameCount = int.Parse(frames, CultureInfo.InvariantCulture);
         var viewportWidth = int.Parse(width, CultureInfo.InvariantCulture);
         var viewportHeight = int.Parse(height, CultureInfo.InvariantCulture);
         var result = await registry.ExecuteAsync<InspectScenePerformanceBudgetRequest, InspectScenePerformanceBudgetResult>(
             "rekall.render.performance.inspect_scene_budget",
-            new InspectScenePerformanceBudgetRequest(root, scene, frameCount, viewportWidth, viewportHeight, profile),
+            new InspectScenePerformanceBudgetRequest(root, scene, frameCount, viewportWidth, viewportHeight, profile)
+            {
+                QualityPreset = qualityPreset,
+                QualityOverrides = ParseQualityOverrides(qualityOverridesJson),
+                IncludeGpuTimings = bool.Parse(includeGpuTimings)
+            },
             context);
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Profile: {result.Value.Profile}; target FPS: {result.Value.TargetFramesPerSecond}");
@@ -636,6 +687,8 @@ internal static class RekallAgeCli
         Console.WriteLine($"Textures: {result.Value.TextureCount}; runtime textures: {result.Value.RuntimeTextureCount}; asset issues: {result.Value.AssetIssueCount}");
         Console.WriteLine($"Stereo: {result.Value.StereoEnabled}; multiview: {result.Value.UsesSinglePassMultiview}; eyes: {result.Value.EyeCount}");
         Console.WriteLine($"Render target pixels: {result.Value.EstimatedRenderTargetPixels}; geometry bytes: {result.Value.EstimatedGeometryBytes}");
+        PrintQualityReport(result.Value.QualityPlan, result.Value.GpuTimings, result.Value.ResourceBytes);
+        Console.WriteLine($"Resource bytes: {result.Value.ResourceBytes}; workload draws: {result.Value.RenderWorkloadDrawCount}; workload dispatches: {result.Value.RenderWorkloadDispatchCount}");
         Console.WriteLine($"Budget: draws {result.Value.Limits.MaxDrawInvocations}, triangles {result.Value.Limits.MaxTriangles}, vertices {result.Value.Limits.MaxVertices}, textures {result.Value.Limits.MaxTextures}, pixels {result.Value.Limits.MaxRenderTargetPixels}");
         foreach (var camera in result.Value.CameraMasks)
         {
@@ -665,6 +718,11 @@ internal static class RekallAgeCli
         foreach (var recommendation in result.Value.Recommendations)
         {
             Console.WriteLine($"Recommendation: {recommendation}");
+        }
+
+        foreach (var command in result.Value.SuggestedCommands)
+        {
+            Console.WriteLine($"Next: {command}");
         }
 
         return result.Ok ? 0 : 1;
@@ -4032,7 +4090,10 @@ internal static class RekallAgeCli
         string width,
         string height,
         string backend,
-        string? inputsJson = null)
+        string? inputsJson = null,
+        string? qualityPreset = null,
+        string? qualityOverridesJson = null,
+        string includeGpuTimings = "false")
     {
         var frameCount = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
         var viewportWidth = int.Parse(width, System.Globalization.CultureInfo.InvariantCulture);
@@ -4049,7 +4110,12 @@ internal static class RekallAgeCli
                 viewportHeight,
                 true,
                 backend,
-                Inputs: inputs),
+                Inputs: inputs)
+            {
+                QualityPreset = qualityPreset,
+                QualityOverrides = ParseQualityOverrides(qualityOverridesJson),
+                IncludeGpuTimings = bool.Parse(includeGpuTimings)
+            },
             context);
 
         Console.WriteLine($"Runtime viewport {scene} frame {result.Value.FrameIndex}: {result.Value.Width}x{result.Value.Height}");
@@ -4058,6 +4124,7 @@ internal static class RekallAgeCli
         Console.WriteLine($"Hardware accelerated: {result.Value.HardwareAccelerated}");
         Console.WriteLine($"Acceleration: {result.Value.AccelerationStatus}");
         Console.WriteLine($"Selected device: {result.Value.SelectedDeviceName ?? "(none)"}");
+        PrintQualityReport(result.Value.QualityPlan, result.Value.GpuTimings, result.Value.ResourceBytes);
         Console.WriteLine(
             $"Input actions: {(result.Value.InputActions.Count == 0 ? "(none)" : string.Join(", ", result.Value.InputActions.Select(action => $"{action.Name}={action.Value:G}")))}");
         Console.WriteLine($"Elapsed simulation: {result.Value.ElapsedSeconds:F3}s");
@@ -4118,6 +4185,119 @@ internal static class RekallAgeCli
         }
 
         return result.Ok && result.Value.Captured && result.Value.NonBlank ? 0 : 1;
+    }
+
+    private static async Task<int> CompareQualityPresetsAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string frames,
+        string outputDirectory,
+        string width,
+        string height,
+        string backend,
+        string presets,
+        string? overridesJson,
+        string includeGpuTimings)
+    {
+        var request = new CompareQualityPresetsRequest(
+            root,
+            scene,
+            presets.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
+            int.Parse(frames, CultureInfo.InvariantCulture),
+            outputDirectory,
+            int.Parse(width, CultureInfo.InvariantCulture),
+            int.Parse(height, CultureInfo.InvariantCulture),
+            backend,
+            ParseQualityOverrides(overridesJson),
+            bool.Parse(includeGpuTimings));
+        var result = await registry.ExecuteAsync<CompareQualityPresetsRequest, CompareQualityPresetsResult>(
+            "rekall.render.compare_quality_presets",
+            request,
+            context);
+        Console.WriteLine($"Compared quality presets for {scene} at frame {result.Value.FrameIndex}");
+        foreach (var capture in result.Value.Captures)
+        {
+            Console.WriteLine($"Preset: {capture.RequestedPreset} -> {capture.ResolvedPreset}");
+            Console.WriteLine($"  Output: {capture.OutputWidth}x{capture.OutputHeight}; Internal: {capture.RenderWidth}x{capture.RenderHeight}");
+            Console.WriteLine($"  Capture: {capture.ScreenshotPath}; nonblank={capture.NonBlank}");
+            Console.WriteLine($"  Resources: {capture.ResourceBytes} bytes; draws={capture.DrawCount}; dispatches={capture.DispatchCount}");
+            if (capture.GpuTimings.Available)
+            {
+                Console.WriteLine($"  GPU frame: {capture.GpuTimings.TotalMilliseconds!.Value:F6} ms");
+                foreach (var pass in capture.GpuTimings.Passes)
+                {
+                    Console.WriteLine($"  GPU pass: {pass.Name}; {pass.Nanoseconds:F3} ns; {pass.Milliseconds:F6} ms");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"  GPU timings: {capture.GpuTimings.Code}");
+            }
+
+            foreach (var degradation in capture.Degradations)
+            {
+                Console.WriteLine($"  Degradation: {degradation.Code}; feature={degradation.Feature}; Requested={degradation.RequestedValue}; resolved={degradation.ResolvedValue}");
+            }
+        }
+
+        foreach (var command in result.Value.NextCommands)
+        {
+            Console.WriteLine($"Next: {command}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.Captures.All(capture => capture.NonBlank) ? 0 : 1;
+    }
+
+    private static RekallAgeRenderQualityOverrides? ParseQualityOverrides(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        return System.Text.Json.JsonSerializer.Deserialize<RekallAgeRenderQualityOverrides>(
+            json,
+            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+    }
+
+    private static void PrintQualityReport(
+        RekallAgeResolvedRenderFeaturePlan? quality,
+        RekallAgeGpuFrameTimingReport timings,
+        long resourceBytes)
+    {
+        if (quality is null)
+        {
+            return;
+        }
+
+        Console.WriteLine($"Requested quality: {quality.RequestedPreset}");
+        Console.WriteLine($"Resolved quality: {quality.ResolvedPreset}");
+        Console.WriteLine($"Internal resolution: {quality.RenderWidth}x{quality.RenderHeight}");
+        Console.WriteLine($"Render resources: {resourceBytes} bytes (transient={quality.EstimatedTransientBytes}; persistent={quality.EstimatedPersistentBytes})");
+        if (timings.Available)
+        {
+            Console.WriteLine($"GPU frame: {timings.TotalMilliseconds!.Value:F6} ms");
+            foreach (var pass in timings.Passes)
+            {
+                Console.WriteLine($"GPU pass: {pass.Name}; {pass.Nanoseconds:F3} ns; {pass.Milliseconds:F6} ms");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"GPU timings: {timings.Code}");
+        }
+
+        foreach (var degradation in quality.Degradations)
+        {
+            Console.WriteLine($"Degradation: {degradation.Code}; feature={degradation.Feature}; Requested={degradation.RequestedValue}; resolved={degradation.ResolvedValue}");
+        }
     }
 
     private static async Task<int> ExportSceneGlbAsync(

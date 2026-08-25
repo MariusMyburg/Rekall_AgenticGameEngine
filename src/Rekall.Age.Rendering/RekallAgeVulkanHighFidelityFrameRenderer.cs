@@ -100,7 +100,8 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
             particlePlan)
         {
             DirectionalLight = directionalLight,
-            EffectiveCamera = effectiveCamera
+            EffectiveCamera = effectiveCamera,
+            QualityPlan = resolved
         };
     }
 
@@ -495,6 +496,8 @@ public sealed record RekallAgeVulkanHighFidelityFramePlan(
 
     public RekallAgeVulkanEffectiveCamera EffectiveCamera { get; init; } =
         RekallAgeVulkanEffectiveCamera.Default;
+
+    public RekallAgeResolvedRenderFeaturePlan? QualityPlan { get; init; }
 }
 
 public sealed record RekallAgeHighFidelityPostSettings(
@@ -530,6 +533,17 @@ public sealed record RekallAgeHighFidelityFrameReport(
 
     public IReadOnlyList<RekallAgeHighFidelityParticleDebugCapture> ParticleDebugCaptures { get; init; } =
         Array.Empty<RekallAgeHighFidelityParticleDebugCapture>();
+
+    public RekallAgeResolvedRenderFeaturePlan? QualityPlan { get; init; }
+
+    public RekallAgeGpuFrameTimingReport GpuTimings { get; init; } =
+        RekallAgeGpuFrameTimingReport.Unavailable(0);
+
+    public long ResourceBytes { get; init; }
+
+    public int DrawCount { get; init; }
+
+    public int DispatchCount { get; init; }
 }
 
 public sealed record RekallAgeHighFidelityParticleReport(
@@ -647,7 +661,10 @@ public sealed record RekallAgeHighFidelityFrameResourceReport(
     string Format,
     int Width,
     int Height,
-    bool Allocated);
+    bool Allocated)
+{
+    public long EstimatedBytes { get; init; }
+}
 
 public sealed record RekallAgeHighFidelityFramePassReport(
     string Name,
@@ -656,4 +673,9 @@ public sealed record RekallAgeHighFidelityFramePassReport(
     IReadOnlyList<string> Outputs,
     bool Executed,
     int DispatchCount,
-    int DrawCount);
+    int DrawCount)
+{
+    public double? GpuNanoseconds { get; init; }
+
+    public double? GpuMilliseconds { get; init; }
+}

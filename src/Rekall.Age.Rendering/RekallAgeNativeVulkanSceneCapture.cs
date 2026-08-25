@@ -565,6 +565,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 prepared,
                 highFidelityPlan?.Graph,
                 highFidelityPlan?.ShadowPlan);
+            var gpuTimings = RekallAgeGpuFrameTimingReport.Unavailable(frame.FrameIndex);
+            RekallAgeVulkanGpuProfiler? gpuProfiler = null;
+            RekallAgeVulkanGpuFrameQuery? gpuFrameQuery = null;
+            IReadOnlyList<RekallAgeHighFidelityFramePassReport> executedPassReports = [];
 
             if (!prepared.HasDrawableGeometry && highFidelityPlan?.ParticlePlan.AllocatedCapacity <= 0)
             {
@@ -693,6 +697,24 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 CreateProjectPipelines(state, frame, target, resolvedPipelines);
                 if (highFidelityPlan is not null)
                 {
+                    executedPassReports = CreateExecutedHighFidelityPassReports(commandPlan, highFidelityPlan);
+                    if (highFidelityPlan.QualityPlan?.Post.GpuTimestamps == true
+                        && persistentContext is not null)
+                    {
+                        gpuProfiler = persistentContext.GetOrCreateGpuProfiler();
+                        var qualitySignature = BuildGpuQualitySignature(highFidelityPlan.QualityPlan);
+                        var completedTimings = gpuProfiler.ReadCompletedPriorFrame(qualitySignature);
+                        gpuTimings = completedTimings.Available
+                            ? completedTimings
+                            : completedTimings with { FrameIndex = frame.FrameIndex };
+                        gpuFrameQuery = gpuProfiler.BeginFrame(
+                            frame.FrameIndex,
+                            qualitySignature,
+                            executedPassReports
+                                .Where(pass => pass.Executed)
+                                .Select(pass => pass.Name)
+                                .ToArray());
+                    }
                     CreateHighFidelityPostPipeline(state, target, highFidelityPlan, commandPlan, errors);
                     if (errors.Count > 0)
                     {
@@ -709,9 +731,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 }
                 else
                 {
-                    RecordHighFidelityCommands(state, commandPlan, highFidelityPlan);
+                    RecordHighFidelityCommands(state, commandPlan, highFidelityPlan, gpuFrameQuery);
                 }
-                SubmitAndWait(state);
+                SubmitAndWait(state, gpuProfiler, gpuFrameQuery);
 
                 if (highFidelityPlan?.ParticlePlan.AllocatedCapacity > 0)
                 {
@@ -795,13 +817,14 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         : CreateHighFidelityReport(
                             highFidelityPlan,
                             executed: true,
-                            CreateExecutedHighFidelityPassReports(commandPlan, highFidelityPlan),
+                            executedPassReports,
                             [],
                             commandPlan,
                             shadowDebugCaptures,
                             fogDebugCaptures,
                             particleDebugCaptures,
-                            state)
+                            state,
+                            gpuTimings)
                 };
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -826,6 +849,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             }
             finally
             {
+                gpuProfiler?.CancelRecording(gpuFrameQuery);
                 state.Dispose();
             }
         }
@@ -4087,16 +4111,20 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         private static void RecordHighFidelityCommands(
             VulkanState state,
             RekallAgeVulkanSceneCommandPlan commandPlan,
-            RekallAgeVulkanHighFidelityFramePlan highFidelityPlan)
+            RekallAgeVulkanHighFidelityFramePlan highFidelityPlan,
+            RekallAgeVulkanGpuFrameQuery? gpuFrameQuery)
         {
             var target = commandPlan.PreparedFrame.Target;
             var beginInfo = new CommandBufferBeginInfo { SType = StructureType.CommandBufferBeginInfo };
             state.Vk.ResetCommandBuffer(state.CommandBuffer, 0);
             ThrowIfFailed(state.Vk.BeginCommandBuffer(state.CommandBuffer, &beginInfo), "vkBeginCommandBuffer HDR");
+            gpuFrameQuery?.Reset(state.CommandBuffer);
             RecordTextureUploads(state);
             if (highFidelityPlan.ShadowPlan.Enabled)
             {
+                gpuFrameQuery?.BeginPass(state.CommandBuffer, "shadow-directional");
                 RecordShadowCommands(state, commandPlan, highFidelityPlan.ShadowPlan);
+                gpuFrameQuery?.EndPass(state.CommandBuffer, "shadow-directional");
             }
 
             var sceneClears = stackalloc ClearValue[2];
@@ -4112,6 +4140,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 ClearValueCount = 2,
                 PClearValues = sceneClears
             };
+            gpuFrameQuery?.BeginPass(state.CommandBuffer, "opaque-hdr");
             state.Vk.CmdBeginRenderPass(state.CommandBuffer, &scenePass, SubpassContents.Inline);
             var vertexBuffer = state.VertexBuffer;
             var vertexOffset = 0UL;
@@ -4119,14 +4148,17 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             state.Vk.CmdBindIndexBuffer(state.CommandBuffer, state.IndexBuffer, 0, IndexType.Uint32);
             DrawPassRanges(state, 0, pass.Draws, transparent: false);
             state.Vk.CmdEndRenderPass(state.CommandBuffer);
+            gpuFrameQuery?.EndPass(state.CommandBuffer, "opaque-hdr");
 
             if (highFidelityPlan.FogPlan.UsesFroxelGrid)
             {
-                RecordFroxelFogCommands(state, commandPlan, highFidelityPlan.FogPlan);
+                RecordFroxelFogCommands(state, commandPlan, highFidelityPlan.FogPlan, gpuFrameQuery);
             }
             else if (highFidelityPlan.FogPlan.Enabled)
             {
+                gpuFrameQuery?.BeginPass(state.CommandBuffer, "fog-integrate");
                 RecordAnalyticFogCommands(state, commandPlan, highFidelityPlan.FogPlan);
+                gpuFrameQuery?.EndPass(state.CommandBuffer, "fog-integrate");
             }
             else
             {
@@ -4148,10 +4180,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 RecordShadowDebugCopies(state, highFidelityPlan.ShadowPlan);
             }
 
-            RecordTransparentAndParticleCommands(state, commandPlan, highFidelityPlan);
+            RecordTransparentAndParticleCommands(state, commandPlan, highFidelityPlan, gpuFrameQuery);
 
             if (HasPostPass(commandPlan, "bloom"))
             {
+                gpuFrameQuery?.BeginPass(state.CommandBuffer, "bloom");
                 TransitionImage(
                     state,
                     state.BloomImage,
@@ -4198,6 +4231,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     AccessFlags.ShaderReadBit,
                     PipelineStageFlags.ComputeShaderBit,
                     PipelineStageFlags.FragmentShaderBit);
+                gpuFrameQuery?.EndPass(state.CommandBuffer, "bloom");
             }
 
             var outputClear = new ClearValue { Color = new ClearColorValue(0, 0, 0, 1) };
@@ -4212,6 +4246,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 ClearValueCount = 1,
                 PClearValues = &outputClear
             };
+            gpuFrameQuery?.BeginPass(state.CommandBuffer, "tone-map");
             state.Vk.CmdBeginRenderPass(state.CommandBuffer, &outputPass, SubpassContents.Inline);
             state.Vk.CmdBindPipeline(state.CommandBuffer, PipelineBindPoint.Graphics, state.ToneMapPipeline);
             var toneSet = state.ToneMapDescriptorSet;
@@ -4242,7 +4277,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 &toneParameters);
             state.Vk.CmdDraw(state.CommandBuffer, 3, 1, 0, 0);
             state.Vk.CmdEndRenderPass(state.CommandBuffer);
+            gpuFrameQuery?.EndPass(state.CommandBuffer, "tone-map");
 
+            gpuFrameQuery?.BeginPass(state.CommandBuffer, "present");
             TransitionImage(
                 state,
                 state.OutputImage,
@@ -4269,6 +4306,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 state.ReadbackBuffer,
                 1,
                 &copy);
+            gpuFrameQuery?.EndPass(state.CommandBuffer, "present");
             ThrowIfFailed(state.Vk.EndCommandBuffer(state.CommandBuffer), "vkEndCommandBuffer HDR");
         }
 
@@ -4322,12 +4360,14 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         private static void RecordTransparentAndParticleCommands(
             VulkanState state,
             RekallAgeVulkanSceneCommandPlan commandPlan,
-            RekallAgeVulkanHighFidelityFramePlan highFidelityPlan)
+            RekallAgeVulkanHighFidelityFramePlan highFidelityPlan,
+            RekallAgeVulkanGpuFrameQuery? gpuFrameQuery)
         {
             var draws = commandPlan.RenderPasses[0].Draws;
             var hasParticles = highFidelityPlan.ParticlePlan.AllocatedCapacity > 0;
             if (hasParticles)
             {
+                gpuFrameQuery?.BeginPass(state.CommandBuffer, "particle-upload");
                 var indirectReset = new uint[] { 6, 0, 0, 0 };
                 fixed (uint* reset = indirectReset)
                 {
@@ -4360,7 +4400,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     &resetBarrier,
                     0,
                     null);
+                gpuFrameQuery?.EndPass(state.CommandBuffer, "particle-upload");
 
+                gpuFrameQuery?.BeginPass(state.CommandBuffer, "particle-simulate");
                 state.Vk.CmdBindPipeline(state.CommandBuffer, PipelineBindPoint.Compute, state.ParticleComputePipeline);
                 var computeSet = state.ParticleComputeDescriptorSet;
                 state.Vk.CmdBindDescriptorSets(
@@ -4407,13 +4449,17 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     barriers,
                     0,
                     null);
+                gpuFrameQuery?.EndPass(state.CommandBuffer, "particle-simulate");
             }
 
             if (!hasParticles && !draws.Any(draw => draw.Transparent))
             {
+                gpuFrameQuery?.BeginPass(state.CommandBuffer, "transparent-particles");
+                gpuFrameQuery?.EndPass(state.CommandBuffer, "transparent-particles");
                 return;
             }
 
+            gpuFrameQuery?.BeginPass(state.CommandBuffer, "transparent-particles");
             TransitionImage(
                 state,
                 state.DepthImage,
@@ -4499,6 +4545,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     0,
                     null);
             }
+            gpuFrameQuery?.EndPass(state.CommandBuffer, "transparent-particles");
         }
 
         private static BufferMemoryBarrier ParticleBarrier(Buffer buffer) => new()
@@ -4540,8 +4587,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         private static void RecordFroxelFogCommands(
             VulkanState state,
             RekallAgeVulkanSceneCommandPlan commandPlan,
-            RekallAgeVulkanFogPlan fogPlan)
+            RekallAgeVulkanFogPlan fogPlan,
+            RekallAgeVulkanGpuFrameQuery? gpuFrameQuery)
         {
+            gpuFrameQuery?.BeginPass(state.CommandBuffer, "fog-integrate");
             TransitionDepthForFog(state, toShaderRead: true);
             if (state.FogHistoryNeedsClear)
             {
@@ -4648,6 +4697,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 (commandPlan.PreparedFrame.Target.Width + 3) / 4,
                 (commandPlan.PreparedFrame.Target.Height + 3) / 4,
                 1);
+            gpuFrameQuery?.EndPass(state.CommandBuffer, "fog-integrate");
+            gpuFrameQuery?.BeginPass(state.CommandBuffer, "fog-debug-readback");
             TransitionImage(
                 state,
                 state.FogImage,
@@ -4717,6 +4768,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 PipelineStageFlags.ComputeShaderBit,
                 PipelineStageFlags.ComputeShaderBit | PipelineStageFlags.FragmentShaderBit);
             TransitionDepthForFog(state, toShaderRead: false);
+            gpuFrameQuery?.EndPass(state.CommandBuffer, "fog-debug-readback");
         }
 
         private static void TransitionDepthForFog(VulkanState state, bool toShaderRead)
@@ -4792,7 +4844,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             IReadOnlyList<RekallAgeHighFidelityShadowDebugCapture>? shadowDebugCaptures = null,
             IReadOnlyList<RekallAgeHighFidelityFogDebugCapture>? fogDebugCaptures = null,
             IReadOnlyList<RekallAgeHighFidelityParticleDebugCapture>? particleDebugCaptures = null,
-            VulkanState? executionState = null)
+            VulkanState? executionState = null,
+            RekallAgeGpuFrameTimingReport? gpuTimings = null)
         {
             var allocated = new HashSet<string>(StringComparer.Ordinal)
             {
@@ -4819,6 +4872,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 allocated.Add("particle-indirect");
                 allocated.Add("particle-fragment-counts");
             }
+            var resolvedGpuTimings = gpuTimings
+                ?? RekallAgeGpuFrameTimingReport.Unavailable(commandPlan?.PreparedFrame.Frame.FrameIndex ?? 0);
+            var timedPasses = RekallAgeVulkanGpuProfiler.AttachTimings(passes, resolvedGpuTimings);
             return new RekallAgeHighFidelityFrameReport(
                 executed,
                 "R16G16B16A16_SFloat",
@@ -4830,9 +4886,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         resource.Format,
                         resource.Width,
                         resource.Height,
-                        executed))
+                        executed)
+                    {
+                        EstimatedBytes = EstimateGraphResourceBytes(resource)
+                    })
                     .ToArray(),
-                passes,
+                timedPasses,
                 plan.Graph.Diagnostics
                     .Select(diagnostic => $"{diagnostic.Code} [{diagnostic.Target}]: {diagnostic.Message}")
                     .Concat(diagnostics)
@@ -4906,7 +4965,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     SimulationDestination = plan.ParticlePlan.SimulationDestination,
                     GpuActiveCount = executed ? executionState?.ParticleGpuActiveCount ?? 0 : 0
                 },
-                ParticleDebugCaptures = particleDebugCaptures ?? []
+                ParticleDebugCaptures = particleDebugCaptures ?? [],
+                QualityPlan = plan.QualityPlan,
+                GpuTimings = resolvedGpuTimings,
+                ResourceBytes = plan.Graph.EstimatedBytes,
+                DrawCount = timedPasses.Where(pass => pass.Executed).Sum(pass => pass.DrawCount),
+                DispatchCount = timedPasses.Where(pass => pass.Executed).Sum(pass => pass.DispatchCount)
             };
         }
 
@@ -5077,6 +5141,38 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         private static bool HasPostPass(RekallAgeVulkanSceneCommandPlan commandPlan, string name) =>
             commandPlan.PostPasses.Any(pass => pass.Enabled && pass.Name.Equals(name, StringComparison.Ordinal));
 
+        private static string BuildGpuQualitySignature(RekallAgeResolvedRenderFeaturePlan plan) => string.Join(
+            "|",
+            plan.ResolvedPreset,
+            $"{plan.RenderWidth}x{plan.RenderHeight}",
+            plan.ResolutionScale.ToString("R", CultureInfo.InvariantCulture),
+            plan.Shadows.CascadeCount,
+            plan.Shadows.Resolution,
+            plan.Fog.Mode,
+            plan.Fog.FroxelWidth,
+            plan.Fog.FroxelHeight,
+            plan.Fog.FroxelDepth,
+            plan.Post.Bloom,
+            plan.Post.Ssao,
+            plan.Particles.MaximumActiveParticles);
+
+        private static long EstimateGraphResourceBytes(RekallAgeHighFidelityRenderResource resource)
+        {
+            var bytesPerElement = resource.Format.Trim().ToUpperInvariant() switch
+            {
+                "R8_UNORM" => 1,
+                "R16G16_SFLOAT" => 4,
+                "R32_UINT" => 4,
+                "D32_SFLOAT" => 4,
+                "R8G8B8A8_UNORM" => 4,
+                "R16G16B16A16_SFLOAT" => 8,
+                _ => 0
+            };
+            return bytesPerElement == 0
+                ? 0
+                : checked((long)resource.Width * resource.Height * resource.Layers * bytesPerElement);
+        }
+
         private static void DrawPassRanges(
             VulkanState state,
             int passIndex,
@@ -5232,7 +5328,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 &barrier);
         }
 
-        private static void SubmitAndWait(VulkanState state)
+        private static void SubmitAndWait(
+            VulkanState state,
+            RekallAgeVulkanGpuProfiler? gpuProfiler = null,
+            RekallAgeVulkanGpuFrameQuery? gpuFrameQuery = null)
         {
             if (state.Fence.Handle == 0)
             {
@@ -5253,8 +5352,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 PCommandBuffers = &commandBuffer
             };
             ThrowIfFailed(state.Vk.QueueSubmit(state.GraphicsQueue, 1, &submitInfo, state.Fence), "vkQueueSubmit");
+            var gpuFenceToken = gpuProfiler is not null && gpuFrameQuery is not null
+                ? gpuProfiler.MarkSubmitted(gpuFrameQuery)
+                : 0;
             var fence = state.Fence;
             ThrowIfFailed(state.Vk.WaitForFences(state.Device, 1, &fence, true, FenceTimeoutNanoseconds), "vkWaitForFences");
+            gpuProfiler?.MarkFenceCompleted(gpuFenceToken);
         }
 
         private static void UpdateFrameUniformBuffers(
@@ -6020,6 +6123,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             internal int? LastParticleFrameIndex;
             internal bool LastParticleDestinationIsA;
             internal string ParticleTopologyFingerprint = string.Empty;
+            internal RekallAgeVulkanGpuProfiler? GpuProfiler;
             internal RekallAgeVulkanParticleHistory ParticleHistory => new(
                 ParticleCapacity,
                 LastParticleFrameIndex,
@@ -6051,6 +6155,20 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 FogHistory = history;
                 PreviousFogCamera = camera;
                 FogHistoryValid = FogHistoryImage.Handle != 0;
+            }
+
+            internal RekallAgeVulkanGpuProfiler GetOrCreateGpuProfiler()
+            {
+                if (GpuProfiler is null)
+                {
+                    GpuProfiler = new RekallAgeVulkanGpuProfiler(
+                        Vk,
+                        PhysicalDevice,
+                        Device,
+                        GraphicsQueueFamily);
+                }
+
+                return GpuProfiler;
             }
 
             internal void CommitParticleState(int frameIndex, bool destinationIsA, string topologyFingerprint)
@@ -6105,6 +6223,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 if (Device.Handle != 0)
                 {
                     Vk.DeviceWaitIdle(Device);
+                    GpuProfiler?.Dispose();
+                    GpuProfiler = null;
                     DestroyFogHistory();
                     DestroyParticleState();
                     Vk.DestroyDevice(Device, null);

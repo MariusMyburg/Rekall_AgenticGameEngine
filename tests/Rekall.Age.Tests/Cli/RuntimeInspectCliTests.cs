@@ -402,6 +402,104 @@ public sealed class RuntimeInspectCliTests
     }
 
     [Fact]
+    public async Task RuntimeViewportCapturePrintsResolvedQualityOverrideAndTruthfulUnavailableGpuTiming()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Runtime Quality CLI", ["world", "rendering3d"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+                .AddEntity(RekallAgeEntityDocument.Create("Cube", ["prop"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["z"] = 3 }))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" }))),
+            CancellationToken.None);
+        var outputDirectory = Path.Combine(root, "QualityCapture");
+
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            "render", "viewport", "capture",
+            root, "Main", "0", outputDirectory, "160", "90", "software", "[]",
+            "Medium", "{\"resolutionScale\":0.5}", "true");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Requested quality: Medium", result.Output);
+        Assert.Contains("Resolved quality: Medium", result.Output);
+        Assert.Contains("Internal resolution: 80x45", result.Output);
+        Assert.Contains("GPU timings: REKALL_GPU_TIMESTAMPS_UNAVAILABLE", result.Output);
+        Assert.Contains("Degradation: REKALL_RENDER_FEATURE_DEVICE_CLAMPED", result.Output);
+        Assert.Contains("Requested=true; resolved=false", result.Output);
+    }
+
+    [Fact]
+    public async Task QualityCompareCliUsesSharedOperationAndPrintsAlignedCaptureFacts()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Compare Quality CLI", ["world", "rendering2d"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"])
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera2D", new JsonObject { ["active"] = true })))
+                .AddEntity(RekallAgeEntityDocument.Create("Sprite", ["prop"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject { ["x"] = 20, ["y"] = 20 }))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.SpriteRenderer", new JsonObject { ["sprite"] = "missing" }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            "render", "quality", "compare",
+            root, "Main", "2", Path.Combine(root, "Compare"), "128", "72", "software",
+            "Performance,High", "{}", "false");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Compared quality presets for Main at frame 2", result.Output);
+        Assert.Contains("Performance -> Performance", result.Output);
+        Assert.Contains("High -> High", result.Output);
+        Assert.Contains("Internal: 64x36", result.Output);
+        Assert.Contains("Next: command execute rekall.render.capture_runtime_viewport", result.Output);
+    }
+
+    [Fact]
+    public async Task PerformanceBudgetCliAcceptsQualityOverridesAndPrintsTruthfulGpuTimingState()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Performance Quality CLI", ["world", "rendering3d"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+                .AddEntity(RekallAgeEntityDocument.Create("Cube", ["prop"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["z"] = 3 }))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" }))),
+            CancellationToken.None);
+
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            "render", "performance", "budget",
+            root, "Main", "desktop60", "1", "160", "90",
+            "Medium", "{\"resolutionScale\":0.5}", "false");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Requested quality: Medium", result.Output);
+        Assert.Contains("Resolved quality: Medium", result.Output);
+        Assert.Contains("Internal resolution: 80x45", result.Output);
+        Assert.Contains("Resource bytes:", result.Output);
+        Assert.Contains("GPU timings: REKALL_GPU_TIMESTAMPS_UNAVAILABLE", result.Output);
+    }
+
+    [Fact]
     public async Task ContextScenePrintsCameraMasksAndRenderLayers()
     {
         var root = TestPaths.CreateTempDirectory();

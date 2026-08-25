@@ -92,6 +92,7 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new InspectSceneMeshGeometryCommand());
         registry.Register(new InspectStereoRenderPlanCommand());
         registry.Register(new InspectScenePerformanceBudgetCommand());
+        registry.Register(new CompareQualityPresetsCommand());
         registry.Register(new ApplyVirtualGeometryToSceneCommand());
         registry.Register(new InspectVirtualGeometrySceneCommand());
         registry.Register(new InspectSceneVisibilityCommand());

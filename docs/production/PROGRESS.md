@@ -5422,6 +5422,25 @@ Post-run checks found zero Rekall test/worker/player processes, zero staged
 `session-*` trees in the current engine roots, and zero current-run Studio
 automation roots. Task 5B is complete and Task 6/final delivery are unblocked.
 
+Fix Round 1 closes the review gap in that result. The generic gauntlet blueprint
+now attaches an agent-owned `Game.Modules.AgentGauntlet.GauntletState` and a
+semantic action map. The agent-authored module registers the component and a
+runtime system that consumes `agent.gauntlet.advance` with the engine delta
+time. The workflow builds the module and runs a deterministic one-frame
+`rekall.runtime.inspect_scene` checkpoint after authoring: component existence,
+exact `progress` delta `1`, and exact `Position2D.X` delta `1` must all pass
+before package/audit/capture. The regression verifies the generated module
+project/source, attached state, exact runtime results, package archive, ready
+audit, and nonblank captured proof artifact; authored non-empty scene
+preservation remains green.
+
+The final Fix Round 1 gates passed gauntlet 4/4, the original Studio test three
+consecutive times, Studio 65/65, engine 1,815/1,815, and the solution build with
+zero warnings/errors. A tracked clean-checkout record now preserves the exact
+root-cause ledger, commands, local timestamps/timings/counts, failed
+environmental-gate chronology, raw artifact hashes, and residue audit:
+[`docs/production/evidence/2026-08-25-task-5b-studio-gauntlet.md`](evidence/2026-08-25-task-5b-studio-gauntlet.md).
+
 ## Evidence index
 
 - `docs/production/2026-08-17-engine-maturity-audit.md`

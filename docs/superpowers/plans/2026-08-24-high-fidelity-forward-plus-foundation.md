@@ -509,6 +509,24 @@ zero errors in 5.47 seconds. Post-run checks found zero Rekall test/worker/playe
 processes, zero staged `session-*` trees in the current engine roots, and zero
 current-run Studio automation roots.
 
+**Fix Round 1 closure:** The gauntlet-authored route now satisfies the mandatory
+runtime gameplay checkpoint rather than proving only playable-adapter text. Its
+generic marker owns `Game.Modules.AgentGauntlet.GauntletState` and a semantic
+input map; its agent-authored module consumes the semantic action with the
+engine delta time and changes both component state and `Position2D`. After the
+latest scene/module mutation, the workflow builds modules and requires exact
+`rekall.runtime.inspect_scene` assertions of `progress delta = 1` and
+`position2d.x delta = 1` before the unchanged package, audit, and nonblank proof
+capture. The expanded regression verifies generated project/source, attached
+state, exact runtime results, archive, audit, capture, and proof output.
+
+Final Fix Round 1 gates passed: gauntlet class 4/4, the original Studio case
+three consecutive times, Studio 65/65, engine 1,815/1,815, and the solution
+build with zero warnings/errors. The tracked phase ledger, commands, exact
+timestamps/timings/counts, raw artifact hashes, environmental gate chronology,
+and residue audit are in
+[`docs/production/evidence/2026-08-25-task-5b-studio-gauntlet.md`](../../production/evidence/2026-08-25-task-5b-studio-gauntlet.md).
+
 ---
 
 ### Task 6: Generic GPU Particle Emitters

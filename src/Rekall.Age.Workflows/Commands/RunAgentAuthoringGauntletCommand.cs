@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Modules.Commands;
 using Rekall.Age.Playback;
@@ -6,6 +7,7 @@ using Rekall.Age.Playback.Commands;
 using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
 using Rekall.Age.Runtime.Abstractions;
+using Rekall.Age.Runtime.Commands;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
 
@@ -44,6 +46,8 @@ public sealed class RunAgentAuthoringGauntletCommand
     private readonly ApplySceneBlueprintCommand _applyBlueprint = new();
     private readonly ScaffoldPlayableModuleCommand _scaffoldPlayableModule = new();
     private readonly WriteModuleSourceCommand _writeModuleSource = new();
+    private readonly BuildModulesCommand _buildModules = new();
+    private readonly InspectSceneRuntimeCommand _inspectSceneRuntime = new();
     private readonly PackagePlayableGameCommand _packagePlayableGame = new();
     private readonly AuditPlayablePackageCommand _auditPlayablePackage = new();
 
@@ -132,6 +136,65 @@ public sealed class RunAgentAuthoringGauntletCommand
             if (!source.Ok)
             {
                 return Failure(request with { ProjectRoot = projectRoot, SceneName = sceneName }, checks, null, null, source.Summary, source.Errors);
+            }
+
+            var build = await _buildModules.ExecuteAsync(new BuildModulesRequest(projectRoot), context);
+            checks.Add(ToCheck("module-built", build));
+            if (!build.Ok)
+            {
+                return Failure(request with { ProjectRoot = projectRoot, SceneName = sceneName }, checks, null, null, build.Summary, build.Errors);
+            }
+
+            var runtimeProof = await _inspectSceneRuntime.ExecuteAsync(
+                new InspectSceneRuntimeRequest(
+                    projectRoot,
+                    sceneName,
+                    Frames: 1,
+                    Inputs:
+                    [
+                        new RekallAgeRuntimeInputFrame(SemanticActions:
+                        [
+                            new RekallAgeRuntimeSemanticActionSample(
+                                "agent.gauntlet.advance",
+                                Value: 1,
+                                IsDown: true,
+                                WasPressed: true)
+                        ])
+                        {
+                            DeltaSeconds = 1
+                        }
+                    ],
+                    Assertions:
+                    [
+                        new InspectSceneRuntimeAssertion(
+                            "Agent Authored Marker",
+                            "component",
+                            "exists")
+                        {
+                            ComponentType = "Game.Modules.AgentGauntlet.GauntletState"
+                        },
+                        new InspectSceneRuntimeAssertion(
+                            "Agent Authored Marker",
+                            "delta.component.property",
+                            "equals")
+                        {
+                            ComponentType = "Game.Modules.AgentGauntlet.GauntletState",
+                            PropertyName = "progress",
+                            Expected = JsonValue.Create(1)
+                        },
+                        new InspectSceneRuntimeAssertion(
+                            "Agent Authored Marker",
+                            "delta.position2d.x",
+                            "equals")
+                        {
+                            Expected = JsonValue.Create(1)
+                        }
+                    ]),
+                context);
+            checks.Add(ToCheck("runtime-gameplay-proved", runtimeProof));
+            if (!runtimeProof.Ok)
+            {
+                return Failure(request with { ProjectRoot = projectRoot, SceneName = sceneName }, checks, null, null, runtimeProof.Summary, runtimeProof.Errors);
             }
         }
 
@@ -281,6 +344,27 @@ public sealed class RunAgentAuthoringGauntletCommand
                         new JsonObject
                         {
                             ["sprite"] = "agent-authored-marker"
+                        }),
+                    new RekallAgeSceneBlueprintComponent(
+                        "Game.Modules.AgentGauntlet.GauntletState",
+                        new JsonObject
+                        {
+                            ["progress"] = 0,
+                            ["unitsPerSecond"] = 1
+                        }),
+                    new RekallAgeSceneBlueprintComponent(
+                        "Rekall.InputActionMap",
+                        new JsonObject
+                        {
+                            ["actions"] = new JsonArray
+                            {
+                                new JsonObject
+                                {
+                                    ["name"] = "agent.gauntlet.advance",
+                                    ["negativeKey"] = "A",
+                                    ["positiveKey"] = "D"
+                                }
+                            }
                         })
                 ])
         ];
@@ -290,6 +374,7 @@ public sealed class RunAgentAuthoringGauntletCommand
     {
         return """
 using Rekall.Age.Modules;
+using Rekall.Age.Runtime.Abstractions;
 
 namespace Game.Modules.AgentGauntlet;
 
@@ -301,6 +386,8 @@ public sealed class AgentGauntletModule : RekallAgeModule, IRekallAgePlayableMod
 
     public override void Configure(RekallAgeModuleBuilder builder)
     {
+        builder.RegisterComponent<GauntletState>();
+        builder.RegisterRuntimeSystem<AgentGauntletRuntimeSystem>();
     }
 
     public RekallAgePlayableModuleState CreateInitialState(RekallAgePlayableModuleContext context)
@@ -332,6 +419,51 @@ public sealed class AgentGauntletModule : RekallAgeModule, IRekallAgePlayableMod
             new RekallAgePlayableDrawCommand("text", "agent-proof-hud", 10, 10, 0, 0, "#ffffff", $"Score {score}")
         };
         return new RekallAgePlayableModuleFrame($"AGENT GAUNTLET\nScore {score}\nLane {lane}", drawCommands);
+    }
+}
+
+[RekallAgeComponent("Gauntlet State")]
+public sealed class GauntletState : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public double Progress { get; init; }
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double UnitsPerSecond { get; init; } = 1;
+}
+
+public sealed class AgentGauntletRuntimeSystem : IRekallAgeRuntimeModuleSystem
+{
+    public string Id => nameof(AgentGauntletRuntimeSystem);
+
+    public int Priority => 0;
+
+    public ValueTask<RekallAgeRuntimeWorld> UpdateAsync(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeModuleFrameContext context)
+    {
+        const string componentType = "Game.Modules.AgentGauntlet.GauntletState";
+        var action = world.InputActionValue("agent.gauntlet.advance");
+        if (Math.Abs(action) <= double.Epsilon)
+        {
+            return ValueTask.FromResult(world);
+        }
+
+        var seconds = context.DeltaTime.TotalSeconds;
+        var updatedWorld = world.UpdateEntitiesWithComponent(componentType, entity =>
+        {
+            var unitsPerSecond = entity.ComponentNumber(componentType, "unitsPerSecond", 1);
+            var delta = action * unitsPerSecond * seconds;
+            var position = entity.Transform.Position2D;
+            return entity
+                .WithPosition2D(new RekallAgeRuntimeVector2(position.X + delta, position.Y))
+                .WithComponentNumber(
+                    componentType,
+                    "progress",
+                    entity.ComponentNumber(componentType, "progress") + delta);
+        });
+
+        return ValueTask.FromResult(updatedWorld);
     }
 }
 """;

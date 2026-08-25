@@ -226,6 +226,62 @@ public sealed class VulkanParticlePlannerTests
         Assert.Equal(["#ff0000ff", "#00ff00ff", "#0000ffff", "#ffffffff"], range.Source.ColorCurve.Select(key => key.Color));
     }
 
+    [Fact]
+    public void GpuPackedParticleNumbersAcceptExactFloatMaximumBoundary()
+    {
+        var maximum = (double)float.MaxValue;
+        var frame = Frame(
+            Emitter("speed", 8, 8) with { MinimumSpeed = maximum, MaximumSpeed = maximum },
+            Emitter("drag", 7, 8) with { Drag = maximum },
+            Emitter("gravity", 6, 8) with { GravityX = maximum },
+            Emitter("direction", 5, 8) with { VelocityDirectionX = maximum, VelocityDirectionY = 0 },
+            Emitter("size", 4, 8) with { SizeCurve = [new(0, maximum), new(1, maximum)] },
+            Emitter("appearance", 3, 8) with { EmissiveIntensity = maximum, SoftParticleFade = maximum },
+            Emitter("flipbook", 2, 8) with { FlipbookFramesPerSecond = maximum },
+            Emitter("transform", 1, 8) with
+            {
+                Transform = new(maximum, maximum, maximum, 0, 0, 0, 1, 1, 1)
+            });
+
+        var plan = new RekallAgeVulkanParticlePlanner().Plan(frame, new(64), 1.0 / 60.0);
+
+        Assert.Equal(8, plan.Emitters.Count);
+        Assert.Empty(plan.RejectedEntityIds);
+    }
+
+    [Fact]
+    public void FiniteNumbersBeyondFloatRangeRejectBeforeGpuPackingByCategory()
+    {
+        var above = Math.BitIncrement((double)float.MaxValue);
+        var huge = double.MaxValue;
+        var frame = Frame(
+            Emitter("speed", 9, 8) with { MaximumSpeed = above },
+            Emitter("drag", 8, 8) with { Drag = huge },
+            Emitter("gravity", 7, 8) with { GravityZ = above },
+            Emitter("direction", 6, 8) with { VelocityDirectionX = huge },
+            Emitter("size", 5, 8) with { SizeCurve = [new(0, above)] },
+            Emitter("emissive", 4, 8) with { EmissiveIntensity = huge },
+            Emitter("fade", 3, 8) with { SoftParticleFade = above },
+            Emitter("flipbook", 2, 8) with { FlipbookFramesPerSecond = huge },
+            Emitter("transform", 1, 8) with
+            {
+                Transform = new(above, 0, 0, 0, 0, 0, 1, 1, 1)
+            });
+
+        var plan = new RekallAgeVulkanParticlePlanner().Plan(frame, new(72), 1.0 / 60.0);
+
+        Assert.Empty(plan.Emitters);
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_MOTION_INVALID" && item.EntityIds.SequenceEqual(["speed"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_MOTION_INVALID" && item.EntityIds.SequenceEqual(["drag"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_MOTION_INVALID" && item.EntityIds.SequenceEqual(["gravity"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_MOTION_INVALID" && item.EntityIds.SequenceEqual(["direction"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_SIZE_CURVE_INVALID" && item.EntityIds.SequenceEqual(["size"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_APPEARANCE_INVALID" && item.EntityIds.SequenceEqual(["emissive"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_APPEARANCE_INVALID" && item.EntityIds.SequenceEqual(["fade"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_FLIPBOOK_INVALID" && item.EntityIds.SequenceEqual(["flipbook"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_TRANSFORM_INVALID" && item.EntityIds.SequenceEqual(["transform"]));
+    }
+
     private static RekallAgeRuntimeViewportFrame Frame(params RekallAgeRuntimeViewportParticleEmitter[] emitters) =>
         Frame(1, 1.0 / 60.0, emitters);
 

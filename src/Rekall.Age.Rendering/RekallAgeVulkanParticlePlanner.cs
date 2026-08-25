@@ -78,6 +78,14 @@ public sealed class RekallAgeVulkanParticlePlanner
                 continue;
             }
 
+            if (!FloatRepresentable(source.Transform.X)
+                || !FloatRepresentable(source.Transform.Y)
+                || !FloatRepresentable(source.Transform.Z))
+            {
+                Reject("REKALL_PARTICLE_TRANSFORM_INVALID", source.EntityId, "Particle position must be finite and representable by the GPU float contract.");
+                continue;
+            }
+
             if (!MotionValid(source))
             {
                 Reject("REKALL_PARTICLE_MOTION_INVALID", source.EntityId, "Particle direction, cone, speed, gravity, and drag must be finite and within supported ranges.");
@@ -97,7 +105,9 @@ public sealed class RekallAgeVulkanParticlePlanner
             }
 
             if (!double.IsFinite(source.EmissiveIntensity) || source.EmissiveIntensity < 0
-                || !double.IsFinite(source.SoftParticleFade) || source.SoftParticleFade < 0)
+                || !FloatRepresentable(source.EmissiveIntensity)
+                || !double.IsFinite(source.SoftParticleFade) || source.SoftParticleFade < 0
+                || !FloatRepresentable(source.SoftParticleFade))
             {
                 Reject("REKALL_PARTICLE_APPEARANCE_INVALID", source.EntityId, "Particle emissive intensity and soft-particle fade must be finite and non-negative.");
                 continue;
@@ -106,7 +116,8 @@ public sealed class RekallAgeVulkanParticlePlanner
             if (source.FlipbookColumns <= 0 || source.FlipbookColumns > 4096
                 || source.FlipbookRows <= 0 || source.FlipbookRows > 4096
                 || !double.IsFinite(source.FlipbookFramesPerSecond)
-                || source.FlipbookFramesPerSecond < 0)
+                || source.FlipbookFramesPerSecond < 0
+                || !FloatRepresentable(source.FlipbookFramesPerSecond))
             {
                 Reject("REKALL_PARTICLE_FLIPBOOK_INVALID", source.EntityId, "Particle flipbook dimensions and frame rate must be finite, positive, and bounded.");
                 continue;
@@ -277,16 +288,19 @@ public sealed class RekallAgeVulkanParticlePlanner
             + emitter.VelocityDirectionY * emitter.VelocityDirectionY
             + emitter.VelocityDirectionZ * emitter.VelocityDirectionZ;
         return double.IsFinite(directionLengthSquared) && directionLengthSquared > 0
+            && FloatRepresentable(emitter.VelocityDirectionX)
+            && FloatRepresentable(emitter.VelocityDirectionY)
+            && FloatRepresentable(emitter.VelocityDirectionZ)
             && double.IsFinite(emitter.VelocityConeDegrees) && emitter.VelocityConeDegrees >= 0 && emitter.VelocityConeDegrees < 90
-            && double.IsFinite(emitter.MinimumSpeed) && emitter.MinimumSpeed >= 0
-            && double.IsFinite(emitter.MaximumSpeed) && emitter.MaximumSpeed >= emitter.MinimumSpeed
-            && double.IsFinite(emitter.GravityX) && double.IsFinite(emitter.GravityY) && double.IsFinite(emitter.GravityZ)
-            && double.IsFinite(emitter.Drag) && emitter.Drag >= 0;
+            && FloatRepresentable(emitter.MinimumSpeed) && emitter.MinimumSpeed >= 0
+            && FloatRepresentable(emitter.MaximumSpeed) && emitter.MaximumSpeed >= emitter.MinimumSpeed
+            && FloatRepresentable(emitter.GravityX) && FloatRepresentable(emitter.GravityY) && FloatRepresentable(emitter.GravityZ)
+            && FloatRepresentable(emitter.Drag) && emitter.Drag >= 0;
     }
 
     private static bool SizeCurveValid(RekallAgeRuntimeViewportParticleEmitter emitter) =>
         CurveTimesValid(emitter.SizeCurve.Select(item => item.NormalizedAge).ToArray(), emitter.SizeCurve.Count)
-        && emitter.SizeCurve.All(item => double.IsFinite(item.Value) && item.Value >= 0);
+        && emitter.SizeCurve.All(item => FloatRepresentable(item.Value) && item.Value >= 0);
 
     private static bool ColorCurveValid(RekallAgeRuntimeViewportParticleEmitter emitter) =>
         CurveTimesValid(emitter.ColorCurve.Select(item => item.NormalizedAge).ToArray(), emitter.ColorCurve.Count)
@@ -313,6 +327,9 @@ public sealed class RekallAgeVulkanParticlePlanner
     }
 
     private static bool PositiveFinite(double value) => double.IsFinite(value) && value > 0;
+
+    private static bool FloatRepresentable(double value) =>
+        double.IsFinite(value) && value >= -float.MaxValue && value <= float.MaxValue;
 
     private static double FiniteNonNegative(double value) => double.IsFinite(value) ? Math.Max(0, value) : 0;
 

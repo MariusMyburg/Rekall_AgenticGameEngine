@@ -249,7 +249,103 @@ public sealed class VulkanParticleCaptureTests
         Assert.Contains(particles.Diagnostics, item => item.StartsWith("REKALL_PARTICLE_COLOR_INVALID:", StringComparison.Ordinal));
     }
 
-    private static RekallAgeRuntimeViewportFrame Frame(bool withEmitter)
+    [Fact]
+    public async Task ScaledRenderExtentReadsAuthenticCountersThenResolvesOverdrawToOutputExtent()
+    {
+        var scaledFrame = Frame(withEmitter: true, resolutionScale: 0.5, width: 96, height: 64) with { Renderables = [] };
+        var referenceFrame = Frame(withEmitter: true, resolutionScale: 1, width: 48, height: 32) with { Renderables = [] };
+        var output = TestPaths.CreateTempDirectory();
+        using var scaledCapture = new RekallAgeNativeVulkanSceneCapture();
+        using var referenceCapture = new RekallAgeNativeVulkanSceneCapture();
+
+        var scaled = await scaledCapture.CaptureSceneAsync(scaledFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var reference = await referenceCapture.CaptureSceneAsync(referenceFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(scaled.Captured, string.Join(Environment.NewLine, scaled.Errors));
+        Assert.True(reference.Captured, string.Join(Environment.NewLine, reference.Errors));
+        var scaledOverdraw = Assert.Single(Assert.IsType<RekallAgeHighFidelityFrameReport>(scaled.HighFidelityFrame).ParticleDebugCaptures, item => item.Kind == "overdraw");
+        var referenceOverdraw = Assert.Single(Assert.IsType<RekallAgeHighFidelityFrameReport>(reference.HighFidelityFrame).ParticleDebugCaptures, item => item.Kind == "overdraw");
+        Assert.Equal(48, scaledOverdraw.EvidenceWidth);
+        Assert.Equal(32, scaledOverdraw.EvidenceHeight);
+        Assert.Equal(96, scaledOverdraw.OutputWidth);
+        Assert.Equal(64, scaledOverdraw.OutputHeight);
+        Assert.Equal(referenceOverdraw.GpuSampleCount, scaledOverdraw.GpuSampleCount);
+        Assert.Equal(referenceOverdraw.GpuEvidenceChecksum, scaledOverdraw.GpuEvidenceChecksum);
+        Assert.True(scaledOverdraw.NonBlank);
+        Assert.Equal("gpu-particle-fragment-counter-readback", scaledOverdraw.Source);
+    }
+
+    [Theory]
+    [InlineData("disabled")]
+    [InlineData("zero-emission")]
+    [InlineData("rejected")]
+    public async Task InactiveParticleOnlyScenesUseTruthfulClearCapture(string scenario)
+    {
+        var emitter = HighFidelityRenderGraphTests.ParticleEmitter(8);
+        emitter = scenario switch
+        {
+            "disabled" => emitter with { Enabled = false },
+            "zero-emission" => emitter with { SpawnRate = 0, Bursts = [] },
+            "rejected" => emitter with { SimulationSpace = "screen" },
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+        };
+        var frame = Frame(withEmitter: false) with { Renderables = [], ParticleEmitters = [emitter] };
+        var output = TestPaths.CreateTempDirectory();
+        using var capture = new RekallAgeNativeVulkanSceneCapture();
+
+        var result = await capture.CaptureSceneAsync(frame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(result.Captured, string.Join(Environment.NewLine, result.Errors));
+        Assert.Equal(0, result.MeshCount);
+        Assert.Null(result.HighFidelityFrame);
+        Assert.Empty(result.Errors);
+    }
+
+    [Fact]
+    public async Task FloatMaximumDirectionPacksToTheSameGpuMotionAsItsUnitVector()
+    {
+        var emitter = HighFidelityRenderGraphTests.ParticleEmitter(8) with
+        {
+            SpawnRate = 0,
+            Bursts = [new(1.0 / 60.0, 8)],
+            LifetimeSeconds = 1,
+            VelocityDirectionX = 1,
+            VelocityDirectionY = 0,
+            VelocityDirectionZ = 0,
+            VelocityConeDegrees = 0,
+            MinimumSpeed = 1,
+            MaximumSpeed = 1,
+            GravityX = 0,
+            GravityY = 0,
+            GravityZ = 0,
+            Drag = 0
+        };
+        var unitFirst = Frame(withEmitter: false) with { Renderables = [], ParticleEmitters = [emitter] };
+        var unitSecond = unitFirst with { FrameIndex = 2, ElapsedSeconds = 0.25 + 1.0 / 60.0, DeltaSeconds = 0.25 };
+        var maximumFirst = unitFirst with { ParticleEmitters = [emitter with { VelocityDirectionX = float.MaxValue }] };
+        var maximumSecond = maximumFirst with { FrameIndex = 2, ElapsedSeconds = 0.25 + 1.0 / 60.0, DeltaSeconds = 0.25 };
+        var output = TestPaths.CreateTempDirectory();
+        using var unitCapture = new RekallAgeNativeVulkanSceneCapture();
+        using var maximumCapture = new RekallAgeNativeVulkanSceneCapture();
+
+        await unitCapture.CaptureSceneAsync(unitFirst, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var unit = await unitCapture.CaptureSceneAsync(unitSecond, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        await maximumCapture.CaptureSceneAsync(maximumFirst, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var maximum = await maximumCapture.CaptureSceneAsync(maximumSecond, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(unit.Captured, string.Join(Environment.NewLine, unit.Errors));
+        Assert.True(maximum.Captured, string.Join(Environment.NewLine, maximum.Errors));
+        Assert.Equal(unit.ByteChecksum, maximum.ByteChecksum);
+        var unitBounds = Assert.Single(Assert.IsType<RekallAgeHighFidelityFrameReport>(unit.HighFidelityFrame).ParticleDebugCaptures, item => item.Kind == "bounds");
+        var maximumBounds = Assert.Single(Assert.IsType<RekallAgeHighFidelityFrameReport>(maximum.HighFidelityFrame).ParticleDebugCaptures, item => item.Kind == "bounds");
+        Assert.Equal(unitBounds.ByteChecksum, maximumBounds.ByteChecksum);
+    }
+
+    private static RekallAgeRuntimeViewportFrame Frame(
+        bool withEmitter,
+        double resolutionScale = 1,
+        int width = 96,
+        int height = 64)
     {
         var camera = new RekallAgeRuntimeViewportCamera(
             "camera", "Camera", "Camera3D", true,
@@ -259,12 +355,12 @@ public sealed class VulkanParticleCaptureTests
             FarClip: 50,
             ClearColor: "#020306");
         var quality = new RekallAgeRenderQualityProfileResolver().Resolve(
-            new RekallAgeRenderQualityIntent("High", Bloom: false, MaximumActiveParticles: 64),
+            new RekallAgeRenderQualityIntent("High", ResolutionScale: resolutionScale, Bloom: false, MaximumActiveParticles: 64),
             RekallAgeRenderingDeviceCapabilities.DesktopBaseline("particle-native-test"),
-            96,
-            64);
+            width,
+            height);
         return new RekallAgeRuntimeViewportFrame(
-            "Particle Native Test", 1, 1.0 / 60.0, 96, 64,
+            "Particle Native Test", 1, 1.0 / 60.0, width, height,
             camera, [camera],
             [new RekallAgeRuntimeViewportRenderable(
                 "cube", "Cube", "mesh", "rekall.primitive.cube",

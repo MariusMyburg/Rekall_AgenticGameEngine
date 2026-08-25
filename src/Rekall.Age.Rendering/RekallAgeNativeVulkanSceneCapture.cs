@@ -92,7 +92,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         }
 
         var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets);
-        if (meshes.Count == 0 && frame.ParticleEmitters.Count == 0)
+        var executableParticlePlan = meshes.Count == 0
+            ? new RekallAgeVulkanHighFidelityFrameRenderer().Plan(frame, meshes)
+            : null;
+        var hasExecutableParticles = executableParticlePlan is { Ready: true }
+            && executableParticlePlan.ParticlePlan.AllocatedCapacity > 0;
+        if (meshes.Count == 0 && !hasExecutableParticles)
         {
             var clear = await _clearCapture.CaptureClearRenderPassAsync(
                 checked((uint)frame.Width),
@@ -2416,6 +2421,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 out state.ParticleActiveIndexMemory);
 
             var pixelCount = checked((int)(width * height));
+            state.ParticleFragmentCountWidth = width;
+            state.ParticleFragmentCountHeight = height;
             CreateHostBuffer(
                 state,
                 new byte[checked(pixelCount * sizeof(uint))],
@@ -2481,15 +2488,22 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         private static ParticleEmitterGpu ToGpuEmitter(RekallAgeVulkanParticleEmitterRange range)
         {
             var source = range.Source;
-            var direction = new Vector3(
-                FiniteFloat(source.VelocityDirectionX),
-                FiniteFloat(source.VelocityDirectionY),
-                FiniteFloat(source.VelocityDirectionZ));
-            if (direction.LengthSquared() < 0.000001f)
+            var directionLength = Math.Sqrt(
+                source.VelocityDirectionX * source.VelocityDirectionX
+                + source.VelocityDirectionY * source.VelocityDirectionY
+                + source.VelocityDirectionZ * source.VelocityDirectionZ);
+            Vector3 direction;
+            if (!double.IsFinite(directionLength) || directionLength < 0.000001)
             {
                 direction = Vector3.UnitY;
             }
-            direction = Vector3.Normalize(direction);
+            else
+            {
+                direction = new Vector3(
+                    checked((float)(source.VelocityDirectionX / directionLength)),
+                    checked((float)(source.VelocityDirectionY / directionLength)),
+                    checked((float)(source.VelocityDirectionZ / directionLength)));
+            }
             var sizeKeys = source.SizeCurve.OrderBy(item => item.NormalizedAge).ToArray();
             var colorKeys = source.ColorCurve.OrderBy(item => item.NormalizedAge).ToArray();
             var sizeTimes = FillCurveVector(sizeKeys.Select(item => item.NormalizedAge).ToArray());
@@ -5567,42 +5581,84 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 DrawDebugBox(bounds, width, height, x, y, Math.Min(size, 12), 40, 255, 120);
             }
 
-            var overdraw = new byte[bounds.Length];
-            var fragmentBytes = ReadHostBytes(state, state.ParticleFragmentCountMemory, checked((ulong)width * (ulong)height * sizeof(uint)));
+            var evidenceWidth = checked((int)state.ParticleFragmentCountWidth);
+            var evidenceHeight = checked((int)state.ParticleFragmentCountHeight);
+            var overdrawEvidence = new byte[checked(evidenceWidth * evidenceHeight * 4)];
+            var fragmentBytes = ReadHostBytes(
+                state,
+                state.ParticleFragmentCountMemory,
+                checked((ulong)evidenceWidth * (ulong)evidenceHeight * sizeof(uint)));
             ulong fragmentCount = 0;
-            for (var pixel = 0; pixel < width * height; pixel++)
+            for (var pixel = 0; pixel < evidenceWidth * evidenceHeight; pixel++)
             {
                 var offset = pixel * 4;
                 var count = BitConverter.ToUInt32(fragmentBytes, pixel * sizeof(uint));
                 fragmentCount += count;
                 var intensity = checked((byte)Math.Min(255u, count * 32u));
-                overdraw[offset] = intensity;
-                overdraw[offset + 1] = checked((byte)(intensity / 4));
-                overdraw[offset + 2] = 0;
-                overdraw[offset + 3] = byte.MaxValue;
+                overdrawEvidence[offset] = intensity;
+                overdrawEvidence[offset + 1] = checked((byte)(intensity / 4));
+                overdrawEvidence[offset + 2] = 0;
+                overdrawEvidence[offset + 3] = byte.MaxValue;
             }
+            var overdraw = ResolveDebugImage(overdrawEvidence, evidenceWidth, evidenceHeight, width, height);
 
             var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture);
             var captures = new List<RekallAgeHighFidelityParticleDebugCapture>(2);
-            foreach (var (kind, rgba) in new[] { ("bounds", bounds), ("overdraw", overdraw) })
+            foreach (var item in new[]
+            {
+                (Kind: "bounds", Rgba: bounds, Evidence: bounds, EvidenceWidth: width, EvidenceHeight: height),
+                (Kind: "overdraw", Rgba: overdraw, Evidence: overdrawEvidence, EvidenceWidth: evidenceWidth, EvidenceHeight: evidenceHeight)
+            })
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var path = Path.Combine(outputDirectory, $"vulkan-particle-{kind}-{timestamp}.png");
-                RekallAgePngWriter.WriteRgbaAsync(path, width, height, rgba, cancellationToken)
+                var path = Path.Combine(outputDirectory, $"vulkan-particle-{item.Kind}-{timestamp}.png");
+                RekallAgePngWriter.WriteRgbaAsync(path, width, height, item.Rgba, cancellationToken)
                     .AsTask().GetAwaiter().GetResult();
-                var analysis = Analyze(rgba);
+                var analysis = Analyze(item.Rgba);
                 captures.Add(new RekallAgeHighFidelityParticleDebugCapture(
-                    kind,
+                    item.Kind,
                     path,
-                    rgba.Where((_, index) => index % 4 != 3).Any(value => value > 0),
+                    item.Rgba.Where((_, index) => index % 4 != 3).Any(value => value > 0),
                     analysis.Checksum)
                 {
-                    Source = kind == "bounds" ? "gpu-particle-state-readback" : "gpu-particle-fragment-counter-readback",
-                    EvidenceResource = kind == "bounds" ? plan.ParticlePlan.SimulationDestination : "particle-fragment-counts",
-                    GpuSampleCount = kind == "bounds" ? checked((ulong)activeCount) : fragmentCount
+                    Source = item.Kind == "bounds" ? "gpu-particle-state-readback" : "gpu-particle-fragment-counter-readback",
+                    EvidenceResource = item.Kind == "bounds" ? plan.ParticlePlan.SimulationDestination : "particle-fragment-counts",
+                    GpuSampleCount = item.Kind == "bounds" ? checked((ulong)activeCount) : fragmentCount,
+                    EvidenceWidth = item.EvidenceWidth,
+                    EvidenceHeight = item.EvidenceHeight,
+                    OutputWidth = width,
+                    OutputHeight = height,
+                    GpuEvidenceChecksum = Analyze(item.Evidence).Checksum
                 });
             }
             return captures;
+        }
+
+        private static byte[] ResolveDebugImage(
+            byte[] source,
+            int sourceWidth,
+            int sourceHeight,
+            int outputWidth,
+            int outputHeight)
+        {
+            if (sourceWidth == outputWidth && sourceHeight == outputHeight)
+            {
+                return source;
+            }
+
+            var output = new byte[checked(outputWidth * outputHeight * 4)];
+            for (var y = 0; y < outputHeight; y++)
+            {
+                var sourceY = Math.Min(sourceHeight - 1, checked(y * sourceHeight / outputHeight));
+                for (var x = 0; x < outputWidth; x++)
+                {
+                    var sourceX = Math.Min(sourceWidth - 1, checked(x * sourceWidth / outputWidth));
+                    var sourceOffset = checked((sourceY * sourceWidth + sourceX) * 4);
+                    var outputOffset = checked((y * outputWidth + x) * 4);
+                    source.AsSpan(sourceOffset, 4).CopyTo(output.AsSpan(outputOffset, 4));
+                }
+            }
+            return output;
         }
 
         private static uint ReadHostUInt32(VulkanState state, DeviceMemory memory, int byteOffset) =>
@@ -6117,6 +6173,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public Buffer ParticleFragmentCountBuffer;
             public DeviceMemory ParticleFragmentCountMemory;
             public int ParticleGpuActiveCount;
+            public uint ParticleFragmentCountWidth;
+            public uint ParticleFragmentCountHeight;
             public DescriptorSetLayout DescriptorSetLayout;
             public DescriptorSetLayout DrawDescriptorSetLayout;
             public DescriptorSetLayout MaterialDescriptorSetLayout;

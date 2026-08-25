@@ -571,6 +571,16 @@ public sealed record RekallAgeHighFidelityParticleDebugCapture(
     public string EvidenceResource { get; init; } = string.Empty;
 
     public ulong GpuSampleCount { get; init; }
+
+    public int EvidenceWidth { get; init; }
+
+    public int EvidenceHeight { get; init; }
+
+    public int OutputWidth { get; init; }
+
+    public int OutputHeight { get; init; }
+
+    public ulong GpuEvidenceChecksum { get; init; }
 }
 
 public sealed record RekallAgeHighFidelityFogReport(

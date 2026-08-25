@@ -49,3 +49,28 @@ Observed: 21 passed, 0 failed, 0 skipped.
 ## Concerns
 
 None.
+
+## Fix round 1 (review follow-up)
+
+### Findings addressed
+
+- Unsupported provider/model errors now retain requested and resolved values. The CLI renders bounded `Requested:` and `Resolved:` facts after the stable provider error code/message.
+- Cancellation now has a dedicated CLI boundary result: `REKALL_LANGUAGE_MODEL_CANCELLED`, exit code 1, and no fatal/unhandled diagnostic.
+- Added deterministic, loopback OpenAI Responses CLI coverage for a successful `agent run openai gpt-5.6-sol`, a provider-backed `agent run-project openai gpt-5.6-sol`, provider usage, and tool-execution output. The spawned CLI uses its ordinary catalog, lease, adapter, SSE reader, and agent loop; no live network or external credential is used.
+- Provider lease disposal now uses an atomic exact-once state transition. A concurrent-disposal test runs 32 simultaneous callers against counting owned resources and asserts each is disposed once.
+
+### Review-fix RED evidence
+
+1. `dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~LanguageModelProviderCatalogTests"`
+   - Failed as expected: unsupported provider diagnostics had no requested value.
+2. `dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~AgentCliTests"`
+   - Failed as expected: unavailable-model CLI output omitted requested/resolved facts and a cancelled OpenAI CLI command rendered `Unexpected error` instead of the stable cancellation code.
+
+### Review-fix GREEN evidence
+
+`dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~LanguageModelProviderCatalogTests|FullyQualifiedName~AgentCliTests|FullyQualifiedName~ProjectAgentSessionTests"`
+
+Observed: 25 passed, 0 failed, 0 skipped.
+
+- `dotnet build Rekall.AGE.sln --no-restore`: passed with 0 warnings and 0 errors.
+- `129b36c` — `fix: harden language model provider CLI`

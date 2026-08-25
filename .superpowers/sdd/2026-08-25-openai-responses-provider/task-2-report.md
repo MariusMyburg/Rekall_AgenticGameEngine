@@ -147,3 +147,19 @@ Result: **Build succeeded; 0 warnings, 0 errors** (12.90 s in the final verifica
 ## Concerns
 
 None. Live OpenAI connectivity is intentionally untested; the production wire contract is exercised entirely through recording handlers and fragmented/blocked tracking streams so the suite remains deterministic and key-free.
+
+## Fix round 1 restart checkpoint (2026-08-25)
+
+Status at safe boundary: **investigation complete enough to begin RED; no round-1 production or test bytes have been changed yet**. The prior Task 2 gate remains the latest executed evidence: 133/133 focused tests passed and the solution build completed with 0 warnings and 0 errors. No command or task-owned process is running.
+
+Confirmed root causes from backward data-flow tracing:
+
+1. Stateless continuation is lost at three consecutive boundaries: the provider-neutral response/message contracts have no opaque continuation field; `MapResponse` reduces OpenAI output items to text/reasoning text/tool calls; and the agent creates a new assistant transcript entry containing only content and calls. Consequently the next OpenAI request can reconstruct items but cannot replay provider reasoning/encrypted output in original output order.
+2. `NormalizeBaseUri` applies `TrimEnd('/')` to `AbsoluteUri`, so query/fragment/user-info are neither rejected nor isolated from path normalization; relative `models`/`responses` resolution can therefore target the wrong URI.
+3. the SSE byte-line reader and assembled event use the same 262,144-character bound. A valid `response.completed` terminal envelope necessarily repeats accumulated output and is rejected before the existing aggregate text/argument validation can run.
+4. non-streaming response mapping reads only `output_text` message parts, and the streaming switch reads only `response.output_text.delta`; documented refusal parts/events therefore disappear from user-visible content.
+5. several behaviors named in the original report are implemented but have no behavior test proving the branch: Retry-After HTTP-date, invalid UTF-8, event after completion, `response.failed`, `response.incomplete`, parallel calls, function-call done event shapes, and transport exceptions. The report overstates the durable evidence until those tests exist.
+
+RED/GREEN state for this fix round: no new RED has been run because the restart arrived immediately after root-cause investigation and before test editing. Exact next action after restart: add provider-neutral opaque-state contract/agent-copy tests and a two-turn recording-handler continuation test first, then run the narrow new-test filter and capture the expected RED before implementing; repeat that strict RED -> GREEN cycle for endpoint validation, terminal SSE bounds/refusals, and each missing branch-coverage fixture.
+
+Files changed/uncommitted before this checkpoint: no task-owned source/test file; only this report is being committed. The controller-owned `progress.md` remains modified, unstaged, and untouched.

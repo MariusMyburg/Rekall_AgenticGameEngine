@@ -112,6 +112,24 @@ the accepted gameplay evidence above.
   from mean luminance 0.036 to 0.069 and from 16,029 to 24,001 distinct colors,
   with localized warm/cool pools and retained deep blacks. Architecture and
   character detail remain below final acceptance.
+- The repeated weathered-ruin graph now authors layered string courses,
+  pilaster caps, five facade ribs, uneven crown blocks, and a displaced fallen
+  crown before its shared bevel/weathering/weighted-normal stages. The rebuilt
+  live-linked model contains 7,392 compiled vertices and 3,024 triangles, up
+  from the broad low-detail slab that dominated the earlier frame.
+- The Warden graph now authors a recessed faceplate, helmet crest, mirrored
+  pauldron spikes, layered tassets, mirrored greaves and boots, blade grip and
+  pommel, and an inset belt buckle. Reducing its global bevel from three to two
+  segments kept those meaningful silhouette additions while bringing the
+  compiled artifact below AGE's 64 MiB asset limit. The published runtime mesh
+  contains 64,284 vertices and 26,228 triangles.
+- The aligned real RTX 5090 High capture after both live-linked rebuilds remains
+  at 141 draws/4 dispatches with zero missing or fallback assets. It records
+  24,500 distinct colors, 65.2% dominant-color share, and mean luminance 0.070.
+  The player now reads as layered armor rather than a box figure, and repeated
+  ruins catch light across authored profiles; material separation, large-scale
+  composition, and broader architectural readability remain below final visual
+  acceptance.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, prop geometry remains visibly coarse, and the

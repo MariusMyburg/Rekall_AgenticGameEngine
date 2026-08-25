@@ -458,10 +458,20 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   assignments in ordinary AGE graphs. Hero meshes must add meaningful silhouette
   and surface-form detail rather than tessellation-only density.
 
+  2026-08-26 checkpoint: the reusable weathered-ruin module now adds masonry
+  courses, facade ribs, pilaster caps, and damaged crown silhouettes; the
+  Warden adds layered head, shoulder, waist, leg, boot, and weapon forms. Both
+  use ordinary generic AGE graph nodes and remain editable source assets.
+
 - [ ] **Step 3: Bake, publish, catalog, and place**
 
   Publish immutable models, preserve material slots/UVs/tangents, place coherent
   modular architecture and props, and keep gameplay logic in Aetherfall modules.
+
+  2026-08-26 checkpoint: both graphs were rebaked and their existing live-linked
+  models rebuilt in place, so all 30 ruin instances and the player consume the
+  improved geometry without game-specific engine behavior. This is a partial
+  checkpoint; material-slot separation and additional environment kits remain.
 
 - [ ] **Step 4: Prove visible improvement**
 

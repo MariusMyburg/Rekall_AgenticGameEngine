@@ -12,6 +12,32 @@ namespace Rekall.Age.Tests.Examples;
 public sealed class AetherfallHighFidelityAcceptanceTests
 {
     [Fact]
+    public async Task WeatheredRuinPublishesLayeredMasonryAndDamagedCrownDetail()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var graph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
+            projectRoot, "aetherfall.weathered-ruin.graph", CancellationToken.None);
+
+        Assert.Contains(graph.Nodes, node => node.NodeId == "string-course-array");
+        Assert.Contains(graph.Nodes, node => node.NodeId == "relief-ribs");
+        Assert.Contains(graph.Nodes, node => node.NodeId == "pilaster-caps");
+        Assert.Contains(graph.Nodes, node => node.NodeId == "crown-blocks");
+
+        var evaluation = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default,
+            new(811, 0, "aetherfall-acceptance", "desktop"), CancellationToken.None);
+
+        Assert.True(evaluation.Succeeded, string.Join(Environment.NewLine, evaluation.Diagnostics.Select(item => item.Message)));
+        Assert.True(evaluation.Outputs["mesh"].Topology.FaceIds.Count >= 2_100);
+
+        var source = await new RekallAgeMeshAssetStore().LoadVersionedAsync(
+            projectRoot, "aetherfall-weathered-ruin-mesh", CancellationToken.None);
+        var model = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(
+            projectRoot, "Assets", "Models", "aetherfall-weathered-ruin-model.age.model.json")))!.AsObject();
+        Assert.Equal(source.Revision, model["lastSuccessfulBuild"]!["sourceFileRevision"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task FracturedBoulderUsesPublishedSmoothSubdivisionDetail()
     {
         var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
@@ -150,8 +176,8 @@ public sealed class AetherfallHighFidelityAcceptanceTests
 
         Assert.Equal(authoredVertexCount, geometry.Vertices.Count);
         Assert.Equal(authoredIndexCount, geometry.Indices.Count);
-        Assert.True(authoredVertexCount >= 1_208,
-            $"Expected the published Warden to retain its authored detail, found {authoredVertexCount} vertices.");
+        Assert.True(authoredVertexCount >= 60_000,
+            $"Expected the published Warden to retain its layered armor and silhouette detail, found {authoredVertexCount} vertices.");
     }
 
     private static JsonObject LoadMainScene() => JsonNode.Parse(File.ReadAllText(Path.Combine(

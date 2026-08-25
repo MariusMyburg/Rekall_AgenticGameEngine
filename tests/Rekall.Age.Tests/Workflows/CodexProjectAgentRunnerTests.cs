@@ -94,6 +94,7 @@ public sealed class CodexProjectAgentRunnerTests
             var parameters = threadStart["params"]!.AsObject();
             Assert.Equal("on-request", parameters["approvalPolicy"]!.GetValue<string>());
             Assert.Equal(Path.GetFullPath(projectRoot), parameters["cwd"]!.GetValue<string>());
+            Assert.True(parameters["ephemeral"]!.GetValue<bool>());
             Assert.Equal("gpt-5.6-sol", parameters["model"]!.GetValue<string>());
             Assert.Equal("workspace-write", parameters["sandbox"]!.GetValue<string>());
             var config = parameters["config"]!.AsObject();

@@ -224,18 +224,23 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
 
         var projectRoot = NormalizeProjectRoot(request.ProjectRoot);
         var config = CreateThreadConfig(request, projectRoot);
+        var parameters = new JsonObject
+        {
+            ["approvalPolicy"] = request.ApprovalPolicy,
+            ["config"] = config,
+            ["cwd"] = projectRoot,
+            ["developerInstructions"] = request.DeveloperInstructions,
+            ["model"] = request.Model,
+            ["sandbox"] = "workspace-write"
+        };
+        if (request.Ephemeral)
+        {
+            parameters["ephemeral"] = true;
+        }
 
         var result = await RequestAsync(
             "thread/start",
-            new JsonObject
-            {
-                ["approvalPolicy"] = request.ApprovalPolicy,
-                ["config"] = config,
-                ["cwd"] = projectRoot,
-                ["developerInstructions"] = request.DeveloperInstructions,
-                ["model"] = request.Model,
-                ["sandbox"] = "workspace-write"
-            },
+            parameters,
             cancellationToken);
         if (!result.TryGetProperty("thread", out var thread) || thread.ValueKind != JsonValueKind.Object)
         {

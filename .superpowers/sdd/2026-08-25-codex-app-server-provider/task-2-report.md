@@ -67,3 +67,12 @@ Final fresh verification is rerun after this report before commit.
 - No Task 1 late-turn, stalled-writer, or completion-cache hardening was changed.
 - No credentials, tokens, account identity, or secret-bearing endpoint configuration were added or logged.
 - No genre-specific engine behavior was added.
+
+## Fix round 1: explicit ephemeral threads
+
+- Added `Ephemeral` to the typed `RekallAgeCodexThreadStartRequest` contract.
+- Every `RekallAgeCodexProjectAgentRunner` project run now opts in explicitly and sends `"ephemeral": true` in the `thread/start` request.
+- Extended the exact restricted-thread fake App Server transcript test to require the flag.
+- RED: the focused transcript test failed because `thread/start.params.ephemeral` was absent.
+- GREEN: the same focused transcript test passed after the contract, client serialization, and project-run setting were connected.
+- Deferred aggregate-result bounds and dead-client retry reset were intentionally left unchanged.

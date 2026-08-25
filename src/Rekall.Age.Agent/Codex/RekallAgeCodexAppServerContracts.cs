@@ -42,6 +42,8 @@ public sealed record RekallAgeCodexThreadStartRequest(
 {
     public string ApprovalPolicy { get; init; } = "on-request";
 
+    public bool Ephemeral { get; init; }
+
     public bool NetworkEnabled { get; init; }
 
     public IReadOnlyList<RekallAgeCodexMcpServer> McpServers { get; init; } = [];

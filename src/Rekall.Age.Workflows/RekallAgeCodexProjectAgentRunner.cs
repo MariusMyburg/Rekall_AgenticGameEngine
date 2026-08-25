@@ -180,6 +180,7 @@ public sealed class RekallAgeCodexProjectAgentRunner :
                 new RekallAgeCodexThreadStartRequest(projectRoot, RequiredModel, DeveloperInstructions)
                 {
                     ApprovalPolicy = ApprovalPolicy,
+                    Ephemeral = true,
                     NetworkEnabled = false,
                     McpServers = [mcpServer]
                 },

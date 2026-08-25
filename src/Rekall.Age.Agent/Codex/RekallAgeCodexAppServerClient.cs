@@ -32,6 +32,7 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
     private readonly Task _stdoutDrain;
     private readonly Task _stderrDrain;
     private readonly object _disposeGate = new();
+    private readonly object _lifecycleGate = new();
     private readonly object _activeTurnGate = new();
     private readonly object _stderrGate = new();
     private readonly StringBuilder _stderrHistory = new();
@@ -221,10 +222,8 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
             throw new ArgumentException("The Codex model and developer instructions are required.", nameof(request));
         }
 
-        var config = request.Config?.DeepClone() as JsonObject ?? new JsonObject();
-        var workspaceConfig = config["sandbox_workspace_write"] as JsonObject ?? new JsonObject();
-        workspaceConfig["network_access"] = request.NetworkEnabled;
-        config["sandbox_workspace_write"] = workspaceConfig;
+        var projectRoot = NormalizeProjectRoot(request.ProjectRoot);
+        var config = CreateThreadConfig(request, projectRoot);
 
         var result = await RequestAsync(
             "thread/start",
@@ -232,10 +231,10 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
             {
                 ["approvalPolicy"] = request.ApprovalPolicy,
                 ["config"] = config,
-                ["cwd"] = request.ProjectRoot,
+                ["cwd"] = projectRoot,
                 ["developerInstructions"] = request.DeveloperInstructions,
                 ["model"] = request.Model,
-                ["sandbox"] = request.Sandbox
+                ["sandbox"] = "workspace-write"
             },
             cancellationToken);
         if (!result.TryGetProperty("thread", out var thread) || thread.ValueKind != JsonValueKind.Object)
@@ -245,7 +244,7 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
 
         var threadId = GetRequiredString(thread, "id", "thread/start");
         var resolvedModel = GetRequiredString(result, "model", "thread/start");
-        var projectRoot = GetRequiredString(result, "cwd", "thread/start");
+        var resolvedProjectRoot = GetRequiredString(result, "cwd", "thread/start");
         if (!string.Equals(request.Model, resolvedModel, StringComparison.Ordinal))
         {
             throw new RekallAgeLanguageModelProviderException(
@@ -256,7 +255,85 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
                 resolvedValue: resolvedModel);
         }
 
+        if (!ProjectRootsMatch(projectRoot, resolvedProjectRoot))
+        {
+            throw ProtocolInvalid("Codex returned a working directory outside the requested project root.");
+        }
+
         return new RekallAgeCodexThread(threadId, resolvedModel, projectRoot);
+    }
+
+    private static JsonObject CreateThreadConfig(
+        RekallAgeCodexThreadStartRequest request,
+        string projectRoot)
+    {
+        var config = new JsonObject
+        {
+            ["sandbox_workspace_write"] = new JsonObject
+            {
+                ["network_access"] = request.NetworkEnabled,
+                ["writable_roots"] = new JsonArray(projectRoot)
+            }
+        };
+        if (request.McpServers.Count == 0)
+        {
+            return config;
+        }
+
+        var mcpServers = new JsonObject();
+        foreach (var server in request.McpServers)
+        {
+            if (string.IsNullOrWhiteSpace(server.Name) || string.IsNullOrWhiteSpace(server.Command))
+            {
+                throw new ArgumentException("Codex MCP server names and commands must be non-empty.", nameof(request));
+            }
+
+            if (mcpServers.ContainsKey(server.Name))
+            {
+                throw new ArgumentException("Codex MCP server names must be unique.", nameof(request));
+            }
+
+            var arguments = new JsonArray();
+            foreach (var argument in server.Arguments)
+            {
+                arguments.Add(argument);
+            }
+
+            mcpServers[server.Name] = new JsonObject
+            {
+                ["command"] = server.Command,
+                ["args"] = arguments
+            };
+        }
+
+        config["mcp_servers"] = mcpServers;
+        return config;
+    }
+
+    private static string NormalizeProjectRoot(string projectRoot) =>
+        Path.TrimEndingDirectorySeparator(Path.GetFullPath(projectRoot));
+
+    private static bool ProjectRootsMatch(string requestedProjectRoot, string resolvedProjectRoot)
+    {
+        if (!Path.IsPathFullyQualified(resolvedProjectRoot))
+        {
+            return false;
+        }
+
+        string normalizedResolvedRoot;
+        try
+        {
+            normalizedResolvedRoot = NormalizeProjectRoot(resolvedProjectRoot);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
+
+        return string.Equals(
+            requestedProjectRoot,
+            normalizedResolvedRoot,
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
     }
 
     public async Task<RekallAgeCodexTurn> StartTurnAsync(
@@ -349,22 +426,26 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         var status = GetRequiredString(turn, "status", "turn/start");
         var completion = new TaskCompletionSource<RekallAgeCodexTurnCompletion>(TaskCreationOptions.RunContinuationsAsynchronously);
         RekallAgeCodexTurnCompletion? earlyCompletion;
-        lock (_activeTurnGate)
+        lock (_lifecycleGate)
         {
-            if (!_turnCompletions.TryAdd(turnId, completion))
+            ThrowIfUnavailableLocked(CancellationToken.None, allowDuringDisposal: false);
+            lock (_activeTurnGate)
             {
-                throw ProtocolInvalid("Codex returned a duplicate turn identifier.");
-            }
+                if (!_turnCompletions.TryAdd(turnId, completion))
+                {
+                    throw ProtocolInvalid("Codex returned a duplicate turn identifier.");
+                }
 
-            if (_earlyTurnCompletions.Remove(turnId, out earlyCompletion))
-            {
-                _activeThreadId = null;
-                _activeTurnId = null;
-            }
-            else
-            {
-                _activeThreadId = threadId;
-                _activeTurnId = turnId;
+                if (_earlyTurnCompletions.Remove(turnId, out earlyCompletion))
+                {
+                    _activeThreadId = null;
+                    _activeTurnId = null;
+                }
+                else
+                {
+                    _activeThreadId = threadId;
+                    _activeTurnId = turnId;
+                }
             }
         }
 
@@ -431,6 +512,38 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
     public ValueTask<RekallAgeCodexServerRequest> ReadServerRequestAsync(CancellationToken cancellationToken = default) =>
         _serverRequests.Reader.ReadAsync(cancellationToken);
 
+    public Task RespondToServerRequestAsync(
+        RekallAgeCodexServerRequest request,
+        JsonNode? result,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return WriteServerResponseAsync(
+            request.Id,
+            "result",
+            result?.DeepClone() ?? new JsonObject(),
+            cancellationToken);
+    }
+
+    public Task RespondToServerRequestErrorAsync(
+        RekallAgeCodexServerRequest request,
+        int code,
+        string message,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ValidateRequired(message, nameof(message));
+        return WriteServerResponseAsync(
+            request.Id,
+            "error",
+            new JsonObject
+            {
+                ["code"] = code,
+                ["message"] = message
+            },
+            cancellationToken);
+    }
+
     public ValueTask<RekallAgeCodexDiagnostic> ReadDiagnosticAsync(CancellationToken cancellationToken = default) =>
         _diagnostics.Reader.ReadAsync(cancellationToken);
 
@@ -483,18 +596,23 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         CancellationToken cancellationToken,
         bool allowDuringDisposal = false)
     {
-        ThrowIfUnavailable(cancellationToken, allowDuringDisposal);
-        if (!_pendingSlots.Wait(0))
+        PendingRequest pending;
+        long id;
+        lock (_lifecycleGate)
         {
-            throw ProtocolInvalid("The Codex pending-request limit was reached.");
-        }
+            ThrowIfUnavailableLocked(cancellationToken, allowDuringDisposal);
+            if (!_pendingSlots.Wait(0))
+            {
+                throw ProtocolInvalid("The Codex pending-request limit was reached.");
+            }
 
-        var id = Interlocked.Increment(ref _nextRequestId);
-        var pending = new PendingRequest(method);
-        if (!_pending.TryAdd(id, pending))
-        {
-            _pendingSlots.Release();
-            throw ProtocolInvalid("Codex request identifiers could not be allocated safely.");
+            id = Interlocked.Increment(ref _nextRequestId);
+            pending = new PendingRequest(method);
+            if (!_pending.TryAdd(id, pending))
+            {
+                _pendingSlots.Release();
+                throw ProtocolInvalid("Codex request identifiers could not be allocated safely.");
+            }
         }
 
         using var cancellationRegistration = cancellationToken.Register(() => CancelPending(id));
@@ -567,7 +685,7 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
                     return;
                 }
 
-                DispatchInboundLine(line);
+                await DispatchInboundLineAsync(line);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -617,7 +735,7 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         }
     }
 
-    private void DispatchInboundLine(string line)
+    private async Task DispatchInboundLineAsync(string line)
     {
         using var document = JsonDocument.Parse(line);
         var root = document.RootElement;
@@ -635,13 +753,30 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
 
             var method = methodElement.GetString()!;
             var parameters = root.TryGetProperty("params", out var parameterElement)
-                ? parameterElement.Clone()
+                ? SanitizeRetainedParameters(parameterElement)
                 : EmptyObject();
             if (root.TryGetProperty("id", out var serverRequestId))
             {
+                ValidateServerRequestId(serverRequestId);
                 if (!_serverRequests.Writer.TryWrite(new RekallAgeCodexServerRequest(serverRequestId.Clone(), method, parameters)))
                 {
-                    RecordDiagnostic(RekallAgeCodexErrorCodes.ProtocolInvalid, "The bounded Codex server-request queue is full.");
+                    var overflow = ProtocolInvalid("The bounded Codex server-request queue is full.");
+                    try
+                    {
+                        await WriteServerResponseAsync(
+                            serverRequestId,
+                            "error",
+                            new JsonObject
+                            {
+                                ["code"] = -32000,
+                                ["message"] = "Codex server-request capacity was exceeded."
+                            },
+                            CancellationToken.None);
+                    }
+                    finally
+                    {
+                        FailAndBeginShutdown(overflow);
+                    }
                 }
 
                 return;
@@ -670,15 +805,106 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         HandleResponse(id, root);
     }
 
-    private void HandleResponse(long id, JsonElement response)
+    private Task WriteServerResponseAsync(
+        JsonElement id,
+        string memberName,
+        JsonNode payload,
+        CancellationToken cancellationToken)
     {
-        if (!_pending.TryRemove(id, out var pending))
+        ValidateServerRequestId(id);
+        return WriteMessageAsync(
+            new JsonObject
+            {
+                ["id"] = JsonNode.Parse(id.GetRawText()),
+                [memberName] = payload
+            },
+            cancellationToken);
+    }
+
+    private static void ValidateServerRequestId(JsonElement id)
+    {
+        if (id.ValueKind == JsonValueKind.String)
         {
-            RecordDiagnostic(RekallAgeCodexErrorCodes.ProtocolInvalid, "Codex emitted a response with an unknown request identifier.");
             return;
         }
 
-        _pendingSlots.Release();
+        if (id.ValueKind != JsonValueKind.Number || !id.TryGetInt64(out _))
+        {
+            throw ProtocolInvalid("Codex emitted a server request with an invalid identifier.");
+        }
+    }
+
+    private static JsonElement SanitizeRetainedParameters(JsonElement parameters)
+    {
+        var node = JsonNode.Parse(parameters.GetRawText());
+        SanitizeRetainedNode(node);
+        return JsonSerializer.SerializeToElement(node, JsonOptions);
+    }
+
+    private static void SanitizeRetainedNode(JsonNode? node)
+    {
+        if (node is JsonObject jsonObject)
+        {
+            foreach (var property in jsonObject.ToArray())
+            {
+                if (IsSensitiveRetainedProperty(property.Key))
+                {
+                    jsonObject[property.Key] = "[REDACTED]";
+                }
+                else
+                {
+                    SanitizeRetainedNode(property.Value);
+                }
+            }
+
+            return;
+        }
+
+        if (node is JsonArray jsonArray)
+        {
+            foreach (var item in jsonArray)
+            {
+                SanitizeRetainedNode(item);
+            }
+
+            return;
+        }
+
+        if (node is JsonValue value && value.TryGetValue<string>(out var textValue))
+        {
+            value.ReplaceWith(SanitizeStderr(textValue));
+        }
+    }
+
+    private static bool IsSensitiveRetainedProperty(string propertyName)
+    {
+        var normalized = propertyName.Replace("_", string.Empty, StringComparison.Ordinal)
+            .Replace("-", string.Empty, StringComparison.Ordinal)
+            .ToLowerInvariant();
+        return normalized.Contains("account", StringComparison.Ordinal)
+            || normalized.Contains("authorization", StringComparison.Ordinal)
+            || normalized.Contains("credential", StringComparison.Ordinal)
+            || normalized.Contains("email", StringComparison.Ordinal)
+            || normalized.Contains("apikey", StringComparison.Ordinal)
+            || normalized.Contains("password", StringComparison.Ordinal)
+            || normalized.Contains("secret", StringComparison.Ordinal)
+            || normalized.Contains("token", StringComparison.Ordinal);
+    }
+
+    private void HandleResponse(long id, JsonElement response)
+    {
+        PendingRequest? pending;
+        lock (_lifecycleGate)
+        {
+            if (!_pending.TryRemove(id, out pending))
+            {
+                RecordDiagnostic(RekallAgeCodexErrorCodes.ProtocolInvalid, "Codex emitted a response with an unknown request identifier.");
+                return;
+            }
+
+            _pendingSlots.Release();
+        }
+
         if (response.TryGetProperty("error", out var error))
         {
             var code = error.ValueKind == JsonValueKind.Object
@@ -722,23 +948,31 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         TaskCompletionSource<RekallAgeCodexTurnCompletion>? completion;
         var completedTurn = new RekallAgeCodexTurnCompletion(threadId, turnId, status);
         var unknownTurn = false;
-        lock (_activeTurnGate)
+        lock (_lifecycleGate)
         {
-            if (_turnCompletions.TryGetValue(turnId, out completion))
+            if (_terminalError is not null)
             {
-                if (string.Equals(_activeTurnId, turnId, StringComparison.Ordinal))
+                return;
+            }
+
+            lock (_activeTurnGate)
+            {
+                if (_turnCompletions.TryGetValue(turnId, out completion))
                 {
-                    _activeThreadId = null;
-                    _activeTurnId = null;
+                    if (string.Equals(_activeTurnId, turnId, StringComparison.Ordinal))
+                    {
+                        _activeThreadId = null;
+                        _activeTurnId = null;
+                    }
                 }
-            }
-            else if (Volatile.Read(ref _turnStartPending) != 0 && _earlyTurnCompletions.Count == 0)
-            {
-                _earlyTurnCompletions.Add(turnId, completedTurn);
-            }
-            else
-            {
-                unknownTurn = true;
+                else if (Volatile.Read(ref _turnStartPending) != 0 && _earlyTurnCompletions.Count == 0)
+                {
+                    _earlyTurnCompletions.Add(turnId, completedTurn);
+                }
+                else
+                {
+                    unknownTurn = true;
+                }
             }
         }
 
@@ -792,7 +1026,10 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
 
     private async Task DisposeCoreAsync()
     {
-        Interlocked.Exchange(ref _disposing, 1);
+        lock (_lifecycleGate)
+        {
+            Interlocked.Exchange(ref _disposing, 1);
+        }
         string? activeThread;
         string? activeTurn;
         lock (_activeTurnGate)
@@ -877,12 +1114,17 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
 
     private void CompletePending(long id, JsonElement? result = null, Exception? error = null)
     {
-        if (!_pending.TryRemove(id, out var pending))
+        PendingRequest? pending;
+        lock (_lifecycleGate)
         {
-            return;
+            if (!_pending.TryRemove(id, out pending))
+            {
+                return;
+            }
+
+            _pendingSlots.Release();
         }
 
-        _pendingSlots.Release();
         if (error is not null)
         {
             pending.Completion.TrySetException(error);
@@ -895,22 +1137,67 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
 
     private void FailAll(RekallAgeLanguageModelProviderException error)
     {
-        Interlocked.CompareExchange(ref _terminalError, error, null);
-        foreach (var id in _pending.Keys)
+        List<PendingRequest> pendingRequests = [];
+        List<TaskCompletionSource<RekallAgeCodexTurnCompletion>> turnCompletions = [];
+        RekallAgeLanguageModelProviderException terminalError;
+        lock (_lifecycleGate)
         {
-            CompletePending(id, error: _terminalError);
+            _terminalError ??= error;
+            terminalError = _terminalError;
+            foreach (var pending in _pending.ToArray())
+            {
+                if (_pending.TryRemove(pending.Key, out var removed))
+                {
+                    _pendingSlots.Release();
+                    pendingRequests.Add(removed);
+                }
+            }
+
+            foreach (var turn in _turnCompletions.ToArray())
+            {
+                if (_turnCompletions.TryRemove(turn.Key, out var completion))
+                {
+                    turnCompletions.Add(completion);
+                }
+            }
+
+            lock (_activeTurnGate)
+            {
+                _earlyTurnCompletions.Clear();
+                _activeThreadId = null;
+                _activeTurnId = null;
+            }
         }
 
-        foreach (var turn in _turnCompletions.ToArray())
+        foreach (var pending in pendingRequests)
         {
-            if (_turnCompletions.TryRemove(turn.Key, out var completion))
-            {
-                completion.TrySetException(_terminalError);
-            }
+            pending.Completion.TrySetException(terminalError);
+        }
+
+        foreach (var completion in turnCompletions)
+        {
+            completion.TrySetException(terminalError);
+        }
+    }
+
+    private void FailAndBeginShutdown(RekallAgeLanguageModelProviderException error)
+    {
+        FailAll(error);
+        lock (_disposeGate)
+        {
+            _disposeTask ??= DisposeCoreAsync();
         }
     }
 
     private void ThrowIfUnavailable(CancellationToken cancellationToken, bool allowDuringDisposal = false)
+    {
+        lock (_lifecycleGate)
+        {
+            ThrowIfUnavailableLocked(cancellationToken, allowDuringDisposal);
+        }
+    }
+
+    private void ThrowIfUnavailableLocked(CancellationToken cancellationToken, bool allowDuringDisposal)
     {
         if (cancellationToken.IsCancellationRequested)
         {

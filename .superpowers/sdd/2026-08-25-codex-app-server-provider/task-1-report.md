@@ -4,7 +4,7 @@
 
 Implemented the typed Codex App Server JSONL boundary and exact owned-process lifecycle in `Rekall.Age.Agent`. The client starts `codex app-server --listen stdio://` with `ProcessStartInfo.ArgumentList`, performs the installed stable handshake, exposes typed account/model/thread/turn operations, and keeps notification, server-request, diagnostic, pending-request, JSONL-line, and stderr state bounded.
 
-Task 2 can supply its structured `mcp_servers` configuration through `RekallAgeCodexThreadStartRequest.Config`. The client defensively clones that object, preserves the MCP configuration, and applies `sandbox_workspace_write.network_access=false` unless explicitly enabled.
+Task 2 supplies MCP processes through typed `RekallAgeCodexMcpServer` values. `thread/start` always emits `sandbox="workspace-write"`, replaces writable roots with the one normalized project root, and applies `sandbox_workspace_write.network_access=false` unless explicitly enabled. There is no public raw sandbox or config JSON escape hatch.
 
 ## Task-owned files
 
@@ -64,7 +64,7 @@ Focused gate:
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~CodexAppServerClientTests|FullyQualifiedName~CodexProcessLifecycleTests"
 ```
 
-Result before final commit: 19 passed, 0 failed, 0 skipped.
+Initial implementation result: 19 passed, 0 failed, 0 skipped.
 
 Solution compatibility gate:
 
@@ -85,3 +85,34 @@ The installed v0.130.0 JSON schemas were generated only under this task's ignore
 ## Residual scope
 
 Task 1 intentionally does not implement the Task 2 project runner, MCP child configuration construction, Studio provider UI, or the real authenticated authoring gauntlet.
+
+## Fix round 1: load-bearing protocol boundary
+
+Review identified four issues that had to be resolved before the runner could safely consume this client. The fix round made these changes:
+
+- Replaced caller-controlled `Sandbox` and raw `Config` with typed MCP server entries. The outgoing config is reconstructed from scratch, hard-codes workspace-write sandboxing, retains only the normalized project root as writable, and keeps network disabled by default. The completed returned-working-directory check also normalizes and compares `cwd`, rejecting a mismatch with `REKALL_CODEX_PROTOCOL_INVALID` without echoing the returned path.
+- Added result and error response APIs for queued server requests. Both string and numeric JSON-RPC IDs preserve their original JSON type and pass through the existing single writer. If the bounded server-request queue overflows, the client sends a fixed `-32000` error for the unqueued request and begins terminal cleanup of only its owned process instead of silently dropping an actionable approval.
+- Added one lifecycle gate around terminal transition, request admission/removal, and turn registration/completion. Terminal transition snapshots and removes admitted work while holding that same gate, so no request or turn can be added behind the terminal snapshot and wait forever.
+- Sanitizes notification and server-request parameters before bounded queue admission. Recursive field-name redaction covers account identity and common credential containers, while string-value sanitization removes bearer tokens, API-key shapes, email addresses, and user-profile paths. Tests prove synthetic email/token/authorization/api-key/secret material is absent from retained payloads.
+
+Focused RED observations for this fix round:
+
+1. The authority transcript did not compile because the safe typed MCP contract did not exist. The typed authority construction was added together with a behavioral returned-`cwd` mismatch test and normalized comparison; the focused gate then passed both boundaries.
+2. The server-response transcript did not compile because no result/error APIs existed. Overflow and retained-payload tests then drove the fixed denial/shutdown and redaction behavior.
+3. A response immediately followed by terminal protocol corruption returned a turn that could be registered outside the terminal snapshot. The shared lifecycle gate now guarantees either terminal start failure or a registered completion that is terminally completed, never an orphan.
+
+Final fix-round verification is recorded below after running from the final task-owned working tree.
+
+```powershell
+dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~CodexAppServerClientTests|FullyQualifiedName~CodexProcessLifecycleTests"
+```
+
+Result: 24 passed, 0 failed, 0 skipped.
+
+```powershell
+dotnet build Rekall.AGE.sln --no-restore
+```
+
+Result: build succeeded with 0 warnings and 0 errors.
+
+Per the end-to-end priority override, late turn-start response deadlines, stalled-stdin write deadlines, and eviction of completed turns that callers never consume are deferred until after the first functional Codex integration. They were not started in this fix round.

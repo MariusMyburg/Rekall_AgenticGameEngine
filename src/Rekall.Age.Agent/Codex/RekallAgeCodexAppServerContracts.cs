@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
 
 namespace Rekall.Age.Agent.Codex;
 
@@ -43,12 +42,15 @@ public sealed record RekallAgeCodexThreadStartRequest(
 {
     public string ApprovalPolicy { get; init; } = "on-request";
 
-    public string Sandbox { get; init; } = "workspace-write";
-
     public bool NetworkEnabled { get; init; }
 
-    public JsonObject? Config { get; init; }
+    public IReadOnlyList<RekallAgeCodexMcpServer> McpServers { get; init; } = [];
 }
+
+public sealed record RekallAgeCodexMcpServer(
+    string Name,
+    string Command,
+    IReadOnlyList<string> Arguments);
 
 public sealed record RekallAgeCodexThread(string Id, string Model, string ProjectRoot);
 

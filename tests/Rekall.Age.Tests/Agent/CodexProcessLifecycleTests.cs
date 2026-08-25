@@ -228,6 +228,36 @@ public sealed class CodexProcessLifecycleTests
     }
 
     [Fact]
+    public async Task ResponseFollowedByTerminalProtocolFailureCannotOrphanATurn()
+    {
+        using var timeout = TestTimeout();
+        var process = new FakeCodexProcess();
+        await using var client = await StartInitializedClientAsync(process, cancellationToken: timeout.Token);
+        var startTurn = client.StartTurnAsync("thread-1", "task", cancellationToken: timeout.Token);
+        _ = await process.ReadClientLineAsync(timeout.Token);
+
+        await process.WriteServerRawAsync(
+            "{\"id\":2,\"result\":{\"turn\":{\"id\":\"turn-1\",\"status\":\"inProgress\",\"items\":[]}}}\n"
+            + "{malformed terminal protocol line}\n");
+
+        RekallAgeLanguageModelProviderException error;
+        try
+        {
+            var turn = await startTurn;
+            using var completionTimeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+            error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() =>
+                client.WaitForTurnCompletionAsync(turn, completionTimeout.Token));
+        }
+        catch (RekallAgeLanguageModelProviderException startError)
+        {
+            error = startError;
+        }
+
+        Assert.Equal(RekallAgeCodexErrorCodes.ProtocolInvalid, error.Code);
+        Assert.Equal(0, client.PendingRequestCount);
+    }
+
+    [Fact]
     public async Task FailedTurnUsesStableCodeWithoutProviderControlledErrorPayload()
     {
         using var timeout = TestTimeout();
@@ -264,6 +294,28 @@ public sealed class CodexProcessLifecycleTests
         Assert.Equal(RekallAgeCodexErrorCodes.ModelUnavailable, error.Code);
         Assert.Equal("requested-model", error.RequestedValue);
         Assert.Equal("fallback-model", error.ResolvedValue);
+    }
+
+    [Fact]
+    public async Task ThreadStartRejectsAResolvedWorkingDirectoryOutsideTheRequestedProjectRoot()
+    {
+        using var timeout = TestTimeout();
+        var process = new FakeCodexProcess();
+        await using var client = await StartInitializedClientAsync(process, cancellationToken: timeout.Token);
+        var projectRoot = Path.GetFullPath("codex-cwd-fixture");
+        var differentRoot = Path.GetFullPath("codex-other-fixture");
+        var startThread = client.StartThreadAsync(
+            new RekallAgeCodexThreadStartRequest(projectRoot, "requested-model", "Use AGE primitives."),
+            timeout.Token);
+        _ = await process.ReadClientLineAsync(timeout.Token);
+        await process.WriteServerLineAsync(
+            "{\"id\":2,\"result\":{\"thread\":{\"id\":\"thread-1\"},\"model\":\"requested-model\",\"cwd\":"
+            + JsonValue.Create(differentRoot)!.ToJsonString()
+            + "}}");
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() => startThread);
+        Assert.Equal(RekallAgeCodexErrorCodes.ProtocolInvalid, error.Code);
+        Assert.DoesNotContain(differentRoot, error.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

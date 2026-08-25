@@ -105,25 +105,13 @@ public sealed class CodexAppServerClientTests
         Assert.Equal("item/started", notification.Method);
 
         var projectRoot = Path.GetFullPath("codex-protocol-fixture");
-        var suppliedConfig = JsonNode.Parse(
-            """
-            {
-              "mcp_servers": {
-                "rekall-age": {
-                  "command": "rekall-cli",
-                  "args": ["mcp", "stdio"]
-                }
-              },
-              "sandbox_workspace_write": {
-                "network_access": true,
-                "writable_roots": ["bounded-root"]
-              }
-            }
-            """)!.AsObject();
         var threadTask = client.StartThreadAsync(
             new RekallAgeCodexThreadStartRequest(projectRoot, "model-a", "Author through AGE primitives.")
             {
-                Config = suppliedConfig
+                McpServers =
+                [
+                    new RekallAgeCodexMcpServer("rekall-age", "rekall-cli", ["mcp", "stdio"])
+                ]
             },
             timeout.Token);
         AssertJson(
@@ -143,7 +131,7 @@ public sealed class CodexAppServerClientTests
                   },
                   "sandbox_workspace_write": {
                     "network_access": false,
-                    "writable_roots": ["bounded-root"]
+                    "writable_roots": [{{JsonValue.Create(projectRoot)!.ToJsonString()}}]
                   }
                 },
                 "cwd": {{JsonValue.Create(projectRoot)!.ToJsonString()}},
@@ -153,7 +141,6 @@ public sealed class CodexAppServerClientTests
               }
             }
             """);
-        Assert.True(suppliedConfig["sandbox_workspace_write"]!["network_access"]!.GetValue<bool>());
         await process.WriteServerLineAsync(
             "{\"id\":5,\"result\":{\"thread\":{\"id\":\"thread-1\"},\"model\":\"model-a\",\"cwd\":"
             + JsonValue.Create(projectRoot)!.ToJsonString()
@@ -237,6 +224,125 @@ public sealed class CodexAppServerClientTests
         await process.WriteServerLineAsync(
             """{"id":2,"result":{"account":{"type":"apiKey"},"requiresOpenaiAuth":true}}""");
         _ = await account;
+    }
+
+    [Fact]
+    public async Task ServerRequestResponsesPreserveStringAndNumericIdsThroughTheSingleWriter()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var process = new FakeCodexProcess();
+        await using var client = await StartInitializedClientAsync(process, cancellationToken: timeout.Token);
+
+        await process.WriteServerLineAsync(
+            """{"id":"approval-1","method":"item/commandExecution/requestApproval","params":{"threadId":"thread-1"}}""");
+        var stringRequest = await client.ReadServerRequestAsync(timeout.Token);
+        await client.RespondToServerRequestAsync(
+            stringRequest,
+            new JsonObject { ["decision"] = "decline" },
+            timeout.Token);
+        AssertJson(
+            await process.ReadClientLineAsync(timeout.Token),
+            """{"id":"approval-1","result":{"decision":"decline"}}""");
+
+        await process.WriteServerLineAsync(
+            """{"id":17,"method":"item/fileChange/requestApproval","params":{"threadId":"thread-1"}}""");
+        var numericRequest = await client.ReadServerRequestAsync(timeout.Token);
+        await client.RespondToServerRequestErrorAsync(
+            numericRequest,
+            -32001,
+            "Denied by the AGE authority boundary.",
+            timeout.Token);
+        AssertJson(
+            await process.ReadClientLineAsync(timeout.Token),
+            """{"id":17,"error":{"code":-32001,"message":"Denied by the AGE authority boundary."}}""");
+    }
+
+    [Fact]
+    public async Task ServerRequestOverflowDeniesTheUnqueuedRequestAndShutsDownTheOwnedProcess()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var process = new FakeCodexProcess();
+        var options = new RekallAgeCodexAppServerOptions
+        {
+            ExecutablePath = "codex-test",
+            ClientVersion = "test",
+            ServerRequestCapacity = 1,
+            ShutdownTimeout = TimeSpan.FromMilliseconds(40),
+            InterruptTimeout = TimeSpan.FromMilliseconds(40)
+        };
+        var client = await StartInitializedClientAsync(process, options, timeout.Token);
+
+        await process.WriteServerLineAsync(
+            """{"id":"kept","method":"item/commandExecution/requestApproval","params":{"threadId":"thread-1"}}""");
+        await process.WriteServerLineAsync(
+            """{"id":"overflow","method":"item/fileChange/requestApproval","params":{"threadId":"thread-1"}}""");
+
+        AssertJson(
+            await process.ReadClientLineAsync(timeout.Token),
+            """{"id":"overflow","error":{"code":-32000,"message":"Codex server-request capacity was exceeded."}}""");
+        await client.DisposeAsync();
+        Assert.Equal(1, process.InputCloseCount);
+        Assert.Equal(1, process.KillCount);
+        Assert.True(process.LastKillEntireProcessTree);
+    }
+
+    [Fact]
+    public async Task RetainedNotificationsAndServerRequestsRedactCredentialAndAccountFields()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var process = new FakeCodexProcess();
+        var options = new RekallAgeCodexAppServerOptions
+        {
+            ExecutablePath = "codex-test",
+            ClientVersion = "test",
+            NotificationCapacity = 1,
+            ShutdownTimeout = TimeSpan.FromMilliseconds(40),
+            InterruptTimeout = TimeSpan.FromMilliseconds(40)
+        };
+        await using var client = await StartInitializedClientAsync(process, options, timeout.Token);
+
+        await process.WriteServerLineAsync(
+            """{"method":"account/updated","params":{"email":"person@example.invalid","accessToken":"token-value","nested":{"Authorization":"Bearer private-material"},"threadId":"thread-1"}}""");
+        await process.WriteServerLineAsync(
+            """{"method":"account/updated","params":{"password":"second-private-value","threadId":"thread-1"}}""");
+        await process.WriteServerLineAsync(
+            """{"id":"approval","method":"item/commandExecution/requestApproval","params":{"apiKey":"sk-private","credential":{"secret":"hidden"},"threadId":"thread-1"}}""");
+        await process.WriteServerLineAsync("""{"id":999,"result":{}}""");
+
+        var diagnostic = await client.ReadDiagnosticAsync(timeout.Token);
+        var notification = await client.ReadNotificationAsync(timeout.Token);
+        var serverRequest = await client.ReadServerRequestAsync(timeout.Token);
+        var retained = notification.Params.GetRawText() + serverRequest.Params.GetRawText() + diagnostic.Message;
+        Assert.Contains("thread-1", retained, StringComparison.Ordinal);
+        Assert.DoesNotContain("person@example.invalid", retained, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("token-value", retained, StringComparison.Ordinal);
+        Assert.DoesNotContain("private-material", retained, StringComparison.Ordinal);
+        Assert.DoesNotContain("sk-private", retained, StringComparison.Ordinal);
+        Assert.DoesNotContain("hidden", retained, StringComparison.Ordinal);
+        Assert.DoesNotContain("second-private-value", retained, StringComparison.Ordinal);
+    }
+
+    private static async Task<RekallAgeCodexAppServerClient> StartInitializedClientAsync(
+        FakeCodexProcess process,
+        RekallAgeCodexAppServerOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        options ??= new RekallAgeCodexAppServerOptions
+        {
+            ExecutablePath = "codex-test",
+            ClientVersion = "test",
+            ShutdownTimeout = TimeSpan.FromMilliseconds(40),
+            InterruptTimeout = TimeSpan.FromMilliseconds(40)
+        };
+        var start = RekallAgeCodexAppServerClient.StartAsync(
+            options,
+            new FakeCodexProcessFactory(process),
+            cancellationToken);
+        _ = await process.ReadClientLineAsync(cancellationToken);
+        await process.WriteServerLineAsync(
+            """{"id":1,"result":{"userAgent":"codex-cli/0.130.0","platformFamily":"windows","platformOs":"windows","codexHome":"C:\\bounded"}}""");
+        _ = await process.ReadClientLineAsync(cancellationToken);
+        return await start;
     }
 
     private static void AssertJson(string actual, string expected)

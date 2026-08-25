@@ -78,6 +78,13 @@ the accepted gameplay evidence above.
   distracting high-frequency noise across the whole scene. Authored material
   instances now use a 0.35 normal scale. This materially reduces the visible
   noise while preserving stone and ground relief.
+- The fractured-slate boulder is the first Aetherfall consumer of AGE's
+  crease-aware subdivision tranche. Its ordinary procedural graph now adds a
+  smooth-subdivision detail stage after authored deformation, increasing the
+  reusable asset from 222 points/240 faces to 922 points/920 faces. The graph
+  was rebaked and its live-linked model rebuilt at logical revision 3 with
+  matching source revision and compiled hash; this is real player geometry,
+  not an existence-only descriptor check.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, prop geometry remains visibly coarse, and the

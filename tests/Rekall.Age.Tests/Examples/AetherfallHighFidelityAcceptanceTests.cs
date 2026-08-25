@@ -12,6 +12,26 @@ namespace Rekall.Age.Tests.Examples;
 public sealed class AetherfallHighFidelityAcceptanceTests
 {
     [Fact]
+    public async Task FracturedBoulderUsesPublishedSmoothSubdivisionDetail()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var graph = await new RekallAgeModelingGraphAssetStore().LoadAsync(projectRoot, "aetherfall.rubble-boulder.graph", CancellationToken.None);
+        var subdivision = Assert.Single(graph.Nodes, node => node.TypeId == "rekall.modeling.subdivide_smooth");
+        Assert.Equal(1, subdivision.Parameters["levels"]!.GetValue<int>());
+
+        var evaluation = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default,
+            new(509, 0, "aetherfall-acceptance", "desktop"), CancellationToken.None);
+
+        Assert.True(evaluation.Succeeded, string.Join(Environment.NewLine, evaluation.Diagnostics.Select(item => item.Message)));
+        Assert.True(evaluation.Outputs["mesh"].Topology.FaceIds.Count >= 900);
+        var source = await new RekallAgeMeshAssetStore().LoadVersionedAsync(projectRoot, "aetherfall-rubble-boulder-mesh", CancellationToken.None);
+        var model = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(projectRoot, "Assets", "Models", "aetherfall-rubble-boulder-model.age.model.json")))!.AsObject();
+        Assert.Equal(source.Revision, model["lastSuccessfulBuild"]!["sourceFileRevision"]!.GetValue<string>());
+        Assert.Equal(source.Value.Revision, model["lastSuccessfulBuild"]!["sourceLogicalRevision"]!.GetValue<long>());
+    }
+
+    [Fact]
     public async Task BrokenArchConsumesPersistedBezierCurveThroughTheGenericGraphPipeline()
     {
         var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall-rubble-boulder-model",
   "displayName": "Fractured Slate Boulder",
-  "revision": 2,
+  "revision": 3,
   "source": {
     "kind": "Mesh",
     "assetId": "aetherfall-rubble-boulder-mesh",
@@ -10,12 +10,12 @@
   },
   "buildState": 0,
   "lastSuccessfulBuild": {
-    "sourceFileRevision": "6ce45af1360f1229c5ae4e2e8c66f2e81a7b36fa4044c335263c3ce72d7bbc69",
-    "sourceLogicalRevision": 2,
-    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-rubble-boulder-model/a36e5df318b464d081f97b81d859249a4c4de74ec408ed705e55e41fcfa0702f.age.compiled-mesh.json",
-    "compiledContentHash": "a36e5df318b464d081f97b81d859249a4c4de74ec408ed705e55e41fcfa0702f",
+    "sourceFileRevision": "c4720eb0c8fcb7bf56284cc1834109240b7aa135bc7f062ed021d4c79ce0c6a3",
+    "sourceLogicalRevision": 3,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-rubble-boulder-model/4274cace73977e46848950f5130ebe6fcd5e9566e43d57d6153fc891ad330fe0.age.compiled-mesh.json",
+    "compiledContentHash": "4274cace73977e46848950f5130ebe6fcd5e9566e43d57d6153fc891ad330fe0",
     "compilerVersion": "rekall-age-model-compiler-v1",
-    "builtAtUtc": "2026-08-25T17:13:59.3564494+00:00",
+    "builtAtUtc": "2026-08-25T22:33:57.933488+00:00",
     "diagnostics": []
   },
   "frozen": false

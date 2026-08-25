@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Rekall.Age.Agent.LanguageModels;
+using Rekall.Age.Agent.Codex;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Workflows;
 
@@ -34,6 +35,14 @@ public sealed class LanguageModelProviderCatalogTests
         Assert.Equal("REKALL_OPENAI_API_KEY_MISSING", diagnostic.Code);
         Assert.Equal("OpenAI requires OPENAI_API_KEY or a session-only API key.", diagnostic.Message);
         Assert.DoesNotContain("Authorization", string.Join('\n', catalog.Providers), StringComparison.OrdinalIgnoreCase);
+
+        var codex = Assert.Single(catalog.Providers, provider => provider.Id == "codex");
+        Assert.Equal("Codex App Server", codex.DisplayName);
+        Assert.Equal("gpt-5.6-sol", codex.DefaultModel);
+        Assert.Equal("codex-managed", codex.AuthenticationKind);
+        Assert.Equal("unknown", codex.AuthenticationState);
+        Assert.True(codex.IsAvailable);
+        Assert.Empty(codex.Diagnostics);
     }
 
     [Fact]
@@ -97,7 +106,7 @@ public sealed class LanguageModelProviderCatalogTests
 
         Assert.Equal("REKALL_LANGUAGE_MODEL_PROVIDER_UNSUPPORTED", error.Code);
         Assert.Equal("missing-provider", error.RequestedValue);
-        Assert.Equal("ollama,openai", error.ResolvedValue);
+        Assert.Equal("ollama,openai,codex", error.ResolvedValue);
     }
 
     [Fact]
@@ -141,6 +150,34 @@ public sealed class LanguageModelProviderCatalogTests
         Assert.Equal("ollama", first.ProviderId);
         Assert.Equal("openai", second.ProviderId);
         Assert.False(secondHandler.Disposed);
+    }
+
+    [Fact]
+    public async Task CodexAcquisitionUsesTheProjectRunnerForTheSharedProviderLease()
+    {
+        var fixture = Directory.CreateTempSubdirectory("rekall-codex-catalog-");
+        try
+        {
+            var cliPath = Path.Combine(fixture.FullName, "Rekall.Age.Cli.exe");
+            await File.WriteAllTextAsync(cliPath, "packaged-cli-fixture");
+            var runner = new RekallAgeCodexProjectAgentRunner(
+                new RekallAgeCodexMcpConfiguration(cliPath),
+                clientFactory: _ => throw new InvalidOperationException("Acquisition must remain lazy."));
+            var catalog = new RekallAgeLanguageModelProviderCatalog(
+                new RekallAgeLanguageModelProviderSettings(),
+                () => new HttpClient(),
+                codexRunnerFactory: () => runner);
+
+            await using var lease = catalog.Acquire("codex", new RekallAgeCommandRegistry());
+
+            Assert.Equal("codex", lease.ProviderId);
+            Assert.Same(runner, lease.Runner);
+            Assert.Same(runner, lease.ModelClient);
+        }
+        finally
+        {
+            Directory.Delete(fixture.FullName, recursive: true);
+        }
     }
 
     [Fact]

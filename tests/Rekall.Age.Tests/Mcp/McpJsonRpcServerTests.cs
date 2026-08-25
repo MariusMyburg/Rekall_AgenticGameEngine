@@ -227,6 +227,31 @@ public sealed class McpJsonRpcServerTests
     }
 
     [Fact]
+    public async Task ToolsCallKeepsStructuredAgeErrorsVisibleToMcpClients()
+    {
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new FailingEchoCommand());
+        var server = new RekallAgeMcpJsonRpcServer(registry);
+
+        var response = await server.HandleJsonLineAsync(
+            """{"jsonrpc":"2.0","id":31,"method":"tools/call","params":{"name":"rekall.test.failure","arguments":{"message":"strict delta was zero"}}}""",
+            CreateContext());
+
+        using var document = JsonDocument.Parse(response!);
+        var result = document.RootElement.GetProperty("result");
+        Assert.True(result.GetProperty("isError").GetBoolean());
+        var structured = result.GetProperty("structuredContent");
+        Assert.False(structured.GetProperty("ok").GetBoolean());
+        Assert.Equal(
+            "REKALL_RUNTIME_ASSERTION_FAILED",
+            structured.GetProperty("errors")[0].GetProperty("code").GetString());
+        Assert.Contains(
+            "REKALL_RUNTIME_ASSERTION_FAILED",
+            result.GetProperty("content")[0].GetProperty("text").GetString(),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ToolsCallReturnsJsonRpcErrorForUnknownTool()
     {
         var server = CreateServer();
@@ -275,6 +300,31 @@ public sealed class McpJsonRpcServerTests
             return ValueTask.FromResult(RekallAgeCommandResult<EchoResult>.Success(
                 new EchoResult(request.Message),
                 "Echoed test message."));
+        }
+    }
+
+    private sealed class FailingEchoCommand : IRekallAgeCommand<EchoRequest, EchoResult>
+    {
+        public string Name => "rekall.test.failure";
+
+        public RekallAgeCommandSchema Schema => new(
+            Name,
+            "Returns a deterministic structured AGE failure.",
+            typeof(EchoRequest).FullName!,
+            typeof(EchoResult).FullName!);
+
+        public ValueTask<RekallAgeCommandResult<EchoResult>> ExecuteAsync(
+            EchoRequest request,
+            RekallAgeCommandContext context)
+        {
+            var error = new RekallAgeCommandError(
+                "REKALL_RUNTIME_ASSERTION_FAILED",
+                request.Message,
+                "Main");
+            return ValueTask.FromResult(RekallAgeCommandResult<EchoResult>.Failure(
+                new EchoResult(request.Message),
+                "Runtime assertion failed.",
+                [error]));
         }
     }
 }

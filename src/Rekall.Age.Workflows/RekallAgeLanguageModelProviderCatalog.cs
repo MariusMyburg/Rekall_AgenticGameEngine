@@ -1,4 +1,5 @@
 using Rekall.Age.Agent.LanguageModels;
+using Rekall.Age.Agent.Codex;
 using Rekall.Age.Core.Commands;
 using System.Text.Json.Serialization;
 
@@ -37,13 +38,17 @@ public sealed class RekallAgeLanguageModelProviderCatalog
 {
     private readonly RekallAgeLanguageModelProviderSettings _settings;
     private readonly Func<HttpClient> _httpClientFactory;
+    private readonly Func<RekallAgeCodexProjectAgentRunner> _codexRunnerFactory;
 
     public RekallAgeLanguageModelProviderCatalog(
         RekallAgeLanguageModelProviderSettings? settings = null,
-        Func<HttpClient>? httpClientFactory = null)
+        Func<HttpClient>? httpClientFactory = null,
+        Func<RekallAgeCodexProjectAgentRunner>? codexRunnerFactory = null)
     {
         _settings = settings ?? ReadEnvironmentSettings();
         _httpClientFactory = httpClientFactory ?? CreateHttpClient;
+        _codexRunnerFactory = codexRunnerFactory
+            ?? (() => new RekallAgeCodexProjectAgentRunner(RekallAgeCodexMcpConfiguration.Resolve()));
         Providers = DescribeProviders(_settings);
     }
 
@@ -74,8 +79,77 @@ public sealed class RekallAgeLanguageModelProviderCatalog
                             "REKALL_OPENAI_API_KEY_MISSING",
                             "OpenAI requires OPENAI_API_KEY or a session-only API key.")
                     ])
-            }
+            },
+            DescribeCodexProvider()
         ]);
+    }
+
+    public static RekallAgeLanguageModelProviderDescriptor DescribeCodexProvider(
+        RekallAgeCodexAccount? account = null,
+        IReadOnlyList<RekallAgeCodexModel>? models = null)
+    {
+        if (account is null)
+        {
+            return new RekallAgeLanguageModelProviderDescriptor(
+                "codex",
+                "Codex App Server",
+                RekallAgeCodexProjectAgentRunner.RequiredModel,
+                "codex-managed")
+            {
+                AuthenticationState = "unknown",
+                IsAvailable = true,
+                Diagnostics = []
+            };
+        }
+
+        if (!account.IsAuthenticated)
+        {
+            return new RekallAgeLanguageModelProviderDescriptor(
+                "codex",
+                "Codex App Server",
+                RekallAgeCodexProjectAgentRunner.RequiredModel,
+                "codex-managed")
+            {
+                AuthenticationState = "required",
+                IsAvailable = false,
+                Diagnostics =
+                [
+                    new RekallAgeLanguageModelProviderDiagnostic(
+                        RekallAgeCodexErrorCodes.AuthenticationRequired,
+                        "Codex authentication is required. Sign in through Codex and retry.")
+                ]
+            };
+        }
+
+        var authenticationState = account.AuthenticationType switch
+        {
+            "apiKey" => "api-key",
+            { Length: > 0 } value => value,
+            _ => "authenticated"
+        };
+        var modelAvailable = models is null || models.Any(model =>
+            !model.Hidden
+            && string.Equals(
+                model.Model,
+                RekallAgeCodexProjectAgentRunner.RequiredModel,
+                StringComparison.Ordinal));
+        return new RekallAgeLanguageModelProviderDescriptor(
+            "codex",
+            "Codex App Server",
+            RekallAgeCodexProjectAgentRunner.RequiredModel,
+            "codex-managed")
+        {
+            AuthenticationState = authenticationState,
+            IsAvailable = modelAvailable,
+            Diagnostics = modelAvailable
+                ? []
+                :
+                [
+                    new RekallAgeLanguageModelProviderDiagnostic(
+                        RekallAgeCodexErrorCodes.ModelUnavailable,
+                        "The exact Codex project model is unavailable.")
+                ]
+        };
     }
 
     public RekallAgeLanguageModelProviderLease Acquire(
@@ -110,6 +184,16 @@ public sealed class RekallAgeLanguageModelProviderCatalog
         var httpClient = _httpClientFactory();
         try
         {
+            if (normalizedProviderId == "codex")
+            {
+                var codexRunner = _codexRunnerFactory();
+                return new RekallAgeLanguageModelProviderLease(
+                    normalizedProviderId,
+                    httpClient,
+                    codexRunner,
+                    codexRunner);
+            }
+
             IRekallAgeLanguageModelClient client = normalizedProviderId switch
             {
                 "ollama" => new RekallAgeOllamaLanguageModelClient(httpClient, ResolveOllamaUrl(settings)),

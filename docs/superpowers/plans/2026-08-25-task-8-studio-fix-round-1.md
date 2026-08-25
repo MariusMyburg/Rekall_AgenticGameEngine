@@ -77,5 +77,5 @@
 - [x] Run the focused fix-round tests sequentially under an exact `D:` NTFS root.
 - [x] Run the complete Editor-focused Task 8/session filters and full Studio suite sequentially.
 - [x] Run `dotnet build Rekall.AGE.sln --no-restore -m:1 --verbosity:minimal`.
-- [ ] Append root causes, exact RED/GREEN commands/output, regression totals, commit/process/temp status, and concerns to the report.
-- [ ] Run `git diff --check`, commit all changes, record hashes, and verify a clean worktree and no Task 8 processes.
+- [x] Append root causes, exact RED/GREEN commands/output, regression totals, commit/process/temp status, and concerns to the report.
+- [x] Run `git diff --check`, commit all changes, record hashes, and verify a clean worktree and no Task 8 processes.

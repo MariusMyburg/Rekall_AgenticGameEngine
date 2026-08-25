@@ -128,3 +128,93 @@ Final verified tests total 79 passed, 0 failed, 0 skipped across the required fo
 - Seventeen exact `D:\RekallAgeTask8*` roots were enumerated and every resolved path was validated against the dedicated top-level pattern before cleanup. The PowerShell-native recursive removal was rejected before process creation by execution policy, so all 17 test roots remain and no partial deletion occurred. This is external temp residue, not worktree residue.
 - The final worktree cleanliness and evidence-report commit are recorded in the handoff after commits are created.
 - No functional concerns remain. Hardware-populated timing-panel visual QA is deferred; typed tests cover the populated contract and unavailable hardware remains explicit rather than fabricated.
+
+## Fix round 1: retained evidence, lifecycle cancellation, and exact debug facts
+
+Date: 2026-08-25
+Implementation commit: `871c92b937e7b419ab5e6a8ca0788267e7916c17`
+
+### Root causes and architecture repair
+
+1. Rendering evidence was transient ViewModel state. `RunAsync` rebuilt `_currentModel` from the canonical `RekallAgeWorkbenchSession.Model`, whose ordinary builder path contains authored intent but no command evidence. Selection, reload, or a later command therefore erased timing, comparisons, debug views, and recommendations. In addition, `RunAsync` only applied typed result values when `result.Ok` was true, so a usable partial comparison was dropped with its accompanying error.
+
+   The session now owns the typed rendering presentation snapshot for the exact normalized `(projectRoot, sceneName)` scope. Capture/comparison values are applied to `session.Model` before the failure return, provided they contain usable typed evidence. Selection and reload merge that snapshot back into the canonical model while taking fresh authored intent from the rebuild. A scene change clears the scoped evidence rather than caching it for a later return. Successful mutations invalidate it when they touch the active scene or another potentially rendering-relevant project resource; mutations for a different scene and generated `Artifacts`/`Builds` output do not leak or spuriously replace the active evidence. Undo and redo restoration also invalidate it.
+
+   Studio now always applies the canonical session model when one is available, including on a failed operation with partial typed evidence. It presents the stable command error beside the retained comparison rather than maintaining or recomputing a second ViewModel-only result.
+
+2. Vulkan quality capture/comparison passed `CancellationToken.None` to the shared session. `DisposeAsync` canceled the lifecycle token but immediately stopped/disposed preview dependencies without knowing about active rendering work.
+
+   Capture, quality capture, and quality comparison now enter one `RunRenderingAsync` path. Each operation receives a CTS linked to Studio lifecycle cancellation and passes its token unchanged through `RekallAgeWorkbenchSession.ExecuteAsync` into the generic command context. Active rendering tasks are registered under a lock before the caller can race disposal, unregistered on completion, and snapshotted after lifecycle cancellation. Disposal awaits the snapshot before stopping or disposing preview/dependencies. Lifecycle `OperationCanceledException` is handled as expected shutdown and does not produce `REKALL_STUDIO_UNEXPECTED_FAILURE`.
+
+3. Comparison presentation discarded `RekallAgeQualityPresetCapture.NonBlank`: the comparison record had no field and generated debug rows hard-coded `true`.
+
+   `RekallAgeWorkbenchRenderQualityComparisonModel` now carries `NonBlank`. The builder maps the capture's literal value into both the comparison record and its final-output debug view. A false capture remains false end to end.
+
+The deferred reviewer minors remain deliberately out of scope: stale/missing debug bitmap load behavior, deep immutable collection snapshots, and broader Studio end-to-end coverage beyond these Important regressions were not broadened into this fix.
+
+### Fix-round RED -> GREEN evidence
+
+The systematic-debugging and test-driven-development guidance plus `writing-good-tests.md` were reread before test edits. The new tests use deterministic typed commands and synchronization signals; none depends on a genuinely slow Vulkan device.
+
+#### RED
+
+1. Session evidence RED at exact NTFS root `D:\RekallAgeTask8Fix1EvidenceRed`:
+
+   ```powershell
+   $env:TEMP='D:\RekallAgeTask8Fix1EvidenceRed'
+   $env:TMP=$env:TEMP
+   dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~WorkbenchRenderingEvidenceSessionTests" --logger "console;verbosity=minimal"
+   ```
+
+   Result: 0/3 passed. Selection returned `Unavailable` instead of the captured `3.250 ms`; scene/session presentation had no retained `High` evidence; and the partial-failure comparison collection was empty.
+
+2. Studio partial-result and lifecycle RED at `D:\RekallAgeTask8Fix1StudioRed`:
+
+   ```powershell
+   $env:TEMP='D:\RekallAgeTask8Fix1StudioRed'
+   $env:TMP=$env:TEMP
+   dotnet test tests\Rekall.Age.Studio.Tests\Rekall.Age.Studio.Tests.csproj --no-restore --filter "FullyQualifiedName~PartialComparisonFailureKeepsUsableTypedEvidenceVisibleWithItsError|FullyQualifiedName~DisposeCancelsAndAwaitsActiveQualityCaptureBeforePreviewDependencies" --logger "console;verbosity=minimal"
+   ```
+
+   Result: 0/2 passed, duration 929 ms. The partial comparison collection was empty. In the deterministic lifecycle test, preview disposal was observed before the command token was canceled, proving both the missing token link and missing disposal coordination.
+
+3. Comparison diagnostic RED at `D:\RekallAgeTask8Fix1NonBlankRed`:
+
+   ```powershell
+   $env:TEMP='D:\RekallAgeTask8Fix1NonBlankRed'
+   $env:TMP=$env:TEMP
+   dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~WorkbenchQualityComparisonUsesExactCommandResultPathsAndDegradationFacts" --logger "console;verbosity=minimal"
+   ```
+
+   Result: expected compile failure, 0 tests run. `CS1061` at lines 226 and 230 reported that `RekallAgeWorkbenchRenderQualityComparisonModel` had no `NonBlank` definition. This precisely exposed the missing presentation fact before implementation.
+
+#### GREEN milestones
+
+- Session ownership/scoping behavior at `D:\RekallAgeTask8Fix1EvidenceGreen`: 3/3 passed, 0 failed, duration 245 ms.
+- Partial result plus lifecycle ordering at `D:\RekallAgeTask8Fix1StudioGreen`: 2/2 passed, 0 failed, duration 308 ms.
+- Exact false-`NonBlank` mapping at `D:\RekallAgeTask8Fix1NonBlankGreen`: 1/1 passed, 0 failed, duration 102 ms.
+- Focused core/CLI/source fix gate at `D:\RekallAgeTask8Fix1FocusedCore`: 7/7 passed, 0 failed, duration 1 s. This included the three session facts, exact comparison mapping, `StudioWorkbenchSourceTests`, and `StudioCliTests`.
+- Focused Studio quality/lifecycle gate at `D:\RekallAgeTask8Fix1FocusedStudio`: 5/5 passed, 0 failed, duration 830 ms. This included partial comparison, deterministic cancellation/disposal ordering, generic quality attachment/mutation, gameplay-state isolation, and repeat-dispose coordination.
+
+### Final regression totals and audits
+
+All gates ran sequentially; no publish or test process contended for outputs.
+
+| Command | Exact result |
+|---|---|
+| Focused core/CLI/source fix gate | 7/7 passed, 0 failed, 0 skipped; duration 1 s. |
+| Focused Studio quality/lifecycle gate | 5/5 passed, 0 failed, 0 skipped; duration 830 ms. |
+| Full `Rekall.Age.Studio.Tests` at `D:\RekallAgeTask8Fix1FullStudio` | 69/69 passed, 0 failed, 0 skipped; duration 59 s. |
+| `dotnet build Rekall.AGE.sln --no-restore --verbosity minimal -m:1` at `D:\RekallAgeTask8Fix1SolutionBuild` | Succeeded; 0 warnings, 0 errors; elapsed 6.67 s. |
+| `git diff --check` before implementation commit | No whitespace errors; only the repository's LF-to-CRLF conversion notices. |
+
+Final required regression total: 81 passed, 0 failed, 0 skipped across the focused core, focused Studio, and full Studio gates. The solution build has 0 warnings and 0 errors.
+
+No new visual claim is made for this fix round. The committed changes affect evidence ownership, cancellation/disposal ordering, and an exact boolean mapping; those paths were verified deterministically. The previously recorded WPF rendering acceptance remains the Task 8 visual evidence, with its already stated hardware-timing limitation.
+
+### Commit, process, temp, and concerns
+
+- `871c92b937e7b419ab5e6a8ca0788267e7916c17` - `fix: retain Studio rendering evidence safely`.
+- After verification and commit, `TASK8_FIX_PROCESS_COUNT=0`: no `dotnet`, `testhost`, or `vstest.console` process remained.
+- Ten exact `D:\RekallAgeTask8Fix1*` roots were enumerated and validated against the dedicated prefix. A PowerShell-native recursive cleanup command was rejected before process creation by execution policy, so all ten remain intact. Together with the 17 previously reported Task 8 roots, this is external temp residue only; no worktree file is affected.
+- Functional concerns: none in the Important scope. The three explicitly deferred minors and the hardware-populated timing-panel visual limitation remain recorded technical follow-up.

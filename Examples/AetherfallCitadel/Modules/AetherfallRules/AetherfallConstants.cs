@@ -28,6 +28,7 @@ internal static class AetherfallConstants
     public const double DashCost = 18;
     public const double DashCooldownSeconds = 0.85;
     public const double DashInvulnerabilitySeconds = 0.22;
+    public const double ConduitInteractionRadius = 4.0;
     public const double MaximumDeltaSeconds = 0.1;
     public const double ArrivalMinimumX = -6.2;
     public const double ArrivalMaximumX = 6.2;

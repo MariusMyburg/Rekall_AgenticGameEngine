@@ -56,6 +56,8 @@ public sealed record RekallAgeRuntimeViewportFrame(
 
     public RekallAgeResolvedRenderFeaturePlan? ResolvedQualityPlan { get; init; }
 
+    public RekallAgeRuntimeViewportEnvironment? Environment { get; init; }
+
     public IReadOnlyList<RekallAgeRuntimeViewportFogVolume> FogVolumes { get; init; } =
         Array.Empty<RekallAgeRuntimeViewportFogVolume>();
 
@@ -232,6 +234,17 @@ public sealed record RekallAgeRuntimeViewportFogVolume(
 
 public sealed record RekallAgeRuntimeViewportParticleBurst(double TimeSeconds, int Count);
 
+public sealed record RekallAgeRuntimeViewportEnvironment(
+    string EntityId,
+    string EntityName,
+    string? SkyAssetId,
+    double AmbientEnergy,
+    double Exposure,
+    string ToneMapper,
+    double WhitePoint,
+    string? ColorGradeAssetId,
+    string BackgroundPolicy);
+
 public sealed record RekallAgeRuntimeViewportParticleScalarKey(double NormalizedAge, double Value);
 
 public sealed record RekallAgeRuntimeViewportParticleColorKey(double NormalizedAge, string Color);
@@ -360,6 +373,10 @@ public sealed record RekallAgeRuntimeViewportRenderable(
     public double ShadowNormalBias { get; init; } = 0.02;
 
     public int ShadowPriority { get; init; }
+
+    public double LightRange { get; init; } = 10;
+
+    public int LightPriority { get; init; }
 
     public string AlphaMode { get; init; } = "opaque";
 

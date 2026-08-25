@@ -29,12 +29,12 @@ internal static class PresentationSimulation
 
         var seconds = Math.Clamp(context.DeltaTime.TotalSeconds, 0, AetherfallConstants.MaximumDeltaSeconds);
         var targetX = Math.Clamp(warden.Transform.Position3D.X * 0.65, -8, 8);
-        var targetZ = Math.Clamp(warden.Transform.Position3D.Z - 15, -27, 28);
+        var targetZ = Math.Clamp(warden.Transform.Position3D.Z - 13.2, -25.2, 29.8);
         var smoothing = 1 - Math.Exp(-6 * seconds);
         var cameraPosition = camera.Transform.Position3D;
         world = world.UpdateEntity(camera.Id, entity => entity.WithPosition3D(new RekallAgeRuntimeVector3(
             cameraPosition.X + (targetX - cameraPosition.X) * smoothing,
-            18,
+            13,
             cameraPosition.Z + (targetZ - cameraPosition.Z) * smoothing)));
 
         var integrity = Math.Round(warden.ComponentNumber(AetherfallConstants.WardenStateType, "integrity", 100));
@@ -71,11 +71,68 @@ internal static class PresentationSimulation
             .WithComponentString(LabelType, "text", guardianText)
             .WithComponentString(LabelType, "foregroundColor", guardianStage == "enraged" ? "#ff6677" : "#ffb86b"));
 
+        world = UpdateWardenPresentation(world, warden);
+        world = Place(world, "Warden Softbox", warden.Transform.Position3D, -3.5, 5.7, -1.5);
+        world = UpdateActionEffects(world, warden);
         world = world.UpdateEntitiesWithComponent(AetherfallConstants.EnemyStateType, entity => entity.WithVisible(
             entity.ComponentBoolean(AetherfallConstants.EnemyStateType, "active")
             && entity.ComponentNumber(AetherfallConstants.EnemyStateType, "health") > 0));
         return world.UpdateEntity(guardian.Id, entity => entity.WithVisible(
             !guardianStage.Equals("sealed", StringComparison.OrdinalIgnoreCase)
             && !guardianStage.Equals("defeated", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static RekallAgeRuntimeWorld UpdateWardenPresentation(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeEntity warden)
+    {
+        var origin = warden.Transform.Position3D;
+        world = Place(world, "Warden Mantle", origin, 0, 0.25, 0);
+        world = Place(world, "Warden Crown", origin, 0, 1.25, 0.02);
+        world = Place(world, "Warden Halo", origin, 0, 1.15, 0.2);
+        world = Place(world, "Warden Wing Left", origin, -0.45, 0.12, -0.14);
+        world = Place(world, "Warden Wing Right", origin, 0.45, 0.12, -0.14);
+        world = Place(world, "Warden Blade", origin, 0.62, 0.25, 0.28);
+        return world;
+    }
+
+    private static RekallAgeRuntimeWorld UpdateActionEffects(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeEntity warden)
+    {
+        var dashCooldown = warden.ComponentNumber(AetherfallConstants.WardenStateType, "dashCooldown");
+        var pulseCooldown = warden.ComponentNumber(AetherfallConstants.WardenStateType, "pulseCooldown");
+        world = PlaceEffect(world, "Warden Dash Ribbon", warden.Transform.Position3D, dashCooldown > 0.65);
+        world = PlaceEffect(world, "Pulse Tracer", warden.Transform.Position3D, pulseCooldown > 0.38);
+        return PlaceEffect(world, "Impact Sparks", warden.Transform.Position3D, pulseCooldown is > 0.02 and < 0.18);
+    }
+
+    private static RekallAgeRuntimeWorld PlaceEffect(
+        RekallAgeRuntimeWorld world,
+        string name,
+        RekallAgeRuntimeVector3 origin,
+        bool enabled)
+    {
+        var entity = world.FindEntity(name);
+        return entity is null
+            ? world
+            : world.UpdateEntity(entity.Id, current => current
+                .WithPosition3D(origin)
+                .WithComponentBoolean("Rekall.ParticleEmitter3D", "enabled", enabled));
+    }
+
+    private static RekallAgeRuntimeWorld Place(
+        RekallAgeRuntimeWorld world,
+        string name,
+        RekallAgeRuntimeVector3 origin,
+        double x,
+        double y,
+        double z)
+    {
+        var entity = world.FindEntity(name);
+        return entity is null
+            ? world
+            : world.UpdateEntity(entity.Id, current => current.WithPosition3D(
+                new RekallAgeRuntimeVector3(origin.X + x, origin.Y + y, origin.Z + z)));
     }
 }

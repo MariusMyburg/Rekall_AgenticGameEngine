@@ -1,0 +1,179 @@
+using System.Numerics;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Rekall.Age.Modeling.Contracts;
+
+namespace Rekall.Age.Modeling;
+
+public sealed partial class RekallAgeModelingGraphEvaluator
+{
+    private static RekallAgeMeshAsset CreatePlane(RekallAgeModelingGraphAsset graph, RekallAgeModelingGraphNode node) =>
+        CreateGrid(graph, node with { Parameters = new JsonObject { ["sizeX"] = ReadPositive(node, "sizeX", 1), ["sizeY"] = ReadPositive(node, "sizeY", 1), ["segmentsX"] = 1, ["segmentsY"] = 1 } });
+
+    private static RekallAgeMeshAsset CreateCylinder(RekallAgeModelingGraphAsset graph, RekallAgeModelingGraphNode node) =>
+        CreateFrustum(graph, node with { Parameters = new JsonObject { ["radiusBottom"] = ReadPositive(node, "radius", 0.5), ["radiusTop"] = ReadPositive(node, "radius", 0.5), ["depth"] = ReadPositive(node, "depth", 1), ["segments"] = ReadInteger(node, "segments", 16, 3, 4096), ["capBottom"] = ReadBoolean(node, "capBottom", true), ["capTop"] = ReadBoolean(node, "capTop", true) } });
+
+    private static RekallAgeMeshAsset CreateCone(RekallAgeModelingGraphAsset graph, RekallAgeModelingGraphNode node) =>
+        CreateFrustum(graph, node with { Parameters = new JsonObject { ["radiusBottom"] = ReadPositive(node, "radius", 0.5), ["radiusTop"] = 0.0, ["depth"] = ReadPositive(node, "depth", 1), ["segments"] = ReadInteger(node, "segments", 16, 3, 4096), ["capBottom"] = ReadBoolean(node, "capBottom", true), ["capTop"] = false } });
+
+    private static RekallAgeMeshAsset CreateDisc(RekallAgeModelingGraphAsset graph, RekallAgeModelingGraphNode node)
+    {
+        var radius = ReadPositive(node, "radius", 0.5);
+        var segments = ReadInteger(node, "segments", 16, 3, 4096);
+        var positions = new List<RekallAgeGeometryVector3> { new(0, 0, 0) };
+        for (var i = 0; i < segments; i++)
+        {
+            var angle = Math.PI * 2 * i / segments;
+            positions.Add(new(radius * Math.Cos(angle), radius * Math.Sin(angle), 0));
+        }
+        var faces = Enumerable.Range(0, segments).Select(i => new[] { 0, 1 + i, 1 + (i + 1) % segments }).ToArray();
+        return BuildMesh(graph, node, positions, faces);
+    }
+
+    private static RekallAgeMeshAsset CreateIcoSphere(RekallAgeModelingGraphAsset graph, RekallAgeModelingGraphNode node)
+    {
+        var radius = ReadPositive(node, "radius", 0.5);
+        var subdivisions = ReadInteger(node, "subdivisions", 0, 0, 6);
+        var phi = (1 + Math.Sqrt(5)) / 2;
+        var vectors = new List<Vector3>
+        {
+            new(-1,(float)phi,0),new(1,(float)phi,0),new(-1,(float)-phi,0),new(1,(float)-phi,0),
+            new(0,-1,(float)phi),new(0,1,(float)phi),new(0,-1,(float)-phi),new(0,1,(float)-phi),
+            new((float)phi,0,-1),new((float)phi,0,1),new((float)-phi,0,-1),new((float)-phi,0,1)
+        };
+        var faces = new List<int[]>
+        {
+            new[]{0,11,5},new[]{0,5,1},new[]{0,1,7},new[]{0,7,10},new[]{0,10,11},new[]{1,5,9},new[]{5,11,4},new[]{11,10,2},new[]{10,7,6},new[]{7,1,8},
+            new[]{3,9,4},new[]{3,4,2},new[]{3,2,6},new[]{3,6,8},new[]{3,8,9},new[]{4,9,5},new[]{2,4,11},new[]{6,2,10},new[]{8,6,7},new[]{9,8,1}
+        };
+        for (var level = 0; level < subdivisions; level++)
+        {
+            var cache = new Dictionary<(int, int), int>();
+            var next = new List<int[]>(faces.Count * 4);
+            foreach (var face in faces)
+            {
+                var a = Mid(face[0], face[1]); var b = Mid(face[1], face[2]); var c = Mid(face[2], face[0]);
+                next.AddRange([new[] { face[0], a, c }, new[] { face[1], b, a }, new[] { face[2], c, b }, new[] { a, b, c }]);
+            }
+            faces = next;
+            int Mid(int x, int y)
+            {
+                var key = x < y ? (x, y) : (y, x);
+                if (cache.TryGetValue(key, out var found)) return found;
+                var value = Vector3.Normalize(vectors[x] + vectors[y]);
+                vectors.Add(value); return cache[key] = vectors.Count - 1;
+            }
+        }
+        var positions = vectors.Select(value => { var n = Vector3.Normalize(value) * (float)radius; return new RekallAgeGeometryVector3(n.X, n.Y, n.Z); }).ToArray();
+        return BuildMesh(graph, node, positions, faces);
+    }
+
+    private static RekallAgeMeshAsset CreateCapsule(RekallAgeModelingGraphAsset graph, RekallAgeModelingGraphNode node)
+    {
+        var radius = ReadPositive(node, "radius", 0.5);
+        var depth = ReadPositive(node, "depth", 2);
+        if (depth < radius * 2) throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Capsule depth must be at least its diameter.", node.NodeId);
+        var segments = ReadInteger(node, "segments", 16, 3, 4096);
+        var hemi = ReadInteger(node, "hemisphereRings", 4, 2, 1024);
+        var halfBody = (depth - radius * 2) / 2;
+        var positions = new List<RekallAgeGeometryVector3> { new(0, halfBody + radius, 0) };
+        var ringData = new List<(double Radius, double Y)>();
+        for (var ring = 1; ring < hemi; ring++) { var a = Math.PI * .5 * ring / hemi; ringData.Add((radius * Math.Sin(a), halfBody + radius * Math.Cos(a))); }
+        ringData.Add((radius, halfBody)); ringData.Add((radius, -halfBody));
+        for (var ring = hemi - 1; ring >= 1; ring--) { var a = Math.PI * .5 * ring / hemi; ringData.Add((radius * Math.Sin(a), -halfBody - radius * Math.Cos(a))); }
+        foreach (var data in ringData)
+        for (var segment = 0; segment < segments; segment++) { var a = Math.PI * 2 * segment / segments; positions.Add(new(data.Radius * Math.Cos(a), data.Y, data.Radius * Math.Sin(a))); }
+        var bottom = positions.Count; positions.Add(new(0, -halfBody - radius, 0));
+        var faces = new List<int[]>();
+        for (var s = 0; s < segments; s++) faces.Add([0, Ring(0, (s + 1) % segments), Ring(0, s)]);
+        for (var ring = 0; ring < ringData.Count - 1; ring++) for (var s = 0; s < segments; s++) faces.Add([Ring(ring, s), Ring(ring, (s + 1) % segments), Ring(ring + 1, (s + 1) % segments), Ring(ring + 1, s)]);
+        var last = ringData.Count - 1;
+        for (var s = 0; s < segments; s++) faces.Add([Ring(last, s), Ring(last, (s + 1) % segments), bottom]);
+        return BuildMesh(graph, node, positions, faces);
+        int Ring(int ring, int segment) => 1 + ring * segments + segment;
+    }
+
+    private static RekallAgeMeshAsset CreateProfileSweep(RekallAgeModelingGraphAsset graph, RekallAgeModelingGraphNode node)
+    {
+        var path = ReadPointArray(node, "pathPoints", minimum: 2);
+        var profileKind = ReadString(node, "profile", "circle").ToLowerInvariant();
+        var profileSegments = ReadInteger(node, "profileSegments", 8, profileKind == "rectangle" ? 4 : 3, 4096);
+        var radius = ReadPositive(node, "radius", 0.25);
+        var width = ReadPositive(node, "profileWidth", radius * 2);
+        var height = ReadPositive(node, "profileHeight", radius * 2);
+        var profile = profileKind switch
+        {
+            "circle" => Enumerable.Range(0, profileSegments).Select(i => new Vector2((float)(radius * Math.Cos(Math.PI * 2 * i / profileSegments)), (float)(radius * Math.Sin(Math.PI * 2 * i / profileSegments)))).ToArray(),
+            "rectangle" => new[] { new Vector2((float)-width / 2, (float)-height / 2), new Vector2((float)width / 2, (float)-height / 2), new Vector2((float)width / 2, (float)height / 2), new Vector2((float)-width / 2, (float)height / 2) },
+            _ => throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", $"Profile '{profileKind}' is unsupported.", node.NodeId)
+        };
+        profileSegments = profile.Length;
+        var positions = new List<RekallAgeGeometryVector3>(path.Count * profileSegments);
+        Vector3? previousNormal = null;
+        for (var ring = 0; ring < path.Count; ring++)
+        {
+            var point = ToVector(path[ring]);
+            var tangent = Vector3.Normalize(ToVector(path[Math.Min(path.Count - 1, ring + 1)]) - ToVector(path[Math.Max(0, ring - 1)]));
+            if (!Finite(tangent)) throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Profile sweep path contains coincident spans.", node.NodeId);
+            var normal = previousNormal is null ? InitialNormal(tangent) : Vector3.Normalize(previousNormal.Value - tangent * Vector3.Dot(previousNormal.Value, tangent));
+            if (!Finite(normal)) normal = InitialNormal(tangent);
+            var binormal = Vector3.Normalize(Vector3.Cross(tangent, normal));
+            previousNormal = normal;
+            foreach (var sample in profile)
+            {
+                var value = point + normal * sample.X + binormal * sample.Y;
+                positions.Add(new(value.X, value.Y, value.Z));
+            }
+        }
+        var faces = new List<int[]>((path.Count - 1) * profileSegments + 2);
+        for (var ring = 0; ring < path.Count - 1; ring++) for (var p = 0; p < profileSegments; p++) faces.Add([Point(ring, p), Point(ring + 1, p), Point(ring + 1, (p + 1) % profileSegments), Point(ring, (p + 1) % profileSegments)]);
+        if (ReadBoolean(node, "capStart", true)) faces.Add(Enumerable.Range(0, profileSegments).Reverse().Select(p => Point(0, p)).ToArray());
+        if (ReadBoolean(node, "capEnd", true)) faces.Add(Enumerable.Range(0, profileSegments).Select(p => Point(path.Count - 1, p)).ToArray());
+        var mesh = BuildMesh(graph, node, positions, faces, createUvs: true);
+        var materialId = ReadString(node, "materialAssetId", "material.default");
+        var slotName = ReadString(node, "slotName", "Sweep");
+        var materialValues = Enumerable.Range(0, mesh.Topology.FaceIds.Count).Select(_ => JsonSerializer.SerializeToElement(0)).ToArray();
+        return mesh with { MaterialSlots = [new(slotName, materialId)], Attributes = mesh.Attributes.Append(new("material.index", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Int32, materialValues, "material-index", RekallAgeGeometryInterpolation.Nearest, JsonSerializer.SerializeToElement(0))).ToArray() };
+        int Point(int ring, int profileIndex) => ring * profileSegments + profileIndex;
+    }
+
+    private static RekallAgeMeshAsset BuildMesh(RekallAgeModelingGraphAsset graph, RekallAgeModelingGraphNode node, IReadOnlyList<RekallAgeGeometryVector3> positions, IReadOnlyList<int[]> faces, bool createUvs = false)
+    {
+        var edgeMap = new Dictionary<(int, int), int>(); var edges = new List<RekallAgeMeshEdgePointIndices>(); var cornerPoints = new List<int>(); var cornerEdges = new List<int>(); var offsets = new List<int> { 0 };
+        foreach (var face in faces)
+        {
+            for (var i = 0; i < face.Length; i++) { var a = face[i]; var b = face[(i + 1) % face.Length]; var key = a < b ? (a, b) : (b, a); if (!edgeMap.TryGetValue(key, out var edge)) { edge = edges.Count; edgeMap[key] = edge; edges.Add(new(a, b)); } cornerPoints.Add(a); cornerEdges.Add(edge); }
+            offsets.Add(cornerPoints.Count);
+        }
+        var topology = new RekallAgeMeshTopology(Enumerable.Range(1, positions.Count).Select(i => (ulong)i).ToArray(), positions, Enumerable.Range(1, edges.Count).Select(i => (ulong)(10_000 + i)).ToArray(), edges, Enumerable.Range(1, faces.Count).Select(i => (ulong)(20_000 + i)).ToArray(), offsets, Enumerable.Range(1, cornerPoints.Count).Select(i => (ulong)(30_000 + i)).ToArray(), cornerPoints, cornerEdges);
+        IReadOnlyList<RekallAgeGeometryAttribute> attributes = [];
+        if (createUvs)
+        {
+            var minY = positions.Min(p => p.Y); var maxY = positions.Max(p => p.Y); var span = Math.Max(1e-9, maxY - minY);
+            var uv = cornerPoints.Select(index => { var p = positions[index]; return JsonSerializer.SerializeToElement(new[] { 0.5 + Math.Atan2(p.Z, p.X) / (Math.PI * 2), (p.Y - minY) / span }); }).ToArray();
+            attributes = [new("uv.generated", RekallAgeGeometryDomain.Corner, RekallAgeGeometryValueType.Float2, uv, "texcoord-0")];
+        }
+        var mesh = RekallAgeMeshAsset.Create($"{graph.AssetId}.{node.NodeId}", node.NodeId, topology) with { Revision = graph.Revision, Attributes = attributes };
+        var validation = new RekallAgeMeshValidator().Validate(mesh);
+        if (!validation.IsValid) throw new EvaluationException("REKALL_MODELING_EVALUATION_OUTPUT_INVALID", $"{node.TypeId} produced invalid topology.", node.NodeId);
+        return mesh;
+    }
+
+    private static IReadOnlyList<RekallAgeGeometryVector3> ReadPointArray(RekallAgeModelingGraphNode node, string name, int minimum)
+    {
+        if (node.Parameters[name] is not JsonArray array || array.Count < minimum || array.Count > 4096) throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", $"Parameter '{name}' requires {minimum}-4096 points.", node.NodeId);
+        return array.Select(item => item is JsonArray { Count: 3 } p && TryCoordinate(p[0], out var x) && TryCoordinate(p[1], out var y) && TryCoordinate(p[2], out var z) && double.IsFinite(x) && double.IsFinite(y) && double.IsFinite(z) ? new RekallAgeGeometryVector3(x, y, z) : throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", $"Parameter '{name}' contains an invalid point.", node.NodeId)).ToArray();
+    }
+    private static bool TryCoordinate(JsonNode? node, out double value)
+    {
+        value = default;
+        if (node is not JsonValue json) return false;
+        if (json.TryGetValue<double>(out value)) return true;
+        if (json.TryGetValue<int>(out var integer)) { value = integer; return true; }
+        if (json.TryGetValue<long>(out var longInteger)) { value = longInteger; return true; }
+        return false;
+    }
+    private static Vector3 ToVector(RekallAgeGeometryVector3 p) => new((float)p.X, (float)p.Y, (float)p.Z);
+    private static bool Finite(Vector3 v) => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z) && v.LengthSquared() > 1e-12f;
+    private static Vector3 InitialNormal(Vector3 tangent) { var axis = Math.Abs(tangent.Y) < .9f ? Vector3.UnitY : Vector3.UnitX; return Vector3.Normalize(Vector3.Cross(axis, tangent)); }
+}

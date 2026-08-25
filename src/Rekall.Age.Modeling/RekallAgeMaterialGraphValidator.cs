@@ -135,7 +135,11 @@ public sealed class RekallAgeMaterialGraphValidator
     private static HashSet<string> Reachable(string outputNodeId, IReadOnlyList<RekallAgeMaterialGraphLink> links)
     {
         var result = new HashSet<string>(StringComparer.Ordinal); var stack = new Stack<string>(); stack.Push(outputNodeId);
-        while (stack.TryPop(out var node) && result.Add(node)) foreach (var link in links.Where(item => item.ToNodeId == node)) stack.Push(link.FromNodeId);
+        while (stack.TryPop(out var node))
+        {
+            if (!result.Add(node)) continue;
+            foreach (var link in links.Where(item => item.ToNodeId == node)) stack.Push(link.FromNodeId);
+        }
         return result;
     }
 

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.wet-slate.material",
+  "name": "Aetherfall Wet Slate PBR",
+  "revision": 1,
+  "nodes": [
+    { "nodeId": "uv", "typeId": "rekall.material.coordinate.uv", "typeVersion": 1, "parameters": {} },
+    { "nodeId": "albedo", "typeId": "rekall.material.texture.sample", "typeVersion": 1, "parameters": { "textureAssetId": "asset_citadel-wet-slate-terrain-v1_5e17814a" } },
+    { "nodeId": "normal-texture", "typeId": "rekall.material.texture.sample", "typeVersion": 1, "parameters": { "textureAssetId": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70" } },
+    { "nodeId": "normal", "typeId": "rekall.material.normal.map", "typeVersion": 1, "parameters": { "strength": 0.82 } },
+    { "nodeId": "pbr", "typeId": "rekall.material.surface.pbr", "typeVersion": 1, "parameters": { "roughness": 0.74, "metallic": 0.04 } },
+    { "nodeId": "output", "typeId": "rekall.material.output", "typeVersion": 1, "parameters": {} }
+  ],
+  "links": [
+    { "linkId": "uv-albedo", "fromNodeId": "uv", "fromPortId": "uv", "toNodeId": "albedo", "toPortId": "uv" },
+    { "linkId": "uv-normal", "fromNodeId": "uv", "fromPortId": "uv", "toNodeId": "normal-texture", "toPortId": "uv" },
+    { "linkId": "albedo-pbr", "fromNodeId": "albedo", "fromPortId": "color", "toNodeId": "pbr", "toPortId": "baseColor" },
+    { "linkId": "normaltex-normal", "fromNodeId": "normal-texture", "fromPortId": "color", "toNodeId": "normal", "toPortId": "color" },
+    { "linkId": "normal-pbr", "fromNodeId": "normal", "fromPortId": "normal", "toNodeId": "pbr", "toPortId": "normal" },
+    { "linkId": "pbr-output", "fromNodeId": "pbr", "fromPortId": "surface", "toNodeId": "output", "toPortId": "surface" }
+  ],
+  "output": { "name": "surface", "nodeId": "output", "portId": "surface" },
+  "exposedParameters": []
+}

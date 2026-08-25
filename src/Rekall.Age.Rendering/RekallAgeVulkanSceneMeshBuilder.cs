@@ -604,7 +604,6 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
         if (!renderable.Kind.Equals("mesh", StringComparison.Ordinal)
             || renderable.GeometryMesh is not { } geometry
             || geometry.Vertices.Count == 0
-            || geometry.Vertices.Count > ushort.MaxValue
             || geometry.Indices.Count < 3
             || geometry.Indices.Count % 3 != 0)
         {

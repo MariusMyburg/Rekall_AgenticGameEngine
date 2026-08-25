@@ -9,10 +9,14 @@ public sealed class RekallAgeMeshPrimitiveFactory
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["box"] = "rekall.modeling.primitive.box",
+            ["plane"] = "rekall.modeling.primitive.plane",
             ["grid"] = "rekall.modeling.primitive.grid",
+            ["disc"] = "rekall.modeling.primitive.disc",
             ["sphere"] = "rekall.modeling.primitive.sphere",
-            ["cylinder"] = "rekall.modeling.primitive.frustum",
-            ["cone"] = "rekall.modeling.primitive.frustum",
+            ["ico-sphere"] = "rekall.modeling.primitive.ico_sphere",
+            ["capsule"] = "rekall.modeling.primitive.capsule",
+            ["cylinder"] = "rekall.modeling.primitive.cylinder",
+            ["cone"] = "rekall.modeling.primitive.cone",
             ["torus"] = "rekall.modeling.primitive.torus"
         };
 
@@ -43,7 +47,6 @@ public sealed class RekallAgeMeshPrimitiveFactory
         }
 
         var parameters = new JsonObject();
-        if (normalized == "cone") parameters["radiusTop"] = 0;
         var node = new RekallAgeModelingGraphNode("primitive", typeId, 1, parameters);
         var graph = RekallAgeModelingGraphAsset.Create(
             $"factory.{normalized}",

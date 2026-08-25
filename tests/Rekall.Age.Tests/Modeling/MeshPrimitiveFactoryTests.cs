@@ -6,8 +6,12 @@ public sealed class MeshPrimitiveFactoryTests
 {
     [Theory]
     [InlineData("box")]
+    [InlineData("plane")]
     [InlineData("grid")]
+    [InlineData("disc")]
     [InlineData("sphere")]
+    [InlineData("ico-sphere")]
+    [InlineData("capsule")]
     [InlineData("cylinder")]
     [InlineData("cone")]
     [InlineData("torus")]

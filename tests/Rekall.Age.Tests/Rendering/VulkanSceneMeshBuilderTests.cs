@@ -725,6 +725,25 @@ public sealed class VulkanSceneMeshBuilderTests
         Assert.Equal(0.75f, mesh.Vertices[2].A);
     }
 
+    [Fact]
+    public void BuildMeshesKeepsAuthoredUInt32GeometryBeyondLegacyUShortVertexLimit()
+    {
+        const int vertexCount = ushort.MaxValue + 2;
+        var vertices = Enumerable.Range(0, vertexCount)
+            .Select(index => new RekallAgeRuntimeViewportGeometryVertex(index % 257, index / 257, 0, NormalZ: 1))
+            .ToArray();
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "large-authored", "Large Authored Mesh", "mesh", "rekall.geometry.mesh",
+            0, 0, 0, 1,
+            Variant: "rekall.geometry.mesh",
+            GeometryMesh: new(vertices, [0, ushort.MaxValue, ushort.MaxValue + 1u])));
+
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame));
+
+        Assert.Equal(vertexCount, mesh.Vertices.Count);
+        Assert.Equal((uint)ushort.MaxValue + 1, mesh.Indices.Max());
+    }
+
     private static RekallAgeRuntimeViewportFrame CreateFrame(params RekallAgeRuntimeViewportRenderable[] renderables)
     {
         return new RekallAgeRuntimeViewportFrame(

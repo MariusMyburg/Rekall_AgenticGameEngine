@@ -34,6 +34,7 @@ public sealed class WardenState : RekallAgeComponent
     [RekallAgeProperty] public double PulseCooldown { get; init; }
     [RekallAgeProperty] public double Invulnerability { get; init; }
     [RekallAgeProperty] public double ShardCount { get; init; }
+    [RekallAgeProperty] public bool CombatStarted { get; init; }
     [RekallAgeProperty] public string ObjectivePhase { get; init; } = "arrival";
     [RekallAgeProperty] public string Phase { get; init; } = "playing";
     [RekallAgeProperty] public double FacingX { get; init; }

@@ -76,6 +76,12 @@ public sealed class ViewportContractTests
         Assert.Equal("asset_sky", environment.SkyAssetId);
         Assert.Equal("agx", environment.ToneMapper);
         Assert.Equal("skybox", environment.BackgroundPolicy);
+        var viewport = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 640, 360, false);
+        Assert.NotNull(viewport.Environment);
+        Assert.Equal(1.5, viewport.Environment.AmbientEnergy);
+        Assert.Equal(0.25, viewport.Environment.Exposure);
+        Assert.Equal("agx", viewport.Environment.ToneMapper);
+        Assert.Equal("asset_grade", viewport.Environment.ColorGradeAssetId);
         var shadows = Assert.Single(world.Subsystems.Rendering.ShadowSettings);
         Assert.Equal(4, shadows.CascadeCount);
         Assert.Equal(4096, shadows.AtlasResolution);

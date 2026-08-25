@@ -171,7 +171,16 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             "rekall.modeling.primitive.sphere" => new(CreateSphere(graph, node)),
             "rekall.modeling.primitive.frustum" => new(CreateFrustum(graph, node)),
             "rekall.modeling.primitive.torus" => new(CreateTorus(graph, node)),
+            "rekall.modeling.primitive.plane" => new(CreatePlane(graph, node)),
+            "rekall.modeling.primitive.disc" => new(CreateDisc(graph, node)),
+            "rekall.modeling.primitive.cylinder" => new(CreateCylinder(graph, node)),
+            "rekall.modeling.primitive.cone" => new(CreateCone(graph, node)),
+            "rekall.modeling.primitive.ico_sphere" => new(CreateIcoSphere(graph, node)),
+            "rekall.modeling.primitive.capsule" => new(CreateCapsule(graph, node)),
+            "rekall.modeling.curve.profile_sweep" => new(CreateProfileSweep(graph, node)),
             "rekall.modeling.transform" => TransformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
+            "rekall.modeling.deform.noise" => NoiseDeformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
+            "rekall.modeling.scatter.area" => ScatterAreaGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.join" => JoinGeometry(graph, node, incoming, values),
             "rekall.modeling.boolean" => BooleanGeometry(
                 graph,
@@ -221,6 +230,45 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                 InputGeometry(node, "geometry", incoming, values),
                 "subdivide_smooth",
                 new JsonObject()),
+            "rekall.modeling.bevel" => ApplySemanticOperation(
+                graph,
+                node,
+                InputGeometry(node, "geometry", incoming, values),
+                "bevel_edges",
+                new JsonObject
+                {
+                    ["width"] = ReadNumber(node, "width", 0.05),
+                    ["segments"] = ReadInteger(node, "segments", 1, 1, 64),
+                    ["profile"] = ReadNumber(node, "profile", 0.5),
+                    ["clampOverlap"] = ReadBoolean(node, "clampOverlap", true),
+                    ["hardenNormals"] = ReadBoolean(node, "hardenNormals", false)
+                },
+                RekallAgeGeometryDomain.Edge),
+            "rekall.modeling.inset" => ApplySemanticOperation(
+                graph,
+                node,
+                InputGeometry(node, "geometry", incoming, values),
+                "inset_faces",
+                new JsonObject
+                {
+                    ["thickness"] = ReadNumber(node, "thickness", 0.05),
+                    ["depth"] = ReadNumber(node, "depth", 0),
+                    ["individual"] = ReadBoolean(node, "individual", false),
+                    ["boundary"] = ReadBoolean(node, "boundary", true)
+                },
+                RekallAgeGeometryDomain.Face),
+            "rekall.modeling.solidify" => ApplySemanticOperation(
+                graph, node, InputGeometry(node, "geometry", incoming, values), "solidify",
+                new JsonObject
+                {
+                    ["thickness"] = ReadNumber(node, "thickness", 0.05), ["offset"] = ReadNumber(node, "offset", 0),
+                    ["rim"] = ReadBoolean(node, "rim", true), ["evenThickness"] = ReadBoolean(node, "evenThickness", true)
+                }),
+            "rekall.modeling.mirror" => MirrorGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
+            "rekall.modeling.array" => ArrayGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
+            "rekall.modeling.weighted_normals" => ApplySemanticOperation(
+                graph, node, InputGeometry(node, "geometry", incoming, values), "weighted_normals",
+                new JsonObject { ["attribute"] = ReadString(node, "attribute", "normal.weighted"), ["faceAreaWeight"] = ReadNumber(node, "faceAreaWeight", 1) }),
             "rekall.modeling.merge_by_distance" => ApplySemanticOperation(
                 graph,
                 node,
@@ -228,6 +276,13 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                 "merge_by_distance",
                 new JsonObject { ["distance"] = ReadNumber(node, "distance", 0.0001) },
                 RekallAgeGeometryDomain.Point),
+            "rekall.modeling.fill_holes" => ApplySemanticOperation(graph, node, InputGeometry(node, "geometry", incoming, values), "fill_holes",
+                new JsonObject { ["materialIndex"] = ReadInteger(node, "materialIndex", 0, 0, 65_535) }, RekallAgeGeometryDomain.Edge),
+            "rekall.modeling.bridge_edge_loops" => ApplySemanticOperation(graph, node, InputGeometry(node, "geometry", incoming, values), "bridge_edge_loops",
+                new JsonObject { ["materialIndex"] = ReadInteger(node, "materialIndex", 0, 0, 65_535) }, RekallAgeGeometryDomain.Edge),
+            "rekall.modeling.poke_faces" => ApplySemanticOperation(graph, node, InputGeometry(node, "geometry", incoming, values), "poke_faces", new JsonObject()),
+            "rekall.modeling.dissolve_edges" => ApplySemanticOperation(graph, node, InputGeometry(node, "geometry", incoming, values), "dissolve_edges", new JsonObject(), RekallAgeGeometryDomain.Edge),
+            "rekall.modeling.bisect_plane" => BisectGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.field.math" => EvaluateFieldMath(node, incoming, values),
             "rekall.modeling.attribute.named" => ReadNamedAttribute(node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.attribute.capture" => CaptureAttribute(
@@ -377,6 +432,14 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         if (inputs.Length == 0)
             throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_MISSING", "Join requires at least one geometry input.", node.NodeId);
 
+        return JoinMeshes(graph, node, inputs);
+    }
+
+    private static NodeValue JoinMeshes(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        IReadOnlyList<RekallAgeMeshAsset> inputs)
+    {
         var positions = new List<RekallAgeGeometryVector3>();
         var edgePoints = new List<RekallAgeMeshEdgePointIndices>();
         var faceOffsets = new List<int> { 0 };
@@ -547,11 +610,20 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", $"{node.TypeId} requires geometry input.", node.NodeId);
         try
         {
+            var selectionName = ReadString(node, "selectionSet", "");
+            var explicitSelection = string.IsNullOrWhiteSpace(selectionName) ? null : source.SelectionSets.FirstOrDefault(selection =>
+                selection.Domain == domain && string.Equals(selection.Name, selectionName, StringComparison.Ordinal));
+            if (!string.IsNullOrWhiteSpace(selectionName) && explicitSelection is null)
+                throw new EvaluationException("REKALL_MODELING_SELECTION_SET_MISSING", $"Selection set '{selectionName}' was not found on domain '{domain}'.", node.NodeId);
             var result = new RekallAgeMeshOperationExecutor().Execute(
                 source,
-                new(operationId, domain, domain == RekallAgeGeometryDomain.Point
-                    ? source.Topology.PointIds.ToArray()
-                    : source.Topology.FaceIds.ToArray(), parameters));
+                new(operationId, domain, explicitSelection?.ElementIds ?? domain switch
+                {
+                    RekallAgeGeometryDomain.Point => source.Topology.PointIds.ToArray(),
+                    RekallAgeGeometryDomain.Edge => source.Topology.EdgeIds.ToArray(),
+                    RekallAgeGeometryDomain.Corner => source.Topology.CornerIds.ToArray(),
+                    _ => source.Topology.FaceIds.ToArray()
+                }, parameters));
             return new(result.Mesh with
             {
                 AssetId = $"{graph.AssetId}.{node.NodeId}",
@@ -579,9 +651,107 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         {
             throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Transform scale components must be nonzero.", node.NodeId);
         }
+        return new(TransformMesh(graph, node, source, translation, rotation, scale, node.NodeId));
+    }
+
+    private static RekallAgeMeshAsset TransformMesh(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        RekallAgeMeshAsset source,
+        RekallAgeGeometryVector3 translation,
+        RekallAgeGeometryVector3 rotation,
+        RekallAgeGeometryVector3 scale,
+        string outputName)
+    {
         var positions = source.Topology.Positions
             .Select(position => Add(Rotate(new(position.X * scale.X, position.Y * scale.Y, position.Z * scale.Z), rotation), translation))
             .ToArray();
+        var mesh = source with
+        {
+            AssetId = $"{graph.AssetId}.{outputName}",
+            Name = outputName,
+            Revision = graph.Revision,
+            Topology = source.Topology with { Positions = positions }
+        };
+        var validation = new RekallAgeMeshValidator().Validate(mesh);
+        if (!validation.IsValid)
+        {
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_OUTPUT_INVALID", "Transform evaluator produced invalid topology.", node.NodeId);
+        }
+        return mesh;
+    }
+
+    private static NodeValue ScatterAreaGeometry(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        NodeValue input)
+    {
+        var source = input.Mesh
+            ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", "Scatter Area requires geometry input.", node.NodeId);
+        var count = ReadInteger(node, "count", 8, 1, 4_096);
+        var sizeX = ReadNumber(node, "sizeX", 10);
+        var sizeZ = ReadNumber(node, "sizeZ", 10);
+        var minimumScale = ReadPositive(node, "minimumScale", 0.8);
+        var maximumScale = ReadPositive(node, "maximumScale", 1.2);
+        var minimumYaw = ReadNumber(node, "minimumYaw", -180);
+        var maximumYaw = ReadNumber(node, "maximumYaw", 180);
+        if (sizeX < 0 || sizeZ < 0 || maximumScale < minimumScale || maximumYaw < minimumYaw)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Scatter Area ranges must be ordered and area sizes non-negative.", node.NodeId);
+
+        var state = unchecked((uint)ReadInteger(node, "seed", 0, int.MinValue, int.MaxValue)) ^ 0x9E3779B9u;
+        double NextUnit()
+        {
+            state = unchecked(state * 1664525u + 1013904223u);
+            return state / (double)uint.MaxValue;
+        }
+
+        var instances = new RekallAgeMeshAsset[count];
+        for (var index = 0; index < count; index++)
+        {
+            var translation = new RekallAgeGeometryVector3(
+                (NextUnit() - 0.5) * sizeX,
+                0,
+                (NextUnit() - 0.5) * sizeZ);
+            var yaw = minimumYaw + NextUnit() * (maximumYaw - minimumYaw);
+            var scaleValue = minimumScale + NextUnit() * (maximumScale - minimumScale);
+            instances[index] = TransformMesh(
+                graph,
+                node,
+                source,
+                translation,
+                new(0, yaw, 0),
+                new(scaleValue, scaleValue, scaleValue),
+                $"{node.NodeId}.instance-{index}");
+        }
+        return JoinMeshes(graph, node, instances);
+    }
+
+    private static NodeValue NoiseDeformGeometry(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        NodeValue input)
+    {
+        var source = input.Mesh
+            ?? throw new EvaluationException("REKALL_MODELING_EVALUATION_INPUT_TYPE_INVALID", "Noise Deform requires geometry input.", node.NodeId);
+        var amplitude = ReadNumber(node, "amplitude", 0.25);
+        var frequency = ReadPositive(node, "frequency", 1);
+        var seed = ReadInteger(node, "seed", 0, int.MinValue, int.MaxValue);
+        var axis = ReadString(node, "axis", "z");
+        var positions = source.Topology.Positions.Select(position =>
+        {
+            var phase = seed * 0.1031;
+            var noise = Math.Sin((position.X + phase) * frequency) * 0.55
+                + Math.Cos((position.Y - phase * 0.71) * frequency * 1.37) * 0.3
+                + Math.Sin((position.X + position.Y + phase * 0.19) * frequency * 0.73) * 0.15;
+            var offset = noise * amplitude;
+            return axis switch
+            {
+                "x" => position with { X = position.X + offset },
+                "y" => position with { Y = position.Y + offset },
+                "z" => position with { Z = position.Z + offset },
+                _ => throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", $"Noise Deform axis '{axis}' is unsupported.", node.NodeId)
+            };
+        }).ToArray();
         var mesh = source with
         {
             AssetId = $"{graph.AssetId}.{node.NodeId}",
@@ -591,9 +761,7 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         };
         var validation = new RekallAgeMeshValidator().Validate(mesh);
         if (!validation.IsValid)
-        {
-            throw new EvaluationException("REKALL_MODELING_EVALUATION_OUTPUT_INVALID", "Transform evaluator produced invalid topology.", node.NodeId);
-        }
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_OUTPUT_INVALID", "Noise Deform produced invalid topology.", node.NodeId);
         return new(mesh);
     }
 

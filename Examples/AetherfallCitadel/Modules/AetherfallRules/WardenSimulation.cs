@@ -55,6 +55,11 @@ internal static class WardenSimulation
             minimumZ,
             maximumZ);
         var hasDirection = Math.Abs(moveX) > 0.0001 || Math.Abs(moveZ) > 0.0001;
+        var combatStarted = warden.ComponentBoolean(AetherfallConstants.WardenStateType, "combatStarted")
+            || hasDirection
+            || world.WasInputActionPressed(AetherfallConstants.PulseAction)
+            || world.WasInputActionPressed(AetherfallConstants.DashAction)
+            || world.WasInputActionPressed(AetherfallConstants.InteractAction);
         var aether = warden.ComponentNumber(AetherfallConstants.WardenStateType, "aether", 100);
         var dashCooldown = Math.Max(
             0,
@@ -112,6 +117,7 @@ internal static class WardenSimulation
                 .WithComponentNumber(AetherfallConstants.WardenStateType, "pulseCooldown", pulseCooldown)
                 .WithComponentNumber(AetherfallConstants.WardenStateType, "dashCooldown", dashCooldown)
                 .WithComponentNumber(AetherfallConstants.WardenStateType, "invulnerability", invulnerability)
+                .WithComponentBoolean(AetherfallConstants.WardenStateType, "combatStarted", combatStarted)
                 .WithComponentNumber(AetherfallConstants.WardenStateType, "aether", aether);
             return hasDirection
                 ? updated

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-rubble-boulder-model",
+  "displayName": "Fractured Slate Boulder",
+  "revision": 2,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-rubble-boulder-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "6ce45af1360f1229c5ae4e2e8c66f2e81a7b36fa4044c335263c3ce72d7bbc69",
+    "sourceLogicalRevision": 2,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-rubble-boulder-model/a36e5df318b464d081f97b81d859249a4c4de74ec408ed705e55e41fcfa0702f.age.compiled-mesh.json",
+    "compiledContentHash": "a36e5df318b464d081f97b81d859249a4c4de74ec408ed705e55e41fcfa0702f",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-25T17:13:59.3564494+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

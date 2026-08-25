@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-warden-dark-model",
+  "displayName": "Aetherfall Dark Warden",
+  "revision": 5,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-warden-dark-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "e81a498bd0863e0a569a3a6caf77819a6de27df646d2dc986cf8e7d55c3ba8c5",
+    "sourceLogicalRevision": 6,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-warden-dark-model/f3dda998913cbee478cfb56b7383234dc24435d308ca2cacf1a5516eb77a09d0.age.compiled-mesh.json",
+    "compiledContentHash": "f3dda998913cbee478cfb56b7383234dc24435d308ca2cacf1a5516eb77a09d0",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-25T19:58:30.6436896+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

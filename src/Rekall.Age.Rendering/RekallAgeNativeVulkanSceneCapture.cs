@@ -1754,11 +1754,21 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 return false;
             }
 
-            var upload = new VulkanTextureMipUpload(
-                0,
-                0,
-                checked((uint)texture.Width),
-                checked((uint)texture.Height));
+            var levels = RekallAgeRgbaMipChainBuilder.Build(texture.Width, texture.Height, texture.Rgba);
+            var uploadBytes = new byte[levels.Sum(level => level.Bytes.Length)];
+            var uploads = new VulkanTextureMipUpload[levels.Count];
+            var offset = 0;
+            for (var index = 0; index < levels.Count; index++)
+            {
+                var level = levels[index];
+                level.Bytes.CopyTo(uploadBytes, offset);
+                uploads[index] = new VulkanTextureMipUpload(
+                    checked((ulong)offset),
+                    checked((uint)level.Level),
+                    checked((uint)level.Width),
+                    checked((uint)level.Height));
+                offset += level.Bytes.Length;
+            }
             return TryCreateTextureResource(
                 state,
                 texture.Id,
@@ -1766,8 +1776,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 Format.R8G8B8A8Unorm,
                 checked((uint)texture.Width),
                 checked((uint)texture.Height),
-                [upload],
-                texture.Rgba,
+                uploads,
+                uploadBytes,
                 out resource);
         }
 
@@ -1837,7 +1847,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 out var image,
                 out var memory,
                 out var view);
-            var sampler = CreateSampler(state, samplerDescription);
+            var sampler = CreateSampler(state, samplerDescription, checked((uint)uploads.Count));
             resource = new VulkanTextureResource(id, width, height, uploads, stagingBuffer, stagingMemory, image, memory, view, sampler);
             return true;
         }
@@ -3850,7 +3860,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             return module;
         }
 
-        private static Sampler CreateSampler(VulkanState state, RekallAgeVulkanSceneSampler sampler)
+        private static Sampler CreateSampler(
+            VulkanState state,
+            RekallAgeVulkanSceneSampler sampler,
+            uint mipLevels)
         {
             var createInfo = new SamplerCreateInfo
             {
@@ -3861,7 +3874,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 AddressModeU = ToVkSamplerAddressMode(sampler.WrapS),
                 AddressModeV = ToVkSamplerAddressMode(sampler.WrapT),
                 AddressModeW = SamplerAddressMode.Repeat,
-                MaxLod = 0,
+                MaxLod = Math.Max(0, mipLevels - 1),
                 BorderColor = BorderColor.FloatTransparentBlack
             };
             ThrowIfFailed(state.Vk.CreateSampler(state.Device, &createInfo, null, out var handle), "vkCreateSampler");

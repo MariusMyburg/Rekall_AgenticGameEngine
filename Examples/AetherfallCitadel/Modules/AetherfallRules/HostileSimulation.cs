@@ -15,6 +15,15 @@ internal static class HostileSimulation
             return world;
         }
 
+        if (!warden.ComponentBoolean(AetherfallConstants.WardenStateType, "combatStarted")
+            && string.Equals(
+                warden.ComponentString(AetherfallConstants.WardenStateType, "objectivePhase", "arrival"),
+                "arrival",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return world;
+        }
+
         var seconds = Math.Clamp(context.DeltaTime.TotalSeconds, 0, AetherfallConstants.MaximumDeltaSeconds);
         var elapsed = world.ElapsedTime.TotalSeconds;
         foreach (var source in world.EntitiesWithComponent(AetherfallConstants.EnemyStateType)

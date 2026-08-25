@@ -685,7 +685,9 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                                 ReadString(component.Properties, "color")
                                     ?? ReadString(component.Properties, "lightColor")
                                     ?? stellarColor,
-                                renderLayer));
+                                renderLayer,
+                                Math.Max(0.001, ReadNumber(component.Properties, "range", 10)),
+                                ReadInt32(component.Properties, "priority", 0)));
                         }
 
                         break;

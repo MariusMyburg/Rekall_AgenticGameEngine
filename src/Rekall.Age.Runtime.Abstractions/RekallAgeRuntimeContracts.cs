@@ -405,7 +405,9 @@ public sealed record RekallAgeRuntimeRenderLight(
     double Intensity,
     string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored,
     string? Color = null,
-    string Layer = "default");
+    string Layer = "default",
+    double Range = 10,
+    int Priority = 0);
 
 public sealed record RekallAgeRuntimeRenderUiLayer(
     string EntityId,

@@ -21,8 +21,48 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             vertices,
             indices,
             draws,
-            BuildFrameUniform(frame, effectiveCamera, primaryLightEntityId, directionalLight),
+            BuildFrameUniform(frame, renderablesByEntityId, effectiveCamera, primaryLightEntityId, directionalLight),
             BuildStereoFrame(frame, bounds))
+        {
+            EffectiveCamera = effectiveCamera
+        };
+    }
+
+    public RekallAgeVulkanSceneBatch BuildDynamic(
+        RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes,
+        RekallAgeVulkanSceneBatch stableBatch,
+        string? primaryLightEntityId = null,
+        RekallAgeVulkanDirectionalLightInjection? directionalLight = null)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        ArgumentNullException.ThrowIfNull(meshes);
+        ArgumentNullException.ThrowIfNull(stableBatch);
+        if (meshes.Count != stableBatch.Draws.Count)
+        {
+            throw new ArgumentException("Stable batch topology must contain one draw for each source mesh.", nameof(stableBatch));
+        }
+
+        var renderablesByEntityId = BuildRenderableLookup(frame);
+        var draws = new RekallAgeVulkanSceneDraw[stableBatch.Draws.Count];
+        for (var i = 0; i < draws.Length; i++)
+        {
+            renderablesByEntityId.TryGetValue(meshes[i].EntityId, out var renderable);
+            draws[i] = stableBatch.Draws[i] with
+            {
+                Model = CreateModelMatrix(renderable, frame.ActiveCamera)
+            };
+        }
+
+        var effectiveCamera = frame.ActiveCamera is null || IsDefaultCamera(frame.ActiveCamera)
+            ? stableBatch.EffectiveCamera
+            : ResolveEffectiveCamera(frame, SceneBounds.Empty);
+        return new RekallAgeVulkanSceneBatch(
+            stableBatch.Vertices,
+            stableBatch.Indices,
+            draws,
+            BuildFrameUniform(frame, renderablesByEntityId, effectiveCamera, primaryLightEntityId, directionalLight),
+            BuildStereoFrame(frame, SceneBounds.Empty))
         {
             EffectiveCamera = effectiveCamera
         };
@@ -170,12 +210,16 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
 
     private static RekallAgeVulkanSceneFrameUniform BuildFrameUniform(
         RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyDictionary<string, RekallAgeRuntimeViewportRenderable> renderablesByEntityId,
         RekallAgeVulkanEffectiveCamera camera,
         string? primaryLightEntityId,
         RekallAgeVulkanDirectionalLightInjection? directionalLight)
     {
+        var renderables = renderablesByEntityId.Values;
         var light = directionalLight is null
-            ? ResolvePrimaryLight(frame, primaryLightEntityId)
+            ? string.IsNullOrWhiteSpace(primaryLightEntityId)
+                ? ResolveFirstDirectionalLight(renderables) ?? ResolvePrimaryLight(renderablesByEntityId, renderables, primaryLightEntityId: null)
+                : ResolvePrimaryLight(renderablesByEntityId, renderables, primaryLightEntityId)
             : directionalLight.Available
                 ? new SceneLight(
                     directionalLight.EntityId,
@@ -183,11 +227,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
                     Vector4.Zero,
                     directionalLight.Color)
                 : SceneLight.Disabled;
-        var additionalLight = directionalLight is null
-            ? string.IsNullOrWhiteSpace(primaryLightEntityId)
-                ? SceneLight.Disabled
-                : ResolvePrimaryLight(frame, primaryLightEntityId: null)
-            : ResolveFirstPointLight(frame);
+        var pointLights = ResolvePointLights(renderables, 4);
+        var additionalLight = pointLights.Count == 0 ? SceneLight.Disabled : pointLights[0];
         if (string.Equals(light.EntityId, additionalLight.EntityId, StringComparison.Ordinal))
         {
             additionalLight = SceneLight.Disabled;
@@ -201,16 +242,38 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             camera.SoftwareViewProjection,
             additionalLight.Direction,
             additionalLight.Color,
-            additionalLight.Position);
+            additionalLight.Position,
+            new Vector4(additionalLight.Range, additionalLight.Priority, 0, 0))
+        {
+            PointLights = pointLights.Select(item => new RekallAgeVulkanPointLight(
+                item.EntityId ?? string.Empty, item.Color, item.Position, new Vector4(item.Range, item.Priority, 0, 0))).ToArray()
+        };
     }
 
-    private static SceneLight ResolveFirstPointLight(RekallAgeRuntimeViewportFrame frame)
+    private static IReadOnlyList<SceneLight> ResolvePointLights(
+        IEnumerable<RekallAgeRuntimeViewportRenderable> renderables,
+        int maximumCount)
     {
-        var point = frame.Renderables.FirstOrDefault(renderable =>
+        return renderables
+            .Where(renderable => renderable.Kind.Equals("light", StringComparison.Ordinal)
+                && renderable.Intensity > 0.0001
+                && IsPointLight(renderable))
+            .OrderByDescending(renderable => renderable.LightPriority)
+            .ThenByDescending(renderable => renderable.Intensity)
+            .ThenBy(renderable => renderable.EntityId, StringComparer.Ordinal)
+            .Take(maximumCount)
+            .Select(ToSceneLight)
+            .ToArray();
+    }
+
+    private static SceneLight? ResolveFirstDirectionalLight(
+        IEnumerable<RekallAgeRuntimeViewportRenderable> renderables)
+    {
+        var directional = renderables.FirstOrDefault(renderable =>
             renderable.Kind.Equals("light", StringComparison.Ordinal)
             && renderable.Intensity > 0.0001
-            && IsPointLight(renderable));
-        return point is null ? SceneLight.Disabled : ToSceneLight(point);
+            && !IsPointLight(renderable));
+        return directional is null ? null : ToSceneLight(directional);
     }
 
     private static RekallAgeVulkanEffectiveCamera ResolveEffectiveCamera(
@@ -449,16 +512,15 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
     }
 
     private static SceneLight ResolvePrimaryLight(
-        RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyDictionary<string, RekallAgeRuntimeViewportRenderable> renderablesByEntityId,
+        IEnumerable<RekallAgeRuntimeViewportRenderable> renderables,
         string? primaryLightEntityId)
     {
-        if (!string.IsNullOrWhiteSpace(primaryLightEntityId))
+        if (!string.IsNullOrWhiteSpace(primaryLightEntityId)
+            && renderablesByEntityId.TryGetValue(primaryLightEntityId, out var selected))
         {
-            var selected = frame.Renderables.FirstOrDefault(renderable =>
-                renderable.EntityId.Equals(primaryLightEntityId, StringComparison.Ordinal)
-                && renderable.Kind.Equals("light", StringComparison.Ordinal)
-                && renderable.Intensity > 0.0001);
-            if (selected is not null)
+            if (selected.Kind.Equals("light", StringComparison.Ordinal)
+                && selected.Intensity > 0.0001)
             {
                 return ToSceneLight(selected);
             }
@@ -466,7 +528,7 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
 
         RekallAgeRuntimeViewportRenderable? firstLight = null;
         RekallAgeRuntimeViewportRenderable? firstPointLight = null;
-        foreach (var renderable in frame.Renderables)
+        foreach (var renderable in renderables)
         {
             if (!renderable.Kind.Equals("light", StringComparison.Ordinal))
             {
@@ -505,12 +567,14 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             IsPointLight(light)
                 ? new Vector4((float)light.X, (float)light.Y, (float)light.Z, 1)
                 : new Vector4((float)light.X, (float)light.Y, (float)light.Z, 0),
-            ResolveLightColor(light));
+            ResolveLightColor(light),
+            (float)Math.Clamp(light.LightRange, 0.001, 1_000_000),
+            light.LightPriority);
 
     private static Vector4 ResolveLightColor(RekallAgeRuntimeViewportRenderable light)
     {
         var color = ParseColor(light.MaterialColor);
-        var intensity = (float)Math.Clamp(light.Intensity, 0.05, 4.0);
+        var intensity = (float)Math.Clamp(light.Intensity, 0.05, IsPointLight(light) ? 16.0 : 4.0);
         return new Vector4(color.X * intensity, color.Y * intensity, color.Z * intensity, 1);
     }
 
@@ -593,7 +657,13 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         }
     }
 
-    private readonly record struct SceneLight(string? EntityId, Vector3 Direction, Vector4 Position, Vector4 Color)
+    private readonly record struct SceneLight(
+        string? EntityId,
+        Vector3 Direction,
+        Vector4 Position,
+        Vector4 Color,
+        float Range = 10,
+        int Priority = 0)
     {
         public static SceneLight Disabled { get; } = new(null, Vector3.Zero, Vector4.Zero, Vector4.Zero);
     }

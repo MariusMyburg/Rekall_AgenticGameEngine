@@ -12,9 +12,33 @@ The finished project must run from Studio and as a relocatable Windows package. 
 
 **Title:** Aetherfall: Citadel of Echoes
 
-**Format:** Single-player, elevated-camera 3D action-adventure across a floating citadel.
+**Format:** Single-player, elevated-camera 3D action-adventure through a grounded ruined citadel landscape.
 
 The player pilots an agile aether warden through three visually distinct connected combat spaces. They activate energy conduits, collect echo shards, evade moving hazards, fight several reusable enemy archetypes, and defeat a multi-stage Citadel Guardian. Movement, aiming, dash, pulse fire, interaction, pause, and reset use semantic input actions. The game is immediately readable from an elevated perspective and does not depend on genre-specific engine behavior.
+
+## Authoritative Visual Direction
+
+Aetherfall must look as realistic and dark as AGE can achieve. Its target is mature cinematic survival-horror naturalism with the environmental readability of an elevated action RPG—not a colorful abstract arena, children's game, or renderer test chamber.
+
+The world is a coherent explorable location built on continuous terrain or ground, even where the playable surface is mostly flat. Paths, encounter clearings, terraces, cliffs, ruins, foundations, rubble, vegetation or restrained alien growth, and near/mid/far landmarks establish believable geography. Architecture must be embedded in the ground and shaped by the location. Terrain, solid world boundaries, foreground occluders, or fog hide the edges of the authored world; disconnected platforms may not float in an empty colored void.
+
+Materials use desaturated wet stone, fractured slate, compacted earth, ash, rough weathered metal, aged timber, mud, and other physically credible surfaces. Lighting uses a cold overcast or moonlit key, sparse warm practical sources, volumetric mist and restrained shafts, readable silhouettes, and deep contact shadows. Emissive color is scarce and motivated. Effects are brief and physical—dust, sparks, debris, mist, impact flashes, and subtle activation energy—rather than persistent neon hoops or rails.
+
+Giant glowing rings, candy magenta/cyan palettes, floating colorful spheres/cubes/cones, obvious raw primitives, geometric panel fields, and nonsensical decorative shapes are explicitly rejected. Actors and enemies must read as authored, material-bearing silhouettes from the gameplay camera. The HUD must support the world without dominating it.
+
+The visual bar is judged from actual native 2560×1440 captures, not component counts or feature flags. A technically valid frame that still looks crude, toy-like, empty, or incoherent fails acceptance and must be revised.
+
+### Approved visual-reference traits
+
+The user's Diablo screenshot is a mood, composition, readability, and lighting reference only; no source asset or protected game content is copied into Aetherfall. The resulting scene should use a tighter elevated three-quarter gameplay camera; dense masonry, ground detail, stairs, debris, walls, and foreground occlusion that fill and frame the view; near-black surroundings with preserved cool gray/green midtones; readable player and enemy silhouettes grouped into an active encounter; restrained atmospheric falloff toward the edges; and sparse warm orange action or practical effects that become the focal point and visibly influence nearby surfaces. The reference rejects a distant barren overview just as strongly as it rejects colorful abstraction.
+
+## Game-Driven Engine Development Rule
+
+Aetherfall is a realistic acceptance driver for both rendering and gameplay. It must exercise responsive movement, aiming, attacks, dash, enemy behavior, collision and damage, health, pickups, progression, encounter state, action-synchronized effects, camera behavior, HUD feedback, pause/reset, difficulty, and readability—not merely prove that a scene can render.
+
+When ordinary terrain, material, modeling, model rendering, animation, camera/composition, lighting, fog, effects, input, events, queries, mutation, physics, navigation, runtime inspection, packaging, or gameplay authoring is awkward, impossible, uninspectable, or visibly weak, improve the smallest generic AGE contract first and then make Aetherfall consume it. Do not hide common engine deficiencies behind one-off game hacks. Game-specific combat, AI, progression, and encounter decisions remain in Aetherfall's authored modules and assets; the engine must not gain genre-specific behavior.
+
+AGE's built-in modeling system is itself under production acceptance. Final flagship geometry must prove that inspectable modeling graphs can create, revise, bake, publish, catalog, and render reusable terrain modules, broken walls and arches, cliffs and rock clusters, rubble and props, gates and foundations, and readable player/enemy characters. Scene primitives may block out composition but may not remain the visible substitute for required production assets. If the graph lacks necessary generic operators, topology and surface control, UV/material-slot authoring, composition/hierarchy, deformation or animation preparation, diagnostics, or dependable bake/publish behavior, extend those generic modeling contracts and prove them before completing the corresponding game asset.
 
 ## Approaches Considered
 
@@ -32,7 +56,7 @@ Three linked arenas provide a bounded production surface while stressing dynamic
 
 ## Player Experience
 
-The opening vista shows the player on a floating arrival platform, the central citadel, distant structures, energy bridges, and the Guardian's sealed observatory. A concise HUD communicates integrity, aether, shards, current objective, score/combo, and boss state.
+The opening vista shows the player on a rain-darkened ruined approach, with a grounded path through fractured terrain toward the central citadel, distant structures, sparse practical lights, mist, and the Guardian's sealed observatory. A concise HUD communicates integrity, aether, shards, current objective, score/combo, and boss state without competing with the world.
 
 The first space teaches motion, dash, pulse fire, pickups, and conduit activation. The second combines moving sentries, orbiting hazards, cover pillars, and a timed energy lock. The third escalates into a guardian battle whose shield, vulnerable phase, radial attack, and defeat state are visible in both the world and HUD. Victory opens the observatory core and presents a replay prompt. Defeat and manual reset restore a deterministic clean run.
 

@@ -43,6 +43,11 @@ crashdumps/
 
 # Local assets and large ad-hoc captures
 Examples/AetherfallCitadel/Builds/
+Examples/**/Assets/Models/Compiled/
+Examples/**/Assets/texture/
+Examples/**/Proof/Captures/
+Examples/**/Transactions/Snapshots/
+Examples/**/Transactions/transactions.age.json
 *.tmp
 *.temp
 *.bak

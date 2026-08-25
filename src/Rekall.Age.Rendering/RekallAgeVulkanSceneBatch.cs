@@ -132,7 +132,17 @@ public sealed record RekallAgeVulkanSceneFrameUniform(
     Matrix4x4 SoftwareViewProjection = default,
     Vector3 AdditionalLightDirection = default,
     Vector4 AdditionalLightColor = default,
-    Vector4 AdditionalLightPosition = default);
+    Vector4 AdditionalLightPosition = default,
+    Vector4 AdditionalLightParameters = default)
+{
+    public IReadOnlyList<RekallAgeVulkanPointLight> PointLights { get; init; } = [];
+}
+
+public sealed record RekallAgeVulkanPointLight(
+    string EntityId,
+    Vector4 Color,
+    Vector4 Position,
+    Vector4 Parameters);
 
 public sealed record RekallAgeVulkanSceneStereoFrame(
     bool Enabled,

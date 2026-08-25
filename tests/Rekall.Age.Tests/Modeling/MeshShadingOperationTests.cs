@@ -46,10 +46,26 @@ public sealed class MeshShadingOperationTests
 
         var uv = Assert.Single(result.Mesh.Attributes, item => item.Name == "uv.lightmap");
         Assert.Equal(RekallAgeGeometryDomain.Corner, uv.Domain);
-        Assert.Equal("texcoord", uv.Semantic);
+        Assert.Equal("texcoord-0", uv.Semantic);
         Assert.Contains(uv.Values, item => item[0].GetDouble() == 0.25 && item[1].GetDouble() == 0.375);
         Assert.Equal(mesh.Topology, result.Mesh.Topology);
         Assert.True(result.Validation.IsValid);
+    }
+
+    [Fact]
+    public async Task ProjectUvOutputCompilesProjectedTextureCoordinates()
+    {
+        var mesh = await Grid();
+        var projected = new RekallAgeMeshOperationExecutor().Execute(mesh, new(
+            "project_uv",
+            RekallAgeGeometryDomain.Face,
+            mesh.Topology.FaceIds,
+            new JsonObject { ["axis"] = "xy", ["scaleU"] = 0.5, ["scaleV"] = 0.25 }));
+
+        var compiled = new RekallAgeMeshCompiler().Compile(projected.Mesh);
+
+        Assert.Contains(compiled.Vertices, vertex => Math.Abs(vertex.Uv.X) > 0.01);
+        Assert.Contains(compiled.Vertices, vertex => Math.Abs(vertex.Uv.Y) > 0.01);
     }
 
     private static async ValueTask<RekallAgeMeshAsset> Grid()

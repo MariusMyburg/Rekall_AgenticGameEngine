@@ -109,10 +109,31 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             Culling = culling,
             CameraViews = cameraViews,
             HeadsetCamera = headsetCamera,
+            Environment = BuildEnvironment(world),
             FogVolumes = BuildFogVolumes(world),
             ParticleEmitters = BuildParticleEmitters(world),
             DeltaSeconds = world.DeltaSeconds
         };
+    }
+
+    private static RekallAgeRuntimeViewportEnvironment? BuildEnvironment(RekallAgeRuntimeWorld world)
+    {
+        var environment = world.Subsystems.Rendering.Environments
+            .OrderBy(item => item.EntityName, StringComparer.Ordinal)
+            .ThenBy(item => item.EntityId, StringComparer.Ordinal)
+            .FirstOrDefault();
+        return environment is null
+            ? null
+            : new RekallAgeRuntimeViewportEnvironment(
+                environment.EntityId,
+                environment.EntityName,
+                environment.SkyAssetId,
+                environment.AmbientEnergy,
+                environment.Exposure,
+                environment.ToneMapper,
+                environment.WhitePoint,
+                environment.ColorGradeAssetId,
+                environment.BackgroundPolicy);
     }
 
     private static IReadOnlyList<RekallAgeRuntimeViewportParticleEmitter> BuildParticleEmitters(RekallAgeRuntimeWorld world) =>
@@ -728,7 +749,11 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 RotationZ: transform.Rotation3D.Z,
                 Intensity: light.Intensity,
                 MaterialColor: light.Color,
-                Layer: light.Layer);
+                Layer: light.Layer)
+            {
+                LightRange = light.Range,
+                LightPriority = light.Priority
+            };
         }
 
         foreach (var element in world.Subsystems.Ui.Elements.Where(element => element.Layout is not null))

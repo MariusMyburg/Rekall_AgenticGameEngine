@@ -1,6 +1,6 @@
 # Rekall AGE Strategic Priorities
 
-Last aligned: 2026-08-23
+Last aligned: 2026-08-25
 
 This document converts the product vision into the current execution order. It
 is deliberately capability-first: substantial playable evidence has priority
@@ -19,6 +19,24 @@ Rekall AGE is not yet production-ready, Godot-equivalent, Blender-grade, or
 capable of publishing a normal AGE game to the browser. Contract tests and
 package audits are valuable evidence, but they do not substitute for an
 independently reviewed, playable game after the latest mutation.
+
+## Immediate 2026-08-25 controller escalation: comprehensive modeling
+
+The Aetherfall controller review rejected the current world as overly
+bright/gray and visibly low-poly. AGE's first editable-mesh foundation was
+necessary but not remotely comprehensive enough. The immediate engine and
+flagship priority is the independent Blender/Godot-informed modeling expansion
+specified in
+`docs/superpowers/specs/2026-08-25-comprehensive-agentic-modeling-design.md` and
+planned in
+`docs/superpowers/plans/2026-08-25-comprehensive-agentic-modeling-expansion.md`.
+
+Wave 1 adds production bevel/inset, solidify, mirror, array/instances,
+weighted/split normals, curves/profile sweep, broader primitives, and the
+selection/agent/Studio surfaces required to use them. Aetherfall must visibly
+consume at least five of these capabilities before renderer-tier capture and
+package acceptance resume. Catalog existence or tessellation-only polygon
+growth does not count as visual acceptance.
 
 The phrase "100% C#" means that engine and game logic remain C#. Platform
 interop may use the minimum required JavaScript, XAML describes Windows UI,
@@ -56,6 +74,32 @@ second game engine or a place where authored gameplay is rewritten.
    generic tile/terrain, navigation, particles, shadows/environment, material
    integration, render-graph attachments, physics breadth, asset cooking,
    audio, profiling, and deployment work.
+
+## Post-Aetherfall: multimodal design references in Studio
+
+Do not interrupt the active Aetherfall milestone for this work. After the
+flagship game is accepted, add the capability in evidence-driven stages:
+
+1. Let users paste, attach, or drag images into the ordinary Studio agent
+   conversation, preview/remove them before sending, and deliver them with the
+   text request to multimodal providers. Store project attachments within the
+   selected project boundary with provenance, size/type limits, privacy-safe
+   diagnostics, and explicit provider capability reporting.
+2. Add a lightweight persistent project References library. Users and agents
+   can label images as mood, environment, character, material, UI, gameplay,
+   composition, or another free-form role; cite a reference from later
+   messages; and distinguish inspiration from edit targets and shippable
+   assets. References never silently enter a package or become copied content.
+3. Let real usage determine whether a broader Game Design workspace is useful.
+   If added, it should connect vision, design pillars, references, mechanics,
+   locations, characters, art direction, tasks, and acceptance evidence while
+   retaining ordinary chat as the fastest path. Avoid a mandatory form-heavy
+   design bureaucracy or a second hidden source of project truth.
+
+Acceptance must prove a user can send a text-and-image request from Studio,
+the selected provider receives the intended bounded inputs, an agent can use a
+persisted reference in later authoring, and project/package audits report the
+reference provenance without bundling it unless explicitly requested.
 
 ## Genuine web publishing contract
 

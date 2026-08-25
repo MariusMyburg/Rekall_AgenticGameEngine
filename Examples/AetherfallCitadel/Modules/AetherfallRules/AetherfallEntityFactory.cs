@@ -98,7 +98,7 @@ internal static class AetherfallEntityFactory
                 new JsonObject
                 {
                     ["primitive"] = "sphere",
-                    ["color"] = "#ff547b"
+                    ["color"] = "#a76a45"
                 });
     }
 

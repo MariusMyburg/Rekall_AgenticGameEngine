@@ -11,7 +11,7 @@ public sealed class ModelingGraphContractTests
     {
         var catalog = RekallAgeModelingNodeCatalog.CreateDefault();
 
-        Assert.Equal(19, catalog.Descriptors.Count);
+        Assert.Equal(39, catalog.Descriptors.Count);
         Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.primitive.box");
         Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.primitive.frustum");
         Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.primitive.torus");
@@ -21,6 +21,11 @@ public sealed class ModelingGraphContractTests
         Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.extrude");
         Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.triangulate");
         Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.project_uv");
+        Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.fill_holes");
+        Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.bridge_edge_loops");
+        Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.poke_faces");
+        Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.dissolve_edges");
+        Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.bisect_plane");
         Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.attribute.capture");
         Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.attribute.named");
         Assert.Contains(catalog.Descriptors, descriptor => descriptor.TypeId == "rekall.modeling.field.math");

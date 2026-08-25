@@ -1,0 +1,125 @@
+using System.Runtime.CompilerServices;
+using System.Text.Json.Nodes;
+using Rekall.Age.Rendering;
+using Rekall.Age.World;
+using Rekall.Age.Runtime;
+
+namespace Rekall.Age.Tests.Examples;
+
+public sealed class AetherfallHighFidelityAcceptanceTests
+{
+    [Fact]
+    public void ResonanceCourtAuthorsACompleteScalableHighFidelityContract()
+    {
+        var entities = LoadMainScene()["entities"]!.AsArray();
+        var components = entities.SelectMany(entity => entity!["components"]!.AsArray()).ToArray();
+
+        Assert.Single(components, component => Type(component) == "Rekall.RenderQualityProfile");
+        Assert.Single(components, component => Type(component) == "Rekall.Environment3D");
+        Assert.Single(components, component => Type(component) == "Rekall.ShadowSettings");
+        Assert.True(components.Count(component => Type(component) == "Rekall.FogVolume") >= 2);
+
+        var emitters = components.Where(component => Type(component) == "Rekall.ParticleEmitter3D").ToArray();
+        Assert.True(emitters.Length >= 6, $"Expected six purposeful authored emitters, found {emitters.Length}.");
+        Assert.True(emitters.Select(component => String(component?["properties"], "role"))
+            .Where(role => role is not null)
+            .Distinct(StringComparer.Ordinal).Count() >= 6);
+        Assert.All(emitters, component => Assert.True(Number(component?["properties"], "emissiveIntensity") > 0));
+    }
+
+    [Fact]
+    public void CourtUsesTexturedPbrMaterialsShadowCastersAndVisibleAnimation()
+    {
+        var entities = LoadMainScene()["entities"]!.AsArray();
+        var materials = entities.SelectMany(entity => entity!["components"]!.AsArray())
+            .Where(component => Type(component) == "Rekall.Material")
+            .ToArray();
+
+        Assert.Contains(materials, material =>
+            !string.IsNullOrWhiteSpace(String(material?["properties"], "baseColorTexture"))
+            && !string.IsNullOrWhiteSpace(String(material?["properties"], "normalTexture"))
+            && !string.IsNullOrWhiteSpace(String(material?["properties"], "emissiveTexture")));
+        Assert.True(entities.Count(entity => Bool(entity, "visible") && HasComponent(entity, "Rekall.MeshRenderer")
+            && Bool(Component(entity, "Rekall.MeshRenderer")?["properties"], "castShadows")) >= 8);
+
+        foreach (var actorName in new[] { "AetherWarden", "TrainingSentinel", "CourtOrbiterEnemy", "CourtLancer" })
+        {
+            var actor = entities.Single(entity => String(entity, "name") == actorName);
+            Assert.True(Bool(actor, "visible"));
+            Assert.True(HasComponent(actor, "Rekall.ModelAssetReference"));
+            Assert.True(HasComponent(actor, "Rekall.AnimationPlayer"));
+        }
+    }
+
+    [Fact]
+    public void CourtHasVisibleArchitecturalDensityAndPurposefulMaterialVariation()
+    {
+        var entities = LoadMainScene()["entities"]!.AsArray();
+        var visibleCourtArchitecture = entities.Where(entity =>
+            Bool(entity, "visible")
+            && HasTag(entity, "zone.resonance")
+            && (HasTag(entity, "architecture") || HasTag(entity, "cover") || HasTag(entity, "rail")))
+            .ToArray();
+
+        Assert.True(entities.Count >= 125, $"Expected a dense authored flagship world, found {entities.Count} entities.");
+        Assert.True(visibleCourtArchitecture.Length >= 32,
+            $"Expected at least 32 visible court architecture pieces, found {visibleCourtArchitecture.Length}.");
+        Assert.True(visibleCourtArchitecture
+            .SelectMany(entity => entity!["components"]!.AsArray())
+            .Where(component => Type(component) == "Rekall.Material")
+            .Select(component => String(component?["properties"], "baseColor"))
+            .Where(color => color is not null)
+            .Distinct(StringComparer.OrdinalIgnoreCase).Count() >= 5);
+    }
+
+    [Fact]
+    public async Task PublishedDarkWardenModelResolvesToItsAuthoredMeshInNativeRuntimeFrame()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var scene = await new RekallAgeSceneStore().LoadAsync(projectRoot, "Main", CancellationToken.None);
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene, projectRoot);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 640, 360, false);
+
+        var warden = Assert.Single(frame.Renderables, item => item.EntityName == "AetherWarden");
+        Assert.DoesNotContain(frame.Observations, item => item.Target == "AetherWarden");
+        var geometry = Assert.IsType<Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportGeometryMesh>(warden.GeometryMesh);
+        var modelDocument = JsonNode.Parse(File.ReadAllText(Path.Combine(
+            projectRoot, "Assets", "Models", "aetherfall-warden-dark-model.age.model.json")))!.AsObject();
+        var compiledRelativePath = modelDocument["lastSuccessfulBuild"]!["compiledMeshPath"]!.GetValue<string>();
+        var compiledMesh = JsonNode.Parse(File.ReadAllText(Path.Combine(projectRoot, compiledRelativePath)))!.AsObject();
+        var authoredVertexCount = compiledMesh["vertices"]!.AsArray().Count;
+        var authoredIndexCount = compiledMesh["indices"]!.AsArray().Count;
+
+        Assert.Equal(authoredVertexCount, geometry.Vertices.Count);
+        Assert.Equal(authoredIndexCount, geometry.Indices.Count);
+        Assert.True(authoredVertexCount >= 1_208,
+            $"Expected the published Warden to retain its authored detail, found {authoredVertexCount} vertices.");
+    }
+
+    private static JsonObject LoadMainScene() => JsonNode.Parse(File.ReadAllText(Path.Combine(
+        FindRepositoryRoot(), "Examples", "AetherfallCitadel", "Scenes", "Main.age.scene.json")))!.AsObject();
+
+    private static JsonNode? Component(JsonNode? entity, string type) => entity?["components"]?.AsArray()
+        .FirstOrDefault(component => Type(component) == type);
+
+    private static bool HasComponent(JsonNode? entity, string type) => Component(entity, type) is not null;
+    private static bool HasTag(JsonNode? entity, string tag) => entity?["tags"]?.AsArray()
+        .Any(item => string.Equals(item?.GetValue<string>(), tag, StringComparison.Ordinal)) == true;
+    private static string? Type(JsonNode? component) => String(component, "type");
+    private static string? String(JsonNode? node, string name) => node?[name]?.GetValue<string>();
+    private static bool Bool(JsonNode? node, string name) => node?[name]?.GetValue<bool>() == true;
+    private static double Number(JsonNode? node, string name) => node?[name]?.GetValue<double>() ?? 0;
+
+    private static string FindRepositoryRoot([CallerFilePath] string sourceFilePath = "")
+    {
+        var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFilePath)!);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Rekall.AGE.sln"))) return directory.FullName;
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Could not find repository root.");
+    }
+}

@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.resonance-halo.graph",
+  "name": "Resonance Halo Graph",
+  "revision": 1,
+  "nodes": [
+    {
+      "nodeId": "halo",
+      "typeId": "rekall.modeling.primitive.torus",
+      "typeVersion": 1,
+      "parameters": {
+        "majorRadius": 3.2,
+        "majorSegments": 96,
+        "minorSegments": 24,
+        "minorRadius": 0.18
+      }
+    },
+    {
+      "nodeId": "transform",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "rotation": [
+          90,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          0.28
+        ]
+      }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "halo-transform",
+      "fromNodeId": "halo",
+      "fromPortId": "geometry",
+      "toNodeId": "transform",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "transform-output",
+      "fromNodeId": "transform",
+      "fromPortId": "geometry",
+      "toNodeId": "output",
+      "toPortId": "input"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "output",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion":1,"assetId":"aetherfall.ruin-dressing-scatter.graph","name":"Ruin Dressing Scatter Cluster","revision":1,
+  "nodes":[
+    {"nodeId":"stone","typeId":"rekall.modeling.primitive.sphere","typeVersion":1,"parameters":{"radius":0.65,"segments":14,"rings":8}},
+    {"nodeId":"flatten","typeId":"rekall.modeling.transform","typeVersion":1,"parameters":{"scale":[1.4,0.55,1]}},
+    {"nodeId":"noise-x","typeId":"rekall.modeling.deform.noise","typeVersion":1,"parameters":{"amplitude":0.16,"frequency":3.1,"seed":141,"axis":"x"}},
+    {"nodeId":"noise-y","typeId":"rekall.modeling.deform.noise","typeVersion":1,"parameters":{"amplitude":0.12,"frequency":2.7,"seed":349,"axis":"y"}},
+    {"nodeId":"noise-z","typeId":"rekall.modeling.deform.noise","typeVersion":1,"parameters":{"amplitude":0.15,"frequency":3.4,"seed":557,"axis":"z"}},
+    {"nodeId":"scatter","typeId":"rekall.modeling.scatter.area","typeVersion":1,"parameters":{"count":11,"sizeX":10,"sizeZ":7,"seed":913,"minimumScale":0.45,"maximumScale":1.45,"minimumYaw":-180,"maximumYaw":180}},
+    {"nodeId":"uv","typeId":"rekall.modeling.project_uv","typeVersion":1,"parameters":{"axis":"xz","scaleU":0.32,"scaleV":0.32}},
+    {"nodeId":"material","typeId":"rekall.modeling.material.assign","typeVersion":1,"parameters":{"materialAssetId":"aetherfall.wet-slate.material","slotName":"Ruin Dressing"}},
+    {"nodeId":"output","typeId":"rekall.modeling.output.mesh","typeVersion":1,"parameters":{}}
+  ],
+  "links":[
+    {"linkId":"1","fromNodeId":"stone","fromPortId":"geometry","toNodeId":"flatten","toPortId":"geometry"},{"linkId":"2","fromNodeId":"flatten","fromPortId":"geometry","toNodeId":"noise-x","toPortId":"geometry"},{"linkId":"3","fromNodeId":"noise-x","fromPortId":"geometry","toNodeId":"noise-y","toPortId":"geometry"},{"linkId":"4","fromNodeId":"noise-y","fromPortId":"geometry","toNodeId":"noise-z","toPortId":"geometry"},{"linkId":"5","fromNodeId":"noise-z","fromPortId":"geometry","toNodeId":"scatter","toPortId":"geometry"},{"linkId":"6","fromNodeId":"scatter","fromPortId":"geometry","toNodeId":"uv","toPortId":"geometry"},{"linkId":"7","fromNodeId":"uv","fromPortId":"geometry","toNodeId":"material","toPortId":"geometry"},{"linkId":"8","fromNodeId":"material","fromPortId":"geometry","toNodeId":"output","toPortId":"input"}
+  ],"outputs":[{"name":"mesh","nodeId":"output","portId":"geometry"}],"exposedParameters":[]
+}

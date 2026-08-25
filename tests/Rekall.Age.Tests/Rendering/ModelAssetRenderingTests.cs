@@ -48,6 +48,29 @@ public sealed class ModelAssetRenderingTests
     }
 
     [Fact]
+    public async Task RebuiltFramesReuseUnchangedCompiledModelGeometry()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await PublishBoxModelAssetAsync(root, "stable-model");
+        var entity = RekallAgeEntityDocument.Create("Stable Instance", ["model-asset"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D"))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.ModelAssetReference",
+                new JsonObject { ["assetId"] = "stable-model" }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer"));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"]).AddEntity(entity),
+            root);
+        var builder = new RekallAgeRuntimeRenderFrameBuilder();
+
+        var first = Assert.Single(builder.Build(world, 320, 180, false).Renderables).GeometryMesh;
+        var second = Assert.Single(builder.Build(world, 320, 180, false).Renderables).GeometryMesh;
+
+        Assert.NotNull(first);
+        Assert.Same(first, second);
+    }
+
+    [Fact]
     public async Task MissingModelAssetProducesStructuredViewportEvidenceInsteadOfSilentFallback()
     {
         var root = TestPaths.CreateTempDirectory();

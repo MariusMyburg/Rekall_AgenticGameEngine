@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-hollow-sentinel-model",
+  "displayName": "Hollow Sentinel",
+  "revision": 4,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-hollow-sentinel-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "e88c7da7735c4ce7abb34e051e348f7f33c855849f21cc4efa51154cb0b780de",
+    "sourceLogicalRevision": 4,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-hollow-sentinel-model/aefb602d46a7ec6d0f38324546ccc41b4bff456fb689e3c2f45867fc72b75b9b.age.compiled-mesh.json",
+    "compiledContentHash": "aefb602d46a7ec6d0f38324546ccc41b4bff456fb689e3c2f45867fc72b75b9b",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-25T20:20:14.8189049+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

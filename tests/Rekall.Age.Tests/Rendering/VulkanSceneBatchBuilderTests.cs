@@ -7,6 +7,28 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VulkanSceneBatchBuilderTests
 {
     [Fact]
+    public void DynamicRebuildReusesStableTopologyAndUpdatesDrawTransform()
+    {
+        var initial = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "mesh", "Mesh", "mesh", "rekall.primitive.cube", 0, 0, 5, 1,
+            Variant: "rekall.geometry.cube"));
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(initial);
+        var builder = new RekallAgeVulkanSceneBatchBuilder();
+        var stable = builder.Build(initial, meshes);
+        var moved = initial with
+        {
+            Renderables = [initial.Renderables[0] with { X = 7 }]
+        };
+
+        var dynamicBatch = builder.BuildDynamic(moved, meshes, stable);
+
+        Assert.Same(stable.Vertices, dynamicBatch.Vertices);
+        Assert.Same(stable.Indices, dynamicBatch.Indices);
+        Assert.NotEqual(stable.Draws[0].Model, dynamicBatch.Draws[0].Model);
+        Assert.Equal(7, dynamicBatch.Draws[0].Model.M41);
+    }
+
+    [Fact]
     public void BuildPreservesAuthoredShaderPipelineOnDraw()
     {
         var pipeline = new RekallAgeRuntimeViewportShaderPipeline("agent/tint", "agent/tint");
@@ -355,6 +377,90 @@ public sealed class VulkanSceneBatchBuilderTests
 
         Assert.Equal(new Vector4(0, 0, 0, 1), batch.Frame.LightPosition);
         Assert.Equal(new Vector4(3, 3, 3, 1), batch.Frame.LightColor);
+    }
+
+    [Fact]
+    public void BuildSelectsFourPracticalsByPriorityIntensityAndStableId()
+    {
+        var lights = new[]
+        {
+            new RekallAgeRuntimeViewportRenderable("z-low", "Low", "light", null, 0, 1, 0, 1, Variant: "PointLight", Intensity: 20, MaterialColor: "#ffffff") { LightPriority = 1 },
+            new RekallAgeRuntimeViewportRenderable("b-priority", "B", "light", null, 0, 2, 0, 2, Variant: "PointLight", Intensity: 4, MaterialColor: "#ffffff") { LightPriority = 8 },
+            new RekallAgeRuntimeViewportRenderable("a-priority", "A", "light", null, 0, 3, 0, 3, Variant: "PointLight", Intensity: 4, MaterialColor: "#ffffff") { LightPriority = 8 },
+            new RekallAgeRuntimeViewportRenderable("c-priority", "C", "light", null, 0, 4, 0, 4, Variant: "PointLight", Intensity: 2, MaterialColor: "#ffffff") { LightPriority = 8 },
+            new RekallAgeRuntimeViewportRenderable("d-middle", "D", "light", null, 0, 5, 0, 5, Variant: "PointLight", Intensity: 9, MaterialColor: "#ffffff") { LightPriority = 4 }
+        };
+        var frame = CreateFrame(lights);
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, []);
+
+        Assert.Equal(["a-priority", "b-priority", "c-priority", "d-middle"], batch.Frame.PointLights.Select(item => item.EntityId));
+        Assert.Equal(new Vector4(0, 3, 0, 1), batch.Frame.PointLights[0].Position);
+        Assert.Equal(batch.Frame.PointLights[0].Position, batch.Frame.AdditionalLightPosition);
+    }
+
+    [Fact]
+    public void DefaultBatchKeepsDirectionalKeyAndFirstPointPractical()
+    {
+        var frame = CreateFrame(
+            new RekallAgeRuntimeViewportRenderable(
+                "mesh", "Mesh", "mesh", "rekall.primitive.cube", 0, 0, 5, 1,
+                Variant: "rekall.geometry.cube"),
+            new RekallAgeRuntimeViewportRenderable(
+                "moon", "Moon", "light", null, 0, 0, 0, 2,
+                Variant: "DirectionalLight", Intensity: 2, MaterialColor: "#8090a0"),
+            new RekallAgeRuntimeViewportRenderable(
+                "lamp", "Lamp", "light", null, 1, 2, 3, 3,
+                Variant: "PointLight", Intensity: 3, MaterialColor: "#ff8000"));
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
+
+        Assert.Equal(0, batch.Frame.LightPosition.W);
+        Assert.Equal(new Vector4(1, 2, 3, 1), batch.Frame.AdditionalLightPosition);
+        Assert.Equal(3, batch.Frame.AdditionalLightColor.X);
+        Assert.Equal(3 * 128f / 255f, batch.Frame.AdditionalLightColor.Y, 5);
+        Assert.Equal(0, batch.Frame.AdditionalLightColor.Z);
+    }
+
+    [Fact]
+    public void AdditionalPracticalUsesPriorityThenIntensityThenStableEntityIdAndPreservesRange()
+    {
+        var low = new RekallAgeRuntimeViewportRenderable(
+            "first", "First", "light", null, 1, 0, 0, 2,
+            Variant: "PointLight", Intensity: 2, MaterialColor: "#ffffff")
+        {
+            LightRange = 30
+        };
+        var hero = new RekallAgeRuntimeViewportRenderable(
+            "hero", "Hero", "light", null, 2, 3, 4, 3,
+            Variant: "PointLight", Intensity: 8, MaterialColor: "#d99b54")
+        {
+            LightRange = 7.5,
+            LightPriority = 5
+        };
+        var brighterButLowerPriority = new RekallAgeRuntimeViewportRenderable(
+            "bright", "Bright", "light", null, 9, 9, 9, 4,
+            Variant: "PointLight", Intensity: 12, MaterialColor: "#ffffff")
+        {
+            LightRange = 20,
+            LightPriority = 1
+        };
+        var frame = CreateFrame(
+            new RekallAgeRuntimeViewportRenderable(
+                "mesh", "Mesh", "mesh", "rekall.primitive.cube", 0, 0, 5, 1,
+                Variant: "rekall.geometry.cube"),
+            low,
+            brighterButLowerPriority,
+            hero);
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
+
+        Assert.Equal(new Vector4(2, 3, 4, 1), batch.Frame.AdditionalLightPosition);
+        Assert.Equal(7.5f, batch.Frame.AdditionalLightParameters.X);
+        Assert.Equal(5, batch.Frame.AdditionalLightParameters.Y);
+        Assert.Equal(8 * 217f / 255f, batch.Frame.AdditionalLightColor.X, 5);
     }
 
     [Fact]

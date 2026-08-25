@@ -18,6 +18,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeCameraTarget3DComponent>();
         builder.RegisterComponent<RekallAgeCameraTargetCycleInputComponent>();
         builder.RegisterComponent<RekallAgeRenderLayerComponent>();
+        builder.RegisterComponent<RekallAgeRenderQualityProfileComponent>();
         builder.RegisterComponent<RekallAgeSpriteRendererComponent>();
         builder.RegisterComponent<RekallAgeMeshRendererComponent>();
         builder.RegisterComponent<RekallAgeXrRigComponent>();
@@ -418,6 +419,45 @@ public sealed class RekallAgeRenderLayerComponent : RekallAgeComponent
 {
     [RekallAgeProperty]
     public string Layer { get; init; } = "default";
+}
+
+[RekallAgeComponent(
+    "Render Quality Profile",
+    Description = "Backend-neutral authored rendering-quality intent. The renderer resolves these requests against device capabilities and reports requested, resolved, and degradation facts without changing gameplay simulation.")]
+public sealed class RekallAgeRenderQualityProfileComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(AllowedValues = ["Performance", "Low", "Medium", "High", "Ultra", "Epic"])]
+    public string Preset { get; init; } = "High";
+
+    [RekallAgeProperty]
+    public double ResolutionScale { get; init; } = 1;
+
+    [RekallAgeProperty]
+    public int ShadowCascadeCount { get; init; } = 3;
+
+    [RekallAgeProperty]
+    public int ShadowResolution { get; init; } = 2048;
+
+    [RekallAgeProperty(AllowedValues = ["analytic", "froxel-low", "froxel", "froxel-high", "froxel-epic"])]
+    public string FogMode { get; init; } = "froxel";
+
+    [RekallAgeProperty]
+    public bool Bloom { get; init; } = true;
+
+    [RekallAgeProperty]
+    public bool Ssao { get; init; } = true;
+
+    [RekallAgeProperty]
+    public int MaximumActiveParticles { get; init; } = 64_000;
+
+    [RekallAgeProperty]
+    public bool AutomaticScaling { get; init; }
+
+    [RekallAgeProperty]
+    public double TargetFramesPerSecond { get; init; } = 60;
+
+    [RekallAgeProperty]
+    public bool EnableGpuTimestamps { get; init; }
 }
 
 [RekallAgeComponent("XR Rig")]

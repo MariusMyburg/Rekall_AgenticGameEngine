@@ -6,6 +6,7 @@ using Rekall.Age.Assets;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor;
 using Rekall.Age.Modeling;
+using Rekall.Age.Project;
 using Rekall.Age.Rendering;
 using Rekall.Age.Studio;
 using Rekall.Age.Workflows;
@@ -18,6 +19,115 @@ namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioViewModelTests
 {
+    [Fact]
+    public async Task AttachQualityProfileUsesTheSharedBuiltInComponentContract()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-attach-quality-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Attach Quality",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+
+            Assert.True(viewModel.AttachQualityProfileCommand.CanExecute(null));
+            await ExecuteAsync(viewModel.AttachQualityProfileCommand);
+
+            Assert.True(viewModel.ApplyQualityCommand.CanExecute(null), viewModel.StatusText);
+            Assert.Contains(viewModel.ComponentSchemas, schema => schema.Type == "Rekall.RenderQualityProfile");
+            var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            var profile = Assert.Single(
+                Assert.Single(scene.Entities).Components,
+                component => component.Type == "Rekall.RenderQualityProfile");
+            Assert.Equal("High", profile.Properties["preset"]!.GetValue<string>());
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task QualityControlsPersistGenericComponentMutationsWithoutChangingGameplayState()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-quality-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await new RekallAgeProjectStore().SaveAsync(
+                root,
+                RekallAgeProjectManifest.Create("Quality Controls", ["world", "rendering3d"]),
+                CancellationToken.None);
+            var quality = RekallAgeEntityDocument.Create("Render Settings", ["rendering"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.RenderQualityProfile",
+                    new JsonObject { ["preset"] = "High" }));
+            var gameplay = RekallAgeEntityDocument.Create("Runtime State", ["gameplay"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Game.RuntimeState",
+                    new JsonObject { ["score"] = 41, ["active"] = true }));
+            await new RekallAgeSceneStore().SaveAsync(
+                root,
+                RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                    .AddEntity(quality)
+                    .AddEntity(gameplay),
+                CancellationToken.None);
+
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.OpenCommand);
+            Assert.Equal(["Performance", "Low", "Medium", "High", "Ultra", "Epic"], viewModel.QualityPresets);
+            Assert.Equal("High", viewModel.RequestedQualityPreset);
+            Assert.Equal("Unavailable", viewModel.ResolvedQualityPreset);
+            Assert.Equal("Unavailable", viewModel.TotalGpuMillisecondsText);
+            viewModel.SelectedQualityPreset = "Epic";
+            viewModel.QualityResolutionScaleInput = "0.8";
+            viewModel.QualityShadowCascadeCountInput = "4";
+            viewModel.QualityShadowResolutionInput = "4096";
+            viewModel.QualityFogModeInput = "froxel-high";
+            viewModel.QualityBloomOverride = false;
+            viewModel.QualitySsaoOverride = true;
+            viewModel.QualityMaximumActiveParticlesInput = "128000";
+
+            await ExecuteAsync(viewModel.ApplyQualityCommand);
+
+            var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            var savedQuality = Assert.Single(
+                scene.GetRequiredEntity(quality.Id).Components,
+                component => component.Type == "Rekall.RenderQualityProfile");
+            Assert.Equal("Epic", savedQuality.Properties["preset"]!.GetValue<string>());
+            Assert.Equal(0.8, savedQuality.Properties["resolutionScale"]!.GetValue<double>());
+            Assert.Equal(4, savedQuality.Properties["shadowCascadeCount"]!.GetValue<int>());
+            Assert.Equal(4096, savedQuality.Properties["shadowResolution"]!.GetValue<int>());
+            Assert.Equal("froxel-high", savedQuality.Properties["fogMode"]!.GetValue<string>());
+            Assert.False(savedQuality.Properties["bloom"]!.GetValue<bool>());
+            Assert.True(savedQuality.Properties["ssao"]!.GetValue<bool>());
+            Assert.Equal(128000, savedQuality.Properties["maximumActiveParticles"]!.GetValue<int>());
+            var savedGameplay = Assert.Single(
+                scene.GetRequiredEntity(gameplay.Id).Components,
+                component => component.Type == "Game.RuntimeState");
+            Assert.Equal(41, savedGameplay.Properties["score"]!.GetValue<int>());
+            Assert.True(savedGameplay.Properties["active"]!.GetValue<bool>());
+
+            var transactions = await new RekallAgeTransactionLogStore().LoadAsync(root, CancellationToken.None);
+            Assert.Contains(transactions.Transactions, transaction =>
+                transaction.Actor == "studio" && transaction.Name.StartsWith("Set render quality", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task PublishedAndPlacedStudioModelSurvivesWindowsPackagingAndPlayableAudit()
     {

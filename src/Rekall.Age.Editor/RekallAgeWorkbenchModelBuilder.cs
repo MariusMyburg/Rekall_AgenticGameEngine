@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Globalization;
 using Rekall.Age.Assets;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
@@ -9,6 +10,8 @@ using Rekall.Age.Modules.Security;
 using Rekall.Age.Project;
 using Rekall.Age.Runtime;
 using Rekall.Age.Runtime.Abstractions;
+using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Validation;
 using Rekall.Age.World;
 
@@ -129,7 +132,10 @@ public sealed class RekallAgeWorkbenchModelBuilder
             new RekallAgeImportQueueModel(Array.Empty<RekallAgeImportQueueItem>()),
             BuildRuntimePanel(runtimeWorld),
             BuildSceneSummary(scene),
-            BuildActionPalette(manifest.Capabilities));
+            BuildActionPalette(manifest.Capabilities))
+        {
+            Rendering = BuildRenderingPanel(runtimeWorld)
+        };
     }
 
     private static RekallAgeSceneGraphModel BuildSceneGraph(RekallAgeSceneDocument scene)
@@ -311,6 +317,20 @@ public sealed class RekallAgeWorkbenchModelBuilder
                 "Capture a generic runtime viewport frame for visual diagnostics.",
                 Recommended: true),
             new(
+                "compare-quality-presets",
+                "Compare Quality Presets",
+                "Rendering",
+                "rekall.render.compare_quality_presets",
+                "Capture aligned deterministic frames for requested render-quality presets.",
+                Recommended: true),
+            new(
+                "inspect-render-budget",
+                "Inspect Render Budget",
+                "Rendering",
+                "rekall.render.performance.inspect_scene_budget",
+                "Inspect the resolved feature plan, render workload, resources, and timing diagnostics.",
+                Recommended: true),
+            new(
                 "import-asset-report",
                 "Import Asset Report",
                 "Assets",
@@ -394,4 +414,226 @@ public sealed class RekallAgeWorkbenchModelBuilder
                     observation.Message))
                 .ToArray());
     }
+
+    private static RekallAgeWorkbenchRenderQualityModel BuildRenderingPanel(RekallAgeRuntimeWorld world)
+    {
+        var profile = world.Subsystems.Rendering.QualityProfiles
+            .OrderBy(item => item.EntityName, StringComparer.Ordinal)
+            .ThenBy(item => item.EntityId, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (profile is null)
+        {
+            return RekallAgeWorkbenchRenderQualityModel.Empty("High");
+        }
+
+        var intent = profile.Intent;
+        var authoring = new RekallAgeWorkbenchRenderQualityAuthoringModel(
+            profile.EntityId,
+            profile.EntityName,
+            intent.Preset,
+            intent.ResolutionScale,
+            intent.ShadowCascadeCount,
+            intent.ShadowResolution,
+            intent.FogMode,
+            intent.Bloom,
+            intent.Ssao,
+            intent.MaximumActiveParticles,
+            intent.AutomaticScaling,
+            intent.TargetFramesPerSecond,
+            intent.EnableGpuTimestamps);
+        return new RekallAgeWorkbenchRenderQualityModel(
+            authoring,
+            RekallAgeWorkbenchRenderQualityRuntimeModel.Unavailable(intent.Preset),
+            [],
+            []);
+    }
+
+    public static RekallAgeWorkbenchRenderQualityRuntimeModel BuildRenderingRuntime(
+        RekallAgeResolvedRenderFeaturePlan plan,
+        RekallAgeGpuFrameTimingReport timings,
+        long resourceBytes,
+        int drawCount,
+        int dispatchCount,
+        IReadOnlyList<string> suggestedActions)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(timings);
+        ArgumentNullException.ThrowIfNull(suggestedActions);
+        var timingAvailable = timings.Available && timings.TotalMilliseconds.HasValue;
+        return new RekallAgeWorkbenchRenderQualityRuntimeModel(
+            plan.RequestedPreset,
+            plan.ResolvedPreset,
+            plan.OutputWidth,
+            plan.OutputHeight,
+            plan.RenderWidth,
+            plan.RenderHeight,
+            plan.ResolutionScale,
+            timingAvailable,
+            timingAvailable ? timings.Code : timings.Code ?? "REKALL_GPU_TIMESTAMPS_UNAVAILABLE",
+            timingAvailable ? timings.Provenance : "unavailable",
+            timingAvailable ? timings.TotalMilliseconds : null,
+            timingAvailable
+                ? $"{timings.TotalMilliseconds!.Value.ToString("0.000", CultureInfo.InvariantCulture)} ms"
+                : "Unavailable",
+            drawCount,
+            dispatchCount,
+            timingAvailable
+                ? timings.Passes.Select(pass => new RekallAgeWorkbenchRenderPassTimingModel(
+                    pass.Name,
+                    pass.Nanoseconds,
+                    pass.Milliseconds,
+                    $"{pass.Milliseconds.ToString("0.000", CultureInfo.InvariantCulture)} ms")).ToArray()
+                : [],
+            [
+                new RekallAgeWorkbenchRenderResourceModel("Frame resources", resourceBytes),
+                new RekallAgeWorkbenchRenderResourceModel("Planned transient", plan.EstimatedTransientBytes),
+                new RekallAgeWorkbenchRenderResourceModel("Planned persistent", plan.EstimatedPersistentBytes)
+            ],
+            ToDegradations(plan.Degradations),
+            suggestedActions.ToArray());
+    }
+
+    public static RekallAgeWorkbenchModel WithCaptureResult(
+        RekallAgeWorkbenchModel model,
+        CaptureRuntimeViewportResult capture)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(capture);
+        var runtime = capture.QualityPlan is null
+            ? model.Rendering.Runtime
+            : BuildRenderingRuntime(
+                capture.QualityPlan,
+                capture.GpuTimings,
+                capture.ResourceBytes,
+                capture.DrawCount,
+                capture.DispatchCount,
+                capture.SuggestedCommands);
+        return model with
+        {
+            Rendering = model.Rendering with
+            {
+                Runtime = runtime,
+                Comparisons = [],
+                DebugViews = BuildDebugViews(capture)
+            }
+        };
+    }
+
+    public static RekallAgeWorkbenchModel WithQualityComparisonResult(
+        RekallAgeWorkbenchModel model,
+        CompareQualityPresetsResult comparison)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(comparison);
+        var comparisons = comparison.Captures.Select(ToComparison).ToArray();
+        var runtime = comparison.Captures.Count == 0
+            ? model.Rendering.Runtime
+            : ToRuntime(comparison.Captures[0], comparison.NextCommands);
+        return model with
+        {
+            Rendering = model.Rendering with
+            {
+                Runtime = runtime,
+                Comparisons = comparisons,
+                DebugViews = comparisons.Select(item => new RekallAgeWorkbenchRenderDebugViewModel(
+                    $"{item.RequestedPreset} final",
+                    "final",
+                    item.ScreenshotPath,
+                    true)).ToArray()
+            }
+        };
+    }
+
+    private static RekallAgeWorkbenchRenderQualityRuntimeModel ToRuntime(
+        RekallAgeQualityPresetCapture capture,
+        IReadOnlyList<string> suggestedActions)
+    {
+        var timingAvailable = capture.GpuTimings.Available && capture.GpuTimings.TotalMilliseconds.HasValue;
+        return new RekallAgeWorkbenchRenderQualityRuntimeModel(
+            capture.RequestedPreset,
+            capture.ResolvedPreset,
+            capture.OutputWidth,
+            capture.OutputHeight,
+            capture.RenderWidth,
+            capture.RenderHeight,
+            null,
+            timingAvailable,
+            timingAvailable ? capture.GpuTimings.Code : capture.GpuTimings.Code ?? "REKALL_GPU_TIMESTAMPS_UNAVAILABLE",
+            timingAvailable ? capture.GpuTimings.Provenance : "unavailable",
+            timingAvailable ? capture.GpuTimings.TotalMilliseconds : null,
+            FormatTiming(capture.GpuTimings),
+            capture.DrawCount,
+            capture.DispatchCount,
+            timingAvailable
+                ? capture.GpuTimings.Passes.Select(pass => new RekallAgeWorkbenchRenderPassTimingModel(
+                    pass.Name,
+                    pass.Nanoseconds,
+                    pass.Milliseconds,
+                    $"{pass.Milliseconds.ToString("0.000", CultureInfo.InvariantCulture)} ms")).ToArray()
+                : [],
+            [new RekallAgeWorkbenchRenderResourceModel("Frame resources", capture.ResourceBytes)],
+            ToDegradations(capture.Degradations),
+            suggestedActions.ToArray());
+    }
+
+    private static RekallAgeWorkbenchRenderQualityComparisonModel ToComparison(
+        RekallAgeQualityPresetCapture capture) => new(
+        capture.RequestedPreset,
+        capture.ResolvedPreset,
+        capture.ScreenshotPath,
+        capture.OutputWidth,
+        capture.OutputHeight,
+        capture.RenderWidth,
+        capture.RenderHeight,
+        capture.ResourceBytes,
+        capture.DrawCount,
+        capture.DispatchCount,
+        capture.GpuTimings.Available ? capture.GpuTimings.TotalMilliseconds : null,
+        FormatTiming(capture.GpuTimings),
+        ToDegradations(capture.Degradations));
+
+    private static IReadOnlyList<RekallAgeWorkbenchRenderDebugViewModel> BuildDebugViews(
+        CaptureRuntimeViewportResult capture)
+    {
+        var views = new List<RekallAgeWorkbenchRenderDebugViewModel>();
+        if (!string.IsNullOrWhiteSpace(capture.ScreenshotPath))
+        {
+            views.Add(new("Final output", "final", capture.ScreenshotPath, capture.NonBlank));
+        }
+
+        if (capture.HighFidelityFrame is { } frame)
+        {
+            views.AddRange(frame.ShadowDebugCaptures.Select(item => new RekallAgeWorkbenchRenderDebugViewModel(
+                $"Shadow cascade {item.CascadeIndex}",
+                "shadow-cascade",
+                item.OutputPath,
+                item.NonBlank)));
+            views.AddRange(frame.FogDebugCaptures.Select(item => new RekallAgeWorkbenchRenderDebugViewModel(
+                $"Fog {item.Kind} {item.SliceIndex}",
+                "fog-slice",
+                item.OutputPath,
+                item.NonBlank)));
+            views.AddRange(frame.ParticleDebugCaptures.Select(item => new RekallAgeWorkbenchRenderDebugViewModel(
+                $"Particles {item.Kind}",
+                $"particle-{item.Kind}",
+                item.OutputPath,
+                item.NonBlank)));
+        }
+
+        return views;
+    }
+
+    private static IReadOnlyList<RekallAgeWorkbenchRenderDegradationModel> ToDegradations(
+        IReadOnlyList<RekallAgeRenderFeatureDegradation> degradations) =>
+        degradations.Select(item => new RekallAgeWorkbenchRenderDegradationModel(
+            item.Code,
+            item.Feature,
+            item.RequestedValue,
+            item.ResolvedValue,
+            item.Message)).ToArray();
+
+    private static string FormatTiming(RekallAgeGpuFrameTimingReport timings) =>
+        timings.Available && timings.TotalMilliseconds.HasValue
+            ? $"{timings.TotalMilliseconds.Value.ToString("0.000", CultureInfo.InvariantCulture)} ms"
+            : "Unavailable";
 }

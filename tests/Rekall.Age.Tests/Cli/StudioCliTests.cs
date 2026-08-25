@@ -43,6 +43,9 @@ public sealed class StudioCliTests
         Assert.Contains("Transactions: 0", result.Output);
         Assert.Contains("Actions:", result.Output);
         Assert.Contains("rekall.validation.scene", result.Output);
+        Assert.Contains("rekall.render.capture_runtime_viewport", result.Output);
+        Assert.Contains("rekall.render.compare_quality_presets", result.Output);
+        Assert.Contains("rekall.render.performance.inspect_scene_budget", result.Output);
     }
 
     private static async Task<(int ExitCode, string Output)> RunAsync(string cliAssembly, params string[] args)

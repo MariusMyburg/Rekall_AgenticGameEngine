@@ -10,7 +10,118 @@ public sealed record RekallAgeWorkbenchModel(
     RekallAgeImportQueueModel ImportQueue,
     RekallAgeRuntimePanelModel Runtime,
     RekallAgeWorkbenchSceneSummaryModel SceneSummary,
-    RekallAgeWorkbenchActionPaletteModel Actions);
+    RekallAgeWorkbenchActionPaletteModel Actions)
+{
+    public RekallAgeWorkbenchRenderQualityModel Rendering { get; init; } =
+        RekallAgeWorkbenchRenderQualityModel.Empty("High");
+}
+
+public sealed record RekallAgeWorkbenchRenderQualityModel(
+    RekallAgeWorkbenchRenderQualityAuthoringModel? Authoring,
+    RekallAgeWorkbenchRenderQualityRuntimeModel Runtime,
+    IReadOnlyList<RekallAgeWorkbenchRenderQualityComparisonModel> Comparisons,
+    IReadOnlyList<RekallAgeWorkbenchRenderDebugViewModel> DebugViews)
+{
+    public static RekallAgeWorkbenchRenderQualityModel Empty(string requestedPreset) => new(
+        null,
+        RekallAgeWorkbenchRenderQualityRuntimeModel.Unavailable(requestedPreset),
+        [],
+        []);
+}
+
+public sealed record RekallAgeWorkbenchRenderQualityAuthoringModel(
+    string EntityId,
+    string EntityName,
+    string Preset,
+    double? ResolutionScale,
+    int? ShadowCascadeCount,
+    int? ShadowResolution,
+    string? FogMode,
+    bool? Bloom,
+    bool? Ssao,
+    int? MaximumActiveParticles,
+    bool AutomaticScaling,
+    double TargetFramesPerSecond,
+    bool EnableGpuTimestamps);
+
+public sealed record RekallAgeWorkbenchRenderQualityRuntimeModel(
+    string RequestedPreset,
+    string? ResolvedPreset,
+    int? OutputWidth,
+    int? OutputHeight,
+    int? RenderWidth,
+    int? RenderHeight,
+    double? ResolutionScale,
+    bool GpuTimingAvailable,
+    string? GpuTimingCode,
+    string GpuTimingProvenance,
+    double? TotalGpuMilliseconds,
+    string TotalGpuMillisecondsText,
+    int DrawCount,
+    int DispatchCount,
+    IReadOnlyList<RekallAgeWorkbenchRenderPassTimingModel> PassTimings,
+    IReadOnlyList<RekallAgeWorkbenchRenderResourceModel> Resources,
+    IReadOnlyList<RekallAgeWorkbenchRenderDegradationModel> Degradations,
+    IReadOnlyList<string> SuggestedActions)
+{
+    public static RekallAgeWorkbenchRenderQualityRuntimeModel Unavailable(string requestedPreset) => new(
+        requestedPreset,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        false,
+        "REKALL_GPU_TIMESTAMPS_UNAVAILABLE",
+        "unavailable",
+        null,
+        "Unavailable",
+        0,
+        0,
+        [],
+        [],
+        [],
+        []);
+}
+
+public sealed record RekallAgeWorkbenchRenderPassTimingModel(
+    string Name,
+    double Nanoseconds,
+    double? Milliseconds,
+    string MillisecondsText);
+
+public sealed record RekallAgeWorkbenchRenderResourceModel(
+    string Name,
+    long Bytes);
+
+public sealed record RekallAgeWorkbenchRenderDegradationModel(
+    string Code,
+    string Feature,
+    string RequestedValue,
+    string ResolvedValue,
+    string Message);
+
+public sealed record RekallAgeWorkbenchRenderQualityComparisonModel(
+    string RequestedPreset,
+    string ResolvedPreset,
+    string ScreenshotPath,
+    int OutputWidth,
+    int OutputHeight,
+    int RenderWidth,
+    int RenderHeight,
+    long ResourceBytes,
+    int DrawCount,
+    int DispatchCount,
+    double? TotalGpuMilliseconds,
+    string TotalGpuMillisecondsText,
+    IReadOnlyList<RekallAgeWorkbenchRenderDegradationModel> Degradations);
+
+public sealed record RekallAgeWorkbenchRenderDebugViewModel(
+    string Label,
+    string Kind,
+    string OutputPath,
+    bool NonBlank);
 
 public sealed record RekallAgeWorkbenchSceneSummaryModel(
     int EntityCount,

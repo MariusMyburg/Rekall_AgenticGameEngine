@@ -19,6 +19,7 @@ using Rekall.Age.LevelDesign.Commands;
 using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Workflows;
 using Rekall.Age.Workflows.Commands;
@@ -57,6 +58,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _removePropertyCommand;
     private readonly RekallAgeAsyncCommand _validateCommand;
     private readonly RekallAgeAsyncCommand _captureCommand;
+    private readonly RekallAgeAsyncCommand _attachQualityProfileCommand;
+    private readonly RekallAgeAsyncCommand _applyQualityCommand;
+    private readonly RekallAgeAsyncCommand _captureQualityCommand;
+    private readonly RekallAgeAsyncCommand _compareQualityCommand;
     private readonly RekallAgeAsyncCommand _playCommand;
     private readonly RekallAgeAsyncCommand _simulateCommand;
     private readonly RekallAgeAsyncCommand _pauseSimulationCommand;
@@ -178,6 +183,23 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private double _scaleSnap = 0.1;
     private int _viewportRenderableCount;
     private bool _viewportVisuallyInformative;
+    private string _selectedQualityPreset = "High";
+    private string _comparisonQualityPreset = "Performance";
+    private string _qualityResolutionScaleInput = string.Empty;
+    private string _qualityShadowCascadeCountInput = string.Empty;
+    private string _qualityShadowResolutionInput = string.Empty;
+    private string _qualityFogModeInput = string.Empty;
+    private bool? _qualityBloomOverride;
+    private bool? _qualitySsaoOverride;
+    private string _qualityMaximumActiveParticlesInput = string.Empty;
+    private string _requestedQualityPreset = "High";
+    private string _resolvedQualityPreset = "Unavailable";
+    private string _outputResolutionText = "Unavailable";
+    private string _internalResolutionText = "Unavailable";
+    private string _totalGpuMillisecondsText = "Unavailable";
+    private string _gpuTimingStatusText = "REKALL_GPU_TIMESTAMPS_UNAVAILABLE · unavailable";
+    private string _renderWorkloadText = "0 draws · 0 dispatches";
+    private RekallAgeWorkbenchRenderDebugViewModel? _selectedRenderDebugView;
     private RekallAgeWorkbenchModel? _currentModel;
     private readonly List<RekallAgeLanguageModelToolExecution> _lastAgentToolExecutions = [];
     internal bool TreatGauntletAsTerminalSuccess { get; set; }
@@ -244,6 +266,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _removePropertyCommand = CreateAsyncCommand(RemovePropertyAsync, CanEditProperty);
         _validateCommand = CreateAsyncCommand(ValidateAsync, HasOpenProject);
         _captureCommand = CreateAsyncCommand(CaptureAsync, HasEditableProject);
+        _attachQualityProfileCommand = CreateAsyncCommand(AttachQualityProfileAsync, CanAttachQualityProfile);
+        _applyQualityCommand = CreateAsyncCommand(() => RunAsync(ApplyRenderQualityAsync), HasQualityProfile);
+        _captureQualityCommand = CreateAsyncCommand(() => RunAsync(CaptureQualityAsync), HasEditableProject);
+        _compareQualityCommand = CreateAsyncCommand(() => RunAsync(CompareQualityAsync), CanCompareQuality);
         _simulateCommand = CreateAsyncCommand(StartSimulationAsync, () => HasOpenProject() && Mode == RekallAgeStudioMode.Edit);
         _pauseSimulationCommand = CreateAsyncCommand(ToggleSimulationPauseAsync, () => !IsBusy && IsSimulating);
         _stepSimulationCommand = CreateAsyncCommand(StepSimulationAsync, () => !IsBusy && IsSimulating && IsSimulationPaused);
@@ -310,6 +336,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<RekallAgeInspectorComponentSchemaModel> ComponentSchemas { get; } = [];
     public ObservableCollection<RekallAgeInspectorPropertySchemaModel> PropertySchemas { get; } = [];
     public ObservableCollection<string> PropertyValueChoices { get; } = [];
+    public ObservableCollection<RekallAgeWorkbenchRenderPassTimingModel> RenderPassTimings { get; } = [];
+    public ObservableCollection<RekallAgeWorkbenchRenderResourceModel> RenderResources { get; } = [];
+    public ObservableCollection<RekallAgeWorkbenchRenderDegradationModel> RenderDegradations { get; } = [];
+    public ObservableCollection<RekallAgeWorkbenchRenderQualityComparisonModel> RenderQualityComparisons { get; } = [];
+    public ObservableCollection<RekallAgeWorkbenchRenderDebugViewModel> RenderDebugViews { get; } = [];
+    public ObservableCollection<string> RenderSuggestedActions { get; } = [];
+    public IReadOnlyList<string> QualityPresets { get; } =
+        ["Performance", "Low", "Medium", "High", "Ultra", "Epic"];
+    public IReadOnlyList<string> QualityFogModes { get; } =
+        ["analytic", "froxel-low", "froxel", "froxel-high", "froxel-epic"];
 
     public ICommand OpenCommand => _openCommand;
     public ICommand CreateCommand => _createCommand;
@@ -327,6 +363,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand RemovePropertyCommand => _removePropertyCommand;
     public ICommand ValidateCommand => _validateCommand;
     public ICommand CaptureCommand => _captureCommand;
+    public ICommand AttachQualityProfileCommand => _attachQualityProfileCommand;
+    public ICommand ApplyQualityCommand => _applyQualityCommand;
+    public ICommand CaptureQualityCommand => _captureQualityCommand;
+    public ICommand CompareQualityCommand => _compareQualityCommand;
     public ICommand SimulateCommand => _simulateCommand;
     public ICommand PauseSimulationCommand => _pauseSimulationCommand;
     public ICommand StepSimulationCommand => _stepSimulationCommand;
@@ -358,6 +398,140 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand OpenModelingGraphCommand => _openModelingGraphCommand;
     public ICommand EvaluateModelingGraphCommand => _evaluateModelingGraphCommand;
     public ICommand ApplyModelingGraphParametersCommand => _applyModelingGraphParametersCommand;
+
+    public string SelectedQualityPreset
+    {
+        get => _selectedQualityPreset;
+        set
+        {
+            if (Set(ref _selectedQualityPreset, value)) RefreshCommands();
+        }
+    }
+
+    public string ComparisonQualityPreset
+    {
+        get => _comparisonQualityPreset;
+        set
+        {
+            if (Set(ref _comparisonQualityPreset, value)) RefreshCommands();
+        }
+    }
+
+    public string QualityResolutionScaleInput
+    {
+        get => _qualityResolutionScaleInput;
+        set
+        {
+            if (Set(ref _qualityResolutionScaleInput, value)) RefreshCommands();
+        }
+    }
+
+    public string QualityShadowCascadeCountInput
+    {
+        get => _qualityShadowCascadeCountInput;
+        set
+        {
+            if (Set(ref _qualityShadowCascadeCountInput, value)) RefreshCommands();
+        }
+    }
+
+    public string QualityShadowResolutionInput
+    {
+        get => _qualityShadowResolutionInput;
+        set
+        {
+            if (Set(ref _qualityShadowResolutionInput, value)) RefreshCommands();
+        }
+    }
+
+    public string QualityFogModeInput
+    {
+        get => _qualityFogModeInput;
+        set
+        {
+            if (Set(ref _qualityFogModeInput, value)) RefreshCommands();
+        }
+    }
+
+    public bool? QualityBloomOverride
+    {
+        get => _qualityBloomOverride;
+        set
+        {
+            if (Set(ref _qualityBloomOverride, value)) RefreshCommands();
+        }
+    }
+
+    public bool? QualitySsaoOverride
+    {
+        get => _qualitySsaoOverride;
+        set
+        {
+            if (Set(ref _qualitySsaoOverride, value)) RefreshCommands();
+        }
+    }
+
+    public string QualityMaximumActiveParticlesInput
+    {
+        get => _qualityMaximumActiveParticlesInput;
+        set
+        {
+            if (Set(ref _qualityMaximumActiveParticlesInput, value)) RefreshCommands();
+        }
+    }
+
+    public string RequestedQualityPreset
+    {
+        get => _requestedQualityPreset;
+        private set => Set(ref _requestedQualityPreset, value);
+    }
+
+    public string ResolvedQualityPreset
+    {
+        get => _resolvedQualityPreset;
+        private set => Set(ref _resolvedQualityPreset, value);
+    }
+
+    public string OutputResolutionText
+    {
+        get => _outputResolutionText;
+        private set => Set(ref _outputResolutionText, value);
+    }
+
+    public string InternalResolutionText
+    {
+        get => _internalResolutionText;
+        private set => Set(ref _internalResolutionText, value);
+    }
+
+    public string TotalGpuMillisecondsText
+    {
+        get => _totalGpuMillisecondsText;
+        private set => Set(ref _totalGpuMillisecondsText, value);
+    }
+
+    public string GpuTimingStatusText
+    {
+        get => _gpuTimingStatusText;
+        private set => Set(ref _gpuTimingStatusText, value);
+    }
+
+    public string RenderWorkloadText
+    {
+        get => _renderWorkloadText;
+        private set => Set(ref _renderWorkloadText, value);
+    }
+
+    public RekallAgeWorkbenchRenderDebugViewModel? SelectedRenderDebugView
+    {
+        get => _selectedRenderDebugView;
+        set
+        {
+            if (!Set(ref _selectedRenderDebugView, value) || value is null || !File.Exists(value.OutputPath)) return;
+            ViewportImage = LoadBitmap(value.OutputPath);
+            ViewportSummary = $"{value.Label} · {(value.NonBlank ? "nonblank" : "blank")}";
+        }
+    }
 
     public string ProjectPathInput
     {
@@ -1079,6 +1253,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         && !string.IsNullOrWhiteSpace(ParentEntityIdInput)
         && !ParentEntityIdInput.Trim().Equals(_session.SelectedEntityId, StringComparison.Ordinal);
     private bool HasEditableProject() => HasOpenProject() && Mode == RekallAgeStudioMode.Edit;
+    private bool HasQualityProfile() => HasEditableProject()
+        && _currentModel?.Rendering.Authoring is not null
+        && QualityPresets.Contains(SelectedQualityPreset, StringComparer.Ordinal);
+    private bool CanAttachQualityProfile() => HasSelectedEntity()
+        && _currentModel?.Rendering.Authoring is null
+        && QualityPresets.Contains(SelectedQualityPreset, StringComparer.Ordinal);
+    private bool CanCompareQuality() => HasEditableProject()
+        && QualityPresets.Contains(SelectedQualityPreset, StringComparer.Ordinal)
+        && QualityPresets.Contains(ComparisonQualityPreset, StringComparer.Ordinal)
+        && !SelectedQualityPreset.Equals(ComparisonQualityPreset, StringComparison.Ordinal);
     private bool CanEditComponent() => HasEditableProject()
         && _session.SelectedEntityId is not null
         && !string.IsNullOrWhiteSpace(ComponentTypeInput);
@@ -1683,6 +1867,218 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             "studio",
             CancellationToken.None).AsTask(), refreshPreviewAfter: true);
 
+    private Task AttachQualityProfileAsync() => RunAsync(() => _session.ExecuteAsync(
+        "rekall.component.add",
+        JsonSerializer.Serialize(new
+        {
+            projectRoot = _session.ProjectRoot,
+            sceneName = _session.SceneName,
+            entityId = _session.SelectedEntityId,
+            componentType = "Rekall.RenderQualityProfile",
+            properties = new JsonObject { ["preset"] = SelectedQualityPreset }
+        }),
+        "Attach render quality profile",
+        "studio",
+        CancellationToken.None).AsTask(), refreshPreviewAfter: true);
+
+    private async Task<RekallAgeWorkbenchOperationResult> ApplyRenderQualityAsync()
+    {
+        if (_currentModel?.Rendering.Authoring is not { } authoring)
+        {
+            return InvalidQualityInput("Attach a Rekall.RenderQualityProfile before applying authored quality settings.");
+        }
+        if (!TryBuildQualityOverrides(out var overrides, out var parseError))
+        {
+            return InvalidQualityInput(parseError);
+        }
+
+        var mutations = new (string Property, JsonNode? Value)[]
+        {
+            ("preset", JsonValue.Create(SelectedQualityPreset)),
+            ("resolutionScale", overrides.ResolutionScale.HasValue ? JsonValue.Create(overrides.ResolutionScale.Value) : null),
+            ("shadowCascadeCount", overrides.ShadowCascadeCount.HasValue ? JsonValue.Create(overrides.ShadowCascadeCount.Value) : null),
+            ("shadowResolution", overrides.ShadowResolution.HasValue ? JsonValue.Create(overrides.ShadowResolution.Value) : null),
+            ("fogMode", string.IsNullOrWhiteSpace(overrides.FogMode) ? null : JsonValue.Create(overrides.FogMode)),
+            ("bloom", overrides.Bloom.HasValue ? JsonValue.Create(overrides.Bloom.Value) : null),
+            ("ssao", overrides.Ssao.HasValue ? JsonValue.Create(overrides.Ssao.Value) : null),
+            ("maximumActiveParticles", overrides.MaximumActiveParticles.HasValue ? JsonValue.Create(overrides.MaximumActiveParticles.Value) : null)
+        };
+
+        RekallAgeWorkbenchOperationResult? result = null;
+        foreach (var mutation in mutations)
+        {
+            var remove = mutation.Value is null;
+            result = await _session.ExecuteAsync(
+                remove ? "rekall.component.remove_property" : "rekall.component.set_property",
+                remove
+                    ? JsonSerializer.Serialize(new
+                    {
+                        projectRoot = _session.ProjectRoot,
+                        sceneName = _session.SceneName,
+                        entityId = authoring.EntityId,
+                        componentType = "Rekall.RenderQualityProfile",
+                        propertyName = mutation.Property
+                    })
+                    : JsonSerializer.Serialize(new
+                    {
+                        projectRoot = _session.ProjectRoot,
+                        sceneName = _session.SceneName,
+                        entityId = authoring.EntityId,
+                        componentType = "Rekall.RenderQualityProfile",
+                        propertyName = mutation.Property,
+                        value = mutation.Value
+                    }),
+                $"Set render quality {mutation.Property}",
+                "studio",
+                CancellationToken.None);
+            if (!result.Ok) return result;
+        }
+
+        return result! with { Summary = $"Set requested render quality to '{SelectedQualityPreset}' through generic component mutations." };
+    }
+
+    private async Task<RekallAgeWorkbenchOperationResult> CaptureQualityAsync()
+    {
+        if (!TryBuildQualityOverrides(out var overrides, out var parseError))
+        {
+            return InvalidQualityInput(parseError);
+        }
+
+        return await _session.ExecuteAsync(
+            "rekall.render.capture_runtime_viewport",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                frames = 1,
+                outputDirectory = Path.Combine(_session.ProjectRoot!, "Artifacts", "Studio", "HighFidelity"),
+                width = 960,
+                height = 540,
+                debugOverlay = false,
+                backendId = "vulkan",
+                qualityPreset = SelectedQualityPreset,
+                qualityOverrides = overrides,
+                includeGpuTimings = true
+            }),
+            $"Capture {SelectedQualityPreset} render quality",
+            "studio",
+            CancellationToken.None);
+    }
+
+    private async Task<RekallAgeWorkbenchOperationResult> CompareQualityAsync()
+    {
+        if (!TryBuildQualityOverrides(out var overrides, out var parseError))
+        {
+            return InvalidQualityInput(parseError);
+        }
+
+        return await _session.ExecuteAsync(
+            "rekall.render.compare_quality_presets",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                presets = new[] { SelectedQualityPreset, ComparisonQualityPreset },
+                frames = 1,
+                outputDirectory = Path.Combine(_session.ProjectRoot!, "Artifacts", "Studio", "QualityComparison"),
+                width = 960,
+                height = 540,
+                backendId = "vulkan",
+                overrides,
+                includeGpuTimings = true
+            }),
+            $"Compare {SelectedQualityPreset} and {ComparisonQualityPreset} render quality",
+            "studio",
+            CancellationToken.None);
+    }
+
+    private bool TryBuildQualityOverrides(
+        out RekallAgeRenderQualityOverrides overrides,
+        out string? error)
+    {
+        if (!TryParseOptionalDouble(QualityResolutionScaleInput, out var resolutionScale))
+        {
+            overrides = new();
+            error = "Resolution scale must be a finite number or blank.";
+            return false;
+        }
+        if (!TryParseOptionalInt32(QualityShadowCascadeCountInput, out var shadowCascadeCount))
+        {
+            overrides = new();
+            error = "Shadow cascade count must be an integer or blank.";
+            return false;
+        }
+        if (!TryParseOptionalInt32(QualityShadowResolutionInput, out var shadowResolution))
+        {
+            overrides = new();
+            error = "Shadow resolution must be an integer or blank.";
+            return false;
+        }
+        if (!TryParseOptionalInt32(QualityMaximumActiveParticlesInput, out var maximumActiveParticles))
+        {
+            overrides = new();
+            error = "Maximum active particles must be an integer or blank.";
+            return false;
+        }
+
+        overrides = new RekallAgeRenderQualityOverrides(
+            resolutionScale,
+            shadowCascadeCount,
+            shadowResolution,
+            string.IsNullOrWhiteSpace(QualityFogModeInput) ? null : QualityFogModeInput.Trim(),
+            QualityBloomOverride,
+            QualitySsaoOverride,
+            maximumActiveParticles);
+        error = null;
+        return true;
+    }
+
+    private static bool TryParseOptionalDouble(string input, out double? value)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            value = null;
+            return true;
+        }
+
+        if ((double.TryParse(input, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+             || double.TryParse(input, NumberStyles.Float, CultureInfo.CurrentCulture, out parsed))
+            && double.IsFinite(parsed))
+        {
+            value = parsed;
+            return true;
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static bool TryParseOptionalInt32(string input, out int? value)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            value = null;
+            return true;
+        }
+
+        if (int.TryParse(input, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            || int.TryParse(input, NumberStyles.Integer, CultureInfo.CurrentCulture, out parsed))
+        {
+            value = parsed;
+            return true;
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static RekallAgeWorkbenchOperationResult InvalidQualityInput(string? message)
+    {
+        const string code = "REKALL_STUDIO_RENDER_QUALITY_INPUT_INVALID";
+        message ??= "Render-quality controls contain an invalid value.";
+        return new(false, message, null, [new RekallAgeCommandError(code, message, "render-quality")]);
+    }
+
     private Task ValidateAsync() => RunAsync(() => _session.ExecuteAsync(
         "rekall.validation.scene",
         JsonSerializer.Serialize(new { projectRoot = _session.ProjectRoot, sceneName = _session.SceneName }),
@@ -2178,6 +2574,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             if (result.Ok && _session.Model is not null)
             {
                 ApplyModel(_session.Model);
+                ApplyRenderingOperationResult(result.Value);
                 foreach (var warning in result.Errors)
                 {
                     ValidationLines.Add($"warning: {warning.Code} - {warning.Message}");
@@ -2264,6 +2661,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         Replace(ActionLines, model.Actions.Actions.Select(action => $"{action.Category}: {action.Label} ({action.Tool})"));
         Replace(RuntimeObservationLines, model.Runtime.Observations.Select(observation =>
             $"{observation.Severity}: {observation.Code} - {observation.Message}"));
+        ApplyRendering(model.Rendering, synchronizeAuthoring: true);
         ViewportTitle = $"{model.Scene.Name} Viewport";
         ViewportRenderableCount = model.Runtime.RenderableCount;
         if (ViewportImage is null)
@@ -2272,6 +2670,68 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
         RefreshSceneGizmo();
     }
+
+    private void ApplyRenderingOperationResult(object? value)
+    {
+        if (_currentModel is null) return;
+        switch (value)
+        {
+            case CaptureRuntimeViewportResult capture:
+                _currentModel = RekallAgeWorkbenchModelBuilder.WithCaptureResult(_currentModel, capture);
+                ApplyRendering(_currentModel.Rendering, synchronizeAuthoring: false);
+                if (capture.Captured && File.Exists(capture.ScreenshotPath))
+                {
+                    ViewportImage = LoadBitmap(capture.ScreenshotPath);
+                    ViewportRenderableCount = capture.RenderableCount;
+                    ViewportSummary = $"{capture.Width}×{capture.Height} · {capture.QualityPlan?.RequestedPreset ?? "authored"} requested · {capture.QualityPlan?.ResolvedPreset ?? "unavailable"} resolved";
+                }
+                break;
+            case CompareQualityPresetsResult comparison:
+                _currentModel = RekallAgeWorkbenchModelBuilder.WithQualityComparisonResult(_currentModel, comparison);
+                ApplyRendering(_currentModel.Rendering, synchronizeAuthoring: false);
+                break;
+        }
+    }
+
+    private void ApplyRendering(
+        RekallAgeWorkbenchRenderQualityModel rendering,
+        bool synchronizeAuthoring)
+    {
+        if (synchronizeAuthoring && rendering.Authoring is { } authoring)
+        {
+            SelectedQualityPreset = authoring.Preset;
+            QualityResolutionScaleInput = ToQualityInput(authoring.ResolutionScale);
+            QualityShadowCascadeCountInput = ToQualityInput(authoring.ShadowCascadeCount);
+            QualityShadowResolutionInput = ToQualityInput(authoring.ShadowResolution);
+            QualityFogModeInput = authoring.FogMode ?? string.Empty;
+            QualityBloomOverride = authoring.Bloom;
+            QualitySsaoOverride = authoring.Ssao;
+            QualityMaximumActiveParticlesInput = ToQualityInput(authoring.MaximumActiveParticles);
+        }
+
+        var runtime = rendering.Runtime;
+        RequestedQualityPreset = runtime.RequestedPreset;
+        ResolvedQualityPreset = runtime.ResolvedPreset ?? "Unavailable";
+        OutputResolutionText = FormatResolution(runtime.OutputWidth, runtime.OutputHeight);
+        InternalResolutionText = FormatResolution(runtime.RenderWidth, runtime.RenderHeight);
+        TotalGpuMillisecondsText = runtime.TotalGpuMillisecondsText;
+        GpuTimingStatusText = $"{runtime.GpuTimingCode ?? "available"} · {runtime.GpuTimingProvenance}";
+        RenderWorkloadText = $"{runtime.DrawCount} draws · {runtime.DispatchCount} dispatches";
+        Replace(RenderPassTimings, runtime.PassTimings);
+        Replace(RenderResources, runtime.Resources);
+        Replace(RenderDegradations, runtime.Degradations);
+        Replace(RenderQualityComparisons, rendering.Comparisons);
+        Replace(RenderDebugViews, rendering.DebugViews);
+        Replace(RenderSuggestedActions, runtime.SuggestedActions);
+        SelectedRenderDebugView = RenderDebugViews.FirstOrDefault();
+        RefreshCommands();
+    }
+
+    private static string FormatResolution(int? width, int? height) =>
+        width.HasValue && height.HasValue ? $"{width.Value}×{height.Value}" : "Unavailable";
+
+    private static string ToQualityInput<T>(T? value) where T : struct, IFormattable =>
+        value.HasValue ? value.Value.ToString(null, CultureInfo.InvariantCulture) : string.Empty;
 
     private void RefreshSceneGizmo()
     {
@@ -2470,6 +2930,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _removePropertyCommand.RaiseCanExecuteChanged();
         _validateCommand.RaiseCanExecuteChanged();
         _captureCommand.RaiseCanExecuteChanged();
+        _attachQualityProfileCommand.RaiseCanExecuteChanged();
+        _applyQualityCommand.RaiseCanExecuteChanged();
+        _captureQualityCommand.RaiseCanExecuteChanged();
+        _compareQualityCommand.RaiseCanExecuteChanged();
         _simulateCommand.RaiseCanExecuteChanged();
         _pauseSimulationCommand.RaiseCanExecuteChanged();
         _stepSimulationCommand.RaiseCanExecuteChanged();

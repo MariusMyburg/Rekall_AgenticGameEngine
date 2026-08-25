@@ -367,6 +367,151 @@
                 <TabItem Header="Assets"><ListBox ItemsSource="{Binding AssetLines}" /></TabItem>
                 <TabItem Header="Overview"><ListBox ItemsSource="{Binding SceneSummaryLines}" /></TabItem>
                 <TabItem Header="Actions"><ListBox ItemsSource="{Binding ActionLines}" /></TabItem>
+                <TabItem Header="Rendering">
+                    <Grid Margin="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="285" />
+                            <ColumnDefinition Width="390" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Style="{StaticResource EditorPanel}" Margin="0,0,8,0">
+                            <DockPanel>
+                                <Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}">
+                                    <TextBlock Text="AUTHORED QUALITY" FontWeight="SemiBold" FontSize="11" />
+                                </Border>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Margin="8">
+                                        <TextBlock Text="Preset" Style="{StaticResource SectionLabel}" />
+                                        <ComboBox ItemsSource="{Binding QualityPresets}"
+                                                  SelectedItem="{Binding SelectedQualityPreset, Mode=TwoWay}"
+                                                  Margin="0,3,0,6" ToolTip="Authored requested preset; the resolved preset is reported separately." />
+                                        <UniformGrid Columns="2" Margin="0,0,0,8">
+                                            <Button Content="Attach to Selected" Command="{Binding AttachQualityProfileCommand}" Padding="7,3" Margin="0,0,3,0" />
+                                            <Button Content="Apply" Command="{Binding ApplyQualityCommand}" Style="{StaticResource AccentButton}" Padding="7,3" Margin="3,0,0,0" />
+                                        </UniformGrid>
+                                        <Expander Header="Feature overrides" IsExpanded="False" Margin="0,2,0,8">
+                                            <Grid Margin="6">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="138" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+                                                <TextBlock Grid.Row="0" Text="Resolution scale" VerticalAlignment="Center" Foreground="{StaticResource MutedText}" />
+                                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding QualityResolutionScaleInput, UpdateSourceTrigger=PropertyChanged}" Margin="3,2" ToolTip="Blank uses the preset value." />
+                                                <TextBlock Grid.Row="1" Text="Shadow cascades" VerticalAlignment="Center" Foreground="{StaticResource MutedText}" />
+                                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding QualityShadowCascadeCountInput, UpdateSourceTrigger=PropertyChanged}" Margin="3,2" ToolTip="Blank uses the preset value." />
+                                                <TextBlock Grid.Row="2" Text="Shadow resolution" VerticalAlignment="Center" Foreground="{StaticResource MutedText}" />
+                                                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding QualityShadowResolutionInput, UpdateSourceTrigger=PropertyChanged}" Margin="3,2" ToolTip="Blank uses the preset value." />
+                                                <TextBlock Grid.Row="3" Text="Fog mode" VerticalAlignment="Center" Foreground="{StaticResource MutedText}" />
+                                                <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding QualityFogModes}" Text="{Binding QualityFogModeInput, UpdateSourceTrigger=PropertyChanged}" IsEditable="True" Margin="3,2" ToolTip="Blank uses the preset value; unsupported values remain inspectable degradations." />
+                                                <TextBlock Grid.Row="4" Text="Bloom" VerticalAlignment="Center" Foreground="{StaticResource MutedText}" />
+                                                <CheckBox Grid.Row="4" Grid.Column="1" IsChecked="{Binding QualityBloomOverride, Mode=TwoWay}" IsThreeState="True" Margin="6,4" ToolTip="Indeterminate uses the preset value." />
+                                                <TextBlock Grid.Row="5" Text="SSAO" VerticalAlignment="Center" Foreground="{StaticResource MutedText}" />
+                                                <CheckBox Grid.Row="5" Grid.Column="1" IsChecked="{Binding QualitySsaoOverride, Mode=TwoWay}" IsThreeState="True" Margin="6,4" ToolTip="Indeterminate uses the preset value." />
+                                                <TextBlock Grid.Row="6" Text="Max particles" VerticalAlignment="Center" Foreground="{StaticResource MutedText}" />
+                                                <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding QualityMaximumActiveParticlesInput, UpdateSourceTrigger=PropertyChanged}" Margin="3,2" ToolTip="Blank uses the preset value." />
+                                            </Grid>
+                                        </Expander>
+                                        <TextBlock Text="Compare against" Style="{StaticResource SectionLabel}" />
+                                        <ComboBox ItemsSource="{Binding QualityPresets}" SelectedItem="{Binding ComparisonQualityPreset, Mode=TwoWay}" Margin="0,3,0,6" />
+                                        <UniformGrid Columns="2">
+                                            <Button Content="Capture" Command="{Binding CaptureQualityCommand}" Padding="7,3" Margin="0,0,3,0" ToolTip="Capture through rekall.render.capture_runtime_viewport." />
+                                            <Button Content="Compare" Command="{Binding CompareQualityCommand}" Padding="7,3" Margin="3,0,0,0" ToolTip="Compare aligned frames through rekall.render.compare_quality_presets." />
+                                        </UniformGrid>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </DockPanel>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource EditorPanel}" Margin="0,0,8,0">
+                            <DockPanel>
+                                <Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}">
+                                    <TextBlock Text="RESOLVED / RUNTIME" FontWeight="SemiBold" FontSize="11" />
+                                </Border>
+                                <Grid Margin="8">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="105" /><ColumnDefinition Width="*" /><ColumnDefinition Width="100" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="Requested" Foreground="{StaticResource MutedText}" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding RequestedQualityPreset}" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Row="0" Grid.Column="2" Text="Resolved" Foreground="{StaticResource MutedText}" />
+                                        <TextBlock Grid.Row="0" Grid.Column="3" Text="{Binding ResolvedQualityPreset}" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Row="1" Text="Output" Foreground="{StaticResource MutedText}" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding OutputResolutionText}" />
+                                        <TextBlock Grid.Row="1" Grid.Column="2" Text="Internal" Foreground="{StaticResource MutedText}" />
+                                        <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding InternalResolutionText}" />
+                                        <TextBlock Grid.Row="2" Text="Total GPU" Foreground="{StaticResource MutedText}" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding TotalGpuMillisecondsText}" Foreground="{StaticResource Accent}" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Row="2" Grid.Column="2" Text="Workload" Foreground="{StaticResource MutedText}" />
+                                        <TextBlock Grid.Row="2" Grid.Column="3" Text="{Binding RenderWorkloadText}" />
+                                    </Grid>
+                                    <DockPanel Grid.Row="1" Margin="0,8,0,4">
+                                        <TextBlock DockPanel.Dock="Top" Text="PASS TIMINGS" Style="{StaticResource SectionLabel}" Margin="0,0,0,3" />
+                                        <TextBlock DockPanel.Dock="Bottom" Text="{Binding GpuTimingStatusText}" Foreground="{StaticResource MutedText}" FontSize="10" TextTrimming="CharacterEllipsis" />
+                                        <ListBox ItemsSource="{Binding RenderPassTimings}" BorderThickness="1">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="4,2">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="90" /></Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding MillisecondsText}" HorizontalAlignment="Right" FontFamily="Cascadia Mono, Consolas" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </DockPanel>
+                                    <DockPanel Grid.Row="2" Margin="0,4,0,0">
+                                        <TextBlock DockPanel.Dock="Top" Text="RESOURCES" Style="{StaticResource SectionLabel}" Margin="0,0,0,3" />
+                                        <ListBox ItemsSource="{Binding RenderResources}" BorderThickness="1">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="4,2">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="135" /></Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Name}" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Bytes, StringFormat={}{0:N0} bytes}" HorizontalAlignment="Right" FontFamily="Cascadia Mono, Consolas" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </DockPanel>
+                                </Grid>
+                            </DockPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource EditorPanel}">
+                            <DockPanel>
+                                <Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}">
+                                    <TextBlock Text="DIAGNOSTICS / CAPTURES" FontWeight="SemiBold" FontSize="11" />
+                                </Border>
+                                <Grid Margin="8">
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="*" /><RowDefinition Height="*" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0">
+                                        <TextBlock Text="Debug view" Style="{StaticResource SectionLabel}" />
+                                        <ComboBox ItemsSource="{Binding RenderDebugViews}" SelectedItem="{Binding SelectedRenderDebugView, Mode=TwoWay}" DisplayMemberPath="Label" Margin="0,3,0,6" ToolTip="Select an exact capture path returned by the renderer." />
+                                    </StackPanel>
+                                    <DockPanel Grid.Row="1" Margin="0,3">
+                                        <TextBlock DockPanel.Dock="Top" Text="DEGRADATIONS" Style="{StaticResource SectionLabel}" />
+                                        <ListBox ItemsSource="{Binding RenderDegradations}">
+                                            <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="3"><TextBlock Text="{Binding Code}" FontWeight="SemiBold" Foreground="#F2B36F" /><TextBlock TextWrapping="Wrap"><Run Text="{Binding Feature}" /><Run Text=": requested=" /><Run Text="{Binding RequestedValue}" /><Run Text=" → resolved=" /><Run Text="{Binding ResolvedValue}" /></TextBlock></StackPanel></DataTemplate></ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </DockPanel>
+                                    <DockPanel Grid.Row="2" Margin="0,3">
+                                        <TextBlock DockPanel.Dock="Top" Text="QUALITY COMPARISONS" Style="{StaticResource SectionLabel}" />
+                                        <ListBox ItemsSource="{Binding RenderQualityComparisons}">
+                                            <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="3"><TextBlock FontWeight="SemiBold"><Run Text="{Binding RequestedPreset}" /><Run Text=" → " /><Run Text="{Binding ResolvedPreset}" /></TextBlock><TextBlock Foreground="{StaticResource MutedText}"><Run Text="{Binding RenderWidth}" /><Run Text="×" /><Run Text="{Binding RenderHeight}" /><Run Text=" · GPU " /><Run Text="{Binding TotalGpuMillisecondsText}" /></TextBlock><TextBlock Text="{Binding ScreenshotPath}" TextTrimming="CharacterEllipsis" FontSize="10" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </DockPanel>
+                                    <DockPanel Grid.Row="3" Margin="0,3">
+                                        <TextBlock DockPanel.Dock="Top" Text="SUGGESTED ACTIONS" Style="{StaticResource SectionLabel}" />
+                                        <ListBox ItemsSource="{Binding RenderSuggestedActions}" FontSize="10" />
+                                    </DockPanel>
+                                </Grid>
+                            </DockPanel>
+                        </Border>
+                    </Grid>
+                </TabItem>
                 <TabItem Header="Runtime"><ListBox ItemsSource="{Binding RuntimeObservationLines}" /></TabItem>
                 <TabItem Header="Transactions"><ListBox ItemsSource="{Binding TransactionLines}" /></TabItem>
                 <TabItem Header="Imports"><ListBox ItemsSource="{Binding ImportLines}" /></TabItem>

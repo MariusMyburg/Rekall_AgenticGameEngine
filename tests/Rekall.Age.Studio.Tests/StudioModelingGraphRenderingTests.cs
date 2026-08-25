@@ -8,17 +8,91 @@ namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioModelingGraphRenderingTests
 {
+    private static void VerifyRenderingWorkspaceSeparatesAuthoredControlsFromResolvedDiagnostics()
+    {
+        Exception? failure = null;
+        {
+            string? studioProjectRoot = null;
+            try
+            {
+                var window = new MainWindow();
+                var viewModel = Assert.IsType<RekallAgeStudioViewModel>(window.DataContext);
+                var repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+                studioProjectRoot = Path.Combine(Path.GetTempPath(), "rekall-age-rendering-workspace-" + Guid.NewGuid().ToString("N"));
+                viewModel.ProjectPathInput = studioProjectRoot;
+                viewModel.ProjectNameInput = "Rendering Workspace Probe";
+                viewModel.SceneNameInput = "Main";
+                ((RekallAgeAsyncCommand)viewModel.CreateCommand).ExecuteAsync(null).GetAwaiter().GetResult();
+                ((RekallAgeAsyncCommand)viewModel.AddEntityCommand).ExecuteAsync(null).GetAwaiter().GetResult();
+                Assert.True(viewModel.AttachQualityProfileCommand.CanExecute(null));
+                ((RekallAgeAsyncCommand)viewModel.AttachQualityProfileCommand).ExecuteAsync(null).GetAwaiter().GetResult();
+                Assert.True(viewModel.ApplyQualityCommand.CanExecute(null), viewModel.StatusText);
+
+                window.Width = 1500;
+                window.Height = 940;
+                window.Show();
+                window.UpdateLayout();
+                var outputTabs = Assert.IsType<TabControl>(window.FindName("OutputTabs"));
+                var renderingTab = outputTabs.Items.OfType<TabItem>().Single(item =>
+                    item.Header?.ToString() == "Rendering");
+                outputTabs.SelectedItem = renderingTab;
+                window.UpdateLayout();
+
+                var preset = Descendants<ComboBox>(window).Single(combo =>
+                    combo.GetBindingExpression(ComboBox.SelectedItemProperty)?.ParentBinding.Path.Path
+                    == nameof(RekallAgeStudioViewModel.SelectedQualityPreset));
+                var buttons = Descendants<Button>(window).ToArray();
+                var apply = Assert.Single(buttons, button => ReferenceEquals(button.Command, viewModel.ApplyQualityCommand));
+                var capture = Assert.Single(buttons, button => ReferenceEquals(button.Command, viewModel.CaptureQualityCommand));
+                var compare = Assert.Single(buttons, button => ReferenceEquals(button.Command, viewModel.CompareQualityCommand));
+                Assert.Same(viewModel.ApplyQualityCommand, apply.Command);
+                Assert.Same(viewModel.CaptureQualityCommand, capture.Command);
+                Assert.Same(viewModel.CompareQualityCommand, compare.Command);
+                Assert.NotNull(preset.GetBindingExpression(ComboBox.SelectedItemProperty));
+                Assert.Equal("Unavailable", viewModel.TotalGpuMillisecondsText);
+                var renderingSurface = Assert.IsAssignableFrom<FrameworkElement>(renderingTab.Content);
+                Assert.True(renderingSurface.ActualWidth > 900);
+                Assert.True(renderingSurface.ActualHeight > 100);
+
+                var bitmap = new RenderTargetBitmap(1500, 940, 96, 96, PixelFormats.Pbgra32);
+                bitmap.Render(window);
+                var output = Path.Combine(repositoryRoot, "artifacts", "studio-acceptance", "rendering-workbench.png");
+                Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                using (var stream = File.Create(output)) encoder.Save(stream);
+                Assert.True(new FileInfo(output).Length > 20_000);
+
+                window.Hide();
+                viewModel.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+            finally
+            {
+                if (studioProjectRoot is not null && Directory.Exists(studioProjectRoot))
+                    Directory.Delete(studioProjectRoot, recursive: true);
+            }
+        }
+
+        Assert.Null(failure);
+    }
+
     [Fact]
     public void ProceduralGraphRendersReadOnlyNodeMetricsWithoutBindingBackToThem()
     {
         Exception? failure = null;
         var thread = new Thread(() =>
         {
+            App? app = null;
             try
             {
-                var app = new App();
+                app = new App();
                 app.InitializeComponent();
                 app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                VerifyRenderingWorkspaceSeparatesAuthoredControlsFromResolvedDiagnostics();
                 var window = new MainWindow();
                 var viewModel = Assert.IsType<RekallAgeStudioViewModel>(window.DataContext);
                 var repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
@@ -88,16 +162,19 @@ public sealed class StudioModelingGraphRenderingTests
                 window.Hide();
                 viewModel.DisposeAsync().AsTask().GetAwaiter().GetResult();
                 Directory.Delete(studioProjectRoot, recursive: true);
-                app.Shutdown();
             }
             catch (Exception exception)
             {
                 failure = exception;
             }
+            finally
+            {
+                app?.Shutdown();
+            }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(15)), "Studio render thread did not complete.");
+        Assert.True(thread.Join(TimeSpan.FromSeconds(30)), "Studio render thread did not complete.");
 
         Assert.Null(failure);
     }

@@ -16,6 +16,7 @@ public static class RekallAgeBuiltInComponentTypeCatalog
         "Rekall.CameraTarget3D",
         "Rekall.CameraTargetCycleInput",
         "Rekall.RenderLayer",
+        "Rekall.RenderQualityProfile",
         "Rekall.SpriteRenderer",
         "Rekall.MeshRenderer",
         "Rekall.XrRig",

@@ -322,6 +322,36 @@ public sealed class CodexAppServerClientTests
         Assert.DoesNotContain("second-private-value", retained, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task RetainedPayloadSanitizationPreservesTokenUsageAndSafeAuthenticationFacts()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var process = new FakeCodexProcess();
+        await using var client = await StartInitializedClientAsync(process, cancellationToken: timeout.Token);
+
+        await process.WriteServerLineAsync(
+            """
+            {"method":"account/updated","params":{"account":{"type":"chatgpt","mode":"oauth","email":"person@example.invalid","profile":{"type":"personal","mode":"interactive","email":"profile@example.invalid"},"authentication":{"type":"chatgpt","mode":"oauth","accessToken":"private-access-token"}},"tokenUsage":{"inputTokens":12,"outputTokenCount":8,"totalTokens":20},"inputTokens":12,"outputTokenCount":8}}
+            """);
+        await process.WriteServerLineAsync(
+            """
+            {"id":"approval","method":"item/commandExecution/requestApproval","params":{"auth":{"type":"chatgpt","mode":"oauth","authorization":"Bearer private-material"},"credential":{"secret":"hidden"},"tokenUsage":{"inputTokens":3,"outputTokenCount":2}}}
+            """);
+
+        var notification = await client.ReadNotificationAsync(timeout.Token);
+        var serverRequest = await client.ReadServerRequestAsync(timeout.Token);
+        AssertJson(
+            notification.Params.GetRawText(),
+            """
+            {"account":{"type":"chatgpt","mode":"oauth","profile":{"type":"personal","mode":"interactive"},"authentication":{"type":"chatgpt","mode":"oauth"}},"tokenUsage":{"inputTokens":12,"outputTokenCount":8,"totalTokens":20},"inputTokens":12,"outputTokenCount":8}
+            """);
+        AssertJson(
+            serverRequest.Params.GetRawText(),
+            """
+            {"auth":{"type":"chatgpt","mode":"oauth"},"tokenUsage":{"inputTokens":3,"outputTokenCount":2}}
+            """);
+    }
+
     private static async Task<RekallAgeCodexAppServerClient> StartInitializedClientAsync(
         FakeCodexProcess process,
         RekallAgeCodexAppServerOptions? options = null,

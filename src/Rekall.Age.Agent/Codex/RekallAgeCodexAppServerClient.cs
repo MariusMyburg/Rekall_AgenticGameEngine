@@ -837,23 +837,27 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
     private static JsonElement SanitizeRetainedParameters(JsonElement parameters)
     {
         var node = JsonNode.Parse(parameters.GetRawText());
-        SanitizeRetainedNode(node);
+        SanitizeRetainedNode(node, identityOrAuthenticationContext: false);
         return JsonSerializer.SerializeToElement(node, JsonOptions);
     }
 
-    private static void SanitizeRetainedNode(JsonNode? node)
+    private static void SanitizeRetainedNode(JsonNode? node, bool identityOrAuthenticationContext)
     {
         if (node is JsonObject jsonObject)
         {
             foreach (var property in jsonObject.ToArray())
             {
-                if (IsSensitiveRetainedProperty(property.Key))
+                var normalizedName = NormalizeRetainedPropertyName(property.Key);
+                if (IsSensitiveRetainedProperty(normalizedName)
+                    || (identityOrAuthenticationContext && IsIdentityProperty(normalizedName)))
                 {
-                    jsonObject[property.Key] = "[REDACTED]";
+                    jsonObject.Remove(property.Key);
                 }
                 else
                 {
-                    SanitizeRetainedNode(property.Value);
+                    SanitizeRetainedNode(
+                        property.Value,
+                        identityOrAuthenticationContext || IsIdentityOrAuthenticationContainer(normalizedName));
                 }
             }
 
@@ -864,7 +868,7 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         {
             foreach (var item in jsonArray)
             {
-                SanitizeRetainedNode(item);
+                SanitizeRetainedNode(item, identityOrAuthenticationContext);
             }
 
             return;
@@ -876,20 +880,48 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         }
     }
 
-    private static bool IsSensitiveRetainedProperty(string propertyName)
-    {
-        var normalized = propertyName.Replace("_", string.Empty, StringComparison.Ordinal)
+    private static string NormalizeRetainedPropertyName(string propertyName) =>
+        propertyName.Replace("_", string.Empty, StringComparison.Ordinal)
             .Replace("-", string.Empty, StringComparison.Ordinal)
             .ToLowerInvariant();
-        return normalized.Contains("account", StringComparison.Ordinal)
-            || normalized.Contains("authorization", StringComparison.Ordinal)
-            || normalized.Contains("credential", StringComparison.Ordinal)
-            || normalized.Contains("email", StringComparison.Ordinal)
-            || normalized.Contains("apikey", StringComparison.Ordinal)
-            || normalized.Contains("password", StringComparison.Ordinal)
-            || normalized.Contains("secret", StringComparison.Ordinal)
-            || normalized.Contains("token", StringComparison.Ordinal);
-    }
+
+    private static bool IsSensitiveRetainedProperty(string normalizedName) => normalizedName is
+        "accesstoken"
+        or "accountid"
+        or "apikey"
+        or "authorization"
+        or "bearertoken"
+        or "clientsecret"
+        or "credential"
+        or "credentials"
+        or "email"
+        or "idtoken"
+        or "password"
+        or "passphrase"
+        or "privatekey"
+        or "refreshtoken"
+        or "secret"
+        or "sessiontoken"
+        or "token"
+        or "tokens"
+        or "userid";
+
+    private static bool IsIdentityOrAuthenticationContainer(string normalizedName) => normalizedName is
+        "account"
+        or "auth"
+        or "authentication"
+        or "profile";
+
+    private static bool IsIdentityProperty(string normalizedName) => normalizedName is
+        "avatar"
+        or "avatarurl"
+        or "displayname"
+        or "id"
+        or "name"
+        or "phone"
+        or "phonenumber"
+        or "picture"
+        or "username";
 
     private void HandleResponse(long id, JsonElement response)
     {

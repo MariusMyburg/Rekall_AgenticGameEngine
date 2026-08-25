@@ -116,3 +116,23 @@ dotnet build Rekall.AGE.sln --no-restore
 Result: build succeeded with 0 warnings and 0 errors.
 
 Per the end-to-end priority override, late turn-start response deadlines, stalled-stdin write deadlines, and eviction of completed turns that callers never consume are deferred until after the first functional Codex integration. They were not started in this fix round.
+
+## Fix round 2: retained telemetry preservation
+
+The first sanitizer treated sensitive words as substrings. That safely removed credentials, but it also replaced legitimate fields such as `account`, `tokenUsage`, `inputTokens`, and `outputTokenCount`, destroying authentication-mode facts and Task 2 telemetry.
+
+The focused regression test first failed with those object and numeric fields replaced by `"[REDACTED]"`. The sanitizer now uses normalized exact credential-field names plus contextual identity-field matching inside `account`, `profile`, `auth`, and `authentication` objects. Sensitive properties are removed recursively, while safe `type`/`mode` values and token-usage/count objects and numbers remain unchanged. The existing credential-leakage test remains part of the gate.
+
+Final fix-round verification:
+
+```powershell
+dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~CodexAppServerClientTests|FullyQualifiedName~CodexProcessLifecycleTests"
+```
+
+Result: 25 passed, 0 failed, 0 skipped.
+
+```powershell
+dotnet build Rekall.AGE.sln --no-restore
+```
+
+Result: build succeeded with 0 warnings and 0 errors.

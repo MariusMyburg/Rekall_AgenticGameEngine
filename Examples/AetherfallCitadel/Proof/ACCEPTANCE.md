@@ -130,6 +130,27 @@ the accepted gameplay evidence above.
   ruins catch light across authored profiles; material separation, large-scale
   composition, and broader architectural readability remain below final visual
   acceptance.
+- Aetherfall exposed that compiled mesh surfaces preserved material asset IDs,
+  but the standard Vulkan path never resolved those material graphs. AGE now
+  resolves the portable static PBR closure for each compiled surface, loads
+  graph-referenced textures, applies base-color/metallic/roughness/normal/
+  emissive bindings, and retains entity material values as instance overrides.
+- The Warden now publishes exactly two semantic surfaces from its ordinary
+  modeling graph: aged steel for armor/weapon forms and charcoal cloth for the
+  body, coat, hood, arms, and cloak. The mesh compiler coalesces alternating
+  faces by material slot, reducing its cooked output from 21 surface runs to two
+  draw surfaces without changing its 64,284 vertices or 26,228 triangles.
+- The representative visual proof now uses frame 120 rather than the misleading
+  first smoothing frame, allowing the authored follow camera to settle at
+  `(0,13,-25.2)` and show the complete player silhouette. The real RTX 5090 High
+  capture records 24,760 distinct colors, mean luminance 0.079, 142 render-work
+  draws across all passes, and zero observations, missing assets, unsupported
+  assets, or fallbacks. The desktop60 budget inspection reports 43 scene draw
+  calls and 162,632 triangles, within every configured limit.
+- The prior four `REKALL_UI_ELEMENT_NO_CANVAS` observations were traced to the
+  real HUD canvas being authored invisible while its child labels remained
+  visible. The canvas is now active, and the exact deterministic movement proof
+  still changes Warden X by `0.506840` with both assertions passing.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, prop geometry remains visibly coarse, and the

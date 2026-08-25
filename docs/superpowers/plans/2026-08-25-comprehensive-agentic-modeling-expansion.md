@@ -473,6 +473,13 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   improved geometry without game-specific engine behavior. This is a partial
   checkpoint; material-slot separation and additional environment kits remain.
 
+  Later 2026-08-26 checkpoint: compiled surface material IDs now resolve through
+  the standard runtime PBR path, including graph-owned texture dependencies and
+  scalar/color factors. The Warden is the first Aetherfall two-surface consumer
+  (aged steel plus charcoal cloth). The compiler now groups faces by material
+  slot, producing two draw surfaces instead of 21 alternating runs. Additional
+  architecture kits and richer texture/material authoring remain.
+
 - [ ] **Step 4: Prove visible improvement**
 
   Capture the same Windows-player view and require rounded hard edges, layered

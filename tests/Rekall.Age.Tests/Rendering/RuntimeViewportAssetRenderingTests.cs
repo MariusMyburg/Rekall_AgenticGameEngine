@@ -1,5 +1,8 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Assets;
+using Rekall.Age.Core.Persistence;
+using Rekall.Age.Modeling;
+using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime;
@@ -594,6 +597,52 @@ public sealed class RuntimeViewportAssetRenderingTests
         var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(root, frame, CancellationToken.None);
 
         Assert.True(assets.Images.ContainsKey("asset_earth"));
+        Assert.Empty(assets.Issues);
+    }
+
+    [Fact]
+    public async Task AssetResolverLoadsMaterialGraphAndItsTexturesForCompiledMeshSurface()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var texturePath = Path.Combine(root, "aged-metal.png");
+        await RekallAgePngWriter.WriteRgbaAsync(texturePath, 1, 1, [92, 67, 43, 255], CancellationToken.None);
+        await new RekallAgeAssetCatalogStore().SaveAsync(
+            root,
+            new RekallAgeAssetCatalogDocument(
+            [
+                new RekallAgeAssetDocument(
+                    "asset_aged_metal", "aged-metal", "Aged Metal", "texture",
+                    texturePath, texturePath, "hash")
+            ]),
+            CancellationToken.None);
+        var graph = RekallAgeMaterialGraphAsset.Create(
+            "material.aged-metal", "Aged Metal",
+            [
+                new("albedo", "rekall.material.texture.sample", 1, new JsonObject { ["textureAssetId"] = "asset_aged_metal" }),
+                new("pbr", "rekall.material.surface.pbr", 1, new JsonObject { ["metallic"] = 0.7, ["roughness"] = 0.4 }),
+                new("output", "rekall.material.output", 1, new JsonObject())
+            ],
+            [
+                new("albedo-pbr", "albedo", "color", "pbr", "baseColor"),
+                new("pbr-output", "pbr", "surface", "output", "surface")
+            ],
+            new("surface", "output", "surface"));
+        await new RekallAgeMaterialGraphAssetStore().SaveIfRevisionAsync(
+            root, graph, RekallAgeDocumentRevision.Missing, CancellationToken.None);
+        var geometry = new RekallAgeRuntimeViewportGeometryMesh(
+            [new(0, 0, 0), new(1, 0, 0), new(0, 1, 0)], [0, 1, 2],
+            Surfaces: [new(0, 0, graph.AssetId, 0, 3, [1])]);
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main", 0, 0, 160, 90, null, [],
+            [new("mesh", "Mesh", "mesh", "rekall.geometry.mesh", 0, 0, 0, 1,
+                Variant: "rekall.geometry.mesh", GeometryMesh: geometry)],
+            0, new(false, 0), []);
+
+        var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(root, frame, CancellationToken.None);
+
+        var material = Assert.Single(assets.Materials.Values);
+        Assert.Equal("asset_aged_metal", material.BaseColorTextureAssetId);
+        Assert.True(assets.Images.ContainsKey("asset_aged_metal"));
         Assert.Empty(assets.Issues);
     }
 

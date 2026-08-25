@@ -602,6 +602,41 @@ public sealed class VulkanSceneMeshBuilderTests
     }
 
     [Fact]
+    public void BuildMeshesBindsResolvedMaterialAssetsToEditableMeshSurfaces()
+    {
+        var geometry = new RekallAgeRuntimeViewportGeometryMesh(
+            [new(0, 0, 0, U: 0, V: 0), new(1, 0, 0, U: 1, V: 0), new(0, 1, 0, U: 0, V: 1)],
+            [0, 1, 2],
+            Surfaces: [new(0, 0, "mat.aged-bronze", 0, 3, [21])]);
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "entity-1", "Armored Figure", "mesh", "rekall.geometry.mesh",
+            0, 0, 0, 1, Variant: "rekall.geometry.mesh", GeometryMesh: geometry));
+        var assets = CreateAssetsWithTexture("bronze-albedo", 1, 1, [120, 82, 44, 255]) with
+        {
+            Materials = new Dictionary<string, RekallAgeRuntimeMaterialAsset>(StringComparer.Ordinal)
+            {
+                ["mat.aged-bronze"] = new("mat.aged-bronze")
+                {
+                    BaseColorTextureAssetId = "bronze-albedo",
+                    BaseColorFactor = new Vector4(0.5f, 0.75f, 1, 1),
+                    MetallicFactor = 0.78f,
+                    RoughnessFactor = 0.34f
+                }
+            }
+        };
+
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets));
+
+        Assert.Equal("mat.aged-bronze", mesh.MaterialAssetId);
+        Assert.Equal("bronze-albedo", mesh.BaseColorTexture?.Id);
+        Assert.Equal(0.175f, mesh.Vertices[0].R, 3);
+        Assert.Equal(0.435f, mesh.Vertices[0].G, 3);
+        Assert.Equal(0.85f, mesh.Vertices[0].B, 3);
+        Assert.Equal(0.78f, mesh.MetallicFactor);
+        Assert.Equal(0.34f, mesh.RoughnessFactor);
+    }
+
+    [Fact]
     public void BuildMeshesCreatesModelAssetMeshDataWhenResolvedAssetExists()
     {
         var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(

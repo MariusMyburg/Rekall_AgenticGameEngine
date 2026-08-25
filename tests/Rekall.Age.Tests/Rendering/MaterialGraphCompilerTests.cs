@@ -109,4 +109,42 @@ public sealed class MaterialGraphCompilerTests
         Assert.Contains(compiled.Resources, item => item.NodeId == "normal-texture");
         Assert.Contains(compiled.Resources, item => item.NodeId == "emissive");
     }
+
+    [Fact]
+    public void RuntimeResolverExtractsPortablePbrBindingsFromMaterialGraph()
+    {
+        var graph = RekallAgeMaterialGraphAsset.Create(
+            "aged-plate", "Aged Plate",
+            [
+                new("albedo", "rekall.material.texture.sample", 1, new JsonObject { ["textureAssetId"] = "plate-albedo" }),
+                new("normal-texture", "rekall.material.texture.sample", 1, new JsonObject { ["textureAssetId"] = "plate-normal" }),
+                new("normal", "rekall.material.normal.map", 1, new JsonObject { ["strength"] = 0.45 }),
+                new("emissive", "rekall.material.texture.sample", 1, new JsonObject { ["textureAssetId"] = "rune-emissive" }),
+                new("pbr", "rekall.material.surface.pbr", 1, new JsonObject
+                {
+                    ["metallic"] = 0.72,
+                    ["roughness"] = 0.31,
+                    ["emissiveStrength"] = 2.5
+                }),
+                new("output", "rekall.material.output", 1, new JsonObject())
+            ],
+            [
+                new("albedo-pbr", "albedo", "color", "pbr", "baseColor"),
+                new("normaltex-normal", "normal-texture", "color", "normal", "color"),
+                new("normal-pbr", "normal", "normal", "pbr", "normal"),
+                new("emissive-pbr", "emissive", "color", "pbr", "emissive"),
+                new("pbr-output", "pbr", "surface", "output", "surface")
+            ], new("surface", "output", "surface"));
+
+        var material = new RekallAgeRuntimeMaterialGraphResolver().Resolve(graph);
+
+        Assert.Equal("aged-plate", material.AssetId);
+        Assert.Equal("plate-albedo", material.BaseColorTextureAssetId);
+        Assert.Equal("plate-normal", material.NormalTextureAssetId);
+        Assert.Equal("rune-emissive", material.EmissiveTextureAssetId);
+        Assert.Equal(0.72f, material.MetallicFactor);
+        Assert.Equal(0.31f, material.RoughnessFactor);
+        Assert.Equal(0.45f, material.NormalScale);
+        Assert.Equal(2.5f, material.EmissiveFactor.W);
+    }
 }

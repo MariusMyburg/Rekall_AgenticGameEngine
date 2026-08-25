@@ -94,6 +94,7 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         Assert.Single(components, component => Type(component) == "Rekall.RenderQualityProfile");
         Assert.Single(components, component => Type(component) == "Rekall.Environment3D");
         Assert.Single(components, component => Type(component) == "Rekall.ShadowSettings");
+        Assert.True(Bool(Assert.Single(entities, entity => HasComponent(entity, "Rekall.UiCanvas")), "visible"));
         Assert.True(components.Count(component => Type(component) == "Rekall.FogVolume") >= 2);
 
         var emitters = components.Where(component => Type(component) == "Rekall.ParticleEmitter3D").ToArray();
@@ -173,11 +174,16 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         var compiledMesh = JsonNode.Parse(File.ReadAllText(Path.Combine(projectRoot, compiledRelativePath)))!.AsObject();
         var authoredVertexCount = compiledMesh["vertices"]!.AsArray().Count;
         var authoredIndexCount = compiledMesh["indices"]!.AsArray().Count;
+        var authoredSurfaces = compiledMesh["surfaces"]!.AsArray();
 
         Assert.Equal(authoredVertexCount, geometry.Vertices.Count);
         Assert.Equal(authoredIndexCount, geometry.Indices.Count);
         Assert.True(authoredVertexCount >= 60_000,
             $"Expected the published Warden to retain its layered armor and silhouette detail, found {authoredVertexCount} vertices.");
+        Assert.Equal(2, authoredSurfaces.Count);
+        Assert.Equal(
+            ["aetherfall.warden-steel.material", "aetherfall.warden-cloth.material"],
+            authoredSurfaces.Select(surface => surface!["materialAssetId"]!.GetValue<string>()).ToArray());
     }
 
     private static JsonObject LoadMainScene() => JsonNode.Parse(File.ReadAllText(Path.Combine(

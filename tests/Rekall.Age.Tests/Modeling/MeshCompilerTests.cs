@@ -147,6 +147,37 @@ public sealed class MeshCompilerTests
     }
 
     [Fact]
+    public void CompileCoalescesAlternatingFacesIntoOneSurfacePerMaterial()
+    {
+        var mesh = IndependentTriangles(4) with
+        {
+            MaterialSlots = [new("steel", "mat.steel"), new("cloth", "mat.cloth")],
+            Attributes =
+            [
+                Attribute("material.index", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Int32,
+                    [0, 1, 0, 1], "material-index")
+            ]
+        };
+
+        var compiled = new RekallAgeMeshCompiler().Compile(mesh);
+
+        Assert.Collection(
+            compiled.Surfaces,
+            steel =>
+            {
+                Assert.Equal(0, steel.MaterialSlotIndex);
+                Assert.Equal(6, steel.IndexCount);
+                Assert.Equal([1000UL, 1002UL], steel.SourceFaceIds);
+            },
+            cloth =>
+            {
+                Assert.Equal(1, cloth.MaterialSlotIndex);
+                Assert.Equal(6, cloth.IndexCount);
+                Assert.Equal([1001UL, 1003UL], cloth.SourceFaceIds);
+            });
+    }
+
+    [Fact]
     public void CompiledIndicesAreUInt32AndCanAddressBeyondUInt16()
     {
         const int triangleCount = 21_846;
@@ -206,6 +237,37 @@ public sealed class MeshCompilerTests
             Enumerable.Range(0, count).ToArray(),
             Enumerable.Range(0, count).ToArray()),
             attributes);
+    }
+
+    private static RekallAgeMeshAsset IndependentTriangles(int triangleCount)
+    {
+        var pointCount = triangleCount * 3;
+        var points = new RekallAgeGeometryVector3[pointCount];
+        var edges = new RekallAgeMeshEdgePointIndices[pointCount];
+        var offsets = new int[triangleCount + 1];
+        for (var face = 0; face < triangleCount; face++)
+        {
+            var start = face * 3;
+            points[start] = new(face * 2, 0, 0);
+            points[start + 1] = new(face * 2 + 1, 0, 0);
+            points[start + 2] = new(face * 2, 1, 0);
+            offsets[face] = start;
+            for (var local = 0; local < 3; local++)
+            {
+                edges[start + local] = new(start + local, start + ((local + 1) % 3));
+            }
+        }
+        offsets[^1] = pointCount;
+        return RekallAgeMeshAsset.Create("independent", "Independent", new(
+            Enumerable.Range(1, pointCount).Select(value => (ulong)value).ToArray(),
+            points,
+            Enumerable.Range(1, pointCount).Select(value => (ulong)(100 + value)).ToArray(),
+            edges,
+            Enumerable.Range(0, triangleCount).Select(value => (ulong)(1000 + value)).ToArray(),
+            offsets,
+            Enumerable.Range(1, pointCount).Select(value => (ulong)(2000 + value)).ToArray(),
+            Enumerable.Range(0, pointCount).ToArray(),
+            Enumerable.Range(0, pointCount).ToArray()));
     }
 
     private static RekallAgeGeometryAttribute Attribute(

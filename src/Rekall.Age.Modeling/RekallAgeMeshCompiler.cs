@@ -71,29 +71,46 @@ public sealed class RekallAgeMeshCompiler
                 uvs[cornerIndex] = ReadVector2(uvAttribute, cornerIndex, pointIndex) ?? new(0, 0);
                 colors[cornerIndex] = ReadVector4(colorAttribute, cornerIndex, pointIndex) ?? new(1, 1, 1, 1);
             }
+        }
 
-            var materialIndex = ReadMaterialIndex(materialAttribute, faceIndex);
-            var surface = GetSurface(surfaces, mesh.MaterialSlots, materialIndex, indices.Count);
-            var localTriangles = TriangulateFace(topology, faceIndex, start, end);
-            foreach (var localTriangle in localTriangles)
+        var faceGroups = Enumerable.Range(0, topology.FaceIds.Count)
+            .GroupBy(faceIndex => ReadMaterialIndex(materialAttribute, faceIndex))
+            .OrderBy(group => group.Min())
+            .ToArray();
+        foreach (var faceGroup in faceGroups)
+        {
+            var materialIndex = faceGroup.Key;
+            var materialAssetId = materialIndex >= 0 && materialIndex < mesh.MaterialSlots.Count
+                ? mesh.MaterialSlots[materialIndex].MaterialAssetId
+                : null;
+            var surface = new SurfaceBuilder(surfaces.Count, materialIndex, materialAssetId, indices.Count);
+            surfaces.Add(surface);
+
+            foreach (var faceIndex in faceGroup)
             {
-                var a = start + localTriangle.A;
-                var b = start + localTriangle.B;
-                var c = start + localTriangle.C;
-                var firstIndex = indices.Count;
-                indices.Add(checked((uint)a));
-                indices.Add(checked((uint)b));
-                indices.Add(checked((uint)c));
-                AccumulateTangent(a, b, c, positions, normals, uvs, tangentSums, bitangentSums);
-                triangles.Add(new(
-                    triangles.Count,
-                    topology.FaceIds[faceIndex],
-                    [topology.CornerIds[a], topology.CornerIds[b], topology.CornerIds[c]],
-                    [pointIds[a], pointIds[b], pointIds[c]],
-                    surface.SurfaceIndex));
-                surface.IndexCount += indices.Count - firstIndex;
+                var start = topology.FaceOffsets[faceIndex];
+                var end = topology.FaceOffsets[faceIndex + 1];
+                var localTriangles = TriangulateFace(topology, faceIndex, start, end);
+                foreach (var localTriangle in localTriangles)
+                {
+                    var a = start + localTriangle.A;
+                    var b = start + localTriangle.B;
+                    var c = start + localTriangle.C;
+                    var firstIndex = indices.Count;
+                    indices.Add(checked((uint)a));
+                    indices.Add(checked((uint)b));
+                    indices.Add(checked((uint)c));
+                    AccumulateTangent(a, b, c, positions, normals, uvs, tangentSums, bitangentSums);
+                    triangles.Add(new(
+                        triangles.Count,
+                        topology.FaceIds[faceIndex],
+                        [topology.CornerIds[a], topology.CornerIds[b], topology.CornerIds[c]],
+                        [pointIds[a], pointIds[b], pointIds[c]],
+                        surface.SurfaceIndex));
+                    surface.IndexCount += indices.Count - firstIndex;
+                }
+                surface.SourceFaceIds.Add(topology.FaceIds[faceIndex]);
             }
-            surface.SourceFaceIds.Add(topology.FaceIds[faceIndex]);
         }
 
         var vertices = new RekallAgeCompiledMeshVertex[topology.CornerIds.Count];
@@ -138,24 +155,6 @@ public sealed class RekallAgeMeshCompiler
             return 0;
         }
         return attribute.Values[faceIndex].TryGetInt32(out var value) ? value : 0;
-    }
-
-    private static SurfaceBuilder GetSurface(
-        List<SurfaceBuilder> surfaces,
-        IReadOnlyList<RekallAgeMaterialSlot> materialSlots,
-        int materialIndex,
-        int firstIndex)
-    {
-        if (surfaces.Count > 0 && surfaces[^1].MaterialSlotIndex == materialIndex)
-        {
-            return surfaces[^1];
-        }
-        var materialAssetId = materialIndex >= 0 && materialIndex < materialSlots.Count
-            ? materialSlots[materialIndex].MaterialAssetId
-            : null;
-        var result = new SurfaceBuilder(surfaces.Count, materialIndex, materialAssetId, firstIndex);
-        surfaces.Add(result);
-        return result;
     }
 
     private static IReadOnlyList<LocalTriangle> TriangulateFace(

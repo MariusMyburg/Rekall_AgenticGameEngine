@@ -58,11 +58,7 @@
         {
           "type": "Rekall.Material",
           "properties": {
-            "baseColor": "#34413e",
-            "metallicFactor": 0.46,
-            "roughnessFactor": 0.34,
-            "emissiveColor": "#161b1a",
-            "emissiveStrength": 0.01
+            "baseColor": "#ffffff"
           }
         },
         {
@@ -1901,7 +1897,7 @@
       ],
       "parentId": null,
       "prefabSourceId": null,
-      "visible": false,
+      "visible": true,
       "locked": false
     },
     {

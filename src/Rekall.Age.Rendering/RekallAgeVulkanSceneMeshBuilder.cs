@@ -295,28 +295,54 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
         RekallAgeRuntimeViewportRenderable renderable,
         RekallAgeRuntimeViewportAssetSet assets)
     {
+        var material = !string.IsNullOrWhiteSpace(mesh.MaterialAssetId)
+            && assets.Materials.TryGetValue(mesh.MaterialAssetId, out var resolvedMaterial)
+                ? resolvedMaterial
+                : null;
+        if (material is not null)
+        {
+            mesh = ApplyBaseColorFactor(mesh, material.BaseColorFactor);
+        }
         var procedural = renderable.ProceduralMaterial is null
             ? null
             : RekallAgeProceduralMaterialTextureGenerator.Generate(renderable.EntityId, renderable.ProceduralMaterial);
         return mesh with
         {
-            BaseColorTexture = ResolveTexture(renderable.TextureAssetId, assets) ?? mesh.BaseColorTexture ?? procedural?.BaseColorTexture,
-            MetallicRoughnessTexture = ResolveTexture(renderable.MetallicRoughnessTextureAssetId, assets) ?? mesh.MetallicRoughnessTexture ?? procedural?.MetallicRoughnessTexture,
-            NormalTexture = ResolveTexture(renderable.NormalTextureAssetId, assets) ?? mesh.NormalTexture ?? procedural?.NormalTexture,
-            OcclusionTexture = ResolveTexture(renderable.OcclusionTextureAssetId, assets) ?? mesh.OcclusionTexture,
-            EmissiveTexture = ResolveTexture(renderable.EmissiveTextureAssetId, assets) ?? mesh.EmissiveTexture ?? procedural?.EmissiveTexture,
+            BaseColorTexture = ResolveTexture(renderable.TextureAssetId, assets)
+                ?? ResolveTexture(material?.BaseColorTextureAssetId, assets)
+                ?? mesh.BaseColorTexture ?? procedural?.BaseColorTexture,
+            MetallicRoughnessTexture = ResolveTexture(renderable.MetallicRoughnessTextureAssetId, assets)
+                ?? ResolveTexture(material?.MetallicRoughnessTextureAssetId, assets)
+                ?? mesh.MetallicRoughnessTexture ?? procedural?.MetallicRoughnessTexture,
+            NormalTexture = ResolveTexture(renderable.NormalTextureAssetId, assets)
+                ?? ResolveTexture(material?.NormalTextureAssetId, assets)
+                ?? mesh.NormalTexture ?? procedural?.NormalTexture,
+            OcclusionTexture = ResolveTexture(renderable.OcclusionTextureAssetId, assets)
+                ?? ResolveTexture(material?.OcclusionTextureAssetId, assets)
+                ?? mesh.OcclusionTexture,
+            EmissiveTexture = ResolveTexture(renderable.EmissiveTextureAssetId, assets)
+                ?? ResolveTexture(material?.EmissiveTextureAssetId, assets)
+                ?? mesh.EmissiveTexture ?? procedural?.EmissiveTexture,
             SurfaceWaterTexture = ResolveTexture(renderable.SurfaceWater?.TextureAssetId, assets) ?? mesh.SurfaceWaterTexture,
             MetallicFactor = renderable.MetallicFactor != 0
                 ? (float)Math.Clamp(renderable.MetallicFactor, 0, 1)
+                : material is not null
+                    ? material.MetallicFactor
                 : procedural is not null
                     ? (float)Math.Clamp(renderable.ProceduralMaterial!.MetallicFactor, 0, 1)
                     : mesh.MetallicFactor,
-            RoughnessFactor = renderable.RoughnessFactor == 1 ? mesh.RoughnessFactor : (float)Math.Clamp(renderable.RoughnessFactor, 0.04, 1),
-            NormalScale = renderable.NormalScale == 1 ? mesh.NormalScale : (float)Math.Clamp(renderable.NormalScale, 0, 4),
-            OcclusionStrength = renderable.OcclusionStrength == 1 ? mesh.OcclusionStrength : (float)Math.Clamp(renderable.OcclusionStrength, 0, 1),
+            RoughnessFactor = renderable.RoughnessFactor != 1
+                ? (float)Math.Clamp(renderable.RoughnessFactor, 0.04, 1)
+                : material?.RoughnessFactor ?? mesh.RoughnessFactor,
+            NormalScale = renderable.NormalScale != 1
+                ? (float)Math.Clamp(renderable.NormalScale, 0, 4)
+                : material?.NormalScale ?? mesh.NormalScale,
+            OcclusionStrength = renderable.OcclusionStrength != 1
+                ? (float)Math.Clamp(renderable.OcclusionStrength, 0, 1)
+                : material?.OcclusionStrength ?? mesh.OcclusionStrength,
             EmissiveFactor = renderable.EmissiveStrength > 0
                 ? ResolveEmissiveFactor(renderable)
-                : procedural?.EmissiveFactor ?? mesh.EmissiveFactor,
+                : material?.EmissiveFactor ?? procedural?.EmissiveFactor ?? mesh.EmissiveFactor,
             Atmosphere = ResolveAtmosphere(renderable),
             CloudLayer = ResolveCloudLayer(renderable),
             CloudShadow = ResolveCloudShadow(renderable),
@@ -327,6 +353,27 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             ShadowLayerMask = renderable.ShadowLayerMask,
             AlphaMode = renderable.AlphaMode,
             AlphaCutoff = (float)Math.Clamp(renderable.AlphaCutoff, 0, 1)
+        };
+    }
+
+    private static RekallAgeVulkanSceneMesh ApplyBaseColorFactor(
+        RekallAgeVulkanSceneMesh mesh,
+        Vector4 factor)
+    {
+        if (factor == Vector4.One)
+        {
+            return mesh;
+        }
+
+        return mesh with
+        {
+            Vertices = mesh.Vertices.Select(vertex => vertex with
+            {
+                R = Math.Clamp(vertex.R * factor.X, 0, 1),
+                G = Math.Clamp(vertex.G * factor.Y, 0, 1),
+                B = Math.Clamp(vertex.B * factor.Z, 0, 1),
+                A = Math.Clamp(vertex.A * factor.W, 0, 1)
+            }).ToArray()
         };
     }
 

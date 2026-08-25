@@ -218,3 +218,65 @@ No new visual claim is made for this fix round. The committed changes affect evi
 - After verification and commit, `TASK8_FIX_PROCESS_COUNT=0`: no `dotnet`, `testhost`, or `vstest.console` process remained.
 - Ten exact `D:\RekallAgeTask8Fix1*` roots were enumerated and validated against the dedicated prefix. A PowerShell-native recursive cleanup command was rejected before process creation by execution policy, so all ten remain intact. Together with the 17 previously reported Task 8 roots, this is external temp residue only; no worktree file is affected.
 - Functional concerns: none in the Important scope. The three explicitly deferred minors and the hardware-populated timing-panel visual limitation remain recorded technical follow-up.
+
+## Fix round 2: failed-capture evidence and generated-output isolation
+
+Date: 2026-08-25
+Implementation commit: `dd80d5b14bca9fbce54fee047e99d050da2c440a`
+
+### Root cause and repair
+
+The remaining Important finding had two coupled causes in `RekallAgeWorkbenchSession`:
+
+1. `ApplyUsableRenderingResult` only admitted `CaptureRuntimeViewportResult` when both `Captured=true` and `QualityPlan` was present. Native Vulkan failure results truthfully set `Captured=false`, but can still carry a resolved feature plan, GPU timing report, resource/workload facts, degradations, suggested actions, and stable command errors. The predicate discarded all those usable typed facts. The session now admits any capture with a non-null resolved plan, preserves the operation's `Ok=false` result and error code, and retains that evidence through harmless selection/rebuilds. `BuildDebugViews` separately requires `Captured=true`, so a failed result with a non-empty prospective screenshot path never invents a final image or debug capture.
+
+2. Successful typed evidence was applied before transaction invalidation. The path heuristic treated any changed resource outside the active scene, another scene, `Artifacts`, or `Builds` as authored rendering state. Capture/compare commands record their generated screenshot paths in the transaction, so default relative `QualityCaptures` output and valid custom external directories immediately cleared the evidence that produced them. Invalidation now distinguishes the two output-only evidence commands (`rekall.render.capture_runtime_viewport` and `rekall.render.compare_quality_presets`) from authored mutations. Their recorded generated outputs never invalidate their own evidence regardless of directory. Other commands still use the existing resource-scope logic: a real `rekall.render.plan.create` mutation clears evidence, the current-scene component mutation regression remains green, and switching scenes still clears the scope permanently.
+
+No Studio-only state or alternate quality resolution was introduced. The fix remains in the shared session/read-model path consumed by agents and Studio. The previously deferred Minors were not broadened.
+
+### Strict RED -> GREEN evidence
+
+The systematic-debugging, test-driven-development, verification-before-completion, and `writing-good-tests.md` instructions were read before edits. The tests use real `RekallAgeWorkbenchSession` behavior with deterministic typed commands and a real render-plan mutation command.
+
+#### RED
+
+1. Partial failed capture at `D:\RekallAgeTask8Fix2PartialCaptureRed`:
+
+   ```powershell
+   $env:TEMP='D:\RekallAgeTask8Fix2PartialCaptureRed'
+   $env:TMP=$env:TEMP
+   dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~FailedCaptureRetainsTypedRuntimeEvidenceWithoutInventingDebugImagery" --logger "console;verbosity=minimal"
+   ```
+
+   Result: 0/1 passed, duration 146 ms. The typed failed result requested `Epic` and resolved `High`, but the session still presented authored `High` as requested. This was the expected evidence-discard failure; the result itself remained `Ok=false` with `REKALL_TEST_NATIVE_CAPTURE_FAILED`.
+
+2. Generated output paths at `D:\RekallAgeTask8Fix2GeneratedOutputRed`:
+
+   ```powershell
+   $env:TEMP='D:\RekallAgeTask8Fix2GeneratedOutputRed'
+   $env:TMP=$env:TEMP
+   dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~SuccessfulComparisonRetainsEvidenceWhenDefaultQualityCapturesAreTransactionOutputs|FullyQualifiedName~SuccessfulCaptureRetainsEvidenceWhenCustomOutputDirectoryIsOutsideProject" --logger "console;verbosity=minimal"
+   ```
+
+   Result: 0/2 passed, duration 207 ms. The external capture's resolved preset was erased to `null`; the default `QualityCaptures` comparison list was erased from two rows to zero.
+
+#### GREEN
+
+- Partial failed capture at `D:\RekallAgeTask8Fix2PartialCaptureGreen`: 1/1 passed, 0 failed, duration 143 ms. It verifies requested/resolved quality, `3.250 ms` timing, draw/dispatch counts, frame bytes, stable degradation facts, suggested action, retained selection refresh, original failure/error status, and zero debug/comparison imagery.
+- Generated output plus authored-render guard at `D:\RekallAgeTask8Fix2GeneratedOutputGreen`: 3/3 passed, 0 failed, duration 249 ms. Both output locations retain evidence, while the real render-plan mutation invalidates it.
+- Complete session evidence class at `D:\RekallAgeTask8Fix2SessionFocused`: 7/7 passed, 0 failed, duration 371 ms, including current-scene and scene-change invalidation.
+
+### Final regression totals and concerns
+
+All final gates ran sequentially with no competing publish/test process.
+
+| Command | Exact result |
+|---|---|
+| Focused Task 8 core/CLI/source gate at `D:\RekallAgeTask8Fix2FocusedCore` | 11/11 passed, 0 failed, 0 skipped; duration 1 s. |
+| Full `Rekall.Age.Studio.Tests` at `D:\RekallAgeTask8Fix2FullStudio` | 69/69 passed, 0 failed, 0 skipped; duration 57 s. |
+| `dotnet build Rekall.AGE.sln --no-restore --verbosity minimal -m:1` at `D:\RekallAgeTask8Fix2SolutionBuild` | Succeeded; 0 warnings, 0 errors; elapsed 6.66 s. |
+| `git diff --check` before implementation commit | No whitespace errors; only repository LF-to-CRLF conversion notices. |
+
+Final required regression total: 80 passed, 0 failed, 0 skipped across the focused Task 8 and full Studio gates. `TASK8_FIX2_PROCESS_COUNT=0` after verification.
+
+Concerns: none in the remaining Important scope. Eight dedicated `D:\RekallAgeTask8Fix2*` roots remain because the same execution policy that blocked prior Task 8 cleanup still rejects recursive removal before process creation; this brings documented external Task 8 temp residue to 35 roots. Deferred Minors and the previously stated hardware-populated visual limitation remain unchanged.

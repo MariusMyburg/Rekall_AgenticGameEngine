@@ -196,8 +196,8 @@
       "displayName": "Fractured Slate Boulder",
       "kind": "model",
       "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-rubble-boulder-mesh.age.mesh.json",
-      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-rubble-boulder-model\\4274cace73977e46848950f5130ebe6fcd5e9566e43d57d6153fc891ad330fe0.age.compiled-mesh.json",
-      "contentHash": "4274cace73977e46848950f5130ebe6fcd5e9566e43d57d6153fc891ad330fe0",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-rubble-boulder-model\\c71b0f4bc697c1a2628525f350a557213460eb243103c46434556f934c1f94d8.age.compiled-mesh.json",
+      "contentHash": "c71b0f4bc697c1a2628525f350a557213460eb243103c46434556f934c1f94d8",
       "glbMetadata": null,
       "textureMetadata": null,
       "provenance": null,
@@ -205,8 +205,8 @@
         "modelDocumentPath": "Assets/Models/aetherfall-rubble-boulder-model.age.model.json",
         "sourceKind": "Mesh",
         "sourceAssetId": "aetherfall-rubble-boulder-mesh",
-        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-rubble-boulder-model/4274cace73977e46848950f5130ebe6fcd5e9566e43d57d6153fc891ad330fe0.age.compiled-mesh.json",
-        "compiledContentHash": "4274cace73977e46848950f5130ebe6fcd5e9566e43d57d6153fc891ad330fe0"
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-rubble-boulder-model/c71b0f4bc697c1a2628525f350a557213460eb243103c46434556f934c1f94d8.age.compiled-mesh.json",
+        "compiledContentHash": "c71b0f4bc697c1a2628525f350a557213460eb243103c46434556f934c1f94d8"
       }
     },
     {

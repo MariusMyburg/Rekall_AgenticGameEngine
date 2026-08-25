@@ -82,7 +82,8 @@ the accepted gameplay evidence above.
   crease-aware subdivision tranche. Its ordinary procedural graph now adds a
   smooth-subdivision detail stage after authored deformation, increasing the
   reusable asset from 222 points/240 faces to 922 points/920 faces. The graph
-  was rebaked and its live-linked model rebuilt at logical revision 3 with
+  then authors area-weighted smooth corner normals before UV compilation. It
+  was rebaked and its live-linked model rebuilt at logical revision 4 with a
   matching source revision and compiled hash; this is real player geometry,
   not an existence-only descriptor check.
 

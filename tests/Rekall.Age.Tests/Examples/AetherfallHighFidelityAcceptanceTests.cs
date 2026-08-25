@@ -25,6 +25,7 @@ public sealed class AetherfallHighFidelityAcceptanceTests
 
         Assert.True(evaluation.Succeeded, string.Join(Environment.NewLine, evaluation.Diagnostics.Select(item => item.Message)));
         Assert.True(evaluation.Outputs["mesh"].Topology.FaceIds.Count >= 900);
+        Assert.Contains(evaluation.Outputs["mesh"].Attributes, attribute => attribute.Semantic == "normal");
         var source = await new RekallAgeMeshAssetStore().LoadVersionedAsync(projectRoot, "aetherfall-rubble-boulder-mesh", CancellationToken.None);
         var model = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(projectRoot, "Assets", "Models", "aetherfall-rubble-boulder-model.age.model.json")))!.AsObject();
         Assert.Equal(source.Revision, model["lastSuccessfulBuild"]!["sourceFileRevision"]!.GetValue<string>());

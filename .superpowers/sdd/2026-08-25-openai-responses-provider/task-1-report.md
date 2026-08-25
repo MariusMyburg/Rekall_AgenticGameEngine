@@ -93,3 +93,86 @@ At implementation commit `27b24cab04b0b3d34e8de0f7a67f32226af2432c`:
 - No project-reference changes or installed dependencies were introduced.
 
 No blocking concerns. Sensitive-value redaction is intentionally driven by the caller-supplied sensitive-value collection; provider implementations must supply their credentials when constructing provider exceptions. A provider stream that never terminates remains bounded by the existing per-turn deadline or caller cancellation.
+
+## Review fix round 1 — 2026-08-25
+
+Implementation commit: `5ba97ffc354338d341be327a21eab79939e319d9` (`fix: harden language model provider boundaries`).
+
+### Root causes and exact contract repairs
+
+1. **Structured exception identifiers could expose credentials.** The initial exception implementation applied the sensitive-value policy to the human-readable message and request/value fields, but assigned `Code` and `ProviderId` directly after only nonblank validation. A caller-supplied credential embedded in either identifier therefore remained available to serializers and structured logs. `Code` and `ProviderId` now pass through a bounded, deterministic identifier policy before assignment: valid canonical values remain useful, invalid values are normalized where possible, any value containing a supplied secret uses the stable fallback `REKALL_LANGUAGE_MODEL_PROVIDER_ERROR` or `unknown`, and blank/oversized/unusable values also fall back. Representative structured serialization proves the supplied secret is absent from `Message`, `ToString()`, `Code`, `ProviderId`, `RequestId`, `RequestedValue`, and `ResolvedValue`.
+2. **The stream boundary trusted C# nullability annotations at runtime.** The initial consumer checked only the outer completed response. Scripted providers or deserializers can still construct null stream events and records whose non-nullable members are null, allowing raw `NullReferenceException` or malformed state to escape. The consumer now rejects null events, null event text, null/blank required response identities, null content/thinking/tool-call collection/finish reason/usage, null tool-call entries, and null/blank required tool-call members before transcript or progress use. Every malformed shape becomes `RekallAgeLanguageModelProviderException` with code `REKALL_LANGUAGE_MODEL_STREAM_INVALID`; cancellation remains `OperationCanceledException` and stops enumeration before tool work.
+3. **Association coverage used only one tool call.** Production already associated results with the current call's ID and atomically discarded an incomplete leading tool-only tail, but the tests could not detect cross-association between same-name calls or orphaning under constrained trimming. New tests execute two `inspect` calls with distinct IDs, arguments, and results through action recovery, then inspect the next provider request. The retained context preserves each exact call/result pair; the tighter context prunes the whole association block while the execution ledger retains both distinct results. Mutation checks proved the new tests fail if the second result reuses the first ID or if trimming retains a tool-only tail, so no production association/trimming change was required.
+
+Existing positional constructors, optional streaming selection, the Ollama non-streaming route, and engine-general authoring checkpoint enforcement are unchanged.
+
+### RED evidence
+
+Provider identifier safety:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs|FullyQualifiedName~ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues"
+```
+
+Result: 2 failed, 0 passed; command wall time 22.7s. The exception exposed the raw secret-bearing code/provider identifiers and did not normalize the invalid but useful values.
+
+Malformed stream shapes (after correcting a test-only jagged-array inference compile error):
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~AgentRejectsRuntimeNullStreamEventsAndText|FullyQualifiedName~AgentRejectsDeserializedCompletedResponsesWithNullRequiredMembers"
+```
+
+Result: 12 failed, 0 passed; command wall time 5.2s. Five cases leaked raw `NullReferenceException` (null event, null tool-call collection, null usage, null nested call, and null nested name/arguments paths); seven malformed completed responses were accepted or failed later instead of at the boundary.
+
+The three same-name association/trimming tests passed against the original implementation, establishing that this item was a test-coverage gap rather than a production defect. Two deliberate mutation checks then proved the tests discriminate the required behavior:
+
+- Mutating result association to always use `response.ToolCalls[0].Id` made 2/3 tests fail in 4.0s, with `call_beta` cross-associated to `call_alpha`.
+- Removing the incomplete leading-tail discard made 1/2 constrained-trimming cases fail in 4.0s by retaining orphan tool-result messages without their assistant call block.
+
+Both mutations were reverted before GREEN verification.
+
+### GREEN evidence
+
+Identifier safety, including preservation of valid structured facts:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~ProviderExceptionUsesStableSecretFreeIdentifierFallbacksInStructuredLogs|FullyQualifiedName~ProviderExceptionNormalizesInvalidIdentifiersToStableSafeValues|FullyQualifiedName~ProviderExceptionExposesStructuredFactsAndRedactsSensitiveValues|FullyQualifiedName~ProviderExceptionPreservesValidStableIdentifiers"
+```
+
+Result: 4 passed, 0 failed, 0 skipped; test duration 30ms; command wall time 8.3s.
+
+Malformed-stream rejection plus distinct cancellation behavior:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~AgentRejectsRuntimeNullStreamEventsAndText|FullyQualifiedName~AgentRejectsDeserializedCompletedResponsesWithNullRequiredMembers|FullyQualifiedName~AgentCancellationStopsStreamEnumerationBeforeToolWork"
+```
+
+Result: 13 passed, 0 failed, 0 skipped; test duration 63ms; command wall time 6.9s.
+
+Same-name association, recovery, and atomic trimming:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~AgentAssociatesSameNameToolResultsWithExactProviderCallIds|FullyQualifiedName~AgentRetainsOrPrunesSameNameCallResultBlockAtomicallyThroughRecoveryAndTrimming"
+```
+
+Result after restoring both mutations: 3 passed, 0 failed, 0 skipped; test duration 27ms; command wall time 4.0s.
+
+Required focused regression command:
+
+```powershell
+dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~LanguageModelContractTests|FullyQualifiedName~LanguageModelAgentTests|FullyQualifiedName~ProjectAgentRunnerTests|FullyQualifiedName~ProjectAgentSessionTests|FullyQualifiedName~OllamaLanguageModelClientTests"
+```
+
+Result: 106 passed, 0 failed, 0 skipped; test duration 621ms; command wall time 4.3s; no compiler or test warnings.
+
+Solution build:
+
+```powershell
+dotnet build Rekall.AGE.sln --no-restore
+```
+
+Result: build succeeded, 0 warnings, 0 errors; MSBuild elapsed 6.84s; command wall time 7.2s.
+
+`git diff --check` and `git diff --cached --check` reported no whitespace errors; Git emitted only the repository's normal Windows line-ending conversion notices. No project references or installed dependencies changed.
+
+At implementation commit `5ba97ffc354338d341be327a21eab79939e319d9`, before this report-only update, the worktree was clean. The final audit found 0 matching long-lived `dotnet`, `testhost`, or Rekall processes rooted in this worktree and 0 untracked temp/backup artifacts. No blocking or residual concerns were identified for this review round.

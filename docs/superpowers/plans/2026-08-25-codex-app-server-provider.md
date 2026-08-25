@@ -37,23 +37,23 @@
 - Consumes: installed `codex app-server --listen stdio://` and the stable v2 methods documented in the spec.
 - Produces: initialize/account/model/thread/turn operations plus a bounded notification stream.
 
-- [ ] **Step 1: Write failing protocol sequencing tests**
+- [x] **Step 1: Write failing protocol sequencing tests**
 
 Use a fake duplex process. Assert exact sequence and payloads for `initialize`, `initialized`, `account/read`, paginated `model/list`, `thread/start`, `turn/start`, `turn/interrupt`, and `turn/completed`. Feed out-of-order numeric response IDs and prove each pending task completes once.
 
-- [ ] **Step 2: Implement typed contracts and the single-writer client**
+- [x] **Step 2: Implement typed contracts and the single-writer client**
 
 Use one writer lock/channel, monotonically increasing IDs, and a pending-request dictionary. A dedicated stdout reader distinguishes responses, server requests, and notifications. Bound one line, stderr history, pending requests, and notification backlog. Unknown IDs become diagnostics without completing unrelated work.
 
-- [ ] **Step 3: Write failing lifecycle/error tests**
+- [x] **Step 3: Write failing lifecycle/error tests**
 
 Cover missing executable, incompatible initialize response, malformed JSON, oversized line, premature EOF, nonzero exit, cancellation before/after turn start, unresponsive shutdown, stderr flooding, and concurrent disposal. Assert the exact owned process tree is terminated only after graceful close/interrupt timeouts.
 
-- [ ] **Step 4: Implement process ownership and stable errors**
+- [x] **Step 4: Implement process ownership and stable errors**
 
 Add exact codes from the spec. Start stderr/stdout drains immediately. On disposal: interrupt an active turn, close stdin, wait boundedly, then terminate only the owned process tree. Complete all pending tasks once with a structured provider exception.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~CodexAppServerClientTests|FullyQualifiedName~CodexProcessLifecycleTests"
@@ -76,23 +76,23 @@ git commit -m "feat: control Codex App Server sessions"
 - Consumes: Task 1 client, `IRekallAgeProjectAgentRunner`, and packaged `Rekall.Age.Cli mcp stdio`.
 - Produces: `RekallAgeCodexProjectAgentRunner` with model discovery, auth state, project turn execution, progress, cancellation, and result mapping.
 
-- [ ] **Step 1: Write failing thread/configuration tests**
+- [x] **Step 1: Write failing thread/configuration tests**
 
 Assert `thread/start` receives absolute project `cwd`, exact model, `workspace-write`, no extra writable roots, network disabled, generic AGE developer instructions, and structured config for MCP server `rekall-age` with exact CLI executable plus `mcp`, `stdio` arguments. Assert no shell-escaped command string exists.
 
-- [ ] **Step 2: Implement MCP configuration and project runner**
+- [x] **Step 2: Implement MCP configuration and project runner**
 
 Resolve the packaged CLI path explicitly. Validate it before starting Codex. Map `account/read` and `model/list` to provider status/models. Start one ephemeral thread per project run, stream bounded agent/tool progress, finish on `turn/completed`, and map failure/cancellation to stable result diagnostics.
 
-- [ ] **Step 3: Write failing policy/evidence tests**
+- [x] **Step 3: Write failing policy/evidence tests**
 
 With a scripted App Server, prove the developer instructions require semantic input, delta time, agent-owned runtime state, strict post-mutation gameplay assertions, and the gauntlet delivery path. Prove MCP errors remain visible. Prove approval requests follow the configured policy and are never silently accepted.
 
-- [ ] **Step 4: Implement approval and cancellation routing**
+- [x] **Step 4: Implement approval and cancellation routing**
 
 Expose an approval callback on the runner. Studio can answer; noninteractive CLI defaults to denial unless `--approval-policy never` was explicitly selected. Cancellation sends `turn/interrupt`, waits for `turn/completed`, then uses lifecycle cleanup.
 
-- [ ] **Step 5: Run workflow/MCP tests and commit**
+- [x] **Step 5: Run workflow/MCP tests and commit**
 
 ```powershell
 dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~CodexProjectAgentRunnerTests|FullyQualifiedName~McpJsonRpcServerTests|FullyQualifiedName~ProjectAgentRunnerTests"
@@ -118,27 +118,27 @@ git commit -m "feat: connect Codex agents to AGE MCP tools"
 - Consumes: Codex runner and the provider-neutral UI/CLI from the OpenAI plan.
 - Produces: end-user Codex selection/auth/model/run/cancel flows and real acceptance evidence.
 
-- [ ] **Step 1: Write failing CLI and Studio integration tests**
+- [x] **Step 1: Write failing CLI and Studio integration tests**
 
 Cover `agent models codex`, `agent run-project codex`, and `agent auth codex status`. Assert Studio provider switching disposes the prior runner, reports ChatGPT/API-key/unauthenticated state without secrets, lists `gpt-5.6-sol`, streams progress, routes approvals, and cancels/awaits an active turn on disposal.
 
-- [ ] **Step 2: Implement the end-user Codex surfaces**
+- [x] **Step 2: Implement the end-user Codex surfaces**
 
 Reuse the existing provider selector and runner contract. Add Codex login/status actions backed by App Server account methods. Do not read auth files directly. Keep Ollama/OpenAI behavior and automation arguments compatible.
 
-- [ ] **Step 3: Run a real authenticated protocol smoke**
+- [x] **Step 3: Run a real authenticated protocol smoke**
 
 Use the installed Codex runtime, require `account/read` to report authenticated, require `model/list` to contain `gpt-5.6-sol`, start an ephemeral read-only smoke thread, complete one bounded turn, cancel no processes, and record runtime/model/account-mode facts without email or tokens.
 
-- [ ] **Step 4: Run the real Codex-authored AGE gauntlet**
+- [x] **Step 4: Run the real Codex-authored AGE gauntlet**
 
 Create a fresh temporary project and ask `gpt-5.6-sol` to author a small non-Aetherfall 3D game solely through AGE MCP tools. Require the closed-loop gauntlet plus independent assertions after the latest mutation: representative semantic input, attached `Game.*` component, nonzero transform delta or changed agent-owned property, successful module build, package, audit, and nonblank capture. Repair any generic engine defect exposed and rerun the strict assertion; never weaken it.
 
-- [ ] **Step 5: Run full zero-failure verification**
+- [x] **Step 5: Run full zero-failure verification**
 
 Run Codex-focused tests, full Studio, full engine, and solution build sequentially. Audit no Codex/AGE child process remains. Record exact bounded temp residue; never claim blocked cleanup succeeded.
 
-- [ ] **Step 6: Update Markdown and commit**
+- [x] **Step 6: Update Markdown and commit**
 
 Record protocol version/runtime version, auth mode without identity, model, exact commands/durations, streamed event/tool counts, gameplay assertions, package/audit/capture hashes, process cleanup, and all test totals.
 
@@ -146,4 +146,3 @@ Record protocol version/runtime version, auth mode without identity, model, exac
 git add src/Rekall.Age.Cli src/Rekall.Age.Studio tests/Rekall.Age.Tests tests/Rekall.Age.Studio.Tests docs/production/2026-08-25-codex-agent-acceptance.md
 git commit -m "feat: author games with Codex in AGE"
 ```
-

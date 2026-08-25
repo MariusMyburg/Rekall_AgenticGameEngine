@@ -4,7 +4,7 @@
   "name": "Ruin Sooted Stone Mass",
   "revision": 1,
   "nodes": [
-    { "nodeId": "color", "typeId": "rekall.material.constant.color", "typeVersion": 1, "parameters": { "value": "#747a75" } },
+    { "nodeId": "color", "typeId": "rekall.material.constant.color", "typeVersion": 1, "parameters": { "value": "#c2c6c0" } },
     { "nodeId": "pbr", "typeId": "rekall.material.surface.pbr", "typeVersion": 1, "parameters": { "roughness": 0.91, "metallic": 0.02 } },
     { "nodeId": "output", "typeId": "rekall.material.output", "typeVersion": 1, "parameters": {} }
   ],

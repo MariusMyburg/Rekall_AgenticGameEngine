@@ -4,7 +4,7 @@
   "name": "Ruin Worn Carved Trim",
   "revision": 1,
   "nodes": [
-    { "nodeId": "color", "typeId": "rekall.material.constant.color", "typeVersion": 1, "parameters": { "value": "#d0c4ad" } },
+    { "nodeId": "color", "typeId": "rekall.material.constant.color", "typeVersion": 1, "parameters": { "value": "#ded4c2" } },
     { "nodeId": "pbr", "typeId": "rekall.material.surface.pbr", "typeVersion": 1, "parameters": { "roughness": 0.74, "metallic": 0.04 } },
     { "nodeId": "output", "typeId": "rekall.material.output", "typeVersion": 1, "parameters": {} }
   ],

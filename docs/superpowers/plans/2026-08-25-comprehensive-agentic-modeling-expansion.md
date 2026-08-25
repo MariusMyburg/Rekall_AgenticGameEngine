@@ -484,7 +484,10 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   its structural mass and carved trim are authored as separate material graph
   branches, compiled to exactly two coalesced surfaces, and rebuilt once for all
   30 scene instances. The settled Vulkan frame proves the surfaces resolve with
-  no observations or fallbacks. Remaining scene work must improve shadowed
+  no observations or fallbacks. Both graph base-color factors are intentionally
+  near-neutral because the placed entities already author varied masonry tints;
+  this avoids double-darkening their colors while preserving reusable PBR
+  roughness and metallic response. Remaining scene work must improve shadowed
   masonry readability and soften the harsh lit-trim contrast without flattening
   the requested deep-black presentation.
 

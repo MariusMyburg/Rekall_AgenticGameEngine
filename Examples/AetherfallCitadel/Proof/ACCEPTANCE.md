@@ -154,9 +154,12 @@ the accepted gameplay evidence above.
 - The shared weathered-ruin model now publishes two semantic graph-authored PBR
   surfaces: `aetherfall.ruin-mass.material` for the sooted structural masonry
   and `aetherfall.ruin-trim.material` for coping, string courses, pilaster caps,
-  facade ribs, and crown blocks. The rebuilt artifact retains 7,392 vertices
-  and 3,024 triangles while all 30 placed instances gain material-readable
-  profiling. The settled real RTX 5090 High frame has 24,639 distinct colors,
+  facade ribs, and crown blocks. Their graph color factors remain near-neutral
+  so they preserve each placed instance's authored stone tint instead of
+  multiplying the already-dark masonry toward black. The rebuilt artifact
+  retains 7,392 vertices and 3,024 triangles while all 30 placed instances gain
+  material-readable profiling. The settled real RTX 5090 High frame has 24,628
+  distinct colors,
   mean luminance 0.078, 201 render-work draws, and zero observations or asset
   fallbacks. The matching `desktop60` budget passes with 63 scene draw calls,
   162,632 triangles, 594,744 vertices, and no blockers or warnings. The capture

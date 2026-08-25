@@ -118,6 +118,146 @@ public sealed class WorkbenchRenderingEvidenceSessionTests
         Assert.Single(session.Model.Rendering.DebugViews);
     }
 
+    [Fact]
+    public async Task FailedCaptureRetainsTypedRuntimeEvidenceWithoutInventingDebugImagery()
+    {
+        var fixture = await CreateFixtureAsync(includeArena: false);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new PartialFailedCaptureCommand());
+        var session = new RekallAgeWorkbenchSession(registry);
+        Assert.True((await session.OpenAsync(fixture.Root, "Main", default)).Ok);
+
+        var result = await session.ExecuteAsync(
+            "rekall.render.capture_runtime_viewport",
+            JsonSerializer.Serialize(new CaptureRuntimeViewportRequest(
+                fixture.Root,
+                "Main",
+                1,
+                Path.Combine(fixture.Root, "failed-capture"))),
+            "Capture partial quality evidence",
+            "studio",
+            default);
+
+        Assert.False(result.Ok);
+        Assert.Equal("REKALL_TEST_NATIVE_CAPTURE_FAILED", Assert.Single(result.Errors).Code);
+        var capture = Assert.IsType<CaptureRuntimeViewportResult>(result.Value);
+        Assert.False(capture.Captured);
+        var runtime = session.Model!.Rendering.Runtime;
+        Assert.Equal("Epic", runtime.RequestedPreset);
+        Assert.Equal("High", runtime.ResolvedPreset);
+        Assert.Equal("3.250 ms", runtime.TotalGpuMillisecondsText);
+        Assert.Equal(4, runtime.DrawCount);
+        Assert.Equal(2, runtime.DispatchCount);
+        Assert.Contains(runtime.Resources, item => item.Name == "Frame resources" && item.Bytes == 8192);
+        var degradation = Assert.Single(runtime.Degradations);
+        Assert.Equal("REKALL_TEST_FEATURE_DEGRADED", degradation.Code);
+        Assert.Equal("enabled", degradation.RequestedValue);
+        Assert.Equal("disabled", degradation.ResolvedValue);
+        Assert.Single(runtime.SuggestedActions);
+        Assert.Empty(session.Model.Rendering.DebugViews);
+        Assert.Empty(session.Model.Rendering.Comparisons);
+
+        Assert.True((await session.SelectEntityAsync(fixture.StateEntityId, default)).Ok);
+        Assert.Equal("Epic", session.Model!.Rendering.Runtime.RequestedPreset);
+        Assert.Equal("3.250 ms", session.Model.Rendering.Runtime.TotalGpuMillisecondsText);
+        Assert.Empty(session.Model.Rendering.DebugViews);
+    }
+
+    [Fact]
+    public async Task SuccessfulComparisonRetainsEvidenceWhenDefaultQualityCapturesAreTransactionOutputs()
+    {
+        var fixture = await CreateFixtureAsync(includeArena: false);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new OutputRecordingComparisonCommand());
+        var session = new RekallAgeWorkbenchSession(registry);
+        Assert.True((await session.OpenAsync(fixture.Root, "Main", default)).Ok);
+
+        var result = await session.ExecuteAsync(
+            "rekall.render.compare_quality_presets",
+            JsonSerializer.Serialize(new CompareQualityPresetsRequest(
+                fixture.Root,
+                "Main",
+                ["Performance", "Epic"])),
+            "Compare default quality output",
+            "studio",
+            default);
+
+        Assert.True(result.Ok, result.Summary);
+        var comparison = Assert.IsType<CompareQualityPresetsResult>(result.Value);
+        Assert.All(comparison.Captures, capture => Assert.StartsWith("QualityCaptures", capture.ScreenshotPath));
+        Assert.Equal(2, session.Model!.Rendering.Comparisons.Count);
+        Assert.Equal("Performance", session.Model.Rendering.Runtime.RequestedPreset);
+        Assert.Equal("3.250 ms", session.Model.Rendering.Runtime.TotalGpuMillisecondsText);
+    }
+
+    [Fact]
+    public async Task SuccessfulCaptureRetainsEvidenceWhenCustomOutputDirectoryIsOutsideProject()
+    {
+        var fixture = await CreateFixtureAsync(includeArena: false);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new OutputRecordingCaptureCommand());
+        var session = new RekallAgeWorkbenchSession(registry);
+        Assert.True((await session.OpenAsync(fixture.Root, "Main", default)).Ok);
+        var outputDirectory = Path.Combine(
+            Path.GetDirectoryName(fixture.Root)!,
+            "external-quality-output-" + Guid.NewGuid().ToString("N"));
+
+        var result = await session.ExecuteAsync(
+            "rekall.render.capture_runtime_viewport",
+            JsonSerializer.Serialize(new CaptureRuntimeViewportRequest(
+                fixture.Root,
+                "Main",
+                1,
+                outputDirectory)),
+            "Capture external quality output",
+            "studio",
+            default);
+
+        Assert.True(result.Ok, result.Summary);
+        var capture = Assert.IsType<CaptureRuntimeViewportResult>(result.Value);
+        Assert.StartsWith(outputDirectory, capture.ScreenshotPath);
+        Assert.Equal("High", session.Model!.Rendering.Runtime.ResolvedPreset);
+        Assert.Equal("3.250 ms", session.Model.Rendering.Runtime.TotalGpuMillisecondsText);
+        Assert.Single(session.Model.Rendering.DebugViews);
+    }
+
+    [Fact]
+    public async Task AuthoredRenderPlanMutationStillInvalidatesCaptureEvidence()
+    {
+        var fixture = await CreateFixtureAsync(includeArena: false);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new DeterministicCaptureCommand());
+        registry.Register(new CreateRenderPlanCommand());
+        var session = new RekallAgeWorkbenchSession(registry);
+        Assert.True((await session.OpenAsync(fixture.Root, "Main", default)).Ok);
+        Assert.True((await session.ExecuteAsync(
+            "rekall.render.capture_runtime_viewport",
+            JsonSerializer.Serialize(new CaptureRuntimeViewportRequest(
+                fixture.Root,
+                "Main",
+                1,
+                Path.Combine(fixture.Root, "capture"))),
+            "Capture before render mutation",
+            "studio",
+            default)).Ok);
+        Assert.Equal("High", session.Model!.Rendering.Runtime.ResolvedPreset);
+
+        var mutated = await session.ExecuteAsync(
+            "rekall.render.plan.create",
+            JsonSerializer.Serialize(new CreateRenderPlanRequest(
+                fixture.Root,
+                "vulkan",
+                "Mutated plan")),
+            "Mutate authored render plan",
+            "studio",
+            default);
+
+        Assert.True(mutated.Ok, mutated.Summary);
+        Assert.Null(session.Model!.Rendering.Runtime.ResolvedPreset);
+        Assert.Equal("Unavailable", session.Model.Rendering.Runtime.TotalGpuMillisecondsText);
+        Assert.Empty(session.Model.Rendering.DebugViews);
+    }
+
     private static async Task<Fixture> CreateFixtureAsync(bool includeArena)
     {
         var root = TestPaths.CreateTempDirectory();
@@ -265,6 +405,112 @@ public sealed class WorkbenchRenderingEvidenceSessionTests
                 value,
                 error.Message,
                 [error]));
+        }
+    }
+
+    private sealed class PartialFailedCaptureCommand
+        : IRekallAgeCommand<CaptureRuntimeViewportRequest, CaptureRuntimeViewportResult>
+    {
+        public string Name => "rekall.render.capture_runtime_viewport";
+        public RekallAgeCommandSchema Schema => new(Name, "Deterministic failed native capture with typed evidence.", typeof(CaptureRuntimeViewportRequest).FullName!, typeof(CaptureRuntimeViewportResult).FullName!);
+
+        public ValueTask<RekallAgeCommandResult<CaptureRuntimeViewportResult>> ExecuteAsync(
+            CaptureRuntimeViewportRequest request,
+            RekallAgeCommandContext context)
+        {
+            var degradation = new RekallAgeRenderFeatureDegradation(
+                "REKALL_TEST_FEATURE_DEGRADED",
+                "testFeature",
+                "enabled",
+                "disabled",
+                "The test device could not enable the requested feature.");
+            var value = CaptureResult(nonBlank: false) with
+            {
+                Captured = false,
+                ScreenshotPath = Path.Combine(request.OutputDirectory, "failed-native.png"),
+                HardwareAccelerated = false,
+                AccelerationStatus = "vulkan-scene-failed",
+                QualityPlan = QualityPlan() with
+                {
+                    RequestedPreset = "Epic",
+                    ResolvedPreset = "High",
+                    Degradations = [degradation]
+                },
+                ResourceBytes = 8192,
+                DrawCount = 4,
+                DispatchCount = 2
+            };
+            var error = new RekallAgeCommandError(
+                "REKALL_TEST_NATIVE_CAPTURE_FAILED",
+                "Native capture failed after resolving and profiling the frame.",
+                request.SceneName);
+            return ValueTask.FromResult(RekallAgeCommandResult<CaptureRuntimeViewportResult>.Failure(
+                value,
+                error.Message,
+                [error]));
+        }
+    }
+
+    private sealed class OutputRecordingCaptureCommand
+        : IRekallAgeCommand<CaptureRuntimeViewportRequest, CaptureRuntimeViewportResult>
+    {
+        public string Name => "rekall.render.capture_runtime_viewport";
+        public RekallAgeCommandSchema Schema => new(Name, "Records deterministic generated capture output.", typeof(CaptureRuntimeViewportRequest).FullName!, typeof(CaptureRuntimeViewportResult).FullName!);
+
+        public ValueTask<RekallAgeCommandResult<CaptureRuntimeViewportResult>> ExecuteAsync(
+            CaptureRuntimeViewportRequest request,
+            RekallAgeCommandContext context)
+        {
+            var value = CaptureResult() with
+            {
+                ScreenshotPath = Path.Combine(request.OutputDirectory, "captured.png")
+            };
+            context.Transaction.RecordChangedResource(value.ScreenshotPath);
+            return ValueTask.FromResult(RekallAgeCommandResult<CaptureRuntimeViewportResult>.Success(value));
+        }
+    }
+
+    private sealed class OutputRecordingComparisonCommand
+        : IRekallAgeCommand<CompareQualityPresetsRequest, CompareQualityPresetsResult>
+    {
+        public string Name => "rekall.render.compare_quality_presets";
+        public RekallAgeCommandSchema Schema => new(Name, "Records deterministic generated comparison outputs.", typeof(CompareQualityPresetsRequest).FullName!, typeof(CompareQualityPresetsResult).FullName!);
+
+        public ValueTask<RekallAgeCommandResult<CompareQualityPresetsResult>> ExecuteAsync(
+            CompareQualityPresetsRequest request,
+            RekallAgeCommandContext context)
+        {
+            var source = CaptureResult();
+            var captures = request.Presets.Select(preset =>
+            {
+                var screenshotPath = Path.Combine(
+                    request.OutputDirectory,
+                    preset.ToLowerInvariant(),
+                    "captured.png");
+                context.Transaction.RecordChangedResource(screenshotPath);
+                return new RekallAgeQualityPresetCapture(
+                    preset,
+                    preset,
+                    1,
+                    screenshotPath,
+                    true,
+                    320,
+                    180,
+                    320,
+                    180,
+                    source.ResourceBytes,
+                    source.DrawCount,
+                    source.DispatchCount,
+                    [],
+                    source.GpuTimings,
+                    source.FrameAnalysis);
+            }).ToArray();
+            return ValueTask.FromResult(RekallAgeCommandResult<CompareQualityPresetsResult>.Success(
+                new CompareQualityPresetsResult(
+                    request.SceneName,
+                    1,
+                    captures,
+                    source.SuggestedCommands)));
         }
     }
 }

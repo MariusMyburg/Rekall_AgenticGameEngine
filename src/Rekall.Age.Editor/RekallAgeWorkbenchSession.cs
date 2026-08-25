@@ -269,7 +269,7 @@ public sealed class RekallAgeWorkbenchSession
                 _undoTransactions.Push(transaction.Id);
                 _redoTransactions.Clear();
             }
-            if (AffectsRenderingEvidence(transaction))
+            if (AffectsRenderingEvidence(commandName, transaction))
             {
                 _renderingEvidence = null;
             }
@@ -518,7 +518,7 @@ public sealed class RekallAgeWorkbenchSession
 
         var updated = value switch
         {
-            CaptureRuntimeViewportResult { Captured: true, QualityPlan: not null } capture =>
+            CaptureRuntimeViewportResult { QualityPlan: not null } capture =>
                 RekallAgeWorkbenchModelBuilder.WithCaptureResult(Model, capture),
             CompareQualityPresetsResult { Captures.Count: > 0 } comparison =>
                 RekallAgeWorkbenchModelBuilder.WithQualityComparisonResult(Model, comparison),
@@ -562,9 +562,17 @@ public sealed class RekallAgeWorkbenchSession
         && SamePath(evidence.ProjectRoot, projectRoot)
         && evidence.SceneName.Equals(sceneName, StringComparison.Ordinal);
 
-    private bool AffectsRenderingEvidence(RekallAgeTransaction transaction)
+    private bool AffectsRenderingEvidence(
+        string commandName,
+        RekallAgeTransaction transaction)
     {
         if (ProjectRoot is null || SceneName is null || transaction.ChangedResources.Count == 0)
+        {
+            return false;
+        }
+
+        if (commandName is "rekall.render.capture_runtime_viewport"
+            or "rekall.render.compare_quality_presets")
         {
             return false;
         }

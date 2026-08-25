@@ -597,6 +597,11 @@ public sealed class RekallAgeWorkbenchModelBuilder
         CaptureRuntimeViewportResult capture)
     {
         var views = new List<RekallAgeWorkbenchRenderDebugViewModel>();
+        if (!capture.Captured)
+        {
+            return views;
+        }
+
         if (!string.IsNullOrWhiteSpace(capture.ScreenshotPath))
         {
             views.Add(new("Final output", "final", capture.ScreenshotPath, capture.NonBlank));

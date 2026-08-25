@@ -283,6 +283,14 @@ public sealed unsafe class RekallAgeVulkanGpuProfiler : IDisposable
         }
     }
 
+    internal void InvalidateSubmitted(RekallAgeVulkanGpuFrameQuery? frame, ulong fenceToken)
+    {
+        if (frame is not null && fenceToken != 0)
+        {
+            _lifecycle?.InvalidateSubmitted(frame.Lease, fenceToken);
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -464,6 +472,23 @@ internal sealed class RekallAgeVulkanGpuQueryPoolLifecycle
         return true;
     }
 
+    public bool InvalidateSubmitted(RekallAgeVulkanGpuQueryPoolLease lease, ulong fenceToken)
+    {
+        if (fenceToken == 0 || !Matches(lease, SlotState.InFlight))
+        {
+            return false;
+        }
+
+        var slot = _slots[lease.SlotIndex];
+        if (slot.FenceToken != fenceToken)
+        {
+            return false;
+        }
+
+        slot.State = SlotState.Read;
+        return true;
+    }
+
     public void MarkRead(RekallAgeVulkanGpuQueryPoolLease lease)
     {
         var slot = Require(lease, SlotState.Completed);
@@ -520,5 +545,77 @@ internal sealed class RekallAgeVulkanGpuQueryPoolLifecycle
         InFlight,
         Completed,
         Read
+    }
+}
+
+internal enum RekallAgeVulkanSubmissionState
+{
+    NotSubmitted,
+    Submitted,
+    FenceCompleted,
+    RecoveredAfterDeviceIdle,
+    DeviceLost
+}
+
+/// <summary>
+/// Tracks when resources referenced by a queue submission may be destroyed. A failed or timed-out
+/// fence wait is not completion; only a successful fence wait, successful device-idle recovery, or
+/// terminal device loss makes the submitted resources releasable.
+/// </summary>
+internal sealed class RekallAgeVulkanSubmissionLifecycle
+{
+    public RekallAgeVulkanSubmissionState State { get; private set; } =
+        RekallAgeVulkanSubmissionState.NotSubmitted;
+
+    public bool CanReleaseResources => State is
+        RekallAgeVulkanSubmissionState.NotSubmitted
+        or RekallAgeVulkanSubmissionState.FenceCompleted
+        or RekallAgeVulkanSubmissionState.RecoveredAfterDeviceIdle
+        or RekallAgeVulkanSubmissionState.DeviceLost;
+
+    public bool RequiresDeviceRebuild => State == RekallAgeVulkanSubmissionState.DeviceLost;
+
+    public void MarkSubmitted()
+    {
+        if (State != RekallAgeVulkanSubmissionState.NotSubmitted)
+        {
+            throw new InvalidOperationException("Vulkan submission lifecycle has already been submitted.");
+        }
+
+        State = RekallAgeVulkanSubmissionState.Submitted;
+    }
+
+    public void RecordFenceWait(Result result)
+    {
+        if (State != RekallAgeVulkanSubmissionState.Submitted)
+        {
+            throw new InvalidOperationException("A Vulkan fence wait can only complete a submitted lifecycle.");
+        }
+
+        if (result == Result.Success)
+        {
+            State = RekallAgeVulkanSubmissionState.FenceCompleted;
+        }
+        else if (result == Result.ErrorDeviceLost)
+        {
+            State = RekallAgeVulkanSubmissionState.DeviceLost;
+        }
+    }
+
+    public void RecordDeviceIdle(Result result)
+    {
+        if (State != RekallAgeVulkanSubmissionState.Submitted)
+        {
+            throw new InvalidOperationException("Device-idle recovery is only valid for an unresolved Vulkan submission.");
+        }
+
+        if (result == Result.Success)
+        {
+            State = RekallAgeVulkanSubmissionState.RecoveredAfterDeviceIdle;
+        }
+        else if (result == Result.ErrorDeviceLost)
+        {
+            State = RekallAgeVulkanSubmissionState.DeviceLost;
+        }
     }
 }

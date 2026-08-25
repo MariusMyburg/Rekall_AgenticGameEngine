@@ -69,6 +69,8 @@ public sealed record CaptureRuntimeViewportResult(
     public int DrawCount { get; init; }
 
     public int DispatchCount { get; init; }
+
+    public IReadOnlyList<string> SuggestedCommands { get; init; } = Array.Empty<string>();
 }
 
 public sealed record CaptureRuntimeViewportCulledRenderable(
@@ -243,7 +245,8 @@ public sealed class CaptureRuntimeViewportCommand
             QualityPlan = frame.ResolvedQualityPlan,
             GpuTimings = RekallAgeGpuFrameTimingReport.Unavailable(frame.FrameIndex),
             ResourceBytes = EstimatedResourceBytes(frame.ResolvedQualityPlan),
-            DrawCount = frame.Renderables.Count
+            DrawCount = frame.Renderables.Count,
+            SuggestedCommands = BuildSuggestedCommands(request)
         };
 
         context.Transaction.RecordChangedResource(capture.ScreenshotPath);
@@ -324,7 +327,8 @@ public sealed class CaptureRuntimeViewportCommand
             ResourceBytes = capture.HighFidelityFrame?.ResourceBytes
                 ?? EstimatedResourceBytes(frame.ResolvedQualityPlan),
             DrawCount = capture.HighFidelityFrame?.DrawCount ?? capture.DrawCallCount,
-            DispatchCount = capture.HighFidelityFrame?.DispatchCount ?? 0
+            DispatchCount = capture.HighFidelityFrame?.DispatchCount ?? 0,
+            SuggestedCommands = BuildSuggestedCommands(request)
         };
 
         if (capture.Captured)
@@ -396,7 +400,8 @@ public sealed class CaptureRuntimeViewportCommand
             ElapsedSeconds = elapsedSeconds,
             QualityPlan = frame.ResolvedQualityPlan,
             GpuTimings = RekallAgeGpuFrameTimingReport.Unavailable(frame.FrameIndex),
-            ResourceBytes = EstimatedResourceBytes(frame.ResolvedQualityPlan)
+            ResourceBytes = EstimatedResourceBytes(frame.ResolvedQualityPlan),
+            SuggestedCommands = BuildSuggestedCommands(request)
         };
 
         if (capture.Captured)
@@ -1208,9 +1213,33 @@ public sealed class CaptureRuntimeViewportCommand
             EmptyLayoutDiagnostics())
         {
             ElapsedSeconds = 0,
-            GpuTimings = RekallAgeGpuFrameTimingReport.Unavailable(Math.Max(0, request.Frames))
+            GpuTimings = RekallAgeGpuFrameTimingReport.Unavailable(Math.Max(0, request.Frames)),
+            SuggestedCommands = BuildSuggestedCommands(request)
         };
     }
+
+    private static IReadOnlyList<string> BuildSuggestedCommands(CaptureRuntimeViewportRequest request)
+    {
+        var projectRoot = BoundedCommandValue(request.ProjectRoot);
+        var sceneName = BoundedCommandValue(request.SceneName);
+        return
+        [
+            BoundCommand($"command execute rekall.render.compare_quality_presets with projectRoot='{projectRoot}', sceneName='{sceneName}', presets=['Performance','High'], frames={Math.Max(0, request.Frames)}, width={Math.Max(1, request.Width)}, and height={Math.Max(1, request.Height)}."),
+            BoundCommand($"command execute rekall.render.performance.inspect_scene_budget with projectRoot='{projectRoot}', sceneName='{sceneName}', frames={Math.Max(0, request.Frames)}, width={Math.Max(1, request.Width)}, and height={Math.Max(1, request.Height)}.")
+        ];
+    }
+
+    private static string BoundedCommandValue(string? value)
+    {
+        var sanitized = (value ?? string.Empty)
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Replace("'", "''", StringComparison.Ordinal);
+        return sanitized.Length <= 160 ? sanitized : sanitized[..160];
+    }
+
+    private static string BoundCommand(string command) =>
+        command.Length <= 512 ? command : command[..512];
 }
 
 public sealed record CompareQualityPresetsRequest(
@@ -1241,7 +1270,10 @@ public sealed record RekallAgeQualityPresetCapture(
     int DispatchCount,
     IReadOnlyList<RekallAgeRenderFeatureDegradation> Degradations,
     RekallAgeGpuFrameTimingReport GpuTimings,
-    RekallAgeViewportFrameAnalysis FrameAnalysis);
+    RekallAgeViewportFrameAnalysis FrameAnalysis)
+{
+    internal RekallAgeHighFidelityFrameReport? HighFidelityFrame { get; init; }
+}
 
 public sealed record CompareQualityPresetsResult(
     string SceneName,
@@ -1258,16 +1290,21 @@ public sealed class CompareQualityPresetsCommand
     private static readonly HashSet<string> SupportedPresets = new(
         ["Performance", "Low", "Medium", "High", "Ultra", "Epic"],
         StringComparer.OrdinalIgnoreCase);
-    private readonly CaptureRuntimeViewportCommand _capture;
+    private readonly Func<QualityPresetCaptureSession> _captureSessionFactory;
 
     public CompareQualityPresetsCommand()
-        : this(new CaptureRuntimeViewportCommand())
+        : this(CreateIsolatedNativeSession)
     {
     }
 
     internal CompareQualityPresetsCommand(CaptureRuntimeViewportCommand capture)
+        : this(() => new QualityPresetCaptureSession(capture, null))
     {
-        _capture = capture;
+    }
+
+    private CompareQualityPresetsCommand(Func<QualityPresetCaptureSession> captureSessionFactory)
+    {
+        _captureSessionFactory = captureSessionFactory;
     }
 
     public string Name => "rekall.render.compare_quality_presets";
@@ -1294,6 +1331,7 @@ public sealed class CompareQualityPresetsCommand
         var captures = new List<RekallAgeQualityPresetCapture>(request.Presets.Count);
         foreach (var requestedPreset in request.Presets)
         {
+            using var captureSession = _captureSessionFactory();
             var canonicalPreset = SupportedPresets.Single(value =>
                 value.Equals(requestedPreset.Trim(), StringComparison.OrdinalIgnoreCase));
             var outputDirectory = Path.Combine(
@@ -1317,7 +1355,11 @@ public sealed class CompareQualityPresetsCommand
             if (request.IncludeGpuTimings
                 && request.BackendId.Equals("vulkan", StringComparison.OrdinalIgnoreCase))
             {
-                var warmup = await _capture.ExecuteAsync(captureRequest, context);
+                var warmupRequest = captureRequest with
+                {
+                    Frames = Math.Max(0, request.Frames - 1)
+                };
+                var warmup = await captureSession.Capture.ExecuteAsync(warmupRequest, context);
                 if (!warmup.Ok || !warmup.Value.Captured)
                 {
                     var nested = warmup.Errors.Count > 0
@@ -1333,7 +1375,7 @@ public sealed class CompareQualityPresetsCommand
                 }
             }
 
-            var capture = await _capture.ExecuteAsync(captureRequest, context);
+            var capture = await captureSession.Capture.ExecuteAsync(captureRequest, context);
             if (!capture.Ok || !capture.Value.Captured)
             {
                 var nested = capture.Errors.Count > 0
@@ -1365,7 +1407,10 @@ public sealed class CompareQualityPresetsCommand
                 capture.Value.DispatchCount,
                 quality.Degradations,
                 capture.Value.GpuTimings,
-                capture.Value.FrameAnalysis));
+                capture.Value.FrameAnalysis)
+            {
+                HighFidelityFrame = capture.Value.HighFidelityFrame
+            });
         }
 
         var frameIndex = captures.Count == 0 ? request.Frames : captures[0].FrameIndex;
@@ -1451,4 +1496,22 @@ public sealed class CompareQualityPresetsCommand
 
     private static CompareQualityPresetsResult EmptyComparison(CompareQualityPresetsRequest request) =>
         new(request.SceneName, Math.Max(0, request.Frames), [], BuildNextCommands(request));
+
+    private static QualityPresetCaptureSession CreateIsolatedNativeSession()
+    {
+        var clearCapture = new RekallAgeNativeVulkanRenderPassSubmission();
+        var sceneCapture = new RekallAgeNativeVulkanSceneCapture(clearCapture);
+        return new QualityPresetCaptureSession(
+            new CaptureRuntimeViewportCommand(clearCapture, sceneCapture),
+            sceneCapture);
+    }
+
+    private sealed class QualityPresetCaptureSession(
+        CaptureRuntimeViewportCommand capture,
+        IDisposable? owner) : IDisposable
+    {
+        public CaptureRuntimeViewportCommand Capture { get; } = capture;
+
+        public void Dispose() => owner?.Dispose();
+    }
 }

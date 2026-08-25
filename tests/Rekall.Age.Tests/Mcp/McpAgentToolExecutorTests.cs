@@ -6,7 +6,9 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Mcp;
 using Rekall.Age.Modules.BuiltIns;
 using Rekall.Age.Modules.Commands;
+using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Validation.Commands;
+using Rekall.Age.World;
 
 namespace Rekall.Age.Tests.Mcp;
 
@@ -67,6 +69,57 @@ public sealed class McpAgentToolExecutorTests
         Assert.True(result["ok"]!.GetValue<bool>());
         Assert.Contains("Rekall AGE", result["summary"]!.GetValue<string>());
         Assert.NotNull(result["value"]);
+    }
+
+    [Fact]
+    public async Task CaptureViewportExecutionSerializesWorkloadAndBoundedNextCommands()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"])
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.Camera2D",
+                        new JsonObject { ["active"] = true })))
+                .AddEntity(RekallAgeEntityDocument.Create("Sprite", ["prop"])
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.Transform2D",
+                        new JsonObject { ["x"] = 12, ["y"] = 18 }))
+                    .AddComponent(RekallAgeComponentDocument.Create(
+                        "Rekall.SpriteRenderer",
+                        new JsonObject { ["sprite"] = "missing" }))),
+            CancellationToken.None);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new CaptureRuntimeViewportCommand());
+        var executor = new RekallAgeMcpAgentToolExecutor(registry);
+
+        var result = await executor.ExecuteAsync(
+            "rekall.render.capture_runtime_viewport",
+            new JsonObject
+            {
+                ["projectRoot"] = root,
+                ["sceneName"] = "Main",
+                ["frames"] = 2,
+                ["outputDirectory"] = Path.Combine(root, "McpCapture"),
+                ["width"] = 64,
+                ["height"] = 48,
+                ["debugOverlay"] = false,
+                ["backendId"] = "software"
+            },
+            CancellationToken.None);
+
+        Assert.True(result["ok"]!.GetValue<bool>(), result.ToJsonString());
+        var value = result["value"]!;
+        Assert.Equal(1, value["drawCount"]!.GetValue<int>());
+        Assert.Equal(0, value["dispatchCount"]!.GetValue<int>());
+        var suggestions = value["suggestedCommands"]!.AsArray();
+        Assert.Equal(2, suggestions.Count);
+        Assert.Contains(suggestions, command =>
+            command!.GetValue<string>().Contains("rekall.render.compare_quality_presets", StringComparison.Ordinal));
+        Assert.Contains(suggestions, command =>
+            command!.GetValue<string>().Contains("rekall.render.performance.inspect_scene_budget", StringComparison.Ordinal));
+        Assert.All(suggestions, command => Assert.InRange(command!.GetValue<string>().Length, 1, 512));
     }
 
     [Fact]

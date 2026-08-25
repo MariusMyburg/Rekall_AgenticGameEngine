@@ -4125,6 +4125,11 @@ internal static class RekallAgeCli
         Console.WriteLine($"Acceleration: {result.Value.AccelerationStatus}");
         Console.WriteLine($"Selected device: {result.Value.SelectedDeviceName ?? "(none)"}");
         PrintQualityReport(result.Value.QualityPlan, result.Value.GpuTimings, result.Value.ResourceBytes);
+        Console.WriteLine($"Workload: draws={result.Value.DrawCount}; dispatches={result.Value.DispatchCount}");
+        foreach (var command in result.Value.SuggestedCommands)
+        {
+            Console.WriteLine($"Next: {command}");
+        }
         Console.WriteLine(
             $"Input actions: {(result.Value.InputActions.Count == 0 ? "(none)" : string.Join(", ", result.Value.InputActions.Select(action => $"{action.Name}={action.Value:G}")))}");
         Console.WriteLine($"Elapsed simulation: {result.Value.ElapsedSeconds:F3}s");

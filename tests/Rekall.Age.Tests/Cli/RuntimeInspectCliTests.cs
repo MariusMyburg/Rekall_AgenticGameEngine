@@ -433,6 +433,9 @@ public sealed class RuntimeInspectCliTests
         Assert.Contains("GPU timings: REKALL_GPU_TIMESTAMPS_UNAVAILABLE", result.Output);
         Assert.Contains("Degradation: REKALL_RENDER_FEATURE_DEVICE_CLAMPED", result.Output);
         Assert.Contains("Requested=true; resolved=false", result.Output);
+        Assert.Contains("Workload: draws=1; dispatches=0", result.Output);
+        Assert.Contains("Next: command execute rekall.render.compare_quality_presets", result.Output);
+        Assert.Contains("Next: command execute rekall.render.performance.inspect_scene_budget", result.Output);
     }
 
     [Fact]

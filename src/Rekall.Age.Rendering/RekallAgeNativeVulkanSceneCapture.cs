@@ -519,6 +519,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         {
             var errors = new List<string>();
             var state = new VulkanState(persistentContext?.Vk ?? Vk.GetApi());
+            if (persistentContext is not null
+                && !persistentContext.TryRecoverSubmittedResources(errors))
+            {
+                return Unavailable(frame, string.Empty, "Silk.NET Vulkan", persistentContext.SelectedDevice, assets, meshes.Count, 0, 0, [], errors);
+            }
             var highFidelityPlan = new RekallAgeVulkanHighFidelityFrameRenderer().Plan(
                 frame,
                 meshes,
@@ -850,7 +855,18 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             finally
             {
                 gpuProfiler?.CancelRecording(gpuFrameQuery);
-                state.Dispose();
+                if (state.Submission.CanReleaseResources)
+                {
+                    state.Dispose();
+                    if (state.Submission.RequiresDeviceRebuild)
+                    {
+                        persistentContext?.ResetAfterDeviceLoss();
+                    }
+                }
+                else if (persistentContext is not null)
+                {
+                    persistentContext.RetainSubmittedState(state);
+                }
             }
         }
 
@@ -5352,12 +5368,45 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 PCommandBuffers = &commandBuffer
             };
             ThrowIfFailed(state.Vk.QueueSubmit(state.GraphicsQueue, 1, &submitInfo, state.Fence), "vkQueueSubmit");
+            state.Submission.MarkSubmitted();
             var gpuFenceToken = gpuProfiler is not null && gpuFrameQuery is not null
                 ? gpuProfiler.MarkSubmitted(gpuFrameQuery)
                 : 0;
+            state.TrackSubmittedQuery(gpuProfiler, gpuFrameQuery, gpuFenceToken);
             var fence = state.Fence;
-            ThrowIfFailed(state.Vk.WaitForFences(state.Device, 1, &fence, true, FenceTimeoutNanoseconds), "vkWaitForFences");
-            gpuProfiler?.MarkFenceCompleted(gpuFenceToken);
+            var fenceResult = state.Vk.WaitForFences(
+                state.Device,
+                1,
+                &fence,
+                true,
+                FenceTimeoutNanoseconds);
+            state.Submission.RecordFenceWait(fenceResult);
+            if (fenceResult == Result.Success)
+            {
+                gpuProfiler?.MarkFenceCompleted(gpuFenceToken);
+                return;
+            }
+
+            if (fenceResult == Result.ErrorDeviceLost)
+            {
+                state.InvalidateSubmittedQuery();
+                ThrowIfFailed(fenceResult, "vkWaitForFences");
+            }
+
+            var idleResult = state.Vk.DeviceWaitIdle(state.Device);
+            state.Submission.RecordDeviceIdle(idleResult);
+            if (state.Submission.CanReleaseResources)
+            {
+                state.InvalidateSubmittedQuery();
+            }
+
+            if (idleResult == Result.ErrorDeviceLost)
+            {
+                throw new InvalidOperationException(
+                    $"vkDeviceWaitIdle reported device loss after vkWaitForFences failed with Vulkan result {fenceResult}.");
+            }
+
+            ThrowIfFailed(fenceResult, "vkWaitForFences");
         }
 
         private static void UpdateFrameUniformBuffers(
@@ -6096,6 +6145,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
         internal sealed class PersistentContext : IDisposable
         {
+            private readonly List<VulkanState> _retainedSubmittedStates = [];
+
             internal Vk Vk { get; } = Vk.GetApi();
             internal bool Initialized => Device.Handle != 0;
             internal Instance Instance;
@@ -6178,6 +6229,61 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 ParticleTopologyFingerprint = topologyFingerprint;
             }
 
+            internal void RetainSubmittedState(VulkanState state)
+            {
+                if (state.Submission.CanReleaseResources)
+                {
+                    throw new InvalidOperationException("Only unresolved submitted Vulkan resources may be retained.");
+                }
+
+                _retainedSubmittedStates.Add(state);
+            }
+
+            internal bool TryRecoverSubmittedResources(List<string> errors)
+            {
+                if (_retainedSubmittedStates.Count == 0)
+                {
+                    return true;
+                }
+
+                var result = Vk.DeviceWaitIdle(Device);
+                if (result is not Result.Success and not Result.ErrorDeviceLost)
+                {
+                    errors.Add(
+                        $"Vulkan capture is paused because submitted resources remain in flight; vkDeviceWaitIdle returned {result}.");
+                    return false;
+                }
+
+                ReleaseRetainedSubmittedStates(result);
+                if (result == Result.ErrorDeviceLost)
+                {
+                    ResetAfterDeviceLoss();
+                }
+
+                return true;
+            }
+
+            internal void ResetAfterDeviceLoss()
+            {
+                if (_retainedSubmittedStates.Count > 0)
+                {
+                    ReleaseRetainedSubmittedStates(Result.ErrorDeviceLost);
+                }
+
+                DestroyPersistentDeviceResources();
+            }
+
+            private void ReleaseRetainedSubmittedStates(Result completionResult)
+            {
+                foreach (var state in _retainedSubmittedStates)
+                {
+                    state.ResolveRetainedSubmission(completionResult);
+                    state.Dispose();
+                }
+
+                _retainedSubmittedStates.Clear();
+            }
+
             internal void DestroyParticleState()
             {
                 if (Device.Handle == 0)
@@ -6222,15 +6328,47 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             {
                 if (Device.Handle != 0)
                 {
-                    Vk.DeviceWaitIdle(Device);
-                    GpuProfiler?.Dispose();
-                    GpuProfiler = null;
-                    DestroyFogHistory();
-                    DestroyParticleState();
+                    var result = Vk.DeviceWaitIdle(Device);
+                    if (result is not Result.Success and not Result.ErrorDeviceLost)
+                    {
+                        // Vulkan gives no proof that submitted resources are no longer in use. Keeping
+                        // the device and its children alive is safer than destroying live objects.
+                        return;
+                    }
+
+                    if (_retainedSubmittedStates.Count > 0)
+                    {
+                        ReleaseRetainedSubmittedStates(result);
+                    }
+
+                    DestroyPersistentDeviceResources();
+                }
+                else if (Instance.Handle != 0)
+                {
+                    Vk.DestroyInstance(Instance, null);
+                    Instance = default;
+                }
+            }
+
+            private void DestroyPersistentDeviceResources()
+            {
+                GpuProfiler?.Dispose();
+                GpuProfiler = null;
+                DestroyFogHistory();
+                DestroyParticleState();
+                if (Device.Handle != 0)
+                {
                     Vk.DestroyDevice(Device, null);
                     Device = default;
                 }
 
+                PhysicalDevice = default;
+                GraphicsQueue = default;
+                GraphicsQueueFamily = 0;
+                SelectedDevice = null;
+                FogHistory = null;
+                PreviousFogCamera = null;
+                FogHistoryValid = false;
                 if (Instance.Handle != 0)
                 {
                     Vk.DestroyInstance(Instance, null);
@@ -6241,6 +6379,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
         internal sealed class VulkanState : IDisposable
         {
+            private RekallAgeVulkanGpuProfiler? _submittedGpuProfiler;
+            private RekallAgeVulkanGpuFrameQuery? _submittedGpuFrameQuery;
+            private ulong _submittedGpuFenceToken;
+
             public VulkanState(Vk vk)
             {
                 Vk = vk;
@@ -6415,9 +6557,42 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public CommandPool CommandPool;
             public CommandBuffer CommandBuffer;
             public Fence Fence;
+            public RekallAgeVulkanSubmissionLifecycle Submission { get; } = new();
+
+            public void TrackSubmittedQuery(
+                RekallAgeVulkanGpuProfiler? profiler,
+                RekallAgeVulkanGpuFrameQuery? frameQuery,
+                ulong fenceToken)
+            {
+                _submittedGpuProfiler = profiler;
+                _submittedGpuFrameQuery = frameQuery;
+                _submittedGpuFenceToken = fenceToken;
+            }
+
+            public void InvalidateSubmittedQuery()
+            {
+                _submittedGpuProfiler?.InvalidateSubmitted(
+                    _submittedGpuFrameQuery,
+                    _submittedGpuFenceToken);
+                _submittedGpuProfiler = null;
+                _submittedGpuFrameQuery = null;
+                _submittedGpuFenceToken = 0;
+            }
+
+            public void ResolveRetainedSubmission(Result result)
+            {
+                Submission.RecordDeviceIdle(result);
+                InvalidateSubmittedQuery();
+            }
 
             public void Dispose()
             {
+                if (!Submission.CanReleaseResources)
+                {
+                    throw new InvalidOperationException(
+                        "Cannot destroy Vulkan frame resources while their queue submission may still be in flight.");
+                }
+
                 if (Device.Handle != 0)
                 {
                     if (Ownership.OwnsVulkanDevice)

@@ -7,6 +7,7 @@ using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.World;
+using Silk.NET.Vulkan;
 
 namespace Rekall.Age.Tests.Rendering;
 
@@ -138,6 +139,50 @@ public sealed class VulkanGpuProfilerTests
 
         Assert.Equal(abandoned.SlotIndex, reused.SlotIndex);
         Assert.Equal(abandoned.Generation + 1, reused.Generation);
+    }
+
+    [Fact]
+    public void SubmittedFrameTimeoutRetainsResourcesUntilDeviceIdleAndInvalidatesItsQueryLease()
+    {
+        var queries = new RekallAgeVulkanGpuQueryPoolLifecycle(slotCount: 1);
+        var lease = queries.Acquire(frameIndex: 12, queryCount: 4);
+        queries.MarkSubmitted(lease, fenceToken: 301);
+        var submission = new RekallAgeVulkanSubmissionLifecycle();
+        submission.MarkSubmitted();
+
+        submission.RecordFenceWait(Result.Timeout);
+
+        Assert.Equal(RekallAgeVulkanSubmissionState.Submitted, submission.State);
+        Assert.False(submission.CanReleaseResources);
+        Assert.False(queries.CanReset(lease.SlotIndex));
+
+        submission.RecordDeviceIdle(Result.Success);
+        Assert.True(queries.InvalidateSubmitted(lease, fenceToken: 301));
+
+        Assert.Equal(RekallAgeVulkanSubmissionState.RecoveredAfterDeviceIdle, submission.State);
+        Assert.True(submission.CanReleaseResources);
+        Assert.False(submission.RequiresDeviceRebuild);
+        Assert.True(queries.CanReset(lease.SlotIndex));
+        var reused = queries.Acquire(frameIndex: 13, queryCount: 2);
+        Assert.Equal(lease.Generation + 1, reused.Generation);
+    }
+
+    [Fact]
+    public void SubmittedFrameWaitErrorFollowedByDeviceLossRequiresRebuildBeforeRelease()
+    {
+        var submission = new RekallAgeVulkanSubmissionLifecycle();
+        submission.MarkSubmitted();
+
+        submission.RecordFenceWait(Result.ErrorUnknown);
+
+        Assert.Equal(RekallAgeVulkanSubmissionState.Submitted, submission.State);
+        Assert.False(submission.CanReleaseResources);
+
+        submission.RecordDeviceIdle(Result.ErrorDeviceLost);
+
+        Assert.Equal(RekallAgeVulkanSubmissionState.DeviceLost, submission.State);
+        Assert.True(submission.CanReleaseResources);
+        Assert.True(submission.RequiresDeviceRebuild);
     }
 
     [Fact]
@@ -362,9 +407,117 @@ public sealed class VulkanGpuProfilerTests
         Assert.All(result.Value.Captures, capture =>
         {
             Assert.True(capture.GpuTimings.Available, $"{capture.RequestedPreset}: {capture.GpuTimings.Code}");
-            Assert.Equal(capture.FrameIndex, capture.GpuTimings.FrameIndex);
+            Assert.Equal(capture.FrameIndex - 1, capture.GpuTimings.FrameIndex);
             Assert.NotEmpty(capture.GpuTimings.Passes);
         });
+    }
+
+    [Fact]
+    public async Task NativeTemporalFogComparisonIsIsolatedAcrossPresetOrderAndRepeatedInvocations()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Isolated Native Quality Comparison", ["world", "rendering3d"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                    {
+                        ["active"] = true,
+                        ["z"] = -4,
+                        ["clearColor"] = "#03050a"
+                    })))
+                .AddEntity(RekallAgeEntityDocument.Create("Cube", ["prop"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["z"] = 3 }))
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" })))
+                .AddEntity(RekallAgeEntityDocument.Create("Mist", ["rendering"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.FogVolume", new JsonObject
+                    {
+                        ["shape"] = "global",
+                        ["density"] = 0.035,
+                        ["albedo"] = "#8fb8e8",
+                        ["emission"] = "#020408",
+                        ["anisotropy"] = 0.12,
+                        ["heightFalloff"] = 0.35
+                    })))
+                .AddEntity(RekallAgeEntityDocument.Create("Post", ["post-process"])
+                    .AddComponent(RekallAgeComponentDocument.Create("Rekall.PostProcessStack", new JsonObject
+                    {
+                        ["enabled"] = true,
+                        ["passes"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = "tone", ["type"] = "tone-map" }
+                        }
+                    }))),
+            CancellationToken.None);
+        var sceneStore = new RekallAgeSceneStore();
+        var before = JsonSerializer.Serialize(await sceneStore.LoadAsync(root, "Main", CancellationToken.None));
+        var command = new CompareQualityPresetsCommand();
+        var overrides = new RekallAgeRenderQualityOverrides(
+            ResolutionScale: 0.5,
+            ShadowCascadeCount: 1,
+            ShadowResolution: 128,
+            FogMode: "froxel-low",
+            Bloom: false,
+            Ssao: false,
+            MaximumActiveParticles: 0);
+
+        async Task<CompareQualityPresetsResult> CompareAsync(IReadOnlyList<string> presets, string output)
+        {
+            var result = await command.ExecuteAsync(
+                new CompareQualityPresetsRequest(
+                    root,
+                    "Main",
+                    presets,
+                    Frames: 4,
+                    OutputDirectory: Path.Combine(root, output),
+                    Width: 64,
+                    Height: 48,
+                    BackendId: "vulkan",
+                    Overrides: overrides,
+                    IncludeGpuTimings: true),
+                new RekallAgeCommandContext(
+                    "agent",
+                    RekallAgeTransaction.Begin($"compare {output}"),
+                    CancellationToken.None));
+            Assert.True(result.Ok, string.Join(Environment.NewLine, result.Errors.Select(error => error.Message)));
+            return result.Value;
+        }
+
+        var forward = await CompareAsync(["Performance", "Low"], "Forward");
+        var reverse = await CompareAsync(["Low", "Performance"], "Reverse");
+        var repeated = await CompareAsync(["Performance", "Low"], "Repeated");
+
+        foreach (var comparison in new[] { forward, reverse, repeated })
+        {
+            Assert.All(comparison.Captures, capture =>
+            {
+                var frame = Assert.IsType<RekallAgeHighFidelityFrameReport>(capture.HighFidelityFrame);
+                var fog = Assert.IsType<RekallAgeHighFidelityFogReport>(frame.Fog);
+                Assert.True(fog.TemporalReprojection);
+                Assert.True(fog.HistorySampled);
+                Assert.Equal(1, fog.HistoryResourceGeneration);
+            });
+        }
+
+        foreach (var preset in new[] { "Performance", "Low" })
+        {
+            var expected = forward.Captures.Single(capture => capture.RequestedPreset == preset);
+            var reversed = reverse.Captures.Single(capture => capture.RequestedPreset == preset);
+            var again = repeated.Captures.Single(capture => capture.RequestedPreset == preset);
+            Assert.Equal(
+                await File.ReadAllBytesAsync(expected.ScreenshotPath),
+                await File.ReadAllBytesAsync(reversed.ScreenshotPath));
+            Assert.Equal(
+                await File.ReadAllBytesAsync(expected.ScreenshotPath),
+                await File.ReadAllBytesAsync(again.ScreenshotPath));
+        }
+
+        var after = JsonSerializer.Serialize(await sceneStore.LoadAsync(root, "Main", CancellationToken.None));
+        Assert.Equal(before, after);
     }
 
     [Fact]

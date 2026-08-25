@@ -535,7 +535,7 @@ public sealed record RekallAgeHighFidelityFrameReport(
 public sealed record RekallAgeHighFidelityParticleReport(
     bool Enabled,
     int AllocatedCapacity,
-    int ActiveSlotCount,
+    int PlannedSpawnCount,
     RekallAgeVulkanParticleDispatch SimulationDispatch,
     int SimulationDispatchCount,
     int DrawCount,
@@ -556,6 +556,8 @@ public sealed record RekallAgeHighFidelityParticleReport(
     public string SimulationSource { get; init; } = string.Empty;
 
     public string SimulationDestination { get; init; } = string.Empty;
+
+    public int GpuActiveCount { get; init; }
 }
 
 public sealed record RekallAgeHighFidelityParticleDebugCapture(
@@ -565,6 +567,10 @@ public sealed record RekallAgeHighFidelityParticleDebugCapture(
     ulong ByteChecksum)
 {
     public string Source { get; init; } = string.Empty;
+
+    public string EvidenceResource { get; init; } = string.Empty;
+
+    public ulong GpuSampleCount { get; init; }
 }
 
 public sealed record RekallAgeHighFidelityFogReport(

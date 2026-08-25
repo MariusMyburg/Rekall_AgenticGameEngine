@@ -33,6 +33,8 @@ public sealed class VulkanParticleCaptureTests
         var particle = Assert.IsType<RekallAgeHighFidelityParticleReport>(report.Particles);
         Assert.True(particle.Enabled);
         Assert.Equal(64, particle.AllocatedCapacity);
+        Assert.Equal(64, particle.PlannedSpawnCount);
+        Assert.Equal(64, particle.GpuActiveCount);
         Assert.Equal(1, particle.SimulationDispatchCount);
         Assert.True(particle.IndirectDraw);
         Assert.True(particle.DepthTested);
@@ -54,7 +56,10 @@ public sealed class VulkanParticleCaptureTests
         {
             Assert.True(File.Exists(debug.OutputPath), debug.OutputPath);
             Assert.True(debug.NonBlank, debug.Kind);
-            Assert.Equal("native-particle-execution", debug.Source);
+            Assert.Equal(debug.Kind == "bounds" ? "gpu-particle-state-readback" : "gpu-particle-fragment-counter-readback", debug.Source);
+            if (debug.Kind == "bounds") Assert.StartsWith("particle-state-", debug.EvidenceResource, StringComparison.Ordinal);
+            else Assert.Equal("particle-fragment-counts", debug.EvidenceResource);
+            Assert.True(debug.GpuSampleCount > 0);
         });
     }
 
@@ -80,6 +85,168 @@ public sealed class VulkanParticleCaptureTests
         Assert.Equal("particle-state-b", firstParticles.SimulationDestination);
         Assert.Equal("particle-state-b", secondParticles.SimulationSource);
         Assert.Equal("particle-state-a", secondParticles.SimulationDestination);
+    }
+
+    [Fact]
+    public async Task SurvivingParticlesReportGpuActiveCountWhenCurrentFramePlansNoSpawn()
+    {
+        var emitter = HighFidelityRenderGraphTests.ParticleEmitter(64) with
+        {
+            SpawnRate = 0,
+            Bursts = [new(1.0 / 60.0, 8)],
+            LifetimeSeconds = 2
+        };
+        var firstFrame = Frame(withEmitter: false) with { ParticleEmitters = [emitter] };
+        var secondFrame = firstFrame with { FrameIndex = 2, ElapsedSeconds = 2.0 / 60.0 };
+        var output = TestPaths.CreateTempDirectory();
+        using var capture = new RekallAgeNativeVulkanSceneCapture();
+
+        var first = await capture.CaptureSceneAsync(firstFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var second = await capture.CaptureSceneAsync(secondFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        var firstReport = Assert.IsType<RekallAgeHighFidelityParticleReport>(Assert.IsType<RekallAgeHighFidelityFrameReport>(first.HighFidelityFrame).Particles);
+        var secondReport = Assert.IsType<RekallAgeHighFidelityParticleReport>(Assert.IsType<RekallAgeHighFidelityFrameReport>(second.HighFidelityFrame).Particles);
+        Assert.Equal(8, firstReport.PlannedSpawnCount);
+        Assert.Equal(8, firstReport.GpuActiveCount);
+        Assert.Equal(0, secondReport.PlannedSpawnCount);
+        Assert.Equal(8, secondReport.GpuActiveCount);
+    }
+
+    [Fact]
+    public async Task EqualCapacityEmitterReplacementResetsResidentTopology()
+    {
+        var firstFrame = Frame(withEmitter: true);
+        var replacement = firstFrame.ParticleEmitters.Single() with { EntityId = "replacement", EntityName = "Replacement" };
+        var secondFrame = firstFrame with { FrameIndex = 2, ElapsedSeconds = 2.0 / 60.0, ParticleEmitters = [replacement] };
+        var output = TestPaths.CreateTempDirectory();
+        using var capture = new RekallAgeNativeVulkanSceneCapture();
+
+        var first = await capture.CaptureSceneAsync(firstFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var second = await capture.CaptureSceneAsync(secondFrame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        var firstReport = Assert.IsType<RekallAgeHighFidelityParticleReport>(Assert.IsType<RekallAgeHighFidelityFrameReport>(first.HighFidelityFrame).Particles);
+        var secondReport = Assert.IsType<RekallAgeHighFidelityParticleReport>(Assert.IsType<RekallAgeHighFidelityFrameReport>(second.HighFidelityFrame).Particles);
+        Assert.False(secondReport.PreviousStateReused);
+        Assert.True(secondReport.StateResourceGeneration > firstReport.StateResourceGeneration);
+    }
+
+    [Fact]
+    public async Task ParticleOnlySceneExecutesNativeComputeIndirectDrawAndCapture()
+    {
+        var frame = Frame(withEmitter: true) with { Renderables = [] };
+        var output = TestPaths.CreateTempDirectory();
+        using var capture = new RekallAgeNativeVulkanSceneCapture();
+
+        var result = await capture.CaptureSceneAsync(frame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(result.Captured, string.Join(Environment.NewLine, result.Errors));
+        Assert.Equal(0, result.MeshCount);
+        var report = Assert.IsType<RekallAgeHighFidelityFrameReport>(result.HighFidelityFrame);
+        Assert.True(Assert.IsType<RekallAgeHighFidelityParticleReport>(report.Particles).GpuActiveCount > 0);
+        Assert.Contains(report.Passes, pass => pass.Name == "particle-simulate" && pass.Executed);
+        Assert.Contains(report.Passes, pass => pass.Name == "transparent-particles" && pass.Executed);
+    }
+
+    [Fact]
+    public async Task ParticleOverdrawEvidenceExcludesOrdinaryGeometry()
+    {
+        var output = TestPaths.CreateTempDirectory();
+        using var withGeometryCapture = new RekallAgeNativeVulkanSceneCapture();
+        using var particleOnlyCapture = new RekallAgeNativeVulkanSceneCapture();
+
+        var geometryFrame = Frame(withEmitter: true);
+        var isolatedGeometry = geometryFrame.Renderables.Single() with
+        {
+            X = 2.5,
+            Y = 1.5,
+            Z = 4,
+            ScaleX = 0.2,
+            ScaleY = 0.2,
+            ScaleZ = 0.2,
+            MaterialColor = "#ffffff"
+        };
+        var withGeometry = await withGeometryCapture.CaptureSceneAsync(geometryFrame with { Renderables = [isolatedGeometry] }, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var particleOnly = await particleOnlyCapture.CaptureSceneAsync(Frame(withEmitter: true) with { Renderables = [] }, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        var geometryOverdraw = Assert.Single(Assert.IsType<RekallAgeHighFidelityFrameReport>(withGeometry.HighFidelityFrame).ParticleDebugCaptures, item => item.Kind == "overdraw");
+        var particleOnlyOverdraw = Assert.Single(Assert.IsType<RekallAgeHighFidelityFrameReport>(particleOnly.HighFidelityFrame).ParticleDebugCaptures, item => item.Kind == "overdraw");
+        Assert.Equal(geometryOverdraw.ByteChecksum, particleOnlyOverdraw.ByteChecksum);
+        Assert.Equal(geometryOverdraw.GpuSampleCount, particleOnlyOverdraw.GpuSampleCount);
+    }
+
+    [Fact]
+    public async Task AuthoredMiddleCurveKeyChangesNativeGpuParticleOutput()
+    {
+        var baseEmitter = HighFidelityRenderGraphTests.ParticleEmitter(8) with
+        {
+            SpawnRate = 0,
+            Bursts = [new(1.0 / 60.0, 8)],
+            LifetimeSeconds = 1,
+            SizeCurve = [new(0, 0.25), new(0.5, 0.5), new(1, 0.25)],
+            ColorCurve = [new(0, "#ff0000ff"), new(0.5, "#00ff00ff"), new(1, "#ff0000ff")],
+            SoftParticleFade = 0
+        };
+        var first = Frame(withEmitter: false) with { Renderables = [], ParticleEmitters = [baseEmitter] };
+        var middle = first with { FrameIndex = 2, ElapsedSeconds = 0.5 + 1.0 / 60.0, DeltaSeconds = 0.5 };
+        var flatFirst = first with
+        {
+            ParticleEmitters = [baseEmitter with
+            {
+                SizeCurve = [new(0, 0.25), new(0.5, 0.25), new(1, 0.25)],
+                ColorCurve = [new(0, "#ff0000ff"), new(0.5, "#ff0000ff"), new(1, "#ff0000ff")]
+            }]
+        };
+        var flatMiddle = flatFirst with { FrameIndex = 2, ElapsedSeconds = 0.5 + 1.0 / 60.0, DeltaSeconds = 0.5 };
+        var output = TestPaths.CreateTempDirectory();
+        using var curvedCapture = new RekallAgeNativeVulkanSceneCapture();
+        using var flatCapture = new RekallAgeNativeVulkanSceneCapture();
+
+        await curvedCapture.CaptureSceneAsync(first, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var curved = await curvedCapture.CaptureSceneAsync(middle, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        await flatCapture.CaptureSceneAsync(flatFirst, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var flat = await flatCapture.CaptureSceneAsync(flatMiddle, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(curved.Captured, string.Join(Environment.NewLine, curved.Errors));
+        Assert.True(flat.Captured, string.Join(Environment.NewLine, flat.Errors));
+        Assert.NotEqual(flat.ByteChecksum, curved.ByteChecksum);
+        var curvedBounds = Assert.Single(Assert.IsType<RekallAgeHighFidelityFrameReport>(curved.HighFidelityFrame).ParticleDebugCaptures, item => item.Kind == "bounds");
+        var flatBounds = Assert.Single(Assert.IsType<RekallAgeHighFidelityFrameReport>(flat.HighFidelityFrame).ParticleDebugCaptures, item => item.Kind == "bounds");
+        Assert.NotEqual(flatBounds.ByteChecksum, curvedBounds.ByteChecksum);
+    }
+
+    [Fact]
+    public async Task InvalidPackInputsSurfaceStableNativeReportDiagnosticsBeforeGpuAllocation()
+    {
+        var valid = HighFidelityRenderGraphTests.ParticleEmitter(8);
+        var frame = Frame(withEmitter: false) with
+        {
+            ParticleEmitters =
+            [
+                valid with { EntityId = "space", SimulationSpace = "screen" },
+                valid with { EntityId = "cone", VelocityConeDegrees = 90 },
+                valid with { EntityId = "speed", MinimumSpeed = -1 },
+                valid with { EntityId = "drag", Drag = -1 },
+                valid with { EntityId = "emission", SpawnRate = -1 },
+                valid with { EntityId = "size", SizeCurve = [new(0, -1)] },
+                valid with { EntityId = "fade", SoftParticleFade = -1 },
+                valid with { EntityId = "color", ColorCurve = [new(0, "bad")] }
+            ]
+        };
+        var output = TestPaths.CreateTempDirectory();
+        using var capture = new RekallAgeNativeVulkanSceneCapture();
+
+        var result = await capture.CaptureSceneAsync(frame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(result.Captured, string.Join(Environment.NewLine, result.Errors));
+        var particles = Assert.IsType<RekallAgeHighFidelityParticleReport>(Assert.IsType<RekallAgeHighFidelityFrameReport>(result.HighFidelityFrame).Particles);
+        Assert.Equal(0, particles.AllocatedCapacity);
+        Assert.Equal(8, particles.RejectedEntityIds.Count);
+        Assert.Contains(particles.Diagnostics, item => item.StartsWith("REKALL_PARTICLE_SIMULATION_SPACE_UNSUPPORTED:", StringComparison.Ordinal));
+        Assert.Contains(particles.Diagnostics, item => item.StartsWith("REKALL_PARTICLE_MOTION_INVALID:", StringComparison.Ordinal));
+        Assert.Contains(particles.Diagnostics, item => item.StartsWith("REKALL_PARTICLE_EMISSION_INVALID:", StringComparison.Ordinal));
+        Assert.Contains(particles.Diagnostics, item => item.StartsWith("REKALL_PARTICLE_SIZE_CURVE_INVALID:", StringComparison.Ordinal));
+        Assert.Contains(particles.Diagnostics, item => item.StartsWith("REKALL_PARTICLE_APPEARANCE_INVALID:", StringComparison.Ordinal));
+        Assert.Contains(particles.Diagnostics, item => item.StartsWith("REKALL_PARTICLE_COLOR_INVALID:", StringComparison.Ordinal));
     }
 
     private static RekallAgeRuntimeViewportFrame Frame(bool withEmitter)

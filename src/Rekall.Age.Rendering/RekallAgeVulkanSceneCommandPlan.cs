@@ -50,7 +50,9 @@ public static class RekallAgeVulkanSceneCommandPlanBuilder
             blockers.Add("Offscreen command plans require a non-OpenXR render target.");
         }
 
-        if (!preparedFrame.HasDrawableGeometry)
+        var hasParticleWork = highFidelityGraph?.Passes.Any(pass =>
+            pass.Name.Equals("particle-simulate", StringComparison.Ordinal)) == true;
+        if (!preparedFrame.HasDrawableGeometry && !hasParticleWork)
         {
             blockers.Add("Offscreen command plans require drawable geometry.");
         }

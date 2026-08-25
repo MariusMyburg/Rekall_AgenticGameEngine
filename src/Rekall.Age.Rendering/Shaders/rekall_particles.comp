@@ -18,9 +18,14 @@ struct ParticleEmitter
     vec4 directionCone;
     vec4 speedDrag;
     vec4 gravityEmission;
-    vec4 sizeSoft;
-    vec4 colorStart;
-    vec4 colorEnd;
+    vec4 sizeCurveTimes;
+    vec4 sizeCurveValues;
+    vec4 colorCurveTimes;
+    vec4 color0;
+    vec4 color1;
+    vec4 color2;
+    vec4 color3;
+    vec4 curveCountsSoft;
     vec4 flipbook;
 };
 
@@ -52,6 +57,34 @@ bool inCircularSpawnRange(uint localIndex, uint start, uint count, uint capacity
     if (count == 0u) return false;
     uint distance = (localIndex + capacity - start) % capacity;
     return distance < min(count, capacity);
+}
+
+float evaluateScalarCurve(vec4 times, vec4 values, uint count, float age)
+{
+    for (uint index = 1u; index < min(count, 4u); ++index)
+    {
+        if (age <= times[index])
+        {
+            float span = max(times[index] - times[index - 1u], 0.000001);
+            return mix(values[index - 1u], values[index], clamp((age - times[index - 1u]) / span, 0.0, 1.0));
+        }
+    }
+    return values[min(max(count, 1u), 4u) - 1u];
+}
+
+vec4 evaluateColorCurve(ParticleEmitter emitter, float age)
+{
+    vec4 colors[4] = vec4[](emitter.color0, emitter.color1, emitter.color2, emitter.color3);
+    uint count = uint(emitter.curveCountsSoft.y);
+    for (uint index = 1u; index < min(count, 4u); ++index)
+    {
+        if (age <= emitter.colorCurveTimes[index])
+        {
+            float span = max(emitter.colorCurveTimes[index] - emitter.colorCurveTimes[index - 1u], 0.000001);
+            return mix(colors[index - 1u], colors[index], clamp((age - emitter.colorCurveTimes[index - 1u]) / span, 0.0, 1.0));
+        }
+    }
+    return colors[min(max(count, 1u), 4u) - 1u];
 }
 
 void main()
@@ -94,16 +127,16 @@ void main()
         vec3 direction = normalize(emitter.directionCone.xyz + vec3(unit - 0.5, 0.0, fract(unit * 17.0) - 0.5) * emitter.directionCone.w);
         particle.positionAge = vec4(emitter.seedFlags.y != 0u ? vec3(0.0) : emitter.originLife.xyz, 0.0);
         particle.velocityLife = vec4(direction * speed, emitter.originLife.w);
-        particle.color = emitter.colorStart;
-        particle.data = vec4(emitter.sizeSoft.x, emitter.sizeSoft.z, emitter.gravityEmission.w, uintBitsToFloat(emitterIndex));
+        particle.color = evaluateColorCurve(emitter, 0.0);
+        particle.data = vec4(evaluateScalarCurve(emitter.sizeCurveTimes, emitter.sizeCurveValues, uint(emitter.curveCountsSoft.x), 0.0), emitter.curveCountsSoft.z, emitter.gravityEmission.w, uintBitsToFloat(emitterIndex));
         alive = true;
     }
 
     if (alive)
     {
         float age = clamp(particle.positionAge.w / max(particle.velocityLife.w, 0.0001), 0.0, 1.0);
-        particle.color = mix(emitter.colorStart, emitter.colorEnd, age);
-        particle.data.x = mix(emitter.sizeSoft.x, emitter.sizeSoft.y, age);
+        particle.color = evaluateColorCurve(emitter, age);
+        particle.data.x = evaluateScalarCurve(emitter.sizeCurveTimes, emitter.sizeCurveValues, uint(emitter.curveCountsSoft.x), age);
         uint activeIndex = atomicAdd(indirectArguments.values[1], 1u);
         activeIndices.values[activeIndex] = slot;
     }

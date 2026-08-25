@@ -43,6 +43,9 @@ public sealed class HighFidelityRenderGraphTests
         Assert.Contains(graph.Resources, resource => resource.Name == "particle-state-b" && resource.Lifetime == "persistent");
         Assert.Contains(graph.Resources, resource => resource.Name == "particle-active-indices" && resource.Usage.Contains("storage", StringComparer.Ordinal));
         Assert.Contains(graph.Resources, resource => resource.Name == "particle-indirect" && resource.Usage.Contains("indirect", StringComparer.Ordinal));
+        Assert.Contains(graph.Resources, resource => resource.Name == "particle-fragment-counts"
+            && resource.Usage.Contains("storage", StringComparer.Ordinal)
+            && resource.Usage.Contains("host-read", StringComparer.Ordinal));
         var simulation = Assert.Single(graph.Passes, pass => pass.Name == "particle-simulate");
         var particles = Assert.Single(graph.Passes, pass => pass.Name == "transparent-particles");
         Assert.Equal("compute", simulation.Kind);
@@ -51,6 +54,7 @@ public sealed class HighFidelityRenderGraphTests
         Assert.Contains("particle-indirect", simulation.Writes);
         Assert.Contains("particle-state-b", particles.Reads);
         Assert.Contains("particle-indirect", particles.Reads);
+        Assert.Contains("particle-fragment-counts", particles.Writes);
         Assert.True(simulation.Order < particles.Order);
         Assert.True(graph.Passes.Single(pass => pass.Name == "fog-integrate").Order < simulation.Order);
         Assert.True(graph.IsValid, string.Join(Environment.NewLine, graph.Diagnostics.Select(item => item.Code)));

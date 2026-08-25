@@ -2,6 +2,7 @@
 
 layout(set = 2, binding = 0) uniform sampler2D sceneDepth;
 layout(set = 2, binding = 1) uniform sampler2D particleTexture;
+layout(set = 2, binding = 2, std430) buffer FragmentCounts { uint values[]; } fragmentCounts;
 
 layout(location = 0) in vec2 fragUv;
 layout(location = 1) in vec4 fragColor;
@@ -20,6 +21,8 @@ void main()
     float soft = fragSoftFade > 0.0 ? clamp((sampledDepth - fragDepth) / fragSoftFade, 0.0, 1.0) : 1.0;
     float alpha = fragColor.a * textureColor.a * edge * soft;
     if (alpha <= 0.001) discard;
+    uint pixelIndex = uint(gl_FragCoord.y) * uint(textureSize(sceneDepth, 0).x) + uint(gl_FragCoord.x);
+    atomicAdd(fragmentCounts.values[pixelIndex], 1u);
     float lighting = (fragFlags & 1u) != 0u ? 0.72 : 1.0;
     vec3 hdr = max(fragColor.rgb * textureColor.rgb * max(fragEmissive, 1.0) * lighting, vec3(0.0));
     bool additive = (fragFlags & 2u) != 0u;

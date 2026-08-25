@@ -70,7 +70,7 @@ public sealed class VulkanParticlePlannerTests
         Assert.Equal(4, plan.AllocatedCapacity);
         Assert.Equal(["infinite-life", "nonfinite-curve", "unsafe-capacity"], plan.RejectedEntityIds);
         Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_LIFETIME_INVALID");
-        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_CURVE_NONFINITE");
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_SIZE_CURVE_INVALID");
         Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_EMITTER_CAPACITY_UNSAFE");
     }
 
@@ -104,7 +104,7 @@ public sealed class VulkanParticlePlannerTests
 
         Assert.Empty(plan.Emitters);
         Assert.Equal(0, plan.AllocatedCapacity);
-        Assert.Equal(0, plan.ActiveSlotCount);
+        Assert.Equal(0, plan.PlannedSpawnCount);
         Assert.Equal(new RekallAgeVulkanParticleDispatch(0, 0, 0), plan.SimulationDispatch);
     }
 
@@ -135,6 +135,95 @@ public sealed class VulkanParticlePlannerTests
             && item.EntityIds.SequenceEqual(["beam"]));
         Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_CAMERA_CULLED"
             && item.EntityIds.SequenceEqual(["distant", "masked"]));
+    }
+
+    [Fact]
+    public void PersistentStateRequiresAnIdenticalEmitterRangeTopology()
+    {
+        var planner = new RekallAgeVulkanParticlePlanner();
+        var initial = planner.Plan(
+            Frame(10, 1, Emitter("a", 2, 8), Emitter("b", 1, 8)),
+            new(16),
+            1.0 / 60.0);
+        var history = new RekallAgeVulkanParticleHistory(
+            initial.AllocatedCapacity,
+            10,
+            LastDestinationIsA: false,
+            initial.TopologyFingerprint);
+
+        var unchanged = planner.Plan(
+            Frame(11, 1 + 1.0 / 60.0, Emitter("b", 1, 8), Emitter("a", 2, 8)),
+            new(16),
+            1.0 / 60.0,
+            history);
+        var replacement = planner.Plan(
+            Frame(11, 1 + 1.0 / 60.0, Emitter("a", 2, 8), Emitter("c", 1, 8)),
+            new(16),
+            1.0 / 60.0,
+            history);
+        var reorderedRanges = planner.Plan(
+            Frame(11, 1 + 1.0 / 60.0, Emitter("a", 1, 8), Emitter("b", 2, 8)),
+            new(16),
+            1.0 / 60.0,
+            history);
+        var removalWithEqualCapacity = planner.Plan(
+            Frame(11, 1 + 1.0 / 60.0, Emitter("a", 2, 16)),
+            new(16),
+            1.0 / 60.0,
+            history);
+
+        Assert.True(unchanged.PreviousStateReused);
+        Assert.Equal(initial.TopologyFingerprint, unchanged.TopologyFingerprint);
+        Assert.False(replacement.PreviousStateReused);
+        Assert.False(reorderedRanges.PreviousStateReused);
+        Assert.False(removalWithEqualCapacity.PreviousStateReused);
+        Assert.NotEqual(initial.TopologyFingerprint, replacement.TopologyFingerprint);
+        Assert.NotEqual(initial.TopologyFingerprint, reorderedRanges.TopologyFingerprint);
+        Assert.NotEqual(initial.TopologyFingerprint, removalWithEqualCapacity.TopologyFingerprint);
+    }
+
+    [Fact]
+    public void InvalidSimulationAndPackableParametersAreRejectedWithStableDiagnostics()
+    {
+        var plan = new RekallAgeVulkanParticlePlanner().Plan(
+            Frame(
+                Emitter("color", 10, 8) with { ColorCurve = [new(0, "not-a-color"), new(1, "#ffffffff")] },
+                Emitter("size", 9, 8) with { SizeCurve = [new(0, 1), new(0.5, -1), new(1, 1)] },
+                Emitter("cone", 8, 8) with { VelocityConeDegrees = 90 },
+                Emitter("speed", 7, 8) with { MinimumSpeed = -1 },
+                Emitter("drag", 6, 8) with { Drag = -1 },
+                Emitter("emission", 5, 8) with { SpawnRate = -1 },
+                Emitter("emissive", 4, 8) with { EmissiveIntensity = -1 },
+                Emitter("fade", 3, 8) with { SoftParticleFade = -1 },
+                Emitter("space", 2, 8) with { SimulationSpace = "screen" }),
+            new(72),
+            1.0 / 60.0);
+
+        Assert.Empty(plan.Emitters);
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_COLOR_INVALID" && item.EntityIds.SequenceEqual(["color"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_SIZE_CURVE_INVALID" && item.EntityIds.SequenceEqual(["size"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_MOTION_INVALID" && item.EntityIds.SequenceEqual(["cone"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_MOTION_INVALID" && item.EntityIds.SequenceEqual(["speed"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_MOTION_INVALID" && item.EntityIds.SequenceEqual(["drag"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_EMISSION_INVALID" && item.EntityIds.SequenceEqual(["emission"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_APPEARANCE_INVALID" && item.EntityIds.SequenceEqual(["emissive"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_APPEARANCE_INVALID" && item.EntityIds.SequenceEqual(["fade"]));
+        Assert.Contains(plan.Diagnostics, item => item.Code == "REKALL_PARTICLE_SIMULATION_SPACE_UNSUPPORTED" && item.EntityIds.SequenceEqual(["space"]));
+    }
+
+    [Fact]
+    public void FourKeyCurvesPreserveAuthoredMiddleKeysAndTimes()
+    {
+        var emitter = Emitter("curved", 1, 8) with
+        {
+            SizeCurve = [new(0, 1), new(0.25, 4), new(0.75, 2), new(1, 1)],
+            ColorCurve = [new(0, "#ff0000ff"), new(0.4, "#00ff00ff"), new(0.8, "#0000ffff"), new(1, "#ffffffff")]
+        };
+
+        var range = Assert.Single(new RekallAgeVulkanParticlePlanner().Plan(Frame(emitter), new(8), 1.0 / 60.0).Emitters);
+
+        Assert.Equal([0, 0.25, 0.75, 1], range.Source.SizeCurve.Select(key => key.NormalizedAge));
+        Assert.Equal(["#ff0000ff", "#00ff00ff", "#0000ffff", "#ffffffff"], range.Source.ColorCurve.Select(key => key.Color));
     }
 
     private static RekallAgeRuntimeViewportFrame Frame(params RekallAgeRuntimeViewportParticleEmitter[] emitters) =>

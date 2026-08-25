@@ -92,7 +92,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         }
 
         var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets);
-        if (meshes.Count == 0)
+        if (meshes.Count == 0 && frame.ParticleEmitters.Count == 0)
         {
             var clear = await _clearCapture.CaptureClearRenderPassAsync(
                 checked((uint)frame.Width),
@@ -513,7 +513,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 highFidelityPlan?.Graph,
                 highFidelityPlan?.ShadowPlan);
 
-            if (!prepared.HasDrawableGeometry)
+            if (!prepared.HasDrawableGeometry && highFidelityPlan?.ParticlePlan.AllocatedCapacity <= 0)
             {
                 errors.Add("Vulkan scene capture could not build drawable mesh buffers.");
                 return Unavailable(frame, string.Empty, null, null, assets, meshes.Count, 0, 0, [], errors);
@@ -660,6 +660,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 }
                 SubmitAndWait(state);
 
+                if (highFidelityPlan?.ParticlePlan.AllocatedCapacity > 0)
+                {
+                    state.ParticleGpuActiveCount = checked((int)ReadHostUInt32(state, state.ParticleIndirectMemory, sizeof(uint)));
+                }
+
                 if (highFidelityPlan?.FogPlan is { UsesFroxelGrid: true }
                     && persistentContext is not null)
                 {
@@ -670,7 +675,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 if (highFidelityPlan?.ParticlePlan.AllocatedCapacity > 0
                     && persistentContext is not null)
                 {
-                    persistentContext.CommitParticleState(frame.FrameIndex, state.ParticleDestinationIsA);
+                    persistentContext.CommitParticleState(
+                        frame.FrameIndex,
+                        state.ParticleDestinationIsA,
+                        highFidelityPlan.ParticlePlan.TopologyFingerprint);
                 }
 
                 Directory.CreateDirectory(outputDirectory);
@@ -683,8 +691,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 var rgba = ReadBack(state, checked((ulong)target.EffectiveOutputWidth * target.EffectiveOutputHeight * 4));
                 var particleDebugCaptures = highFidelityPlan?.ParticlePlan.AllocatedCapacity > 0
                     ? WriteParticleDebugCaptures(
+                        state,
                         highFidelityPlan,
-                        rgba,
                         checked((int)target.EffectiveOutputWidth),
                         checked((int)target.EffectiveOutputHeight),
                         outputDirectory,
@@ -1160,11 +1168,17 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 QueueCount = 1,
                 PQueuePriorities = &priority
             };
+            state.Vk.GetPhysicalDeviceFeatures(state.PhysicalDevice, out var availableFeatures);
+            var enabledFeatures = new PhysicalDeviceFeatures
+            {
+                FragmentStoresAndAtomics = availableFeatures.FragmentStoresAndAtomics
+            };
             var deviceCreateInfo = new DeviceCreateInfo
             {
                 SType = StructureType.DeviceCreateInfo,
                 QueueCreateInfoCount = 1,
-                PQueueCreateInfos = &queueCreateInfo
+                PQueueCreateInfos = &queueCreateInfo,
+                PEnabledFeatures = &enabledFeatures
             };
             ThrowIfFailed(state.Vk.CreateDevice(state.PhysicalDevice, &deviceCreateInfo, null, out state.Device), "vkCreateDevice");
             state.Vk.GetDeviceQueue(state.Device, state.GraphicsQueueFamily, 0, out state.GraphicsQueue);
@@ -1495,8 +1509,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             ulong readbackBytes,
             RekallAgeVulkanShadowPlan? shadowPlan = null)
         {
-            CreateHostBuffer(state, geometryUpload.VertexBytes, BufferUsageFlags.VertexBufferBit, out state.VertexBuffer, out state.VertexMemory);
-            CreateHostBuffer(state, geometryUpload.IndexBytes, BufferUsageFlags.IndexBufferBit, out state.IndexBuffer, out state.IndexMemory);
+            CreateHostBuffer(state, geometryUpload.VertexBytes.Length == 0 ? new byte[1] : geometryUpload.VertexBytes, BufferUsageFlags.VertexBufferBit, out state.VertexBuffer, out state.VertexMemory);
+            CreateHostBuffer(state, geometryUpload.IndexBytes.Length == 0 ? new byte[1] : geometryUpload.IndexBytes, BufferUsageFlags.IndexBufferBit, out state.IndexBuffer, out state.IndexMemory);
 
             var uniformCount = Math.Max(1, frameUniforms.Count);
             state.UniformBuffers = new Buffer[uniformCount];
@@ -2050,6 +2064,17 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             if (particlePlan.AllocatedCapacity > 0)
             {
                 state.Vk.GetPhysicalDeviceProperties(state.PhysicalDevice, out var particleProperties);
+                state.Vk.GetPhysicalDeviceFeatures(state.PhysicalDevice, out var particleFeatures);
+                var capabilityDiagnostics = RekallAgeVulkanParticleCapabilityValidator.Validate(new(
+                    particleProperties.Limits.MaxComputeWorkGroupInvocations,
+                    particleProperties.Limits.MaxComputeWorkGroupSize[0],
+                    particleProperties.Limits.MaxPerStageDescriptorStorageBuffers,
+                    particleProperties.Limits.MaxDescriptorSetStorageBuffers,
+                    particleFeatures.FragmentStoresAndAtomics));
+                foreach (var diagnostic in capabilityDiagnostics)
+                {
+                    errors.Add($"{diagnostic.Code}: {diagnostic.Message} Vulkan device: '{state.SelectedDevice?.Name}'.");
+                }
                 var stateBytes = checked((ulong)particlePlan.AllocatedCapacity * 64UL);
                 if (stateBytes > particleProperties.Limits.MaxStorageBufferRange)
                 {
@@ -2273,11 +2298,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             {
                 if (state.ParticleStateBufferA.Handle == 0)
                 {
-                    CreateParticleResources(state, plan.ParticlePlan);
+                    CreateParticleResources(state, plan.ParticlePlan, target.Width, target.Height);
                 }
                 else
                 {
-                    CreateParticleFrameResources(state, plan.ParticlePlan);
+                    CreateParticleFrameResources(state, plan.ParticlePlan, target.Width, target.Height);
                 }
             }
             CreateFogAndTransparentRenderPasses(state, target);
@@ -2346,7 +2371,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             ThrowIfFailed(state.Vk.CreateFramebuffer(state.Device, &framebufferInfo, null, out state.OutputFramebuffer), "vkCreateFramebuffer tone-map");
         }
 
-        private static void CreateParticleResources(VulkanState state, RekallAgeVulkanParticlePlan plan)
+        private static void CreateParticleResources(
+            VulkanState state,
+            RekallAgeVulkanParticlePlan plan,
+            uint width,
+            uint height)
         {
             var stateBytes = new byte[checked(plan.AllocatedCapacity * 64)];
             CreateHostBuffer(
@@ -2362,10 +2391,14 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 out state.ParticleStateBufferB,
                 out state.ParticleStateMemoryB);
 
-            CreateParticleFrameResources(state, plan);
+            CreateParticleFrameResources(state, plan, width, height);
         }
 
-        private static void CreateParticleFrameResources(VulkanState state, RekallAgeVulkanParticlePlan plan)
+        private static void CreateParticleFrameResources(
+            VulkanState state,
+            RekallAgeVulkanParticlePlan plan,
+            uint width,
+            uint height)
         {
             var emitters = plan.Emitters.Select(ToGpuEmitter).ToArray();
             var emitterBytes = MemoryMarshal.AsBytes(emitters.AsSpan()).ToArray();
@@ -2381,6 +2414,14 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 BufferUsageFlags.StorageBufferBit,
                 out state.ParticleActiveIndexBuffer,
                 out state.ParticleActiveIndexMemory);
+
+            var pixelCount = checked((int)(width * height));
+            CreateHostBuffer(
+                state,
+                new byte[checked(pixelCount * sizeof(uint))],
+                BufferUsageFlags.StorageBufferBit,
+                out state.ParticleFragmentCountBuffer,
+                out state.ParticleFragmentCountMemory);
 
             var indirect = new uint[] { 6, 0, 0, 0 };
             CreateHostBuffer(
@@ -2449,8 +2490,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 direction = Vector3.UnitY;
             }
             direction = Vector3.Normalize(direction);
-            var startSize = source.SizeCurve.OrderBy(item => item.NormalizedAge).FirstOrDefault()?.Value ?? 1;
-            var endSize = source.SizeCurve.OrderBy(item => item.NormalizedAge).LastOrDefault()?.Value ?? startSize;
+            var sizeKeys = source.SizeCurve.OrderBy(item => item.NormalizedAge).ToArray();
+            var colorKeys = source.ColorCurve.OrderBy(item => item.NormalizedAge).ToArray();
+            var sizeTimes = FillCurveVector(sizeKeys.Select(item => item.NormalizedAge).ToArray());
+            var sizeValues = FillCurveVector(sizeKeys.Select(item => item.Value).ToArray());
+            var colorTimes = FillCurveVector(colorKeys.Select(item => item.NormalizedAge).ToArray());
+            var colors = FillColorCurve(colorKeys.Select(item => item.Color).ToArray());
             return new ParticleEmitterGpu(
                 new ParticleUInt4(
                     checked((uint)range.AllocationOffset),
@@ -2478,18 +2523,41 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     FiniteFloat(source.GravityY),
                     FiniteFloat(source.GravityZ),
                     Math.Max(0, FiniteFloat(source.EmissiveIntensity))),
-                new Vector4(
-                    Math.Max(0, FiniteFloat(startSize)),
-                    Math.Max(0, FiniteFloat(endSize)),
-                    Math.Max(0, FiniteFloat(source.SoftParticleFade)),
-                    0),
-                ParseParticleColor(source.ColorCurve.OrderBy(item => item.NormalizedAge).FirstOrDefault()?.Color),
-                ParseParticleColor(source.ColorCurve.OrderBy(item => item.NormalizedAge).LastOrDefault()?.Color),
+                sizeTimes,
+                sizeValues,
+                colorTimes,
+                colors[0],
+                colors[1],
+                colors[2],
+                colors[3],
+                new Vector4(sizeKeys.Length, colorKeys.Length, FiniteFloat(source.SoftParticleFade), 0),
                 new Vector4(
                     Math.Max(1, source.FlipbookColumns),
                     Math.Max(1, source.FlipbookRows),
                     Math.Max(0, FiniteFloat(source.FlipbookFramesPerSecond)),
                     0));
+        }
+
+        private static Vector4 FillCurveVector(IReadOnlyList<double> values)
+        {
+            Span<float> packed = stackalloc float[4];
+            var fallback = values.Count > 0 ? FiniteFloat(values[^1]) : 0;
+            for (var index = 0; index < packed.Length; index++)
+            {
+                packed[index] = index < values.Count ? FiniteFloat(values[index]) : fallback;
+            }
+            return new Vector4(packed[0], packed[1], packed[2], packed[3]);
+        }
+
+        private static Vector4[] FillColorCurve(IReadOnlyList<string> values)
+        {
+            var packed = new Vector4[4];
+            var fallback = values.Count > 0 ? ParseParticleColor(values[^1]) : Vector4.One;
+            for (var index = 0; index < packed.Length; index++)
+            {
+                packed[index] = index < values.Count ? ParseParticleColor(values[index]) : fallback;
+            }
+            return packed;
         }
 
         private static Vector4 ParseParticleColor(string? value)
@@ -3089,19 +3157,20 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             var imageBindings = stackalloc DescriptorSetLayoutBinding[]
             {
                 new(0, DescriptorType.CombinedImageSampler, 1, ShaderStageFlags.FragmentBit),
-                new(1, DescriptorType.CombinedImageSampler, 1, ShaderStageFlags.FragmentBit)
+                new(1, DescriptorType.CombinedImageSampler, 1, ShaderStageFlags.FragmentBit),
+                new(2, DescriptorType.StorageBuffer, 1, ShaderStageFlags.FragmentBit)
             };
             var imageLayoutInfo = new DescriptorSetLayoutCreateInfo
             {
                 SType = StructureType.DescriptorSetLayoutCreateInfo,
-                BindingCount = 2,
+                BindingCount = 3,
                 PBindings = imageBindings
             };
             ThrowIfFailed(state.Vk.CreateDescriptorSetLayout(state.Device, &imageLayoutInfo, null, out state.ParticleImageDescriptorSetLayout), "vkCreateDescriptorSetLayout particles images");
 
             var poolSizes = stackalloc DescriptorPoolSize[]
             {
-                new(DescriptorType.StorageBuffer, 8),
+                new(DescriptorType.StorageBuffer, 9),
                 new(DescriptorType.CombinedImageSampler, 2)
             };
             var poolInfo = new DescriptorPoolCreateInfo
@@ -3177,6 +3246,17 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 ImageWrite(state.ParticleImageDescriptorSet, 1, DescriptorType.CombinedImageSampler, &imageInfos[1])
             };
             state.Vk.UpdateDescriptorSets(state.Device, 2, imageWrites, 0, null);
+            var fragmentCounts = new DescriptorBufferInfo(state.ParticleFragmentCountBuffer, 0, Vk.WholeSize);
+            var fragmentCountWrite = new WriteDescriptorSet
+            {
+                SType = StructureType.WriteDescriptorSet,
+                DstSet = state.ParticleImageDescriptorSet,
+                DstBinding = 2,
+                DescriptorCount = 1,
+                DescriptorType = DescriptorType.StorageBuffer,
+                PBufferInfo = &fragmentCounts
+            };
+            state.Vk.UpdateDescriptorSets(state.Device, 1, &fragmentCountWrite, 0, null);
 
             var computePush = new PushConstantRange(ShaderStageFlags.ComputeBit, 0, (uint)Marshal.SizeOf<ParticleSimulationPushConstants>());
             var computeSetLayout = state.ParticleComputeDescriptorSetLayout;
@@ -4332,6 +4412,31 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 state.Vk.CmdDrawIndirect(state.CommandBuffer, state.ParticleIndirectBuffer, 0, 1, 0);
             }
             state.Vk.CmdEndRenderPass(state.CommandBuffer);
+            if (hasParticles)
+            {
+                var fragmentReadbackBarrier = new BufferMemoryBarrier
+                {
+                    SType = StructureType.BufferMemoryBarrier,
+                    SrcAccessMask = AccessFlags.ShaderWriteBit,
+                    DstAccessMask = AccessFlags.HostReadBit,
+                    SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
+                    DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
+                    Buffer = state.ParticleFragmentCountBuffer,
+                    Offset = 0,
+                    Size = Vk.WholeSize
+                };
+                state.Vk.CmdPipelineBarrier(
+                    state.CommandBuffer,
+                    PipelineStageFlags.FragmentShaderBit,
+                    PipelineStageFlags.HostBit,
+                    0,
+                    0,
+                    null,
+                    1,
+                    &fragmentReadbackBarrier,
+                    0,
+                    null);
+            }
         }
 
         private static BufferMemoryBarrier ParticleBarrier(Buffer buffer) => new()
@@ -4650,6 +4755,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 allocated.Add("particle-emitter-data");
                 allocated.Add("particle-active-indices");
                 allocated.Add("particle-indirect");
+                allocated.Add("particle-fragment-counts");
             }
             return new RekallAgeHighFidelityFrameReport(
                 executed,
@@ -4716,7 +4822,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 Particles = new RekallAgeHighFidelityParticleReport(
                     plan.ParticlePlan.AllocatedCapacity > 0,
                     plan.ParticlePlan.AllocatedCapacity,
-                    plan.ParticlePlan.ActiveSlotCount,
+                    plan.ParticlePlan.PlannedSpawnCount,
                     plan.ParticlePlan.SimulationDispatch,
                     executed && plan.ParticlePlan.AllocatedCapacity > 0 ? 1 : 0,
                     executed && plan.ParticlePlan.AllocatedCapacity > 0 ? 1 : 0,
@@ -4733,7 +4839,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     StateResourceGeneration = executionState?.ParticleStateGeneration ?? 0,
                     PreviousStateReused = executed && executionState?.ParticlePreviousStateReused == true,
                     SimulationSource = plan.ParticlePlan.SimulationSource,
-                    SimulationDestination = plan.ParticlePlan.SimulationDestination
+                    SimulationDestination = plan.ParticlePlan.SimulationDestination,
+                    GpuActiveCount = executed ? executionState?.ParticleGpuActiveCount ?? 0 : 0
                 },
                 ParticleDebugCaptures = particleDebugCaptures ?? []
             };
@@ -5416,21 +5523,37 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
         }
 
         private static IReadOnlyList<RekallAgeHighFidelityParticleDebugCapture> WriteParticleDebugCaptures(
+            VulkanState state,
             RekallAgeVulkanHighFidelityFramePlan plan,
-            byte[] finalRgba,
             int width,
             int height,
             string outputDirectory,
             CancellationToken cancellationToken)
         {
             var bounds = new byte[checked(width * height * 4)];
-            foreach (var range in plan.ParticlePlan.Emitters)
+            var activeCount = Math.Min(state.ParticleGpuActiveCount, plan.ParticlePlan.AllocatedCapacity);
+            var stateMemory = state.ParticleDestinationIsA ? state.ParticleStateMemoryA : state.ParticleStateMemoryB;
+            var stateBytes = ReadHostBytes(state, stateMemory, checked((ulong)plan.ParticlePlan.AllocatedCapacity * 64));
+            var activeBytes = ReadHostBytes(state, state.ParticleActiveIndexMemory, checked((ulong)Math.Max(activeCount, 1) * sizeof(uint)));
+            for (var active = 0; active < activeCount; active++)
             {
+                var slot = checked((int)BitConverter.ToUInt32(activeBytes, active * sizeof(uint)));
+                if (slot < 0 || slot >= plan.ParticlePlan.AllocatedCapacity) continue;
+                var stateOffset = checked(slot * 64);
+                var emitterIndex = checked((int)BitConverter.SingleToUInt32Bits(BitConverter.ToSingle(stateBytes, stateOffset + 60)));
+                if (emitterIndex < 0 || emitterIndex >= plan.ParticlePlan.Emitters.Count) continue;
+                var range = plan.ParticlePlan.Emitters[emitterIndex];
                 var center = new Vector4(
-                    FiniteFloat(range.Source.Transform.X),
-                    FiniteFloat(range.Source.Transform.Y),
-                    FiniteFloat(range.Source.Transform.Z),
+                    BitConverter.ToSingle(stateBytes, stateOffset),
+                    BitConverter.ToSingle(stateBytes, stateOffset + 4),
+                    BitConverter.ToSingle(stateBytes, stateOffset + 8),
                     1);
+                if (range.SimulationSpace.Equals("local", StringComparison.OrdinalIgnoreCase))
+                {
+                    center.X += FiniteFloat(range.Source.Transform.X);
+                    center.Y += FiniteFloat(range.Source.Transform.Y);
+                    center.Z += FiniteFloat(range.Source.Transform.Z);
+                }
                 var clip = Vector4.Transform(center, plan.EffectiveCamera.ViewProjection);
                 var x = width / 2;
                 var y = height / 2;
@@ -5440,16 +5563,21 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     x = Math.Clamp((int)Math.Round((ndc.X * 0.5 + 0.5) * (width - 1)), 0, width - 1);
                     y = Math.Clamp((int)Math.Round((1 - (ndc.Y * 0.5 + 0.5)) * (height - 1)), 0, height - 1);
                 }
-                DrawDebugBox(bounds, width, height, x, y, 5, 40, 255, 120);
+                var size = Math.Max(1, (int)Math.Round(Math.Abs(BitConverter.ToSingle(stateBytes, stateOffset + 48)) * 3));
+                DrawDebugBox(bounds, width, height, x, y, Math.Min(size, 12), 40, 255, 120);
             }
 
             var overdraw = new byte[bounds.Length];
+            var fragmentBytes = ReadHostBytes(state, state.ParticleFragmentCountMemory, checked((ulong)width * (ulong)height * sizeof(uint)));
+            ulong fragmentCount = 0;
             for (var pixel = 0; pixel < width * height; pixel++)
             {
                 var offset = pixel * 4;
-                var brightness = Math.Max(finalRgba[offset], Math.Max(finalRgba[offset + 1], finalRgba[offset + 2]));
-                overdraw[offset] = brightness;
-                overdraw[offset + 1] = checked((byte)(brightness / 4));
+                var count = BitConverter.ToUInt32(fragmentBytes, pixel * sizeof(uint));
+                fragmentCount += count;
+                var intensity = checked((byte)Math.Min(255u, count * 32u));
+                overdraw[offset] = intensity;
+                overdraw[offset + 1] = checked((byte)(intensity / 4));
                 overdraw[offset + 2] = 0;
                 overdraw[offset + 3] = byte.MaxValue;
             }
@@ -5469,10 +5597,31 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     rgba.Where((_, index) => index % 4 != 3).Any(value => value > 0),
                     analysis.Checksum)
                 {
-                    Source = "native-particle-execution"
+                    Source = kind == "bounds" ? "gpu-particle-state-readback" : "gpu-particle-fragment-counter-readback",
+                    EvidenceResource = kind == "bounds" ? plan.ParticlePlan.SimulationDestination : "particle-fragment-counts",
+                    GpuSampleCount = kind == "bounds" ? checked((ulong)activeCount) : fragmentCount
                 });
             }
             return captures;
+        }
+
+        private static uint ReadHostUInt32(VulkanState state, DeviceMemory memory, int byteOffset) =>
+            BitConverter.ToUInt32(ReadHostBytes(state, memory, checked((ulong)byteOffset + sizeof(uint))), byteOffset);
+
+        private static byte[] ReadHostBytes(VulkanState state, DeviceMemory memory, ulong byteCount)
+        {
+            void* mapped;
+            ThrowIfFailed(state.Vk.MapMemory(state.Device, memory, 0, byteCount, 0, &mapped), "vkMapMemory particle evidence");
+            try
+            {
+                var bytes = new byte[checked((int)byteCount)];
+                Marshal.Copy((nint)mapped, bytes, 0, bytes.Length);
+                return bytes;
+            }
+            finally
+            {
+                state.Vk.UnmapMemory(state.Device, memory);
+            }
         }
 
         private static void DrawDebugBox(
@@ -5680,9 +5829,14 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             Vector4 DirectionCone,
             Vector4 SpeedDrag,
             Vector4 GravityEmission,
-            Vector4 SizeSoft,
-            Vector4 ColorStart,
-            Vector4 ColorEnd,
+            Vector4 SizeCurveTimes,
+            Vector4 SizeCurveValues,
+            Vector4 ColorCurveTimes,
+            Vector4 Color0,
+            Vector4 Color1,
+            Vector4 Color2,
+            Vector4 Color3,
+            Vector4 CurveCountsSoft,
             Vector4 Flipbook);
 
         [StructLayout(LayoutKind.Sequential)]
@@ -5759,10 +5913,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             internal int ParticleStateGeneration;
             internal int? LastParticleFrameIndex;
             internal bool LastParticleDestinationIsA;
+            internal string ParticleTopologyFingerprint = string.Empty;
             internal RekallAgeVulkanParticleHistory ParticleHistory => new(
                 ParticleCapacity,
                 LastParticleFrameIndex,
-                LastParticleDestinationIsA);
+                LastParticleDestinationIsA,
+                ParticleTopologyFingerprint);
 
             internal void Attach(VulkanState state)
             {
@@ -5791,10 +5947,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 FogHistoryValid = FogHistoryImage.Handle != 0;
             }
 
-            internal void CommitParticleState(int frameIndex, bool destinationIsA)
+            internal void CommitParticleState(int frameIndex, bool destinationIsA, string topologyFingerprint)
             {
                 LastParticleFrameIndex = frameIndex;
                 LastParticleDestinationIsA = destinationIsA;
+                ParticleTopologyFingerprint = topologyFingerprint;
             }
 
             internal void DestroyParticleState()
@@ -5815,6 +5972,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 ParticleCapacity = 0;
                 LastParticleFrameIndex = null;
                 LastParticleDestinationIsA = false;
+                ParticleTopologyFingerprint = string.Empty;
             }
 
             internal void DestroyFogHistory()
@@ -5956,6 +6114,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public DeviceMemory ParticleActiveIndexMemory;
             public Buffer ParticleIndirectBuffer;
             public DeviceMemory ParticleIndirectMemory;
+            public Buffer ParticleFragmentCountBuffer;
+            public DeviceMemory ParticleFragmentCountMemory;
+            public int ParticleGpuActiveCount;
             public DescriptorSetLayout DescriptorSetLayout;
             public DescriptorSetLayout DrawDescriptorSetLayout;
             public DescriptorSetLayout MaterialDescriptorSetLayout;
@@ -6230,6 +6391,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     DestroyBuffer(FogReadbackBuffer, FogReadbackMemory);
                     DestroyBuffer(FogHistoryUniformBuffer, FogHistoryUniformMemory);
                     DestroyBuffer(ParticleIndirectBuffer, ParticleIndirectMemory);
+                    DestroyBuffer(ParticleFragmentCountBuffer, ParticleFragmentCountMemory);
                     DestroyBuffer(ParticleActiveIndexBuffer, ParticleActiveIndexMemory);
                     DestroyBuffer(ParticleEmitterBuffer, ParticleEmitterMemory);
                     if (OwnsParticleStateBuffers)

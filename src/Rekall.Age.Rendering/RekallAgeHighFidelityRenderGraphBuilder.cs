@@ -51,9 +51,10 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
         {
             resources.Add(Resource("particle-state-a", "R32_UInt", particlePlan.AllocatedCapacity, 1, 16, "persistent", ["storage", "history-input"]));
             resources.Add(Resource("particle-state-b", "R32_UInt", particlePlan.AllocatedCapacity, 1, 16, "persistent", ["storage", "history-input"]));
-            resources.Add(Resource("particle-emitter-data", "R32_UInt", Math.Max(1, particlePlan.Emitters.Count), 1, 40, "transient", ["transfer-destination", "storage"]));
+            resources.Add(Resource("particle-emitter-data", "R32_UInt", Math.Max(1, particlePlan.Emitters.Count), 1, 60, "transient", ["transfer-destination", "storage"]));
             resources.Add(Resource("particle-active-indices", "R32_UInt", particlePlan.AllocatedCapacity, 1, 1, "transient", ["storage"]));
             resources.Add(Resource("particle-indirect", "R32_UInt", 4, 1, 1, "transient", ["storage", "indirect", "transfer-destination"]));
+            resources.Add(Resource("particle-fragment-counts", "R32_UInt", plan.RenderWidth, plan.RenderHeight, 1, "transient", ["storage", "host-read"]));
         }
 
         if (plan.Post.Bloom)
@@ -101,7 +102,12 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
             transparentReads.Add("particle-active-indices");
             transparentReads.Add("particle-indirect");
         }
-        passes.Add(Pass("transparent-particles", "graphics", transparentReads, ["scene-hdr"], nextOrder++));
+        var transparentWrites = new List<string> { "scene-hdr" };
+        if (particlePlan.AllocatedCapacity > 0)
+        {
+            transparentWrites.Add("particle-fragment-counts");
+        }
+        passes.Add(Pass("transparent-particles", "graphics", transparentReads, transparentWrites, nextOrder++));
         if (plan.Post.Bloom)
         {
             passes.Add(Pass("bloom", "compute", ["scene-hdr"], ["bloom-pyramid"], nextOrder++));

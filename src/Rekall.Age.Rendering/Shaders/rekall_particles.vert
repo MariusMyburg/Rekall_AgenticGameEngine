@@ -16,9 +16,14 @@ struct ParticleEmitter
     vec4 directionCone;
     vec4 speedDrag;
     vec4 gravityEmission;
-    vec4 sizeSoft;
-    vec4 colorStart;
-    vec4 colorEnd;
+    vec4 sizeCurveTimes;
+    vec4 sizeCurveValues;
+    vec4 colorCurveTimes;
+    vec4 color0;
+    vec4 color1;
+    vec4 color2;
+    vec4 color3;
+    vec4 curveCountsSoft;
     vec4 flipbook;
 };
 

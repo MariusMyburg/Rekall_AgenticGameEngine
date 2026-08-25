@@ -1,5 +1,7 @@
 using Rekall.Age.Core.Rendering;
 using Rekall.Age.Rendering.Abstractions;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Rekall.Age.Rendering;
 
@@ -9,6 +11,7 @@ public sealed class RekallAgeVulkanParticlePlanner
     public const int MaximumEmitterCapacity = 262_144;
     public const int MaximumGlobalCapacity = 1_048_576;
     public const double MaximumLifetimeSeconds = 3_600;
+    public const int MaximumCurveKeys = 4;
 
     public RekallAgeVulkanParticlePlan Plan(
         RekallAgeRuntimeViewportFrame frame,
@@ -27,7 +30,19 @@ public sealed class RekallAgeVulkanParticlePlanner
                      .OrderByDescending(item => item.Priority)
                      .ThenBy(item => item.EntityId, StringComparer.Ordinal))
         {
-            if (!source.Enabled || (!PositiveFinite(source.SpawnRate) && source.Bursts.All(item => item.Count <= 0)))
+            if (!source.Enabled)
+            {
+                continue;
+            }
+
+            if (!double.IsFinite(source.SpawnRate) || source.SpawnRate < 0
+                || source.Bursts.Any(item => !double.IsFinite(item.TimeSeconds) || item.TimeSeconds < 0 || item.Count < 0))
+            {
+                Reject("REKALL_PARTICLE_EMISSION_INVALID", source.EntityId, "Particle spawn rate and bursts must be finite and non-negative.");
+                continue;
+            }
+
+            if (source.SpawnRate == 0 && source.Bursts.All(item => item.Count == 0))
             {
                 continue;
             }
@@ -56,9 +71,35 @@ public sealed class RekallAgeVulkanParticlePlanner
                 continue;
             }
 
-            if (!CurvesFinite(source))
+            if (!source.SimulationSpace.Equals("world", StringComparison.OrdinalIgnoreCase)
+                && !source.SimulationSpace.Equals("local", StringComparison.OrdinalIgnoreCase))
             {
-                Reject("REKALL_PARTICLE_CURVE_NONFINITE", source.EntityId, "Particle size and color curve times and values must be finite.");
+                Reject("REKALL_PARTICLE_SIMULATION_SPACE_UNSUPPORTED", source.EntityId, "Supported particle simulation spaces are world and local.");
+                continue;
+            }
+
+            if (!MotionValid(source))
+            {
+                Reject("REKALL_PARTICLE_MOTION_INVALID", source.EntityId, "Particle direction, cone, speed, gravity, and drag must be finite and within supported ranges.");
+                continue;
+            }
+
+            if (!SizeCurveValid(source))
+            {
+                Reject("REKALL_PARTICLE_SIZE_CURVE_INVALID", source.EntityId, $"Particle size curves require 1-{MaximumCurveKeys} ordered finite keys in normalized time with non-negative values.");
+                continue;
+            }
+
+            if (!ColorCurveValid(source))
+            {
+                Reject("REKALL_PARTICLE_COLOR_INVALID", source.EntityId, $"Particle color curves require 1-{MaximumCurveKeys} ordered normalized-time keys and #RRGGBB or #RRGGBBAA colors.");
+                continue;
+            }
+
+            if (!double.IsFinite(source.EmissiveIntensity) || source.EmissiveIntensity < 0
+                || !double.IsFinite(source.SoftParticleFade) || source.SoftParticleFade < 0)
+            {
+                Reject("REKALL_PARTICLE_APPEARANCE_INVALID", source.EntityId, "Particle emissive intensity and soft-particle fade must be finite and non-negative.");
                 continue;
             }
 
@@ -142,22 +183,25 @@ public sealed class RekallAgeVulkanParticlePlanner
                 overflowIds));
         }
 
-        var activeSlots = ranges.Sum(item => item.SpawnCount);
+        var plannedSpawnCount = ranges.Sum(item => item.SpawnCount);
+        var topologyFingerprint = ComputeTopologyFingerprint(ranges);
         var stateReused = history is not null
             && history.Capacity == offset
+            && history.TopologyFingerprint.Equals(topologyFingerprint, StringComparison.Ordinal)
             && history.LastFrameIndex is int previousFrame
             && frame.FrameIndex == previousFrame + 1;
         var destinationIsA = stateReused && !history!.LastDestinationIsA;
         return new RekallAgeVulkanParticlePlan(
             ranges,
             offset,
-            activeSlots,
+            plannedSpawnCount,
             offset == 0 ? new RekallAgeVulkanParticleDispatch(0, 0, 0) : new RekallAgeVulkanParticleDispatch(DivideRoundUp(offset, 256), 1, 1),
             overflowIds,
             rejected.OrderBy(item => item, StringComparer.Ordinal).ToArray(),
             diagnostics)
         {
             PreviousStateReused = stateReused,
+            TopologyFingerprint = topologyFingerprint,
             SimulationSource = destinationIsA ? "particle-state-b" : "particle-state-a",
             SimulationDestination = destinationIsA ? "particle-state-a" : "particle-state-b"
         };
@@ -227,9 +271,46 @@ public sealed class RekallAgeVulkanParticlePlanner
         return (int)Math.Min(capacity, Math.Min(int.MaxValue, continuous + bursts));
     }
 
-    private static bool CurvesFinite(RekallAgeRuntimeViewportParticleEmitter emitter) =>
-        emitter.SizeCurve.All(item => double.IsFinite(item.NormalizedAge) && double.IsFinite(item.Value))
-        && emitter.ColorCurve.All(item => double.IsFinite(item.NormalizedAge));
+    private static bool MotionValid(RekallAgeRuntimeViewportParticleEmitter emitter)
+    {
+        var directionLengthSquared = emitter.VelocityDirectionX * emitter.VelocityDirectionX
+            + emitter.VelocityDirectionY * emitter.VelocityDirectionY
+            + emitter.VelocityDirectionZ * emitter.VelocityDirectionZ;
+        return double.IsFinite(directionLengthSquared) && directionLengthSquared > 0
+            && double.IsFinite(emitter.VelocityConeDegrees) && emitter.VelocityConeDegrees >= 0 && emitter.VelocityConeDegrees < 90
+            && double.IsFinite(emitter.MinimumSpeed) && emitter.MinimumSpeed >= 0
+            && double.IsFinite(emitter.MaximumSpeed) && emitter.MaximumSpeed >= emitter.MinimumSpeed
+            && double.IsFinite(emitter.GravityX) && double.IsFinite(emitter.GravityY) && double.IsFinite(emitter.GravityZ)
+            && double.IsFinite(emitter.Drag) && emitter.Drag >= 0;
+    }
+
+    private static bool SizeCurveValid(RekallAgeRuntimeViewportParticleEmitter emitter) =>
+        CurveTimesValid(emitter.SizeCurve.Select(item => item.NormalizedAge).ToArray(), emitter.SizeCurve.Count)
+        && emitter.SizeCurve.All(item => double.IsFinite(item.Value) && item.Value >= 0);
+
+    private static bool ColorCurveValid(RekallAgeRuntimeViewportParticleEmitter emitter) =>
+        CurveTimesValid(emitter.ColorCurve.Select(item => item.NormalizedAge).ToArray(), emitter.ColorCurve.Count)
+        && emitter.ColorCurve.All(item => IsParticleColor(item.Color));
+
+    private static bool CurveTimesValid(IReadOnlyList<double> times, int count)
+    {
+        if (count is < 1 or > MaximumCurveKeys) return false;
+        var ordered = times.Order().ToArray();
+        return ordered.All(item => double.IsFinite(item) && item >= 0 && item <= 1)
+            && ordered.Zip(ordered.Skip(1), (left, right) => right > left).All(item => item);
+    }
+
+    private static bool IsParticleColor(string value) =>
+        value is { Length: 7 or 9 }
+        && value[0] == '#'
+        && value.AsSpan(1).IndexOfAnyExcept("0123456789abcdefABCDEF") < 0;
+
+    private static string ComputeTopologyFingerprint(IReadOnlyList<RekallAgeVulkanParticleEmitterRange> ranges)
+    {
+        var topology = string.Join("\n", ranges.Select(range =>
+            $"{range.EntityId.Length}:{range.EntityId}|{range.AllocationOffset}|{range.AllocationCapacity}|{range.SimulationSpace.ToLowerInvariant()}"));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(topology)));
+    }
 
     private static bool PositiveFinite(double value) => double.IsFinite(value) && value > 0;
 
@@ -273,7 +354,7 @@ public sealed record RekallAgeVulkanParticleEmitterRange(
 public sealed record RekallAgeVulkanParticlePlan(
     IReadOnlyList<RekallAgeVulkanParticleEmitterRange> Emitters,
     int AllocatedCapacity,
-    int ActiveSlotCount,
+    int PlannedSpawnCount,
     RekallAgeVulkanParticleDispatch SimulationDispatch,
     IReadOnlyList<string> OverflowEntityIds,
     IReadOnlyList<string> RejectedEntityIds,
@@ -284,12 +365,15 @@ public sealed record RekallAgeVulkanParticlePlan(
     public string SimulationSource { get; init; } = "particle-state-a";
 
     public string SimulationDestination { get; init; } = "particle-state-b";
+
+    public string TopologyFingerprint { get; init; } = string.Empty;
 }
 
 public sealed record RekallAgeVulkanParticleHistory(
     int Capacity,
     int? LastFrameIndex,
-    bool LastDestinationIsA);
+    bool LastDestinationIsA,
+    string TopologyFingerprint);
 
 public sealed record RekallAgeVulkanParticleDiagnostic(
     string Code,

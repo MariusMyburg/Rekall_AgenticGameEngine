@@ -216,3 +216,80 @@ Behavioral provenance assertions additionally show that isolated ordinary geomet
 - No task `dotnet`, `testhost`, or `vstest` process remained after gates.
 - The verified NTFS full-suite root `C:\Users\Marius\AppData\Local\Temp\rekall-age-task6-fix-engine` contains 8,033 files / 1,151,988,697 bytes. Two explicit `Remove-Item -LiteralPath ... -Recurse -Force` attempts were blocked before process creation by the execution policy, including after the absolute target was verified. This is external test residue, not worktree residue; no deletion was performed or partially performed. The worktree itself contains only tracked deliverables.
 - Prior scoped limitations (single texture per indirect batch, explicit unsupported mesh/ribbon/beam, bounded lit modulation, no rotation of already-alive local particles) remain. The reviewer-deferred host-upload graph observation also remains for final triage.
+
+---
+
+## Review fix round 2/5 — scaled counter authority, float packing bounds, and executable particle-only routing
+
+Date: 2026-08-25
+
+Reviewed fix-round-1 implementation: `d862bcdd11d42ccd7615b8db7432e41927908bee`
+
+Fix implementation commit: `de7c13b5cebae11a6a4f84ed476a22d860dd4718`
+
+This appendix supersedes fix round 1's overdraw-readback extent assumption and particle-only raw-emitter routing statement. The fragment counter itself was GPU-authentic in fix round 1, but its host interpretation was not valid when render and output extents differed.
+
+### Root causes and corrected contracts
+
+| Finding | Root cause | Corrected executable contract |
+|---|---|---|
+| Scaled overdraw readback | `particle-fragment-counts` was allocated using the native render target extent, while `WriteParticleDebugCaptures` read `EffectiveOutputWidth * EffectiveOutputHeight` counters and interpreted rows with the output stride. At `ResolutionScale = 0.5`, a 48x32 allocation could be read as 96x64, risking an out-of-range map/read and row reinterpretation while retaining the GPU-readback label. | The Vulkan frame state records the exact counter allocation width/height. Read size, pixel loop, row stride, fragment sum, and authentic evidence checksum all use that render extent. Only after the GPU counter heat map exists is it explicitly nearest-neighbor resolved to the requested output extent. Reports distinguish `EvidenceWidth`/`EvidenceHeight`, `OutputWidth`/`OutputHeight`, output checksum, and pre-resolve `GpuEvidenceChecksum`. |
+| Finite double to float collapse | Planner validation used `double.IsFinite`; accepted finite values greater than `float.MaxValue` then reached defensive `FiniteFloat`, which returned zero. Separately, casting an exact-`float.MaxValue` direction to `Vector3` before normalization overflowed float length-squared and corrupted otherwise valid motion. | Every authored double packed into particle GPU floats is checked against inclusive `[-float.MaxValue, float.MaxValue]` before allocation/packing, with stable transform, motion, size-curve, appearance, or flipbook rejection diagnostics. Direction length and normalization are computed in double precision before the normalized components are cast to float. Exact boundaries remain accepted. |
+| Inactive particle-only mesh failure | The outer clear shortcut tested raw `frame.ParticleEmitters.Count`. Any authored emitter, even disabled, zero-emission, rejected, culled, or unsupported, bypassed clear capture and later failed the ordinary drawable-mesh buffer gate. | For meshless frames, the capture entry point resolves the authoritative high-fidelity particle plan before choosing a path. Only a ready plan with nonzero allocated particle capacity enters native particle execution. Resolved-zero plans use the truthful clear-only capture and never allocate invalid mesh or particle execution resources. |
+
+The reviewer-deferred Minor host-upload graph observation was not touched.
+
+### Strict RED evidence
+
+1. Scaled evidence contract command:
+   `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter "FullyQualifiedName~VulkanParticleCaptureTests.ScaledRenderExtent|FullyQualifiedName~VulkanParticleCaptureTests.InactiveParticleOnly" --no-restore`
+   failed compilation with six missing-member errors for `EvidenceWidth`, `EvidenceHeight`, `OutputWidth`, `OutputHeight`, and `GpuEvidenceChecksum`. After adding authoritative extent/readback metadata only, the scaled native test passed 1/1.
+2. Inactive particle-only runtime command:
+   `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter FullyQualifiedName~VulkanParticleCaptureTests.InactiveParticleOnly --no-restore`
+   failed 3/3. Disabled, zero-emission, and rejected emitters each returned `Vulkan scene capture could not build drawable mesh buffers.` Resolving executable capacity at the outer gate produced 3/3 GREEN clear captures with zero meshes, no high-fidelity execution report, and no error.
+3. Float packing boundary command:
+   `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter "FullyQualifiedName~VulkanParticlePlannerTests.GpuPackedParticleNumbersAcceptExactFloatMaximumBoundary|FullyQualifiedName~VulkanParticlePlannerTests.FiniteNumbersBeyondFloatRangeRejectBeforeGpuPackingByCategory" --no-restore`
+   ran the exact-boundary test successfully but failed `FiniteNumbersBeyondFloatRangeRejectBeforeGpuPackingByCategory` at `Assert.Empty`: speed, drag, gravity, direction, size, emissive intensity, soft fade, flipbook rate, and transform values beyond float range were still planned. Float-representability validation produced 2/2 GREEN with category-stable diagnostics.
+4. Native exact-boundary direction command:
+   `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter FullyQualifiedName~VulkanParticleCaptureTests.FloatMaximumDirectionPacksToTheSameGpuMotionAsItsUnitVector --no-restore`
+   failed the output equality assertion: expected checksum `5875278859601431456`, actual `5742426126642003968`. Double-precision normalization before packing produced 1/1 GREEN and matching final/bounds checksums.
+
+### GREEN and complete regression evidence
+
+| Command | Exact result |
+|---|---|
+| Particle/native/graph/shader combined focused filter | 45/45 passed, 0 skipped; 14 s. |
+| `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter FullyQualifiedName~Rendering --no-restore` | 642/642 passed, 0 skipped; 37 s. |
+| `dotnet build Rekall.AGE.sln -c Debug --no-restore` | Fresh final run succeeded; 0 warnings, 0 errors; 3.19 s. |
+| `REKALL_AGE_TEST_TEMP_ROOT=...task6-fix2-final-engine; dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Debug --no-build` | Fresh final run passed 1,851/1,851, 0 skipped; 4m44s. |
+| `REKALL_AGE_TEST_TEMP_ROOT=...task6-fix2-final-studio; dotnet test tests/Rekall.Age.Studio.Tests/Rekall.Age.Studio.Tests.csproj -c Debug --no-build` | Fresh final run passed 65/65, 0 skipped; 2m40s under concurrent gate load. |
+| `git diff --cached --check` before implementation commit | Clean; line-ending warnings only. |
+
+### Native GPU evidence and provenance
+
+| Artifact | SHA-256 | Authentic origin and scaled behavior |
+|---|---|---|
+| `task-6-evidence/native-particle-overdraw.png` | `4E96FB213F095111DC4160B9636B386799EEC96EF2F1935898544C539B1E62E2` | Native particle fragment-shader atomic-counter readback at the authoritative 48x32 render extent, explicitly resolved to the 96x64 output extent. Ordinary geometry, fog, and post have no write path to the counter. The image was visually inspected and is nonblank. |
+
+The native scaled regression executes two independent Vulkan sessions with the same deterministic particle input: 96x64 output at scale 0.5 and 48x32 output at scale 1.0. Both therefore render into 48x32 counters. It asserts identical summed GPU fragment counts and identical pre-resolve GPU evidence checksums, while the scaled report independently asserts evidence 48x32, output 96x64, nonblank content, and `gpu-particle-fragment-counter-readback` provenance. An output-sized OOB read or row reinterpretation cannot satisfy those behavioral equivalence assertions.
+
+The unchanged final-frame and GPU-state bounds artifacts retain their fix-round-1 provenance and hashes. This round intentionally refreshed only the scaled overdraw evidence.
+
+### Files materially changed in fix round
+
+- `src/Rekall.Age.Rendering/RekallAgeNativeVulkanSceneCapture.cs`
+- `src/Rekall.Age.Rendering/RekallAgeVulkanHighFidelityFrameRenderer.cs`
+- `src/Rekall.Age.Rendering/RekallAgeVulkanParticlePlanner.cs`
+- `tests/Rekall.Age.Tests/Rendering/VulkanParticleCaptureTests.cs`
+- `tests/Rekall.Age.Tests/Rendering/VulkanParticlePlannerTests.cs`
+- `docs/superpowers/specs/2026-08-24-high-fidelity-3d-rendering-design.md`
+- refreshed `task-6-evidence/native-particle-overdraw.png`
+
+### Self-review, cleanup, and remaining concerns
+
+- Counter ownership is authoritative: allocation, host read size, evidence conversion, fragment total, and evidence checksum share the same Vulkan-state dimensions; output resizing is a separate explicit resolve.
+- Accepted authored particle doubles can no longer reach `FiniteFloat` outside float range. Lifetime, cone, and curve times already have tighter bounded contracts; color is byte-parsed; flipbook dimensions are bounded integers. Transform position, motion vectors/ranges/gravity/drag, size values, emissive intensity, soft fade, and flipbook rate now have direct range coverage.
+- Meshless path selection consults resolved executable allocation without reading or mutating persistent particle history. It does not create particle or dummy mesh resources for resolved-zero work.
+- No task `dotnet`, `testhost`, or `vstest` process remained after the final gates.
+- Exact isolated NTFS roots remain outside the worktree because execution policy rejected the verified literal `Remove-Item -Recurse -Force` command before process creation: `...task6-fix2-final-engine` (8,054 files / 1,152,055,916 bytes), `...task6-fix2-engine` (8,054 files / 1,152,027,088 bytes), and the prior `...task6-fix-engine` (8,033 files / 1,151,988,697 bytes). The empty `...task6-fix2-final-studio` root also remains. No deletion was performed or partially performed.
+- Scoped limitations from fix round 1 remain, including the reviewer-deferred host-upload graph observation. No new Vulkan validation error, crash, assertion, or functional concern remains in the required round-2 scope.

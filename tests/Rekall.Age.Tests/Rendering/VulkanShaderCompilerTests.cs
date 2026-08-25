@@ -106,6 +106,17 @@ public sealed class VulkanShaderCompilerTests
     }
 
     [Fact]
+    public void SceneNormalMappingGuardsDegenerateUvDerivativesBeforeNormalization()
+    {
+        var compiler = new RekallAgeVulkanShaderCompiler();
+        var source = File.ReadAllText(compiler.ResolveShaderPath(Path.Combine("Shaders", "rekall_scene.frag")));
+
+        Assert.Contains("float determinant = st1.s * st2.t - st1.t * st2.s;", source, StringComparison.Ordinal);
+        Assert.Contains("if (abs(determinant) <= 0.0000001)", source, StringComparison.Ordinal);
+        Assert.Contains("tangentRaw - normal * dot(normal, tangentRaw)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CompileHighFidelityPostShadersProducesComputeAndGraphicsSpirvModules()
     {
         var result = new RekallAgeVulkanShaderCompiler().CompileHighFidelityPostPipeline();

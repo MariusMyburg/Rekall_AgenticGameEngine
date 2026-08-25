@@ -86,6 +86,15 @@ the accepted gameplay evidence above.
   was rebaked and its live-linked model rebuilt at logical revision 4 with a
   matching source revision and compiled hash; this is real player geometry,
   not an existence-only descriptor check.
+- A subsequent real RTX 5090 High capture isolated another generic source of
+  the visible black-dot noise: derivative-built normal-map tangent frames
+  normalized zero/near-zero vectors when UV derivatives were degenerate. Both
+  the native Vulkan shader and Windows player shader now reject degenerate UV
+  determinants/tangents and fall back to the authored geometric normal. The
+  aligned 1280x720 frame remains at 141 draws/4 dispatches with zero missing or
+  fallback assets, while distinct colors fall from 12,738 to 12,129 and broad
+  ground/ruin speckling is visibly reduced. Large unlit black faces remain a
+  separate material/lighting/composition deficiency and are not accepted.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, prop geometry remains visibly coarse, and the

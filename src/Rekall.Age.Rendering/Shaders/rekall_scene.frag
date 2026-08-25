@@ -118,10 +118,24 @@ vec3 perturbNormal(vec3 normal)
     vec3 q2 = dFdy(fragWorldPosition);
     vec2 st1 = dFdx(fragUv);
     vec2 st2 = dFdy(fragUv);
-    vec3 tangent = normalize(q1 * st2.t - q2 * st1.t);
-    vec3 bitangent = normalize(-q1 * st2.s + q2 * st1.s);
+    float determinant = st1.s * st2.t - st1.t * st2.s;
+    if (abs(determinant) <= 0.0000001)
+    {
+        return normal;
+    }
+    vec3 tangentRaw = q1 * st2.t - q2 * st1.t;
+    vec3 tangentProjected = tangentRaw - normal * dot(normal, tangentRaw);
+    float tangentLengthSquared = dot(tangentProjected, tangentProjected);
+    if (tangentLengthSquared <= 0.0000001)
+    {
+        return normal;
+    }
+    vec3 tangent = tangentProjected * inversesqrt(tangentLengthSquared);
+    vec3 bitangent = normalize(cross(normal, tangent)) * sign(determinant);
     mat3 tbn = mat3(tangent, bitangent, normal);
-    return normalize(tbn * tangentNormal);
+    vec3 mapped = tbn * tangentNormal;
+    float mappedLengthSquared = dot(mapped, mapped);
+    return mappedLengthSquared <= 0.0000001 ? normal : mapped * inversesqrt(mappedLengthSquared);
 }
 
 float distributionGgx(vec3 normal, vec3 halfVector, float roughness)

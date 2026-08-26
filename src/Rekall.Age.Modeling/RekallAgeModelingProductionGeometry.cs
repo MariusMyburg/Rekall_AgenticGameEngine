@@ -275,46 +275,130 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         if (angleDegrees <= 0 || angleDegrees > 360)
             throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Curve revolve angleDegrees must be greater than zero and at most 360.", node.NodeId);
         var segments = ReadInteger(node, "segments", 32, 3, 4096);
+        var weldDistance = ReadNumber(node, "weldDistance", 0.000001);
+        if (weldDistance < 0 || weldDistance > 1)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Curve revolve weldDistance must be from zero through one world unit.", node.NodeId);
         var wraps = Math.Abs(angleDegrees - 360) <= 1e-9;
         var ringCount = wraps ? segments : segments + 1;
-        var positions = new List<RekallAgeGeometryVector3>(ringCount * profile.Points.Count);
+        var profileSpanCount = profile.Cyclic ? profile.Points.Count : profile.Points.Count - 1;
+        var maximumPointCount = checked((long)ringCount * profile.Points.Count);
+        var maximumFaceCount = checked((long)segments * profileSpanCount);
+        if (maximumPointCount > 2_000_000 || maximumFaceCount > 2_000_000)
+            throw new EvaluationException("REKALL_MODELING_REVOLVE_OUTPUT_LIMIT_EXCEEDED", "Curve revolve would exceed the two-million-point or face output limit.", node.NodeId);
+
+        var profileDistances = new double[profile.Points.Count];
+        for (var profileIndex = 1; profileIndex < profile.Points.Count; profileIndex++)
+            profileDistances[profileIndex] = profileDistances[profileIndex - 1] + Distance(profile.Points[profileIndex - 1].Position, profile.Points[profileIndex].Position);
+        var totalProfileDistance = profileDistances[^1] + (profile.Cyclic ? Distance(profile.Points[^1].Position, profile.Points[0].Position) : 0);
+        if (!double.IsFinite(totalProfileDistance) || totalProfileDistance <= 1e-12)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_CURVE_PROFILE_INVALID", "Curve revolve profile contains no finite nonzero spans.", node.NodeId);
+
+        var positions = new List<RekallAgeGeometryVector3>((int)maximumPointCount);
+        var pointProfileIndices = new List<int>((int)maximumPointCount);
+        var pointAngles = new List<double>((int)maximumPointCount);
+        var pointLookup = new int[ringCount, profile.Points.Count];
+        var weldedPointIndices = Enumerable.Repeat(-1, profile.Points.Count).ToArray();
+        var onAxis = profile.Points.Select(point => RadialDistance(ToVector(point.Position), origin, axis) <= weldDistance).ToArray();
         for (var ring = 0; ring < ringCount; ring++)
         {
             var radians = (float)(Math.PI / 180 * angleDegrees * ring / segments);
             var rotation = Quaternion.CreateFromAxisAngle(axis, radians);
-            foreach (var point in profile.Points)
+            for (var profileIndex = 0; profileIndex < profile.Points.Count; profileIndex++)
             {
+                if (onAxis[profileIndex] && weldedPointIndices[profileIndex] >= 0)
+                {
+                    pointLookup[ring, profileIndex] = weldedPointIndices[profileIndex];
+                    continue;
+                }
+                var point = profile.Points[profileIndex];
                 var rotated = origin + Vector3.Transform(ToVector(point.Position) - origin, rotation);
+                var pointIndex = positions.Count;
                 positions.Add(new(rotated.X, rotated.Y, rotated.Z));
+                pointProfileIndices.Add(profileIndex);
+                pointAngles.Add(onAxis[profileIndex] ? 0 : angleDegrees * ring / segments);
+                pointLookup[ring, profileIndex] = pointIndex;
+                if (onAxis[profileIndex]) weldedPointIndices[profileIndex] = pointIndex;
             }
         }
 
-        var profileSpanCount = profile.Cyclic ? profile.Points.Count : profile.Points.Count - 1;
         var faces = new List<int[]>(segments * profileSpanCount);
+        var faceUvs = new List<RekallAgeGeometryVector2[]>(segments * profileSpanCount);
         for (var ring = 0; ring < segments; ring++)
         {
             var nextRing = wraps ? (ring + 1) % ringCount : ring + 1;
             for (var profileIndex = 0; profileIndex < profileSpanCount; profileIndex++)
             {
                 var nextProfile = (profileIndex + 1) % profile.Points.Count;
-                faces.Add([
-                    Point(ring, profileIndex),
-                    Point(nextRing, profileIndex),
-                    Point(nextRing, nextProfile),
-                    Point(ring, nextProfile)]);
+                var rawPoints = new[]
+                {
+                    Point(ring, profileIndex), Point(nextRing, profileIndex),
+                    Point(nextRing, nextProfile), Point(ring, nextProfile)
+                };
+                var currentU = ring / (double)segments;
+                var nextU = (ring + 1) / (double)segments;
+                var currentV = profileDistances[profileIndex] / totalProfileDistance;
+                var nextV = profile.Cyclic && nextProfile == 0
+                    ? 1
+                    : profileDistances[nextProfile] / totalProfileDistance;
+                var rawUvs = new[]
+                {
+                    new RekallAgeGeometryVector2(currentU, currentV),
+                    new RekallAgeGeometryVector2(nextU, currentV),
+                    new RekallAgeGeometryVector2(nextU, nextV),
+                    new RekallAgeGeometryVector2(currentU, nextV)
+                };
+                var uniquePoints = new List<int>(4);
+                var uniqueUvs = new List<RekallAgeGeometryVector2>(4);
+                for (var corner = 0; corner < rawPoints.Length; corner++)
+                {
+                    if (uniquePoints.Contains(rawPoints[corner])) continue;
+                    uniquePoints.Add(rawPoints[corner]);
+                    uniqueUvs.Add(rawUvs[corner]);
+                }
+                if (uniquePoints.Count < 3) continue;
+                faces.Add(uniquePoints.ToArray());
+                faceUvs.Add(uniqueUvs.ToArray());
             }
         }
 
         var mesh = BuildMesh(graph, node, positions, faces);
+        var uvValues = faceUvs.SelectMany(face => face)
+            .Select(uv => JsonSerializer.SerializeToElement(new[] { uv.X, uv.Y })).ToArray();
+        var provenanceValues = pointProfileIndices.Select(profileIndex =>
+        {
+            var point = profile.Points[profileIndex];
+            return JsonSerializer.SerializeToElement($"{point.SourceSplineId}:{point.SourceStartControlPointId}:{point.SourceEndControlPointId}:{point.SegmentT:R}");
+        }).ToArray();
+        var angleValues = pointAngles.Select(value => JsonSerializer.SerializeToElement(value)).ToArray();
         var materialValues = Enumerable.Range(0, mesh.Topology.FaceIds.Count)
             .Select(_ => JsonSerializer.SerializeToElement(0)).ToArray();
+        var smoothValues = Enumerable.Range(0, mesh.Topology.FaceIds.Count)
+            .Select(_ => JsonSerializer.SerializeToElement(true)).ToArray();
         return mesh with
         {
             MaterialSlots = [new(ReadString(node, "slotName", "Revolved Surface"), ReadString(node, "materialAssetId", "material.default"))],
-            Attributes = [new("material.index", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Int32, materialValues, "material-index", RekallAgeGeometryInterpolation.Nearest, JsonSerializer.SerializeToElement(0))]
+            Attributes =
+            [
+                new("uv.generated", RekallAgeGeometryDomain.Corner, RekallAgeGeometryValueType.Float2, uvValues, "texcoord-0"),
+                new("curve.source.span", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.String, provenanceValues, "curve-source-span", RekallAgeGeometryInterpolation.Nearest),
+                new("revolve.angle", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.Float, angleValues, "revolve-angle"),
+                new("material.index", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Int32, materialValues, "material-index", RekallAgeGeometryInterpolation.Nearest, JsonSerializer.SerializeToElement(0)),
+                new("normal.smooth", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Bool, smoothValues, "smooth-shading", RekallAgeGeometryInterpolation.Nearest, JsonSerializer.SerializeToElement(true))
+            ]
         };
 
-        int Point(int ring, int profileIndex) => ring * profile.Points.Count + profileIndex;
+        int Point(int ring, int profileIndex) => pointLookup[ring, profileIndex];
+        static double Distance(RekallAgeGeometryVector3 left, RekallAgeGeometryVector3 right)
+        {
+            var x = right.X - left.X; var y = right.Y - left.Y; var z = right.Z - left.Z;
+            return Math.Sqrt(x * x + y * y + z * z);
+        }
+        static double RadialDistance(Vector3 point, Vector3 axisOrigin, Vector3 axisDirection)
+        {
+            var offset = point - axisOrigin;
+            var radial = offset - axisDirection * Vector3.Dot(offset, axisDirection);
+            return radial.Length();
+        }
     }
 
     private static RekallAgeMeshAsset BuildMesh(RekallAgeModelingGraphAsset graph, RekallAgeModelingGraphNode node, IReadOnlyList<RekallAgeGeometryVector3> positions, IReadOnlyList<int[]> faces, bool createUvs = false)

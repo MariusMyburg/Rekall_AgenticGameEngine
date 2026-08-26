@@ -113,7 +113,7 @@ assets, xUnit, native Vulkan capture.
 - Produces: `CreateCurveRevolve(...) -> RekallAgeMeshAsset` with deterministic
   valid faces and the five required attribute families.
 
-- [ ] **Step 1: Add failing topology cases**
+- [x] **Step 1: Add failing topology cases**
 
   Cover all of these fixtures explicitly:
 
@@ -130,7 +130,7 @@ assets, xUnit, native Vulkan capture.
   - invalid axis, angle, segments, non-finite origin/weld, coincident spans,
     and over-limit point/face products fail with stable diagnostics.
 
-- [ ] **Step 2: Implement bounded ring construction**
+- [x] **Step 2: Implement bounded ring construction**
 
   Resolve the single curve input, axis unit vector and origin. Compute radial
   vectors and Rodrigues rotations without allocating output until checked
@@ -138,20 +138,20 @@ assets, xUnit, native Vulkan capture.
   `weldDistance` of the axis. Build wrapped or open angular spans and reduce
   collapsed quads to consistently wound triangles.
 
-- [ ] **Step 3: Emit seam-correct attributes**
+- [x] **Step 3: Emit seam-correct attributes**
 
   Generate UV values per emitted corner, using logical ring `segments` as U=1
   on wrapped seam corners even though their point IDs reuse ring zero. Normalize
   V by cumulative profile distance. Add deterministic source-span and angular
   point values, one material slot with face index zero, and face smoothing true.
 
-- [ ] **Step 4: Prove compiler compatibility**
+- [x] **Step 4: Prove compiler compatibility**
 
   Compile the revolved output after auto smoothing and weighted normals. Assert
   finite unit normals, finite orthogonal tangents, expected material surface,
   and no zero-area or non-triangulable diagnostics.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
   Run `CurveRevolveTests`, `ModelingGraphEvaluationTests`, `MeshCompilerTests`,
   graph validation tests, and the modeling catalog selection. Commit as

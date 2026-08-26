@@ -4,10 +4,23 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-25 02:06 Africa/Johannesburg
+Last verified: 2026-08-26 04:33 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
+
+The current Aetherfall engine-driven milestone adds generic runtime 3D parent
+transform composition, including frame-local caching and bounded diagnostics
+for missing parents and cycles. The real game consumes it through two detailed
+AGE-authored Warden attachments—a beveled runeblade and articulated pauldron—
+using ordinary Model Asset, parent, and animation contracts. A real RTX 5090
+High Vulkan combat capture succeeds with zero observations or asset fallbacks;
+the Aetherfall acceptance class passes 16/16, strict movement/combat/
+progression/reset proofs pass 2/4/4/5, validation reports zero issues, and the
+High desktop60 budget passes at 70 draws, 193,068 triangles, and 748,408
+vertices. This is a functional rigid-articulation milestone, not final visual
+acceptance: native deformable procedural armature/weight authoring and a major
+character/environment fidelity pass remain in progress.
 
 Current execution order is governed by
 [`STRATEGIC-PRIORITIES.md`](STRATEGIC-PRIORITIES.md). The immediate acceptance

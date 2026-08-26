@@ -328,3 +328,30 @@ silhouettes remain too black, the Warden/sentinel/rubble/ruin geometry remains
 visibly coarse, and the composition is not yet at the requested Diablo/Alan
 Wake quality bar. True authored sky/cubemap sampling is also still outstanding;
 the new background is an explicit fallback, not a claim that sky assets render.
+
+## Runtime hierarchy and Warden articulation checkpoint
+
+- AGE now composes ordinary `parentId` 3D transforms for cameras, meshes,
+  lights, fog, and particles. Resolution is cached per frame and invalid
+  missing-parent or cyclic hierarchies fall back to local transforms with
+  bounded structured observations rather than corrupting the frame.
+- Aetherfall exercises that generic contract with two ordinary model-backed
+  child entities parented to `AetherWarden`: a 25-node beveled runeblade graph
+  and a 24-node articulated pauldron/arm graph. Both use existing animation
+  clips and players; no weapon or character behavior was added to engine core.
+- The real RTX 5090 High combat capture is
+  `Proof/Captures/WardenArticulation/vulkan-scene-1280x720-20260826023235054.png`.
+  At frame 10 it records the authored combat state (`AETHER 92`, one shard,
+  score 25), 12,532 distinct colors, 18.1% dominant-color share, mean
+  luminance 0.109, 227 render-work draws, four dispatches, and zero runtime
+  observations, missing assets, unsupported assets, or fallbacks.
+- The complete Aetherfall high-fidelity acceptance class passes 16/16. After
+  the final scene mutation, movement, combat, progression, and reset still pass
+  all 2/4/4/5 strict assertions; Warden X movement remains `0.506840`.
+  Project and scene validation report zero issues. The High `desktop60` budget
+  passes at 70 scene draw calls, 193,068 triangles, 748,408 vertices, and seven
+  textures.
+- This checkpoint proves visible rigid articulation and root-follow behavior.
+  It does not claim Blender-class deformable procedural skin authoring or final
+  Diablo/Alan Wake fidelity; those remain active high-priority modeling and
+  content goals.

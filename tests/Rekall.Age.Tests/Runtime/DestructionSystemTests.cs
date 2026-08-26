@@ -77,6 +77,47 @@ public sealed class DestructionSystemTests
         Assert.Equal(2, cratered.Revision);
     }
 
+    [Fact]
+    public async Task ChunksInheritTheSourceEntitysRotationAndMaterialInsteadOfSnappingToIdentity()
+    {
+        // Reproduces an observed bug: a wall authored with a 90-degree yaw (so its long axis
+        // runs north-south) visibly snapped to face east-west and turned the wrong color the
+        // instant it fractured, because the chunk entities were built with identity rotation
+        // and no material regardless of the source entity's own authored transform/material.
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeMeshAssetStore().SaveAsync(root, ChunkMesh("chunk-0"), CancellationToken.None);
+
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("East Wall", ["destructible", "wall"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["yaw"] = 90
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Material", new JsonObject
+                {
+                    ["baseColor"] = "#8a8478"
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Destructible", new JsonObject
+                {
+                    ["triggered"] = true,
+                    ["chunkMeshAssetIds"] = new JsonArray("chunk-0"),
+                    ["explosionImpulse"] = 5.0
+                })));
+
+        using var loop = RekallAgeRuntimeExecutionLoop.CreateDefault(root);
+        var result = await loop.RunAsync(
+            new RekallAgeRuntimeWorldBuilder().Build(scene, root),
+            1,
+            CancellationToken.None);
+
+        var chunk = Assert.Single(result.World.Entities, entity => entity.Tags.Contains("destructible-chunk"));
+        Assert.Equal(90, chunk.Transform.Rotation3D.Y, precision: 6);
+        var transform3D = Assert.Single(chunk.Components, component => component.Type == "Rekall.Transform3D");
+        Assert.Equal(90, transform3D.Properties["yaw"]!.GetValue<double>(), precision: 6);
+        var material = Assert.Single(chunk.Components, component => component.Type == "Rekall.Material");
+        Assert.Equal("#8a8478", material.Properties["baseColor"]!.GetValue<string>());
+    }
+
     private static RekallAgeMeshAsset ChunkMesh(string assetId) => RekallAgeMeshAsset.Create(
         assetId,
         assetId,

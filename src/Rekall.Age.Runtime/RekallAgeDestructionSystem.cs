@@ -58,6 +58,8 @@ public sealed class RekallAgeDestructionSystem : IRekallAgeRuntimeWorldSystem
             var chunkAssetIds = ReadStringArray(component!, "chunkMeshAssetIds");
             var impulse = ReadDouble(component!, "explosionImpulse", 6);
             var origin = source.Transform.Position3D;
+            var rotation = source.Transform.Rotation3D;
+            var material = source.Components.FirstOrDefault(item => item.Type.Equals("Rekall.Material", StringComparison.Ordinal));
             for (var index = 0; index < chunkAssetIds.Count; index++)
             {
                 var direction = RandomOutwardDirection();
@@ -65,8 +67,10 @@ public sealed class RekallAgeDestructionSystem : IRekallAgeRuntimeWorldSystem
                     $"{source.Id}-chunk-{index}-{context.FrameIndex}",
                     chunkAssetIds[index],
                     origin,
+                    rotation,
                     direction,
-                    impulse));
+                    impulse,
+                    material));
             }
 
             var terrainEntityId = ReadOptionalString(component!, "terrainEntityId");
@@ -156,9 +160,38 @@ public sealed class RekallAgeDestructionSystem : IRekallAgeRuntimeWorldSystem
         string entityId,
         string chunkMeshAssetId,
         RekallAgeRuntimeVector3 origin,
+        RekallAgeRuntimeVector3 rotation,
         RekallAgeRuntimeVector3 direction,
-        double impulse)
+        double impulse,
+        RekallAgeRuntimeComponent? sourceMaterial)
     {
+        var components = new List<RekallAgeRuntimeComponent>
+        {
+            new("Rekall.Transform3D", new JsonObject
+            {
+                ["x"] = origin.X,
+                ["y"] = origin.Y,
+                ["z"] = origin.Z,
+                ["pitch"] = rotation.X,
+                ["yaw"] = rotation.Y,
+                ["roll"] = rotation.Z
+            }),
+            new("Rekall.MeshAssetReference", new JsonObject { ["assetId"] = chunkMeshAssetId }),
+            new("Rekall.MeshRenderer", new JsonObject()),
+            new("Rekall.MeshCollider", new JsonObject { ["convex"] = true }),
+            new("Rekall.Rigidbody3D", new JsonObject
+            {
+                ["mass"] = 1.0,
+                ["linearVelocityX"] = direction.X * impulse,
+                ["linearVelocityY"] = direction.Y * impulse,
+                ["linearVelocityZ"] = direction.Z * impulse
+            })
+        };
+        if (sourceMaterial is not null)
+        {
+            components.Add(new RekallAgeRuntimeComponent("Rekall.Material", sourceMaterial.Properties.DeepClone().AsObject()));
+        }
+
         return new RekallAgeRuntimeEntity(
             entityId,
             entityId,
@@ -167,25 +200,8 @@ public sealed class RekallAgeDestructionSystem : IRekallAgeRuntimeWorldSystem
             null,
             true,
             false,
-            RekallAgeRuntimeTransform.Identity with { Position3D = origin },
-            [
-                new RekallAgeRuntimeComponent("Rekall.Transform3D", new JsonObject
-                {
-                    ["x"] = origin.X,
-                    ["y"] = origin.Y,
-                    ["z"] = origin.Z
-                }),
-                new RekallAgeRuntimeComponent("Rekall.MeshAssetReference", new JsonObject { ["assetId"] = chunkMeshAssetId }),
-                new RekallAgeRuntimeComponent("Rekall.MeshRenderer", new JsonObject()),
-                new RekallAgeRuntimeComponent("Rekall.MeshCollider", new JsonObject { ["convex"] = true }),
-                new RekallAgeRuntimeComponent("Rekall.Rigidbody3D", new JsonObject
-                {
-                    ["mass"] = 1.0,
-                    ["linearVelocityX"] = direction.X * impulse,
-                    ["linearVelocityY"] = direction.Y * impulse,
-                    ["linearVelocityZ"] = direction.Z * impulse
-                })
-            ]);
+            RekallAgeRuntimeTransform.Identity with { Position3D = origin, Rotation3D = rotation },
+            components);
     }
 
     private static bool ReadBoolean(RekallAgeRuntimeComponent component, string name) =>

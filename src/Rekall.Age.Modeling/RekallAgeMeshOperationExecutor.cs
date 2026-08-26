@@ -1209,7 +1209,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
     {
         if (indices.Count == 0) return DefaultValue(attribute);
         if (attribute.Interpolation is RekallAgeGeometryInterpolation.Constant or RekallAgeGeometryInterpolation.Nearest
-            || attribute.ValueType is RekallAgeGeometryValueType.Bool or RekallAgeGeometryValueType.String
+            || attribute.ValueType is RekallAgeGeometryValueType.Bool or RekallAgeGeometryValueType.Int4 or RekallAgeGeometryValueType.String
                 or RekallAgeGeometryValueType.Quaternion or RekallAgeGeometryValueType.Matrix4x4)
             return attribute.Values[indices[0]];
         if (attribute.ValueType == RekallAgeGeometryValueType.Int32)
@@ -1258,6 +1258,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
         {
             RekallAgeGeometryValueType.Bool => JsonSerializer.SerializeToElement(false),
             RekallAgeGeometryValueType.Int32 => JsonSerializer.SerializeToElement(0),
+            RekallAgeGeometryValueType.Int4 => JsonSerializer.SerializeToElement(new int[4]),
             RekallAgeGeometryValueType.Float => JsonSerializer.SerializeToElement(0.0),
             RekallAgeGeometryValueType.Float2 => JsonSerializer.SerializeToElement(new double[2]),
             RekallAgeGeometryValueType.Float3 => JsonSerializer.SerializeToElement(new double[3]),

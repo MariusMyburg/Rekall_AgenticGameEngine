@@ -537,15 +537,28 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             : [new RekallAgeRuntimeViewportGeometrySurface(0, 0, null, 0, geometry.Indices.Count, [])];
         foreach (var surface in surfaces)
         {
-            yield return new RekallAgeVulkanSceneMesh(
+            var mesh = new RekallAgeVulkanSceneMesh(
                 renderable.EntityId,
                 surfaces.Count == 1 ? renderable.EntityName : $"{renderable.EntityName} Surface {surface.SurfaceIndex}",
                 "mesh",
                 vertices,
                 geometry.Indices.Skip(surface.FirstIndex).Take(surface.IndexCount).ToArray())
             {
-                MaterialAssetId = surface.MaterialAssetId
+                MaterialAssetId = surface.MaterialAssetId,
+                SkinIndex = geometry.SkinIndex,
+                SkinBindings = geometry.SkinBindings is { Count: > 0 }
+                    ? geometry.SkinBindings.Select(binding => new RekallAgeVulkanSceneSkinBinding(
+                        binding.Joint0,
+                        binding.Joint1,
+                        binding.Joint2,
+                        binding.Joint3,
+                        (float)binding.Weight0,
+                        (float)binding.Weight1,
+                        (float)binding.Weight2,
+                        (float)binding.Weight3)).ToArray()
+                    : []
             };
+            yield return ApplySkin(mesh, renderable.Skin);
         }
     }
 

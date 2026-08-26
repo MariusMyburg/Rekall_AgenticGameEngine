@@ -38,6 +38,7 @@ public enum RekallAgeGeometryValueType
 {
     Bool,
     Int32,
+    Int4,
     Float,
     Float2,
     Float3,
@@ -193,7 +194,9 @@ public sealed record RekallAgeCompiledMeshVertex(
     RekallAgeGeometryVector3 Normal,
     RekallAgeGeometryVector4 Tangent,
     RekallAgeGeometryVector2 Uv,
-    RekallAgeGeometryVector4 Color);
+    RekallAgeGeometryVector4 Color,
+    IReadOnlyList<int>? JointIndices = null,
+    IReadOnlyList<double>? JointWeights = null);
 
 public sealed record RekallAgeCompiledMeshTriangle(
     int TriangleIndex,

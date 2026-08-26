@@ -629,6 +629,7 @@ public sealed partial class RekallAgeModelingGraphEvaluator
     {
         RekallAgeGeometryValueType.Bool => JsonSerializer.SerializeToElement(false),
         RekallAgeGeometryValueType.Int32 => JsonSerializer.SerializeToElement(0),
+        RekallAgeGeometryValueType.Int4 => JsonSerializer.SerializeToElement(new int[4]),
         RekallAgeGeometryValueType.Float => JsonSerializer.SerializeToElement(0d),
         RekallAgeGeometryValueType.Float2 => JsonSerializer.SerializeToElement(new double[2]),
         RekallAgeGeometryValueType.Float3 => JsonSerializer.SerializeToElement(new double[3]),

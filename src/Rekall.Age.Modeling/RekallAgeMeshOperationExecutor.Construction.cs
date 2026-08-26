@@ -382,7 +382,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
     private static JsonElement Interpolate(RekallAgeGeometryAttribute attribute, int a, int b, double t)
     {
         if (attribute.Interpolation is RekallAgeGeometryInterpolation.Constant or RekallAgeGeometryInterpolation.Nearest
-            || attribute.ValueType is RekallAgeGeometryValueType.Bool or RekallAgeGeometryValueType.String
+            || attribute.ValueType is RekallAgeGeometryValueType.Bool or RekallAgeGeometryValueType.Int4 or RekallAgeGeometryValueType.String
                 or RekallAgeGeometryValueType.Quaternion or RekallAgeGeometryValueType.Matrix4x4)
             return attribute.Values[t < 0.5 ? a : b];
         if (attribute.ValueType == RekallAgeGeometryValueType.Int32)

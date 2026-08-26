@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
 
@@ -6,6 +7,54 @@ namespace Rekall.Age.Tests.Modeling;
 
 public sealed class MeshCompilerTests
 {
+    [Fact]
+    public void GeometrySchemaRecognizesFourComponentIntegerAttributes()
+    {
+        var parsed = Enum.Parse<RekallAgeGeometryValueType>("Int4");
+
+        Assert.Equal("Int4", parsed.ToString());
+    }
+
+    [Fact]
+    public void CompilePreservesNormalizedPointSkinBindingsOnCornerVertices()
+    {
+        var mesh = Polygon(
+            [new(0, 0, 0), new(1, 0, 0), new(0, 1, 0)],
+            faceId: 21,
+            attributes:
+            [
+                Attribute("skin.joints", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.Int4,
+                    [new int[] { 0, 1, 0, 0 }, new int[] { 1, 0, 0, 0 }, new int[] { 0, 1, 0, 0 }], "joint-indices-0"),
+                Attribute("skin.weights", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.Float4,
+                    [new double[] { 1, 3, 0, 0 }, new double[] { 1, 0, 0, 0 }, new double[] { 0.5, 0.5, 0, 0 }], "joint-weights-0")
+            ]);
+
+        RekallAgeCompiledMeshSnapshot? compiled = null;
+        var exception = Record.Exception(() => compiled = new RekallAgeMeshCompiler().Compile(mesh));
+
+        Assert.Null(exception);
+        var vertex = Assert.IsType<JsonObject>(JsonSerializer.SerializeToNode(compiled!.Vertices[0], RekallAgeModelingJson.Options));
+        Assert.Equal([0, 1, 0, 0], Assert.IsType<JsonArray>(vertex["jointIndices"]).Select(value => value!.GetValue<int>()));
+        Assert.Equal([0.25, 0.75, 0, 0], Assert.IsType<JsonArray>(vertex["jointWeights"]).Select(value => value!.GetValue<double>()));
+    }
+
+    [Fact]
+    public void CompileRejectsAnIncompleteSkinAttributePair()
+    {
+        var mesh = Polygon(
+            [new(0, 0, 0), new(1, 0, 0), new(0, 1, 0)],
+            faceId: 21,
+            attributes:
+            [
+                Attribute("skin.joints", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.Int4,
+                    [new int[] { 0, 0, 0, 0 }, new int[] { 0, 0, 0, 0 }, new int[] { 0, 0, 0, 0 }], "joint-indices-0")
+            ]);
+
+        var exception = Assert.Throws<RekallAgeMeshCompileException>(() => new RekallAgeMeshCompiler().Compile(mesh));
+
+        Assert.Equal("REKALL_MESH_COMPILE_SKIN_ATTRIBUTE_PAIR_REQUIRED", exception.Code);
+    }
+
     [Fact]
     public void LegacyAdapterProducesEditableSharedEdgeTopologyAndCompilesAttributes()
     {

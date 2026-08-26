@@ -92,7 +92,13 @@ public sealed class RekallAgeCompiledMeshResolver
                 surface.MaterialAssetId,
                 surface.FirstIndex,
                 surface.IndexCount,
-                surface.SourceFaceIds)).ToArray());
+                surface.SourceFaceIds)).ToArray(),
+            snapshot.Vertices.All(vertex => vertex.JointIndices is { Count: 4 } && vertex.JointWeights is { Count: 4 })
+                ? snapshot.Vertices.Select(vertex => new RekallAgeRuntimeViewportSkinBinding(
+                    vertex.JointIndices![0], vertex.JointIndices[1], vertex.JointIndices[2], vertex.JointIndices[3],
+                    vertex.JointWeights![0], vertex.JointWeights[1], vertex.JointWeights[2], vertex.JointWeights[3])).ToArray()
+                : null,
+            snapshot.Vertices.All(vertex => vertex.JointIndices is { Count: 4 } && vertex.JointWeights is { Count: 4 }) ? 0 : null);
 
     private static string? ReadString(RekallAgeRuntimeComponent component, string name)
     {

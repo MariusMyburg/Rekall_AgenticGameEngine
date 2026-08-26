@@ -7,26 +7,26 @@ authored mesh with the existing generic skeleton-pose renderer path.
 
 ### Task 1: Compile point-domain skin attributes
 
-- [ ] Add failing compiler tests for normalized bindings and invalid pairs.
-- [ ] Add `Int4` geometry value support if it is not already present.
-- [ ] Extend compiled vertices with backward-compatible optional bindings.
-- [ ] Read, validate, normalize, and corner-expand the canonical attributes.
-- [ ] Run focused compiler/codec tests.
+- [x] Add failing compiler tests for normalized bindings and invalid pairs.
+- [x] Add `Int4` geometry value support if it is not already present.
+- [x] Extend compiled vertices with backward-compatible optional bindings.
+- [x] Read, validate, normalize, and corner-expand the canonical attributes.
+- [x] Run focused compiler/codec tests.
 
 ### Task 2: Preserve bindings through runtime geometry
 
-- [ ] Add a failing compiled-model projection test.
-- [ ] Extend viewport geometry with optional skin bindings.
-- [ ] Map compiled bindings through the asset resolver/frame builder.
-- [ ] Keep unweighted geometry behavior unchanged.
-- [ ] Run focused viewport/model resolution tests.
+- [x] Add a failing compiled-model projection test.
+- [x] Extend viewport geometry with optional skin bindings.
+- [x] Map compiled bindings through the asset resolver/frame builder.
+- [x] Keep unweighted geometry behavior unchanged.
+- [x] Run focused viewport/model resolution tests.
 
 ### Task 3: Deform authored geometry
 
-- [ ] Add a failing two-joint Vulkan mesh-builder test.
-- [ ] Reuse the existing morph-then-skin implementation for authored geometry.
-- [ ] Prove finite normals and expected vertex displacement.
-- [ ] Run relevant rendering and skeletal-animation suites.
+- [x] Add a failing two-joint Vulkan mesh-builder test.
+- [x] Reuse the existing morph-then-skin implementation for authored geometry.
+- [x] Prove finite normals and expected vertex displacement.
+- [x] Run relevant rendering and skeletal-animation suites.
 
 ### Task 4: Playable consumer and evidence
 

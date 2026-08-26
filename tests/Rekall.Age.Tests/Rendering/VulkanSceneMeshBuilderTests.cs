@@ -725,6 +725,47 @@ public sealed class VulkanSceneMeshBuilderTests
     }
 
     [Fact]
+    public void BuildMeshesAppliesRuntimeJointPoseToWeightedAuthoredGeometry()
+    {
+        var geometry = new RekallAgeRuntimeViewportGeometryMesh(
+            [new(1, 0, 0), new(0, 0, 0), new(0, 1, 0)],
+            [0, 1, 2],
+            SkinBindings:
+            [
+                new(0, 0, 0, 0, 1, 0, 0, 0),
+                new(0, 0, 0, 0, 1, 0, 0, 0),
+                new(0, 0, 0, 0, 1, 0, 0, 0)
+            ],
+            SkinIndex: 0);
+        var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(
+            "entity-authored-rig", "Weighted Authored Mesh", "mesh", "rekall.geometry.mesh",
+            0, 0, 0, 1,
+            Variant: "rekall.geometry.mesh",
+            GeometryMesh: geometry,
+            Skin: new RekallAgeRuntimeViewportSkin(
+                0,
+                [
+                    new double[]
+                    {
+                        1, 0, 0, 0,
+                        0, 1, 0, 0,
+                        0, 0, 1, 0,
+                        0, 2, 0, 1
+                    }
+                ])));
+
+        var mesh = Assert.Single(new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame));
+
+        Assert.Equal(1, mesh.Vertices[0].X, precision: 4);
+        Assert.Equal(2, mesh.Vertices[0].Y, precision: 4);
+        Assert.All(mesh.Vertices, vertex =>
+        {
+            Assert.True(float.IsFinite(vertex.X));
+            Assert.True(float.IsFinite(vertex.NormalY));
+        });
+    }
+
+    [Fact]
     public void BuildMeshesCreatesAuthoredGeometryMeshData()
     {
         var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(

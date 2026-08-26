@@ -486,7 +486,19 @@ public sealed record RekallAgeRuntimeViewportGeometryMesh(
     IReadOnlyList<RekallAgeRuntimeViewportGeometryVertex> Vertices,
     IReadOnlyList<uint> Indices,
     IReadOnlyList<RekallAgeRuntimeViewportTriangleProvenance>? TriangleProvenance = null,
-    IReadOnlyList<RekallAgeRuntimeViewportGeometrySurface>? Surfaces = null);
+    IReadOnlyList<RekallAgeRuntimeViewportGeometrySurface>? Surfaces = null,
+    IReadOnlyList<RekallAgeRuntimeViewportSkinBinding>? SkinBindings = null,
+    int? SkinIndex = null);
+
+public readonly record struct RekallAgeRuntimeViewportSkinBinding(
+    int Joint0,
+    int Joint1,
+    int Joint2,
+    int Joint3,
+    double Weight0,
+    double Weight1,
+    double Weight2,
+    double Weight3);
 
 public sealed record RekallAgeRuntimeViewportGeometrySurface(
     int SurfaceIndex,

@@ -57,20 +57,20 @@ public sealed class RenderQualityProfileTests
         });
     }
 
-    public static TheoryData<string, double, int, int, string, int> Presets => new()
+    public static TheoryData<string, double, int, int, string, int, int> Presets => new()
     {
-        { "Performance", 0.50, 1, 512, "analytic", 2_000 },
-        { "Low", 0.67, 1, 1024, "analytic", 8_000 },
-        { "Medium", 0.75, 2, 1024, "froxel-low", 24_000 },
-        { "High", 1.00, 3, 2048, "froxel", 64_000 },
-        { "Ultra", 1.00, 4, 2048, "froxel-high", 128_000 },
-        { "Epic", 1.25, 4, 4096, "froxel-epic", 250_000 }
+        { "Performance", 0.50, 1, 512, "analytic", 2_000, 2 },
+        { "Low", 0.67, 1, 1024, "analytic", 8_000, 4 },
+        { "Medium", 0.75, 2, 1024, "froxel-low", 24_000, 8 },
+        { "High", 1.00, 3, 2048, "froxel", 64_000, 16 },
+        { "Ultra", 1.00, 4, 2048, "froxel-high", 128_000, 16 },
+        { "Epic", 1.25, 4, 4096, "froxel-epic", 250_000, 16 }
     };
 
     [Theory]
     [MemberData(nameof(Presets))]
     public void ResolverProducesStablePresetDefaults(
-        string preset, double scale, int cascades, int shadowResolution, string fogMode, int particles)
+        string preset, double scale, int cascades, int shadowResolution, string fogMode, int particles, int pointLights)
     {
         var plan = new RekallAgeRenderQualityProfileResolver().Resolve(
             new RekallAgeRenderQualityIntent(preset),
@@ -83,6 +83,7 @@ public sealed class RenderQualityProfileTests
         Assert.Equal(shadowResolution, plan.Shadows.Resolution);
         Assert.Equal(fogMode, plan.Fog.Mode);
         Assert.Equal(particles, plan.Particles.MaximumActiveParticles);
+        Assert.Equal(pointLights, plan.Lighting.MaximumPointLights);
     }
 
     [Fact]

@@ -137,6 +137,10 @@ public sealed record RekallAgeVulkanSceneFrameUniform(
     Vector4 EnvironmentParameters = default)
 {
     public IReadOnlyList<RekallAgeVulkanPointLight> PointLights { get; init; } = [];
+
+    public int PointLightBudget { get; init; } = 4;
+
+    public IReadOnlyList<string> DroppedPointLightEntityIds { get; init; } = [];
 }
 
 public sealed record RekallAgeVulkanPointLight(
@@ -144,6 +148,11 @@ public sealed record RekallAgeVulkanPointLight(
     Vector4 Color,
     Vector4 Position,
     Vector4 Parameters);
+
+public sealed record RekallAgePointLightSelectionReport(
+    int Budget,
+    IReadOnlyList<string> SelectedEntityIds,
+    IReadOnlyList<string> DroppedEntityIds);
 
 public sealed record RekallAgeVulkanSceneStereoFrame(
     bool Enabled,

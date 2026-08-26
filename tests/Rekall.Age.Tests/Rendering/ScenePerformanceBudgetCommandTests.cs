@@ -167,4 +167,44 @@ public sealed class ScenePerformanceBudgetCommandTests
             && renderable.Layer == "editor"
             && renderable.Reason == "camera-culling-mask");
     }
+
+    [Fact]
+    public async Task InspectScenePerformanceBudgetReportsSelectedAndDroppedPointLights()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+                {
+                    ["primitive"] = "cube"
+                })));
+        for (var i = 1; i <= 18; i++)
+        {
+            scene = scene.AddEntity(RekallAgeEntityDocument.Create($"Light {i:D2}", ["light"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PointLight", new JsonObject
+                {
+                    ["intensity"] = i,
+                    ["range"] = 12,
+                    ["priority"] = i
+                })));
+        }
+
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+        var context = new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("light budget"), CancellationToken.None);
+
+        var result = await new InspectScenePerformanceBudgetCommand().ExecuteAsync(
+            new InspectScenePerformanceBudgetRequest(root, "Main") { QualityPreset = "High" },
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        var lighting = Assert.IsType<Rekall.Age.Rendering.RekallAgePointLightSelectionReport>(result.Value.Lighting);
+        Assert.Equal(16, lighting.Budget);
+        Assert.Equal(16, lighting.SelectedEntityIds.Count);
+        Assert.Equal(2, lighting.DroppedEntityIds.Count);
+    }
 }

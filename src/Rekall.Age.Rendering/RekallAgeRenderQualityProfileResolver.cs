@@ -152,17 +152,20 @@ public sealed class RekallAgeRenderQualityProfileResolver
             particleQuality,
             transient,
             persistent,
-            degradations);
+            degradations)
+        {
+            Lighting = new RekallAgeResolvedLightingQuality(preset.MaximumPointLights)
+        };
     }
 
     private static readonly IReadOnlyDictionary<string, Preset> Presets = new Dictionary<string, Preset>(StringComparer.Ordinal)
     {
-        ["performance"] = new("Performance", 0.50, 1, 512, "analytic", 2_000, false, false, 2),
-        ["low"] = new("Low", 0.67, 1, 1024, "analytic", 8_000, true, false, 4),
-        ["medium"] = new("Medium", 0.75, 2, 1024, "froxel-low", 24_000, true, true, 8),
-        ["high"] = new("High", 1.00, 3, 2048, "froxel", 64_000, true, true, 12),
-        ["ultra"] = new("Ultra", 1.00, 4, 2048, "froxel-high", 128_000, true, true, 16),
-        ["epic"] = new("Epic", 1.25, 4, 4096, "froxel-epic", 250_000, true, true, 24)
+        ["performance"] = new("Performance", 0.50, 1, 512, "analytic", 2_000, false, false, 2, 2),
+        ["low"] = new("Low", 0.67, 1, 1024, "analytic", 8_000, true, false, 4, 4),
+        ["medium"] = new("Medium", 0.75, 2, 1024, "froxel-low", 24_000, true, true, 8, 8),
+        ["high"] = new("High", 1.00, 3, 2048, "froxel", 64_000, true, true, 12, 16),
+        ["ultra"] = new("Ultra", 1.00, 4, 2048, "froxel-high", 128_000, true, true, 16, 16),
+        ["epic"] = new("Epic", 1.25, 4, 4096, "froxel-epic", 250_000, true, true, 24, 16)
     };
 
     private static string NormalizePreset(string value) => value.Trim().ToLowerInvariant();
@@ -279,5 +282,6 @@ public sealed class RekallAgeRenderQualityProfileResolver
         int MaximumActiveParticles,
         bool Bloom,
         bool Ssao,
-        int FilterTapCount);
+        int FilterTapCount,
+        int MaximumPointLights);
 }

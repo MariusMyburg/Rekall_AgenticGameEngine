@@ -56,6 +56,8 @@ public sealed record InspectScenePerformanceBudgetResult(
 {
     public RekallAgeResolvedRenderFeaturePlan? QualityPlan { get; init; }
 
+    public RekallAgePointLightSelectionReport? Lighting { get; init; }
+
     public RekallAgeGpuFrameTimingReport GpuTimings { get; init; } =
         RekallAgeGpuFrameTimingReport.Unavailable(0);
 
@@ -253,6 +255,10 @@ public sealed class InspectScenePerformanceBudgetCommand
                 virtualGeometrySelectedTriangles))
         {
             QualityPlan = gpuMeasurement?.QualityPlan ?? renderFrame.ResolvedQualityPlan,
+            Lighting = new RekallAgePointLightSelectionReport(
+                batch.Frame.PointLightBudget,
+                batch.Frame.PointLights.Select(item => item.EntityId).ToArray(),
+                batch.Frame.DroppedPointLightEntityIds),
             GpuTimings = gpuTimings,
             ResourceBytes = resourceBytes,
             RenderWorkloadDrawCount = workloadDrawCount,

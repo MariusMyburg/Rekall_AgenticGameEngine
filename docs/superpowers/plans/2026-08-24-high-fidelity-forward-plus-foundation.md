@@ -696,12 +696,14 @@ Use modeling graphs, mesh bake, model publish, material graphs, texture catalog 
 
 Configure a shadowed directional key, bounded accent lights, global height fog, local court fog volumes, conduit/projectile/impact/dash/mote/activation emitters, HDR emissive materials, bloom, tone map, and grade. Animation remains in agent-authored assets/modules and consumes `DeltaSeconds`.
 
-2026-08-26 playable finding: the native Vulkan shader currently selects only
-four point lights globally by authored priority. Aetherfall can use that contract
-for the current milestone, but lower-priority lights are omitted without an
-inspection fact. Add generic selected/dropped-light diagnostics and quality-tier
-active-light budgets; migrate the full path to clustered/Forward+ lighting so
-dense authored worlds do not require manual four-light tradeoffs.
+2026-08-26 playable result: the native Vulkan path now resolves Performance/
+Low/Medium/High point-light budgets of 2/4/8/16, uploads sixteen real GPU light
+slots, terminates fragment light work at the selected count, and reports
+selected/dropped entity IDs through capture and performance inspection.
+Aetherfall High retains all nine authored practicals while
+Performance deterministically reports seven drops. This completes the bounded
+many-light bridge; true screen/depth cluster assignment, per-cluster lists, and
+per-cluster overflow facts remain before the architecture is fully Forward+.
 
 - [ ] **Step 5: Re-run strict gameplay assertions after the final mutation**
 

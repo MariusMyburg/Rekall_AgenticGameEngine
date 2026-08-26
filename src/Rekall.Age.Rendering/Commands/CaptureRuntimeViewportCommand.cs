@@ -61,6 +61,8 @@ public sealed record CaptureRuntimeViewportResult(
 
     public RekallAgeHighFidelityFrameReport? HighFidelityFrame { get; init; }
 
+    public RekallAgePointLightSelectionReport? Lighting { get; init; }
+
     public RekallAgeGpuFrameTimingReport GpuTimings { get; init; } =
         RekallAgeGpuFrameTimingReport.Unavailable(0);
 
@@ -322,6 +324,7 @@ public sealed class CaptureRuntimeViewportCommand
             ElapsedSeconds = elapsedSeconds,
             QualityPlan = frame.ResolvedQualityPlan,
             HighFidelityFrame = capture.HighFidelityFrame,
+            Lighting = capture.HighFidelityFrame?.Lighting,
             GpuTimings = capture.HighFidelityFrame?.GpuTimings
                 ?? RekallAgeGpuFrameTimingReport.Unavailable(frame.FrameIndex),
             ResourceBytes = capture.HighFidelityFrame?.ResourceBytes

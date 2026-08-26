@@ -161,7 +161,8 @@ public sealed class VulkanScenePreparedFrameTests
                 new("one", new(2, 1, 0, 1), new(1, 2, 3, 1), new(7, 4, 0, 0)),
                 new("two", new(0, 3, 1, 1), new(4, 5, 6, 1), new(8, 3, 0, 0)),
                 new("three", new(1, 0, 4, 1), new(7, 8, 9, 1), new(9, 2, 0, 0)),
-                new("four", new(2, 2, 2, 1), new(10, 11, 12, 1), new(10, 1, 0, 0))
+                new("four", new(2, 2, 2, 1), new(10, 11, 12, 1), new(10, 1, 0, 0)),
+                new("five", new(5, 4, 3, 1), new(13, 14, 15, 1), new(11, 0, 0, 0))
             ]
         };
 
@@ -184,11 +185,16 @@ public sealed class VulkanScenePreparedFrameTests
         Assert.Equal(0.2f, uniform.LightY);
         Assert.Equal(0.6f, uniform.LightB);
         Assert.Equal(10, uniform.LightPositionZ);
+        Assert.Equal(5, uniform.AdditionalLightDirectionPad);
         Assert.Equal(7, uniform.AdditionalLightRange);
         Assert.Equal(3, uniform.AdditionalLight2G);
         Assert.Equal(6, uniform.AdditionalLight2PositionZ);
         Assert.Equal(9, uniform.AdditionalLight3Range);
         Assert.Equal(12, uniform.AdditionalLight4PositionZ);
+        var uniformBytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(
+            System.Runtime.InteropServices.MemoryMarshal.CreateReadOnlySpan(in uniform, 1));
+        Assert.Equal(1_248, uniformBytes.Length);
+        Assert.Equal(5, System.BitConverter.ToSingle(uniformBytes.Slice(656, sizeof(float))));
         Assert.Equal(0.55f, uniform.EnvironmentAmbientEnergy);
         Assert.Equal(-0.35f, uniform.EnvironmentExposure);
         Assert.Equal(11.2f, uniform.EnvironmentWhitePoint);

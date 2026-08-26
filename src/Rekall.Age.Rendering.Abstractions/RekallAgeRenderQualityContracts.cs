@@ -74,7 +74,12 @@ public sealed record RekallAgeResolvedRenderFeaturePlan(
     RekallAgeResolvedParticleQuality Particles,
     long EstimatedTransientBytes,
     long EstimatedPersistentBytes,
-    IReadOnlyList<RekallAgeRenderFeatureDegradation> Degradations);
+    IReadOnlyList<RekallAgeRenderFeatureDegradation> Degradations)
+{
+    public RekallAgeResolvedLightingQuality Lighting { get; init; } = new(4);
+}
+
+public sealed record RekallAgeResolvedLightingQuality(int MaximumPointLights);
 
 public sealed record RekallAgeResolvedShadowQuality(
     int CascadeCount,

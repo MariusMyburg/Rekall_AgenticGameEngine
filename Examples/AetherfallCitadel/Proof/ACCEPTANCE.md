@@ -206,12 +206,24 @@ the accepted gameplay evidence above.
   assets, or fallbacks. The matching High `desktop60` inspection passes with 68
   scene draw calls, 171,316 triangles, 656,080 vertices, and no warnings or
   blockers. This is improved grounded density, not final visual acceptance.
-- This pass exposed a generic renderer limit: the current Vulkan forward shader
-  uploads only four point lights and selects them by `priority`, then intensity,
-  then stable entity ID. Lower-priority authored lights are silently omitted.
-  A future generic lighting tranche must make selection/drops inspectable and
-  scale the active-light budget by quality level (ultimately clustered/Forward+
-  rather than requiring scene authors to trade one practical against another).
+- AGE now resolves active point-light budgets by quality tier: Performance 2,
+  Low 4, Medium 8, and High/Ultra/Epic 16. The real Vulkan uniform/shader path
+  consumes all sixteen slots rather than retaining extra lights only in CPU
+  metadata, and its fragment loop terminates at the selected count so lower
+  tiers reduce actual light work. Stable selection remains `priority`,
+  intensity, then entity ID.
+  Capture and performance reports expose the resolved budget plus exact selected
+  and dropped entity IDs. Aetherfall High selects all nine authored point lights
+  with no drops; Performance selects the arrival practical and Warden fill while
+  reporting the remaining seven IDs as dropped.
+- The accepted High proof is
+  `Proof/Captures/HighActiveLightCount/vulkan-scene-1280x720-20260826003608775.png`.
+  It records 22,592 distinct colors, 58.1% dominant-color share, mean luminance
+  0.071, 213 render-work draws, and zero observations or asset fallbacks. This
+  restores central warm-path readability while retaining the new cool/warm side
+  pools. True screen-cluster assignment and per-cluster overflow remain; the
+  current quality-scaled sixteen-light array is the first production Forward+
+  bridge, not the final dense-world lighting architecture.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, prop geometry remains visibly coarse, and the

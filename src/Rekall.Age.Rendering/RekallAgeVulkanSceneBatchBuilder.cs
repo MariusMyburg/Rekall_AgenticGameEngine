@@ -227,8 +227,13 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
                     Vector4.Zero,
                     directionalLight.Color)
                 : SceneLight.Disabled;
-        var pointLights = ResolvePointLights(renderables, 4);
-        var additionalLight = pointLights.Count == 0 ? SceneLight.Disabled : pointLights[0];
+        var pointLightBudget = Math.Clamp(
+            frame.ResolvedQualityPlan?.Lighting.MaximumPointLights ?? 4,
+            1,
+            16);
+        var pointLightCandidates = ResolvePointLights(renderables, int.MaxValue);
+        var pointLights = pointLightCandidates.Take(pointLightBudget).ToArray();
+        var additionalLight = pointLights.Length == 0 ? SceneLight.Disabled : pointLights[0];
         if (string.Equals(light.EntityId, additionalLight.EntityId, StringComparison.Ordinal))
         {
             additionalLight = SceneLight.Disabled;
@@ -254,8 +259,13 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             new Vector4(additionalLight.Range, additionalLight.Priority, 0, 0),
             environmentParameters)
         {
+            PointLightBudget = pointLightBudget,
             PointLights = pointLights.Select(item => new RekallAgeVulkanPointLight(
-                item.EntityId ?? string.Empty, item.Color, item.Position, new Vector4(item.Range, item.Priority, 0, 0))).ToArray()
+                item.EntityId ?? string.Empty, item.Color, item.Position, new Vector4(item.Range, item.Priority, 0, 0))).ToArray(),
+            DroppedPointLightEntityIds = pointLightCandidates
+                .Skip(pointLightBudget)
+                .Select(item => item.EntityId ?? string.Empty)
+                .ToArray()
         };
     }
 

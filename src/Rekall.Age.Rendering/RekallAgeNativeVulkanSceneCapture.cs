@@ -4996,6 +4996,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 },
                 ParticleDebugCaptures = particleDebugCaptures ?? [],
                 QualityPlan = plan.QualityPlan,
+                Lighting = commandPlan is null
+                    ? null
+                    : new RekallAgePointLightSelectionReport(
+                        commandPlan.PreparedFrame.Batch.Frame.PointLightBudget,
+                        commandPlan.PreparedFrame.Batch.Frame.PointLights.Select(item => item.EntityId).ToArray(),
+                        commandPlan.PreparedFrame.Batch.Frame.DroppedPointLightEntityIds),
                 GpuTimings = resolvedGpuTimings,
                 ResourceBytes = plan.Graph.EstimatedBytes,
                 DrawCount = timedPasses.Where(pass => pass.Executed).Sum(pass => pass.DrawCount),

@@ -422,6 +422,46 @@ public sealed class VulkanSceneBatchBuilderTests
     }
 
     [Fact]
+    public void HighQualityBatchKeepsSixteenPracticalsInStablePriorityOrder()
+    {
+        var lights = Enumerable.Range(1, 18)
+            .Select(index => new RekallAgeRuntimeViewportRenderable(
+                $"light-{index:D2}",
+                $"Light {index:D2}",
+                "light",
+                null,
+                index,
+                2,
+                0,
+                index,
+                Variant: "PointLight",
+                Intensity: index,
+                MaterialColor: "#ffffff")
+            {
+                LightPriority = index,
+                LightRange = 12
+            })
+            .ToArray();
+        var frame = CreateFrame(lights) with
+        {
+            ResolvedQualityPlan = new RekallAgeRenderQualityProfileResolver().Resolve(
+                new RekallAgeRenderQualityIntent("High"),
+                RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test"),
+                128,
+                72)
+        };
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, []);
+
+        Assert.Equal(16, batch.Frame.PointLights.Count);
+        Assert.Equal(
+            Enumerable.Range(3, 16).Reverse().Select(index => $"light-{index:D2}"),
+            batch.Frame.PointLights.Select(item => item.EntityId));
+        Assert.Equal(16, batch.Frame.PointLightBudget);
+        Assert.Equal(["light-02", "light-01"], batch.Frame.DroppedPointLightEntityIds);
+    }
+
+    [Fact]
     public void DefaultBatchKeepsDirectionalKeyAndFirstPointPractical()
     {
         var frame = CreateFrame(

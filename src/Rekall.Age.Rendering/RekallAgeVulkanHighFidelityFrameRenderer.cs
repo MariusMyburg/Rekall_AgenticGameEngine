@@ -542,6 +542,8 @@ public sealed record RekallAgeHighFidelityFrameReport(
 
     public RekallAgeResolvedRenderFeaturePlan? QualityPlan { get; init; }
 
+    public RekallAgePointLightSelectionReport? Lighting { get; init; }
+
     public RekallAgeGpuFrameTimingReport GpuTimings { get; init; } =
         RekallAgeGpuFrameTimingReport.Unavailable(0);
 

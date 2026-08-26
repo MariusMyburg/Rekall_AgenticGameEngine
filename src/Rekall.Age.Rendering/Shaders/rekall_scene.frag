@@ -30,6 +30,42 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 additionalLightColor4;
     vec4 additionalLightPosition4;
     vec4 additionalLightParameters4;
+    vec4 additionalLightColor5;
+    vec4 additionalLightPosition5;
+    vec4 additionalLightParameters5;
+    vec4 additionalLightColor6;
+    vec4 additionalLightPosition6;
+    vec4 additionalLightParameters6;
+    vec4 additionalLightColor7;
+    vec4 additionalLightPosition7;
+    vec4 additionalLightParameters7;
+    vec4 additionalLightColor8;
+    vec4 additionalLightPosition8;
+    vec4 additionalLightParameters8;
+    vec4 additionalLightColor9;
+    vec4 additionalLightPosition9;
+    vec4 additionalLightParameters9;
+    vec4 additionalLightColor10;
+    vec4 additionalLightPosition10;
+    vec4 additionalLightParameters10;
+    vec4 additionalLightColor11;
+    vec4 additionalLightPosition11;
+    vec4 additionalLightParameters11;
+    vec4 additionalLightColor12;
+    vec4 additionalLightPosition12;
+    vec4 additionalLightParameters12;
+    vec4 additionalLightColor13;
+    vec4 additionalLightPosition13;
+    vec4 additionalLightParameters13;
+    vec4 additionalLightColor14;
+    vec4 additionalLightPosition14;
+    vec4 additionalLightParameters14;
+    vec4 additionalLightColor15;
+    vec4 additionalLightPosition15;
+    vec4 additionalLightParameters15;
+    vec4 additionalLightColor16;
+    vec4 additionalLightPosition16;
+    vec4 additionalLightParameters16;
     vec4 environmentParameters;
 } frame;
 
@@ -765,10 +801,11 @@ void main()
     float cloudShadow = sampleCloudShadow(fragWorldPosition, light);
     float directionalShadow = sampleDirectionalShadow(fragWorldPosition, normal);
     vec3 additionalDirect = vec3(0.0);
-    vec4 practicalColors[4] = vec4[](frame.additionalLightColor, frame.additionalLightColor2, frame.additionalLightColor3, frame.additionalLightColor4);
-    vec4 practicalPositions[4] = vec4[](frame.additionalLightPosition, frame.additionalLightPosition2, frame.additionalLightPosition3, frame.additionalLightPosition4);
-    vec4 practicalParameters[4] = vec4[](frame.additionalLightParameters, frame.additionalLightParameters2, frame.additionalLightParameters3, frame.additionalLightParameters4);
-    for (int practicalIndex = 0; practicalIndex < 4; practicalIndex++)
+    vec4 practicalColors[16] = vec4[](frame.additionalLightColor, frame.additionalLightColor2, frame.additionalLightColor3, frame.additionalLightColor4, frame.additionalLightColor5, frame.additionalLightColor6, frame.additionalLightColor7, frame.additionalLightColor8, frame.additionalLightColor9, frame.additionalLightColor10, frame.additionalLightColor11, frame.additionalLightColor12, frame.additionalLightColor13, frame.additionalLightColor14, frame.additionalLightColor15, frame.additionalLightColor16);
+    vec4 practicalPositions[16] = vec4[](frame.additionalLightPosition, frame.additionalLightPosition2, frame.additionalLightPosition3, frame.additionalLightPosition4, frame.additionalLightPosition5, frame.additionalLightPosition6, frame.additionalLightPosition7, frame.additionalLightPosition8, frame.additionalLightPosition9, frame.additionalLightPosition10, frame.additionalLightPosition11, frame.additionalLightPosition12, frame.additionalLightPosition13, frame.additionalLightPosition14, frame.additionalLightPosition15, frame.additionalLightPosition16);
+    vec4 practicalParameters[16] = vec4[](frame.additionalLightParameters, frame.additionalLightParameters2, frame.additionalLightParameters3, frame.additionalLightParameters4, frame.additionalLightParameters5, frame.additionalLightParameters6, frame.additionalLightParameters7, frame.additionalLightParameters8, frame.additionalLightParameters9, frame.additionalLightParameters10, frame.additionalLightParameters11, frame.additionalLightParameters12, frame.additionalLightParameters13, frame.additionalLightParameters14, frame.additionalLightParameters15, frame.additionalLightParameters16);
+    int practicalCount = clamp(int(frame.additionalLightDirection.w + 0.5), 0, 16);
+    for (int practicalIndex = 0; practicalIndex < practicalCount; practicalIndex++)
     {
         if (dot(practicalColors[practicalIndex].rgb, practicalColors[practicalIndex].rgb) <= 0.000001) continue;
         vec3 practicalOffset = practicalPositions[practicalIndex].xyz - fragWorldPosition;

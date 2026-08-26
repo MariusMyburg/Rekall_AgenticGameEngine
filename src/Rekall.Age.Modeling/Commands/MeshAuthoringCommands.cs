@@ -778,6 +778,86 @@ public sealed class AssertMeshAssetCommand : IRekallAgeCommand<AssertMeshAssetRe
     }
 }
 
+public sealed record FractureMeshRequest(
+    string ProjectRoot,
+    string SourceAssetId,
+    string ChunkAssetIdPrefix,
+    int ChunkCount,
+    long Seed = 0);
+
+public sealed record FractureMeshResult(IReadOnlyList<RekallAgeMeshAssetSummary> Chunks);
+
+public sealed class FractureMeshCommand : IRekallAgeCommand<FractureMeshRequest, FractureMeshResult>
+{
+    private readonly RekallAgeMeshAssetStore _store = new();
+
+    public string Name => "rekall.mesh.fracture";
+
+    public RekallAgeCommandSchema Schema => new(
+        Name,
+        "Splits a closed manifold mesh asset into N Voronoi-style chunk mesh assets around random seed points (built on the same CSG kernel as Boolean operations), persisting each chunk as a new editable mesh asset.",
+        typeof(FractureMeshRequest).FullName!,
+        typeof(FractureMeshResult).FullName!);
+
+    public async ValueTask<RekallAgeCommandResult<FractureMeshResult>> ExecuteAsync(
+        FractureMeshRequest request,
+        RekallAgeCommandContext context)
+    {
+        if (string.IsNullOrWhiteSpace(request.ChunkAssetIdPrefix))
+        {
+            return Failure("REKALL_MESH_FRACTURE_PREFIX_REQUIRED", "A chunk asset id prefix is required.", request.SourceAssetId);
+        }
+
+        RekallAgeMeshAsset source;
+        try
+        {
+            source = await _store.LoadAsync(request.ProjectRoot, request.SourceAssetId, context.CancellationToken);
+        }
+        catch (Exception error) when (error is IOException or InvalidDataException)
+        {
+            return Failure("REKALL_MESH_FRACTURE_SOURCE_NOT_FOUND", error.Message, request.SourceAssetId);
+        }
+
+        IReadOnlyList<RekallAgeMeshAsset> chunks;
+        try
+        {
+            chunks = RekallAgeMeshFracture.Fracture(source, request.ChunkCount, request.Seed);
+        }
+        catch (Exception error) when (error is ArgumentException or ArgumentOutOfRangeException or InvalidOperationException)
+        {
+            return Failure("REKALL_MESH_FRACTURE_FAILED", error.Message, request.SourceAssetId);
+        }
+
+        var summaries = new List<RekallAgeMeshAssetSummary>(chunks.Count);
+        for (var index = 0; index < chunks.Count; index++)
+        {
+            var assetId = $"{request.ChunkAssetIdPrefix}-{index}";
+            var path = _store.GetMeshPath(request.ProjectRoot, assetId);
+            if (File.Exists(path))
+            {
+                return Failure("REKALL_MESH_ASSET_EXISTS", $"Chunk mesh asset '{assetId}' already exists.", assetId);
+            }
+            var chunk = RekallAgeMeshAsset.Create(
+                assetId,
+                $"{request.ChunkAssetIdPrefix} Chunk {index}",
+                chunks[index].Topology,
+                chunks[index].Attributes,
+                chunks[index].MaterialSlots,
+                chunks[index].SelectionSets);
+            context.Transaction.CaptureResourcePreimage(path);
+            var revision = await _store.SaveIfRevisionAsync(request.ProjectRoot, chunk, RekallAgeDocumentRevision.Missing, context.CancellationToken);
+            context.Transaction.RecordChangedResource(path);
+            summaries.Add(MeshCommandEvidence.Summarize(chunk, revision, 8));
+        }
+        return RekallAgeCommandResult<FractureMeshResult>.Success(
+            new(summaries),
+            $"Fractured '{request.SourceAssetId}' into {chunks.Count} chunk mesh asset(s).");
+    }
+
+    private static RekallAgeCommandResult<FractureMeshResult> Failure(string code, string message, string target) =>
+        RekallAgeCommandResult<FractureMeshResult>.Failure(new([]), message, [new(code, message, target)]);
+}
+
 internal static class MeshOperationCommandRunner
 {
     public static async ValueTask<RekallAgeCommandResult<PreviewMeshOperationResult>> RunSingleAsync(

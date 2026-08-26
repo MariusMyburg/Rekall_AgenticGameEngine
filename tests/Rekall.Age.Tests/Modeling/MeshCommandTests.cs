@@ -29,11 +29,12 @@ public sealed class MeshCommandTests
         Assert.Contains("rekall.mesh.assert", names);
         Assert.Contains("rekall.mesh.operation_types.search", names);
         Assert.Contains("rekall.mesh.operation_types.inspect", names);
+        Assert.Contains("rekall.mesh.fracture", names);
 
         var tools = RekallAgeMcpCatalog.FromRegistry(registry).Tools
             .Where(tool => tool.Name.StartsWith("rekall.mesh.", StringComparison.Ordinal))
             .ToArray();
-        Assert.Equal(12, tools.Length);
+        Assert.Equal(13, tools.Length);
         Assert.All(tools, tool => Assert.Equal("modeling", tool.Category));
         Assert.True(tools.Single(tool => tool.Name == "rekall.mesh.inspect").Recommended);
         Assert.True(tools.Single(tool => tool.Name == "rekall.mesh.inspect_compiled").Recommended);
@@ -200,6 +201,38 @@ public sealed class MeshCommandTests
         Assert.Equal([1UL, 2UL, 3UL], hit.GetProperty("sourcePointIds").EnumerateArray().Select(item => item.GetUInt64()));
         Assert.Equal(2.0, hit.GetProperty("distance").GetDouble(), 6);
         Assert.False(json.GetProperty("hitsTruncated").GetBoolean());
+    }
+
+    [Fact]
+    public async Task FractureCommandReachableThroughTheRegistryPersistsChunkAssets()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var box = await BoxPrimitive();
+        await new CreateMeshAssetCommand().ExecuteAsync(new(root, "crate", "Crate", box.Topology, box.Attributes, box.MaterialSlots), Context("create-source"));
+
+        var registry = RekallAgeDefaultCommandRegistry.Create();
+        var response = await registry.ExecuteJsonAsync(
+            "rekall.mesh.fracture",
+            JsonSerializer.Serialize(new { projectRoot = root, sourceAssetId = "crate", chunkAssetIdPrefix = "crate-chunk", chunkCount = 4, seed = 7 }),
+            Context("fracture"));
+
+        Assert.True(response.Ok, response.Summary);
+        var fractured = Assert.IsType<FractureMeshResult>(response.Value);
+        Assert.Equal(4, fractured.Chunks.Count);
+        Assert.Equal(["crate-chunk-0", "crate-chunk-1", "crate-chunk-2", "crate-chunk-3"], fractured.Chunks.Select(chunk => chunk.AssetId));
+        Assert.All(fractured.Chunks, chunk => Assert.True(chunk.Topology.FaceCount > 0));
+
+        var reloaded = await new InspectMeshAssetCommand().ExecuteAsync(new(root, "crate-chunk-0"), Context("inspect-chunk"));
+        Assert.True(reloaded.Ok);
+    }
+
+    private static async ValueTask<RekallAgeMeshAsset> BoxPrimitive()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "source", "Source", [new("source", "rekall.modeling.primitive.box", 1, new())], [], [new("mesh", "source", "geometry")]);
+        var result = await new Rekall.Age.Modeling.RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, new(0, 0, "tests", "desktop"), default);
+        return result.Outputs["mesh"];
     }
 
     private static RekallAgeCommandContext Context(string name) =>
